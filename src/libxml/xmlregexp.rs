@@ -46,9 +46,7 @@ use super::{
 const SIZE_MAX: usize = usize::MAX;
 const MAX_PUSH: usize = 10000000;
 
-/*
- * Note: the order of the enums below is significant, do not shuffle
- */
+// Note: the order of the enums below is significant, do not shuffle
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum XmlRegAtomType {
@@ -194,12 +192,9 @@ pub type XmlRegParserCtxtPtr = *mut XmlRegParserCtxt;
 
 const AM_AUTOMATA_RNG: usize = 1;
 
-/**
- * xmlRegexpPtr:
- *
- * A libxml regular expression, they can actually be far more complex
- * thank the POSIX regex expressions.
- */
+/// A libxml regular expression, they can actually be far more complex
+/// thank the POSIX regex expressions.
+#[doc(alias = "xmlRegexpPtr")]
 pub type XmlRegexpPtr = *mut XmlRegexp;
 #[repr(C)]
 pub struct XmlRegexp {
@@ -238,11 +233,8 @@ pub struct XmlRegInputToken {
     data: *mut c_void,
 }
 
-/**
- * xmlRegExecCtxtPtr:
- *
- * A libxml progressive regular expression evaluation context
- */
+/// A libxml progressive regular expression evaluation context
+#[doc(alias = "xmlRegExecCtxtPtr")]
 pub type XmlRegExecCtxtPtr = *mut XmlRegExecCtxt;
 #[repr(C)]
 pub struct XmlRegExecCtxt {
@@ -287,14 +279,10 @@ pub struct XmlRegExecCtxt {
     nb_push: i32,
 }
 
-/**
- * xmlRegNewParserCtxt:
- * @string:  the string to parse
- *
- * Allocate a new regexp parser context
- *
- * Returns the new context or NULL in case of error
- */
+/// Allocate a new regexp parser context
+///
+/// Returns the new context or NULL in case of error
+#[doc(alias = "xmlRegNewParserCtxt")]
 pub(crate) unsafe extern "C" fn xml_reg_new_parser_ctxt(
     string: *const XmlChar,
 ) -> XmlRegParserCtxtPtr {
@@ -314,12 +302,8 @@ pub(crate) unsafe extern "C" fn xml_reg_new_parser_ctxt(
     ret
 }
 
-/**
- * xmlRegexpErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlRegexpErrMemory")]
 unsafe extern "C" fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: *const c_char) {
     let mut regexp: *const c_char = null();
     if !ctxt.is_null() {
@@ -389,12 +373,8 @@ pub(crate) unsafe extern "C" fn xml_reg_state_push(ctxt: XmlRegParserCtxtPtr) ->
     state
 }
 
-/**
- * xmlRegFreeState:
- * @state:  the regexp state
- *
- * Free a regexp state
- */
+/// Free a regexp state
+#[doc(alias = "xmlRegFreeState")]
 unsafe extern "C" fn xml_reg_free_state(state: XmlRegStatePtr) {
     if state.is_null() {
         return;
@@ -409,12 +389,8 @@ unsafe extern "C" fn xml_reg_free_state(state: XmlRegStatePtr) {
     xml_free(state as _);
 }
 
-/**
- * xmlRegFreeRange:
- * @range:  the regexp range
- *
- * Free a regexp range
- */
+/// Free a regexp range
+#[doc(alias = "xmlRegFreeRange")]
 unsafe extern "C" fn xml_reg_free_range(range: XmlRegRangePtr) {
     if range.is_null() {
         return;
@@ -426,12 +402,8 @@ unsafe extern "C" fn xml_reg_free_range(range: XmlRegRangePtr) {
     xml_free(range as _);
 }
 
-/**
- * xmlRegFreeAtom:
- * @atom:  the regexp atom
- *
- * Free a regexp atom
- */
+/// Free a regexp atom
+#[doc(alias = "xmlRegFreeAtom")]
 pub(crate) unsafe extern "C" fn xml_reg_free_atom(atom: XmlRegAtomPtr) {
     if atom.is_null() {
         return;
@@ -455,12 +427,8 @@ pub(crate) unsafe extern "C" fn xml_reg_free_atom(atom: XmlRegAtomPtr) {
     xml_free(atom as _);
 }
 
-/**
- * xmlRegFreeParserCtxt:
- * @ctxt:  the regexp parser context
- *
- * Free a regexp parser context
- */
+/// Free a regexp parser context
+#[doc(alias = "xmlRegFreeParserCtxt")]
 pub(crate) unsafe extern "C" fn xml_reg_free_parser_ctxt(ctxt: XmlRegParserCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -493,12 +461,8 @@ macro_rules! CUR_SCHAR {
     };
 }
 
-/**
- * xmlFAIsChar:
- * @ctxt:  a regexp parser context
- *
- * [10]   Char   ::=   [^.\?*+()|#x5B#x5D]
- */
+/// `[10]   Char   ::=   [^.\?*+()|#x5B#x5D]`
+#[doc(alias = "xmlFAIsChar")]
 unsafe extern "C" fn xml_fa_is_char(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut len: i32 = 0;
 
@@ -520,15 +484,10 @@ unsafe extern "C" fn xml_fa_is_char(ctxt: XmlRegParserCtxtPtr) -> i32 {
     cur
 }
 
-/**
- * xmlRegNewAtom:
- * @ctxt:  the regexp parser context
- * @type:  the type of atom
- *
- * Allocate a new atom
- *
- * Returns the new atom or NULL in case of error
- */
+/// Allocate a new atom
+///
+/// Returns the new atom or NULL in case of error
+#[doc(alias = "xmlRegNewAtom")]
 pub(crate) unsafe fn xml_reg_new_atom(
     ctxt: XmlRegParserCtxtPtr,
     typ: Option<XmlRegAtomType>,
@@ -575,12 +534,8 @@ macro_rules! IS_NILLABLE {
     };
 }
 
-/**
- * xmlRegexpErrCompile:
- * @extra:  extra information
- *
- * Handle a compilation failure
- */
+/// Handle a compilation failure
+#[doc(alias = "xmlRegexpErrCompile")]
 unsafe extern "C" fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: *const c_char) {
     let mut regexp: *const c_char = null();
     let mut idx: i32 = 0;
@@ -714,13 +669,7 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
     xml_reg_state_add_trans_to(ctxt, target, (*state).no);
 }
 
-/**
- * xmlFAGenerateEpsilonTransition:
- * @ctxt:  a regexp parser context
- * @from:  the from state
- * @to:  the target state or NULL for building a new one
- *
- */
+#[doc(alias = "xmlFAGenerateEpsilonTransition")]
 pub(crate) unsafe extern "C" fn xml_fa_generate_epsilon_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
@@ -737,18 +686,10 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_epsilon_transition(
     0
 }
 
-/**
- * xmlRegNewRange:
- * @ctxt:  the regexp parser context
- * @neg:  is that negative
- * @type:  the type of range
- * @start:  the start codepoint
- * @end:  the end codepoint
- *
- * Allocate a new regexp range
- *
- * Returns the new range or NULL in case of error
- */
+/// Allocate a new regexp range
+///
+/// Returns the new range or NULL in case of error
+#[doc(alias = "xmlRegNewRange")]
 unsafe fn xml_reg_new_range(
     ctxt: XmlRegParserCtxtPtr,
     neg: i32,
@@ -818,22 +759,20 @@ unsafe fn xml_reg_atom_add_range(
     range
 }
 
-/**
- * xmlFAParseCharProp:
- * @ctxt:  a regexp parser context
- *
- * [27]   charProp   ::=   IsCategory | IsBlock
- * [28]   IsCategory ::= Letters | Marks | Numbers | Punctuation |
- *                       Separators | Symbols | Others
- * [29]   Letters   ::=   'L' [ultmo]?
- * [30]   Marks   ::=   'M' [nce]?
- * [31]   Numbers   ::=   'N' [dlo]?
- * [32]   Punctuation   ::=   'P' [cdseifo]?
- * [33]   Separators   ::=   'Z' [slp]?
- * [34]   Symbols   ::=   'S' [mcko]?
- * [35]   Others   ::=   'C' [cfon]?
- * [36]   IsBlock   ::=   'Is' [a-zA-Z0-9#x2D]+
- */
+/// ```ignore
+/// [27]   charProp   ::=   IsCategory | IsBlock
+/// [28]   IsCategory ::= Letters | Marks | Numbers | Punctuation |
+///                       Separators | Symbols | Others
+/// [29]   Letters   ::=   'L' [ultmo]?
+/// [30]   Marks   ::=   'M' [nce]?
+/// [31]   Numbers   ::=   'N' [dlo]?
+/// [32]   Punctuation   ::=   'P' [cdseifo]?
+/// [33]   Separators   ::=   'Z' [slp]?
+/// [34]   Symbols   ::=   'S' [mcko]?
+/// [35]   Others   ::=   'C' [cfon]?
+/// [36]   IsBlock   ::=   'Is' [a-zA-Z0-9#x2D]+
+/// ```
+#[doc(alias = "xmlFAParseCharProp")]
 unsafe extern "C" fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
     let mut cur: i32;
     let typ: Option<XmlRegAtomType>;
@@ -1045,12 +984,8 @@ unsafe extern "C" fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
     }
 }
 
-/************************************************************************
- *									*
- *	Parser for the Schemas Datatype Regular Expressions		*
- *	http://www.w3.org/TR/2001/REC-xmlschema-2-20010502/#regexs	*
- *									*
- ************************************************************************/
+// Parser for the Schemas Datatype Regular Expressions
+// http://www.w3.org/TR/2001/REC-xmlschema-2-20010502/#regexs
 
 unsafe extern "C" fn parse_escaped_codeunit(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut val: i32 = 0;
@@ -1092,16 +1027,14 @@ unsafe extern "C" fn parse_escaped_codepoint(ctxt: XmlRegParserCtxtPtr) -> i32 {
     val
 }
 
-/**
- * xmlFAParseCharClassEsc:
- * @ctxt:  a regexp parser context
- *
- * [23] charClassEsc ::= ( SingleCharEsc | MultiCharEsc | catEsc | complEsc )
- * [24] SingleCharEsc ::= '\' [nrt\|.?*+(){}#x2D#x5B#x5D#x5E]
- * [25] catEsc   ::=   '\p{' charProp '}'
- * [26] complEsc ::=   '\P{' charProp '}'
- * [37] MultiCharEsc ::= '.' | ('\' [sSiIcCdDwW])
- */
+/// ```ignore
+/// [23] charClassEsc ::= ( SingleCharEsc | MultiCharEsc | catEsc | complEsc )
+/// [24] SingleCharEsc ::= '\' [nrt\|.?*+(){}#x2D#x5B#x5D#x5E]
+/// [25] catEsc   ::=   '\p{' charProp '}'
+/// [26] complEsc ::=   '\P{' charProp '}'
+/// [37] MultiCharEsc ::= '.' | ('\' [sSiIcCdDwW])
+/// ```
+#[doc(alias = "xmlFAParseCharClassEsc")]
 unsafe extern "C" fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
     let mut cur: i32;
 
@@ -1308,26 +1241,22 @@ macro_rules! NXT {
     };
 }
 
-/*
- * Need PREV to check on a '-' within a Character Group. May only be used
- * when it's guaranteed that cur is not at the beginning of (*ctxt).string!
- */
+// Need PREV to check on a '-' within a Character Group. May only be used
+// when it's guaranteed that cur is not at the beginning of (*ctxt).string!
 macro_rules! PREV {
     ( $ctxt:expr ) => {
         *(*$ctxt).cur.sub(1)
     };
 }
 
-/**
- * xmlFAParseCharRange:
- * @ctxt:  a regexp parser context
- *
- * [17]   charRange   ::=     seRange | XmlCharRef | XmlCharIncDash
- * [18]   seRange   ::=   charOrEsc '-' charOrEsc
- * [20]   charOrEsc   ::=   XmlChar | SingleCharEsc
- * [21]   XmlChar   ::=   [^\#x2D#x5B#x5D]
- * [22]   XmlCharIncDash   ::=   [^\#x5B#x5D]
- */
+/// ```ignore
+/// [17]   charRange   ::=     seRange | XmlCharRef | XmlCharIncDash
+/// [18]   seRange   ::=   charOrEsc '-' charOrEsc
+/// [20]   charOrEsc   ::=   XmlChar | SingleCharEsc
+/// [21]   XmlChar   ::=   [^\#x2D#x5B#x5D]
+/// [22]   XmlCharIncDash   ::=   [^\#x5B#x5D]
+/// ```
+#[doc(alias = "xmlFAParseCharRange")]
 unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
     let mut cur: i32;
     let mut len: i32 = 0;
@@ -1442,12 +1371,8 @@ unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
     }
 }
 
-/**
- * xmlFAParsePosCharGroup:
- * @ctxt:  a regexp parser context
- *
- * [14]   posCharGroup ::= ( charRange | charClassEsc  )+
- */
+/// `[14]   posCharGroup ::= ( charRange | charClassEsc  )+`
+#[doc(alias = "xmlFAParsePosCharGroup")]
 unsafe extern "C" fn xml_fa_parse_pos_char_group(ctxt: XmlRegParserCtxtPtr) {
     while {
         if CUR!(ctxt) == b'\\' {
@@ -1459,15 +1384,13 @@ unsafe extern "C" fn xml_fa_parse_pos_char_group(ctxt: XmlRegParserCtxtPtr) {
     } {}
 }
 
-/**
- * xmlFAParseCharGroup:
- * @ctxt:  a regexp parser context
- *
- * [13]   charGroup    ::= posCharGroup | negCharGroup | charClassSub
- * [15]   negCharGroup ::= '^' posCharGroup
- * [16]   charClassSub ::= ( posCharGroup | negCharGroup ) '-' charClassExpr
- * [12]   charClassExpr ::= '[' charGroup ']'
- */
+/// ```ignore
+/// [13]   charGroup    ::= posCharGroup | negCharGroup | charClassSub
+/// [15]   negCharGroup ::= '^' posCharGroup
+/// [16]   charClassSub ::= ( posCharGroup | negCharGroup ) '-' charClassExpr
+/// [12]   charClassExpr ::= '[' charGroup ']'
+/// ```
+#[doc(alias = "xmlFAParseCharGroup")]
 unsafe extern "C" fn xml_fa_parse_char_group(ctxt: XmlRegParserCtxtPtr) {
     let neg: i32 = (*ctxt).neg;
 
@@ -1496,13 +1419,11 @@ unsafe extern "C" fn xml_fa_parse_char_group(ctxt: XmlRegParserCtxtPtr) {
     }
 }
 
-/**
- * xmlFAParseCharClass:
- * @ctxt:  a regexp parser context
- *
- * [11]   charClass   ::=     charClassEsc | charClassExpr
- * [12]   charClassExpr   ::=   '[' charGroup ']'
- */
+/// ```ignore
+/// [11]   charClass   ::=     charClassEsc | charClassExpr
+/// [12]   charClassExpr   ::=   '[' charGroup ']'
+/// ```
+#[doc(alias = "xmlFAParseCharClass")]
 unsafe extern "C" fn xml_fa_parse_char_class(ctxt: XmlRegParserCtxtPtr) {
     if CUR!(ctxt) == b'[' {
         NEXT!(ctxt);
@@ -1521,12 +1442,8 @@ unsafe extern "C" fn xml_fa_parse_char_class(ctxt: XmlRegParserCtxtPtr) {
     }
 }
 
-/**
- * xmlFAParseAtom:
- * @ctxt:  a regexp parser context
- *
- * [9]   atom   ::=   Char | charClass | ( '(' regExp ')' )
- */
+/// `[9]   atom   ::=   Char | charClass | ( '(' regExp ')' )`
+#[doc(alias = "xmlFAParseAtom")]
 unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut codepoint: i32;
     let mut len: i32 = 0;
@@ -1587,14 +1504,10 @@ unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
     0
 }
 
-/**
- * xmlFAParseQuantExact:
- * @ctxt:  a regexp parser context
- *
- * [8]   QuantExact   ::=   [0-9]+
- *
- * Returns 0 if success or -1 in case of error
- */
+/// `[8]   QuantExact   ::=   [0-9]+`
+///
+/// Returns 0 if success or -1 in case of error
+#[doc(alias = "xmlFAParseQuantExact")]
 unsafe extern "C" fn xml_fa_parse_quant_exact(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
     let mut ok: i32 = 0;
@@ -1622,16 +1535,14 @@ unsafe extern "C" fn xml_fa_parse_quant_exact(ctxt: XmlRegParserCtxtPtr) -> i32 
     ret
 }
 
-/**
- * xmlFAParseQuantifier:
- * @ctxt:  a regexp parser context
- *
- * [4]   quantifier   ::=   [?*+] | ( '{' quantity '}' )
- * [5]   quantity   ::=   quantRange | quantMin | QuantExact
- * [6]   quantRange   ::=   QuantExact ',' QuantExact
- * [7]   quantMin   ::=   QuantExact ','
- * [8]   QuantExact   ::=   [0-9]+
- */
+/// ```ignore
+/// [4]   quantifier   ::=   [?*+] | ( '{' quantity '}' )
+/// [5]   quantity   ::=   quantRange | quantMin | QuantExact
+/// [6]   quantRange   ::=   QuantExact ',' QuantExact
+/// [7]   quantMin   ::=   QuantExact ','
+/// [8]   QuantExact   ::=   [0-9]+
+/// ```
+#[doc(alias = "xmlFAParseQuantifier")]
 unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut cur: i32;
 
@@ -1691,12 +1602,8 @@ unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> i32 {
     0
 }
 
-/**
- * xmlFAParsePiece:
- * @ctxt:  a regexp parser context
- *
- * [3]   piece   ::=   atom quantifier?
- */
+/// `[3]   piece   ::=   atom quantifier?`
+#[doc(alias = "xmlFAParsePiece")]
 unsafe extern "C" fn xml_fa_parse_piece(ctxt: XmlRegParserCtxtPtr) -> i32 {
     (*ctxt).atom = null_mut();
     let ret: i32 = xml_fa_parse_atom(ctxt);
@@ -1710,14 +1617,10 @@ unsafe extern "C" fn xml_fa_parse_piece(ctxt: XmlRegParserCtxtPtr) -> i32 {
     1
 }
 
-/**
- * xmlRegCopyRange:
- * @range:  the regexp range
- *
- * Copy a regexp range
- *
- * Returns the new copy or NULL in case of error.
- */
+/// Copy a regexp range
+///
+/// Returns the new copy or NULL in case of error.
+#[doc(alias = "xmlRegCopyRange")]
 unsafe extern "C" fn xml_reg_copy_range(
     ctxt: XmlRegParserCtxtPtr,
     range: XmlRegRangePtr,
@@ -1747,15 +1650,10 @@ unsafe extern "C" fn xml_reg_copy_range(
     ret
 }
 
-/**
- * xmlRegCopyAtom:
- * @ctxt:  the regexp parser context
- * @atom:  the original atom
- *
- * Allocate a new regexp range
- *
- * Returns the new atom or NULL in case of error
- */
+/// Allocate a new regexp range
+///
+/// Returns the new atom or NULL in case of error
+#[doc(alias = "xmlRegCopyAtom")]
 unsafe extern "C" fn xml_reg_copy_atom(
     ctxt: XmlRegParserCtxtPtr,
     atom: XmlRegAtomPtr,
@@ -1827,14 +1725,7 @@ pub(crate) unsafe extern "C" fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -
     res
 }
 
-/**
- * xmlFAGenerateCountedEpsilonTransition:
- * @ctxt:  a regexp parser context
- * @from:  the from state
- * @to:  the target state or NULL for building a new one
- * counter:  the counter for that transition
- *
- */
+#[doc(alias = "xmlFAGenerateCountedEpsilonTransition")]
 pub(crate) unsafe extern "C" fn xml_fa_generate_counted_epsilon_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
@@ -1852,14 +1743,7 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_counted_epsilon_transition(
     0
 }
 
-/**
- * xmlFAGenerateCountedTransition:
- * @ctxt:  a regexp parser context
- * @from:  the from state
- * @to:  the target state or NULL for building a new one
- * counter:  the counter for that transition
- *
- */
+#[doc(alias = "xmlFAGenerateCountedTransition")]
 pub(crate) unsafe extern "C" fn xml_fa_generate_counted_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
@@ -1907,15 +1791,8 @@ pub(crate) unsafe extern "C" fn xml_reg_atom_push(
     0
 }
 
-/**
- * xmlFAGenerateTransitions:
- * @ctxt:  a regexp parser context
- * @from:  the from state
- * @to:  the target state or NULL for building a new one
- * @atom:  the atom generating the transition
- *
- * Returns 0 if success and -1 in case of error.
- */
+/// Returns 0 if success and -1 in case of error.
+#[doc(alias = "xmlFAGenerateTransitions")]
 pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
@@ -2143,16 +2020,11 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
     0
 }
 
-/**
- * xmlFAParseBranch:
- * @ctxt:  a regexp parser context
- * @to: optional target to the end of the branch
- *
- * @to is used to optimize by removing duplicate path in automata
- * in expressions like (a|b)(c|d)
- *
- * [2]   branch   ::=   piece*
- */
+/// @to is used to optimize by removing duplicate path in automata
+/// in expressions like (a|b)(c|d)
+///
+/// `[2]   branch   ::=   piece*`
+#[doc(alias = "xmlFAParseBranch")]
 unsafe extern "C" fn xml_fa_parse_branch(ctxt: XmlRegParserCtxtPtr, to: XmlRegStatePtr) -> i32 {
     let mut previous: XmlRegStatePtr;
     let mut ret: i32;
@@ -2206,13 +2078,8 @@ unsafe extern "C" fn xml_fa_parse_branch(ctxt: XmlRegParserCtxtPtr, to: XmlRegSt
     0
 }
 
-/**
- * xmlFAParseRegExp:
- * @ctxt:  a regexp parser context
- * @top:  is this the top-level expression ?
- *
- * [1]   regExp   ::=     branch  ( '|' branch )*
- */
+/// `[1]   regExp   ::=     branch  ( '|' branch )*`
+#[doc(alias = "xmlFAParseRegExp")]
 unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: i32) {
     /* if not top start should have been generated by an epsilon trans */
     let start: XmlRegStatePtr = (*ctxt).state;
@@ -2238,27 +2105,23 @@ unsafe extern "C" fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: i32) {
     }
 }
 
-/**
- * xmlFAEliminateSimpleEpsilonTransitions:
- * @ctxt:  a regexp parser context
- *
- * Eliminating general epsilon transitions can get costly in the general
- * algorithm due to the large amount of generated new transitions and
- * associated comparisons. However for simple epsilon transition used just
- * to separate building blocks when generating the automata this can be
- * reduced to state elimination:
- *    - if there exists an epsilon from X to Y
- *    - if there is no other transition from X
- *      then X and Y are semantically equivalent and X can be eliminated
- *      If X is the start state then make Y the start state, else replace the
- *      target of all transitions to X by transitions to Y.
- *
- * If X is a final state, skip it.
- * Otherwise it would be necessary to manipulate counters for this case when
- * eliminating state 2:
- * State 1 has a transition with an atom to state 2.
- * State 2 is final and has an epsilon transition to state 1.
- */
+/// Eliminating general epsilon transitions can get costly in the general
+/// algorithm due to the large amount of generated new transitions and
+/// associated comparisons. However for simple epsilon transition used just
+/// to separate building blocks when generating the automata this can be
+/// reduced to state elimination:
+///    - if there exists an epsilon from X to Y
+///    - if there is no other transition from X
+///      then X and Y are semantically equivalent and X can be eliminated
+///      If X is the start state then make Y the start state, else replace the
+///      target of all transitions to X by transitions to Y.
+///
+/// If X is a final state, skip it.
+/// Otherwise it would be necessary to manipulate counters for this case when
+/// eliminating state 2:
+/// State 1 has a transition with an atom to state 2.
+/// State 2 is final and has an epsilon transition to state 1.
+#[doc(alias = "xmlFAEliminateSimpleEpsilonTransitions")]
 unsafe extern "C" fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegParserCtxtPtr) {
     let mut newto: i32;
     let mut state: XmlRegStatePtr;
@@ -2320,14 +2183,7 @@ unsafe extern "C" fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegPar
     }
 }
 
-/**
- * xmlFAReduceEpsilonTransitions:
- * @ctxt:  a regexp parser context
- * @fromnr:  the from state
- * @tonr:  the to state
- * @counter:  should that transition be associated to a counted
- *
- */
+#[doc(alias = "xmlFAReduceEpsilonTransitions")]
 unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
     ctxt: XmlRegParserCtxtPtr,
     fromnr: i32,
@@ -2417,11 +2273,7 @@ unsafe extern "C" fn xml_fa_reduce_epsilon_transitions(
     (*to).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
 }
 
-/**
- * xmlFAEliminateEpsilonTransitions:
- * @ctxt:  a regexp parser context
- *
- */
+#[doc(alias = "xmlFAEliminateEpsilonTransitions")]
 pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxtPtr) {
     let mut state: XmlRegStatePtr;
     let mut has_epsilon: i32;
@@ -2567,16 +2419,10 @@ pub(crate) unsafe extern "C" fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRe
     }
 }
 
-/**
- * xmlRegCalloc2:
- * @dim1:  size of first dimension
- * @dim2:  size of second dimension
- * @elemSize:  size of element
- *
- * Allocate a two-dimensional array and set all elements to zero.
- *
- * Returns the new array or NULL in case of error.
- */
+/// Allocate a two-dimensional array and set all elements to zero.
+///
+/// Returns the new array or NULL in case of error.
+#[doc(alias = "xmlRegCalloc2")]
 unsafe extern "C" fn xml_reg_calloc2(dim1: usize, dim2: usize, elem_size: usize) -> *mut c_void {
     /* Check for overflow */
     if dim2 == 0 || elem_size == 0 || dim1 > SIZE_MAX / dim2 / elem_size {
@@ -2590,14 +2436,10 @@ unsafe extern "C" fn xml_reg_calloc2(dim1: usize, dim2: usize, elem_size: usize)
     ret
 }
 
-/**
- * xmlRegEpxFromParse:
- * @ctxt:  the parser context used to build it
- *
- * Allocate a new regexp and fill it with the result from the parser
- *
- * Returns the new regexp or NULL in case of error
- */
+/// Allocate a new regexp and fill it with the result from the parser
+///
+/// Returns the new regexp or NULL in case of error
+#[doc(alias = "xmlRegEpxFromParse")]
 pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlRegexpPtr {
     let ret: XmlRegexpPtr = xml_malloc(size_of::<XmlRegexp>()) as XmlRegexpPtr;
     if ret.is_null() {
@@ -2847,19 +2689,12 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
     ret
 }
 
-/*
- * The POSIX like API
- */
-/**
- * xmlRegexpCompile:
- * @regexp:  a regular expression string
- *
- * Parses a regular expression conforming to XML Schemas Part 2 Datatype
- * Appendix F and builds an automata suitable for testing strings against
- * that regular expression
- *
- * Returns the compiled expression or NULL in case of error
- */
+/// Parses a regular expression conforming to XML Schemas Part 2 Datatype
+/// Appendix F and builds an automata suitable for testing strings against
+/// that regular expression
+///
+/// Returns the compiled expression or NULL in case of error
+#[doc(alias = "xmlRegexpCompile")]
 pub unsafe extern "C" fn xml_regexp_compile(regexp: *const XmlChar) -> XmlRegexpPtr {
     let mut ret: XmlRegexpPtr = null_mut();
 
@@ -2907,12 +2742,8 @@ pub unsafe extern "C" fn xml_regexp_compile(regexp: *const XmlChar) -> XmlRegexp
     ret
 }
 
-/**
- * xmlRegFreeRegexp:
- * @regexp:  the regexp
- *
- * Free a regexp
- */
+/// Free a regexp
+#[doc(alias = "xmlRegFreeRegexp")]
 pub unsafe extern "C" fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
     if regexp.is_null() {
         return;
@@ -3698,15 +3529,10 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
     (*exec).status
 }
 
-/**
- * xmlRegexpExec:
- * @comp:  the compiled regular expression
- * @content:  the value to check against the regular expression
- *
- * Check if the regular expression generates the value
- *
- * Returns 1 if it matches, 0 if not and a negative value in case of error
- */
+/// Check if the regular expression generates the value
+///
+/// Returns 1 if it matches, 0 if not and a negative value in case of error
+#[doc(alias = "xmlRegexpExec")]
 pub unsafe extern "C" fn xml_regexp_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     if comp.is_null() || content.is_null() {
         return -1;
@@ -4016,13 +3842,8 @@ unsafe extern "C" fn xml_reg_print_state(output: *mut FILE, state: XmlRegStatePt
     }
 }
 
-/**
- * xmlRegexpPrint:
- * @output: the file for the output debug
- * @regexp: the compiled regexp
- *
- * Print the content of the compiled regular expression
- */
+/// Print the content of the compiled regular expression
+#[doc(alias = "xmlRegexpPrint")]
 pub unsafe extern "C" fn xml_regexp_print(output: *mut FILE, regexp: XmlRegexpPtr) {
     if output.is_null() {
         return;
@@ -4056,17 +3877,11 @@ pub unsafe extern "C" fn xml_regexp_print(output: *mut FILE, regexp: XmlRegexpPt
     }
 }
 
-/**
- * xmlFAEqualAtoms:
- * @atom1:  an atom
- * @atom2:  an atom
- * @deep: if not set only compare string pointers
- *
- * Compares two atoms to check whether they are the same exactly
- * this is used to remove equivalent transitions
- *
- * Returns 1 if same and 0 otherwise
- */
+/// Compares two atoms to check whether they are the same exactly
+/// this is used to remove equivalent transitions
+///
+/// Returns 1 if same and 0 otherwise
+#[doc(alias = "xmlFAEqualAtoms")]
 unsafe extern "C" fn xml_fa_equal_atoms(
     atom1: XmlRegAtomPtr,
     atom2: XmlRegAtomPtr,
@@ -4110,16 +3925,11 @@ unsafe extern "C" fn xml_fa_equal_atoms(
     ret
 }
 
-/**
- * xmlFACompareAtomTypes:
- * @type1:  an atom type
- * @type2:  an atom type
- *
- * Compares two atoms type to check whether they intersect in some ways,
- * this is used by xmlFACompareAtoms only
- *
- * Returns 1 if they may intersect and 0 otherwise
- */
+/// Compares two atoms type to check whether they intersect in some ways,
+/// this is used by xmlFACompareAtoms only
+///
+/// Returns 1 if they may intersect and 0 otherwise
+#[doc(alias = "xmlFACompareAtomTypes")]
 unsafe extern "C" fn xml_fa_compare_atom_types(
     mut type1: XmlRegAtomType,
     mut type2: XmlRegAtomType,
@@ -4351,19 +4161,12 @@ unsafe extern "C" fn xml_fa_compare_atom_types(
     1
 }
 
-/**
- * xmlRegStrEqualWildcard:
- * @expStr:  the string to be evaluated
- * @valStr:  the validation string
- *
- * Checks if both strings are equal or have the same content. "*"
- * can be used as a wildcard in @valStr; "|" is used as a separator of
- * substrings in both @expStr and @valStr.
- *
- * Returns 1 if the comparison is satisfied and the number of substrings
- * is equal, 0 otherwise.
- */
-
+/// Checks if both strings are equal or have the same content. "*"
+/// can be used as a wildcard in @valStr; "|" is used as a separator of
+/// substrings in both @expStr and @valStr.
+///
+/// Returns 1 if the comparison is satisfied and the number of substrings is equal, 0 otherwise.
+#[doc(alias = "xmlRegStrEqualWildcard")]
 unsafe extern "C" fn xml_reg_str_equal_wildcard(
     mut exp_str: *const XmlChar,
     mut val_str: *const XmlChar,
@@ -4619,17 +4422,11 @@ unsafe extern "C" fn xml_fa_compare_ranges(
     ret
 }
 
-/**
- * xmlFACompareAtoms:
- * @atom1:  an atom
- * @atom2:  an atom
- * @deep: if not set only compare string pointers
- *
- * Compares two atoms to check whether they intersect in some ways,
- * this is used by xmlFAComputesDeterminism and xmlFARecurseDeterminism only
- *
- * Returns 1 if yes and 0 otherwise
- */
+/// Compares two atoms to check whether they intersect in some ways,
+/// this is used by xmlFAComputesDeterminism and xmlFARecurseDeterminism only
+///
+/// Returns 1 if yes and 0 otherwise
+#[doc(alias = "xmlFACompareAtoms")]
 unsafe extern "C" fn xml_fa_compare_atoms(
     mut atom1: XmlRegAtomPtr,
     mut atom2: XmlRegAtomPtr,
@@ -4733,14 +4530,9 @@ unsafe extern "C" fn xml_fa_compare_atoms(
     1
 }
 
-/**
- * xmlFARecurseDeterminism:
- * @ctxt:  a regexp parser context
- *
- * Check whether the associated regexp is determinist,
- * should be called after xmlFAEliminateEpsilonTransitions()
- *
- */
+/// Check whether the associated regexp is determinist,
+/// should be called after xmlFAEliminateEpsilonTransitions()
+#[doc(alias = "xmlFARecurseDeterminism")]
 unsafe extern "C" fn xml_fa_recurse_determinism(
     ctxt: XmlRegParserCtxtPtr,
     state: XmlRegStatePtr,
@@ -4798,12 +4590,8 @@ unsafe extern "C" fn xml_fa_recurse_determinism(
     ret
 }
 
-/**
- * xmlFAFinishRecurseDeterminism:
- * @ctxt:  a regexp parser context
- *
- * Reset flags after checking determinism.
- */
+/// Reset flags after checking determinism.
+#[doc(alias = "xmlFAFinishRecurseDeterminism")]
 unsafe extern "C" fn xml_fa_finish_recurse_determinism(
     ctxt: XmlRegParserCtxtPtr,
     state: XmlRegStatePtr,
@@ -4825,14 +4613,9 @@ unsafe extern "C" fn xml_fa_finish_recurse_determinism(
     }
 }
 
-/**
- * xmlFAComputesDeterminism:
- * @ctxt:  a regexp parser context
- *
- * Check whether the associated regexp is determinist,
- * should be called after xmlFAEliminateEpsilonTransitions()
- *
- */
+/// Check whether the associated regexp is determinist,
+/// should be called after xmlFAEliminateEpsilonTransitions()
+#[doc(alias = "xmlFAComputesDeterminism")]
 pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> i32 {
     let mut state: XmlRegStatePtr;
     let mut t1: XmlRegTransPtr;
@@ -4988,14 +4771,10 @@ pub(crate) unsafe extern "C" fn xml_fa_computes_determinism(ctxt: XmlRegParserCt
     ret
 }
 
-/**
- * xmlRegexpIsDeterminist:
- * @comp:  the compiled regular expression
- *
- * Check if the regular expression is determinist
- *
- * Returns 1 if it yes, 0 if not and a negative value in case of error
- */
+/// Check if the regular expression is determinist
+///
+/// Returns 1 if it yes, 0 if not and a negative value in case of error
+#[doc(alias = "xmlRegexpIsDeterminist")]
 pub unsafe extern "C" fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
     if comp.is_null() {
         return -1;
@@ -5028,15 +4807,8 @@ pub unsafe extern "C" fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
     ret
 }
 
-/**
- * xmlRegExecCallbacks:
- * @exec: the regular expression context
- * @token: the current token string
- * @transdata: transition data
- * @inputdata: input data
- *
- * Callback function when doing a transition in the automata
- */
+/// Callback function when doing a transition in the automata
+#[doc(alias = "xmlRegExecCallbacks")]
 pub type XmlRegExecCallbacks = unsafe extern "C" fn(
     exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
@@ -5044,20 +4816,10 @@ pub type XmlRegExecCallbacks = unsafe extern "C" fn(
     inputdata: *mut c_void,
 );
 
-/*
- * The progressive API
- */
-/**
- * xmlRegNewExecCtxt:
- * @comp: a precompiled regular expression
- * @callback: a callback function used for handling progresses in the
- *            automata matching phase
- * @data: the context data associated to the callback in this context
- *
- * Build a context used for progressive evaluation of a regexp.
- *
- * Returns the new context
- */
+/// Build a context used for progressive evaluation of a regexp.
+///
+/// Returns the new context
+#[doc(alias = "xmlRegNewExecCtxt")]
 pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
     comp: XmlRegexpPtr,
     callback: Option<XmlRegExecCallbacks>,
@@ -5121,12 +4883,8 @@ pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
     exec
 }
 
-/**
- * xmlRegFreeExecCtxt:
- * @exec: a regular expression evaluation context
- *
- * Free the structures associated to a regular expression evaluation context.
- */
+/// Free the structures associated to a regular expression evaluation context.
+#[doc(alias = "xmlRegFreeExecCtxt")]
 pub unsafe extern "C" fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
     if exec.is_null() {
         return;
@@ -5161,18 +4919,11 @@ pub unsafe extern "C" fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
 
 pub(crate) const REGEXP_ALL_LAX_COUNTER: usize = 0x123457;
 
-/**
- * xmlRegCompactPushString:
- * @exec: a regexp execution context
- * @comp:  the precompiled exec with a compact table
- * @value: a string token input
- * @data: data associated to the token to reuse in callbacks
- *
- * Push one input token in the execution context
- *
- * Returns: 1 if the regexp reached a final state, 0 if non-final, and
- *     a negative value in case of error.
- */
+/// Push one input token in the execution context
+///
+/// Returns: 1 if the regexp reached a final state, 0 if non-final,
+/// and a negative value in case of error.
+#[doc(alias = "xmlRegCompactPushString")]
 unsafe extern "C" fn xml_reg_compact_push_string(
     exec: XmlRegExecCtxtPtr,
     comp: XmlRegexpPtr,
@@ -5292,18 +5043,11 @@ unsafe extern "C" fn xml_fareg_exec_save_input_string(
     (*(*exec).input_stack.add((*exec).input_stack_nr as usize)).data = null_mut();
 }
 
-/**
- * xmlRegExecPushStringInternal:
- * @exec: a regexp execution context or NULL to indicate the end
- * @value: a string token input
- * @data: data associated to the token to reuse in callbacks
- * @compound: value was assembled from 2 strings
- *
- * Push one input token in the execution context
- *
- * Returns: 1 if the regexp reached a final state, 0 if non-final, and
- *     a negative value in case of error.
- */
+/// Push one input token in the execution context
+///
+/// Returns: 1 if the regexp reached a final state, 0 if non-final,
+/// and a negative value in case of error.
+#[doc(alias = "xmlRegExecPushStringInternal")]
 unsafe extern "C" fn xml_reg_exec_push_string_internal(
     exec: XmlRegExecCtxtPtr,
     mut value: *const XmlChar,
@@ -5648,17 +5392,11 @@ unsafe extern "C" fn xml_reg_exec_push_string_internal(
     (*exec).status
 }
 
-/**
- * xmlRegExecPushString:
- * @exec: a regexp execution context or NULL to indicate the end
- * @value: a string token input
- * @data: data associated to the token to reuse in callbacks
- *
- * Push one input token in the execution context
- *
- * Returns: 1 if the regexp reached a final state, 0 if non-final, and
- *     a negative value in case of error.
- */
+/// Push one input token in the execution context
+///
+/// Returns: 1 if the regexp reached a final state, 0 if non-final,
+/// and a negative value in case of error.
+#[doc(alias = "xmlRegExecPushString")]
 pub unsafe extern "C" fn xml_reg_exec_push_string(
     exec: XmlRegExecCtxtPtr,
     value: *const XmlChar,
@@ -5669,18 +5407,11 @@ pub unsafe extern "C" fn xml_reg_exec_push_string(
 
 const XML_REG_STRING_SEPARATOR: c_char = b'|' as _;
 
-/**
- * xmlRegExecPushString2:
- * @exec: a regexp execution context or NULL to indicate the end
- * @value: the first string token input
- * @value2: the second string token input
- * @data: data associated to the token to reuse in callbacks
- *
- * Push one input token in the execution context
- *
- * Returns: 1 if the regexp reached a final state, 0 if non-final, and
- *     a negative value in case of error.
- */
+/// Push one input token in the execution context
+///
+/// Returns: 1 if the regexp reached a final state, 0 if non-final,
+/// and a negative value in case of error.
+#[doc(alias = "xmlRegExecPushString2")]
 pub unsafe extern "C" fn xml_reg_exec_push_string2(
     exec: XmlRegExecCtxtPtr,
     value: *const XmlChar,
@@ -5733,20 +5464,11 @@ pub unsafe extern "C" fn xml_reg_exec_push_string2(
     ret
 }
 
-/**
- * xmlRegExecGetValues:
- * @exec: a regexp execution context
- * @err: error extraction or normal one
- * @nbval: pointer to the number of accepted values IN/OUT
- * @nbneg: return number of negative transitions
- * @values: pointer to the array of acceptable values
- * @terminal: return value if this was a terminal state
- *
- * Extract information from the regexp execution, internal routine to
- * implement xmlRegExecNextValues() and xmlRegExecErrInfo()
- *
- * Returns: 0 in case of success or -1 in case of error.
- */
+/// Extract information from the regexp execution, internal routine to
+/// implement xmlRegExecNextValues() and xmlRegExecErrInfo()
+///
+/// Returns: 0 in case of success or -1 in case of error.
+#[doc(alias = "xmlRegExecGetValues")]
 unsafe extern "C" fn xml_reg_exec_get_values(
     exec: XmlRegExecCtxtPtr,
     err: i32,
@@ -5949,23 +5671,14 @@ unsafe extern "C" fn xml_reg_exec_get_values(
     0
 }
 
-/**
- * xmlRegExecNextValues:
- * @exec: a regexp execution context
- * @nbval: pointer to the number of accepted values IN/OUT
- * @nbneg: return number of negative transitions
- * @values: pointer to the array of acceptable values
- * @terminal: return value if this was a terminal state
- *
- * Extract information from the regexp execution,
- * the parameter @values must point to an array of @nbval string pointers
- * on return nbval will contain the number of possible strings in that
- * state and the @values array will be updated with them. The string values
- * returned will be freed with the @exec context and don't need to be
- * deallocated.
- *
- * Returns: 0 in case of success or -1 in case of error.
- */
+/// Extract information from the regexp execution,
+/// the parameter @values must point to an array of @nbval string pointers
+/// on return nbval will contain the number of possible strings in that
+/// state and the @values array will be updated with them. The string values
+/// returned will be freed with the @exec context and don't need to be deallocated.
+///
+/// Returns: 0 in case of success or -1 in case of error.
+#[doc(alias = "xmlRegExecNextValues")]
 pub unsafe extern "C" fn xml_reg_exec_next_values(
     exec: XmlRegExecCtxtPtr,
     nbval: *mut i32,
@@ -5976,25 +5689,15 @@ pub unsafe extern "C" fn xml_reg_exec_next_values(
     xml_reg_exec_get_values(exec, 0, nbval, nbneg, values, terminal)
 }
 
-/**
- * xmlRegExecErrInfo:
- * @exec: a regexp execution context generating an error
- * @string: return value for the error string
- * @nbval: pointer to the number of accepted values IN/OUT
- * @nbneg: return number of negative transitions
- * @values: pointer to the array of acceptable values
- * @terminal: return value if this was a terminal state
- *
- * Extract error information from the regexp execution, the parameter
- * @string will be updated with the value pushed and not accepted,
- * the parameter @values must point to an array of @nbval string pointers
- * on return nbval will contain the number of possible strings in that
- * state and the @values array will be updated with them. The string values
- * returned will be freed with the @exec context and don't need to be
- * deallocated.
- *
- * Returns: 0 in case of success or -1 in case of error.
- */
+/// Extract error information from the regexp execution, the parameter
+/// @string will be updated with the value pushed and not accepted,
+/// the parameter @values must point to an array of @nbval string pointers
+/// on return nbval will contain the number of possible strings in that
+/// state and the @values array will be updated with them. The string values
+/// returned will be freed with the @exec context and don't need to be deallocated.
+///
+/// Returns: 0 in case of success or -1 in case of error.
+#[doc(alias = "xmlRegExecErrInfo")]
 pub unsafe extern "C" fn xml_reg_exec_err_info(
     exec: XmlRegExecCtxtPtr,
     string: *mut *const XmlChar,
@@ -6016,12 +5719,7 @@ pub unsafe extern "C" fn xml_reg_exec_err_info(
     xml_reg_exec_get_values(exec, 1, nbval, nbneg, values, terminal)
 }
 
-/*
- * Formal regular expression handling
- * Its goal is to do some formal work on content models
- */
-
-/* expressions are used within a context */
+// expressions are used within a context
 #[cfg(feature = "libxml_expr")]
 pub type XmlExpCtxtPtr = *mut XmlExpCtxt;
 #[cfg(feature = "libxml_expr")]
@@ -6039,12 +5737,8 @@ pub struct XmlExpCtxt {
     tab_size: i32,
 }
 
-/**
- * xmlExpFreeCtxt:
- * @ctxt:  an expression context
- *
- * Free an expression context
- */
+/// Free an expression context
+#[doc(alias = "xmlExpFreeCtxt")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
     use super::dict::xml_dict_free;
@@ -6059,15 +5753,10 @@ pub unsafe extern "C" fn xml_exp_free_ctxt(ctxt: XmlExpCtxtPtr) {
     xml_free(ctxt as _);
 }
 
-/**
- * xmlExpNewCtxt:
- * @maxNodes:  the maximum number of nodes
- * @dict:  optional dictionary to use internally
- *
- * Creates a new context for manipulating expressions
- *
- * Returns the context or NULL in case of error
- */
+/// Creates a new context for manipulating expressions
+///
+/// Returns the context or NULL in case of error
+#[doc(alias = "xmlExpNewCtxt")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: i32, dict: XmlDictPtr) -> XmlExpCtxtPtr {
     use crate::libxml::dict::{xml_dict_create, xml_dict_reference};
@@ -6110,14 +5799,10 @@ pub unsafe extern "C" fn xml_exp_new_ctxt(mut max_nodes: i32, dict: XmlDictPtr) 
     ret
 }
 
-/**
- * xmlExpCtxtNbNodes:
- * @ctxt: an expression context
- *
- * Debugging facility provides the number of allocated nodes at a that point
- *
- * Returns the number of nodes in use or -1 in case of error
- */
+/// Debugging facility provides the number of allocated nodes at a that point
+///
+/// Returns the number of nodes in use or -1 in case of error
+#[doc(alias = "xmlExpCtxtNbNodes")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_ctxt_nb_nodes(ctxt: XmlExpCtxtPtr) -> i32 {
     if ctxt.is_null() {
@@ -6126,14 +5811,10 @@ pub unsafe extern "C" fn xml_exp_ctxt_nb_nodes(ctxt: XmlExpCtxtPtr) -> i32 {
     (*ctxt).nb_nodes
 }
 
-/**
- * xmlExpCtxtNbCons:
- * @ctxt: an expression context
- *
- * Debugging facility provides the number of allocated nodes over lifetime
- *
- * Returns the number of nodes ever allocated or -1 in case of error
- */
+/// Debugging facility provides the number of allocated nodes over lifetime
+///
+/// Returns the number of nodes ever allocated or -1 in case of error
+#[doc(alias = "xmlExpCtxtNbCons")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_ctxt_nb_cons(ctxt: XmlExpCtxtPtr) -> i32 {
     if ctxt.is_null() {
@@ -6142,7 +5823,7 @@ pub unsafe extern "C" fn xml_exp_ctxt_nb_cons(ctxt: XmlExpCtxtPtr) -> i32 {
     (*ctxt).nb_cons
 }
 
-/* Expressions are trees but the tree is opaque */
+// Expressions are trees but the tree is opaque
 #[cfg(feature = "libxml_expr")]
 pub type XmlExpNodePtr = *mut XmlExpNode;
 #[cfg(feature = "libxml_expr")]
@@ -6190,25 +5871,15 @@ pub enum XmlExpNodeType {
     XmlExpCount = 5,
 }
 
-/*
- * 2 core expressions shared by all for the empty language set
- * and for the set with just the empty token
- */
+// 2 core expressions shared by all for the empty language set
+// and for the set with just the empty token
 #[cfg(feature = "libxml_expr")]
 pub static mut FORBIDDEN_EXP: XmlExpNodePtr = null_mut();
 #[cfg(feature = "libxml_expr")]
 pub static mut EMPTY_EXP: XmlExpNodePtr = null_mut();
 
-/*
- * Expressions are reference counted internally
- */
-/**
- * xmlExpFree:
- * @ctxt: the expression context
- * @exp: the expression
- *
- * Dereference the expression
- */
+/// Dereference the expression
+#[doc(alias = "xmlExpFree")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_free(ctxt: XmlExpCtxtPtr, exp: XmlExpNodePtr) {
     if exp.is_null() || exp == FORBIDDEN_EXP || exp == EMPTY_EXP {
@@ -6246,12 +5917,8 @@ pub unsafe extern "C" fn xml_exp_free(ctxt: XmlExpCtxtPtr, exp: XmlExpNodePtr) {
     }
 }
 
-/**
- * xmlExpRef:
- * @exp: the expression
- *
- * Increase the reference count of the expression
- */
+/// Increase the reference count of the expression
+#[doc(alias = "xmlExpRef")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_ref(exp: XmlExpNodePtr) {
     if !exp.is_null() {
@@ -6462,26 +6129,18 @@ unsafe extern "C" fn xml_exp_parse_expr(ctxt: XmlExpCtxtPtr) -> XmlExpNodePtr {
     ret
 }
 
-/*
- * constructors can be either manual or from a string
- */
-/**
- * xmlExpParse:
- * @ctxt: the expressions context
- * @expr: the 0 terminated string
- *
- * Minimal parser for regexps, it understand the following constructs
- *  - string terminals
- *  - choice operator |
- *  - sequence operator ,
- *  - subexpressions (...)
- *  - usual cardinality operators + * and ?
- *  - finite sequences  { min, max }
- *  - infinite sequences { min, * }
- *    There is minimal checkings made especially no checking on strings values
- *
- * Returns a new expression or NULL in case of failure
- */
+/// Minimal parser for regexps, it understand the following constructs
+///  - string terminals
+///  - choice operator |
+///  - sequence operator ,
+///  - subexpressions (...)
+///  - usual cardinality operators + * and ?
+///  - finite sequences  { min, max }
+///  - infinite sequences { min, * }
+///    There is minimal checkings made especially no checking on strings values
+///
+/// Returns a new expression or NULL in case of failure
+#[doc(alias = "xmlExpParse")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_parse(ctxt: XmlExpCtxtPtr, expr: *const c_char) -> XmlExpNodePtr {
     (*ctxt).expr = expr;
@@ -6496,10 +6155,8 @@ pub unsafe extern "C" fn xml_exp_parse(ctxt: XmlExpCtxtPtr, expr: *const c_char)
     ret
 }
 
-/*
- * xmlExpHashNameComputeKey:
- * Calculate the hash key for a token
- */
+/// Calculate the hash key for a token
+#[doc(alias = "xmlExpHashNameComputeKey")]
 #[cfg(feature = "libxml_expr")]
 unsafe extern "C" fn xml_exp_hash_name_compute_key(mut name: *const XmlChar) -> u16 {
     let mut value: u16 = 0;
@@ -6518,10 +6175,8 @@ unsafe extern "C" fn xml_exp_hash_name_compute_key(mut name: *const XmlChar) -> 
     value
 }
 
-/*
- * xmlExpHashComputeKey:
- * Calculate the hash key for a compound expression
- */
+/// Calculate the hash key for a compound expression
+#[doc(alias = "xmlExpHashComputeKey")]
 #[cfg(feature = "libxml_expr")]
 unsafe extern "C" fn xml_exp_hash_compute_key(
     typ: XmlExpNodeType,
@@ -6576,16 +6231,12 @@ unsafe extern "C" fn xml_exp_new_node(ctxt: XmlExpCtxtPtr, typ: XmlExpNodeType) 
     ret
 }
 
-/**
- * xmlExpHashGetEntry:
- * @table: the hash table
- *
- * Get the unique entry from the hash table. The entry is created if
- * needed. @left and @right are consumed, i.e. their refe count will
- * be decremented by the operation.
- *
- * Returns the pointer or NULL in case of error
- */
+/// Get the unique entry from the hash table. The entry is created if
+/// needed. @left and @right are consumed, i.e. their refe count will
+/// be decremented by the operation.
+///
+/// Returns the pointer or NULL in case of error
+#[doc(alias = "xmlExpHashGetEntry")]
 #[cfg(feature = "libxml_expr")]
 unsafe extern "C" fn xml_exp_hash_get_entry(
     ctxt: XmlExpCtxtPtr,
@@ -6869,16 +6520,10 @@ unsafe extern "C" fn xml_exp_hash_get_entry(
     entry
 }
 
-/**
- * xmlExpNewAtom:
- * @ctxt: the expression context
- * @name: the atom name
- * @len: the atom name length in byte (or -1);
- *
- * Get the atom associated to this name from that context
- *
- * Returns the node or NULL in case of error
- */
+/// Get the atom associated to this name from that context
+///
+/// Returns the node or NULL in case of error
+#[doc(alias = "xmlExpNewAtom")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_new_atom(
     ctxt: XmlExpCtxtPtr,
@@ -6903,19 +6548,13 @@ pub unsafe extern "C" fn xml_exp_new_atom(
     )
 }
 
-/**
- * xmlExpNewOr:
- * @ctxt: the expression context
- * @left: left expression
- * @right: right expression
- *
- * Get the atom associated to the choice @left | @right
- * Note that @left and @right are consumed in the operation, to keep
- * an handle on them use xmlExpRef() and use xmlExpFree() to release them,
- * this is true even in case of failure (unless ctxt.is_null()).
- *
- * Returns the node or NULL in case of error
- */
+/// Get the atom associated to the choice @left | @right
+/// Note that @left and @right are consumed in the operation, to keep
+/// an handle on them use xmlExpRef() and use xmlExpFree() to release them,
+/// this is true even in case of failure (unless ctxt.is_null()).
+///
+/// Returns the node or NULL in case of error
+#[doc(alias = "xmlExpNewOr")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_new_or(
     ctxt: XmlExpCtxtPtr,
@@ -6933,19 +6572,13 @@ pub unsafe extern "C" fn xml_exp_new_or(
     xml_exp_hash_get_entry(ctxt, XmlExpNodeType::XmlExpOr, left, right, null(), 0, 0)
 }
 
-/**
- * xmlExpNewSeq:
- * @ctxt: the expression context
- * @left: left expression
- * @right: right expression
- *
- * Get the atom associated to the sequence @left , @right
- * Note that @left and @right are consumed in the operation, to keep
- * an handle on them use xmlExpRef() and use xmlExpFree() to release them,
- * this is true even in case of failure (unless ctxt.is_null()).
- *
- * Returns the node or NULL in case of error
- */
+/// Get the atom associated to the sequence @left , @right
+/// Note that @left and @right are consumed in the operation, to keep
+/// an handle on them use xmlExpRef() and use xmlExpFree() to release them,
+/// this is true even in case of failure (unless ctxt.is_null()).
+///
+/// Returns the node or NULL in case of error
+#[doc(alias = "xmlExpNewSeq")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_new_seq(
     ctxt: XmlExpCtxtPtr,
@@ -6963,20 +6596,13 @@ pub unsafe extern "C" fn xml_exp_new_seq(
     xml_exp_hash_get_entry(ctxt, XmlExpNodeType::XmlExpSeq, left, right, null(), 0, 0)
 }
 
-/**
- * xmlExpNewRange:
- * @ctxt: the expression context
- * @subset: the expression to be repeated
- * @min: the lower bound for the repetition
- * @max: the upper bound for the repetition, -1 means infinite
- *
- * Get the atom associated to the range (@subset){@min, @max}
- * Note that @subset is consumed in the operation, to keep
- * an handle on it use xmlExpRef() and use xmlExpFree() to release it,
- * this is true even in case of failure (unless ctxt.is_null()).
- *
- * Returns the node or NULL in case of error
- */
+/// Get the atom associated to the range (@subset){@min, @max}
+/// Note that @subset is consumed in the operation, to keep
+/// an handle on it use xmlExpRef() and use xmlExpFree() to release it,
+/// this is true even in case of failure (unless ctxt.is_null()).
+///
+/// Returns the node or NULL in case of error
+#[doc(alias = "xmlExpNewRange")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_new_range(
     ctxt: XmlExpCtxtPtr,
@@ -7002,17 +6628,10 @@ pub unsafe extern "C" fn xml_exp_new_range(
     )
 }
 
-/*
- * The really interesting APIs
- */
-/**
- * xmlExpIsNillable:
- * @exp: the expression
- *
- * Finds if the expression is nillable, i.e. if it accepts the empty sequence
- *
- * Returns 1 if nillable, 0 if not and -1 in case of error
- */
+/// Finds if the expression is nillable, i.e. if it accepts the empty sequence
+///
+/// Returns 1 if nillable, 0 if not and -1 in case of error
+#[doc(alias = "xmlExpIsNillable")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_is_nillable(exp: XmlExpNodePtr) -> i32 {
     if exp.is_null() {
@@ -7021,14 +6640,10 @@ pub unsafe extern "C" fn xml_exp_is_nillable(exp: XmlExpNodePtr) -> i32 {
     (IS_NILLABLE!(exp) != 0) as i32
 }
 
-/**
- * xmlExpMaxToken:
- * @expr: a compiled expression
- *
- * Indicate the maximum number of input a expression can accept
- *
- * Returns the maximum length or -1 in case of error
- */
+/// Indicate the maximum number of input a expression can accept
+///
+/// Returns the maximum length or -1 in case of error
+#[doc(alias = "xmlExpMaxToken")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_max_token(expr: XmlExpNodePtr) -> i32 {
     if expr.is_null() {
@@ -7082,18 +6697,11 @@ unsafe extern "C" fn xml_exp_get_language_int(
     // return (-1);
 }
 
-/**
- * xmlExpGetLanguage:
- * @ctxt: the expression context
- * @exp: the expression
- * @langList: where to store the tokens
- * @len: the allocated length of @list
- *
- * Find all the strings used in @exp and store them in @list
- *
- * Returns the number of unique strings found, -1 in case of errors and
- *         -2 if there is more than @len strings
- */
+/// Find all the strings used in @exp and store them in @list
+///
+/// Returns the number of unique strings found, -1 in case of errors and
+/// -2 if there is more than @len strings
+#[doc(alias = "xmlExpGetLanguage")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_get_language(
     ctxt: XmlExpCtxtPtr,
@@ -7170,20 +6778,13 @@ unsafe extern "C" fn xml_exp_get_start_int(
     // return -1;
 }
 
-/**
- * xmlExpGetStart:
- * @ctxt: the expression context
- * @exp: the expression
- * @tokList: where to store the tokens
- * @len: the allocated length of @list
- *
- * Find all the strings that appears at the start of the languages
- * accepted by @exp and store them in @list. E.g. for (a, b) | c
- * it will return the list [a, c]
- *
- * Returns the number of unique strings found, -1 in case of errors and
- *         -2 if there is more than @len strings
- */
+/// Find all the strings that appears at the start of the languages
+/// accepted by @exp and store them in @list. E.g. for (a, b) | c
+/// it will return the list [a, c]
+///
+/// Returns the number of unique strings found, -1 in case of errors and
+/// -2 if there is more than @len strings
+#[doc(alias = "xmlExpGetStart")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_get_start(
     ctxt: XmlExpCtxtPtr,
@@ -7294,18 +6895,10 @@ unsafe extern "C" fn xml_exp_string_derive_int(
     null_mut()
 }
 
-/**
- * xmlExpStringDerive:
- * @ctxt: the expression context
- * @exp: the expression
- * @str: the string
- * @len: the string len in bytes if available
- *
- * Do one step of Brzozowski derivation of the expression @exp with
- * respect to the input string
- *
- * Returns the resulting expression or NULL in case of internal error
- */
+/// Do one step of Brzozowski derivation of the expression @exp with respect to the input string
+///
+/// Returns the resulting expression or NULL in case of internal error
+#[doc(alias = "xmlExpStringDerive")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_string_derive(
     ctxt: XmlExpCtxtPtr,
@@ -7343,20 +6936,12 @@ unsafe extern "C" fn xml_exp_check_card(exp: XmlExpNodePtr, sub: XmlExpNodePtr) 
     ret
 }
 
-/**
- * xmlExpDivide:
- * @ctxt: the expressions context
- * @exp: the englobing expression
- * @sub: the subexpression
- * @mult: the multiple expression
- * @remain: the remain from the derivation of the multiple
- *
- * Check if exp is a multiple of sub, i.e. if there is a finite number n
- * so that sub{n} subsume exp
- *
- * Returns the multiple value if successful, 0 if it is not a multiple
- *         and -1 in case of internal error.
- */
+/// Check if exp is a multiple of sub, i.e. if there is a finite number n
+/// so that sub{n} subsume exp
+///
+/// Returns the multiple value if successful, 0 if it is not a multiple
+/// and -1 in case of internal error.
+#[doc(alias = "xmlExpDivide")]
 #[cfg(feature = "libxml_expr")]
 unsafe extern "C" fn xml_exp_divide(
     ctxt: XmlExpCtxtPtr,
@@ -7423,17 +7008,11 @@ unsafe extern "C" fn xml_exp_divide(
     0
 }
 
-/**
- * xmlExpExpDeriveInt:
- * @ctxt: the expressions context
- * @exp: the englobing expression
- * @sub: the subexpression
- *
- * Try to do a step of Brzozowski derivation but at a higher level
- * the input being a subexpression.
- *
- * Returns the resulting expression or NULL in case of internal error
- */
+/// Try to do a step of Brzozowski derivation but at a higher level
+/// the input being a subexpression.
+///
+/// Returns the resulting expression or NULL in case of internal error
+#[doc(alias = "xmlExpExpDeriveInt")]
 unsafe extern "C" fn xml_exp_exp_derive_int(
     ctxt: XmlExpCtxtPtr,
     exp: XmlExpNodePtr,
@@ -7834,20 +7413,14 @@ unsafe extern "C" fn xml_exp_exp_derive_int(
     ret
 }
 
-/**
- * xmlExpExpDerive:
- * @ctxt: the expressions context
- * @exp: the englobing expression
- * @sub: the subexpression
- *
- * Evaluates the expression resulting from @exp consuming a sub expression @sub
- * Based on algebraic derivation and sometimes direct Brzozowski derivation
- * it usually takes less than linear time and can handle expressions generating
- * infinite languages.
- *
- * Returns the resulting expression or NULL in case of internal error, the
- *         result must be freed
- */
+/// Evaluates the expression resulting from @exp consuming a sub expression @sub
+/// Based on algebraic derivation and sometimes direct Brzozowski derivation
+/// it usually takes less than linear time and can handle expressions generating
+/// infinite languages.
+///
+/// Returns the resulting expression or NULL in case of internal error,
+/// the result must be freed
+#[doc(alias = "xmlExpExpDerive")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_exp_derive(
     ctxt: XmlExpCtxtPtr,
@@ -7870,17 +7443,11 @@ pub unsafe extern "C" fn xml_exp_exp_derive(
     xml_exp_exp_derive_int(ctxt, exp, sub)
 }
 
-/**
- * xmlExpSubsume:
- * @ctxt: the expressions context
- * @exp: the englobing expression
- * @sub: the subexpression
- *
- * Check whether @exp accepts all the languages accepted by @sub
- * the input being a subexpression.
- *
- * Returns 1 if true 0 if false and -1 in case of failure.
- */
+/// Check whether @exp accepts all the languages accepted by @sub
+/// the input being a subexpression.
+///
+/// Returns 1 if true 0 if false and -1 in case of failure.
+#[doc(alias = "xmlExpSubsume")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_subsume(
     ctxt: XmlExpCtxtPtr,
@@ -8021,13 +7588,8 @@ unsafe extern "C" fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob:
     }
 }
 
-/**
- * xmlExpDump:
- * @buf:  a buffer to receive the output
- * @expr:  the compiled expression
- *
- * Serialize the expression as compiled to the buffer
- */
+/// Serialize the expression as compiled to the buffer
+#[doc(alias = "xmlExpDump")]
 #[cfg(feature = "libxml_expr")]
 pub unsafe extern "C" fn xml_exp_dump(buf: XmlBufPtr, expr: XmlExpNodePtr) {
     if buf.is_null() || expr.is_null() {

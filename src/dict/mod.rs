@@ -26,12 +26,9 @@ const MAX_HASH_LEN: usize = 3;
 const MIN_DICT_SIZE: usize = 128;
 const MAX_DICT_SIZE: usize = 8 * 2048;
 
-/*
- * xmlDictComputeFastKey:
- *
- * Calculate a hash key using a fast hash function that works well
- * for low hash table fill.
- */
+/// Calculate a hash key using a fast hash function that works well
+/// for low hash table fill.
+#[doc(alias = "xmlDictComputeFastKey")]
 fn xml_dict_compute_fast_key(name: &[u8], seed: i32) -> u64 {
     let mut value: u64 = seed as _;
 
@@ -51,15 +48,12 @@ fn xml_dict_compute_fast_key(name: &[u8], seed: i32) -> u64 {
     value
 }
 
-/*
- * xmlDictComputeBigKey:
- *
- * Calculate a hash key using a good hash function that works well for
- * larger hash table sizes.
- *
- * Hash function by "One-at-a-Time Hash" see
- * http://burtleburtle.net/bob/hash/doobs.html
- */
+// Calculate a hash key using a good hash function that works well for
+// larger hash table sizes.
+//
+// Hash function by "One-at-a-Time Hash" see
+// http://burtleburtle.net/bob/hash/doobs.html
+#[doc(alias = "xmlDictComputeBigKey")]
 fn xml_dict_compute_big_key(data: &[u8], seed: i32) -> u32 {
     if data.is_empty() {
         return 0;
@@ -90,14 +84,11 @@ macro_rules! xml_dict_compute_key {
     }};
 }
 
-/*
- * xmlDictComputeFastQKey:
- *
- * Calculate a hash key for two strings using a fast hash function
- * that works well for low hash table fill.
- *
- * Neither of the two strings must be NULL.
- */
+/// Calculate a hash key for two strings using a fast hash function
+/// that works well for low hash table fill.
+///
+/// Neither of the two strings must be NULL.
+#[doc(alias = "xmlDictComputeFastQKey")]
 fn xml_dict_compute_fast_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
     let mut value: u64 = seed as _;
 
@@ -129,17 +120,14 @@ fn xml_dict_compute_fast_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
     value
 }
 
-/*
- * xmlDictComputeBigQKey:
- *
- * Calculate a hash key for two strings using a good hash function
- * that works well for larger hash table sizes.
- *
- * Hash function by "One-at-a-Time Hash" see
- * http://burtleburtle.net/bob/hash/doobs.html
- *
- * Neither of the two strings must be NULL.
- */
+/// Calculate a hash key for two strings using a good hash function
+/// that works well for larger hash table sizes.
+///
+/// Hash function by "One-at-a-Time Hash" see
+/// http://burtleburtle.net/bob/hash/doobs.html
+///
+/// Neither of the two strings must be NULL.
+#[doc(alias = "xmlDictComputeBigQKey")]
 fn xml_dict_compute_big_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
     let mut hash: u32 = seed as _;
 

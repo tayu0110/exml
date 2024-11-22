@@ -179,9 +179,7 @@ impl TryFrom<i32> for XmlSchemaValType {
     }
 }
 
-/*
- * XML Schemas defines multiple type of types.
- */
+// XML Schemas defines multiple type of types.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlSchemaTypeType {
@@ -240,9 +238,7 @@ pub enum XmlSchemaContentType {
     XmlSchemaContentAny,
 }
 
-/**
- * Annotation
- */
+/// Annotation
 pub type XmlSchemaAnnotPtr = *mut XmlSchemaAnnot;
 #[repr(C)]
 pub struct XmlSchemaAnnot {
@@ -250,97 +246,38 @@ pub struct XmlSchemaAnnot {
     pub(crate) content: XmlNodePtr, /* the annotation */
 }
 
-/**
- * XML_SCHEMAS_ANYATTR_SKIP:
- *
- * Skip unknown attribute from validation
- * Obsolete, not used anymore.
- */
+/// Skip unknown attribute from validation Obsolete, not used anymore.
 const XML_SCHEMAS_ANYATTR_SKIP: i32 = 1;
-/**
- * XML_SCHEMAS_ANYATTR_LAX:
- *
- * Ignore validation non definition on attributes
- * Obsolete, not used anymore.
- */
+/// Ignore validation non definition on attributes Obsolete, not used anymore.
 const XML_SCHEMAS_ANYATTR_LAX: i32 = 2;
-/**
- * XML_SCHEMAS_ANYATTR_STRICT:
- *
- * Apply strict validation rules on attributes
- * Obsolete, not used anymore.
- */
+/// Apply strict validation rules on attributes Obsolete, not used anymore.
 const XML_SCHEMAS_ANYATTR_STRICT: i32 = 3;
-/**
- * XML_SCHEMAS_ANY_SKIP:
- *
- * Skip unknown attribute from validation
- */
+/// Skip unknown attribute from validation
 pub(crate) const XML_SCHEMAS_ANY_SKIP: i32 = 1;
-/**
- * XML_SCHEMAS_ANY_LAX:
- *
- * Used by wildcards.
- * Validate if type found, don't worry if not found
- */
+/// Used by wildcards.
+/// Validate if type found, don't worry if not found
 pub(crate) const XML_SCHEMAS_ANY_LAX: i32 = 2;
-/**
- * XML_SCHEMAS_ANY_STRICT:
- *
- * Used by wildcards.
- * Apply strict validation rules
- */
+/// Used by wildcards.
+/// Apply strict validation rules
 pub(crate) const XML_SCHEMAS_ANY_STRICT: i32 = 3;
-/**
- * XML_SCHEMAS_ATTR_USE_PROHIBITED:
- *
- * Used by wildcards.
- * The attribute is prohibited.
- */
+/// Used by wildcards.
+/// The attribute is prohibited.
 pub(crate) const XML_SCHEMAS_ATTR_USE_PROHIBITED: i32 = 0;
-/**
- * XML_SCHEMAS_ATTR_USE_REQUIRED:
- *
- * The attribute is required.
- */
+/// The attribute is required.
 pub(crate) const XML_SCHEMAS_ATTR_USE_REQUIRED: i32 = 1;
-/**
- * XML_SCHEMAS_ATTR_USE_OPTIONAL:
- *
- * The attribute is optional.
- */
+/// The attribute is optional.
 pub(crate) const XML_SCHEMAS_ATTR_USE_OPTIONAL: i32 = 2;
-/**
- * XML_SCHEMAS_ATTR_GLOBAL:
- *
- * allow elements in no namespace
- */
+/// Allow elements in no namespace
 pub(crate) const XML_SCHEMAS_ATTR_GLOBAL: i32 = 1 << 0;
-/**
- * XML_SCHEMAS_ATTR_NSDEFAULT:
- *
- * allow elements in no namespace
- */
+/// Allow elements in no namespace
 pub(crate) const XML_SCHEMAS_ATTR_NSDEFAULT: i32 = 1 << 7;
-/**
- * XML_SCHEMAS_ATTR_INTERNAL_RESOLVED:
- *
- * this is set when the "type" and "ref" references
- * have been resolved.
- */
+/// This is set when the "type" and "ref" references have been resolved.
 pub(crate) const XML_SCHEMAS_ATTR_INTERNAL_RESOLVED: i32 = 1 << 8;
-/**
- * XML_SCHEMAS_ATTR_FIXED:
- *
- * the attribute has a fixed value
- */
+/// The attribute has a fixed value
 pub(crate) const XML_SCHEMAS_ATTR_FIXED: i32 = 1 << 9;
 
-/**
- * xmlSchemaAttribute:
- * An attribute definition.
- */
-
+/// An attribute definition.
+#[doc(alias = "xmlSchemaAttribute")]
 pub type XmlSchemaAttributePtr = *mut XmlSchemaAttribute;
 #[repr(C)]
 pub struct XmlSchemaAttribute {
@@ -366,40 +303,30 @@ pub struct XmlSchemaAttribute {
     pub(crate) ref_decl: XmlSchemaAttributePtr, /* Deprecated; not used */
 }
 
-/**
- * xmlSchemaAttributeLink:
- * Used to build a list of attribute uses on complexType definitions.
- * WARNING: Deprecated; not used.
- */
 pub type XmlSchemaAttributeLinkPtr = *mut XmlSchemaAttributeLink;
+/// Used to build a list of attribute uses on complexType definitions.
+/// WARNING: Deprecated; not used.
+#[doc(alias = "xmlSchemaAttributeLink")]
 #[repr(C)]
 pub struct XmlSchemaAttributeLink {
     next: *mut XmlSchemaAttributeLink, /* the next attribute link ... */
     attr: *mut XmlSchemaAttribute,     /* the linked attribute */
 }
 
-/**
- * XML_SCHEMAS_WILDCARD_COMPLETE:
- *
- * If the wildcard is complete.
- */
+/// If the wildcard is complete.
 const XML_SCHEMAS_WILDCARD_COMPLETE: i32 = 1 << 0;
 
-/**
- * xmlSchemaCharValueLink:
- * Used to build a list of namespaces on wildcards.
- */
 pub type XmlSchemaWildcardNsPtr = *mut XmlSchemaWildcardNs;
+/// Used to build a list of namespaces on wildcards.
+#[doc(alias = "xmlSchemaCharValueLink")]
 #[repr(C)]
 pub struct XmlSchemaWildcardNs {
     pub(crate) next: *mut XmlSchemaWildcardNs, /* the next constraint link ... */
     pub(crate) value: *const XmlChar,          /* the value */
 }
 
-/**
- * xmlSchemaWildcard.
- * A wildcard.
- */
+/// A wildcard.
+#[doc(alias = "xmlSchemaWildcard")]
 pub type XmlSchemaWildcardPtr = *mut XmlSchemaWildcard;
 #[repr(C)]
 pub struct XmlSchemaWildcard {
@@ -416,45 +343,20 @@ pub struct XmlSchemaWildcard {
     pub(crate) flags: i32,
 }
 
-/**
- * XML_SCHEMAS_ATTRGROUP_WILDCARD_BUILDED:
- *
- * The attribute wildcard has been built.
- */
+/// The attribute wildcard has been built.
 pub(crate) const XML_SCHEMAS_ATTRGROUP_WILDCARD_BUILDED: i32 = 1 << 0;
-/**
- * XML_SCHEMAS_ATTRGROUP_GLOBAL:
- *
- * The attribute group has been defined.
- */
+/// The attribute group has been defined.
 pub(crate) const XML_SCHEMAS_ATTRGROUP_GLOBAL: i32 = 1 << 1;
-/**
- * XML_SCHEMAS_ATTRGROUP_MARKED:
- *
- * Marks the attr group as marked; used for circular checks.
- */
+/// Marks the attr group as marked; used for circular checks.
 pub(crate) const XML_SCHEMAS_ATTRGROUP_MARKED: i32 = 1 << 2;
 
-/**
- * XML_SCHEMAS_ATTRGROUP_REDEFINED:
- *
- * The attr group was redefined.
- */
+/// The attr group was redefined.
 pub(crate) const XML_SCHEMAS_ATTRGROUP_REDEFINED: i32 = 1 << 3;
-/**
- * XML_SCHEMAS_ATTRGROUP_HAS_REFS:
- *
- * Whether this attr. group contains attr. group references.
- */
+/// Whether this attr. group contains attr. group references.
 pub(crate) const XML_SCHEMAS_ATTRGROUP_HAS_REFS: i32 = 1 << 4;
 
-/**
- * An attribute group definition.
- *
- * xmlSchemaAttribute and xmlSchemaAttributeGroup start of structures
- * must be kept similar
- */
 pub type XmlSchemaAttributeGroupPtr = *mut XmlSchemaAttributeGroup;
+/// xmlSchemaAttribute and xmlSchemaAttributeGroup start of structures must be kept similar
 #[repr(C)]
 pub struct XmlSchemaAttributeGroup {
     pub(crate) typ: XmlSchemaTypeType,        /* The kind of type */
@@ -475,229 +377,97 @@ pub struct XmlSchemaAttributeGroup {
     pub(crate) attr_uses: *mut c_void,
 }
 
-/**
- * xmlSchemaTypeLink:
- * Used to build a list of types (e.g. member types of
- * simpleType with variety "union").
- */
 pub type XmlSchemaTypeLinkPtr = *mut XmlSchemaTypeLink;
+/// Used to build a list of types (e.g. member types of
+/// simpleType with variety "union").
+#[doc(alias = "xmlSchemaTypeLink")]
 #[repr(C)]
 pub struct XmlSchemaTypeLink {
     pub(crate) next: *mut XmlSchemaTypeLink, /* the next type link ... */
     pub(crate) typ: XmlSchemaTypePtr,        /* the linked type */
 }
 
-/**
- * xmlSchemaFacetLink:
- * Used to build a list of facets.
- */
 pub type XmlSchemaFacetLinkPtr = *mut XmlSchemaFacetLink;
+/// Used to build a list of facets.
+#[doc(alias = "xmlSchemaFacetLink")]
 #[repr(C)]
 pub struct XmlSchemaFacetLink {
     pub(crate) next: *mut XmlSchemaFacetLink, /* the next facet link ... */
     pub(crate) facet: XmlSchemaFacetPtr,      /* the linked facet */
 }
 
-/**
- * XML_SCHEMAS_TYPE_MIXED:
- *
- * the element content type is mixed
- */
+/// The element content type is mixed
 pub(crate) const XML_SCHEMAS_TYPE_MIXED: i32 = 1 << 0;
-/**
- * XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION:
- *
- * the simple or complex type has a derivation method of "extension".
- */
+/// The simple or complex type has a derivation method of "extension".
 pub(crate) const XML_SCHEMAS_TYPE_DERIVATION_METHOD_EXTENSION: i32 = 1 << 1;
-/**
- * XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION:
- *
- * the simple or complex type has a derivation method of "restriction".
- */
+/// The simple or complex type has a derivation method of "restriction".
 pub(crate) const XML_SCHEMAS_TYPE_DERIVATION_METHOD_RESTRICTION: i32 = 1 << 2;
-/**
- * XML_SCHEMAS_TYPE_GLOBAL:
- *
- * the type is global
- */
+/// The type is global
 pub(crate) const XML_SCHEMAS_TYPE_GLOBAL: i32 = 1 << 3;
-/**
- * XML_SCHEMAS_TYPE_OWNED_ATTR_WILDCARD:
- *
- * the complexType owns an attribute wildcard, i.e.
- * it can be freed by the complexType
- */
+/// The complexType owns an attribute wildcard, i.e.
+/// it can be freed by the complexType
 const XML_SCHEMAS_TYPE_OWNED_ATTR_WILDCARD: i32 =    1 << 4 /* Obsolete. */;
-/**
- * XML_SCHEMAS_TYPE_VARIETY_ABSENT:
- *
- * the simpleType has a variety of "absent".
- * TODO: Actually not necessary :-/, since if
- * none of the variety flags occur then it's
- * automatically absent.
- */
+/// The simpleType has a variety of "absent".
+/// TODO: Actually not necessary :-/, since if
+/// none of the variety flags occur then it's
+/// automatically absent.
 const XML_SCHEMAS_TYPE_VARIETY_ABSENT: i32 = 1 << 5;
-/**
- * XML_SCHEMAS_TYPE_VARIETY_LIST:
- *
- * the simpleType has a variety of "list".
- */
+/// The simpleType has a variety of "list".
 pub(crate) const XML_SCHEMAS_TYPE_VARIETY_LIST: i32 = 1 << 6;
-/**
- * XML_SCHEMAS_TYPE_VARIETY_UNION:
- *
- * the simpleType has a variety of "union".
- */
+/// The simpleType has a variety of "union".
 pub(crate) const XML_SCHEMAS_TYPE_VARIETY_UNION: i32 = 1 << 7;
-/**
- * XML_SCHEMAS_TYPE_VARIETY_ATOMIC:
- *
- * the simpleType has a variety of "union".
- */
+/// The simpleType has a variety of "union".
 pub(crate) const XML_SCHEMAS_TYPE_VARIETY_ATOMIC: i32 = 1 << 8;
-/**
- * XML_SCHEMAS_TYPE_FINAL_EXTENSION:
- *
- * the complexType has a final of "extension".
- */
+/// The complexType has a final of "extension".
 pub(crate) const XML_SCHEMAS_TYPE_FINAL_EXTENSION: i32 = 1 << 9;
-/**
- * XML_SCHEMAS_TYPE_FINAL_RESTRICTION:
- *
- * the simpleType/complexType has a final of "restriction".
- */
+/// The simpleType/complexType has a final of "restriction".
 pub(crate) const XML_SCHEMAS_TYPE_FINAL_RESTRICTION: i32 = 1 << 10;
-/**
- * XML_SCHEMAS_TYPE_FINAL_LIST:
- *
- * the simpleType has a final of "list".
- */
+/// The simpleType has a final of "list".
 pub(crate) const XML_SCHEMAS_TYPE_FINAL_LIST: i32 = 1 << 11;
-/**
- * XML_SCHEMAS_TYPE_FINAL_UNION:
- *
- * the simpleType has a final of "union".
- */
+/// The simpleType has a final of "union".
 pub(crate) const XML_SCHEMAS_TYPE_FINAL_UNION: i32 = 1 << 12;
-/**
- * XML_SCHEMAS_TYPE_FINAL_DEFAULT:
- *
- * the simpleType has a final of "default".
- */
+/// The simpleType has a final of "default".
 const XML_SCHEMAS_TYPE_FINAL_DEFAULT: i32 = 1 << 13;
-/**
- * XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE:
- *
- * Marks the item as a builtin primitive.
- */
+/// Marks the item as a builtin primitive.
 pub(crate) const XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE: i32 = 1 << 14;
-/**
- * XML_SCHEMAS_TYPE_MARKED:
- *
- * Marks the item as marked; used for circular checks.
- */
+/// Marks the item as marked; used for circular checks.
 pub(crate) const XML_SCHEMAS_TYPE_MARKED: i32 = 1 << 16;
-/**
- * XML_SCHEMAS_TYPE_BLOCK_DEFAULT:
- *
- * the complexType did not specify 'block' so use the default of the
- * <schema> item.
- */
+/// The complexType did not specify 'block' so use the default of the <schema> item.
 const XML_SCHEMAS_TYPE_BLOCK_DEFAULT: i32 = 1 << 17;
-/**
- * XML_SCHEMAS_TYPE_BLOCK_EXTENSION:
- *
- * the complexType has a 'block' of "extension".
- */
+/// The complexType has a 'block' of "extension".
 pub(crate) const XML_SCHEMAS_TYPE_BLOCK_EXTENSION: i32 = 1 << 18;
-/**
- * XML_SCHEMAS_TYPE_BLOCK_RESTRICTION:
- *
- * the complexType has a 'block' of "restriction".
- */
+/// The complexType has a 'block' of "restriction".
 pub(crate) const XML_SCHEMAS_TYPE_BLOCK_RESTRICTION: i32 = 1 << 19;
-/**
- * XML_SCHEMAS_TYPE_ABSTRACT:
- *
- * the simple/complexType is abstract.
- */
+/// The simple/complexType is abstract.
 pub(crate) const XML_SCHEMAS_TYPE_ABSTRACT: i32 = 1 << 20;
-/**
- * XML_SCHEMAS_TYPE_FACETSNEEDVALUE:
- *
- * indicates if the facets need a computed value
- */
+/// Indicates if the facets need a computed value
 pub(crate) const XML_SCHEMAS_TYPE_FACETSNEEDVALUE: i32 = 1 << 21;
-/**
- * XML_SCHEMAS_TYPE_INTERNAL_RESOLVED:
- *
- * indicates that the type was typefixed
- */
+/// Indicates that the type was typefixed
 pub(crate) const XML_SCHEMAS_TYPE_INTERNAL_RESOLVED: i32 = 1 << 22;
-/**
- * XML_SCHEMAS_TYPE_INTERNAL_INVALID:
- *
- * indicates that the type is invalid
- */
+/// Indicates that the type is invalid
 pub(crate) const XML_SCHEMAS_TYPE_INTERNAL_INVALID: i32 = 1 << 23;
-/**
- * XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE:
- *
- * a whitespace-facet value of "preserve"
- */
+/// A whitespace-facet value of "preserve"
 pub(crate) const XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE: i32 = 1 << 24;
-/**
- * XML_SCHEMAS_TYPE_WHITESPACE_REPLACE:
- *
- * a whitespace-facet value of "replace"
- */
+/// A whitespace-facet value of "replace"
 pub(crate) const XML_SCHEMAS_TYPE_WHITESPACE_REPLACE: i32 = 1 << 25;
-/**
- * XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE:
- *
- * a whitespace-facet value of "collapse"
- */
+/// A whitespace-facet value of "collapse"
 pub(crate) const XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE: i32 = 1 << 26;
-/**
- * XML_SCHEMAS_TYPE_HAS_FACETS:
- *
- * has facets
- */
+/// Has facets
 pub(crate) const XML_SCHEMAS_TYPE_HAS_FACETS: i32 = 1 << 27;
-/**
- * XML_SCHEMAS_TYPE_NORMVALUENEEDED:
- *
- * indicates if the facets (pattern) need a normalized value
- */
+/// Indicates if the facets (pattern) need a normalized value
 pub(crate) const XML_SCHEMAS_TYPE_NORMVALUENEEDED: i32 = 1 << 28;
 
-/**
- * XML_SCHEMAS_TYPE_FIXUP_1:
- *
- * First stage of fixup was done.
- */
+/// First stage of fixup was done.
 pub(crate) const XML_SCHEMAS_TYPE_FIXUP_1: i32 = 1 << 29;
 
-/**
- * XML_SCHEMAS_TYPE_REDEFINED:
- *
- * The type was redefined.
- */
+/// The type was redefined.
 pub(crate) const XML_SCHEMAS_TYPE_REDEFINED: i32 = 1 << 30;
-/**
- * XML_SCHEMAS_TYPE_REDEFINING:
- *
- * The type redefines an other type.
- */
+/// The type redefines an other type.
 /* #define XML_SCHEMAS_TYPE_REDEFINING    1 << 31 */
 
-/**
- * xmlSchemaType:
- *
- * Schemas type definition.
- */
 pub type XmlSchemaTypePtr = *mut XmlSchemaType;
+/// Schemas type definition.
+#[doc(alias = "xmlSchemaType")]
 #[repr(C)]
 pub struct XmlSchemaType {
     pub(crate) typ: XmlSchemaTypeType,   /* The kind of type */
@@ -734,133 +504,54 @@ pub struct XmlSchemaType {
     pub(crate) attr_uses: *mut c_void,
 }
 
-/*
- * xmlSchemaElement:
- * An element definition.
- *
- * xmlSchemaType, xmlSchemaFacet and xmlSchemaElement start of
- * structures must be kept similar
- */
-/**
- * XML_SCHEMAS_ELEM_NILLABLE:
- *
- * the element is nillable
- */
+/// The element is nillable
 pub(crate) const XML_SCHEMAS_ELEM_NILLABLE: i32 = 1 << 0;
-/**
- * XML_SCHEMAS_ELEM_GLOBAL:
- *
- * the element is global
- */
+/// The element is global
 pub(crate) const XML_SCHEMAS_ELEM_GLOBAL: i32 = 1 << 1;
-/**
- * XML_SCHEMAS_ELEM_DEFAULT:
- *
- * the element has a default value
- */
+/// The element has a default value
 pub(crate) const XML_SCHEMAS_ELEM_DEFAULT: i32 = 1 << 2;
-/**
- * XML_SCHEMAS_ELEM_FIXED:
- *
- * the element has a fixed value
- */
+/// The element has a fixed value
 pub(crate) const XML_SCHEMAS_ELEM_FIXED: i32 = 1 << 3;
-/**
- * XML_SCHEMAS_ELEM_ABSTRACT:
- *
- * the element is abstract
- */
+/// The element is abstract
 pub(crate) const XML_SCHEMAS_ELEM_ABSTRACT: i32 = 1 << 4;
-/**
- * XML_SCHEMAS_ELEM_TOPLEVEL:
- *
- * the element is top level
- * obsolete: use XML_SCHEMAS_ELEM_GLOBAL instead
- */
+/// The element is top level
+/// obsolete: use XML_SCHEMAS_ELEM_GLOBAL instead
 pub(crate) const XML_SCHEMAS_ELEM_TOPLEVEL: i32 = 1 << 5;
-/**
- * XML_SCHEMAS_ELEM_REF:
- *
- * the element is a reference to a type
- */
+/// The element is a reference to a type
 const XML_SCHEMAS_ELEM_REF: i32 = 1 << 6;
-/**
- * XML_SCHEMAS_ELEM_NSDEFAULT:
- *
- * allow elements in no namespace
- * Obsolete, not used anymore.
- */
+/// Allow elements in no namespace
+/// Obsolete, not used anymore.
 const XML_SCHEMAS_ELEM_NSDEFAULT: i32 = 1 << 7;
-/**
- * XML_SCHEMAS_ELEM_INTERNAL_RESOLVED:
- *
- * this is set when "type", "ref", "substitutionGroup"
- * references have been resolved.
- */
+/// This is set when "type", "ref", "substitutionGroup"
+/// References have been resolved.
 pub(crate) const XML_SCHEMAS_ELEM_INTERNAL_RESOLVED: i32 = 1 << 8;
-/**
- * XML_SCHEMAS_ELEM_CIRCULAR:
- *
- * a helper flag for the search of circular references.
- */
+/// A helper flag for the search of circular references.
 pub(crate) const XML_SCHEMAS_ELEM_CIRCULAR: i32 = 1 << 9;
-/**
- * XML_SCHEMAS_ELEM_BLOCK_ABSENT:
- *
- * the "block" attribute is absent
- */
+/// The "block" attribute is absent
 const XML_SCHEMAS_ELEM_BLOCK_ABSENT: i32 = 1 << 10;
-/**
- * XML_SCHEMAS_ELEM_BLOCK_EXTENSION:
- *
- * disallowed substitutions are absent
- */
+/// Disallowed substitutions are absent
 pub(crate) const XML_SCHEMAS_ELEM_BLOCK_EXTENSION: i32 = 1 << 11;
-/**
- * XML_SCHEMAS_ELEM_BLOCK_RESTRICTION:
- *
- * disallowed substitutions: "restriction"
- */
+/// Disallowed substitutions: "restriction"
 pub(crate) const XML_SCHEMAS_ELEM_BLOCK_RESTRICTION: i32 = 1 << 12;
-/**
- * XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION:
- *
- * disallowed substitutions: "substitution"
- */
+/// Disallowed substitutions: "substitution"
 pub(crate) const XML_SCHEMAS_ELEM_BLOCK_SUBSTITUTION: i32 = 1 << 13;
-/**
- * XML_SCHEMAS_ELEM_FINAL_ABSENT:
- *
- * substitution group exclusions are absent
- */
+/// Substitution group exclusions are absent
 const XML_SCHEMAS_ELEM_FINAL_ABSENT: i32 = 1 << 14;
-/**
- * XML_SCHEMAS_ELEM_FINAL_EXTENSION:
- *
- * substitution group exclusions: "extension"
- */
+/// Substitution group exclusions: "extension"
 pub(crate) const XML_SCHEMAS_ELEM_FINAL_EXTENSION: i32 = 1 << 15;
-/**
- * XML_SCHEMAS_ELEM_FINAL_RESTRICTION:
- *
- * substitution group exclusions: "restriction"
- */
+/// Substitution group exclusions: "restriction"
 pub(crate) const XML_SCHEMAS_ELEM_FINAL_RESTRICTION: i32 = 1 << 16;
-/**
- * XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD:
- *
- * the declaration is a substitution group head
- */
+/// The declaration is a substitution group head
 pub(crate) const XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD: i32 = 1 << 17;
-/**
- * XML_SCHEMAS_ELEM_INTERNAL_CHECKED:
- *
- * this is set when the elem decl has been checked against
- * all constraints
- */
+/// This is set when the elem decl has been checked against all constraints
 pub(crate) const XML_SCHEMAS_ELEM_INTERNAL_CHECKED: i32 = 1 << 18;
 
 pub type XmlSchemaElementPtr = *mut XmlSchemaElement;
+/// An element definition.
+///
+/// xmlSchemaType, xmlSchemaFacet and xmlSchemaElement start of
+/// structures must be kept similar
+#[doc(alias = "xmlSchemaElement")]
 #[repr(C)]
 pub struct XmlSchemaElement {
     pub(crate) typ: XmlSchemaTypeType,   /* The kind of type */
@@ -893,33 +584,15 @@ pub struct XmlSchemaElement {
     pub(crate) idcs: *mut c_void,          /* The identity-constraint defs */
 }
 
-/*
- * XML_SCHEMAS_FACET_UNKNOWN:
- *
- * unknown facet handling
- */
+/// Unknown facet handling
 const XML_SCHEMAS_FACET_UNKNOWN: i32 = 0;
-/*
- * XML_SCHEMAS_FACET_PRESERVE:
- *
- * preserve the type of the facet
- */
+/// Preserve the type of the facet
 pub(crate) const XML_SCHEMAS_FACET_PRESERVE: i32 = 1;
-/*
- * XML_SCHEMAS_FACET_REPLACE:
- *
- * replace the type of the facet
- */
+/// Replace the type of the facet
 pub(crate) const XML_SCHEMAS_FACET_REPLACE: i32 = 2;
-/*
- * XML_SCHEMAS_FACET_COLLAPSE:
- *
- * collapse the types of the facet
- */
+/// Collapse the types of the facet
 pub(crate) const XML_SCHEMAS_FACET_COLLAPSE: i32 = 3;
-/**
- * A facet definition.
- */
+/// A facet definition.
 pub type XmlSchemaFacetPtr = *mut XmlSchemaFacet;
 #[repr(C)]
 pub struct XmlSchemaFacet {
@@ -935,9 +608,7 @@ pub struct XmlSchemaFacet {
     pub(crate) regexp: XmlRegexpPtr, /* The regex for patterns */
 }
 
-/**
- * A notation definition.
- */
+/// A notation definition.
 pub type XmlSchemaNotationPtr = *mut XmlSchemaNotation;
 #[repr(C)]
 pub struct XmlSchemaNotation {
@@ -948,82 +619,35 @@ pub struct XmlSchemaNotation {
     pub(crate) target_namespace: *const XmlChar,
 }
 
-/*
-* TODO: Actually all those flags used for the schema should sit
-* on the schema parser context, since they are used only
-* during parsing an XML schema document, and not available
-* on the component level as per spec.
-*/
-/**
- * XML_SCHEMAS_QUALIF_ELEM:
- *
- * Reflects elementFormDefault == qualified in
- * an XML schema document.
- */
+// TODO: Actually all those flags used for the schema should sit
+// on the schema parser context, since they are used only
+// during parsing an XML schema document, and not available
+// on the component level as per spec.
+/// Reflects elementFormDefault == qualified in
+/// an XML schema document.
 pub(crate) const XML_SCHEMAS_QUALIF_ELEM: i32 = 1 << 0;
-/**
- * XML_SCHEMAS_QUALIF_ATTR:
- *
- * Reflects attributeFormDefault == qualified in
- * an XML schema document.
- */
+/// Reflects attributeFormDefault == qualified in
+/// an XML schema document.
 pub(crate) const XML_SCHEMAS_QUALIF_ATTR: i32 = 1 << 1;
-/**
- * XML_SCHEMAS_FINAL_DEFAULT_EXTENSION:
- *
- * the schema has "extension" in the set of finalDefault.
- */
+/// The schema has "extension" in the set of finalDefault.
 pub(crate) const XML_SCHEMAS_FINAL_DEFAULT_EXTENSION: i32 = 1 << 2;
-/**
- * XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION:
- *
- * the schema has "restriction" in the set of finalDefault.
- */
+/// The schema has "restriction" in the set of finalDefault.
 pub(crate) const XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION: i32 = 1 << 3;
-/**
- * XML_SCHEMAS_FINAL_DEFAULT_LIST:
- *
- * the schema has "list" in the set of finalDefault.
- */
+/// The schema has "list" in the set of finalDefault.
 pub(crate) const XML_SCHEMAS_FINAL_DEFAULT_LIST: i32 = 1 << 4;
-/**
- * XML_SCHEMAS_FINAL_DEFAULT_UNION:
- *
- * the schema has "union" in the set of finalDefault.
- */
+/// The schema has "union" in the set of finalDefault.
 pub(crate) const XML_SCHEMAS_FINAL_DEFAULT_UNION: i32 = 1 << 5;
-/**
- * XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION:
- *
- * the schema has "extension" in the set of blockDefault.
- */
+/// The schema has "extension" in the set of blockDefault.
 pub(crate) const XML_SCHEMAS_BLOCK_DEFAULT_EXTENSION: i32 = 1 << 6;
-/**
- * XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION:
- *
- * the schema has "restriction" in the set of blockDefault.
- */
+/// The schema has "restriction" in the set of blockDefault.
 pub(crate) const XML_SCHEMAS_BLOCK_DEFAULT_RESTRICTION: i32 = 1 << 7;
-/**
- * XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION:
- *
- * the schema has "substitution" in the set of blockDefault.
- */
+/// The schema has "substitution" in the set of blockDefault.
 pub(crate) const XML_SCHEMAS_BLOCK_DEFAULT_SUBSTITUTION: i32 = 1 << 8;
-/**
- * XML_SCHEMAS_INCLUDING_CONVERT_NS:
- *
- * the schema is currently including an other schema with
- * no target namespace.
- */
+/// The schema is currently including an other schema with no target namespace.
 pub(crate) const XML_SCHEMAS_INCLUDING_CONVERT_NS: i32 = 1 << 9;
 
-/**
- * xmlSchemaFreeAnnot:
- * @annot:  a schema type structure
- *
- * Deallocate a annotation structure
- */
+/// Deallocate a annotation structure
+#[doc(alias = "xmlSchemaFreeAnnot")]
 pub(crate) unsafe extern "C" fn xml_schema_free_annot(mut annot: XmlSchemaAnnotPtr) {
     if annot.is_null() {
         return;
@@ -1042,12 +666,8 @@ pub(crate) unsafe extern "C" fn xml_schema_free_annot(mut annot: XmlSchemaAnnotP
     }
 }
 
-/**
- * xmlSchemaItemListFree:
- * @annot:  a schema type structure
- *
- * Deallocate a annotation structure
- */
+/// Deallocate a annotation structure
+#[doc(alias = "xmlSchemaItemListFree")]
 pub(crate) unsafe extern "C" fn xml_schema_item_list_free(list: XmlSchemaItemListPtr) {
     if list.is_null() {
         return;
@@ -1058,12 +678,8 @@ pub(crate) unsafe extern "C" fn xml_schema_item_list_free(list: XmlSchemaItemLis
     xml_free(list as _);
 }
 
-/**
- * xmlSchemaFreeTypeLinkList:
- * @alink: a type link
- *
- * Deallocate a list of types.
- */
+/// Deallocate a list of types.
+#[doc(alias = "xmlSchemaFreeTypeLinkList")]
 unsafe extern "C" fn xml_schema_free_type_link_list(mut link: XmlSchemaTypeLinkPtr) {
     let mut next: XmlSchemaTypeLinkPtr;
 
@@ -1074,12 +690,8 @@ unsafe extern "C" fn xml_schema_free_type_link_list(mut link: XmlSchemaTypeLinkP
     }
 }
 
-/**
- * xmlSchemaFreeType:
- * @type:  a schema type structure
- *
- * Deallocate a Schema Type structure.
- */
+/// Deallocate a Schema Type structure.
+#[doc(alias = "xmlSchemaFreeType")]
 pub unsafe extern "C" fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
     if typ.is_null() {
         return;
@@ -1122,12 +734,8 @@ pub unsafe extern "C" fn xml_schema_free_type(typ: XmlSchemaTypePtr) {
     xml_free(typ as _);
 }
 
-/**
- * xmlSchemaFreeWildcardNsSet:
- * set:  a schema wildcard namespace
- *
- * Deallocates a list of wildcard constraint structures.
- */
+/// Deallocates a list of wildcard constraint structures.
+#[doc(alias = "xmlSchemaFreeWildcardNsSet")]
 pub(crate) unsafe extern "C" fn xml_schema_free_wildcard_ns_set(mut set: XmlSchemaWildcardNsPtr) {
     let mut next: XmlSchemaWildcardNsPtr;
 
@@ -1138,12 +746,8 @@ pub(crate) unsafe extern "C" fn xml_schema_free_wildcard_ns_set(mut set: XmlSche
     }
 }
 
-/**
- * xmlSchemaFreeWildcard:
- * @wildcard:  a wildcard structure
- *
- * Deallocates a wildcard structure.
- */
+/// Deallocates a wildcard structure.
+#[doc(alias = "xmlSchemaFreeWildcard")]
 pub unsafe extern "C" fn xml_schema_free_wildcard(wildcard: XmlSchemaWildcardPtr) {
     if wildcard.is_null() {
         return;

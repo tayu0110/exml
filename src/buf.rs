@@ -29,13 +29,9 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
     }
 }
 
-/**
- * xmlBufOverflowError:
- * @extra:  extra information
- *
- * Handle a buffer overflow error
- * To be improved...
- */
+/// Handle a buffer overflow error
+/// To be improved...
+#[doc(alias = "xmlBufOverflowError")]
 pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
     let extra = CString::new(extra).unwrap();
     __xml_simple_error(

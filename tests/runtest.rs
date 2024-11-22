@@ -1,5 +1,6 @@
 //! Rust implementation of original libxml2's `runtest.c`.  
 //! If you want this to work, copy the `test/` and `result/` directories from the original libxml2.
+#![cfg_attr(feature = "sax1", allow(deprecated))]
 
 use std::{
     cell::{Cell, RefCell},
@@ -24,7 +25,10 @@ use exml::{
         parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel,
         XmlParserErrors,
     },
-    globals::{reset_last_error, set_generic_error, set_structured_error, GenericErrorContext},
+    globals::{
+        reset_last_error, set_generic_error, set_pedantic_parser_default_value,
+        set_structured_error, GenericErrorContext,
+    },
     io::{
         pop_input_callbacks, register_input_callbacks, xml_no_net_external_entity_loader,
         XmlInputCallback,
@@ -39,9 +43,9 @@ use exml::{
         htmltree::html_doc_dump_memory,
         parser::{
             xml_cleanup_parser, xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser,
-            xml_parse_document, xml_parse_file, xml_pedantic_parser_default, xml_read_file,
-            xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
-            XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            xml_parse_document, xml_parse_file, xml_read_file, xml_read_memory,
+            xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
+            XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::xml_create_file_parser_ctxt,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -4614,12 +4618,9 @@ unsafe extern "C" fn load_xpath_expr(
     filename: *const c_char,
 ) -> XmlXPathObjectPtr {
     use exml::{
-        globals::set_load_ext_dtd_default_value,
+        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
         libxml::{
-            parser::{
-                xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS,
-                XML_DETECT_IDS,
-            },
+            parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
             xpath::{
                 xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
@@ -4637,7 +4638,7 @@ unsafe extern "C" fn load_xpath_expr(
      * load XPath expr as a file
      */
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
-    xml_substitute_entities_default(1);
+    set_substitute_entities_default_value(1);
 
     let doc: XmlDocPtr = xml_read_file(
         filename,
@@ -4813,13 +4814,10 @@ unsafe extern "C" fn c14n_run_test(
     result_file: *const c_char,
 ) -> i32 {
     use exml::{
-        globals::set_load_ext_dtd_default_value,
+        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
         libxml::{
             c14n::xml_c14n_doc_dump_memory,
-            parser::{
-                xml_substitute_entities_default, XmlParserOption, XML_COMPLETE_ATTRS,
-                XML_DETECT_IDS,
-            },
+            parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xpath::xml_xpath_free_object,
         },
     };
@@ -4836,7 +4834,7 @@ unsafe extern "C" fn c14n_run_test(
      * attributes and resolve all character and entities references
      */
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
-    xml_substitute_entities_default(1);
+    set_substitute_entities_default_value(1);
 
     let doc: XmlDocPtr = xml_read_file(
         xml_filename,
@@ -6049,7 +6047,7 @@ fn test_initialize() {
             break;
         }
     }
-    xml_pedantic_parser_default(0);
+    set_pedantic_parser_default_value(0);
     set_structured_error(Some(test_structured_error_handler), None);
     #[cfg(feature = "schema")]
     {

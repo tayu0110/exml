@@ -61,31 +61,16 @@ use crate::{
 
 use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
 
-/**
- * xmlRelaxNGValidityErrorFunc:
- * @ctx: the validation context
- * @msg: the message
- * @...: extra arguments
- *
- * Signature of an error callback from a Relax-NG validation
- */
+/// Signature of an error callback from a Relax-NG validation
+#[doc(alias = "xmlRelaxNGValidityErrorFunc")]
 pub type XmlRelaxNGValidityErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/**
- * xmlRelaxNGValidityWarningFunc:
- * @ctx: the validation context
- * @msg: the message
- * @...: extra arguments
- *
- * Signature of a warning callback from a Relax-NG validation
- */
+/// Signature of a warning callback from a Relax-NG validation
+#[doc(alias = "xmlRelaxNGValidityWarningFunc")]
 pub type XmlRelaxNGValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/*
- * xmlRelaxNGValidErr:
- *
- * List of possible Relax NG validation errors
- */
+// List of possible Relax NG validation errors
+#[doc(alias = "xmlRelaxNGValidErr")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlRelaxNGValidErr {
@@ -131,11 +116,8 @@ pub enum XmlRelaxNGValidErr {
     XmlRelaxngErrTextwrong,
 }
 
-/*
- * xmlRelaxNGParserFlags:
- *
- * List of possible Relax NG Parser flags
- */
+/// List of possible Relax NG Parser flags
+#[doc(alias = "xmlRelaxNGParserFlags")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum XmlRelaxNGParserFlag {
@@ -257,12 +239,9 @@ pub struct XmlRelaxNGDefine {
     cont_model: XmlRegexpPtr,        /* a compiled content model if available */
 }
 
-/**
- * xmlRelaxNG:
- *
- * A RelaxNGs definition
- */
 pub type XmlRelaxNGPtr = *mut XmlRelaxNG;
+/// A RelaxNGs definition
+#[doc(alias = "xmlRelaxNG")]
 #[repr(C)]
 pub struct XmlRelaxNG {
     _private: *mut c_void, /* unused by the library for users or bindings */
@@ -350,12 +329,9 @@ const FLAGS_NEGATIVE: i32 = 2;
 const FLAGS_MIXED_CONTENT: i32 = 4;
 const FLAGS_NOERROR: i32 = 8;
 
-/**
- * xmlRelaxNGInterleaveGroup:
- *
- * A RelaxNGs partition set associated to lists of definitions
- */
 pub type XmlRelaxNGInterleaveGroupPtr = *mut XmlRelaxNGInterleaveGroup;
+/// A RelaxNGs partition set associated to lists of definitions
+#[doc(alias = "xmlRelaxNGInterleaveGroup")]
 #[repr(C)]
 pub struct XmlRelaxNGInterleaveGroup {
     rule: XmlRelaxNGDefinePtr,       /* the rule to satisfy */
@@ -366,12 +342,9 @@ pub struct XmlRelaxNGInterleaveGroup {
 const IS_DETERMINIST: i32 = 1;
 const IS_NEEDCHECK: i32 = 2;
 
-/**
- * xmlRelaxNGPartitions:
- *
- * A RelaxNGs partition associated to an interleave group
- */
 pub type XmlRelaxNGPartitionPtr = *mut XmlRelaxNGPartition;
+/// A RelaxNGs partition associated to an interleave group
+#[doc(alias = "xmlRelaxNGPartitions")]
 #[repr(C)]
 pub struct XmlRelaxNGPartition {
     nbgroups: i32, /* number of groups in the partitions */
@@ -381,13 +354,10 @@ pub struct XmlRelaxNGPartition {
     groups: *mut XmlRelaxNGInterleaveGroupPtr,
 }
 
-/**
- * xmlRelaxNGValidState:
- *
- * A RelaxNGs validation state
- */
 const MAX_ATTR: usize = 20;
 pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
+/// A RelaxNGs validation state
+#[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
     node: XmlNodePtr,       /* the current node */
@@ -400,12 +370,9 @@ pub struct XmlRelaxNGValidState {
     attrs: *mut XmlAttrPtr, /* the array of attributes */
 }
 
-/**
- * xmlRelaxNGStates:
- *
- * A RelaxNGs container for validation state
- */
 pub type XmlRelaxNGStatesPtr = *mut XmlRelaxNGStates;
+/// A RelaxNGs container for validation state
+#[doc(alias = "xmlRelaxNGStates")]
 #[repr(C)]
 pub struct XmlRelaxNGStates {
     nb_state: i32,  /* the number of states */
@@ -415,12 +382,9 @@ pub struct XmlRelaxNGStates {
 
 const ERROR_IS_DUP: i32 = 1;
 
-/**
- * xmlRelaxNGValidError:
- *
- * A RelaxNGs validation error
- */
 pub type XmlRelaxNGValidErrorPtr = *mut XmlRelaxNGValidError;
+/// A RelaxNGs validation error
+#[doc(alias = "xmlRelaxNGValidError")]
 #[repr(C)]
 pub struct XmlRelaxNGValidError {
     err: XmlRelaxNGValidErr, /* the error number */
@@ -431,15 +395,9 @@ pub struct XmlRelaxNGValidError {
     arg2: *const XmlChar,    /* second arg */
 }
 
-/**
- * xmlRelaxNGValidCtxt:
- *
- * A RelaxNGs validation context
- */
-/**
- * A schemas validation context
- */
 pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
+/// A RelaxNGs validation context
+#[doc(alias = "xmlRelaxNGValidCtxt")]
 #[repr(C)]
 pub struct XmlRelaxNGValidCtxt {
     user_data: Option<GenericErrorContext>, /* user specific data block */
@@ -486,16 +444,9 @@ pub struct XmlRelaxNGValidCtxt {
                                        * outside the regexp */
 }
 
-// Both definition and declaration of this type are not found in any sourse codes of original libxml2...what is this ???
-// pub type xmlRelaxNGSchema = _xmlRelaxNGSchema;
-// pub type xmlRelaxNGSchemaPtr = *mut xmlRelaxNGSchema;
-
-/**
- * xmlRelaxNGInclude:
- *
- * Structure associated to a RelaxNGs document element
- */
 pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
+/// Structure associated to a RelaxNGs document element
+#[doc(alias = "xmlRelaxNGInclude")]
 #[repr(C)]
 pub struct XmlRelaxNGInclude {
     next: XmlRelaxNGIncludePtr,   /* keep a chain of includes */
@@ -505,12 +456,9 @@ pub struct XmlRelaxNGInclude {
     schema: XmlRelaxNGPtr,        /* the schema */
 }
 
-/**
- * xmlRelaxNGDocument:
- *
- * Structure associated to a RelaxNGs document element
- */
 pub type XmlRelaxNGDocumentPtr = *mut XmlRelaxNGDocument;
+/// Structure associated to a RelaxNGs document element
+#[doc(alias = "xmlRelaxNGDocument")]
 #[repr(C)]
 pub struct XmlRelaxNGDocument {
     next: XmlRelaxNGDocumentPtr,  /* keep a chain of documents */
@@ -521,29 +469,16 @@ pub struct XmlRelaxNGDocument {
     external_ref: i32,            /* 1 if an external ref */
 }
 
-/**
- * xmlRelaxNGTypeHave:
- * @data:  data needed for the library
- * @type:  the type name
- * @value:  the value to check
- *
- * Function provided by a type library to check if a type is exported
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Function provided by a type library to check if a type is exported
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGTypeHave")]
 type XmlRelaxNGTypeHave = unsafe extern "C" fn(data: *mut c_void, typ: *const XmlChar) -> i32;
 
-/**
- * xmlRelaxNGTypeCheck:
- * @data:  data needed for the library
- * @type:  the type name
- * @value:  the value to check
- * @result:  place to store the result if needed
- *
- * Function provided by a type library to check if a value match a type
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Function provided by a type library to check if a value match a type
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGTypeCheck")]
 type XmlRelaxNGTypeCheck = unsafe extern "C" fn(
     data: *mut c_void,
     typ: *const XmlChar,
@@ -552,19 +487,10 @@ type XmlRelaxNGTypeCheck = unsafe extern "C" fn(
     node: XmlNodePtr,
 ) -> i32;
 
-/**
- * xmlRelaxNGFacetCheck:
- * @data:  data needed for the library
- * @type:  the type name
- * @facet:  the facet name
- * @val:  the facet value
- * @strval:  the string value
- * @value:  the value to check
- *
- * Function provided by a type library to check a value facet
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Function provided by a type library to check a value facet
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGFacetCheck")]
 type XmlRelaxNGFacetCheck = unsafe extern "C" fn(
     data: *mut c_void,
     typ: *const XmlChar,
@@ -574,27 +500,14 @@ type XmlRelaxNGFacetCheck = unsafe extern "C" fn(
     value: *mut c_void,
 ) -> i32;
 
-/**
- * xmlRelaxNGTypeFree:
- * @data:  data needed for the library
- * @result:  the value to free
- *
- * Function provided by a type library to free a returned result
- */
+/// Function provided by a type library to free a returned result
+#[doc(alias = "xmlRelaxNGTypeFree")]
 type XmlRelaxNGTypeFree = unsafe extern "C" fn(data: *mut c_void, result: *mut c_void);
 
-/**
- * xmlRelaxNGTypeCompare:
- * @data:  data needed for the library
- * @type:  the type name
- * @value1:  the first value
- * @value2:  the second value
- *
- * Function provided by a type library to compare two values accordingly
- * to a type.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Function provided by a type library to compare two values accordingly to a type.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGTypeCompare")]
 type XmlRelaxNGTypeCompare = unsafe extern "C" fn(
     data: *mut c_void,
     typ: *const XmlChar,
@@ -648,16 +561,10 @@ macro_rules! VALID_ERR3P {
     };
 }
 
-/**
- * xmlRelaxNGGetErrorString:
- * @err:  the error code
- * @arg1:  the first string argument
- * @arg2:  the second string argument
- *
- * computes a formatted error string for the given error code and args
- *
- * Returns the error string, it must be deallocated by the caller
- */
+/// Computes a formatted error string for the given error code and args
+///
+/// Returns the error string, it must be deallocated by the caller
+#[doc(alias = "xmlRelaxNGGetErrorString")]
 unsafe extern "C" fn xml_relaxng_get_error_string(
     err: XmlRelaxNGValidErr,
     mut arg1: *const XmlChar,
@@ -923,17 +830,8 @@ unsafe extern "C" fn xml_relaxng_get_error_string(
     xml_escape_format_string(addr_of_mut!(result))
 }
 
-/**
- * xmlRngVErr:
- * @ctxt:  a Relax-NG validation context
- * @node:  the node raising the error
- * @error:  the error code
- * @msg:  message
- * @str1:  extra info
- * @str2:  extra info
- *
- * Handle a Relax NG Validation error
- */
+/// Handle a Relax NG Validation error
+#[doc(alias = "xmlRngVErr")]
 unsafe extern "C" fn xml_rng_verr(
     ctxt: XmlRelaxNGValidCtxtPtr,
     node: XmlNodePtr,
@@ -984,17 +882,8 @@ unsafe extern "C" fn xml_rng_verr(
     );
 }
 
-/**
- * xmlRelaxNGShowValidError:
- * @ctxt:  the validation context
- * @err:  the error number
- * @node:  the node
- * @child:  the node child generating the problem.
- * @arg1:  the first argument
- * @arg2:  the second argument
- *
- * Show a validation error.
- */
+/// Show a validation error.
+#[doc(alias = "xmlRelaxNGShowValidError")]
 unsafe extern "C" fn xml_relaxng_show_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
@@ -1028,12 +917,8 @@ unsafe extern "C" fn xml_relaxng_show_valid_error(
 
 const MAX_ERROR: usize = 5;
 
-/**
- * xmlRelaxNGDumpValidError:
- * @ctxt:  the validation context
- *
- * Show all validation error over a given index.
- */
+/// Show all validation error over a given index.
+#[doc(alias = "xmlRelaxNGDumpValidError")]
 unsafe extern "C" fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) {
     let mut k: usize;
     let mut err: XmlRelaxNGValidErrorPtr;
@@ -1078,18 +963,10 @@ unsafe extern "C" fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) 
     (*ctxt).err_nr = 0;
 }
 
-/**
- * xmlRelaxNGValidErrorPush:
- * @ctxt:  the validation context
- * @err:  the error code
- * @arg1:  the first string argument
- * @arg2:  the second string argument
- * @dup:  arg need to be duplicated
- *
- * Pushes a new error on top of the error stack
- *
- * Returns 0 in case of error, the index in the stack otherwise
- */
+/// Pushes a new error on top of the error stack
+///
+/// Returns 0 in case of error, the index in the stack otherwise
+#[doc(alias = "xmlRelaxNGValidErrorPush")]
 unsafe extern "C" fn xml_relaxng_valid_error_push(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
@@ -1150,17 +1027,9 @@ unsafe extern "C" fn xml_relaxng_valid_error_push(
     (*ctxt).err_nr - 1
 }
 
-/**
- * xml_relaxng_add_valid_error:
- * @ctxt:  the validation context
- * @err:  the error number
- * @arg1:  the first argument
- * @arg2:  the second argument
- * @dup:  need to dup the args
- *
- * Register a validation error, either generating it if it's sure
- * or stacking it for later handling if unsure.
- */
+/// Register a validation error, either generating it if it's sure
+/// or stacking it for later handling if unsure.
+#[doc(alias = "xmlRelaxNGAddValidError")]
 unsafe extern "C" fn xml_relaxng_add_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
@@ -1208,13 +1077,8 @@ unsafe extern "C" fn xml_relaxng_add_valid_error(
     }
 }
 
-/**
- * xmlRngVErrMemory:
- * @ctxt:  a Relax-NG validation context
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlRngVErrMemory")]
 unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *const c_char) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
@@ -1271,18 +1135,10 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
     }
 }
 
-/**
- * xmlRelaxNGRegisterTypeLibrary:
- * @namespace:  the URI bound to the library
- * @data:  data associated to the library
- * @have:  the provide function
- * @check:  the checking function
- * @comp:  the comparison function
- *
- * Register a new type library
- *
- * Returns 0 in case of success and -1 in case of error.
- */
+/// Register a new type library
+///
+/// Returns 0 in case of success and -1 in case of error.
+#[doc(alias = "xmlRelaxNGRegisterTypeLibrary")]
 unsafe extern "C" fn xml_relaxng_register_type_library(
     namespace: *const XmlChar,
     data: *mut c_void,
@@ -1328,16 +1184,10 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     0
 }
 
-/**
- * xmlRelaxNGSchemaTypeHave:
- * @data:  data needed for the library
- * @type:  the type name
- *
- * Check if the given type is provided by
- * the W3C XMLSchema Datatype library.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Check if the given type is provided by the W3C XMLSchema Datatype library.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGSchemaTypeHave")]
 unsafe extern "C" fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
     if typ.is_null() {
         return -1;
@@ -1350,18 +1200,10 @@ unsafe extern "C" fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *cons
     1
 }
 
-/**
- * xmlRelaxNGSchemaTypeCheck:
- * @data:  data needed for the library
- * @type:  the type name
- * @value:  the value to check
- * @node:  the node
- *
- * Check if the given type and value are validated by
- * the W3C XMLSchema Datatype library.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Check if the given type and value are validated by the W3C XMLSchema Datatype library.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGSchemaTypeCheck")]
 unsafe extern "C" fn xml_relaxng_schema_type_check(
     _data: *mut c_void,
     r#type: *const XmlChar,
@@ -1393,18 +1235,10 @@ unsafe extern "C" fn xml_relaxng_schema_type_check(
     -1
 }
 
-/**
- * xmlRelaxNGSchemaTypeCompare:
- * @data:  data needed for the library
- * @type:  the type name
- * @value1:  the first value
- * @value2:  the second value
- *
- * Compare two values for equality accordingly a type from the W3C XMLSchema
- * Datatype library.
- *
- * Returns 1 if equal, 0 if no and -1 in case of error.
- */
+/// Compare two values for equality accordingly a type from the W3C XMLSchema Datatype library.
+///
+/// Returns 1 if equal, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGSchemaTypeCompare")]
 unsafe extern "C" fn xml_relaxng_schema_type_compare(
     _data: *mut c_void,
     r#type: *const XmlChar,
@@ -1460,19 +1294,10 @@ unsafe extern "C" fn xml_relaxng_schema_type_compare(
     0
 }
 
-/**
- * xmlRelaxNGSchemaFacetCheck:
- * @data:  data needed for the library
- * @type:  the type name
- * @facet:  the facet name
- * @val:  the facet value
- * @strval:  the string value
- * @value:  the value to check
- *
- * Function provided by a type library to check a value facet
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Function provided by a type library to check a value facet
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGSchemaFacetCheck")]
 unsafe extern "C" fn xml_relaxng_schema_facet_check(
     _data: *mut c_void,
     r#type: *const XmlChar,
@@ -1541,22 +1366,15 @@ unsafe extern "C" fn xml_relaxng_schema_facet_check(
     0
 }
 
-/**
- * xmlRelaxNGSchemaFreeValue:
- * @data:  data needed for the library
- * @value:  the value to free
- *
- * Function provided by a type library to free a Schemas value
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Function provided by a type library to free a Schemas value
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGSchemaFreeValue")]
 unsafe extern "C" fn xml_relaxng_schema_free_value(_data: *mut c_void, value: *mut c_void) {
     xml_schema_free_value(value as _);
 }
 
-/*
- * The Relax-NG namespace
- */
+// The Relax-NG namespace
 const XML_RELAXNG_NS: &CStr = c"http://relaxng.org/ns/structure/1.0";
 
 macro_rules! IS_RELAXNG {
@@ -1569,16 +1387,10 @@ macro_rules! IS_RELAXNG {
     };
 }
 
-/**
- * xmlRelaxNGDefaultTypeHave:
- * @data:  data needed for the library
- * @type:  the type name
- *
- * Check if the given type is provided by
- * the default datatype library.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Check if the given type is provided by the default datatype library.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGDefaultTypeHave")]
 unsafe extern "C" fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
     if typ.is_null() {
         return -1;
@@ -1592,18 +1404,10 @@ unsafe extern "C" fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *con
     0
 }
 
-/**
- * xmlRelaxNGDefaultTypeCheck:
- * @data:  data needed for the library
- * @type:  the type name
- * @value:  the value to check
- * @node:  the node
- *
- * Check if the given type and value are validated by
- * the default datatype library.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Check if the given type and value are validated by the default datatype library.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGDefaultTypeCheck")]
 unsafe extern "C" fn xml_relaxng_default_type_check(
     _data: *mut c_void,
     typ: *const XmlChar,
@@ -1624,16 +1428,10 @@ unsafe extern "C" fn xml_relaxng_default_type_check(
     0
 }
 
-/**
- * xmlRelaxNGNormalize:
- * @ctxt:  a schema validation context
- * @str:  the string to normalize
- *
- * Implements the  normalizeWhiteSpace( s ) function from
- * section 6.2.9 of the spec
- *
- * Returns the new string or NULL in case of error.
- */
+/// Implements the  normalizeWhiteSpace( s ) function from section 6.2.9 of the spec
+///
+/// Returns the new string or NULL in case of error.
+#[doc(alias = "xmlRelaxNGNormalize")]
 unsafe extern "C" fn xml_relaxng_normalize(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut str: *const XmlChar,
@@ -1679,18 +1477,10 @@ unsafe extern "C" fn xml_relaxng_normalize(
     ret
 }
 
-/**
- * xmlRelaxNGDefaultTypeCompare:
- * @data:  data needed for the library
- * @type:  the type name
- * @value1:  the first value
- * @value2:  the second value
- *
- * Compare two values accordingly a type from the default
- * datatype library.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Compare two values accordingly a type from the default datatype library.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGDefaultTypeCompare")]
 unsafe extern "C" fn xml_relaxng_default_type_compare(
     _data: *mut c_void,
     typ: *const XmlChar,
@@ -1733,13 +1523,10 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
     ret
 }
 
-/**
- * xmlRelaxNGInitTypes:
- *
- * Initialize the default type libraries.
- *
- * Returns 0 in case of success and -1 in case of error.
- */
+/// Initialize the default type libraries.
+///
+/// Returns 0 in case of success and -1 in case of error.
+#[doc(alias = "xmlRelaxNGInitTypes")]
 pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
     if XML_RELAXNG_TYPE_INITIALIZED.get() {
         return 0;
@@ -1774,13 +1561,8 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
     0
 }
 
-/**
- * xmlRelaxNGFreeTypeLibrary:
- * @lib:  the type library structure
- * @namespace:  the URI bound to the library
- *
- * Free the structure associated to the type library
- */
+/// Free the structure associated to the type library
+#[doc(alias = "xmlRelaxNGFreeTypeLibrary")]
 extern "C" fn xml_relaxng_free_type_library(payload: *mut c_void, _namespace: *const XmlChar) {
     let lib: XmlRelaxNGTypeLibraryPtr = payload as _;
     if lib.is_null() {
@@ -1794,16 +1576,8 @@ extern "C" fn xml_relaxng_free_type_library(payload: *mut c_void, _namespace: *c
     }
 }
 
-/**
- * xmlRelaxNGCleanupTypes:
- *
- * DEPRECATED: This function will be made private. Call xmlCleanupParser
- * to free global state but see the warnings there. xmlCleanupParser
- * should be only called once at program exit. In most cases, you don't
- * have call cleanup functions at all.
- *
- * Cleanup the default Schemas type library associated to RelaxNG
- */
+/// Cleanup the default Schemas type library associated to RelaxNG
+#[doc(alias = "xmlRelaxNGCleanupTypes")]
 pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
     xml_schema_cleanup_types();
     if !XML_RELAXNG_TYPE_INITIALIZED.get() {
@@ -1816,13 +1590,8 @@ pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
     XML_RELAXNG_TYPE_INITIALIZED.set(false);
 }
 
-/**
- * xmlRngPErrMemory:
- * @ctxt:  an Relax-NG parser context
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlRngPErrMemory")]
 unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *const c_char) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
@@ -1879,18 +1648,11 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
     }
 }
 
-/*
- * Interfaces for parsing.
- */
-/**
- * xmlRelaxNGNewParserCtxt:
- * @URL:  the location of the schema
- *
- * Create an XML RelaxNGs parse context for that file/resource expected
- * to contain an XML RelaxNGs file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML RelaxNGs parse context for that file/resource expected
+/// to contain an XML RelaxNGs file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlRelaxNGNewParserCtxt")]
 pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
     url: *const c_char,
 ) -> XmlRelaxNGParserCtxtPtr {
@@ -1912,16 +1674,11 @@ pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
     ret
 }
 
-/**
- * xmlRelaxNGNewMemParserCtxt:
- * @buffer:  a pointer to a c_char array containing the schemas
- * @size:  the size of the array
- *
- * Create an XML RelaxNGs parse context for that memory buffer expected
- * to contain an XML RelaxNGs file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML RelaxNGs parse context for that memory buffer expected
+/// to contain an XML RelaxNGs file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlRelaxNGNewMemParserCtxt")]
 pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: i32,
@@ -1945,16 +1702,14 @@ pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
     ret
 }
 
-/**
- * xmlRelaxNGNewDocParserCtxt:
- * @doc:  a preparsed document tree
- *
- * Create an XML RelaxNGs parser context for that document.
- * Note: since the process of compiling a RelaxNG schemas modifies the
- *       document, the @doc parameter is duplicated internally.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML RelaxNGs parser context for that document.
+///
+/// # Note
+/// since the process of compiling a RelaxNG schemas modifies the document,
+/// the @doc parameter is duplicated internally.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlRelaxNGNewDocParserCtxt")]
 pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
     doc: XmlDocPtr,
 ) -> XmlRelaxNGParserCtxtPtr {
@@ -1981,16 +1736,11 @@ pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
     ret
 }
 
-/**
- * xmlRelaxParserSetFlag:
- * @ctxt: a RelaxNG parser context
- * @flags: a set of flags values
- *
- * Semi private function used to pass information to a parser context
- * which are a combination of xmlRelaxNGParserFlag .
- *
- * Returns 0 if success and -1 in case of error
- */
+/// Semi private function used to pass information to a parser context
+/// which are a combination of xmlRelaxNGParserFlag .
+///
+/// Returns 0 if success and -1 in case of error
+#[doc(alias = "xmlRelaxParserSetFlag")]
 pub unsafe extern "C" fn xml_relax_parser_set_flag(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut flags: i32,
@@ -2012,12 +1762,8 @@ pub unsafe extern "C" fn xml_relax_parser_set_flag(
     0
 }
 
-/**
- * xmlRelaxNGFreePartition:
- * @partitions:  a partition set structure
- *
- * Deallocate RelaxNG partition set structures.
- */
+/// Deallocate RelaxNG partition set structures.
+#[doc(alias = "xmlRelaxNGFreePartition")]
 unsafe extern "C" fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
     let mut group: XmlRelaxNGInterleaveGroupPtr;
 
@@ -2044,12 +1790,8 @@ unsafe extern "C" fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionP
     }
 }
 
-/**
- * xmlRelaxNGFreeDefine:
- * @define:  a define structure
- *
- * Deallocate a RelaxNG define structure.
- */
+/// Deallocate a RelaxNG define structure.
+#[doc(alias = "xmlRelaxNGFreeDefine")]
 unsafe extern "C" fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
     if define.is_null() {
         return;
@@ -2084,12 +1826,8 @@ unsafe extern "C" fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
     xml_free(define as _);
 }
 
-/**
- * xmlRelaxNGFreeInnerSchema:
- * @schema:  a schema structure
- *
- * Deallocate a RelaxNG schema structure.
- */
+/// Deallocate a RelaxNG schema structure.
+#[doc(alias = "xmlRelaxNGFreeInnerSchema")]
 unsafe extern "C" fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         return;
@@ -2108,12 +1846,8 @@ unsafe extern "C" fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
     xml_free(schema as _);
 }
 
-/**
- * xmlRelaxNGFreeDocument:
- * @docu:  a document structure
- *
- * Deallocate a RelaxNG document structure.
- */
+/// Deallocate a RelaxNG document structure.
+#[doc(alias = "xmlRelaxNGFreeDocument")]
 unsafe extern "C" fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
     if docu.is_null() {
         return;
@@ -2131,12 +1865,8 @@ unsafe extern "C" fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
     xml_free(docu as _);
 }
 
-/**
- * xmlRelaxNGFreeDocumentList:
- * @docu:  a list of  document structure
- *
- * Deallocate a RelaxNG document structures.
- */
+/// Deallocate a RelaxNG document structures.
+#[doc(alias = "xmlRelaxNGFreeDocumentList")]
 unsafe extern "C" fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocumentPtr) {
     let mut next: XmlRelaxNGDocumentPtr;
 
@@ -2147,12 +1877,8 @@ unsafe extern "C" fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocument
     }
 }
 
-/**
- * xmlRelaxNGFreeInclude:
- * @incl:  a include structure
- *
- * Deallocate a RelaxNG include structure.
- */
+/// Deallocate a RelaxNG include structure.
+#[doc(alias = "xmlRelaxNGFreeInclude")]
 unsafe extern "C" fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
     if incl.is_null() {
         return;
@@ -2170,12 +1896,8 @@ unsafe extern "C" fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
     xml_free(incl as _);
 }
 
-/**
- * xmlRelaxNGFreeIncludeList:
- * @incl:  a include structure list
- *
- * Deallocate a RelaxNG include structure.
- */
+/// Deallocate a RelaxNG include structure.
+#[doc(alias = "xmlRelaxNGFreeIncludeList")]
 unsafe extern "C" fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePtr) {
     let mut next: XmlRelaxNGIncludePtr;
 
@@ -2186,12 +1908,8 @@ unsafe extern "C" fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePt
     }
 }
 
-/**
- * xmlRelaxNGFreeParserCtxt:
- * @ctxt:  the schema parser context
- *
- * Free the resources associated to the schema parser context
- */
+/// Free the resources associated to the schema parser context
+#[doc(alias = "xmlRelaxNGFreeParserCtxt")]
 pub unsafe extern "C" fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -2229,15 +1947,8 @@ pub unsafe extern "C" fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxt
     xml_free(ctxt as _);
 }
 
-/**
- * xmlRelaxNGSetParserErrors:
- * @ctxt:  a Relax-NG validation context
- * @err:  the error callback
- * @warn:  the warning callback
- * @ctx:  contextual data for the callbacks
- *
- * Set the callback functions used to handle errors for a validation context
- */
+/// Set the callback functions used to handle errors for a validation context
+#[doc(alias = "xmlRelaxNGSetParserErrors")]
 pub unsafe fn xml_relaxng_set_parser_errors(
     ctxt: XmlRelaxNGParserCtxtPtr,
     err: Option<GenericError>,
@@ -2253,17 +1964,10 @@ pub unsafe fn xml_relaxng_set_parser_errors(
     (*ctxt).user_data = ctx;
 }
 
-/**
- * xmlRelaxNGGetParserErrors:
- * @ctxt:  a Relax-NG validation context
- * @err:  the error callback result
- * @warn:  the warning callback result
- * @ctx:  contextual data for the callbacks result
- *
- * Get the callback information used to handle errors for a validation context
- *
- * Returns -1 in case of failure, 0 otherwise.
- */
+/// Get the callback information used to handle errors for a validation context
+///
+/// Returns -1 in case of failure, 0 otherwise.
+#[doc(alias = "xmlRelaxNGGetParserErrors")]
 pub unsafe fn xml_relaxng_get_parser_errors(
     ctxt: XmlRelaxNGParserCtxtPtr,
     err: *mut Option<GenericError>,
@@ -2285,14 +1989,8 @@ pub unsafe fn xml_relaxng_get_parser_errors(
     0
 }
 
-/**
- * xmlRelaxNGSetParserStructuredErrors:
- * @ctxt:  a Relax-NG parser context
- * @serror:  the error callback
- * @ctx:  contextual data for the callbacks
- *
- * Set the callback functions used to handle errors for a parsing context
- */
+/// Set the callback functions used to handle errors for a parsing context
+#[doc(alias = "xmlRelaxNGSetParserStructuredErrors")]
 pub unsafe fn xml_relaxng_set_parser_structured_errors(
     ctxt: XmlRelaxNGParserCtxtPtr,
     serror: Option<StructuredError>,
@@ -2307,16 +2005,10 @@ pub unsafe fn xml_relaxng_set_parser_structured_errors(
     (*ctxt).user_data = ctx;
 }
 
-/**
- * xmlRelaxNGGetElements:
- * @ctxt:  a Relax-NG parser context
- * @def:  the definition definition
- * @eora:  gather elements (0), attributes (1) or elements and text (2)
- *
- * Compute the list of top elements a definition can generate
- *
- * Returns a list of elements or NULL if none was found.
- */
+/// Compute the list of top elements a definition can generate
+///
+/// Returns a list of elements or NULL if none was found.
+#[doc(alias = "xmlRelaxNGGetElements")]
 unsafe extern "C" fn xml_relaxng_get_elements(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
@@ -2431,13 +2123,8 @@ unsafe extern "C" fn xml_relaxng_get_elements(
     ret
 }
 
-/**
- * xmlRelaxNGPopErrors:
- * @ctxt:  the validation context
- * @level:  the error level in the stack
- *
- * pop and discard all errors until the given level is reached
- */
+/// pop and discard all errors until the given level is reached
+#[doc(alias = "xmlRelaxNGPopErrors")]
 unsafe extern "C" fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level: i32) {
     let mut err: XmlRelaxNGValidErrorPtr;
 
@@ -2463,16 +2150,10 @@ unsafe extern "C" fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level:
 
 const INVALID_NAME: &CStr = c"\u{1}";
 
-/**
- * xmlRelaxNGElementMatch:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to check
- * @elem:  the element
- *
- * Check if the element matches the definition nameClass
- *
- * Returns 1 if the element matches, 0 if no, or -1 in case of error
- */
+/// Check if the element matches the definition nameClass
+///
+/// Returns 1 if the element matches, 0 if no, or -1 in case of error
+#[doc(alias = "xmlRelaxNGElementMatch")]
 unsafe extern "C" fn xml_relaxng_element_match(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut define: XmlRelaxNGDefinePtr,
@@ -2602,19 +2283,12 @@ unsafe extern "C" fn xml_relaxng_element_match(
     ret
 }
 
-/**
- * xmlRelaxNGCompareNameClasses:
- * @defs1:  the first element/attribute defs
- * @defs2:  the second element/attribute defs
- * @name:  the restriction on the name
- * @ns:  the restriction on the namespace
- *
- * Compare the 2 lists of element definitions. The comparison is
- * that if both lists do not accept the same QNames, it returns 1
- * If the 2 lists can accept the same QName the comparison returns 0
- *
- * Returns 1 distinct, 0 if equal
- */
+/// Compare the 2 lists of element definitions. The comparison is
+/// that if both lists do not accept the same QNames, it returns 1
+/// If the 2 lists can accept the same QName the comparison returns 0
+///
+/// Returns 1 distinct, 0 if equal
+#[doc(alias = "xmlRelaxNGCompareNameClasses")]
 unsafe extern "C" fn xml_relaxng_compare_name_classes(
     def1: XmlRelaxNGDefinePtr,
     def2: XmlRelaxNGDefinePtr,
@@ -2714,18 +2388,12 @@ unsafe extern "C" fn xml_relaxng_compare_name_classes(
     ret
 }
 
-/**
- * xmlRelaxNGCompareElemDefLists:
- * @ctxt:  a Relax-NG parser context
- * @defs1:  the first list of element/attribute defs
- * @defs2:  the second list of element/attribute defs
- *
- * Compare the 2 lists of element or attribute definitions. The comparison
- * is that if both lists do not accept the same QNames, it returns 1
- * If the 2 lists can accept the same QName the comparison returns 0
- *
- * Returns 1 distinct, 0 if equal
- */
+/// Compare the 2 lists of element or attribute definitions. The comparison
+/// is that if both lists do not accept the same QNames, it returns 1
+/// If the 2 lists can accept the same QName the comparison returns 0
+///
+/// Returns 1 distinct, 0 if equal
+#[doc(alias = "xmlRelaxNGCompareElemDefLists")]
 unsafe extern "C" fn xml_relaxng_compare_elem_def_lists(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     mut def1: *mut XmlRelaxNGDefinePtr,
@@ -2752,17 +2420,8 @@ unsafe extern "C" fn xml_relaxng_compare_elem_def_lists(
     1
 }
 
-/**
- * xmlRngPErr:
- * @ctxt:  a Relax-NG parser context
- * @node:  the node raising the error
- * @error:  the error code
- * @msg:  message
- * @str1:  extra info
- * @str2:  extra info
- *
- * Handle a Relax NG Parsing error
- */
+/// Handle a Relax NG Parsing error
+#[doc(alias = "xmlRngPErr")]
 unsafe extern "C" fn xml_rng_perr(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -2812,21 +2471,15 @@ unsafe extern "C" fn xml_rng_perr(
     );
 }
 
-/**
- * xmlRelaxNGComputeInterleaves:
- * @def:  the interleave definition
- * @ctxt:  a Relax-NG parser context
- * @name:  the definition name
- *
- * A lot of work for preprocessing interleave definitions
- * is potentially needed to get a decent execution speed at runtime
- *   - trying to get a total order on the element nodes generated
- *     by the interleaves, order the list of interleave definitions
- *     following that order.
- *   - if <text/> is used to handle mixed content, it is better to
- *     flag this in the define and simplify the runtime checking
- *     algorithm
- */
+/// A lot of work for preprocessing interleave definitions
+/// is potentially needed to get a decent execution speed at runtime
+///   - trying to get a total order on the element nodes generated
+///     by the interleaves, order the list of interleave definitions
+///     following that order.
+///   - if <text/> is used to handle mixed content, it is better to
+///     flag this in the define and simplify the runtime checking
+///     algorithm
+#[doc(alias = "xmlRelaxNGComputeInterleaves")]
 extern "C" fn xml_relaxng_compute_interleaves(
     payload: *mut c_void,
     data: *mut c_void,
@@ -3037,14 +2690,10 @@ macro_rules! IS_BLANK_NODE {
     };
 }
 
-/**
- * xmlRelaxNGIsBlank:
- * @str:  a string
- *
- * Check if a string is ignorable c.f. 4.2. Whitespace
- *
- * Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
- */
+/// Check if a string is ignorable c.f. 4.2. Whitespace
+///
+/// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
+#[doc(alias = "xmlRelaxNGIsBlank")]
 unsafe extern "C" fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
     if str.is_null() {
         return 1;
@@ -3058,13 +2707,8 @@ unsafe extern "C" fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
     1
 }
 
-/**
- * xmlRelaxNGCleanupAttributes:
- * @ctxt:  a Relax-NG parser context
- * @node:  a Relax-NG node
- *
- * Check all the attributes on the given node
- */
+/// Check all the attributes on the given node
+#[doc(alias = "xmlRelaxNGCleanupAttributes")]
 unsafe extern "C" fn xml_relaxng_cleanup_attributes(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -3191,15 +2835,10 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
     }
 }
 
-/**
- * xmlRelaxNGDocumentPush:
- * @ctxt:  the parser context
- * @value:  the element doc
- *
- * Pushes a new doc on top of the doc stack
- *
- * Returns 0 in case of error, the index in the stack otherwise
- */
+/// Pushes a new doc on top of the doc stack
+///
+/// Returns 0 in case of error, the index in the stack otherwise
+#[doc(alias = "xmlRelaxNGDocumentPush")]
 unsafe extern "C" fn xml_relaxng_document_push(
     ctxt: XmlRelaxNGParserCtxtPtr,
     value: XmlRelaxNGDocumentPtr,
@@ -3231,14 +2870,10 @@ unsafe extern "C" fn xml_relaxng_document_push(
     (*ctxt).doc_nr - 1
 }
 
-/**
- * xmlRelaxNGDocumentPop:
- * @ctxt: the parser context
- *
- * Pops the top doc from the doc stack
- *
- * Returns the doc just removed
- */
+/// Pops the top doc from the doc stack
+///
+/// Returns the doc just removed
+#[doc(alias = "xmlRelaxNGDocumentPop")]
 unsafe extern "C" fn xml_relaxng_document_pop(
     ctxt: XmlRelaxNGParserCtxtPtr,
 ) -> XmlRelaxNGDocumentPtr {
@@ -3256,18 +2891,12 @@ unsafe extern "C" fn xml_relaxng_document_pop(
     ret
 }
 
-/**
- * xmlRelaxNGLoadExternalRef:
- * @ctxt: the parser context
- * @URL:  the normalized URL
- * @ns:  the inherited ns if any
- *
- * First lookup if the document is already loaded into the parser context,
- * check against recursion. If not found the resource is loaded and
- * the content is preprocessed before being returned back to the caller.
- *
- * Returns the xmlRelaxNGDocumentPtr or NULL in case of error
- */
+/// First lookup if the document is already loaded into the parser context,
+/// check against recursion. If not found the resource is loaded and
+/// the content is preprocessed before being returned back to the caller.
+///
+/// Returns the xmlRelaxNGDocumentPtr or NULL in case of error
+#[doc(alias = "xmlRelaxNGLoadExternalRef")]
 unsafe extern "C" fn xml_relaxng_load_external_ref(
     ctxt: XmlRelaxNGParserCtxtPtr,
     url: *const XmlChar,
@@ -3364,15 +2993,10 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     ret
 }
 
-/**
- * xmlRelaxNGIncludePush:
- * @ctxt:  the parser context
- * @value:  the element doc
- *
- * Pushes a new include on top of the include stack
- *
- * Returns 0 in case of error, the index in the stack otherwise
- */
+/// Pushes a new include on top of the include stack
+///
+/// Returns 0 in case of error, the index in the stack otherwise
+#[doc(alias = "xmlRelaxNGIncludePush")]
 unsafe extern "C" fn xml_relaxng_include_push(
     ctxt: XmlRelaxNGParserCtxtPtr,
     value: XmlRelaxNGIncludePtr,
@@ -3404,14 +3028,10 @@ unsafe extern "C" fn xml_relaxng_include_push(
     (*ctxt).inc_nr - 1
 }
 
-/**
- * xmlRelaxNGIncludePop:
- * @ctxt: the parser context
- *
- * Pops the top include from the include stack
- *
- * Returns the include just removed
- */
+/// Pops the top include from the include stack
+///
+/// Returns the include just removed
+#[doc(alias = "xmlRelaxNGIncludePop")]
 unsafe extern "C" fn xml_relaxng_include_pop(
     ctxt: XmlRelaxNGParserCtxtPtr,
 ) -> XmlRelaxNGIncludePtr {
@@ -3429,13 +3049,9 @@ unsafe extern "C" fn xml_relaxng_include_pop(
     ret
 }
 
-/**
- * xmlRelaxNGNormExtSpace:
- * @value:  a value
- *
- * Removes the leading and ending spaces of the value
- * The string is modified "in situ"
- */
+/// Removes the leading and ending spaces of the value
+/// The string is modified "in situ"
+#[doc(alias = "xmlRelaxNGNormExtSpace")]
 unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
     let mut start: *mut XmlChar = value;
     let mut cur: *mut XmlChar = value;
@@ -3490,17 +3106,10 @@ unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
     }
 }
 
-/**
- * xmlRelaxNGRemoveRedefine:
- * @ctxt: the parser context
- * @URL:  the normalized URL
- * @target:  the included target
- * @name:  the define name to eliminate
- *
- * Applies the elimination algorithm of 4.7
- *
- * Returns 0 in case of error, 1 in case of success.
- */
+/// Applies the elimination algorithm of 4.7
+///
+/// Returns 0 in case of error, 1 in case of success.
+#[doc(alias = "xmlRelaxNGRemoveRedefine")]
 unsafe extern "C" fn xml_relaxng_remove_redefine(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     _url: *const XmlChar,
@@ -3567,19 +3176,12 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
     found
 }
 
-/**
- * xmlRelaxNGLoadInclude:
- * @ctxt: the parser context
- * @URL:  the normalized URL
- * @node: the include node.
- * @ns:  the namespace passed from the context.
- *
- * First lookup if the document is already loaded into the parser context,
- * check against recursion. If not found the resource is loaded and
- * the content is preprocessed before being returned back to the caller.
- *
- * Returns the xmlRelaxNGIncludePtr or NULL in case of error
- */
+/// First lookup if the document is already loaded into the parser context,
+/// check against recursion. If not found the resource is loaded and
+/// the content is preprocessed before being returned back to the caller.
+///
+/// Returns the xmlRelaxNGIncludePtr or NULL in case of error
+#[doc(alias = "xmlRelaxNGLoadInclude")]
 unsafe extern "C" fn xml_relaxng_load_include(
     ctxt: XmlRelaxNGParserCtxtPtr,
     url: *const XmlChar,
@@ -3782,14 +3384,9 @@ unsafe extern "C" fn xml_relaxng_load_include(
     ret
 }
 
-/**
- * xmlRelaxNGCleanupTree:
- * @ctxt:  a Relax-NG parser context
- * @root:  an xmlNodePtr subtree
- *
- * Cleanup the subtree from unwanted nodes for parsing, resolve
- * Include and externalRef lookups.
- */
+/// Cleanup the subtree from unwanted nodes for parsing, resolve
+/// Include and externalRef lookups.
+#[doc(alias = "xmlRelaxNGCleanupTree")]
 unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodePtr) {
     let mut cur: XmlNodePtr;
     let mut delete: XmlNodePtr;
@@ -4357,16 +3954,11 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
     }
 }
 
-/**
- * xmlRelaxNGCleanupDoc:
- * @ctxt:  a Relax-NG parser context
- * @doc:  an xmldocPtr document pointer
- *
- * Cleanup the document from unwanted nodes for parsing, resolve
- * Include and externalRef lookups.
- *
- * Returns the cleaned up document or NULL in case of error
- */
+/// Cleanup the document from unwanted nodes for parsing, resolve
+/// Include and externalRef lookups.
+///
+/// Returns the cleaned up document or NULL in case of error
+#[doc(alias = "xmlRelaxNGCleanupDoc")]
 unsafe extern "C" fn xml_relaxng_cleanup_doc(
     ctxt: XmlRelaxNGParserCtxtPtr,
     doc: XmlDocPtr,
@@ -4394,14 +3986,10 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
     doc
 }
 
-/**
- * xmlRelaxNGNewRelaxNG:
- * @ctxt:  a Relax-NG validation context (optional)
- *
- * Allocate a new RelaxNG structure.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new RelaxNG structure.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGNewRelaxNG")]
 unsafe extern "C" fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
     let ret: XmlRelaxNGPtr = xml_malloc(size_of::<XmlRelaxNG>()) as _;
     if ret.is_null() {
@@ -4413,15 +4001,10 @@ unsafe extern "C" fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> X
     ret
 }
 
-/**
- * xmlRelaxNGNewDefine:
- * @ctxt:  a Relax-NG validation context
- * @node:  the node in the input document.
- *
- * Allocate a new RelaxNG define.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new RelaxNG define.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGNewDefine")]
 unsafe extern "C" fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -4460,15 +4043,9 @@ unsafe extern "C" fn xml_relaxng_new_define(
     ret
 }
 
-/**
- * xmlRelaxNGCheckCombine:
- * @define:  the define(s) list
- * @ctxt:  a Relax-NG parser context
- * @name:  the name associated to the defines
- *
- * Applies the 4.17. combine attribute rule for all the define
- * element of a given grammar using the same name.
- */
+/// Applies the 4.17. combine attribute rule for all the define
+/// element of a given grammar using the same name.
+#[doc(alias = "xmlRelaxNGCheckCombine")]
 extern "C" fn xml_relaxng_check_combine(
     payload: *mut c_void,
     data: *mut c_void,
@@ -4622,15 +4199,9 @@ extern "C" fn xml_relaxng_check_combine(
     }
 }
 
-/**
- * xmlRelaxNGCheckReference:
- * @ref:  the ref
- * @ctxt:  a Relax-NG parser context
- * @name:  the name associated to the defines
- *
- * Applies the 4.17. combine attribute rule for all the define
- * element of a given grammar using the same name.
- */
+/// Applies the 4.17. combine attribute rule for all the define
+/// element of a given grammar using the same name.
+#[doc(alias = "xmlRelaxNGCheckReference")]
 extern "C" fn xml_relaxng_check_reference(
     payload: *mut c_void,
     data: *mut c_void,
@@ -4703,14 +4274,10 @@ extern "C" fn xml_relaxng_check_reference(
     }
 }
 
-/**
- * xmlRelaxNGNewGrammar:
- * @ctxt:  a Relax-NG validation context (optional)
- *
- * Allocate a new RelaxNG grammar.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new RelaxNG grammar.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGNewGrammar")]
 unsafe extern "C" fn xml_relaxng_new_grammar(
     ctxt: XmlRelaxNGParserCtxtPtr,
 ) -> XmlRelaxNGGrammarPtr {
@@ -4724,16 +4291,10 @@ unsafe extern "C" fn xml_relaxng_new_grammar(
     ret
 }
 
-/**
- * xmlRelaxNGParseExceptNameClass:
- * @ctxt:  a Relax-NG parser context
- * @node:  the except node
- * @attr:  1 if within an attribute, 0 if within an element
- *
- * parse the content of a RelaxNG nameClass node.
- *
- * Returns the definition pointer or NULL in case of error.
- */
+/// Parse the content of a RelaxNG nameClass node.
+///
+/// Returns the definition pointer or NULL in case of error.
+#[doc(alias = "xmlRelaxNGParseExceptNameClass")]
 unsafe extern "C" fn xml_relaxng_parse_except_name_class(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -4806,16 +4367,10 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
     ret
 }
 
-/**
- * xmlRelaxNGParseNameClass:
- * @ctxt:  a Relax-NG parser context
- * @node:  the nameClass node
- * @def:  the current definition
- *
- * parse the content of a RelaxNG nameClass node.
- *
- * Returns the definition pointer or NULL in case of error.
- */
+/// Parse the content of a RelaxNG nameClass node.
+///
+/// Returns the definition pointer or NULL in case of error.
+#[doc(alias = "xmlRelaxNGParseNameClass")]
 unsafe extern "C" fn xml_relaxng_parse_name_class(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -5009,15 +4564,10 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
     ret
 }
 
-/**
- * xmlRelaxNGGetDataTypeLibrary:
- * @ctxt:  a Relax-NG parser context
- * @node:  the current data or value element
- *
- * Applies algorithm from 4.3. datatypeLibrary attribute
- *
- * Returns the datatypeLibrary value or NULL if not found
- */
+/// Applies algorithm from 4.3. datatypeLibrary attribute
+///
+/// Returns the datatypeLibrary value or NULL if not found
+#[doc(alias = "xmlRelaxNGGetDataTypeLibrary")]
 unsafe extern "C" fn xml_relaxng_get_data_type_library(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     mut node: XmlNodePtr,
@@ -5064,15 +4614,10 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
     null_mut()
 }
 
-/**
- * xmlRelaxNGParseData:
- * @ctxt:  a Relax-NG parser context
- * @node:  the data node.
- *
- * parse the content of a RelaxNG data node.
- *
- * Returns the definition pointer or NULL in case of error
- */
+/// Parse the content of a RelaxNG data node.
+///
+/// Returns the definition pointer or NULL in case of error
+#[doc(alias = "xmlRelaxNGParseData")]
 unsafe extern "C" fn xml_relaxng_parse_data(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -5275,15 +4820,10 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     def
 }
 
-/**
- * xmlRelaxNGParseAttribute:
- * @ctxt:  a Relax-NG parser context
- * @node:  the element node
- *
- * parse the content of a RelaxNG attribute node.
- *
- * Returns the definition pointer or NULL in case of error.
- */
+/// Parse the content of a RelaxNG attribute node.
+///
+/// Returns the definition pointer or NULL in case of error.
+#[doc(alias = "xmlRelaxNGParseAttribute")]
 unsafe extern "C" fn xml_relaxng_parse_attribute(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -5378,15 +4918,10 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
     ret
 }
 
-/**
- * xmlRelaxNGParseValue:
- * @ctxt:  a Relax-NG parser context
- * @node:  the data node.
- *
- * parse the content of a RelaxNG value node.
- *
- * Returns the definition pointer or NULL in case of error
- */
+/// Parse the content of a RelaxNG value node.
+///
+/// Returns the definition pointer or NULL in case of error
+#[doc(alias = "xmlRelaxNGParseValue")]
 unsafe extern "C" fn xml_relaxng_parse_value(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -5517,15 +5052,10 @@ unsafe extern "C" fn xml_relaxng_parse_value(
     def
 }
 
-/**
- * xmlRelaxNGParseInterleave:
- * @ctxt:  a Relax-NG parser context
- * @node:  the data node.
- *
- * parse the content of a RelaxNG interleave node.
- *
- * Returns the definition pointer or NULL in case of error
- */
+/// Parse the content of a RelaxNG interleave node.
+///
+/// Returns the definition pointer or NULL in case of error
+#[doc(alias = "xmlRelaxNGParseInterleave")]
 unsafe extern "C" fn xml_relaxng_parse_interleave(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -5599,14 +5129,8 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
     def
 }
 
-/**
- * xmlRelaxNGParseImportRef:
- * @payload: the parser context
- * @data: the current grammar
- * @name: the reference name
- *
- * Import import one references into the current grammar
- */
+/// Import import one references into the current grammar
+#[doc(alias = "xmlRelaxNGParseImportRef")]
 extern "C" fn xml_relaxng_parse_import_ref(
     payload: *mut c_void,
     data: *mut c_void,
@@ -5650,15 +5174,10 @@ extern "C" fn xml_relaxng_parse_import_ref(
     }
 }
 
-/**
- * xmlRelaxNGParseImportRefs:
- * @ctxt: the parser context
- * @grammar: the sub grammar
- *
- * Import references from the subgrammar into the current grammar
- *
- * Returns 0 in case of success, -1 in case of failure
- */
+/// Import references from the subgrammar into the current grammar
+///
+/// Returns 0 in case of success, -1 in case of failure
+#[doc(alias = "xmlRelaxNGParseImportRefs")]
 unsafe extern "C" fn xml_relaxng_parse_import_refs(
     ctxt: XmlRelaxNGParserCtxtPtr,
     grammar: XmlRelaxNGGrammarPtr,
@@ -5691,15 +5210,10 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
     0
 }
 
-/**
- * xmlRelaxNGProcessExternalRef:
- * @ctxt: the parser context
- * @node:  the externalRef node
- *
- * Process and compile an externalRef node
- *
- * Returns the xmlRelaxNGDefinePtr or NULL in case of error
- */
+/// Process and compile an externalRef node
+///
+/// Returns the xmlRelaxNGDefinePtr or NULL in case of error
+#[doc(alias = "xmlRelaxNGProcessExternalRef")]
 unsafe extern "C" fn xml_relaxng_process_external_ref(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -5792,16 +5306,10 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
     def
 }
 
-/**
- * xmlRelaxNGParsePattern:
- * @ctxt:  a Relax-NG parser context
- * @node:  the pattern node.
- *
- * parse the content of a RelaxNG pattern node.
- *
- * Returns the definition pointer or NULL in case of error or if no
- *     pattern is generated.
- */
+/// Parse the content of a RelaxNG pattern node.
+///
+/// Returns the definition pointer or NULL in case of error or if no pattern is generated.
+#[doc(alias = "xmlRelaxNGParsePattern")]
 unsafe extern "C" fn xml_relaxng_parse_pattern(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -6210,15 +5718,10 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
     def
 }
 
-/**
- * xmlRelaxNGParseElement:
- * @ctxt:  a Relax-NG parser context
- * @node:  the element node
- *
- * parse the content of a RelaxNG element node.
- *
- * Returns the definition pointer or NULL in case of error.
- */
+/// Parse the content of a RelaxNG element node.
+///
+/// Returns the definition pointer or NULL in case of error.
+#[doc(alias = "xmlRelaxNGParseElement")]
 unsafe extern "C" fn xml_relaxng_parse_element(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -6353,16 +5856,10 @@ unsafe extern "C" fn xml_relaxng_parse_element(
     ret
 }
 
-/**
- * xmlRelaxNGParsePatterns:
- * @ctxt:  a Relax-NG parser context
- * @nodes:  list of nodes
- * @group:  use an implicit <group> for elements
- *
- * parse the content of a RelaxNG start node.
- *
- * Returns the definition pointer or NULL in case of error.
- */
+/// Parse the content of a RelaxNG start node.
+///
+/// Returns the definition pointer or NULL in case of error.
+#[doc(alias = "xmlRelaxNGParsePatterns")]
 unsafe extern "C" fn xml_relaxng_parse_patterns(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut nodes: XmlNodePtr,
@@ -6412,15 +5909,10 @@ unsafe extern "C" fn xml_relaxng_parse_patterns(
     def
 }
 
-/**
- * xmlRelaxNGParseStart:
- * @ctxt:  a Relax-NG parser context
- * @nodes:  start children nodes
- *
- * parse the content of a RelaxNG start node.
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Parse the content of a RelaxNG start node.
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlRelaxNGParseStart")]
 unsafe extern "C" fn xml_relaxng_parse_start(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut nodes: XmlNodePtr,
@@ -6499,15 +5991,10 @@ unsafe extern "C" fn xml_relaxng_parse_start(
     ret
 }
 
-/**
- * xmlRelaxNGParseDefine:
- * @ctxt:  a Relax-NG parser context
- * @node:  the define node
- *
- * parse the content of a RelaxNG define element node.
- *
- * Returns 0 in case of success or -1 in case of error
- */
+/// Parse the content of a RelaxNG define element node.
+///
+/// Returns 0 in case of success or -1 in case of error
+#[doc(alias = "xmlRelaxNGParseDefine")]
 unsafe extern "C" fn xml_relaxng_parse_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -6602,15 +6089,10 @@ unsafe extern "C" fn xml_relaxng_parse_define(
     ret
 }
 
-/**
- * xmlRelaxNGParseInclude:
- * @ctxt:  a Relax-NG parser context
- * @node:  the include node
- *
- * Integrate the content of an include node in the current grammar
- *
- * Returns 0 in case of success or -1 in case of error
- */
+/// Integrate the content of an include node in the current grammar
+///
+/// Returns 0 in case of success or -1 in case of error
+#[doc(alias = "xmlRelaxNGParseInclude")]
 unsafe extern "C" fn xml_relaxng_parse_include(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -6674,15 +6156,10 @@ unsafe extern "C" fn xml_relaxng_parse_include(
     ret
 }
 
-/**
- * xmlRelaxNGParseGrammarContent:
- * @ctxt:  a Relax-NG parser context
- * @nodes:  grammar children nodes
- *
- * parse the content of a RelaxNG grammar node.
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Parse the content of a RelaxNG grammar node.
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlRelaxNGParseGrammarContent")]
 unsafe extern "C" fn xml_relaxng_parse_grammar_content(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut nodes: XmlNodePtr,
@@ -6744,14 +6221,8 @@ unsafe extern "C" fn xml_relaxng_parse_grammar_content(
     ret
 }
 
-/**
- * xmlRelaxNGCombineStart:
- * @ctxt:  a Relax-NG parser context
- * @grammar:  the grammar
- *
- * Applies the 4.17. combine rule for all the start
- * element of a given grammar.
- */
+/// Applies the 4.17. combine rule for all the start element of a given grammar.
+#[doc(alias = "xmlRelaxNGCombineStart")]
 unsafe extern "C" fn xml_relaxng_combine_start(
     ctxt: XmlRelaxNGParserCtxtPtr,
     grammar: XmlRelaxNGGrammarPtr,
@@ -6888,16 +6359,10 @@ unsafe extern "C" fn xml_relaxng_combine_start(
     }
 }
 
-/**
- * xmlRelaxNGParseGrammar:
- * @ctxt:  a Relax-NG parser context
- * @nodes:  grammar children nodes
- *
- * parse a Relax-NG <grammar> node
- *
- * Returns the internal xmlRelaxNGGrammarPtr built or
- *         NULL in case of error
- */
+/// Parse a Relax-NG <grammar> node
+///
+/// Returns the internal xmlRelaxNGGrammarPtr built or NULL in case of error
+#[doc(alias = "xmlRelaxNGParseGrammar")]
 unsafe extern "C" fn xml_relaxng_parse_grammar(
     ctxt: XmlRelaxNGParserCtxtPtr,
     nodes: XmlNodePtr,
@@ -6970,16 +6435,10 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
     ret
 }
 
-/**
- * xmlRelaxNGCheckCycles:
- * @ctxt:  a Relax-NG parser context
- * @nodes:  grammar children nodes
- * @depth:  the counter
- *
- * Check for cycles.
- *
- * Returns 0 if check passed, and -1 in case of error
- */
+/// Check for cycles.
+///
+/// Returns 0 if check passed, and -1 in case of error
+#[doc(alias = "xmlRelaxNGCheckCycles")]
 unsafe extern "C" fn xml_relaxng_check_cycles(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
@@ -7014,17 +6473,10 @@ unsafe extern "C" fn xml_relaxng_check_cycles(
     ret
 }
 
-/**
- * xmlRelaxNGTryUnlink:
- * @ctxt:  a Relax-NG parser context
- * @cur:  the definition to unlink
- * @parent:  the parent definition
- * @prev:  the previous sibling definition
- *
- * Try to unlink a definition. If not possible make it a NOOP
- *
- * Returns the new prev definition
- */
+/// Try to unlink a definition. If not possible make it a NOOP
+///
+/// Returns the new prev definition
+#[doc(alias = "xmlRelaxNGTryUnlink")]
 unsafe extern "C" fn xml_relaxng_try_unlink(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     cur: XmlRelaxNGDefinePtr,
@@ -7048,15 +6500,10 @@ unsafe extern "C" fn xml_relaxng_try_unlink(
     prev
 }
 
-/**
- * xmlRelaxNGGenerateAttributes:
- * @ctxt:  a Relax-NG parser context
- * @def:  the definition definition
- *
- * Check if the definition can only generate attributes
- *
- * Returns 1 if yes, 0 if no and -1 in case of error.
- */
+/// Check if the definition can only generate attributes
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error.
+#[doc(alias = "xmlRelaxNGGenerateAttributes")]
 unsafe extern "C" fn xml_relaxng_generate_attributes(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
@@ -7139,13 +6586,8 @@ unsafe extern "C" fn xml_relaxng_generate_attributes(
     1
 }
 
-/**
- * xmlRelaxNGSimplify:
- * @ctxt:  a Relax-NG parser context
- * @nodes:  grammar children nodes
- *
- * Check for simplification of empty and notAllowed
- */
+/// Check for simplification of empty and notAllowed
+#[doc(alias = "xmlRelaxNGSimplify")]
 unsafe extern "C" fn xml_relaxng_simplify(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
@@ -7333,13 +6775,8 @@ unsafe extern "C" fn xml_relaxng_simplify(
     }
 }
 
-/**
- * xmlRelaxNGCheckGroupAttrs:
- * @ctxt:  a Relax-NG parser context
- * @def:  the group definition
- *
- * Detects violations of rule 7.3
- */
+/// Detects violations of rule 7.3
+#[doc(alias = "xmlRelaxNGCheckGroupAttrs")]
 unsafe extern "C" fn xml_relaxng_check_group_attrs(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
@@ -7427,15 +6864,10 @@ unsafe extern "C" fn xml_relaxng_check_group_attrs(
     (*def).dflags |= IS_PROCESSED as i16;
 }
 
-/**
- * xmlRelaxNGGroupContentType:
- * @ct1:  the first content type
- * @ct2:  the second content type
- *
- * Try to group 2 content types
- *
- * Returns the content type
- */
+/// Try to group 2 content types
+///
+/// Returns the content type
+#[doc(alias = "xmlRelaxNGGroupContentType")]
 unsafe extern "C" fn xml_relaxng_group_content_type(
     ct1: XmlRelaxNGContentType,
     ct2: XmlRelaxNGContentType,
@@ -7455,14 +6887,10 @@ unsafe extern "C" fn xml_relaxng_group_content_type(
     XmlRelaxNGContentType::Error
 }
 
-/**
- * xmlRelaxNGIsNullable:
- * @define:  the definition to verify
- *
- * Check if a definition is nullable.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error
- */
+/// Check if a definition is nullable.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error
+#[doc(alias = "xmlRelaxNGIsNullable")]
 unsafe extern "C" fn xml_relaxng_is_nullable(define: XmlRelaxNGDefinePtr) -> i32 {
     let mut ret: i32;
 
@@ -7528,13 +6956,8 @@ unsafe extern "C" fn xml_relaxng_is_nullable(define: XmlRelaxNGDefinePtr) -> i32
     ret
 }
 
-/**
- * xmlRelaxNGCheckChoiceDeterminism:
- * @ctxt:  a Relax-NG parser context
- * @def:  the choice definition
- *
- * Also used to find indeterministic pattern in choice
- */
+/// Also used to find indeterministic pattern in choice
+#[doc(alias = "xmlRelaxNGCheckChoiceDeterminism")]
 unsafe extern "C" fn xml_relaxng_check_choice_determinism(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
@@ -7677,15 +7100,10 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
     (*def).dflags |= IS_PROCESSED as i16;
 }
 
-/**
- * xmlRelaxNGMaxContentType:
- * @ct1:  the first content type
- * @ct2:  the second content type
- *
- * Compute the max content-type
- *
- * Returns the content type
- */
+/// Compute the max content-type
+///
+/// Returns the content type
+#[doc(alias = "xmlRelaxNGMaxContentType")]
 unsafe extern "C" fn xml_relaxng_max_content_type(
     ct1: XmlRelaxNGContentType,
     ct2: XmlRelaxNGContentType,
@@ -7702,17 +7120,10 @@ unsafe extern "C" fn xml_relaxng_max_content_type(
     XmlRelaxNGContentType::Empty
 }
 
-/**
- * xmlRelaxNGCheckRules:
- * @ctxt:  a Relax-NG parser context
- * @cur:  the current definition
- * @flags:  some accumulated flags
- * @ptype:  the parent type
- *
- * Check for rules in section 7.1 and 7.2
- *
- * Returns the content type of @cur
- */
+/// Check for rules in section 7.1 and 7.2
+///
+/// Returns the content type of @cur
+#[doc(alias = "xmlRelaxNGCheckRules")]
 unsafe extern "C" fn xml_relaxng_check_rules(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
@@ -8195,17 +7606,11 @@ unsafe extern "C" fn xml_relaxng_check_rules(
     val
 }
 
-/**
- * xmlRelaxNGParseDocument:
- * @ctxt:  a Relax-NG parser context
- * @node:  the root node of the RelaxNG schema
- *
- * parse a Relax-NG definition resource and build an internal
- * xmlRelaxNG structure which can be used to validate instances.
- *
- * Returns the internal XML RelaxNG structure built or
- *         NULL in case of error
- */
+/// parse a Relax-NG definition resource and build an internal
+/// xmlRelaxNG structure which can be used to validate instances.
+///
+/// Returns the internal XML RelaxNG structure built or NULL in case of error
+#[doc(alias = "xmlRelaxNGParseDocument")]
 unsafe extern "C" fn xml_relaxng_parse_document(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
@@ -8284,14 +7689,10 @@ unsafe extern "C" fn xml_relaxng_parse_document(
     schema
 }
 
-/**
- * xmlRelaxNGIsCompilable:
- * @define:  the definition to check
- *
- * Check if a definition is nullable.
- *
- * Returns 1 if yes, 0 if no and -1 in case of error
- */
+/// Check if a definition is nullable.
+///
+/// Returns 1 if yes, 0 if no and -1 in case of error
+#[doc(alias = "xmlRelaxNGIsCompilable")]
 unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 {
     let mut ret: i32 = -1;
 
@@ -8434,16 +7835,11 @@ unsafe extern "C" fn xml_relaxng_def_name(def: XmlRelaxNGDefinePtr) -> *const c_
     // c"unknown".as_ptr() as _
 }
 
-/**
- * xmlRelaxNGCompile:
- * ctxt:  the RelaxNG parser context
- * @define:  the definition tree to compile
- *
- * Compile the set of definitions, it works recursively, till the
- * element boundaries, where it tries to compile the content if possible
- *
- * Returns 0 if success and -1 in case of error
- */
+/// Compile the set of definitions, it works recursively, till the
+/// element boundaries, where it tries to compile the content if possible
+///
+/// Returns 0 if success and -1 in case of error
+#[doc(alias = "xmlRelaxNGCompile")]
 unsafe extern "C" fn xml_relaxng_compile(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
@@ -8653,16 +8049,11 @@ unsafe extern "C" fn xml_relaxng_compile(
     ret
 }
 
-/**
- * xmlRelaxNGTryCompile:
- * ctxt:  the RelaxNG parser context
- * @define:  the definition tree to compile
- *
- * Try to compile the set of definitions, it works recursively,
- * possibly ignoring parts which cannot be compiled.
- *
- * Returns 0 if success and -1 in case of error
- */
+/// Try to compile the set of definitions, it works recursively,
+/// possibly ignoring parts which cannot be compiled.
+///
+/// Returns 0 if success and -1 in case of error
+#[doc(alias = "xmlRelaxNGTryCompile")]
 unsafe extern "C" fn xml_relaxng_try_compile(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
@@ -8718,16 +8109,11 @@ unsafe extern "C" fn xml_relaxng_try_compile(
     ret
 }
 
-/**
- * xmlRelaxNGParse:
- * @ctxt:  a Relax-NG parser context
- *
- * parse a schema definition resource and build an internal
- * XML Schema structure which can be used to validate instances.
- *
- * Returns the internal XML RelaxNG structure built from the resource or
- *         NULL in case of error
- */
+/// Parse a schema definition resource and build an internal
+/// XML Schema structure which can be used to validate instances.
+///
+/// Returns the internal XML RelaxNG structure built from the resource or NULL in case of error
+#[doc(alias = "xmlRelaxNGParse")]
 pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
     let mut doc: XmlDocPtr;
 
@@ -8882,12 +8268,8 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
     ret
 }
 
-/**
- * xmlRelaxNGFreeGrammar:
- * @grammar:  a grammar structure
- *
- * Deallocate a RelaxNG grammar structure.
- */
+/// Deallocate a RelaxNG grammar structure.
+#[doc(alias = "xmlRelaxNGFreeGrammar")]
 unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
     if grammar.is_null() {
         return;
@@ -8909,12 +8291,8 @@ unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
     xml_free(grammar as _);
 }
 
-/**
- * xmlRelaxNGFree:
- * @schema:  a schema structure
- *
- * Deallocate a RelaxNG structure.
- */
+/// Deallocate a RelaxNG structure.
+#[doc(alias = "xmlRelaxNGFree")]
 pub unsafe extern "C" fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         return;
@@ -8942,13 +8320,8 @@ pub unsafe extern "C" fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
     xml_free(schema as _);
 }
 
-/**
- * xmlRelaxNGDumpDefines:
- * @output:  the file output
- * @defines:  a list of define structures
- *
- * Dump a RelaxNG structure back
- */
+/// Dump a RelaxNG structure back
+#[doc(alias = "xmlRelaxNGDumpDefines")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_relaxng_dump_defines(output: *mut FILE, mut defines: XmlRelaxNGDefinePtr) {
     while !defines.is_null() {
@@ -8957,13 +8330,8 @@ unsafe extern "C" fn xml_relaxng_dump_defines(output: *mut FILE, mut defines: Xm
     }
 }
 
-/**
- * xmlRelaxNGDumpDefine:
- * @output:  the file output
- * @define:  a define structure
- *
- * Dump a RelaxNG structure back
- */
+/// Dump a RelaxNG structure back
+#[doc(alias = "xmlRelaxNGDumpDefine")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_relaxng_dump_define(output: *mut FILE, define: XmlRelaxNGDefinePtr) {
     if define.is_null() {
@@ -9076,14 +8444,8 @@ unsafe extern "C" fn xml_relaxng_dump_define(output: *mut FILE, define: XmlRelax
     }
 }
 
-/**
- * xmlRelaxNGDumpGrammar:
- * @output:  the file output
- * @grammar:  a grammar structure
- * @top:  is this a top grammar
- *
- * Dump a RelaxNG structure back
- */
+/// Dump a RelaxNG structure back
+#[doc(alias = "xmlRelaxNGDumpGrammar")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_relaxng_dump_grammar(
     output: *mut FILE,
@@ -9124,13 +8486,8 @@ unsafe extern "C" fn xml_relaxng_dump_grammar(
     fprintf(output, c"</grammar>\n".as_ptr() as _);
 }
 
-/**
- * xmlRelaxNGDump:
- * @output:  the file output
- * @schema:  a schema structure
- *
- * Dump a RelaxNG structure back
- */
+/// Dump a RelaxNG structure back
+#[doc(alias = "xmlRelaxNGDump")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGPtr) {
     use std::ffi::CString;
@@ -9161,13 +8518,8 @@ pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGP
     xml_relaxng_dump_grammar(output, (*schema).topgrammar, 1);
 }
 
-/**
- * xmlRelaxNGDumpTree:
- * @output:  the file output
- * @schema:  a schema structure
- *
- * Dump the transformed RelaxNG tree.
- */
+/// Dump the transformed RelaxNG tree.
+#[doc(alias = "xmlRelaxNGDumpTree")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_relaxng_dump_tree(output: *mut FILE, schema: XmlRelaxNGPtr) {
     if output.is_null() {
@@ -9187,18 +8539,8 @@ pub unsafe extern "C" fn xml_relaxng_dump_tree(output: *mut FILE, schema: XmlRel
     }
 }
 
-/*
- * Interfaces for validating
- */
-/**
- * xmlRelaxNGSetValidErrors:
- * @ctxt:  a Relax-NG validation context
- * @err:  the error function
- * @warn: the warning function
- * @ctx: the functions context
- *
- * Set the error and warning callback information
- */
+/// Set the error and warning callback information
+#[doc(alias = "xmlRelaxNGSetValidErrors")]
 pub unsafe fn xml_relaxng_set_valid_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: Option<GenericError>,
@@ -9214,17 +8556,10 @@ pub unsafe fn xml_relaxng_set_valid_errors(
     (*ctxt).serror = None;
 }
 
-/**
- * xmlRelaxNGGetValidErrors:
- * @ctxt:  a Relax-NG validation context
- * @err:  the error function result
- * @warn: the warning function result
- * @ctx: the functions context result
- *
- * Get the error and warning callback information
- *
- * Returns -1 in case of error and 0 otherwise
- */
+/// Get the error and warning callback information
+///
+/// Returns -1 in case of error and 0 otherwise
+#[doc(alias = "xmlRelaxNGGetValidErrors")]
 pub unsafe extern "C" fn xml_relaxng_get_valid_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: *mut Option<GenericError>,
@@ -9246,14 +8581,8 @@ pub unsafe extern "C" fn xml_relaxng_get_valid_errors(
     0
 }
 
-/**
- * xmlRelaxNGSetValidStructuredErrors:
- * @ctxt:  a Relax-NG validation context
- * @serror:  the structured error function
- * @ctx: the functions context
- *
- * Set the structured error callback
- */
+/// Set the structured error callback
+#[doc(alias = "xmlRelaxNGSetValidStructuredErrors")]
 pub unsafe fn xml_relaxng_set_valid_structured_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     serror: Option<StructuredError>,
@@ -9268,13 +8597,8 @@ pub unsafe fn xml_relaxng_set_valid_structured_errors(
     (*ctxt).user_data = ctx;
 }
 
-/**
- * xmlRelaxNGFreeStates:
- * @ctxt:  a Relax-NG validation context
- * @states:  the container
- *
- * Free a RelaxNG validation state container
- */
+/// Free a RelaxNG validation state container
+#[doc(alias = "xmlRelaxNGFreeStates")]
 unsafe extern "C" fn xml_relaxng_free_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
@@ -9313,14 +8637,10 @@ unsafe extern "C" fn xml_relaxng_free_states(
     }
 }
 
-/**
- * xmlRelaxNGNewValidCtxt:
- * @schema:  a precompiled XML RelaxNGs
- *
- * Create an XML RelaxNGs validation context based on the given schema
- *
- * Returns the validation context or NULL in case of error
- */
+/// Create an XML RelaxNGs validation context based on the given schema
+///
+/// Returns the validation context or NULL in case of error
+#[doc(alias = "xmlRelaxNGNewValidCtxt")]
 pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
     schema: XmlRelaxNGPtr,
 ) -> XmlRelaxNGValidCtxtPtr {
@@ -9349,15 +8669,10 @@ pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
     ret
 }
 
-/**
- * xmlRelaxNGNewStates:
- * @ctxt:  a Relax-NG validation context
- * @size:  the default size for the container
- *
- * Allocate a new RelaxNG validation state container
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new RelaxNG validation state container
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGNewStates")]
 unsafe extern "C" fn xml_relaxng_new_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut size: i32,
@@ -9392,17 +8707,10 @@ unsafe extern "C" fn xml_relaxng_new_states(
     ret
 }
 
-/**
- * xmlRelaxNGAddStateUniq:
- * @ctxt:  a Relax-NG validation context
- * @states:  the states container
- * @state:  the validation state
- *
- * Add a RelaxNG validation state to the container without checking
- * for unicity.
- *
- * Return 1 in case of success and 0 if this is a duplicate and -1 on error
- */
+/// Add a RelaxNG validation state to the container without checking for unicity.
+///
+/// Return 1 in case of success and 0 if this is a duplicate and -1 on error
+#[doc(alias = "xmlRelaxNGAddStateUniq")]
 unsafe extern "C" fn xml_relaxng_add_states_uniq(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
@@ -9429,12 +8737,8 @@ unsafe extern "C" fn xml_relaxng_add_states_uniq(
     1
 }
 
-/**
- * xmlRelaxNGFreeValidState:
- * @state:  a validation state structure
- *
- * Deallocate a RelaxNG validation state structure.
- */
+/// Deallocate a RelaxNG validation state structure.
+#[doc(alias = "xmlRelaxNGFreeValidState")]
 unsafe extern "C" fn xml_relaxng_free_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     state: XmlRelaxNGValidStatePtr,
@@ -9456,14 +8760,10 @@ unsafe extern "C" fn xml_relaxng_free_valid_state(
     }
 }
 
-/**
- * xmlRelaxNGElemPop:
- * @ctxt:  the validation context
- *
- * Pop the regexp of the current node content model from the stack
- *
- * Returns the exec or NULL if empty
- */
+/// Pop the regexp of the current node content model from the stack
+///
+/// Returns the exec or NULL if empty
+#[doc(alias = "xmlRelaxNGElemPop")]
 unsafe extern "C" fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPtr {
     if (*ctxt).elem_nr <= 0 {
         return null_mut();
@@ -9479,12 +8779,8 @@ unsafe extern "C" fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRe
     ret
 }
 
-/**
- * xmlRelaxNGFreeValidCtxt:
- * @ctxt:  the schema validation context
- *
- * Free the resources associated to the schema validation context
- */
+/// Free the resources associated to the schema validation context
+#[doc(alias = "xmlRelaxNGFreeValidCtxt")]
 pub unsafe extern "C" fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -9523,15 +8819,10 @@ pub unsafe extern "C" fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPt
     xml_free(ctxt as _);
 }
 
-/**
- * xmlRelaxNGNewValidState:
- * @ctxt:  a Relax-NG validation context
- * @node:  the current node or NULL for the document
- *
- * Allocate a new RelaxNG validation state
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new RelaxNG validation state
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGNewValidState")]
 unsafe extern "C" fn xml_relaxng_new_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     node: XmlNodePtr,
@@ -9629,15 +8920,10 @@ unsafe extern "C" fn xml_relaxng_new_valid_state(
     ret
 }
 
-/**
- * xmlRelaxNGSkipIgnored:
- * @ctxt:  a schema validation context
- * @node:  the top node.
- *
- * Skip ignorable nodes in that context
- *
- * Returns the new sibling or NULL in case of error.
- */
+/// Skip ignorable nodes in that context
+///
+/// Returns the new sibling or NULL in case of error.
+#[doc(alias = "xmlRelaxNGSkipIgnored")]
 unsafe extern "C" fn xml_relaxng_skip_ignored(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut node: XmlNodePtr,
@@ -9662,12 +8948,8 @@ unsafe extern "C" fn xml_relaxng_skip_ignored(
     node
 }
 
-/**
- * xmlRelaxNGValidErrorPop:
- * @ctxt: the validation context
- *
- * Pops the top error from the error stack
- */
+/// Pops the top error from the error stack
+#[doc(alias = "xmlRelaxNGValidErrorPop")]
 unsafe extern "C" fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
     if (*ctxt).err_nr <= 0 {
         (*ctxt).err = null_mut();
@@ -9693,14 +8975,10 @@ unsafe extern "C" fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
     }
 }
 
-/**
- * xmlRelaxNGNextValue:
- * @ctxt:  a Relax-NG validation context
- *
- * Skip to the next value when validating within a list
- *
- * Returns 0 if the operation succeeded or an error code.
- */
+/// Skip to the next value when validating within a list
+///
+/// Returns 0 if the operation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGNextValue")]
 unsafe extern "C" fn xml_relaxng_next_value(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
     let mut cur: *mut XmlChar;
 
@@ -9724,15 +9002,10 @@ unsafe extern "C" fn xml_relaxng_next_value(ctxt: XmlRelaxNGValidCtxtPtr) -> i32
     0
 }
 
-/**
- * xmlRelaxNGValidateValueList:
- * @ctxt:  a Relax-NG validation context
- * @defines:  the list of definitions to verify
- *
- * Validate the given set of definitions for the current value
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given set of definitions for the current value
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateValueList")]
 unsafe extern "C" fn xml_relaxng_validate_value_list(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut defines: XmlRelaxNGDefinePtr,
@@ -9749,17 +9022,10 @@ unsafe extern "C" fn xml_relaxng_validate_value_list(
     ret
 }
 
-/**
- * xmlRelaxNGValidateDatatype:
- * @ctxt:  a Relax-NG validation context
- * @value:  the string value
- * @type:  the datatype definition
- * @node:  the node
- *
- * Validate the given value against the datatype
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given value against the datatype
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateDatatype")]
 unsafe extern "C" fn xml_relaxng_validate_datatype(
     ctxt: XmlRelaxNGValidCtxtPtr,
     value: *const XmlChar,
@@ -9841,15 +9107,10 @@ unsafe extern "C" fn xml_relaxng_validate_datatype(
     ret
 }
 
-/**
- * xmlRelaxNGValidateValue:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to verify
- *
- * Validate the given definition for the current value
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given definition for the current value
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateValue")]
 unsafe extern "C" fn xml_relaxng_validate_value(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
@@ -10118,15 +9379,10 @@ unsafe extern "C" fn xml_relaxng_validate_value(
     ret
 }
 
-/**
- * xmlRelaxNGValidateValueContent:
- * @ctxt:  a Relax-NG validation context
- * @defines:  the list of definitions to verify
- *
- * Validate the given definitions for the current value
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given definitions for the current value
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateValueContent")]
 unsafe extern "C" fn xml_relaxng_validate_value_content(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut defines: XmlRelaxNGDefinePtr,
@@ -10143,16 +9399,10 @@ unsafe extern "C" fn xml_relaxng_validate_value_content(
     ret
 }
 
-/**
- * xmlRelaxNGAttributeMatch:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to check
- * @prop:  the attribute
- *
- * Check if the attribute matches the definition nameClass
- *
- * Returns 1 if the attribute matches, 0 if no, or -1 in case of error
- */
+/// Check if the attribute matches the definition nameClass
+///
+/// Returns 1 if the attribute matches, 0 if no, or -1 in case of error
+#[doc(alias = "xmlRelaxNGAttributeMatch")]
 unsafe extern "C" fn xml_relaxng_attribute_match(
     _ctxt: XmlRelaxNGValidCtxtPtr,
     mut define: XmlRelaxNGDefinePtr,
@@ -10211,15 +9461,10 @@ unsafe extern "C" fn xml_relaxng_attribute_match(
     1
 }
 
-/**
- * xmlRelaxNGValidateAttribute:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to verify
- *
- * Validate the given attribute definition for that node
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given attribute definition for that node
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateAttribute")]
 unsafe extern "C" fn xml_relaxng_validate_attribute(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
@@ -10318,15 +9563,10 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
     ret
 }
 
-/**
- * xmlRelaxNGValidateAttributeList:
- * @ctxt:  a Relax-NG validation context
- * @define:  the list of definition to verify
- *
- * Validate the given node against the list of attribute definitions
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given node against the list of attribute definitions
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateAttributeList")]
 unsafe extern "C" fn xml_relaxng_validate_attribute_list(
     ctxt: XmlRelaxNGValidCtxtPtr,
     defines: XmlRelaxNGDefinePtr,
@@ -10373,15 +9613,8 @@ unsafe extern "C" fn xml_relaxng_validate_attribute_list(
     ret
 }
 
-/**
-* xmlRelaxNGValidateCompiledCallback:
-* @exec:  the regular expression instance
-* @token:  the token which matched
-* @transdata:  callback data, the define for the subelement if available
-* @inputdata:  callback data, the Relax NG validation context
-*
-* Handle the callback and if needed validate the element children.
-*/
+/// Handle the callback and if needed validate the element children.
+#[doc(alias = "xmlRelaxNGValidateCompiledCallback")]
 unsafe extern "C" fn xml_relaxng_validate_compiled_callback(
     _exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
@@ -10421,16 +9654,10 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_callback(
     }
 }
 
-/**
- * xmlRelaxNGValidateCompiledContent:
- * @ctxt:  the RelaxNG validation context
- * @regexp:  the regular expression as compiled
- * @content:  list of children to test against the regexp
- *
- * Validate the content model of an element or start using the regexp
- *
- * Returns 0 in case of success, -1 in case of error.
- */
+/// Validate the content model of an element or start using the regexp
+///
+/// Returns 0 in case of success, -1 in case of error.
+#[doc(alias = "xmlRelaxNGValidateCompiledContent")]
 unsafe extern "C" fn xml_relaxng_validate_compiled_content(
     ctxt: XmlRelaxNGValidCtxtPtr,
     regexp: XmlRegexpPtr,
@@ -10522,17 +9749,11 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
     ret
 }
 
-/**
- * xmlRelaxNGValidateElementEnd:
- * @ctxt:  a Relax-NG validation context
- * @dolog:  indicate that error logging should be done
- *
- * Validate the end of the element, implements check that
- * there is nothing left not consumed in the element content
- * or in the attribute list.
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the end of the element, implements check that
+/// there is nothing left not consumed in the element content or in the attribute list.
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateElementEnd")]
 unsafe extern "C" fn xml_relaxng_validate_element_end(
     ctxt: XmlRelaxNGValidCtxtPtr,
     dolog: i32,
@@ -10568,17 +9789,13 @@ unsafe extern "C" fn xml_relaxng_validate_element_end(
     0
 }
 
-/**
- * xmlRelaxNGBestState:
- * @ctxt:  a Relax-NG validation context
- *
- * Find the "best" state in the (*ctxt).states list of states to report
- * errors about. I.e. a state with no element left in the child list
- * or the one with the less attributes left.
- * This is called only if a validation error was detected
- *
- * Returns the index of the "best" state or -1 in case of error
- */
+/// Find the "best" state in the (*ctxt).states list of states to report
+/// errors about. I.e. a state with no element left in the child list
+/// or the one with the less attributes left.
+/// This is called only if a validation error was detected
+///
+/// Returns the index of the "best" state or -1 in case of error
+#[doc(alias = "xmlRelaxNGBestState")]
 unsafe extern "C" fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
     let mut state: XmlRelaxNGValidStatePtr;
 
@@ -10611,13 +9828,9 @@ unsafe extern "C" fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32
     best
 }
 
-/**
- * xmlRelaxNGLogBestError:
- * @ctxt:  a Relax-NG validation context
- *
- * Find the "best" state in the (*ctxt).states list of states to report
- * errors about and log it.
- */
+/// Find the "best" state in the (*ctxt).states list of states to report
+/// errors about and log it.
+#[doc(alias = "xmlRelaxNGLogBestError")]
 unsafe extern "C" fn xml_relaxng_log_best_error(ctxt: XmlRelaxNGValidCtxtPtr) {
     if ctxt.is_null() || (*ctxt).states.is_null() || (*(*ctxt).states).nb_state <= 0 {
         return;
@@ -10631,15 +9844,10 @@ unsafe extern "C" fn xml_relaxng_log_best_error(ctxt: XmlRelaxNGValidCtxtPtr) {
     }
 }
 
-/**
- * xmlRelaxNGValidateDefinitionList:
- * @ctxt:  a Relax-NG validation context
- * @define:  the list of definition to verify
- *
- * Validate the given node content against the (list) of definitions
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given node content against the (list) of definitions
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateDefinitionList")]
 unsafe extern "C" fn xml_relaxng_validate_definition_list(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut defines: XmlRelaxNGDefinePtr,
@@ -10675,15 +9883,10 @@ unsafe extern "C" fn xml_relaxng_validate_definition_list(
     ret
 }
 
-/**
- * xmlRelaxNGCopyValidState:
- * @ctxt:  a Relax-NG validation context
- * @state:  a validation state
- *
- * Copy the validation state
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Copy the validation state
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGCopyValidState")]
 unsafe extern "C" fn xml_relaxng_copy_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     state: XmlRelaxNGValidStatePtr,
@@ -10742,16 +9945,10 @@ unsafe extern "C" fn xml_relaxng_copy_valid_state(
     ret
 }
 
-/**
- * xmlRelaxNGEqualValidState:
- * @ctxt:  a Relax-NG validation context
- * @state1:  a validation state
- * @state2:  a validation state
- *
- * Compare the validation states for equality
- *
- * Returns 1 if equal, 0 otherwise
- */
+/// Compare the validation states for equality
+///
+/// Returns 1 if equal, 0 otherwise
+#[doc(alias = "xmlRelaxNGEqualValidState")]
 unsafe extern "C" fn xml_relaxng_equal_valid_state(
     _ctxt: XmlRelaxNGValidCtxtPtr,
     state1: XmlRelaxNGValidStatePtr,
@@ -10789,16 +9986,10 @@ unsafe extern "C" fn xml_relaxng_equal_valid_state(
     1
 }
 
-/**
- * xmlRelaxNGAddState:
- * @ctxt:  a Relax-NG validation context
- * @states:  the states container
- * @state:  the validation state
- *
- * Add a RelaxNG validation state to the container
- *
- * Return 1 in case of success and 0 if this is a duplicate and -1 on error
- */
+/// Add a RelaxNG validation state to the container
+///
+/// Return 1 in case of success and 0 if this is a duplicate and -1 on error
+#[doc(alias = "xmlRelaxNGAddState")]
 unsafe extern "C" fn xml_relaxng_add_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
@@ -10831,15 +10022,10 @@ unsafe extern "C" fn xml_relaxng_add_states(
     1
 }
 
-/**
- * xmlRelaxNGNodeMatchesList:
- * @node:  the node
- * @list:  a NULL terminated array of definitions
- *
- * Check if a node can be matched by one of the definitions
- *
- * Returns 1 if matches 0 otherwise
- */
+/// Check if a node can be matched by one of the definitions
+///
+/// Returns 1 if matches 0 otherwise
+#[doc(alias = "xmlRelaxNGNodeMatchesList")]
 unsafe extern "C" fn xml_relaxng_node_matches_list(
     node: XmlNodePtr,
     list: *mut XmlRelaxNGDefinePtr,
@@ -10878,15 +10064,10 @@ unsafe extern "C" fn xml_relaxng_node_matches_list(
     0
 }
 
-/**
- * xmlRelaxNGValidateInterleave:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to verify
- *
- * Validate an interleave definition for a node.
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate an interleave definition for a node.
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateInterleave")]
 unsafe extern "C" fn xml_relaxng_validate_interleave(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
@@ -11220,15 +10401,10 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
     ret
 }
 
-/**
- * xmlRelaxNGValidateState:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to verify
- *
- * Validate the current state against the definition
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the current state against the definition
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateState")]
 unsafe extern "C" fn xml_relaxng_validate_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
@@ -11712,12 +10888,12 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             (*ctxt).states = res;
             (*ctxt).flags = oldflags;
             // #if 0
-            //                 /*
-            //                  * errors may have to be propagated back...
-            //                  */
-            //                 if (*ctxt).errNr > errNr {
-            //                     xmlRelaxNGPopErrors(ctxt, errNr);
-            //                 }
+            // /*
+            //  * errors may have to be propagated back...
+            //  */
+            // if (*ctxt).errNr > errNr {
+            //     xmlRelaxNGPopErrors(ctxt, errNr);
+            // }
             // #endif
             ret = 0;
         }
@@ -12009,15 +11185,10 @@ unsafe extern "C" fn xml_relaxng_validate_state(
     ret
 }
 
-/**
- * xmlRelaxNGValidateDefinition:
- * @ctxt:  a Relax-NG validation context
- * @define:  the definition to verify
- *
- * Validate the current node lists against the definition
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the current node lists against the definition
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateDefinition")]
 unsafe extern "C" fn xml_relaxng_validate_definition(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
@@ -12140,15 +11311,10 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
     ret
 }
 
-/**
- * xmlRelaxNGValidateDocument:
- * @ctxt:  a Relax-NG validation context
- * @doc:  the document
- *
- * Validate the given document
- *
- * Returns 0 if the validation succeeded or an error code.
- */
+/// Validate the given document
+///
+/// Returns 0 if the validation succeeded or an error code.
+#[doc(alias = "xmlRelaxNGValidateDocument")]
 unsafe extern "C" fn xml_relaxng_validate_document(
     ctxt: XmlRelaxNGValidCtxtPtr,
     doc: XmlDocPtr,
@@ -12229,19 +11395,14 @@ unsafe extern "C" fn xml_relaxng_validate_document(
     ret
 }
 
-/**
- * xmlRelaxNGCleanPSVI:
- * @node:  an input element or document
- *
- * Call this routine to speed up XPath computation on static documents.
- * This stamps all the element nodes with the document order
- * Like for line information, the order is kept in the element->content
- * field, the value stored is actually - the node number (starting at -1)
- * to be able to differentiate from line numbers.
- *
- * Returns the number of elements found in the document or -1 in case
- *    of error.
- */
+/// Call this routine to speed up XPath computation on static documents.
+/// This stamps all the element nodes with the document order
+/// Like for line information, the order is kept in the element->content
+/// field, the value stored is actually - the node number (starting at -1)
+/// to be able to differentiate from line numbers.
+///
+/// Returns the number of elements found in the document or -1 in case of error.
+#[doc(alias = "xmlRelaxNGCleanPSVI")]
 #[cfg(feature = "schema")]
 unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
     let mut cur: XmlNodePtr;
@@ -12294,16 +11455,11 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
     }
 }
 
-/**
- * xmlRelaxNGValidateDoc:
- * @ctxt:  a Relax-NG validation context
- * @doc:  a parsed document tree
- *
- * Validate a document tree in memory.
- *
- * Returns 0 if the document is valid, a positive error code
- *     number otherwise and -1 in case of internal or API error.
- */
+/// Validate a document tree in memory.
+///
+/// Returns 0 if the document is valid, a positive error code
+/// number otherwise and -1 in case of internal or API error.
+#[doc(alias = "xmlRelaxNGValidateDoc")]
 pub unsafe extern "C" fn xml_relaxng_validate_doc(
     ctxt: XmlRelaxNGValidCtxtPtr,
     doc: XmlDocPtr,
@@ -12329,16 +11485,9 @@ pub unsafe extern "C" fn xml_relaxng_validate_doc(
     ret
 }
 
-/**
-* xmlRelaxNGValidateProgressiveCallback:
-* @exec:  the regular expression instance
-* @token:  the token which matched
-* @transdata:  callback data, the define for the subelement if available
-* @inputdata:  callback data, the Relax NG validation context
-*
-* Handle the callback and if needed validate the element children.
-* some of the in/out information are passed via the context in @inputdata.
-*/
+/// Handle the callback and if needed validate the element children.
+/// some of the in/out information are passed via the context in @inputdata.
+#[doc(alias = "xmlRelaxNGValidateProgressiveCallback")]
 unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
     _exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
@@ -12480,15 +11629,10 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
     (*ctxt).state = oldstate;
 }
 
-/**
- * xmlRelaxNGElemPush:
- * @ctxt:  the validation context
- * @exec:  the regexp runtime for the new content model
- *
- * Push a new regexp for the current node content model on the stack
- *
- * Returns 0 in case of success and -1 in case of error.
- */
+/// Push a new regexp for the current node content model on the stack
+///
+/// Returns 0 in case of success and -1 in case of error.
+#[doc(alias = "xmlRelaxNGElemPush")]
 unsafe extern "C" fn xml_relaxng_elem_push(
     ctxt: XmlRelaxNGValidCtxtPtr,
     exec: XmlRegExecCtxtPtr,
@@ -12519,20 +11663,11 @@ unsafe extern "C" fn xml_relaxng_elem_push(
     0
 }
 
-/*
- * Interfaces for progressive validation when possible
- */
-/**
- * xmlRelaxNGValidatePushElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- *
- * Push a new element start on the RelaxNG validation stack.
- *
- * returns 1 if no validation problem was found or 0 if validating the
- *         element requires a full node, and -1 in case of error.
- */
+/// Push a new element start on the RelaxNG validation stack.
+///
+/// returns 1 if no validation problem was found or 0 if validating the
+/// element requires a full node, and -1 in case of error.
+#[doc(alias = "xmlRelaxNGValidatePushElement")]
 pub unsafe extern "C" fn xml_relaxng_validate_push_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _doc: XmlDocPtr,
@@ -12593,16 +11728,10 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_element(
     ret
 }
 
-/**
- * xmlRelaxNGValidatePushCData:
- * @ctxt:  the RelaxNG validation context
- * @data:  some character data read
- * @len:  the length of the data
- *
- * check the CData parsed for validation in the current stack
- *
- * returns 1 if no validation problem was found or -1 otherwise
- */
+/// Check the CData parsed for validation in the current stack
+///
+/// Returns 1 if no validation problem was found or -1 otherwise
+#[doc(alias = "xmlRelaxNGValidatePushCData")]
 pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut data: *const XmlChar,
@@ -12635,16 +11764,10 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
     1
 }
 
-/**
- * xmlRelaxNGValidatePopElement:
- * @ctxt:  the RelaxNG validation context
- * @doc:  a document instance
- * @elem:  an element instance
- *
- * Pop the element end from the RelaxNG validation stack.
- *
- * returns 1 if no validation problem was found or 0 otherwise
- */
+/// Pop the element end from the RelaxNG validation stack.
+///
+/// returns 1 if no validation problem was found or 0 otherwise
+#[doc(alias = "xmlRelaxNGValidatePopElement")]
 pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _doc: XmlDocPtr,
@@ -12683,17 +11806,11 @@ pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
     ret
 }
 
-/**
- * xmlRelaxNGValidateFullElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- *
- * Validate a full subtree when xmlRelaxNGValidatePushElement() returned
- * 0 and the content of the node has been expanded.
- *
- * returns 1 if no validation problem was found or -1 in case of error.
- */
+/// Validate a full subtree when xmlRelaxNGValidatePushElement() returned
+/// 0 and the content of the node has been expanded.
+///
+/// Returns 1 if no validation problem was found or -1 in case of error.
+#[doc(alias = "xmlRelaxNGValidateFullElement")]
 pub unsafe extern "C" fn xml_relaxng_validate_full_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _doc: XmlDocPtr,

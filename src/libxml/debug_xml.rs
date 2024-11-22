@@ -53,16 +53,8 @@ pub struct XmlDebugCtxt {
     options: i32,         /* options */
 }
 
-/*
- * The standard Dump routines.
- */
-/**
- * xmlDebugDumpString:
- * @output:  the FILE * for the output
- * @str:  the string
- *
- * Dumps information about the string, shorten it if necessary
- */
+/// Dumps information about the string, shorten it if necessary
+#[doc(alias = "xmlDebugDumpString")]
 pub unsafe extern "C" fn xml_debug_dump_string(mut output: *mut FILE, str: *const XmlChar) {
     extern "C" {
         static stdout: *mut FILE;
@@ -88,6 +80,7 @@ pub unsafe extern "C" fn xml_debug_dump_string(mut output: *mut FILE, str: *cons
     fprintf(output, c"...".as_ptr());
 }
 
+#[doc(alias = "xmlCtxtDumpInitCtxt")]
 unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
     extern "C" {
         static stdout: *mut FILE;
@@ -108,6 +101,7 @@ unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
     (*ctxt).shift[100] = 0;
 }
 
+#[doc(alias = "xmlCtxtDumpSpaces")]
 unsafe extern "C" fn xml_ctxt_dump_spaces(ctxt: XmlDebugCtxtPtr) {
     if (*ctxt).check != 0 {
         return;
@@ -125,6 +119,7 @@ unsafe extern "C" fn xml_ctxt_dump_spaces(ctxt: XmlDebugCtxtPtr) {
     }
 }
 
+#[doc(alias = "xmlCtxtDumpString")]
 unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
     if (*ctxt).check != 0 {
         return;
@@ -151,13 +146,8 @@ unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const Xml
 
 const DUMP_TEXT_TYPE: i32 = 1;
 
-/**
- * xmlDebugErr:
- * @ctxt:  a debug context
- * @error:  the error code
- *
- * Handle a debug error.
- */
+/// Handle a debug error.
+#[doc(alias = "xmlDebugErr")]
 unsafe extern "C" fn xml_debug_err(
     ctxt: XmlDebugCtxtPtr,
     error: XmlParserErrors,
@@ -184,6 +174,8 @@ unsafe extern "C" fn xml_debug_err(
         msg
     );
 }
+
+#[doc(alias = "xmlDebugErr2")]
 unsafe extern "C" fn xml_debug_err2(
     ctxt: XmlDebugCtxtPtr,
     error: XmlParserErrors,
@@ -211,6 +203,8 @@ unsafe extern "C" fn xml_debug_err2(
         extra
     );
 }
+
+#[doc(alias = "xmlDebugErr3")]
 unsafe extern "C" fn xml_debug_err3(
     ctxt: XmlDebugCtxtPtr,
     error: XmlParserErrors,
@@ -239,17 +233,12 @@ unsafe extern "C" fn xml_debug_err3(
     );
 }
 
-/**
- * xmlNsCheckScope:
- * @node: the node
- * @ns: the namespace node
- *
- * Check that a given namespace is in scope on a node.
- *
- * Returns 1 if in scope, -1 in case of argument error,
- *         -2 if the namespace is not in scope, and -3 if not on
- *         an ancestor node.
- */
+/// Check that a given namespace is in scope on a node.
+///
+/// Returns 1 if in scope, -1 in case of argument error,
+/// -2 if the namespace is not in scope,
+/// and -3 if not on an ancestor node.
+#[doc(alias = "xmlNsCheckScope")]
 unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i32 {
     let mut cur: XmlNsPtr;
 
@@ -310,14 +299,8 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
     -3
 }
 
-/**
- * xmlCtxtNsCheckScope:
- * @ctxt: the debugging context
- * @node: the node
- * @ns: the namespace node
- *
- * Report if a given namespace is is not in scope.
- */
+/// Report if a given namespace is is not in scope.
+#[doc(alias = "xmlCtxtNsCheckScope")]
 unsafe extern "C" fn xml_ctxt_ns_check_scope(
     ctxt: XmlDebugCtxtPtr,
     node: XmlNodePtr,
@@ -358,13 +341,8 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
     }
 }
 
-/**
- * xmlCtxtCheckString:
- * @ctxt: the debug context
- * @str: the string
- *
- * Do debugging on the string, currently it just checks the UTF-8 content
- */
+/// Do debugging on the string, currently it just checks the UTF-8 content
+#[doc(alias = "xmlCtxtCheckString")]
 unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
     if str.is_null() {
         return;
@@ -379,14 +357,9 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
     }
 }
 
-/**
- * xmlCtxtCheckName:
- * @ctxt: the debug context
- * @name: the name
- *
- * Do debugging on the name, for example the dictionary status and
- * conformance to the Name production.
- */
+/// Do debugging on the name, for example the dictionary status and
+/// conformance to the Name production.
+#[doc(alias = "xmlCtxtCheckName")]
 unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const XmlChar) {
     if (*ctxt).check != 0 {
         if name.is_null() {
@@ -424,6 +397,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
     }
 }
 
+#[doc(alias = "xmlCtxtGenericNodeCheck")]
 unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     let dict: XmlDictPtr;
     let doc: XmlDocPtr = (*node).doc;
@@ -627,6 +601,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     }
 }
 
+#[doc(alias = "xmlCtxtDumpDtdNode")]
 unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -675,13 +650,8 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
     xml_ctxt_generic_node_check(ctxt, dtd as XmlNodePtr);
 }
 
-/**
- * xmlCtxtDumpDTD:
- * @output:  the FILE * for the output
- * @dtd:  the DTD
- *
- * Dumps debug information for the DTD
- */
+/// Dumps debug information for the DTD
+#[doc(alias = "xmlCtxtDumpDTD")]
 unsafe extern "C" fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
     if dtd.is_null() {
         if (*ctxt).check == 0 {
@@ -699,6 +669,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
     }
 }
 
+#[doc(alias = "xmlCtxtDumpElemDecl")]
 unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlElementPtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -765,6 +736,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
     xml_ctxt_generic_node_check(ctxt, elem as XmlNodePtr);
 }
 
+#[doc(alias = "xmlCtxtDumpAttrDecl")]
 unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -889,6 +861,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     xml_ctxt_generic_node_check(ctxt, attr as XmlNodePtr);
 }
 
+#[doc(alias = "xmlCtxtDumpEntityDecl")]
 unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -979,6 +952,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
     xml_ctxt_generic_node_check(ctxt, ent as XmlNodePtr);
 }
 
+#[doc(alias = "xmlCtxtDumpNamespace")]
 unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -1027,6 +1001,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
     }
 }
 
+#[doc(alias = "xmlCtxtDumpNamespaceList")]
 unsafe extern "C" fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
     while !ns.is_null() {
         xml_ctxt_dump_namespace(ctxt, ns);
@@ -1034,6 +1009,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns:
     }
 }
 
+#[doc(alias = "xmlCtxtDumpEntity")]
 unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -1106,14 +1082,8 @@ unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityP
     }
 }
 
-/**
- * xmlCtxtDumpAttrList:
- * @output:  the FILE * for the output
- * @attr:  the attribute list
- * @depth:  the indentation level.
- *
- * Dumps debug information for the attribute list
- */
+/// Dumps debug information for the attribute list
+#[doc(alias = "xmlCtxtDumpAttrList")]
 unsafe extern "C" fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: XmlAttrPtr) {
     while !attr.is_null() {
         xml_ctxt_dump_attr(ctxt, attr);
@@ -1121,14 +1091,8 @@ unsafe extern "C" fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: Xm
     }
 }
 
-/**
- * xmlCtxtDumpOneNode:
- * @output:  the FILE * for the output
- * @node:  the node
- * @depth:  the indentation level.
- *
- * Dumps debug information for the element node, it is not recursive
- */
+/// Dumps debug information for the element node, it is not recursive
+#[doc(alias = "xmlCtxtDumpOneNode")]
 unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
@@ -1328,14 +1292,8 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
     xml_ctxt_generic_node_check(ctxt, node);
 }
 
-/**
- * xmlCtxtDumpNode:
- * @output:  the FILE * for the output
- * @node:  the node
- * @depth:  the indentation level.
- *
- * Dumps debug information for the element node, it is recursive
- */
+/// Dumps debug information for the element node, it is recursive
+#[doc(alias = "xmlCtxtDumpNode")]
 unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
@@ -1355,14 +1313,8 @@ unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
     }
 }
 
-/**
- * xmlCtxtDumpNodeList:
- * @output:  the FILE * for the output
- * @node:  the node list
- * @depth:  the indentation level.
- *
- * Dumps debug information for the list of element node, it is recursive
- */
+/// Dumps debug information for the list of element node, it is recursive
+#[doc(alias = "xmlCtxtDumpNodeList")]
 unsafe extern "C" fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, mut node: XmlNodePtr) {
     while !node.is_null() {
         xml_ctxt_dump_node(ctxt, node);
@@ -1370,14 +1322,8 @@ unsafe extern "C" fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, mut node: Xm
     }
 }
 
-/**
- * xmlCtxtDumpAttr:
- * @output:  the FILE * for the output
- * @attr:  the attribute
- * @depth:  the indentation level.
- *
- * Dumps debug information for the attribute
- */
+/// Dumps debug information for the attribute
+#[doc(alias = "xmlCtxtDumpAttr")]
 unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
     xml_ctxt_dump_spaces(ctxt);
 
@@ -1411,18 +1357,13 @@ unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr)
     xml_ctxt_generic_node_check(ctxt, attr as XmlNodePtr);
 }
 
+#[doc(alias = "xmlCtxtDumpCleanCtxt")]
 unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
     /* remove the ATTRIBUTE_UNUSED when this is added */
 }
 
-/**
- * xmlDebugDumpAttr:
- * @output:  the FILE * for the output
- * @attr:  the attribute
- * @depth:  the indentation level.
- *
- * Dumps debug information for the attribute
- */
+/// Dumps debug information for the attribute
+#[doc(alias = "xmlDebugDumpAttr")]
 pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = zeroed();
 
@@ -1436,14 +1377,8 @@ pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/**
- * xmlDebugDumpAttrList:
- * @output:  the FILE * for the output
- * @attr:  the attribute list
- * @depth:  the indentation level.
- *
- * Dumps debug information for the attribute list
- */
+/// Dumps debug information for the attribute list
+#[doc(alias = "xmlDebugDumpAttrList")]
 pub unsafe extern "C" fn xml_debug_dump_attr_list(output: *mut FILE, attr: XmlAttrPtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1457,14 +1392,8 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list(output: *mut FILE, attr: XmlAt
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/**
- * xmlDebugDumpOneNode:
- * @output:  the FILE * for the output
- * @node:  the node
- * @depth:  the indentation level.
- *
- * Dumps debug information for the element node, it is not recursive
- */
+/// Dumps debug information for the element node, it is not recursive
+#[doc(alias = "xmlDebugDumpOneNode")]
 pub unsafe extern "C" fn xml_debug_dump_one_node(output: *mut FILE, node: XmlNodePtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1478,14 +1407,8 @@ pub unsafe extern "C" fn xml_debug_dump_one_node(output: *mut FILE, node: XmlNod
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/**
- * xmlDebugDumpNode:
- * @output:  the FILE * for the output
- * @node:  the node
- * @depth:  the indentation level.
- *
- * Dumps debug information for the element node, it is recursive
- */
+/// Dumps debug information for the element node, it is recursive
+#[doc(alias = "xmlDebugDumpNode")]
 pub unsafe extern "C" fn xml_debug_dump_node(mut output: *mut FILE, node: XmlNodePtr, depth: i32) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1502,14 +1425,8 @@ pub unsafe extern "C" fn xml_debug_dump_node(mut output: *mut FILE, node: XmlNod
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/**
- * xmlDebugDumpNodeList:
- * @output:  the FILE * for the output
- * @node:  the node list
- * @depth:  the indentation level.
- *
- * Dumps debug information for the list of element node, it is recursive
- */
+/// Dumps debug information for the list of element node, it is recursive
+#[doc(alias = "xmlDebugDumpNodeList")]
 pub unsafe extern "C" fn xml_debug_dump_node_list(
     mut output: *mut FILE,
     node: XmlNodePtr,
@@ -1531,6 +1448,7 @@ pub unsafe extern "C" fn xml_debug_dump_node_list(
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
+#[doc(alias = "xmlCtxtDumpDocHead")]
 unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         if (*ctxt).check == 0 {
@@ -1639,13 +1557,8 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
     }
 }
 
-/**
- * xmlCtxtDumpDocumentHead:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Dumps debug information concerning the document, not recursive
- */
+/// Dumps debug information concerning the document, not recursive
+#[doc(alias = "xmlCtxtDumpDocumentHead")]
 unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         return;
@@ -1684,13 +1597,8 @@ unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Xml
     }
 }
 
-/**
- * xmlDebugDumpDocumentHead:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Dumps debug information concerning the document, not recursive
- */
+/// Dumps debug information concerning the document, not recursive
+#[doc(alias = "xmlDebugDumpDocumentHead")]
 pub unsafe extern "C" fn xml_debug_dump_document_head(mut output: *mut FILE, doc: XmlDocPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1708,13 +1616,8 @@ pub unsafe extern "C" fn xml_debug_dump_document_head(mut output: *mut FILE, doc
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/**
- * xmlCtxtDumpDocument:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Dumps debug information for the document, it's recursive
- */
+/// Dumps debug information for the document, it's recursive
+#[doc(alias = "xmlCtxtDumpDocument")]
 unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         if (*ctxt).check == 0 {
@@ -1735,13 +1638,8 @@ unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
     }
 }
 
-/**
- * xmlDebugDumpDocument:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Dumps debug information for the document, it's recursive
- */
+/// Dumps debug information for the document, it's recursive
+#[doc(alias = "xmlDebugDumpDocument")]
 pub unsafe extern "C" fn xml_debug_dump_document(mut output: *mut FILE, doc: XmlDocPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1759,13 +1657,8 @@ pub unsafe extern "C" fn xml_debug_dump_document(mut output: *mut FILE, doc: Xml
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/**
- * xmlDebugDumpDTD:
- * @output:  the FILE * for the output
- * @dtd:  the DTD
- *
- * Dumps debug information for the DTD
- */
+/// Dumps debug information for the DTD
+#[doc(alias = "xmlDebugDumpDTD")]
 pub unsafe extern "C" fn xml_debug_dump_dtd(mut output: *mut FILE, dtd: XmlDtdPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1783,6 +1676,7 @@ pub unsafe extern "C" fn xml_debug_dump_dtd(mut output: *mut FILE, dtd: XmlDtdPt
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
+#[doc(alias = "xmlCtxtDumpEntityCallback")]
 extern "C" fn xml_ctxt_dump_entity_callback(
     payload: *mut c_void,
     data: *mut c_void,
@@ -1864,13 +1758,8 @@ extern "C" fn xml_ctxt_dump_entity_callback(
     }
 }
 
-/**
- * xmlCtxtDumpEntities:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Dumps debug information for all the entities in use by the document
- */
+/// Dumps debug information for all the entities in use by the document
+#[doc(alias = "xmlCtxtDumpEntities")]
 unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         return;
@@ -1898,13 +1787,8 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
     }
 }
 
-/**
- * xmlDebugDumpEntities:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Dumps debug information for all the entities in use by the document
- */
+/// Dumps debug information for all the entities in use by the document
+#[doc(alias = "xmlDebugDumpEntities")]
 pub unsafe extern "C" fn xml_debug_dump_entities(output: *mut FILE, doc: XmlDocPtr) {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1917,21 +1801,11 @@ pub unsafe extern "C" fn xml_debug_dump_entities(output: *mut FILE, doc: XmlDocP
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
-/****************************************************************
- *								*
- *			Checking routines			*
- *								*
- ****************************************************************/
-/**
- * xmlDebugCheckDocument:
- * @output:  the FILE * for the output
- * @doc:  the document
- *
- * Check the document for potential content problems, and output
- * the errors to @output
- *
- * Returns the number of errors found
- */
+/// Check the document for potential content problems, and output
+/// the errors to `output`
+///
+/// Returns the number of errors found
+#[doc(alias = "xmlDebugCheckDocument")]
 pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: XmlDocPtr) -> i32 {
     let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
 
@@ -1950,18 +1824,8 @@ pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: Xm
     ctxt.errors
 }
 
-/****************************************************************
- *								*
- *			XML shell helpers			*
- *								*
- ****************************************************************/
-/**
- * xmlLsOneNode:
- * @output:  the FILE * for the output
- * @node:  the node to dump
- *
- * Dump to @output the type and name of @node.
- */
+/// Dump to `output` the type and name of @node.
+#[doc(alias = "xmlLsOneNode")]
 pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
     if output.is_null() {
         return;
@@ -2096,14 +1960,10 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
     fprintf(output, c"\n".as_ptr());
 }
 
-/**
- * xmlLsCountNode:
- * @node:  the node to count
- *
- * Count the children of @node.
- *
- * Returns the number of children of @node.
- */
+/// Count the children of @node.
+///
+/// Returns the number of children of @node.
+#[doc(alias = "xmlLsCountNode")]
 pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
     let mut list: XmlNodePtr = null_mut();
@@ -2157,14 +2017,10 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
     ret
 }
 
-/**
- * xmlBoolToText:
- * @boolval: a bool to turn into text
- *
- * Convenient way to turn bool into text
- *
- * Returns a pointer to either "True" or "False"
- */
+/// Convenient way to turn bool into text
+///
+/// Returns a pointer to either "True" or "False"
+#[doc(alias = "xmlBoolToText")]
 pub unsafe extern "C" fn xml_bool_to_text(boolval: i32) -> *const c_char {
     if boolval != 0 {
         c"True".as_ptr()
@@ -2173,30 +2029,18 @@ pub unsafe extern "C" fn xml_bool_to_text(boolval: i32) -> *const c_char {
     }
 }
 
-/****************************************************************
- *								*
- *	 The XML shell related structures and functions		*
- *								*
- ****************************************************************/
-/**
- * xmlShellReadlineFunc:
- * @prompt:  a string prompt
- *
- * This is a generic signature for the XML shell input function.
- *
- * Returns a string which will be freed by the Shell.
- */
+/// This is a generic signature for the XML shell input function.
+///
+/// Returns a string which will be freed by the Shell.
+#[doc(alias = "xmlShellReadlineFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlShellReadlineFunc = unsafe extern "C" fn(prompt: *mut c_char) -> *mut c_char;
 
-/**
- * xmlShellCtxt:
- *
- * A debugging shell context.
- * TODO: add the defined function tables.
- */
+/// A debugging shell context.  
+/// TODO: add the defined function tables.
 #[cfg(feature = "xpath")]
 pub type XmlShellCtxtPtr = *mut XmlShellCtxt;
+#[doc(alias = "xmlShellCtxt")]
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlShellCtxt {
@@ -2209,17 +2053,10 @@ pub struct XmlShellCtxt {
     input: XmlShellReadlineFunc,
 }
 
-/**
- * xmlShellCmd:
- * @ctxt:  a shell context
- * @arg:  a string argument
- * @node:  a first node
- * @node2:  a second node
- *
- * This is a generic signature for the XML shell functions.
- *
- * Returns an int, negative returns indicating errors.
- */
+/// This is a generic signature for the XML shell functions.
+///
+/// Returns an int, negative returns indicating errors.
+#[doc(alias = "xmlShellCmd")]
 #[cfg(feature = "xpath")]
 pub type XmlShellCmd = unsafe extern "C" fn(
     ctxt: XmlShellCtxtPtr,
@@ -2228,13 +2065,8 @@ pub type XmlShellCmd = unsafe extern "C" fn(
     node2: XmlNodePtr,
 ) -> i32;
 
-/**
- * xmlShellPrintXPathError:
- * @errorType: valid xpath error id
- * @arg: the argument that cause xpath to fail
- *
- * Print the xpath error to libxml default error channel
- */
+/// Print the xpath error to libxml default error channel
+#[doc(alias = "xmlShellPrintXPathError")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *const c_char) {
     use std::ffi::CStr;
@@ -2288,13 +2120,8 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *
     }
 }
 
-/**
- * xmlShellPrintNodeCtxt:
- * @ctxt : a non-null shell context
- * @node : a non-null node to print to the output FILE
- *
- * Print node to the output FILE
- */
+/// Print node to the output FILE
+#[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
@@ -2322,13 +2149,8 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
     fprintf(fp, c"\n".as_ptr());
 }
 
-/**
- * xmlShellPrintXPathResultCtxt:
- * @ctxt: a valid shell context
- * @list: a valid result generated by an xpath evaluation
- *
- * Prints result to the output FILE
- */
+/// Prints result to the output FILE
+#[doc(alias = "xmlShellPrintXPathResultCtxt")]
 unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
     ctxt: XmlShellCtxtPtr,
     list: XmlXPathObjectPtr,
@@ -2378,29 +2200,18 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
     }
 }
 
-/**
- * xmlShellPrintXPathResult:
- * @list: a valid result generated by an xpath evaluation
- *
- * Prints result to the output FILE
- */
+/// Prints result to the output FILE
+#[doc(alias = "xmlShellPrintXPathResult")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
     xml_shell_print_xpath_result_ctxt(null_mut(), list);
 }
 
-/**
- * xmlShellList:
- * @ctxt:  the shell context
- * @arg:  unused
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "ls"
- * Does an Unix like listing of the given node (like a directory)
- *
- * Returns 0
- */
+/// Implements the XML shell function "ls"
+/// Does an Unix like listing of the given node (like a directory)
+///
+/// Returns 0
+#[doc(alias = "xmlShellList")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_list(
     ctxt: XmlShellCtxtPtr,
@@ -2438,18 +2249,11 @@ pub unsafe extern "C" fn xml_shell_list(
     0
 }
 
-/**
- * xmlShellBase:
- * @ctxt:  the shell context
- * @arg:  unused
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "base"
- * dumps the current XML base of the node
- *
- * Returns 0
- */
+/// Implements the XML shell function "base"
+/// dumps the current XML base of the node
+///
+/// Returns 0
+#[doc(alias = "xmlShellBase")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_base(
     ctxt: XmlShellCtxtPtr,
@@ -2478,18 +2282,11 @@ pub unsafe extern "C" fn xml_shell_base(
     0
 }
 
-/**
- * xmlShellDir:
- * @ctxt:  the shell context
- * @arg:  unused
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "dir"
- * dumps information about the node (namespace, attributes, content).
- *
- * Returns 0
- */
+/// Implements the XML shell function "dir"
+/// dumps information about the node (namespace, attributes, content).
+///
+/// Returns 0
+#[doc(alias = "xmlShellDir")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_dir(
     ctxt: XmlShellCtxtPtr,
@@ -2516,18 +2313,11 @@ pub unsafe extern "C" fn xml_shell_dir(
     0
 }
 
-/**
- * xmlShellLoad:
- * @ctxt:  the shell context
- * @filename:  the file name
- * @node:  unused
- * @node2:  unused
- *
- * Implements the XML shell function "load"
- * loads a new document specified by the filename
- *
- * Returns 0 or -1 if loading failed
- */
+/// Implements the XML shell function "load"
+/// loads a new document specified by the filename
+///
+/// Returns 0 or -1 if loading failed
+#[doc(alias = "xmlShellLoad")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_load(
     ctxt: XmlShellCtxtPtr,
@@ -2591,29 +2381,18 @@ pub unsafe extern "C" fn xml_shell_load(
     0
 }
 
-/**
- * xmlShellPrintNode:
- * @node : a non-null node to print to the output FILE
- *
- * Print node to the output FILE
- */
+/// Print node to the output FILE
+#[doc(alias = "xmlShellPrintNode")]
 #[cfg(all(feature = "xpath", feature = "output"))]
 pub unsafe extern "C" fn xml_shell_print_node(node: XmlNodePtr) {
     xml_shell_print_node_ctxt(null_mut(), node);
 }
 
-/**
- * xmlShellCat:
- * @ctxt:  the shell context
- * @arg:  unused
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "cat"
- * dumps the serialization node content (XML or HTML).
- *
- * Returns 0
- */
+/// Implements the XML shell function "cat"
+/// dumps the serialization node content (XML or HTML).
+///
+/// Returns 0
+#[doc(alias = "xmlShellCat")]
 #[cfg(all(feature = "xpath", feature = "output"))]
 pub unsafe extern "C" fn xml_shell_cat(
     ctxt: XmlShellCtxtPtr,
@@ -2654,19 +2433,12 @@ pub unsafe extern "C" fn xml_shell_cat(
     0
 }
 
-/**
- * xmlShellWrite:
- * @ctxt:  the shell context
- * @filename:  the file name
- * @node:  a node in the tree
- * @node2:  unused
- *
- * Implements the XML shell function "write"
- * Write the current node to the filename, it saves the serialization
- * of the subtree under the @node specified
- *
- * Returns 0 or -1 in case of error
- */
+/// Implements the XML shell function "write"
+/// Write the current node to the filename, it saves the serialization
+/// of the subtree under the @node specified
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlShellWrite")]
 #[cfg(all(feature = "xpath", feature = "output"))]
 pub unsafe extern "C" fn xml_shell_write(
     ctxt: XmlShellCtxtPtr,
@@ -2728,18 +2500,11 @@ pub unsafe extern "C" fn xml_shell_write(
     0
 }
 
-/**
- * xmlShellSave:
- * @ctxt:  the shell context
- * @filename:  the file name (optional)
- * @node:  unused
- * @node2:  unused
- *
- * Implements the XML shell function "save"
- * Write the current document to the filename, or it's original name
- *
- * Returns 0 or -1 in case of error
- */
+/// Implements the XML shell function "save"
+/// Write the current document to the filename, or it's original name
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlShellSave")]
 #[cfg(all(feature = "xpath", feature = "output"))]
 pub unsafe extern "C" fn xml_shell_save(
     ctxt: XmlShellCtxtPtr,
@@ -2791,19 +2556,12 @@ pub unsafe extern "C" fn xml_shell_save(
     0
 }
 
-/**
- * xmlShellValidate:
- * @ctxt:  the shell context
- * @dtd:  the DTD URI (optional)
- * @node:  unused
- * @node2:  unused
- *
- * Implements the XML shell function "validate"
- * Validate the document, if a DTD path is provided, then the validation
- * is done against the given DTD.
- *
- * Returns 0 or -1 in case of error
- */
+/// Implements the XML shell function "validate"
+/// Validate the document, if a DTD path is provided, then the validation
+/// is done against the given DTD.
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlShellValidate")]
 #[cfg(all(feature = "xpath", feature = "valid"))]
 pub unsafe extern "C" fn xml_shell_validate(
     ctxt: XmlShellCtxtPtr,
@@ -2849,19 +2607,12 @@ pub unsafe extern "C" fn xml_shell_validate(
     res
 }
 
-/**
- * xmlShellDu:
- * @ctxt:  the shell context
- * @arg:  unused
- * @tree:  a node defining a subtree
- * @node2:  unused
- *
- * Implements the XML shell function "du"
- * show the structure of the subtree under node @tree
- * If @tree is null, the command works on the current node.
- *
- * Returns 0 or -1 in case of error
- */
+/// Implements the XML shell function "du"
+/// show the structure of the subtree under node @tree
+/// If @tree is null, the command works on the current node.
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlShellDu")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_du(
     ctxt: XmlShellCtxtPtr,
@@ -2943,20 +2694,13 @@ pub unsafe extern "C" fn xml_shell_du(
     0
 }
 
-/**
- * xmlShellPwd:
- * @ctxt:  the shell context
- * @buffer:  the output buffer
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "pwd"
- * Show the full path from the root to the node, if needed building
- * thumblers when similar elements exists at a given ancestor level.
- * The output is compatible with XPath commands.
- *
- * Returns 0 or -1 in case of error
- */
+/// Implements the XML shell function "pwd"
+/// Show the full path from the root to the node, if needed building
+/// thumblers when similar elements exists at a given ancestor level.
+/// The output is compatible with XPath commands.
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlShellPwd")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell_pwd(
     _ctxt: XmlShellCtxtPtr,
@@ -2992,18 +2736,11 @@ pub unsafe extern "C" fn xml_shell_pwd(
     0
 }
 
-/**
- * xmlShellRNGValidate:
- * @ctxt:  the shell context
- * @schemas:  the path to the Relax-NG schemas
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "relaxng"
- * validating the instance against a Relax-NG schemas
- *
- * Returns 0
- */
+/// Implements the XML shell function "relaxng"
+/// validating the instance against a Relax-NG schemas
+///
+/// Returns 0
+#[doc(alias = "xmlShellRNGValidate")]
 #[cfg(feature = "schema")]
 unsafe extern "C" fn xml_shell_rng_validate(
     sctxt: XmlShellCtxtPtr,
@@ -3060,18 +2797,11 @@ unsafe extern "C" fn xml_shell_rng_validate(
     0
 }
 
-/**
- * xmlShellGrep:
- * @ctxt:  the shell context
- * @arg:  the string or regular expression to find
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "grep"
- * dumps information about the node (namespace, attributes, content).
- *
- * Returns 0
- */
+/// Implements the XML shell function "grep"
+/// dumps information about the node (namespace, attributes, content).
+///
+/// Returns 0
+#[doc(alias = "xmlShellGrep")]
 unsafe extern "C" fn xml_shell_grep(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
@@ -3152,18 +2882,11 @@ unsafe extern "C" fn xml_shell_grep(
     0
 }
 
-/**
- * xmlShellSetContent:
- * @ctxt:  the shell context
- * @value:  the content as a string
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "dir"
- * dumps information about the node (namespace, attributes, content).
- *
- * Returns 0
- */
+/// Implements the XML shell function "dir"
+/// dumps information about the node (namespace, attributes, content).
+///
+/// Returns 0
+#[doc(alias = "xmlShellSetContent")]
 unsafe extern "C" fn xml_shell_set_content(
     ctxt: XmlShellCtxtPtr,
     value: *mut c_char,
@@ -3203,19 +2926,11 @@ unsafe extern "C" fn xml_shell_set_content(
     0
 }
 
-/**
- * xmlShellRegisterNamespace:
- * @ctxt:  the shell context
- * @arg:  a string in prefix=nsuri format
- * @node:  unused
- * @node2:  unused
- *
- * Implements the XML shell function "setns"
- * register/unregister a prefix=namespace pair
- * on the XPath context
- *
- * Returns 0 on success and a negative value otherwise.
- */
+/// Implements the XML shell function "setns"
+/// register/unregister a prefix=namespace pair on the XPath context
+///
+/// Returns 0 on success and a negative value otherwise.
+#[doc(alias = "xmlShellRegisterNamespace")]
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn xml_shell_register_namespace(
     ctxt: XmlShellCtxtPtr,
@@ -3276,18 +2991,11 @@ unsafe extern "C" fn xml_shell_register_namespace(
     0
 }
 
-/**
- * xmlShellRegisterRootNamespaces:
- * @ctxt:  the shell context
- * @arg:  unused
- * @node:  the root element
- * @node2:  unused
- *
- * Implements the XML shell function "setrootns"
- * which registers all namespaces declarations found on the root element.
- *
- * Returns 0 on success and a negative value otherwise.
- */
+/// Implements the XML shell function "setrootns"
+/// which registers all namespaces declarations found on the root element.
+///
+/// Returns 0 on success and a negative value otherwise.
+#[doc(alias = "xmlShellRegisterRootNamespaces")]
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn xml_shell_register_root_namespaces(
     ctxt: XmlShellCtxtPtr,
@@ -3319,18 +3027,11 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
     0
 }
 
-/**
- * xmlShellSetBase:
- * @ctxt:  the shell context
- * @arg:  the new base
- * @node:  a node
- * @node2:  unused
- *
- * Implements the XML shell function "setbase"
- * change the current XML base of the node
- *
- * Returns 0
- */
+/// Implements the XML shell function "setbase"
+/// change the current XML base of the node
+///
+/// Returns 0
+#[doc(alias = "xmlShellSetBase")]
 #[cfg(feature = "tree")]
 unsafe extern "C" fn xml_shell_set_base(
     _ctxt: XmlShellCtxtPtr,
@@ -3351,20 +3052,10 @@ unsafe extern "C" fn xml_shell_set_base(
     0
 }
 
-/*
- * The Shell interface.
- */
-/**
- * xmlShell:
- * @doc:  the initial document
- * @filename:  the output buffer
- * @input:  the line reading function
- * @output:  the output FILE*, defaults to stdout if NULL
- *
- * Implements the XML shell
- * This allow to load, validate, view, modify and save a document
- * using a environment similar to a UNIX commandline.
- */
+/// Implements the XML shell
+/// This allow to load, validate, view, modify and save a document
+/// using a environment similar to a UNIX commandline.
+#[doc(alias = "xmlShell")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_shell(
     doc: XmlDocPtr,

@@ -10,30 +10,16 @@ use libc::{memcpy, strlen, INT_MAX};
 
 use super::globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc};
 
-/**
- * XmlChar:
- *
- * This is a basic byte in an UTF-8 encoded string.
- * It's unsigned allowing to pinpoint case where char * are assigned
- * to XmlChar * (possibly making serialization back impossible).
- */
+/// This is a basic byte in an UTF-8 encoded string.
+/// It's unsigned allowing to pinpoint case where char * are assigned
+/// to XmlChar * (possibly making serialization back impossible).
+#[doc(alias = "xmlChar")]
 pub type XmlChar = u8;
 
-/************************************************************************
- *                                                                      *
- *                Commodity functions to handle xmlChars                *
- *                                                                      *
- ************************************************************************/
-
-/**
- * xmlStrndup:
- * @cur:  the input XmlChar *
- * @len:  the len of @cur
- *
- * a strndup for array of XmlChar's
- *
- * Returns a new XmlChar * or NULL
- */
+/// a strndup for array of XmlChar's
+///
+/// Returns a new XmlChar * or NULL
+#[doc(alias = "xmlStrndup")]
 pub unsafe extern "C" fn xml_strndup(cur: *const XmlChar, len: i32) -> *mut XmlChar {
     if cur.is_null() || len < 0 {
         return null_mut();
@@ -47,16 +33,12 @@ pub unsafe extern "C" fn xml_strndup(cur: *const XmlChar, len: i32) -> *mut XmlC
     ret
 }
 
-/**
- * xmlStrdup:
- * @cur:  the input XmlChar *
- *
- * a strdup for array of XmlChar's. Since they are supposed to be
- * encoded in UTF-8 or an encoding with 8bit based chars, we assume
- * a termination mark of '0'.
- *
- * Returns a new XmlChar * or NULL
- */
+/// a strdup for array of XmlChar's. Since they are supposed to be
+/// encoded in UTF-8 or an encoding with 8bit based chars, we assume
+/// a termination mark of '0'.
+///
+/// Returns a new XmlChar * or NULL
+#[doc(alias = "xmlStrdup")]
 pub unsafe extern "C" fn xml_strdup(cur: *const XmlChar) -> *mut XmlChar {
     let mut p = cur;
 
@@ -69,15 +51,10 @@ pub unsafe extern "C" fn xml_strdup(cur: *const XmlChar) -> *mut XmlChar {
     xml_strndup(cur, p.offset_from(cur).abs() as i32)
 }
 
-/**
- * xmlCharStrndup:
- * @cur:  the input char *
- * @len:  the len of @cur
- *
- * a strndup for char's to XmlChar's
- *
- * Returns a new XmlChar * or NULL
- */
+/// A strndup for char's to XmlChar's
+///
+/// Returns a new XmlChar * or NULL
+#[doc(alias = "xmlCharStrndup")]
 pub unsafe extern "C" fn xml_char_strndup(cur: *const c_char, len: i32) -> *mut XmlChar {
     if cur.is_null() || len < 0 {
         return null_mut();
@@ -97,14 +74,10 @@ pub unsafe extern "C" fn xml_char_strndup(cur: *const c_char, len: i32) -> *mut 
     ret
 }
 
-/**
- * xmlCharStrdup:
- * @cur:  the input char *
- *
- * a strdup for char's to XmlChar's
- *
- * Returns a new XmlChar * or NULL
- */
+/// A strdup for char's to XmlChar's
+///
+/// Returns a new XmlChar * or NULL
+#[doc(alias = "xmlCharStrdup")]
 pub unsafe extern "C" fn xml_char_strdup(cur: *const c_char) -> *mut XmlChar {
     let mut p: *const c_char = cur;
 
@@ -117,15 +90,10 @@ pub unsafe extern "C" fn xml_char_strdup(cur: *const c_char) -> *mut XmlChar {
     xml_char_strndup(cur, p.offset_from(cur).abs() as i32)
 }
 
-/**
- * xmlStrcmp:
- * @str1:  the first XmlChar *
- * @str2:  the second XmlChar *
- *
- * a strcmp for XmlChar's
- *
- * Returns the integer result of the comparison
- */
+/// A strcmp for XmlChar's
+///
+/// Returns the integer result of the comparison
+#[doc(alias = "xmlStrcmp")]
 pub unsafe extern "C" fn xml_strcmp(mut str1: *const XmlChar, mut str2: *const XmlChar) -> i32 {
     if str1 == str2 {
         return 0;
@@ -224,16 +192,10 @@ pub unsafe fn xml_str_qequal(
     true
 }
 
-/**
- * xmlStrncmp:
- * @str1:  the first XmlChar *
- * @str2:  the second XmlChar *
- * @len:  the max comparison length
- *
- * a strncmp for XmlChar's
- *
- * Returns the integer result of the comparison
- */
+/// A strncmp for XmlChar's
+///
+/// Returns the integer result of the comparison
+#[doc(alias = "xmlStrncmp")]
 pub unsafe extern "C" fn xml_strncmp(
     mut str1: *const XmlChar,
     mut str2: *const XmlChar,
@@ -288,15 +250,10 @@ const CASEMAP: [XmlChar; 256] = [
     0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF,
 ];
 
-/**
- * xmlStrcasecmp:
- * @str1:  the first XmlChar *
- * @str2:  the second XmlChar *
- *
- * a strcasecmp for XmlChar's
- *
- * Returns the integer result of the comparison
- */
+/// A strcasecmp for XmlChar's
+///
+/// Returns the integer result of the comparison
+#[doc(alias = "xmlStrcasecmp")]
 pub unsafe extern "C" fn xml_strcasecmp(mut str1: *const XmlChar, mut str2: *const XmlChar) -> i32 {
     let mut tmp: i32;
 
@@ -322,16 +279,10 @@ pub unsafe extern "C" fn xml_strcasecmp(mut str1: *const XmlChar, mut str2: *con
     0
 }
 
-/**
- * xmlStrncasecmp:
- * @str1:  the first XmlChar *
- * @str2:  the second XmlChar *
- * @len:  the max comparison length
- *
- * a strncasecmp for XmlChar's
- *
- * Returns the integer result of the comparison
- */
+/// A strncasecmp for XmlChar's
+///
+/// Returns the integer result of the comparison
+#[doc(alias = "xmlStrncasecmp")]
 pub unsafe extern "C" fn xml_strncasecmp(
     mut str1: *const XmlChar,
     mut str2: *const XmlChar,
@@ -368,15 +319,10 @@ pub unsafe extern "C" fn xml_strncasecmp(
     0
 }
 
-/**
- * xmlStrchr:
- * @str:  the XmlChar * array
- * @val:  the XmlChar to search
- *
- * a strchr for XmlChar's
- *
- * Returns the XmlChar * for the first occurrence or NULL.
- */
+/// A strchr for XmlChar's
+///
+/// Returns the XmlChar * for the first occurrence or NULL.
+#[doc(alias = "xmlStrchr")]
 pub unsafe extern "C" fn xml_strchr(mut str: *const XmlChar, val: XmlChar) -> *const XmlChar {
     if str.is_null() {
         return null();
@@ -391,15 +337,10 @@ pub unsafe extern "C" fn xml_strchr(mut str: *const XmlChar, val: XmlChar) -> *c
     null()
 }
 
-/**
- * xmlStrstr:
- * @str:  the XmlChar * array (haystack)
- * @val:  the XmlChar to search (needle)
- *
- * a strstr for XmlChar's
- *
- * Returns the XmlChar * for the first occurrence or NULL.
- */
+/// A strstr for XmlChar's
+///
+/// Returns the XmlChar * for the first occurrence or NULL.
+#[doc(alias = "xmlStrstr")]
 pub unsafe extern "C" fn xml_strstr(
     mut str: *const XmlChar,
     val: *const XmlChar,
@@ -425,15 +366,10 @@ pub unsafe extern "C" fn xml_strstr(
     null()
 }
 
-/**
- * xmlStrcasestr:
- * @str:  the XmlChar * array (haystack)
- * @val:  the XmlChar to search (needle)
- *
- * a case-ignoring strstr for XmlChar's
- *
- * Returns the XmlChar * for the first occurrence or NULL.
- */
+/// A case-ignoring strstr for XmlChar's
+///
+/// Returns the XmlChar * for the first occurrence or NULL.
+#[doc(alias = "xmlStrcasestr")]
 pub unsafe extern "C" fn xml_strcasestr(
     mut str: *const XmlChar,
     val: *const XmlChar,
@@ -459,16 +395,10 @@ pub unsafe extern "C" fn xml_strcasestr(
     null()
 }
 
-/**
- * xmlStrsub:
- * @str:  the XmlChar * array (haystack)
- * @start:  the index of the first char (zero based)
- * @len:  the length of the substring
- *
- * Extract a substring of a given string
- *
- * Returns the XmlChar * for the first occurrence or NULL.
- */
+/// Extract a substring of a given string
+///
+/// Returns the XmlChar * for the first occurrence or NULL.
+#[doc(alias = "xmlStrsub")]
 pub unsafe extern "C" fn xml_strsub(mut str: *const XmlChar, start: i32, len: i32) -> *mut XmlChar {
     if str.is_null() {
         return null_mut();
@@ -492,14 +422,10 @@ pub unsafe extern "C" fn xml_strsub(mut str: *const XmlChar, start: i32, len: i3
     xml_strndup(str, len)
 }
 
-/**
- * xmlStrlen:
- * @str:  the XmlChar * array
- *
- * length of a XmlChar's string
- *
- * Returns the number of XmlChar contained in the ARRAY.
- */
+/// Length of a XmlChar's string
+///
+/// Returns the number of XmlChar contained in the ARRAY.
+#[doc(alias = "xmlStrlen")]
 pub unsafe extern "C" fn xml_strlen(str: *const XmlChar) -> i32 {
     let len = if !str.is_null() {
         strlen(str as *const c_char)
@@ -514,19 +440,13 @@ pub unsafe extern "C" fn xml_strlen(str: *const XmlChar) -> i32 {
     }
 }
 
-/**
- * xmlStrncat:
- * @cur:  the original XmlChar * array
- * @add:  the XmlChar * array added
- * @len:  the length of @add
- *
- * a strncat for array of XmlChar's, it will extend @cur with the len
- * first bytes of @add. Note that if @len < 0 then this is an API error
- * and NULL will be returned.
- *
- * Returns a new XmlChar *, the original @cur is reallocated and should
- * not be freed.
- */
+/// a strncat for array of XmlChar's, it will extend @cur with the len
+/// first bytes of @add. Note that if @len < 0 then this is an API error
+/// and NULL will be returned.
+///
+/// Returns a new XmlChar *, the original @cur is reallocated and should
+/// not be freed.
+#[doc(alias = "xmlStrncat")]
 pub unsafe extern "C" fn xml_strncat(
     cur: *mut XmlChar,
     add: *const XmlChar,
@@ -555,18 +475,12 @@ pub unsafe extern "C" fn xml_strncat(
     ret
 }
 
-/**
- * xmlStrncatNew:
- * @str1:  first XmlChar string
- * @str2:  second XmlChar string
- * @len:  the len of @str2 or < 0
- *
- * same as xmlStrncat, but creates a new string.  The original
- * two strings are not freed. If @len is < 0 then the length
- * will be calculated automatically.
- *
- * Returns a new XmlChar * or NULL
- */
+/// same as xmlStrncat, but creates a new string.  The original
+/// two strings are not freed. If @len is < 0 then the length
+/// will be calculated automatically.
+///
+/// Returns a new XmlChar * or NULL
+#[doc(alias = "xmlStrncatNew")]
 pub unsafe extern "C" fn xml_strncat_new(
     str1: *const XmlChar,
     str2: *const XmlChar,
@@ -599,18 +513,13 @@ pub unsafe extern "C" fn xml_strncat_new(
     ret
 }
 
-/**
- * xmlStrcat:
- * @cur:  the original XmlChar * array
- * @add:  the XmlChar * array added
- *
- * a strcat for array of XmlChar's. Since they are supposed to be
- * encoded in UTF-8 or an encoding with 8bit based chars, we assume
- * a termination mark of '0'.
- *
- * Returns a new XmlChar * containing the concatenated string. The original
- * @cur is reallocated and should not be freed.
- */
+/// a strcat for array of XmlChar's. Since they are supposed to be
+/// encoded in UTF-8 or an encoding with 8bit based chars, we assume
+/// a termination mark of '0'.
+///
+/// Returns a new XmlChar * containing the concatenated string. The original
+/// @cur is reallocated and should not be freed.
+#[doc(alias = "xmlStrcat")]
 pub unsafe extern "C" fn xml_strcat(cur: *mut XmlChar, add: *const XmlChar) -> *mut XmlChar {
     let mut p: *const XmlChar = add;
 
@@ -627,32 +536,10 @@ pub unsafe extern "C" fn xml_strcat(cur: *mut XmlChar, add: *const XmlChar) -> *
     xml_strncat(cur, add, p.offset_from(add).abs() as _)
 }
 
-/**
- * xmlStrPrintf:
- * @buf:   the result buffer.
- * @len:   the result buffer length.
- * @msg:   the message with printf formatting.
- * @...:   extra parameters for the message.
- *
- * Formats @msg and places result into @buf.
- *
- * Returns the number of characters written to @buf or -1 if an error occurs.
- */
-// pub fn xmlStrPrintf             (XmlChar *buf, int len, const char *msg, ...) LIBXML_ATTR_FORMAT(3,4) -> i32;
-// pub unsafe extern "C" fn xmlStrPrintf(buf: *mut XmlChar, len: i32, msg: *const c_char, ...) -> i32 {
-//     let args: va_list;
-//     let ret: i32;
-
-//      if((buf == NULL) || (msg == NULL)) {
-//          return(-1);
-//      }
-
-//      va_start(args, msg);
-//      ret = vsnprintf((char *) buf, len, (const char *) msg, args);
-//      va_end(args);
-//      buf[len - 1] = 0; /* be safe ! */
-//      return(ret);
-//  }
+/// Formats @msg and places result into @buf.
+///
+/// Returns the number of characters written to @buf or -1 if an error occurs.
+#[doc(alias = "xmlStrPrintf")]
 #[macro_export]
 macro_rules! xml_str_printf {
     ( $buf:expr, $len:expr, $msg:expr, $( $args:expr ),* ) => {
@@ -668,54 +555,10 @@ macro_rules! xml_str_printf {
     };
 }
 
-/**
- * xmlStrVPrintf:
- * @buf:   the result buffer.
- * @len:   the result buffer length.
- * @msg:   the message with printf formatting.
- * @ap:    extra parameters for the message.
- *
- * Formats @msg and places result into @buf.
- *
- * Returns the number of characters written to @buf or -1 if an error occurs.
- */
-// pub fn xmlStrVPrintf                (XmlChar *buf, int len, const char *msg, va_list ap) LIBXML_ATTR_FORMAT(3,0) -> i32;
-// pub unsafe extern "C" fn xmlStrVPrintf(buf: *mut XmlChar, len: i32, msg: *const char, ap: va_list) -> i32 {
-//     let ret: i32;
-
-//      if((buf == null()) || (msg == null())) {
-//          return(-1);
-//      }
-
-//      ret = vsnprintf((char *) buf, len, (const char *) msg, ap);
-//      buf[len - 1] = 0; /* be safe ! */
-
-//      return(ret);
-//  }
-
-/************************************************************************
- *                                                                      *
- *              Generic UTF8 handling routines                          *
- *                                                                      *
- * From rfc2044: encoding of the Unicode values on UTF-8:               *
- *                                                                      *
- * UCS-4 range (hex.)           UTF-8 octet sequence (binary)           *
- * 0000 0000-0000 007F   0xxxxxxx                                       *
- * 0000 0080-0000 07FF   110xxxxx 10xxxxxx                              *
- * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx                     *
- *                                                                      *
- * I hope we won't use values > 0xFFFF anytime soon !                   *
- *                                                                      *
- ************************************************************************/
-
-/**
- * xmlUTF8Size:
- * @utf: pointer to the UTF8 character
- *
- * calculates the internal size of a UTF8 character
- *
- * returns the numbers of bytes in the character, -1 on format error
- */
+/// Calculates the internal size of a UTF8 character
+///
+/// returns the numbers of bytes in the character, -1 on format error
+#[doc(alias = "xmlUTF8Size")]
 pub unsafe extern "C" fn xml_utf8_size(utf: *const XmlChar) -> i32 {
     let mut len: i32;
 
@@ -742,15 +585,10 @@ pub unsafe extern "C" fn xml_utf8_size(utf: *const XmlChar) -> i32 {
     -1
 }
 
-/**
- * xmlUTF8Charcmp:
- * @utf1: pointer to first UTF8 char
- * @utf2: pointer to second UTF8 char
- *
- * compares the two UCS4 values
- *
- * returns result of the compare as with xmlStrncmp
- */
+/// Compares the two UCS4 values
+///
+/// Returns result of the compare as with xmlStrncmp
+#[doc(alias = "xmlUTF8Charcmp")]
 pub unsafe extern "C" fn xml_utf8_charcmp(utf1: *const XmlChar, utf2: *const XmlChar) -> i32 {
     if utf1.is_null() {
         if utf2.is_null() {
@@ -761,15 +599,11 @@ pub unsafe extern "C" fn xml_utf8_charcmp(utf1: *const XmlChar, utf2: *const Xml
     xml_strncmp(utf1, utf2, xml_utf8_size(utf1))
 }
 
-/**
- * xmlUTF8Strlen:
- * @utf:  a sequence of UTF-8 encoded bytes
- *
- * compute the length of an UTF8 string, it doesn't do a full UTF8
- * checking of the content of the string.
- *
- * Returns the number of characters in the string or -1 in case of error
- */
+/// compute the length of an UTF8 string, it doesn't do a full UTF8
+/// checking of the content of the string.
+///
+/// Returns the number of characters in the string or -1 in case of error
+#[doc(alias = "xmlUTF8Strlen")]
 pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> i32 {
     let mut ret: usize = 0;
 
@@ -810,18 +644,11 @@ pub unsafe extern "C" fn xml_utf8_strlen(mut utf: *const XmlChar) -> i32 {
     }
 }
 
-/**
- * xmlGetUTF8Char:
- * @utf:  a sequence of UTF-8 encoded bytes
- * @len:  a pointer to the minimum number of bytes present in
- *        the sequence.  This is used to assure the next character
- *        is completely contained within the sequence.
- *
- * Read the first UTF8 character from @utf
- *
- * Returns the char value or -1 in case of error, and sets *len to
- *        the actual number of bytes consumed (0 in case of error)
- */
+/// Read the first UTF8 character from @utf
+///
+/// Returns the char value or -1 in case of error, and sets *len to
+/// the actual number of bytes consumed (0 in case of error)
+#[doc(alias = "xmlGetUTF8Char")]
 pub unsafe extern "C" fn xml_get_utf8_char(utf: *const u8, len: *mut i32) -> i32 {
     let mut c: u32;
 
@@ -891,19 +718,15 @@ pub unsafe extern "C" fn xml_get_utf8_char(utf: *const u8, len: *mut i32) -> i32
     -1
 }
 
-/**
- * xmlCheckUTF8:
- * @utf: Pointer to putative UTF-8 encoded string.
- *
- * Checks @utf for being valid UTF-8. @utf is assumed to be
- * null-terminated. This function is not super-strict, as it will
- * allow longer UTF-8 sequences than necessary. Note that Java is
- * capable of producing these sequences if provoked. Also note, this
- * routine checks for the 4-byte maximum size, but does not check for
- * 0x10ffff maximum value.
- *
- * Return value: true if @utf is valid.
- **/
+/// Checks @utf for being valid UTF-8. @utf is assumed to be
+/// null-terminated. This function is not super-strict, as it will
+/// allow longer UTF-8 sequences than necessary. Note that Java is
+/// capable of producing these sequences if provoked. Also note, this
+/// routine checks for the 4-byte maximum size, but does not check for
+/// 0x10ffff maximum value.
+///
+/// Return value: true if @utf is valid.
+#[doc(alias = "xmlCheckUTF8")]
 pub unsafe extern "C" fn xml_check_utf8(mut utf: *const u8) -> i32 {
     let mut ix: i32;
     let mut c: u8;
@@ -958,17 +781,12 @@ pub unsafe extern "C" fn xml_check_utf8(mut utf: *const u8) -> i32 {
     1
 }
 
-/**
- * xmlUTF8Strsize:
- * @utf:  a sequence of UTF-8 encoded bytes
- * @len:  the number of characters in the array
- *
- * storage size of an UTF8 string
- * the behaviour is not guaranteed if the input string is not UTF-8
- *
- * Returns the storage size of
- * the first 'len' characters of ARRAY
- */
+/// storage size of an UTF8 string
+/// the behaviour is not guaranteed if the input string is not UTF-8
+///
+/// Returns the storage size of
+/// the first 'len' characters of ARRAY
+#[doc(alias = "xmlUTF8Strsize")]
 pub unsafe extern "C" fn xml_utf8_strsize(utf: *const XmlChar, mut len: i32) -> i32 {
     let mut ptr: *const XmlChar = utf;
     let mut ch: i32;
@@ -1011,15 +829,10 @@ pub unsafe extern "C" fn xml_utf8_strsize(utf: *const XmlChar, mut len: i32) -> 
     }
 }
 
-/**
- * xmlUTF8Strndup:
- * @utf:  the input UTF8 *
- * @len:  the len of @utf (in chars)
- *
- * a strndup for array of UTF8's
- *
- * Returns a new UTF8 * or NULL
- */
+/// A strndup for array of UTF8's
+///
+/// Returns a new UTF8 * or NULL
+#[doc(alias = "xmlUTF8Strndup")]
 pub unsafe extern "C" fn xml_utf8_strndup(utf: *const XmlChar, len: i32) -> *mut XmlChar {
     if utf.is_null() || len < 0 {
         return null_mut();
@@ -1034,16 +847,11 @@ pub unsafe extern "C" fn xml_utf8_strndup(utf: *const XmlChar, len: i32) -> *mut
     ret
 }
 
-/**
- * xmlUTF8Strpos:
- * @utf:  the input UTF8 *
- * @pos:  the position of the desired UTF8 char (in chars)
- *
- * a function to provide the equivalent of fetching a
- * character from a string array
- *
- * Returns a pointer to the UTF8 character or NULL
- */
+/// A function to provide the equivalent of fetching a
+/// character from a string array
+///
+/// Returns a pointer to the UTF8 character or NULL
+#[doc(alias = "xmlUTF8Strpos")]
 pub unsafe extern "C" fn xml_utf8_strpos(mut utf: *const XmlChar, mut pos: i32) -> *const XmlChar {
     let mut ch: i32;
 
@@ -1084,16 +892,10 @@ pub unsafe extern "C" fn xml_utf8_strpos(mut utf: *const XmlChar, mut pos: i32) 
     utf
 }
 
-/**
- * xmlUTF8Strloc:
- * @utf:  the input UTF8 *
- * @utfchar:  the UTF8 character to be found
- *
- * a function to provide the relative location of a UTF8 char
- *
- * Returns the relative character position of the desired char
- * or -1 if not found
- */
+/// A function to provide the relative location of a UTF8 char
+///
+/// Returns the relative character position of the desired char or -1 if not found
+#[doc(alias = "xmlUTF8Strloc")]
 pub unsafe extern "C" fn xml_utf8_strloc(mut utf: *const XmlChar, utfchar: *const XmlChar) -> i32 {
     let mut i: usize;
 
@@ -1134,18 +936,12 @@ pub unsafe extern "C" fn xml_utf8_strloc(mut utf: *const XmlChar, utfchar: *cons
 
     -1
 }
-/**
- * xmlUTF8Strsub:
- * @utf:  a sequence of UTF-8 encoded bytes
- * @start: relative pos of first char
- * @len:   total number to copy
- *
- * Create a substring from a given UTF-8 string
- * Note:  positions are given in units of UTF-8 chars
- *
- * Returns a pointer to a newly created string
- * or NULL if any problem
- */
+
+/// Create a substring from a given UTF-8 string
+/// Note:  positions are given in units of UTF-8 chars
+///
+/// Returns a pointer to a newly created string or NULL if any problem
+#[doc(alias = "xmlUTF8Strsub")]
 pub unsafe extern "C" fn xml_utf8_strsub(
     mut utf: *const XmlChar,
     start: i32,
@@ -1194,15 +990,9 @@ pub unsafe extern "C" fn xml_utf8_strsub(
     xml_utf8_strndup(utf, len)
 }
 
-/**
- * xmlEscapeFormatString:
- * @msg:  a pointer to the string in which to escape '%' characters.
- * Must be a heap-allocated buffer created by libxml2 that may be
- * returned, or that may be freed and replaced.
- *
- * Replaces the string pointed to by 'msg' with an escaped string.
- * Returns the same string with all '%' characters escaped.
- */
+/// Replaces the string pointed to by 'msg' with an escaped string.
+/// Returns the same string with all '%' characters escaped.
+#[doc(alias = "xmlEscapeFormatString")]
 pub unsafe extern "C" fn xml_escape_format_string(msg: *mut *mut XmlChar) -> *mut XmlChar {
     let mut msg_ptr: *mut XmlChar;
 

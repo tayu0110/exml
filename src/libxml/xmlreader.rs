@@ -73,12 +73,8 @@ use crate::{
     },
 };
 
-/**
- * xmlParserSeverities:
- *
- * How severe an error callback is when the per-reader error callback API
- * is used.
- */
+/// How severe an error callback is when the per-reader error callback API is used.
+#[doc(alias = "xmlParserSeverities")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlParserSeverities {
@@ -88,11 +84,8 @@ pub enum XmlParserSeverities {
     XmlParserSeverityError = 4,
 }
 
-/**
- * xmlTextReaderMode:
- *
- * Internal state values for the reader.
- */
+/// Internal state values for the reader.
+#[doc(alias = "xmlTextReaderMode")]
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,13 +98,10 @@ pub enum XmlTextReaderMode {
     XmlTextreaderModeReading = 5,
 }
 
-/**
- * xmlParserProperties:
- *
- * Some common options to use with xmlTextReaderSetParserProp, but it
- * is better to use xmlParserOption and the xmlReaderNewxxx and
- * xmlReaderForxxx APIs now.
- */
+/// Some common options to use with xmlTextReaderSetParserProp, but it
+/// is better to use xmlParserOption and the xmlReaderNewxxx and
+/// xmlReaderForxxx APIs now.
+#[doc(alias = "xmlParserProperties")]
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -142,11 +132,8 @@ impl TryFrom<i32> for XmlParserProperties {
     }
 }
 
-/**
- * xmlReaderTypes:
- *
- * Predefined constants for the different types of nodes.
- */
+/// Predefined constants for the different types of nodes.
+#[doc(alias = "xmlReaderTypes")]
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,18 +189,12 @@ enum XmlTextReaderValidate {
     ValidateXsd = 4,
 }
 
-/**
- * xmlTextReader:
- *
- * Structure for an xmlReader context.
- */
-/**
- * xmlTextReaderPtr:
- *
- * Pointer to an xmlReader context.
- */
+/// Pointer to an xmlReader context.
+#[doc(alias = "xmlTextReaderPtr")]
 #[cfg(feature = "libxml_reader")]
 pub type XmlTextReaderPtr = *mut XmlTextReader;
+/// Structure for an xmlReader context.
+#[doc(alias = "xmlTextReader")]
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 pub struct XmlTextReader {
@@ -371,11 +352,7 @@ const NODE_IS_EMPTY: i32 = 0x1;
 const NODE_IS_PRESERVED: i32 = 0x2;
 const NODE_IS_SPRESERVED: i32 = 0x4;
 
-/**
- * CONSTSTR:
- *
- * Macro used to return an interned string
- */
+/// Macro used to return an interned string
 macro_rules! CONSTSTR {
     ($reader:expr, $str:expr) => {
         xml_dict_lookup((*$reader).dict, $str, -1)
@@ -387,14 +364,8 @@ macro_rules! CONSTQSTR {
     };
 }
 
-/**
- * xmlTextReaderStartElement:
- * @ctx: the user data (XML parser context)
- * @fullname:  The element name, including namespace prefix
- * @atts:  An array of name/value attributes pairs, NULL terminated
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "xmlTextReaderStartElement")]
 unsafe fn xml_text_reader_start_element(
     ctx: Option<GenericErrorContext>,
     fullname: *const XmlChar,
@@ -425,13 +396,8 @@ unsafe fn xml_text_reader_start_element(
     }
 }
 
-/**
- * xmlTextReaderEndElement:
- * @ctx: the user data (XML parser context)
- * @fullname:  The element name, including namespace prefix
- *
- * called when an ending tag has been processed.
- */
+/// called when an ending tag has been processed.
+#[doc(alias = "xmlTextReaderEndElement")]
 unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname: *const XmlChar) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
@@ -447,21 +413,8 @@ unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname
     }
 }
 
-/**
- * xmlTextReaderStartElementNs:
- * @ctx: the user data (XML parser context)
- * @localname:  the local name of the element
- * @prefix:  the element namespace prefix if available
- * @URI:  the element namespace name if available
- * @nb_namespaces:  number of namespace definitions on that node
- * @namespaces:  pointer to the array of prefix/URI pairs namespace definitions
- * @nb_attributes:  the number of attributes on that node
- * nb_defaulted:  the number of defaulted attributes.
- * @attributes:  pointer to the array of (localname/prefix/URI/value/end)
- *               attribute values.
- *
- * called when an opening tag has been processed.
- */
+/// Called when an opening tag has been processed.
+#[doc(alias = "xmlTextReaderStartElementNs")]
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_text_reader_start_element_ns(
     ctx: Option<GenericErrorContext>,
@@ -509,15 +462,8 @@ unsafe fn xml_text_reader_start_element_ns(
     }
 }
 
-/**
- * xmlTextReaderEndElementNs:
- * @ctx: the user data (XML parser context)
- * @localname:  the local name of the element
- * @prefix:  the element namespace prefix if available
- * @URI:  the element namespace name if available
- *
- * called when an ending tag has been processed.
- */
+/// Called when an ending tag has been processed.
+#[doc(alias = "xmlTextReaderEndElementNs")]
 unsafe fn xml_text_reader_end_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
@@ -538,14 +484,8 @@ unsafe fn xml_text_reader_end_element_ns(
     }
 }
 
-/**
- * xmlTextReaderCharacters:
- * @ctx: the user data (XML parser context)
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- *
- * receiving some chars from the parser.
- */
+/// Receiving some chars from the parser.
+#[doc(alias = "xmlTextReaderCharacters")]
 unsafe fn xml_text_reader_characters(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
@@ -565,14 +505,8 @@ unsafe fn xml_text_reader_characters(
     }
 }
 
-/**
- * xmlTextReaderCDataBlock:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
+/// Called when a pcdata block has been parsed
+#[doc(alias = "xmlTextReaderCDataBlock")]
 unsafe fn xml_text_reader_cdata_block(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
@@ -592,18 +526,10 @@ unsafe fn xml_text_reader_cdata_block(
     }
 }
 
-/*
- * Constructors & Destructor
- */
-/**
- * xmlNewTextReader:
- * @input: the xmlParserInputBufferPtr used to read data
- * @URI: the URI information for the source if available
- *
- * Create an xmlTextReader structure fed with @input
- *
- * Returns the new xmlTextReaderPtr or NULL in case of error
- */
+/// Create an xmlTextReader structure fed with @input
+///
+/// Returns the new xmlTextReaderPtr or NULL in case of error
+#[doc(alias = "xmlNewTextReader")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_new_text_reader(
     input: XmlParserInputBuffer,
@@ -745,14 +671,10 @@ pub unsafe fn xml_new_text_reader(
     ret
 }
 
-/**
- * xmlNewTextReaderFilename:
- * @URI: the URI of the resource to process
- *
- * Create an xmlTextReader structure fed with the resource at @URI
- *
- * Returns the new xmlTextReaderPtr or NULL in case of error
- */
+/// Create an xmlTextReader structure fed with the resource at @URI
+///
+/// Returns the new xmlTextReaderPtr or NULL in case of error
+#[doc(alias = "xmlNewTextReaderFilename")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
     use std::ffi::CStr;
@@ -788,12 +710,8 @@ pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> Xml
     ret
 }
 
-/**
- * xmlFreeTextReader:
- * @reader:  the xmlTextReaderPtr
- *
- * Deallocate all the resources associated to the reader
- */
+/// Deallocate all the resources associated to the reader
+#[doc(alias = "xmlFreeTextReader")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
     use super::xinclude::xml_xinclude_free_context;
@@ -867,19 +785,10 @@ pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
     xml_free(reader as _);
 }
 
-/**
- * xmlTextReaderSetup:
- * @reader:  an XML reader
- * @input: xmlParserInputBufferPtr used to feed the reader, will
- *         be destroyed with it.
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Setup an XML reader with new options
- *
- * Returns 0 in case of success and -1 in case of error.
- */
+/// Setup an XML reader with new options
+///
+/// Returns 0 in case of success and -1 in case of error.
+#[doc(alias = "xmlTextReaderSetup")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_setup(
     reader: XmlTextReaderPtr,
@@ -1134,16 +1043,12 @@ pub unsafe fn xml_text_reader_setup(
     0
 }
 
-/**
- * xmlTextReaderReadTree:
- * @reader:  the xmlTextReaderPtr used
- *
- *  Moves the position of the current instance to the next node in
- *  the stream, exposing its properties.
- *
- *  Returns 1 if the node was read successfully, 0 if there is no more
- *          nodes to read, or -1 in case of error
- */
+/// Moves the position of the current instance to the next node in
+/// the stream, exposing its properties.
+///
+/// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
+/// or -1 in case of error
+#[doc(alias = "xmlTextReaderReadTree")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_read_tree(reader: &mut XmlTextReader) -> i32 {
     if reader.state == XmlTextReaderState::End {
@@ -1237,15 +1142,10 @@ unsafe extern "C" fn xml_text_reader_read_tree(reader: &mut XmlTextReader) -> i3
 
 const CHUNK_SIZE: usize = 512;
 
-/**
- * xmlTextReaderPushData:
- * @reader:  the xmlTextReaderPtr used
- *
- * Push data down the progressive parser until a significant callback
- * got raised.
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Push data down the progressive parser until a significant callback got raised.
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlTextReaderPushData")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> i32 {
     let mut val: i32;
@@ -1366,12 +1266,8 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> i3
     0
 }
 
-/**
- * xmlTextReaderValidatePop:
- * @reader:  the xmlTextReaderPtr used
- *
- * Pop the current node from validation
- */
+/// Pop the current node from validation
+#[doc(alias = "xmlTextReaderValidatePop")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_validate_pop(reader: &mut XmlTextReader) {
     let node: XmlNodePtr = reader.node;
@@ -1425,13 +1321,7 @@ unsafe extern "C" fn xml_text_reader_validate_pop(reader: &mut XmlTextReader) {
 #[cfg(feature = "libxml_reader")]
 const MAX_FREE_NODES: i32 = 100;
 
-/**
- * DICT_FREE:
- * @str:  a string
- *
- * Free a string if it is not owned by the "dict" dictionary in the
- * current scope
- */
+/// Free a string if it is not owned by the "dict" dictionary in the current scope
 #[cfg(feature = "libxml_reader")]
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
@@ -1443,13 +1333,8 @@ macro_rules! DICT_FREE {
     };
 }
 
-/**
- * xmlTextReaderFreePropList:
- * @reader:  the xmlTextReaderPtr used
- * @cur:  the first property in the list
- *
- * Free a property and all its siblings, all the children are freed too.
- */
+/// Free a property and all its siblings, all the children are freed too.
+#[doc(alias = "xmlTextReaderFreePropList")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_prop_list(
     reader: &mut XmlTextReader,
@@ -1464,14 +1349,8 @@ unsafe extern "C" fn xml_text_reader_free_prop_list(
     }
 }
 
-/**
- * xmlTextReaderFreeNodeList:
- * @reader:  the xmlTextReaderPtr used
- * @cur:  the first node in the list
- *
- * Free a node and all its siblings, this is a recursive behaviour, all
- * the children are freed too.
- */
+/// Free a node and all its siblings, this is a recursive behaviour, all the children are freed too.
+#[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlNodePtr) {
     use crate::tree::NodePtr;
@@ -1590,13 +1469,8 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
     }
 }
 
-/**
- * xmlTextReaderFreeProp:
- * @reader:  the xmlTextReaderPtr used
- * @cur:  the node
- *
- * Free a node.
- */
+/// Free a node.
+#[doc(alias = "xmlTextReaderFreeProp")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: XmlAttrPtr) {
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
@@ -1632,14 +1506,9 @@ unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: Xm
     }
 }
 
-/**
- * xmlTextReaderFreeNode:
- * @reader:  the xmlTextReaderPtr used
- * @cur:  the node
- *
- * Free a node, this is a recursive behaviour, all the children are freed too.
- * This doesn't unlink the child from the list, use xmlUnlinkNode() first.
- */
+/// Free a node, this is a recursive behaviour, all the children are freed too.
+/// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
+#[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: XmlNodePtr) {
     use crate::tree::NodePtr;
@@ -1734,15 +1603,10 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
     }
 }
 
-/**
- * xmlTextReaderEntPush:
- * @reader:  the xmlTextReaderPtr used
- * @value:  the entity reference node
- *
- * Pushes a new entity reference node on top of the entities stack
- *
- * Returns -1 in case of error, the index in the stack otherwise
- */
+/// Pushes a new entity reference node on top of the entities stack
+///
+/// Returns -1 in case of error, the index in the stack otherwise
+#[doc(alias = "xmlTextReaderEntPush")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_ent_push(
     reader: &mut XmlTextReader,
@@ -1774,12 +1638,8 @@ unsafe extern "C" fn xml_text_reader_ent_push(
     reader.ent_nr - 1
 }
 
-/**
- * xmlTextReaderValidatePush:
- * @reader:  the xmlTextReaderPtr used
- *
- * Push the current node for validation
- */
+/// Push the current node for validation
+#[doc(alias = "xmlTextReaderValidatePush")]
 #[cfg(all(feature = "libxml_reader", feature = "regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
     let mut node: XmlNodePtr = reader.node;
@@ -1844,14 +1704,8 @@ unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
     }
 }
 
-/**
- * xmlTextReaderValidateCData:
- * @reader:  the xmlTextReaderPtr used
- * @data:  pointer to the CData
- * @len:  length of the CData block in bytes.
- *
- * Push some CData for validation
- */
+/// Push some CData for validation
+#[doc(alias = "xmlTextReaderValidateCData")]
 #[cfg(all(feature = "libxml_reader", feature = "regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_cdata(
     reader: &mut XmlTextReader,
@@ -1878,14 +1732,10 @@ unsafe extern "C" fn xml_text_reader_validate_cdata(
     }
 }
 
-/**
- * xmlTextReaderEntPop:
- * @reader:  the xmlTextReaderPtr used
- *
- * Pops the top element entity from the entities stack
- *
- * Returns the entity just removed
- */
+/// Pops the top element entity from the entities stack
+///
+/// Returns the entity just removed
+#[doc(alias = "xmlTextReaderEntPop")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_ent_pop(reader: &mut XmlTextReader) -> XmlNodePtr {
     if reader.ent_nr <= 0 {
@@ -1902,14 +1752,10 @@ unsafe extern "C" fn xml_text_reader_ent_pop(reader: &mut XmlTextReader) -> XmlN
     ret
 }
 
-/**
- * xmlTextReaderValidateEntity:
- * @reader:  the xmlTextReaderPtr used
- *
- * Handle the validation when an entity reference is encountered and
- * entity substitution is not activated. As a result the parser interface
- * must walk through the entity and do the validation calls
- */
+/// Handle the validation when an entity reference is encountered and
+/// entity substitution is not activated. As a result the parser interface
+/// must walk through the entity and do the validation calls
+#[doc(alias = "xmlTextReaderValidateEntity")]
 #[cfg(all(feature = "libxml_reader", feature = "regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader) {
     use crate::tree::{NodeCommon, NodePtr};
@@ -2022,19 +1868,12 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
     reader.node = oldnode;
 }
 
-/*
- * Iterators
- */
-/**
- * xmlTextReaderRead:
- * @reader:  the xmlTextReaderPtr used
- *
- *  Moves the position of the current instance to the next node in
- *  the stream, exposing its properties.
- *
- *  Returns 1 if the node was read successfully, 0 if there is no more
- *          nodes to read, or -1 in case of error
- */
+/// Moves the position of the current instance to the next node in the stream,
+/// exposing its properties.
+///
+/// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
+/// or -1 in case of error
+#[doc(alias = "xmlTextReaderRead")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32 {
     use crate::{
@@ -2443,16 +2282,12 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
     //     return 0;
 }
 
-/**
- * xmlTextReaderReadInnerXml:
- * @reader:  the xmlTextReaderPtr used
- *
- * Reads the contents of the current node, including child nodes and markup.
- *
- * Returns a string containing the XML content, or NULL if the current node
- *         is neither an element nor attribute, or has no child nodes. The
- *         string must be deallocated by the caller.
- */
+/// Reads the contents of the current node, including child nodes and markup.
+///
+/// Returns a string containing the XML content, or NULL if the current node
+/// is neither an element nor attribute, or has no child nodes. The
+/// string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderReadInnerXml")]
 #[cfg(all(feature = "libxml_reader", feature = "writer"))]
 pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
     reader: &mut XmlTextReader,
@@ -2497,16 +2332,11 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
     resbuf
 }
 
-/**
- * xmlTextReaderReadOuterXml:
- * @reader:  the xmlTextReaderPtr used
- *
- * Reads the contents of the current node, including child nodes and markup.
- *
- * Returns a string containing the node and any XML content, or NULL if the
- *         current node cannot be serialized. The string must be deallocated
- *         by the caller.
- */
+/// Reads the contents of the current node, including child nodes and markup.
+///
+/// Returns a string containing the node and any XML content, or NULL if the
+/// current node cannot be serialized. The string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderReadOuterXml")]
 #[cfg(all(feature = "libxml_reader", feature = "writer"))]
 pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
     reader: &mut XmlTextReader,
@@ -2541,14 +2371,10 @@ pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
     resbuf
 }
 
-/**
- * xmlTextReaderGetSuccessor:
- * @cur:  the current node
- *
- * Get the successor of a node if available.
- *
- * Returns the successor node or NULL
- */
+/// Get the successor of a node if available.
+///
+/// Returns the successor node or NULL
+#[doc(alias = "xmlTextReaderGetSuccessor")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNodePtr {
     if cur.is_null() {
@@ -2571,16 +2397,12 @@ unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNo
     cur
 }
 
-/**
- * xmlTextReaderCollectSiblings:
- * @node:    the first child
- *
- *  Traverse depth-first through all sibling nodes and their children
- *  nodes and concatenate their content. This is an auxiliary function
- *  to xmlTextReaderReadString.
- *
- *  Returns a string containing the content, or NULL in case of error.
- */
+///  Traverse depth-first through all sibling nodes and their children
+///  nodes and concatenate their content. This is an auxiliary function
+///  to xmlTextReaderReadString.
+///
+///  Returns a string containing the content, or NULL in case of error.
+#[doc(alias = "xmlTextReaderCollectSiblings")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar {
     if node.is_null() || (*node).typ == XmlElementType::XmlNamespaceDecl {
@@ -2622,17 +2444,12 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
     ret
 }
 
-/**
- * xmlTextReaderDoExpand:
- * @reader:  the xmlTextReaderPtr used
- *
- * Makes sure that the current node is fully read as well as all its
- * descendant. It means the full DOM subtree must be available at the
- * end of the call.
- *
- * Returns 1 if the node was expanded successfully, 0 if there is no more
- *          nodes to read, or -1 in case of error
- */
+/// Makes sure that the current node is fully read as well as all its descendant.  
+/// It means the full DOM subtree must be available at the end of the call.
+///
+/// Returns 1 if the node was expanded successfully, 0 if there is no more nodes to read,
+/// or -1 in case of error
+#[doc(alias = "xmlTextReaderDoExpand")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_do_expand(reader: &mut XmlTextReader) -> i32 {
     let mut val: i32;
@@ -2665,16 +2482,12 @@ unsafe extern "C" fn xml_text_reader_do_expand(reader: &mut XmlTextReader) -> i3
     1
 }
 
-/**
- * xmlTextReaderReadString:
- * @reader:  the xmlTextReaderPtr used
- *
- * Reads the contents of an element or a text node as a string.
- *
- * Returns a string containing the contents of the Element or Text node,
- *         or NULL if the reader is positioned on any other type of node.
- *         The string must be deallocated by the caller.
- */
+/// Reads the contents of an element or a text node as a string.
+///
+/// Returns a string containing the contents of the Element or Text node,
+/// or NULL if the reader is positioned on any other type of node.
+/// The string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderReadString")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_read_string(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -2708,16 +2521,11 @@ pub unsafe extern "C" fn xml_text_reader_read_string(reader: &mut XmlTextReader)
     null_mut()
 }
 
-/**
- * xmlTextReaderReadAttributeValue:
- * @reader:  the xmlTextReaderPtr used
- *
- * Parses an attribute value into one or more Text and EntityReference nodes.
- *
- * Returns 1 in case of success, 0 if the reader was not positioned on an
- *         attribute node or all the attribute values have been read, or -1
- *         in case of error.
- */
+/// Parses an attribute value into one or more Text and EntityReference nodes.
+///
+/// Returns 1 in case of success, 0 if the reader was not positioned on an
+/// attribute node or all the attribute values have been read, or -1 in case of error.
+#[doc(alias = "xmlTextReaderReadAttributeValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -2754,17 +2562,10 @@ pub unsafe extern "C" fn xml_text_reader_read_attribute_value(reader: &mut XmlTe
     1
 }
 
-/*
- * Attributes of the node
- */
-/**
- * xmlTextReaderAttributeCount:
- * @reader:  the xmlTextReaderPtr used
- *
- * Provides the number of attributes of the current node
- *
- * Returns 0 i no attributes, -1 in case of error or the attribute count
- */
+/// Provides the number of attributes of the current node
+///
+/// Returns 0 i no attributes, -1 in case of error or the attribute count
+#[doc(alias = "xmlTextReaderAttributeCount")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextReader) -> i32 {
     let mut ret: i32;
@@ -2804,14 +2605,10 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
     ret
 }
 
-/**
- * xmlTextReaderDepth:
- * @reader:  the xmlTextReaderPtr used
- *
- * The depth of the node in the tree.
- *
- * Returns the depth or -1 in case of error
- */
+/// The depth of the node in the tree.
+///
+/// Returns the depth or -1 in case of error
+#[doc(alias = "xmlTextReaderDepth")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_depth(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -2830,14 +2627,10 @@ pub unsafe extern "C" fn xml_text_reader_depth(reader: &mut XmlTextReader) -> i3
     reader.depth
 }
 
-/**
- * xmlTextReaderHasAttributes:
- * @reader:  the xmlTextReaderPtr used
- *
- * Whether the node has attributes.
- *
- * Returns 1 if true, 0 if false, and -1 in case or error
- */
+/// Whether the node has attributes.
+///
+/// Returns 1 if true, 0 if false, and -1 in case or error
+#[doc(alias = "xmlTextReaderHasAttributes")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -2858,14 +2651,10 @@ pub unsafe extern "C" fn xml_text_reader_has_attributes(reader: &mut XmlTextRead
     0
 }
 
-/**
- * xmlTextReaderHasValue:
- * @reader:  the xmlTextReaderPtr used
- *
- * Whether the node can have a text value.
- *
- * Returns 1 if true, 0 if false, and -1 in case or error
- */
+/// Whether the node can have a text value.
+///
+/// Returns 1 if true, 0 if false, and -1 in case or error
+#[doc(alias = "xmlTextReaderHasValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_has_value(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -2888,28 +2677,19 @@ pub unsafe extern "C" fn xml_text_reader_has_value(reader: &mut XmlTextReader) -
     }
 }
 
-/**
- * xmlTextReaderIsDefault:
- * @reader:  the xmlTextReaderPtr used
- *
- * Whether an Attribute  node was generated from the default value
- * defined in the DTD or schema.
- *
- * Returns 0 if not defaulted, 1 if defaulted, and -1 in case of error
- */
+/// Whether an Attribute  node was generated from the default value defined in the DTD or schema.
+///
+/// Returns 0 if not defaulted, 1 if defaulted, and -1 in case of error
+#[doc(alias = "xmlTextReaderIsDefault")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_is_default(_reader: &mut XmlTextReader) -> i32 {
     0
 }
 
-/**
- * xmlTextReaderIsEmptyElement:
- * @reader:  the xmlTextReaderPtr used
- *
- * Check if the current node is empty
- *
- * Returns 1 if empty, 0 if not and -1 in case of error
- */
+/// Check if the current node is empty
+///
+/// Returns 1 if empty, 0 if not and -1 in case of error
+#[doc(alias = "xmlTextReaderIsEmptyElement")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -2937,16 +2717,13 @@ pub unsafe extern "C" fn xml_text_reader_is_empty_element(reader: &mut XmlTextRe
     ((*reader.node).extra & NODE_IS_EMPTY as u16 != 0) as i32
 }
 
-/**
- * xmlTextReaderNodeType:
- * @reader:  the xmlTextReaderPtr used
- *
- * Get the node type of the current node
- * Reference:
- * http://www.gnu.org/software/dotgnu/pnetlib-doc/System/Xml/XmlNodeType.html
- *
- * Returns the xmlReaderTypes of the current node or -1 in case of error
- */
+/// Get the node type of the current node
+///
+/// Reference:
+/// http://www.gnu.org/software/dotgnu/pnetlib-doc/System/Xml/XmlNodeType.html
+///
+/// Returns the xmlReaderTypes of the current node or -1 in case of error
+#[doc(alias = "xmlTextReaderNodeType")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -3005,44 +2782,31 @@ pub unsafe extern "C" fn xml_text_reader_node_type(reader: &mut XmlTextReader) -
     // return -1;
 }
 
-/**
- * xmlTextReaderQuoteChar:
- * @reader:  the xmlTextReaderPtr used
- *
- * The quotation mark character used to enclose the value of an attribute.
- *
- * Returns " or ' and -1 in case of error
- */
+/// The quotation mark character used to enclose the value of an attribute.
+///
+/// Returns " or ' and -1 in case of error
+#[doc(alias = "xmlTextReaderQuoteChar")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_quote_char(_reader: &mut XmlTextReader) -> i32 {
     /* TODO maybe lookup the attribute value for " first */
     b'"' as _
 }
 
-/**
- * xmlTextReaderReadState:
- * @reader:  the xmlTextReaderPtr used
- *
- * Gets the read state of the reader.
- *
- * Returns the state value, or -1 in case of error
- */
+/// Gets the read state of the reader.
+///
+/// Returns the state value, or -1 in case of error
+#[doc(alias = "xmlTextReaderReadState")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_read_state(reader: &mut XmlTextReader) -> i32 {
     reader.mode
 }
 
-/**
- * xmlTextReaderIsNamespaceDecl:
- * @reader: the xmlTextReaderPtr used
- *
- * Determine whether the current node is a namespace declaration
- * rather than a regular attribute.
- *
- * Returns 1 if the current node is a namespace declaration, 0 if it
- * is a regular attribute or other type of node, or -1 in case of
- * error.
- */
+/// Determine whether the current node is a namespace declaration
+/// rather than a regular attribute.
+///
+/// Returns 1 if the current node is a namespace declaration, 0 if it
+/// is a regular attribute or other type of node, or -1 in case of error.
+#[doc(alias = "xmlTextReaderIsNamespaceDecl")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -3061,15 +2825,10 @@ pub unsafe extern "C" fn xml_text_reader_is_namespace_decl(reader: &mut XmlTextR
     }
 }
 
-/**
- * xmlTextReaderConstBaseUri:
- * @reader:  the xmlTextReaderPtr used
- *
- * The base URI of the node.
- *
- * Returns the base URI or NULL if not available, the string
- *         will be deallocated with the reader
- */
+/// The base URI of the node.
+///
+/// Returns the base URI or NULL if not available, the string will be deallocated with the reader
+#[doc(alias = "xmlTextReaderConstBaseUri")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_base_uri(
     reader: &mut XmlTextReader,
@@ -3086,15 +2845,10 @@ pub unsafe extern "C" fn xml_text_reader_const_base_uri(
     ret
 }
 
-/**
- * xmlTextReaderConstLocalName:
- * @reader:  the xmlTextReaderPtr used
- *
- * The local name of the node.
- *
- * Returns the local name or NULL if not available, the
- *         string will be deallocated with the reader.
- */
+/// The local name of the node.
+///
+/// Returns the local name or NULL if not available, the string will be deallocated with the reader.
+#[doc(alias = "xmlTextReaderConstLocalName")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_local_name(
     reader: &mut XmlTextReader,
@@ -3124,15 +2878,10 @@ pub unsafe extern "C" fn xml_text_reader_const_local_name(
     (*node).name
 }
 
-/**
- * xmlTextReaderConstName:
- * @reader:  the xmlTextReaderPtr used
- *
- * The qualified name of the node, equal to Prefix :LocalName.
- *
- * Returns the local name or NULL if not available, the string is
- *         deallocated with the reader.
- */
+/// The qualified name of the node, equal to Prefix :LocalName.
+///
+/// Returns the local name or NULL if not available, the string is deallocated with the reader.
+#[doc(alias = "xmlTextReaderConstName")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) -> *const XmlChar {
     if reader.node.is_null() {
@@ -3188,15 +2937,10 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
     // return null_mut();
 }
 
-/**
- * xmlTextReaderConstNamespaceUri:
- * @reader:  the xmlTextReaderPtr used
- *
- * The URI defining the namespace associated with the node.
- *
- * Returns the namespace URI or NULL if not available, the string
- *         will be deallocated with the reader
- */
+/// The URI defining the namespace associated with the node.
+///
+/// Returns the namespace URI or NULL if not available, the string will be deallocated with the reader
+#[doc(alias = "xmlTextReaderConstNamespaceUri")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
     reader: &mut XmlTextReader,
@@ -3224,15 +2968,10 @@ pub unsafe extern "C" fn xml_text_reader_const_namespace_uri(
     null_mut()
 }
 
-/**
- * xmlTextReaderConstPrefix:
- * @reader:  the xmlTextReaderPtr used
- *
- * A shorthand reference to the namespace associated with the node.
- *
- * Returns the prefix or NULL if not available, the string is deallocated
- *         with the reader.
- */
+/// A shorthand reference to the namespace associated with the node.
+///
+/// Returns the prefix or NULL if not available, the string is deallocated with the reader.
+#[doc(alias = "xmlTextReaderConstPrefix")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_prefix(
     reader: &mut XmlTextReader,
@@ -3264,14 +3003,10 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
     null_mut()
 }
 
-/**
- * xmlTextReaderConstXmlLang:
- * @reader:  the xmlTextReaderPtr used
- *
- * The xml:lang scope within which the node resides.
- *
- * Returns the xml:lang value or NULL if none exists.
- */
+/// The xml:lang scope within which the node resides.
+///
+/// Returns the xml:lang value or NULL if none exists.
+#[doc(alias = "xmlTextReaderConstXmlLang")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
     reader: &mut XmlTextReader,
@@ -3288,17 +3023,12 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
     ret
 }
 
-/**
- * xmlTextReaderConstString:
- * @reader:  the xmlTextReaderPtr used
- * @str:  the string to intern.
- *
- * Get an interned string from the reader, allows for example to
- * speedup string name comparisons
- *
- * Returns an interned copy of the string or NULL in case of error. The
- *         string will be deallocated with the reader.
- */
+/// Get an interned string from the reader, allows for example to
+/// speedup string name comparisons
+///
+/// Returns an interned copy of the string or NULL in case of error.
+/// The string will be deallocated with the reader.
+#[doc(alias = "xmlTextReaderConstString")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_string(
     reader: &mut XmlTextReader,
@@ -3307,15 +3037,11 @@ pub unsafe extern "C" fn xml_text_reader_const_string(
     CONSTSTR!(reader, str)
 }
 
-/**
- * xmlTextReaderConstValue:
- * @reader:  the xmlTextReaderPtr used
- *
- * Provides the text value of the node if present
- *
- * Returns the string or NULL if not available. The result will be
- *     deallocated on the next Read() operation.
- */
+/// Provides the text value of the node if present
+///
+/// Returns the string or NULL if not available.
+/// The result will be deallocated on the next Read() operation.
+#[doc(alias = "xmlTextReaderConstValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
     use crate::generic_error;
@@ -3378,19 +3104,10 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
     null_mut()
 }
 
-/*
- * use the Const version of the routine for
- * better performance and simpler code
- */
-/**
- * xmlTextReaderBaseUri:
- * @reader:  the xmlTextReaderPtr used
- *
- * The base URI of the node.
- *
- * Returns the base URI or NULL if not available,
- *    if non NULL it need to be freed by the caller.
- */
+/// The base URI of the node.
+///
+/// Returns the base URI or NULL if not available, if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderBaseUri")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_base_uri(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -3399,15 +3116,10 @@ pub unsafe extern "C" fn xml_text_reader_base_uri(reader: &mut XmlTextReader) ->
     (*reader.node).get_base(null_mut())
 }
 
-/**
- * xmlTextReaderLocalName:
- * @reader:  the xmlTextReaderPtr used
- *
- * The local name of the node.
- *
- * Returns the local name or NULL if not available,
- *   if non NULL it need to be freed by the caller.
- */
+/// The local name of the node.
+///
+/// Returns the local name or NULL if not available, if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderLocalName")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_local_name(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -3435,15 +3147,11 @@ pub unsafe extern "C" fn xml_text_reader_local_name(reader: &mut XmlTextReader) 
     xml_strdup((*node).name)
 }
 
-/**
- * xmlTextReaderName:
- * @reader:  the xmlTextReaderPtr used
- *
- * The qualified name of the node, equal to Prefix :LocalName.
- *
- * Returns the local name or NULL if not available,
- *   if non NULL it need to be freed by the caller.
- */
+/// The qualified name of the node, equal to Prefix :LocalName.
+///
+/// Returns the local name or NULL if not available,
+/// if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderName")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_name(reader: &mut XmlTextReader) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
@@ -3504,15 +3212,11 @@ pub unsafe extern "C" fn xml_text_reader_name(reader: &mut XmlTextReader) -> *mu
     // return null_mut();
 }
 
-/**
- * xmlTextReaderNamespaceUri:
- * @reader:  the xmlTextReaderPtr used
- *
- * The URI defining the namespace associated with the node.
- *
- * Returns the namespace URI or NULL if not available,
- *    if non NULL it need to be freed by the caller.
- */
+/// The URI defining the namespace associated with the node.
+///
+/// Returns the namespace URI or NULL if not available,
+/// if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderNamespaceUri")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_namespace_uri(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -3538,15 +3242,11 @@ pub unsafe extern "C" fn xml_text_reader_namespace_uri(reader: &mut XmlTextReade
     null_mut()
 }
 
-/**
- * xmlTextReaderPrefix:
- * @reader:  the xmlTextReaderPtr used
- *
- * A shorthand reference to the namespace associated with the node.
- *
- * Returns the prefix or NULL if not available,
- *    if non NULL it need to be freed by the caller.
- */
+/// A shorthand reference to the namespace associated with the node.
+///
+/// Returns the prefix or NULL if not available,
+/// if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderPrefix")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_prefix(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -3576,15 +3276,11 @@ pub unsafe extern "C" fn xml_text_reader_prefix(reader: &mut XmlTextReader) -> *
     null_mut()
 }
 
-/**
- * xmlTextReaderXmlLang:
- * @reader:  the xmlTextReaderPtr used
- *
- * The xml:lang scope within which the node resides.
- *
- * Returns the xml:lang value or NULL if none exists.,
- *    if non NULL it need to be freed by the caller.
- */
+/// The xml:lang scope within which the node resides.
+///
+/// Returns the xml:lang value or NULL if none exists.,
+/// if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderXmlLang")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_xml_lang(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -3593,15 +3289,11 @@ pub unsafe extern "C" fn xml_text_reader_xml_lang(reader: &mut XmlTextReader) ->
     (*reader.node).get_lang()
 }
 
-/**
- * xmlTextReaderValue:
- * @reader:  the xmlTextReaderPtr used
- *
- * Provides the text value of the node if present
- *
- * Returns the string or NULL if not available. The result must be deallocated
- *     with xml_free as _()
- */
+/// Provides the text value of the node if present
+///
+/// Returns the string or NULL if not available. The result must be deallocated
+///     with xml_free as _()
+#[doc(alias = "xmlTextReaderValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *mut XmlChar {
     if reader.node.is_null() {
@@ -3641,13 +3333,8 @@ pub unsafe extern "C" fn xml_text_reader_value(reader: &mut XmlTextReader) -> *m
     null_mut()
 }
 
-/**
- * xmlTextReaderFreeDoc:
- * @reader:  the xmlTextReaderPtr used
- * @cur:  pointer to the document
- *
- * Free up all the structures used by a document, tree included.
- */
+/// Free up all the structures used by a document, tree included.
+#[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
     use crate::tree::NodeCommon;
@@ -3712,18 +3399,11 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
     xml_free(cur as _);
 }
 
-/*
- * Methods of the XmlTextReader
- */
-/**
- * xmlTextReaderClose:
- * @reader:  the xmlTextReaderPtr used
- *
- * This method releases any resources allocated by the current instance
- * changes the state to Closed and close any underlying input.
- *
- * Returns 0 or -1 in case of error
- */
+/// This method releases any resources allocated by the current instance
+/// changes the state to Closed and close any underlying input.
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlTextReaderClose")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     reader.node = null_mut();
@@ -3765,17 +3445,12 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i3
     0
 }
 
-/**
- * xmlTextReaderGetAttributeNo:
- * @reader:  the xmlTextReaderPtr used
- * @no: the zero-based index of the attribute relative to the containing element
- *
- * Provides the value of the attribute with the specified index relative
- * to the containing element.
- *
- * Returns a string containing the value of the specified attribute, or NULL
- *    in case of error. The string must be deallocated by the caller.
- */
+/// Provides the value of the attribute with the specified index relative
+/// to the containing element.
+///
+/// Returns a string containing the value of the specified attribute, or NULL in case of error.  
+/// The string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderGetAttributeNo")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     reader: &mut XmlTextReader,
@@ -3827,16 +3502,11 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_no(
     ret
 }
 
-/**
- * xmlTextReaderGetAttribute:
- * @reader:  the xmlTextReaderPtr used
- * @name: the qualified name of the attribute.
- *
- * Provides the value of the attribute with the specified qualified name.
- *
- * Returns a string containing the value of the specified attribute, or NULL
- *    in case of error. The string must be deallocated by the caller.
- */
+/// Provides the value of the attribute with the specified qualified name.
+///
+/// Returns a string containing the value of the specified attribute, or NULL in case of error.  
+/// The string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderGetAttribute")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_attribute(
     reader: &mut XmlTextReader,
@@ -3921,17 +3591,11 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute(
     ret
 }
 
-/**
- * xmlTextReaderGetAttributeNs:
- * @reader:  the xmlTextReaderPtr used
- * @localName: the local name of the attribute.
- * @namespaceURI: the namespace URI of the attribute.
- *
- * Provides the value of the specified attribute
- *
- * Returns a string containing the value of the specified attribute, or NULL
- *    in case of error. The string must be deallocated by the caller.
- */
+/// Provides the value of the specified attribute
+///
+/// Returns a string containing the value of the specified attribute, or NULL in case of error.  
+/// The string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderGetAttributeNs")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
     reader: &mut XmlTextReader,
@@ -3987,21 +3651,16 @@ pub unsafe extern "C" fn xml_text_reader_get_attribute_ns(
     )
 }
 
-/**
- * xmlTextReaderGetRemainder:
- * @reader:  the xmlTextReaderPtr used
- *
- * Method to get the remainder of the buffered XML. this method stops the
- * parser, set its state to End Of File and return the input stream with
- * what is left that the parser did not use.
- *
- * The implementation is not good, the parser certainly progressed past
- * what's left in (*reader).input, and there is an allocation problem. Best
- * would be to rewrite it differently.
- *
- * Returns the xmlParserInputBufferPtr attached to the XML or NULL
- *    in case of error.
- */
+/// Method to get the remainder of the buffered XML. this method stops the
+/// parser, set its state to End Of File and return the input stream with
+/// what is left that the parser did not use.
+///
+/// The implementation is not good, the parser certainly progressed past
+/// what's left in (*reader).input, and there is an allocation problem. Best
+/// would be to rewrite it differently.
+///
+/// Returns the xmlParserInputBufferPtr attached to the XML or NULL in case of error.
+#[doc(alias = "xmlTextReaderGetRemainder")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_get_remainder(
     reader: &mut XmlTextReader,
@@ -4037,17 +3696,11 @@ pub unsafe fn xml_text_reader_get_remainder(
     }
 }
 
-/**
- * xmlTextReaderLookupNamespace:
- * @reader:  the xmlTextReaderPtr used
- * @prefix: the prefix whose namespace URI is to be resolved. To return
- *          the default namespace, specify NULL
- *
- * Resolves a namespace prefix in the scope of the current element.
- *
- * Returns a string containing the namespace URI to which the prefix maps
- *    or NULL in case of error. The string must be deallocated by the caller.
- */
+/// Resolves a namespace prefix in the scope of the current element.
+///
+/// Returns a string containing the namespace URI to which the prefix maps or NULL in case of error.  
+/// The string must be deallocated by the caller.
+#[doc(alias = "xmlTextReaderLookupNamespace")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
     reader: &mut XmlTextReader,
@@ -4071,17 +3724,11 @@ pub unsafe extern "C" fn xml_text_reader_lookup_namespace(
     xml_strdup((*ns).href)
 }
 
-/**
- * xmlTextReaderMoveToAttributeNo:
- * @reader:  the xmlTextReaderPtr used
- * @no: the zero-based index of the attribute relative to the containing
- *      element.
- *
- * Moves the position of the current instance to the attribute with
- * the specified index relative to the containing element.
- *
- * Returns 1 in case of success, -1 in case of error, 0 if not found
- */
+/// Moves the position of the current instance to the attribute with
+/// the specified index relative to the containing element.
+///
+/// Returns 1 in case of success, -1 in case of error, 0 if not found
+#[doc(alias = "xmlTextReaderMoveToAttributeNo")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_attribute_no(
     reader: &mut XmlTextReader,
@@ -4129,17 +3776,11 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_no(
     1
 }
 
-/**
- * xmlTextReaderMoveToAttribute:
- * @reader:  the xmlTextReaderPtr used
- * @name: the qualified name of the attribute.
- *
- * Moves the position of the current instance to the attribute with
- * the specified qualified name.
- *
- * Returns 1 in case of success, -1 in case of error, 0 if not found
- */
-// #[cfg(feature = "libxml_reader")]
+/// Moves the position of the current instance to the attribute with the specified qualified name.
+///
+/// Returns 1 in case of success, -1 in case of error, 0 if not found
+#[doc(alias = "xmlTextReaderMoveToAttribute")]
+#[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
     reader: &mut XmlTextReader,
     name: *const XmlChar,
@@ -4250,17 +3891,11 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute(
     0
 }
 
-/**
- * xmlTextReaderMoveToAttributeNs:
- * @reader:  the xmlTextReaderPtr used
- * @localName:  the local name of the attribute.
- * @namespaceURI:  the namespace URI of the attribute.
- *
- * Moves the position of the current instance to the attribute with the
- * specified local name and namespace URI.
- *
- * Returns 1 in case of success, -1 in case of error, 0 if not found
- */
+/// Moves the position of the current instance to the attribute with the
+/// specified local name and namespace URI.
+///
+/// Returns 1 in case of success, -1 in case of error, 0 if not found
+#[doc(alias = "xmlTextReaderMoveToAttributeNs")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
     reader: &mut XmlTextReader,
@@ -4320,15 +3955,11 @@ pub unsafe extern "C" fn xml_text_reader_move_to_attribute_ns(
     0
 }
 
-/**
- * xmlTextReaderMoveToFirstAttribute:
- * @reader:  the xmlTextReaderPtr used
- *
- * Moves the position of the current instance to the first attribute
- * associated with the current node.
- *
- * Returns 1 in case of success, -1 in case of error, 0 if not found
- */
+/// Moves the position of the current instance to the first attribute
+/// associated with the current node.
+///
+/// Returns 1 in case of success, -1 in case of error, 0 if not found
+#[doc(alias = "xmlTextReaderMoveToFirstAttribute")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_first_attribute(
     reader: &mut XmlTextReader,
@@ -4351,15 +3982,11 @@ pub unsafe extern "C" fn xml_text_reader_move_to_first_attribute(
     0
 }
 
-/**
- * xmlTextReaderMoveToNextAttribute:
- * @reader:  the xmlTextReaderPtr used
- *
- * Moves the position of the current instance to the next attribute
- * associated with the current node.
- *
- * Returns 1 in case of success, -1 in case of error, 0 if not found
- */
+/// Moves the position of the current instance to the next attribute
+/// associated with the current node.
+///
+/// Returns 1 in case of success, -1 in case of error, 0 if not found
+#[doc(alias = "xmlTextReaderMoveToNextAttribute")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_next_attribute(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -4393,15 +4020,11 @@ pub unsafe extern "C" fn xml_text_reader_move_to_next_attribute(reader: &mut Xml
     0
 }
 
-/**
- * xmlTextReaderMoveToElement:
- * @reader:  the xmlTextReaderPtr used
- *
- * Moves the position of the current instance to the node that
- * contains the current Attribute  node.
- *
- * Returns 1 in case of success, -1 in case of error, 0 if not moved
- */
+/// Moves the position of the current instance to the node that
+/// contains the current Attribute node.
+///
+/// Returns 1 in case of success, -1 in case of error, 0 if not moved
+#[doc(alias = "xmlTextReaderMoveToElement")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_move_to_element(reader: &mut XmlTextReader) -> i32 {
     if reader.node.is_null() {
@@ -4417,32 +4040,24 @@ pub unsafe extern "C" fn xml_text_reader_move_to_element(reader: &mut XmlTextRea
     0
 }
 
-/**
- * xmlTextReaderNormalization:
- * @reader:  the xmlTextReaderPtr used
- *
- * The value indicating whether to normalize white space and attribute values.
- * Since attribute value and end of line normalizations are a MUST in the XML
- * specification only the value true is accepted. The broken behaviour of
- * accepting out of range character entities like &#0; is of course not
- * supported either.
- *
- * Returns 1 or -1 in case of error.
- */
+/// The value indicating whether to normalize white space and attribute values.
+/// Since attribute value and end of line normalizations are a MUST in the XML
+/// specification only the value true is accepted. The broken behaviour of
+/// accepting out of range character entities like &#0; is of course not
+/// supported either.
+///
+/// Returns 1 or -1 in case of error.
+#[doc(alias = "xmlTextReaderNormalization")]
 #[cfg(feature = "libxml_reader")]
 pub fn xml_text_reader_normalization(_reader: &mut XmlTextReader) -> i32 {
     1
 }
 
-/**
- * xmlTextReaderConstEncoding:
- * @reader:  the xmlTextReaderPtr used
- *
- * Determine the encoding of the document being read.
- *
- * Returns a string containing the encoding of the document or NULL in
- * case of error.  The string is deallocated with the reader.
- */
+/// Determine the encoding of the document being read.
+///
+/// Returns a string containing the encoding of the document or NULL in case of error.  
+/// The string is deallocated with the reader.
+#[doc(alias = "xmlTextReaderConstEncoding")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_encoding(
     reader: &mut XmlTextReader,
@@ -4467,21 +4082,11 @@ pub unsafe extern "C" fn xml_text_reader_const_encoding(
     }
 }
 
-/*
- * Extensions
- */
-/**
- * xmlTextReaderSetParserProp:
- * @reader:  the xmlTextReaderPtr used
- * @prop:  the xmlParserProperties to set
- * @value:  usually 0 or 1 to (de)activate it
- *
- * Change the parser processing behaviour by changing some of its internal
- * properties. Note that some properties can only be changed before any
- * read has been done.
- *
- * Returns 0 if the call was successful, or -1 in case of error
- */
+/// Change the parser processing behaviour by changing some of its internal
+/// properties. Note that some properties can only be changed before any read has been done.
+///
+/// Returns 0 if the call was successful, or -1 in case of error
+#[doc(alias = "xmlTextReaderSetParserProp")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
     reader: &mut XmlTextReader,
@@ -4540,15 +4145,10 @@ pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
     }
 }
 
-/**
- * xmlTextReaderGetParserProp:
- * @reader:  the xmlTextReaderPtr used
- * @prop:  the xmlParserProperties to get
- *
- * Read the parser internal property.
- *
- * Returns the value, usually 0 or 1, or -1 in case of error.
- */
+/// Read the parser internal property.
+///
+/// Returns the value, usually 0 or 1, or -1 in case of error.
+#[doc(alias = "xmlTextReaderGetParserProp")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_parser_prop(
     reader: &mut XmlTextReader,
@@ -4578,16 +4178,12 @@ pub unsafe extern "C" fn xml_text_reader_get_parser_prop(
     }
 }
 
-/**
- * xmlTextReaderCurrentNode:
- * @reader:  the xmlTextReaderPtr used
- *
- * Hacking interface allowing to get the xmlNodePtr corresponding to the
- * current node being accessed by the xmlTextReader. This is dangerous
- * because the underlying node may be destroyed on the next Reads.
- *
- * Returns the xmlNodePtr or NULL in case of error.
- */
+/// Hacking interface allowing to get the xmlNodePtr corresponding to the
+/// current node being accessed by the xmlTextReader. This is dangerous
+/// because the underlying node may be destroyed on the next Reads.
+///
+/// Returns the xmlNodePtr or NULL in case of error.
+#[doc(alias = "xmlTextReaderCurrentNode")]
 #[cfg(feature = "libxml_reader")]
 pub fn xml_text_reader_current_node(reader: &mut XmlTextReader) -> XmlNodePtr {
     if !reader.curnode.is_null() {
@@ -4596,14 +4192,10 @@ pub fn xml_text_reader_current_node(reader: &mut XmlTextReader) -> XmlNodePtr {
     reader.node
 }
 
-/**
- * xmlTextReaderGetParserLineNumber:
- * @reader: the user data (XML reader context)
- *
- * Provide the line number of the current parsing point.
- *
- * Returns an int or 0 if not available
- */
+/// Provide the line number of the current parsing point.
+///
+/// Returns an int or 0 if not available
+#[doc(alias = "xmlTextReaderGetParserLineNumber")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_parser_line_number(reader: &mut XmlTextReader) -> i32 {
     if reader.ctxt.is_null() || (*reader.ctxt).input.is_null() {
@@ -4612,14 +4204,10 @@ pub unsafe extern "C" fn xml_text_reader_get_parser_line_number(reader: &mut Xml
     (*(*reader.ctxt).input).line
 }
 
-/**
- * xmlTextReaderGetParserColumnNumber:
- * @reader: the user data (XML reader context)
- *
- * Provide the column number of the current parsing point.
- *
- * Returns an int or 0 if not available
- */
+/// Provide the column number of the current parsing point.
+///
+/// Returns an int or 0 if not available
+#[doc(alias = "xmlTextReaderGetParserColumnNumber")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_parser_column_number(
     reader: &mut XmlTextReader,
@@ -4630,16 +4218,12 @@ pub unsafe extern "C" fn xml_text_reader_get_parser_column_number(
     (*(*reader.ctxt).input).col
 }
 
-/**
- * xmlTextReaderPreserve:
- * @reader:  the xmlTextReaderPtr used
- *
- * This tells the XML Reader to preserve the current node.
- * The caller must also use xmlTextReaderCurrentDoc() to
- * keep an handle on the resulting document once parsing has finished
- *
- * Returns the xmlNodePtr or NULL in case of error.
- */
+/// This tells the XML Reader to preserve the current node.
+/// The caller must also use xmlTextReaderCurrentDoc() to
+/// keep an handle on the resulting document once parsing has finished
+///
+/// Returns the xmlNodePtr or NULL in case of error.
+#[doc(alias = "xmlTextReaderPreserve")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_preserve(reader: &mut XmlTextReader) -> XmlNodePtr {
     let cur = if !reader.curnode.is_null() {
@@ -4670,18 +4254,12 @@ pub unsafe extern "C" fn xml_text_reader_preserve(reader: &mut XmlTextReader) ->
     cur
 }
 
-/**
- * xmlTextReaderPreservePattern:
- * @reader:  the xmlTextReaderPtr used
- * @pattern:  an XPath subset pattern
- * @namespaces: the prefix definitions, array of [URI, prefix] or NULL
- *
- * This tells the XML Reader to preserve all nodes matched by the
- * pattern. The caller must also use xmlTextReaderCurrentDoc() to
- * keep an handle on the resulting document once parsing has finished
- *
- * Returns a non-negative number in case of success and -1 in case of error
- */
+/// This tells the XML Reader to preserve all nodes matched by the pattern.
+/// The caller must also use xmlTextReaderCurrentDoc() to
+/// keep an handle on the resulting document once parsing has finished
+///
+/// Returns a non-negative number in case of success and -1 in case of error
+#[doc(alias = "xmlTextReaderPreservePattern")]
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
     reader: &mut XmlTextReader,
@@ -4730,18 +4308,16 @@ pub unsafe extern "C" fn xml_text_reader_preserve_pattern(
     res
 }
 
-/**
- * xmlTextReaderCurrentDoc:
- * @reader:  the xmlTextReaderPtr used
- *
- * Hacking interface allowing to get the xmlDocPtr corresponding to the
- * current document being accessed by the xmlTextReader.
- * NOTE: as a result of this call, the reader will not destroy the
- *       associated XML document and calling xmlFreeDoc() on the result
- *       is needed once the reader parsing has finished.
- *
- * Returns the xmlDocPtr or NULL in case of error.
- */
+/// Hacking interface allowing to get the xmlDocPtr corresponding to the
+/// current document being accessed by the xmlTextReader.
+///
+/// # NOTE
+/// As a result of this call, the reader will not destroy the
+/// associated XML document and calling xmlFreeDoc() on the result
+/// is needed once the reader parsing has finished.
+///
+/// Returns the xmlDocPtr or NULL in case of error.
+#[doc(alias = "xmlTextReaderCurrentDoc")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_current_doc(reader: &mut XmlTextReader) -> XmlDocPtr {
     if !reader.doc.is_null() {
@@ -4755,16 +4331,11 @@ pub unsafe extern "C" fn xml_text_reader_current_doc(reader: &mut XmlTextReader)
     (*reader.ctxt).my_doc
 }
 
-/**
- * xmlTextReaderExpand:
- * @reader:  the xmlTextReaderPtr used
- *
- * Reads the contents of the current node and the full subtree. It then makes
- * the subtree available until the next xmlTextReaderRead() call
- *
- * Returns a node pointer valid until the next xmlTextReaderRead() call
- *         or NULL in case of error.
- */
+/// Reads the contents of the current node and the full subtree. It then makes
+/// the subtree available until the next xmlTextReaderRead() call
+///
+/// Returns a node pointer valid until the next xmlTextReaderRead() call or NULL in case of error.
+#[doc(alias = "xmlTextReaderExpand")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_expand(reader: &mut XmlTextReader) -> XmlNodePtr {
     if reader.node.is_null() {
@@ -4840,16 +4411,12 @@ unsafe extern "C" fn xml_text_reader_next_tree(reader: &mut XmlTextReader) -> i3
     1
 }
 
-/**
- * xmlTextReaderNext:
- * @reader:  the xmlTextReaderPtr used
- *
- * Skip to the node following the current one in document order while
- * avoiding the subtree if any.
- *
- * Returns 1 if the node was read successfully, 0 if there is no more
- *          nodes to read, or -1 in case of error
- */
+/// Skip to the node following the current one in document order while
+/// avoiding the subtree if any.
+///
+/// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
+/// or -1 in case of error
+#[doc(alias = "xmlTextReaderNext")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_next(reader: &mut XmlTextReader) -> i32 {
     let mut ret: i32;
@@ -4880,17 +4447,12 @@ pub unsafe extern "C" fn xml_text_reader_next(reader: &mut XmlTextReader) -> i32
     xml_text_reader_read(reader)
 }
 
-/**
- * xmlTextReaderNextSibling:
- * @reader:  the xmlTextReaderPtr used
- *
- * Skip to the node following the current one in document order while
- * avoiding the subtree if any.
- * Currently implemented only for Readers built on a document
- *
- * Returns 1 if the node was read successfully, 0 if there is no more
- *          nodes to read, or -1 in case of error
- */
+/// Skip to the node following the current one in document order while avoiding the subtree if any.
+/// Currently implemented only for Readers built on a document
+///
+/// Returns 1 if the node was read successfully, 0 if there is no more nodes to read,
+/// or -1 in case of error
+#[doc(alias = "xmlTextReaderNextSibling")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_next_sibling(reader: &mut XmlTextReader) -> i32 {
     if reader.doc.is_null() {
@@ -4915,14 +4477,10 @@ pub unsafe extern "C" fn xml_text_reader_next_sibling(reader: &mut XmlTextReader
     0
 }
 
-/**
- * xmlTextReaderIsValid:
- * @reader:  the xmlTextReaderPtr used
- *
- * Retrieve the validity status from the parser context
- *
- * Returns the flag value 1 if valid, 0 if no, and -1 in case of error
- */
+/// Retrieve the validity status from the parser context
+///
+/// Returns the flag value 1 if valid, 0 if no, and -1 in case of error
+#[doc(alias = "xmlTextReaderIsValid")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_is_valid(reader: &mut XmlTextReader) -> i32 {
     #[cfg(feature = "schema")]
@@ -5186,20 +4744,12 @@ fn xml_text_reader_validity_structured_relay(
     }
 }
 
-/**
- * xmlTextReaderRelaxNGValidateInternal:
- * @reader:  the xmlTextReaderPtr used
- * @rng:  the path to a RelaxNG schema or NULL
- * @ctxt: the RelaxNG schema validation context or NULL
- * @options: options (not yet used)
- *
- * Use RelaxNG to validate the document as it is processed.
- * Activation is only possible before the first Read().
- * If both @rng and @ctxt are NULL, then RelaxNG validation is deactivated.
- *
- * Returns 0 in case the RelaxNG validation could be (de)activated and
- *       -1 in case of error.
- */
+/// Use RelaxNG to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// If both @rng and @ctxt are NULL, then RelaxNG validation is deactivated.
+///
+/// Returns 0 in case the RelaxNG validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderRelaxNGValidateInternal")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
     reader: XmlTextReaderPtr,
@@ -5304,18 +4854,12 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
     0
 }
 
-/**
- * xmlTextReaderRelaxNGValidate:
- * @reader:  the xmlTextReaderPtr used
- * @rng:  the path to a RelaxNG schema or NULL
- *
- * Use RelaxNG schema to validate the document as it is processed.
- * Activation is only possible before the first Read().
- * If @rng is NULL, then RelaxNG schema validation is deactivated.
- *
- * Returns 0 in case the schemas validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Use RelaxNG schema to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// If @rng is NULL, then RelaxNG schema validation is deactivated.
+///
+/// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderRelaxNGValidate")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe extern "C" fn xml_text_reader_relaxng_validate(
     reader: XmlTextReaderPtr,
@@ -5324,19 +4868,12 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate(
     xml_text_reader_relaxng_validate_internal(reader, rng, null_mut(), 0)
 }
 
-/**
- * xmlTextReaderRelaxNGValidateCtxt:
- * @reader:  the xmlTextReaderPtr used
- * @ctxt: the RelaxNG schema validation context or NULL
- * @options: options (not used yet)
- *
- * Use RelaxNG schema context to validate the document as it is processed.
- * Activation is only possible before the first Read().
- * If @ctxt is NULL, then RelaxNG schema validation is deactivated.
- *
- * Returns 0 in case the schemas validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Use RelaxNG schema context to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// If @ctxt is NULL, then RelaxNG schema validation is deactivated.
+///
+/// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderRelaxNGValidateCtxt")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
     reader: XmlTextReaderPtr,
@@ -5346,19 +4883,14 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
     xml_text_reader_relaxng_validate_internal(reader, null_mut(), ctxt, options)
 }
 
-/**
-* xmlTextReaderRelaxNGSetSchema:
-* @reader:  the xmlTextReaderPtr used
-* @schema:  a precompiled RelaxNG schema
-*
-* Use RelaxNG to validate the document as it is processed.
-* Activation is only possible before the first Read().
-* if @schema is NULL, then RelaxNG validation is deactivated.
-* The @schema should not be freed until the reader is deallocated
-* or its use has been deactivated.
-*
-* Returns 0 in case the RelaxNG validation could be (de)activated and -1 in case of error.
-*/
+/// Use RelaxNG to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// if @schema is NULL, then RelaxNG validation is deactivated.
+/// The @schema should not be freed until the reader is deallocated
+/// or its use has been deactivated.
+///
+/// Returns 0 in case the RelaxNG validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderRelaxNGSetSchema")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
     reader: XmlTextReaderPtr,
@@ -5421,17 +4953,10 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
     0
 }
 
-/**
- * xmlTextReaderLocator:
- * @ctx: the xmlTextReaderPtr used
- * @file: returned file information
- * @line: returned line information
- *
- * Internal locator function for the readers
- *
- * Returns 0 in case the Schema validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Internal locator function for the readers
+///
+/// Returns 0 in case the Schema validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderLocator")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 unsafe extern "C" fn xml_text_reader_locator(
     ctx: *mut c_void,
@@ -5484,20 +5009,12 @@ unsafe extern "C" fn xml_text_reader_locator(
     -1
 }
 
-/**
- * xmlTextReaderSchemaValidateInternal:
- * @reader:  the xmlTextReaderPtr used
- * @xsd:  the path to a W3C XSD schema or NULL
- * @ctxt: the XML Schema validation context or NULL
- * @options: options (not used yet)
- *
- * Validate the document as it is processed using XML Schema.
- * Activation is only possible before the first Read().
- * If both @xsd and @ctxt are NULL then XML Schema validation is deactivated.
- *
- * Returns 0 in case the schemas validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Validate the document as it is processed using XML Schema.
+/// Activation is only possible before the first Read().
+/// If both @xsd and @ctxt are NULL then XML Schema validation is deactivated.
+///
+/// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderSchemaValidateInternal")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 unsafe extern "C" fn xml_text_reader_schema_validate_internal(
     reader: XmlTextReaderPtr,
@@ -5623,18 +5140,12 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
     0
 }
 
-/**
- * xmlTextReaderSchemaValidate:
- * @reader:  the xmlTextReaderPtr used
- * @xsd:  the path to a W3C XSD schema or NULL
- *
- * Use W3C XSD schema to validate the document as it is processed.
- * Activation is only possible before the first Read().
- * If @xsd is NULL, then XML Schema validation is deactivated.
- *
- * Returns 0 in case the schemas validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Use W3C XSD schema to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// If @xsd is NULL, then XML Schema validation is deactivated.
+///
+/// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderSchemaValidate")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe extern "C" fn xml_text_reader_schema_validate(
     reader: XmlTextReaderPtr,
@@ -5643,19 +5154,12 @@ pub unsafe extern "C" fn xml_text_reader_schema_validate(
     xml_text_reader_schema_validate_internal(reader, xsd, null_mut(), 0)
 }
 
-/**
- * xmlTextReaderSchemaValidateCtxt:
- * @reader:  the xmlTextReaderPtr used
- * @ctxt: the XML Schema validation context or NULL
- * @options: options (not used yet)
- *
- * Use W3C XSD schema context to validate the document as it is processed.
- * Activation is only possible before the first Read().
- * If @ctxt is NULL, then XML Schema validation is deactivated.
- *
- * Returns 0 in case the schemas validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Use W3C XSD schema context to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// If @ctxt is NULL, then XML Schema validation is deactivated.
+///
+/// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderSchemaValidateCtxt")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe extern "C" fn xml_text_reader_schema_validate_ctxt(
     reader: XmlTextReaderPtr,
@@ -5665,20 +5169,14 @@ pub unsafe extern "C" fn xml_text_reader_schema_validate_ctxt(
     xml_text_reader_schema_validate_internal(reader, null_mut(), ctxt, options)
 }
 
-/**
- * xmlTextReaderSetSchema:
- * @reader:  the xmlTextReaderPtr used
- * @schema:  a precompiled Schema schema
- *
- * Use XSD Schema to validate the document as it is processed.
- * Activation is only possible before the first Read().
- * if @schema is NULL, then Schema validation is deactivated.
- * The @schema should not be freed until the reader is deallocated
- * or its use has been deactivated.
- *
- * Returns 0 in case the Schema validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Use XSD Schema to validate the document as it is processed.
+/// Activation is only possible before the first Read().
+/// if @schema is NULL, then Schema validation is deactivated.
+/// The @schema should not be freed until the reader is deallocated
+/// or its use has been deactivated.
+///
+/// Returns 0 in case the Schema validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlTextReaderSetSchema")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
 pub unsafe extern "C" fn xml_text_reader_set_schema(
     reader: XmlTextReaderPtr,
@@ -5768,15 +5266,11 @@ pub unsafe extern "C" fn xml_text_reader_set_schema(
     0
 }
 
-/**
- * xmlTextReaderConstXmlVersion:
- * @reader:  the xmlTextReaderPtr used
- *
- * Determine the XML version of the document being read.
- *
- * Returns a string containing the XML version of the document or NULL
- * in case of error.  The string is deallocated with the reader.
- */
+/// Determine the XML version of the document being read.
+///
+/// Returns a string containing the XML version of the document or NULL in case of error.  
+/// The string is deallocated with the reader.
+#[doc(alias = "xmlTextReaderConstXmlVersion")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_xml_version(
     reader: XmlTextReaderPtr,
@@ -5804,16 +5298,12 @@ pub unsafe extern "C" fn xml_text_reader_const_xml_version(
     }
 }
 
-/**
- * xmlTextReaderStandalone:
- * @reader:  the xmlTextReaderPtr used
- *
- * Determine the standalone status of the document being read.
- *
- * Returns 1 if the document was declared to be standalone, 0 if it
- * was declared to be not standalone, or -1 if the document did not
- * specify its standalone status or in case of error.
- */
+/// Determine the standalone status of the document being read.
+///
+/// Returns 1 if the document was declared to be standalone, 0 if it
+/// was declared to be not standalone, or -1 if the document did not
+/// specify its standalone status or in case of error.
+#[doc(alias = "xmlTextReaderStandalone")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_standalone(reader: XmlTextReaderPtr) -> i32 {
     let mut doc: XmlDocPtr = null_mut();
@@ -5832,22 +5322,15 @@ pub unsafe extern "C" fn xml_text_reader_standalone(reader: XmlTextReaderPtr) ->
     (*doc).standalone
 }
 
-/*
- * Index lookup
- */
-/**
- * xmlTextReaderByteConsumed:
- * @reader: an XML reader
- *
- * This function provides the current index of the parser used
- * by the reader, relative to the start of the current entity.
- * This function actually just wraps a call to xmlBytesConsumed()
- * for the parser context associated with the reader.
- * See xmlBytesConsumed() for more information.
- *
- * Returns the index in bytes from the beginning of the entity or -1
- *         in case the index could not be computed.
- */
+/// This function provides the current index of the parser used
+/// by the reader, relative to the start of the current entity.
+/// This function actually just wraps a call to xmlBytesConsumed()
+/// for the parser context associated with the reader.
+/// See xmlBytesConsumed() for more information.
+///
+/// Returns the index in bytes from the beginning of the entity or -1
+/// in case the index could not be computed.
+#[doc(alias = "xmlTextReaderByteConsumed")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_byte_consumed(reader: XmlTextReaderPtr) -> i64 {
     if reader.is_null() || (*reader).ctxt.is_null() {
@@ -5856,17 +5339,10 @@ pub unsafe extern "C" fn xml_text_reader_byte_consumed(reader: XmlTextReaderPtr)
     xml_byte_consumed((*reader).ctxt)
 }
 
-/*
- * New more complete APIs for simpler creation and reuse of readers
- */
-/**
- * xmlReaderWalker:
- * @doc:  a preparsed document
- *
- * Create an xmltextReader for a preparsed document.
- *
- * Returns the new reader or NULL in case of error.
- */
+/// Create an xmltextReader for a preparsed document.
+///
+/// Returns the new reader or NULL in case of error.
+#[doc(alias = "xmlReaderWalker")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     use crate::generic_error;
@@ -5896,18 +5372,11 @@ pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     ret
 }
 
-/**
- * xmlReaderForDoc:
- * @cur:  a pointer to a zero terminated string
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Create an xmltextReader for an XML in-memory document.
- * The parsing flags @options are a combination of xmlParserOption.
- *
- * Returns the new reader or NULL in case of error.
- */
+/// Create an xmltextReader for an XML in-memory document.
+/// The parsing flags @options are a combination of xmlParserOption.
+///
+/// Returns the new reader or NULL in case of error.
+#[doc(alias = "xmlReaderForDoc")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_for_doc(
     cur: *const XmlChar,
@@ -5929,17 +5398,11 @@ pub unsafe extern "C" fn xml_reader_for_doc(
     )
 }
 
-/**
- * xmlReaderForFile:
- * @filename:  a file or URL
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * parse an XML file from the filesystem or the network.
- * The parsing flags @options are a combination of xmlParserOption.
- *
- * Returns the new reader or NULL in case of error.
- */
+/// Parse an XML file from the filesystem or the network.
+/// The parsing flags @options are a combination of xmlParserOption.
+///
+/// Returns the new reader or NULL in case of error.
+#[doc(alias = "xmlReaderForFile")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_for_file(
     filename: *const c_char,
@@ -5954,19 +5417,11 @@ pub unsafe extern "C" fn xml_reader_for_file(
     reader
 }
 
-/**
- * xmlReaderForMemory:
- * @buffer:  a pointer to a c_char array
- * @size:  the size of the array
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Create an xmltextReader for an XML in-memory document.
- * The parsing flags @options are a combination of xmlParserOption.
- *
- * Returns the new reader or NULL in case of error.
- */
+/// Create an xmltextReader for an XML in-memory document.
+/// The parsing flags @options are a combination of xmlParserOption.
+///
+/// Returns the new reader or NULL in case of error.
+#[doc(alias = "xmlReaderForMemory")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_memory(
     buffer: Vec<u8>,
@@ -5988,20 +5443,11 @@ pub unsafe fn xml_reader_for_memory(
     reader
 }
 
-/**
- * xmlReaderForIO:
- * @ioread:  an I/O read function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Create an xmltextReader for an XML document from I/O functions and source.
- * The parsing flags @options are a combination of xmlParserOption.
- *
- * Returns the new reader or NULL in case of error.
- */
+/// Create an xmltextReader for an XML document from I/O functions and source.
+/// The parsing flags @options are a combination of xmlParserOption.
+///
+/// Returns the new reader or NULL in case of error.
+#[doc(alias = "xmlReaderForIO")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_for_io(
     ioctx: impl Read + 'static,
@@ -6021,16 +5467,11 @@ pub unsafe extern "C" fn xml_reader_for_io(
     reader
 }
 
-/**
- * xmlReaderNewWalker:
- * @reader:  an XML reader
- * @doc:  a preparsed document
- *
- * Setup an xmltextReader to parse a preparsed XML document.
- * This reuses the existing @reader xmlTextReader.
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Setup an xmltextReader to parse a preparsed XML document.
+/// This reuses the existing @reader xmlTextReader.
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "xmlReaderNewWalker")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
     if doc.is_null() {
@@ -6068,20 +5509,12 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
     0
 }
 
-/**
- * xmlReaderNewDoc:
- * @reader:  an XML reader
- * @cur:  a pointer to a zero terminated string
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Setup an xmltextReader to parse an XML in-memory document.
- * The parsing flags @options are a combination of xmlParserOption.
- * This reuses the existing @reader xmlTextReader.
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Setup an xmltextReader to parse an XML in-memory document.
+/// The parsing flags @options are a combination of xmlParserOption.
+/// This reuses the existing @reader xmlTextReader.
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "xmlReaderNewDoc")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_new_doc(
     reader: XmlTextReaderPtr,
@@ -6108,19 +5541,12 @@ pub unsafe extern "C" fn xml_reader_new_doc(
     )
 }
 
-/**
- * xmlReaderNewFile:
- * @reader:  an XML reader
- * @filename:  a file or URL
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * parse an XML file from the filesystem or the network.
- * The parsing flags @options are a combination of xmlParserOption.
- * This reuses the existing @reader xmlTextReader.
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Parse an XML file from the filesystem or the network.
+/// The parsing flags @options are a combination of xmlParserOption.
+/// This reuses the existing @reader xmlTextReader.
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "xmlReaderNewFile")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_new_file(
     reader: XmlTextReaderPtr,
@@ -6148,21 +5574,12 @@ pub unsafe extern "C" fn xml_reader_new_file(
     xml_text_reader_setup(reader, Some(input), filename, encoding, options)
 }
 
-/**
- * xmlReaderNewMemory:
- * @reader:  an XML reader
- * @buffer:  a pointer to a c_char array
- * @size:  the size of the array
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Setup an xmltextReader to parse an XML in-memory document.
- * The parsing flags @options are a combination of xmlParserOption.
- * This reuses the existing @reader xmlTextReader.
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Setup an xmltextReader to parse an XML in-memory document.
+/// The parsing flags @options are a combination of xmlParserOption.
+/// This reuses the existing @reader xmlTextReader.
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "xmlReaderNewMemory")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_new_memory(
     reader: XmlTextReaderPtr,
@@ -6183,23 +5600,12 @@ pub unsafe fn xml_reader_new_memory(
     xml_text_reader_setup(reader, Some(input), url, encoding, options)
 }
 
-/**
- * xmlReaderNewIO:
- * @reader:  an XML reader
- * @ioread:  an I/O read function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of xmlParserOption
- *
- * Setup an xmltextReader to parse an XML document from I/O functions
- * and source.
- * The parsing flags @options are a combination of xmlParserOption.
- * This reuses the existing @reader xmlTextReader.
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Setup an xmltextReader to parse an XML document from I/O functions and source.
+/// The parsing flags @options are a combination of xmlParserOption.
+/// This reuses the existing @reader xmlTextReader.
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "xmlReaderNewIO")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_reader_new_io(
     reader: XmlTextReaderPtr,
@@ -6218,21 +5624,12 @@ pub unsafe extern "C" fn xml_reader_new_io(
     xml_text_reader_setup(reader, Some(input), url, encoding, options)
 }
 
-/*
- * Error handling extensions
- */
+/// Error handling extensions
 #[cfg(feature = "libxml_reader")]
 pub type XmlTextReaderLocatorPtr = *mut c_void;
 
-/**
- * xmlTextReaderErrorFunc:
- * @arg: the user argument
- * @msg: the message
- * @severity: the severity of the error
- * @locator: a locator indicating where the error occurred
- *
- * Signature of an error callback from a reader parser
- */
+/// Signature of an error callback from a reader parser
+#[doc(alias = "xmlTextReaderErrorFunc")]
 #[cfg(feature = "libxml_reader")]
 pub type XmlTextReaderErrorFunc = unsafe fn(
     arg: Option<GenericErrorContext>,
@@ -6241,14 +5638,10 @@ pub type XmlTextReaderErrorFunc = unsafe fn(
     locator: XmlTextReaderLocatorPtr,
 );
 
-/**
- * xmlTextReaderLocatorLineNumber:
- * @locator: the xmlTextReaderLocatorPtr used
- *
- * Obtain the line number for the given locator.
- *
- * Returns the line number or -1 in case of error.
- */
+/// Obtain the line number for the given locator.
+///
+/// Returns the line number or -1 in case of error.
+#[doc(alias = "xmlTextReaderLocatorLineNumber")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_locator_line_number(
     locator: XmlTextReaderLocatorPtr,
@@ -6279,15 +5672,10 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
     ret
 }
 
-/**
- * xmlTextReaderLocatorBaseURI:
- * @locator: the xmlTextReaderLocatorPtr used
- *
- * Obtain the base URI for the given locator.
- *
- * Returns the base URI or NULL in case of error,
- *    if non NULL it need to be freed by the caller.
- */
+/// Obtain the base URI for the given locator.
+///
+/// Returns the base URI or NULL in case of error, if non NULL it need to be freed by the caller.
+#[doc(alias = "xmlTextReaderLocatorBaseURI")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
     locator: XmlTextReaderLocatorPtr,
@@ -6354,16 +5742,10 @@ fn xml_text_reader_warning(ctxt: Option<GenericErrorContext>, msg: &str) {
     // va_end(ap);
 }
 
-/**
- * xmlTextReaderSetErrorHandler:
- * @reader:  the xmlTextReaderPtr used
- * @f:    the callback function to call on error and warnings
- * @arg:    a user argument to pass to the callback function
- *
- * Register a callback function that will be called on error and warnings.
- *
- * If @f is NULL, the default error and warning handlers are restored.
- */
+/// Register a callback function that will be called on error and warnings.
+///
+/// If @f is NULL, the default error and warning handlers are restored.
+#[doc(alias = "xmlTextReaderSetErrorHandler")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_set_error_handler(
     reader: XmlTextReaderPtr,
@@ -6443,16 +5825,10 @@ pub unsafe fn xml_text_reader_set_error_handler(
     }
 }
 
-/**
-* xmlTextReaderSetStructuredErrorHandler:
- * @reader:  the xmlTextReaderPtr used
- * @f:    the callback function to call on error and warnings
- * @arg:    a user argument to pass to the callback function
- *
- * Register a callback function that will be called on error and warnings.
- *
- * If @f is NULL, the default error and warning handlers are restored.
- */
+/// Register a callback function that will be called on error and warnings.
+///
+/// If @f is NULL, the default error and warning handlers are restored.
+#[doc(alias = "xmlTextReaderSetStructuredErrorHandler")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_text_reader_set_structured_error_handler(
     reader: XmlTextReaderPtr,
@@ -6539,14 +5915,8 @@ pub unsafe fn xml_text_reader_set_structured_error_handler(
     }
 }
 
-/**
- * xmlTextReaderGetErrorHandler:
- * @reader:  the xmlTextReaderPtr used
- * @f:    the callback function or NULL is no callback has been registered
- * @arg:    a user argument
- *
- * Retrieve the error callback function and user argument.
- */
+/// Retrieve the error callback function and user argument.
+#[doc(alias = "xmlTextReaderGetErrorHandler")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_get_error_handler(
     reader: XmlTextReaderPtr,

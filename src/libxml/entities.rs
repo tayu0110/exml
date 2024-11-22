@@ -43,9 +43,7 @@ use crate::{
 
 use super::{chvalid::xml_is_char, hash::CVoidWrapper};
 
-/*
- * The different valid entity types.
- */
+/// The different valid entity types.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlEntityType {
@@ -81,10 +79,8 @@ impl TryFrom<i32> for XmlEntityType {
     }
 }
 
-/*
- * An unit of storage for an entity, contains the string, the value
- * and the linkind data needed for the linking in the hash table.
- */
+/// An unit of storage for an entity, contains the string,
+/// the value and the linkind data needed for the linking in the hash table.
 pub type XmlEntityPtr = *mut XmlEntity;
 #[repr(C)]
 pub struct XmlEntity {
@@ -164,34 +160,13 @@ impl NodeCommon for XmlEntity {
     }
 }
 
-/*
- * All entities are stored in an hash table.
- * There is 2 separate hash tables for global and parameter entities.
- */
-
+/// All entities are stored in an hash table.
+/// There is 2 separate hash tables for global and parameter entities.
 pub type XmlEntitiesTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 
-/*
- * External functions:
- */
-
-/**
- * xmlInitializePredefinedEntities:
- *
- * Set up the predefined entities.
- * Deprecated call
- */
-#[deprecated]
-#[cfg(feature = "legacy")]
-pub unsafe extern "C" fn xmlInitializePredefinedEntities() {}
-
-/**
- * xml_entities_err_memory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlEntitiesErrMemory")]
 unsafe extern "C" fn xml_entities_err_memory(extra: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromTree,
@@ -202,11 +177,8 @@ unsafe extern "C" fn xml_entities_err_memory(extra: *const c_char) {
     );
 }
 
-/*
- * xmlCreateEntity:
- *
- * internal routine doing the entity node structures allocations
- */
+/// internal routine doing the entity node structures allocations
+#[doc(alias = "xmlCreateEntity")]
 unsafe extern "C" fn xml_create_entity(
     dict: XmlDictPtr,
     name: *const XmlChar,
@@ -255,23 +227,14 @@ unsafe extern "C" fn xml_create_entity(
     ret
 }
 
-/**
- * xmlNewEntity:
- * @doc:  the document
- * @name:  the entity name
- * @type:  the entity type XML_xxx_yyy_ENTITY
- * @ExternalID:  the entity external ID if available
- * @SystemID:  the entity system ID if available
- * @content:  the entity content
- *
- * Create a new entity, this differs from xmlAddDocEntity() that if
- * the document is NULL or has no internal subset defined, then an
- * unlinked entity structure will be returned, it is then the responsibility
- * of the caller to link it to the document later or free it when not needed
- * anymore.
- *
- * Returns a pointer to the entity or NULL in case of error
- */
+/// Create a new entity, this differs from xmlAddDocEntity() that if
+/// the document is NULL or has no internal subset defined, then an
+/// unlinked entity structure will be returned, it is then the responsibility
+/// of the caller to link it to the document later or free it when not needed
+/// anymore.
+///
+/// Returns a pointer to the entity or NULL in case of error
+#[doc(alias = "xmlNewEntity")]
 pub unsafe extern "C" fn xml_new_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
@@ -296,13 +259,8 @@ pub unsafe extern "C" fn xml_new_entity(
     ret
 }
 
-/**
- * xmlEntitiesErr:
- * @code:  the error code
- * @msg:  the message
- *
- * Raise an error.
- */
+/// Raise an error.
+#[doc(alias = "xmlEntitiesErr")]
 unsafe extern "C" fn xml_entities_err(code: XmlParserErrors, msg: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromTree,
@@ -313,13 +271,8 @@ unsafe extern "C" fn xml_entities_err(code: XmlParserErrors, msg: *const c_char)
     );
 }
 
-/**
- * xmlEntitiesWarn:
- * @code:  the error code
- * @msg:  the message
- *
- * Raise a warning.
- */
+/// Raise a warning.
+#[doc(alias = "xmlEntitiesWarn")]
 unsafe extern "C" fn xml_entities_warn(
     code: XmlParserErrors,
     msg: *const c_char,
@@ -350,9 +303,8 @@ unsafe extern "C" fn xml_entities_warn(
     );
 }
 
-/*
- * xmlFreeEntity : clean-up an entity record.
- */
+/// clean-up an entity record.
+#[doc(alias = "xmlFreeEntity")]
 unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
@@ -401,9 +353,8 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
     xml_free(entity as _);
 }
 
-/*
- * xmlAddEntity : register a new entity for an entities table.
- */
+/// Register a new entity for an entities table.
+#[doc(alias = "xmlAddEntity")]
 unsafe extern "C" fn xml_add_entity(
     dtd: XmlDtdPtr,
     name: *const XmlChar,
@@ -516,19 +467,10 @@ unsafe extern "C" fn xml_add_entity(
     ret
 }
 
-/**
- * xmlAddDocEntity:
- * @doc:  the document
- * @name:  the entity name
- * @type:  the entity type XML_xxx_yyy_ENTITY
- * @ExternalID:  the entity external ID if available
- * @SystemID:  the entity system ID if available
- * @content:  the entity content
- *
- * Register a new entity for this document.
- *
- * Returns a pointer to the entity or NULL in case of error
- */
+/// Register a new entity for this document.
+///
+/// Returns a pointer to the entity or NULL in case of error
+#[doc(alias = "xmlAddDocEntity")]
 pub unsafe extern "C" fn xml_add_doc_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
@@ -573,19 +515,10 @@ pub unsafe extern "C" fn xml_add_doc_entity(
     ret
 }
 
-/**
- * xmlAddDtdEntity:
- * @doc:  the document
- * @name:  the entity name
- * @type:  the entity type XML_xxx_yyy_ENTITY
- * @ExternalID:  the entity external ID if available
- * @SystemID:  the entity system ID if available
- * @content:  the entity content
- *
- * Register a new entity for this document DTD external subset.
- *
- * Returns a pointer to the entity or NULL in case of error
- */
+/// Register a new entity for this document DTD external subset.
+///
+/// Returns a pointer to the entity or NULL in case of error
+#[doc(alias = "xmlAddDtdEntity")]
 pub unsafe extern "C" fn xml_add_dtd_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
@@ -630,9 +563,7 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
     ret
 }
 
-/*
- * The XML predefined entities.
- */
+// The XML predefined entities.
 
 static mut XML_ENTITY_LT: XmlEntity = XmlEntity {
     _private: AtomicPtr::new(null_mut()),
@@ -745,14 +676,10 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
     expanded_size: 0,
 };
 
-/**
- * xmlGetPredefinedEntity:
- * @name:  the entity name
- *
- * Check whether this name is an predefined entity.
- *
- * Returns NULL if not, otherwise the entity
- */
+/// Check whether this name is an predefined entity.
+///
+/// Returns NULL if not, otherwise the entity
+#[doc(alias = "xmlGetPredefinedEntity")]
 pub unsafe extern "C" fn xml_get_predefined_entity(name: *const XmlChar) -> XmlEntityPtr {
     if name.is_null() {
         return null_mut();
@@ -786,17 +713,11 @@ pub unsafe extern "C" fn xml_get_predefined_entity(name: *const XmlChar) -> XmlE
     null_mut()
 }
 
-/**
- * xmlGetEntityFromTable:
- * @table:  an entity table
- * @name:  the entity name
- * @parameter:  look for parameter entities
- *
- * Do an entity lookup in the table.
- * returns the corresponding parameter entity, if found.
- *
- * Returns A pointer to the entity structure or NULL if not found.
- */
+/// Do an entity lookup in the table.
+/// returns the corresponding parameter entity, if found.
+///
+/// Returns A pointer to the entity structure or NULL if not found.
+#[doc(alias = "xmlGetEntityFromTable")]
 unsafe extern "C" fn xml_get_entity_from_table(
     table: XmlEntitiesTablePtr,
     name: *const XmlChar,
@@ -804,17 +725,12 @@ unsafe extern "C" fn xml_get_entity_from_table(
     xml_hash_lookup(table, name) as XmlEntityPtr
 }
 
-/**
- * xmlGetDocEntity:
- * @doc:  the document referencing the entity
- * @name:  the entity name
- *
- * Do an entity lookup in the document entity hash table and
- * returns the corresponding entity, otherwise a lookup is done
- * in the predefined entities too.
- *
- * Returns A pointer to the entity structure or NULL if not found.
- */
+/// Do an entity lookup in the document entity hash table and
+/// returns the corresponding entity, otherwise a lookup is done
+/// in the predefined entities too.
+///
+/// Returns A pointer to the entity structure or NULL if not found.
+#[doc(alias = "xmlGetDocEntity")]
 pub unsafe extern "C" fn xml_get_doc_entity(
     doc: *const XmlDoc,
     name: *const XmlChar,
@@ -843,17 +759,12 @@ pub unsafe extern "C" fn xml_get_doc_entity(
     xml_get_predefined_entity(name)
 }
 
-/**
- * xmlGetDtdEntity:
- * @doc:  the document referencing the entity
- * @name:  the entity name
- *
- * Do an entity lookup in the DTD entity hash table and
- * returns the corresponding entity, if found.
- * Note: the first argument is the document node, not the DTD node.
- *
- * Returns A pointer to the entity structure or NULL if not found.
- */
+/// Do an entity lookup in the DTD entity hash table and
+/// returns the corresponding entity, if found.
+/// Note: the first argument is the document node, not the DTD node.
+///
+/// Returns A pointer to the entity structure or NULL if not found.
+#[doc(alias = "xmlGetDtdEntity")]
 pub unsafe extern "C" fn xml_get_dtd_entity(doc: XmlDocPtr, name: *const XmlChar) -> XmlEntityPtr {
     let table: XmlEntitiesTablePtr;
 
@@ -867,16 +778,11 @@ pub unsafe extern "C" fn xml_get_dtd_entity(doc: XmlDocPtr, name: *const XmlChar
     null_mut()
 }
 
-/**
- * xmlGetParameterEntity:
- * @doc:  the document referencing the entity
- * @name:  the entity name
- *
- * Do an entity lookup in the internal and external subsets and
- * returns the corresponding parameter entity, if found.
- *
- * Returns A pointer to the entity structure or NULL if not found.
- */
+/// Do an entity lookup in the internal and external subsets and
+/// returns the corresponding parameter entity, if found.
+///
+/// Returns A pointer to the entity structure or NULL if not found.
+#[doc(alias = "xmlGetParameterEntity")]
 pub unsafe extern "C" fn xml_get_parameter_entity(
     doc: XmlDocPtr,
     name: *const XmlChar,
@@ -901,40 +807,7 @@ pub unsafe extern "C" fn xml_get_parameter_entity(
     null_mut()
 }
 
-/**
- * xmlEncodeEntities:
- * @doc:  the document containing the string
- * @input:  A string to convert to XML.
- *
- * TODO: remove xmlEncodeEntities, once we are not afraid of breaking binary
- *       compatibility
- *
- * People must migrate their code to xmlEncodeEntitiesReentrant !
- * This routine will issue a warning when encountered.
- *
- * Returns NULL
- */
-#[deprecated]
-#[cfg(feature = "legacy")]
-pub unsafe extern "C" fn xmlEncodeEntities(
-    _doc: XmlDocPtr,
-    _input: *const XmlChar,
-) -> *const XmlChar {
-    use std::sync::atomic::AtomicI32;
-
-    static WARNING: AtomicI32 = AtomicI32::new(1);
-
-    if WARNING.load(Ordering::Acquire) != 0 {
-        generic_error!("Deprecated API xmlEncodeEntities() used\n");
-        generic_error!("   change code to use xmlEncodeEntitiesReentrant()\n");
-        WARNING.store(0, Ordering::Release);
-    }
-    null()
-}
-
-/*
- * Macro used to grow the current buffer.
- */
+// Macro used to grow the current buffer.
 macro_rules! grow_buffer_reentrant {
     ($buffer:expr, $buffer_size:expr, $mem_error:tt) => {
         let tmp: *mut XmlChar;
@@ -951,19 +824,13 @@ macro_rules! grow_buffer_reentrant {
     };
 }
 
-/**
- * xmlEncodeEntitiesInternal:
- * @doc:  the document containing the string
- * @input:  A string to convert to XML.
- * @attr: are we handling an attribute value
- *
- * Do a global encoding of a string, replacing the predefined entities
- * and non ASCII values with their entities and CharRef counterparts.
- * Contrary to xmlEncodeEntities, this routine is reentrant, and result
- * must be deallocated.
- *
- * Returns A newly allocated string with the substitution done.
- */
+/// Do a global encoding of a string, replacing the predefined entities
+/// and non ASCII values with their entities and CharRef counterparts.
+/// Contrary to xmlEncodeEntities, this routine is reentrant, and result
+/// must be deallocated.
+///
+/// Returns A newly allocated string with the substitution done.
+#[doc(alias = "xmlEncodeEntitiesInternal")]
 pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
     doc: XmlDocPtr,
     input: *const XmlChar,
@@ -1258,18 +1125,13 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
     null_mut()
 }
 
-/**
- * xmlEncodeEntitiesReentrant:
- * @doc:  the document containing the string
- * @input:  A string to convert to XML.
- *
- * Do a global encoding of a string, replacing the predefined entities
- * and non ASCII values with their entities and CharRef counterparts.
- * Contrary to xmlEncodeEntities, this routine is reentrant, and result
- * must be deallocated.
- *
- * Returns A newly allocated string with the substitution done.
- */
+/// Do a global encoding of a string, replacing the predefined entities
+/// and non ASCII values with their entities and CharRef counterparts.
+/// Contrary to xmlEncodeEntities, this routine is reentrant, and result
+/// must be deallocated.
+///
+/// Returns A newly allocated string with the substitution done.
+#[doc(alias = "xmlEncodeEntitiesReentrant")]
 pub unsafe extern "C" fn xml_encode_entities_reentrant(
     doc: XmlDocPtr,
     input: *const XmlChar,
@@ -1277,16 +1139,11 @@ pub unsafe extern "C" fn xml_encode_entities_reentrant(
     xml_encode_entities_internal(doc, input, 0)
 }
 
-/**
- * xmlEncodeSpecialChars:
- * @doc:  the document containing the string
- * @input:  A string to convert to XML.
- *
- * Do a global encoding of a string, replacing the predefined entities
- * this routine is reentrant, and result must be deallocated.
- *
- * Returns A newly allocated string with the substitution done.
- */
+/// Do a global encoding of a string, replacing the predefined entities
+/// this routine is reentrant, and result must be deallocated.
+///
+/// Returns A newly allocated string with the substitution done.
+#[doc(alias = "xmlEncodeSpecialChars")]
 pub unsafe extern "C" fn xml_encode_special_chars(
     _doc: *const XmlDoc,
     input: *const XmlChar,
@@ -1394,26 +1251,19 @@ pub unsafe extern "C" fn xml_encode_special_chars(
     null_mut()
 }
 
-/**
- * xmlCreateEntitiesTable:
- *
- * create and initialize an empty entities hash table.
- * This really doesn't make sense and should be deprecated
- *
- * Returns the xmlEntitiesTablePtr just created or NULL in case of error.
- */
+/// create and initialize an empty entities hash table.
+/// This really doesn't make sense and should be deprecated
+///
+/// Returns the xmlEntitiesTablePtr just created or NULL in case of error.
+#[doc(alias = "xmlCreateEntitiesTable")]
 pub unsafe extern "C" fn xml_create_entities_table() -> XmlEntitiesTablePtr {
     xml_hash_create(0) as XmlEntitiesTablePtr
 }
 
-/**
- * xmlCopyEntity:
- * @ent:  An entity
- *
- * Build a copy of an entity
- *
- * Returns the new xmlEntitiesPtr or NULL in case of error.
- */
+/// Build a copy of an entity
+///
+/// Returns the new xmlEntitiesPtr or NULL in case of error.
+#[doc(alias = "xmlCopyEntity")]
 #[cfg(feature = "tree")]
 extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let ent: XmlEntityPtr = payload as XmlEntityPtr;
@@ -1453,14 +1303,10 @@ extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar) -> *m
     }
 }
 
-/**
- * xmlCopyEntitiesTable:
- * @table:  An entity table
- *
- * Build a copy of an entity table.
- *
- * Returns the new xmlEntitiesTablePtr or NULL in case of error.
- */
+/// Build a copy of an entity table.
+///
+/// Returns the new xmlEntitiesTablePtr or NULL in case of error.
+#[doc(alias = "xmlCopyEntitiesTable")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_entities_table(
     table: XmlEntitiesTablePtr,
@@ -1468,13 +1314,8 @@ pub unsafe extern "C" fn xml_copy_entities_table(
     xml_hash_copy(table, Some(xml_copy_entity))
 }
 
-/**
- * xmlFreeEntityWrapper:
- * @entity:  An entity
- * @name:  its name
- *
- * Deallocate the memory used by an entities in the hash table.
- */
+/// Deallocate the memory used by an entities in the hash table.
+#[doc(alias = "xmlFreeEntityWrapper")]
 extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const XmlChar) {
     unsafe {
         if !entity.is_null() {
@@ -1483,23 +1324,14 @@ extern "C" fn xml_free_entity_wrapper(entity: *mut c_void, _name: *const XmlChar
     }
 }
 
-/**
- * xmlFreeEntitiesTable:
- * @table:  An entity table
- *
- * Deallocate the memory used by an entities hash table.
- */
+/// Deallocate the memory used by an entities hash table.
+#[doc(alias = "xmlFreeEntitiesTable")]
 pub unsafe extern "C" fn xml_free_entities_table(table: XmlEntitiesTablePtr) {
     xml_hash_free(table, Some(xml_free_entity_wrapper));
 }
 
-/**
- * xmlDumpEntityDeclScan:
- * @ent:  An entity table
- * @buf:  An XML buffer.
- *
- * When using the hash table scan function, arguments need to be reversed
- */
+/// When using the hash table scan function, arguments need to be reversed
+#[doc(alias = "xmlDumpEntityDeclScan")]
 #[cfg(feature = "output")]
 extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _name: *const XmlChar) {
     unsafe {
@@ -1507,26 +1339,16 @@ extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _nam
     }
 }
 
-/**
- * xmlDumpEntitiesTable:
- * @buf:  An XML buffer.
- * @table:  An entity table
- *
- * This will dump the content of the entity table as an XML DTD definition
- */
+/// This will dump the content of the entity table as an XML DTD definition
+#[doc(alias = "xmlDumpEntitiesTable")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr) {
     xml_hash_scan(table, Some(xml_dump_entity_decl_scan), buf as _);
 }
 
-/**
- * xmlDumpEntityContent:
- * @buf:  An XML buffer.
- * @content:  The entity content.
- *
- * This will dump the quoted string value, taking care of the special
- * treatment required by %
- */
+/// This will dump the quoted string value, taking care of the special
+/// treatment required by %
+#[doc(alias = "xmlDumpEntityContent")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
     if !xml_strchr(content, b'%').is_null() {
@@ -1564,13 +1386,8 @@ unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const Xml
     }
 }
 
-/**
- * xmlDumpEntityDecl:
- * @buf:  An XML buffer.
- * @ent:  An entity table
- *
- * This will dump the content of the entity table as an XML DTD definition
- */
+/// This will dump the content of the entity table as an XML DTD definition
+#[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     if buf.is_null() || ent.is_null() {
@@ -1658,15 +1475,6 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
         }
     }
 }
-
-/**
- * xmlCleanupPredefinedEntities:
- *
- * Cleanup up the predefined entities table.
- * Deprecated call
- */
-#[cfg(feature = "legacy")]
-pub unsafe extern "C" fn xmlCleanupPredefinedEntities() {}
 
 #[cfg(test)]
 mod tests {

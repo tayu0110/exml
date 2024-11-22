@@ -57,22 +57,12 @@ use super::{
     parser_internals::xml_is_letter,
 };
 
-/**
- * XML_CATALOGS_NAMESPACE:
- *
- * The namespace for the XML Catalogs elements.
- */
+/// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
-/**
- * XML_CATALOG_PI:
- *
- * The specific XML Catalog Processing Instruction name.
- */
+/// The specific XML Catalog Processing Instruction name.
 pub(crate) const XML_CATALOG_PI: &CStr = c"oasis-xml-catalog";
 
-/*
- * The API is voluntarily limited to general cataloging.
- */
+/// The API is voluntarily limited to general cataloging.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlCatalogPrefer {
@@ -174,12 +164,8 @@ static XML_DEBUG_CATALOGS: AtomicI32 = AtomicI32::new(0); /* used for debugging 
 static mut XML_CATALOG_DEFAULT_ALLOW: XmlCatalogAllow = XmlCatalogAllow::All;
 static mut XML_CATALOG_DEFAULT_PREFER: XmlCatalogPrefer = XmlCatalogPrefer::Public;
 
-/**
- * xmlCatalogErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlCatalogErrMemory")]
 unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -202,16 +188,11 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
     );
 }
 
-/**
- * xmlCreateNewCatalog:
- * @type:  type of catalog
- * @prefer:  the PUBLIC vs. SYSTEM current preference value
- *
- * create a new Catalog, this type is shared both by XML and
- * SGML catalogs, but the acceptable types values differs.
- *
- * Returns the xmlCatalogPtr or null_mut() in case of error
- */
+/// create a new Catalog, this type is shared both by XML and SGML catalogs,
+/// but the acceptable types values differs.
+///
+/// Returns the xmlCatalogPtr or null_mut() in case of error
+#[doc(alias = "xmlCreateNewCatalog")]
 unsafe extern "C" fn xml_create_new_catalog(
     typ: XmlCatalogType,
     prefer: XmlCatalogPrefer,
@@ -232,17 +213,10 @@ unsafe extern "C" fn xml_create_new_catalog(
     ret
 }
 
-/*
- * Operations on a given catalog.
- */
-/**
- * xmlNewCatalog:
- * @sgml:  should this create an SGML catalog
- *
- * create a new Catalog.
- *
- * Returns the xmlCatalogPtr or null_mut() in case of error
- */
+/// create a new Catalog.
+///
+/// Returns the xmlCatalogPtr or null_mut() in case of error
+#[doc(alias = "xmlNewCatalog")]
 pub unsafe extern "C" fn xml_new_catalog(sgml: i32) -> XmlCatalogPtr {
     let catal: XmlCatalogPtr;
 
@@ -263,14 +237,10 @@ pub unsafe extern "C" fn xml_new_catalog(sgml: i32) -> XmlCatalogPtr {
     catal
 }
 
-/**
- * xmlLoadFileContent:
- * @filename:  a file path
- *
- * Load a file content into memory.
- *
- * Returns a pointer to the 0 terminated string or null_mut() in case of error
- */
+/// Load a file content into memory.
+///
+/// Returns a pointer to the 0 terminated string or null_mut() in case of error
+#[doc(alias = "xmlLoadFileContent")]
 unsafe extern "C" fn xml_load_file_content(filename: *const c_char) -> *mut XmlChar {
     let mut info: stat = unsafe { zeroed() };
 
@@ -328,14 +298,10 @@ macro_rules! SKIP_BLANKS {
     };
 }
 
-/**
- * xmlParseSGMLCatalogComment:
- * @cur:  the current character
- *
- * Skip a comment in an SGML catalog
- *
- * Returns new current character
- */
+/// Skip a comment in an SGML catalog
+///
+/// Returns new current character
+#[doc(alias = "xmlParseSGMLCatalogComment")]
 unsafe extern "C" fn xml_parse_sgmlcatalog_comment(mut cur: *const XmlChar) -> *const XmlChar {
     if *cur.add(0) != b'-' || *cur.add(1) != b'-' {
         return cur;
@@ -350,15 +316,10 @@ unsafe extern "C" fn xml_parse_sgmlcatalog_comment(mut cur: *const XmlChar) -> *
     cur.add(2)
 }
 
-/**
- * xmlParseSGMLCatalogName:
- * @cur:  the current character
- * @name:  the return location
- *
- * Parse an SGML catalog name
- *
- * Returns new current character and store the value in @name
- */
+/// Parse an SGML catalog name
+///
+/// Returns new current character and store the value in @name
+#[doc(alias = "xmlParseSGMLCatalogName")]
 unsafe extern "C" fn xml_parse_sgml_catalog_name(
     mut cur: *const XmlChar,
     name: *mut *mut XmlChar,
@@ -396,15 +357,10 @@ unsafe extern "C" fn xml_parse_sgml_catalog_name(
     cur
 }
 
-/**
- * xmlParseSGMLCatalogPubid:
- * @cur:  the current character
- * @id:  the return location
- *
- * Parse an SGML catalog ID
- *
- * Returns new current character and store the value in @id
- */
+/// Parse an SGML catalog ID
+///
+/// Returns new current character and store the value in @id
+#[doc(alias = "xmlParseSGMLCatalogPubid")]
 unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
     mut cur: *const XmlChar,
     id: *mut *mut XmlChar,
@@ -469,18 +425,13 @@ unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
     cur
 }
 
-/**
- * xmlCatalogNormalizePublic:
- * @pubID:  the public ID string
- *
- *  Normalizes the Public Identifier
- *
- * Implements 6.2. Public Identifier Normalization
- * from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
- *
- * Returns the new string or null_mut(), the string must be deallocated
- *         by the caller.
- */
+/// Normalizes the Public Identifier
+///
+/// Implements 6.2. Public Identifier Normalization
+/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+///
+/// Returns the new string or null_mut(), the string must be deallocated by the caller.
+#[doc(alias = "xmlCatalogNormalizePublic")]
 unsafe extern "C" fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mut XmlChar {
     let mut ok: i32 = 1;
     let mut white: i32;
@@ -531,19 +482,11 @@ unsafe extern "C" fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mu
     ret
 }
 
-/**
- * xmlNewCatalogEntry:
- * @type:  type of entry
- * @name:  name of the entry
- * @value:  value of the entry
- * @prefer:  the PUBLIC vs. SYSTEM current preference value
- * @group:  for members of a group, the group entry
- *
- * create a new Catalog entry, this type is shared both by XML and
- * SGML catalogs, but the acceptable types values differs.
- *
- * Returns the xmlCatalogEntryPtr or null_mut() in case of error
- */
+/// create a new Catalog entry, this type is shared both by XML and SGML catalogs,
+/// but the acceptable types values differs.
+///
+/// Returns the xmlCatalogEntryPtr or null_mut() in case of error
+#[doc(alias = "xmlNewCatalogEntry")]
 unsafe extern "C" fn xml_new_catalog_entry(
     typ: XmlCatalogEntryType,
     mut name: *const XmlChar,
@@ -600,12 +543,8 @@ unsafe extern "C" fn xml_new_catalog_entry(
     ret
 }
 
-/**
- * xmlFreeCatalogEntry:
- * @payload:  a Catalog entry
- *
- * Free the memory allocated to a Catalog entry
- */
+/// Free the memory allocated to a Catalog entry
+#[doc(alias = "xmlFreeCatalogEntry")]
 extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar) {
     let ret: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     if ret.is_null() {
@@ -649,16 +588,11 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
     }
 }
 
-/**
- * xmlExpandCatalog:
- * @catal:  a catalog
- * @filename:  a file path
- *
- * Load the catalog and expand the existing catal structure.
- * This can be either an XML Catalog or an SGML Catalog
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Load the catalog and expand the existing catal structure.
+/// This can be either an XML Catalog or an SGML Catalog
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlExpandCatalog")]
 unsafe extern "C" fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i32 {
     let ret: i32;
 
@@ -702,19 +636,11 @@ unsafe extern "C" fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c
     0
 }
 
-/**
- * xmlParseSGMLCatalog:
- * @catal:  the SGML Catalog
- * @value:  the content of the SGML Catalog serialization
- * @file:  the filepath for the catalog
- * @super:  should this be handled as a Super Catalog in which case
- *          parsing is not recursive
- *
- * Parse an SGML catalog content and fill up the @catal hash table with
- * the new entries found.
- *
- * Returns 0 in case of success, -1 in case of error.
- */
+/// Parse an SGML catalog content and fill up the @catal hash table with
+/// the new entries found.
+///
+/// Returns 0 in case of success, -1 in case of error.
+#[doc(alias = "xmlParseSGMLCatalog")]
 unsafe extern "C" fn xml_parse_sgml_catalog(
     catal: XmlCatalogPtr,
     value: *const XmlChar,
@@ -937,17 +863,13 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
     0
 }
 
-/**
- * xmlLoadACatalog:
- * @filename:  a file path
- *
- * Load the catalog and build the associated data structures.
- * This can be either an XML Catalog or an SGML Catalog
- * It will recurse in SGML CATALOG entries. On the other hand XML
- * Catalogs are not handled recursively.
- *
- * Returns the catalog parsed or null_mut() in case of error
- */
+/// Load the catalog and build the associated data structures.  
+/// This can be either an XML Catalog or an SGML Catalog.  
+/// It will recurse in SGML CATALOG entries.  
+/// On the other hand XML Catalogs are not handled recursively.
+///
+/// Returns the catalog parsed or null_mut() in case of error
+#[doc(alias = "xmlLoadACatalog")]
 pub unsafe extern "C" fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
     let mut first: *mut XmlChar;
     let catal: XmlCatalogPtr;
@@ -1005,16 +927,12 @@ pub unsafe extern "C" fn xml_load_a_catalog(filename: *const c_char) -> XmlCatal
     catal
 }
 
-/**
- * xmlLoadSGMLSuperCatalog:
- * @filename:  a file path
- *
- * Load an SGML super catalog. It won't expand CATALOG or DELEGATE
- * references. This is only needed for manipulating SGML Super Catalogs
- * like adding and removing CATALOG or DELEGATE entries.
- *
- * Returns the catalog parsed or null_mut() in case of error
- */
+/// Load an SGML super catalog. It won't expand CATALOG or DELEGATE references.  
+/// This is only needed for manipulating SGML Super Catalogs
+/// like adding and removing CATALOG or DELEGATE entries.
+///
+/// Returns the catalog parsed or null_mut() in case of error
+#[doc(alias = "xmlLoadSGMLSuperCatalog")]
 pub unsafe extern "C" fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalogPtr {
     let content: *mut XmlChar = xml_load_file_content(filename);
     if content.is_null() {
@@ -1109,14 +1027,10 @@ pub unsafe extern "C" fn xml_load_sgml_super_catalog(filename: *const c_char) ->
 //     }
 // }
 
-/**
- * xmlConvertSGMLCatalog:
- * @catal: the catalog
- *
- * Convert all the SGML catalog entries as XML ones
- *
- * Returns the number of entries converted if successful, -1 otherwise
- */
+/// Convert all the SGML catalog entries as XML ones
+///
+/// Returns the number of entries converted if successful, -1 otherwise
+#[doc(alias = "xmlConvertSGMLCatalog")]
 pub unsafe extern "C" fn xml_convert_sgml_catalog(catal: XmlCatalogPtr) -> i32 {
     if catal.is_null() || !matches!((*catal).typ, XmlCatalogType::XmlSGMLCatalogType) {
         return -1;
@@ -1201,30 +1115,17 @@ pub unsafe extern "C" fn xml_convert_sgml_catalog(catal: XmlCatalogPtr) -> i32 {
     0
 }
 
-/*
- * Hash table containing all the trees of XML catalogs parsed by
- * the application.
- */
+// Hash table containing all the trees of XML catalogs parsed by the application.
 static XML_CATALOG_XMLFILES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
     AtomicPtr::new(null_mut());
 
-/*
- * A mutex for modifying the shared global catalog(s)
- * xmlDefaultCatalog tree.
- * It also protects xmlCatalogXMLFiles
- * The core of this readers/writer scheme is in xmlFetchXMLCatalogFile()
- */
+// A mutex for modifying the shared global catalog(s) xmlDefaultCatalog tree.
+// It also protects xmlCatalogXMLFiles.
+// The core of this readers/writer scheme is in `xmlFetchXMLCatalogFile()`.
 static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 
-/**
- * xmlCatalogErr:
- * @catal: the Catalog entry
- * @node: the context node
- * @msg:  the error message
- * @extra:  extra information
- *
- * Handle a catalog error
- */
+/// Handle a catalog error
+#[doc(alias = "xmlCatalogErr")]
 unsafe extern "C" fn xml_catalog_err(
     catal: XmlCatalogEntryPtr,
     node: XmlNodePtr,
@@ -1266,21 +1167,11 @@ unsafe extern "C" fn xml_catalog_err(
     );
 }
 
-/**
- * xmlParseXMLCatalogOneNode:
- * @cur:  the XML node
- * @type:  the type of Catalog entry
- * @name:  the name of the node
- * @attrName:  the attribute holding the value
- * @uriAttrName:  the attribute holding the URI-Reference
- * @prefer:  the PUBLIC vs. SYSTEM current preference value
- * @cgroup:  the group which includes this node
- *
- * Finishes the examination of an XML tree node of a catalog and build
- * a Catalog entry from it.
- *
- * Returns the new Catalog entry node or null_mut() in case of error.
- */
+/// Finishes the examination of an XML tree node of a catalog and build
+/// a Catalog entry from it.
+///
+/// Returns the new Catalog entry node or null_mut() in case of error.
+#[doc(alias = "xmlParseXMLCatalogOneNode")]
 unsafe extern "C" fn xml_parse_xml_catalog_one_node(
     cur: XmlNodePtr,
     typ: XmlCatalogEntryType,
@@ -1387,17 +1278,9 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
     ret
 }
 
-/**
- * xmlParseXMLCatalogNode:
- * @cur:  the XML node
- * @prefer:  the PUBLIC vs. SYSTEM current preference value
- * @parent:  the parent Catalog entry
- * @cgroup:  the group which includes this node
- *
- * Examines an XML tree node of a catalog and build
- * a Catalog entry from it adding it to its parent. The examination can
- * be recursive.
- */
+/// Examines an XML tree node of a catalog and build a Catalog entry from it adding it to its parent.
+/// The examination can be recursive.
+#[doc(alias = "xmlParseXMLCatalogNode")]
 unsafe extern "C" fn xml_parse_xml_catalog_node(
     cur: XmlNodePtr,
     mut prefer: XmlCatalogPrefer,
@@ -1569,17 +1452,10 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
     }
 }
 
-/**
- * xmlParseXMLCatalogNodeList:
- * @cur:  the XML node list of siblings
- * @prefer:  the PUBLIC vs. SYSTEM current preference value
- * @parent:  the parent Catalog entry
- * @cgroup:  the group which includes this list
- *
- * Examines a list of XML sibling nodes of a catalog and build
- * a list of Catalog entry from it adding it to the parent.
- * The examination will recurse to examine node subtrees.
- */
+/// Examines a list of XML sibling nodes of a catalog and build
+/// a list of Catalog entry from it adding it to the parent.
+/// The examination will recurse to examine node subtrees.
+#[doc(alias = "xmlParseXMLCatalogNodeList")]
 unsafe extern "C" fn xml_parse_xml_catalog_node_list(
     mut cur: XmlNodePtr,
     prefer: XmlCatalogPrefer,
@@ -1598,16 +1474,11 @@ unsafe extern "C" fn xml_parse_xml_catalog_node_list(
     /* TODO: sort the list according to REWRITE lengths and prefer value */
 }
 
-/**
- * xmlParseXMLCatalogFile:
- * @prefer:  the PUBLIC vs. SYSTEM current preference value
- * @filename:  the filename for the catalog
- *
- * Parses the catalog file to extract the XML tree and then analyze the
- * tree to build a list of Catalog entries corresponding to this catalog
- *
- * Returns the resulting Catalog entries list
- */
+/// Parses the catalog file to extract the XML tree and then analyze the
+/// tree to build a list of Catalog entries corresponding to this catalog
+///
+/// Returns the resulting Catalog entries list
+#[doc(alias = "xmlParseXMLCatalogFile")]
 unsafe extern "C" fn xml_parse_xml_catalog_file(
     mut prefer: XmlCatalogPrefer,
     filename: *const XmlChar,
@@ -1697,14 +1568,10 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
     parent
 }
 
-/**
- * xmlFetchXMLCatalogFile:
- * @catal:  an existing but incomplete catalog entry
- *
- * Fetch and parse the subcatalog referenced by an entry
- *
- * Returns 0 in case of success, -1 otherwise
- */
+/// Fetch and parse the subcatalog referenced by an entry
+///
+/// Returns 0 in case of success, -1 otherwise
+#[doc(alias = "xmlFetchXMLCatalogFile")]
 unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
     let mut doc: XmlCatalogEntryPtr;
 
@@ -1791,14 +1658,10 @@ unsafe extern "C" fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i3
     0
 }
 
-/**
- * xmlGetXMLCatalogEntryType:
- * @name:  the name
- *
- * lookup the internal type associated to an XML catalog entry name
- *
- * Returns the type associated with that name
- */
+/// lookup the internal type associated to an XML catalog entry name
+///
+/// Returns the type associated with that name
+#[doc(alias = "xmlGetXMLCatalogEntryType")]
 unsafe extern "C" fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntryType {
     let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
     if xml_str_equal(name, c"system".as_ptr() as _) {
@@ -1825,18 +1688,10 @@ unsafe extern "C" fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> Xml
     typ
 }
 
-/**
- * xmlAddXMLCatalog:
- * @catal:  top of an XML catalog
- * @type:  the type of record to add to the catalog
- * @orig:  the system, public or prefix to match (or null_mut())
- * @replace:  the replacement value for the match
- *
- * Add an entry in the XML catalog, it may overwrite existing but
- * different entries.
- *
- * Returns 0 if successful, -1 otherwise
- */
+/// Add an entry in the XML catalog, it may overwrite existing but different entries.
+///
+/// Returns 0 if successful, -1 otherwise
+#[doc(alias = "xmlAddXMLCatalog")]
 unsafe extern "C" fn xml_add_xml_catalog(
     catal: XmlCatalogEntryPtr,
     typs: *const XmlChar,
@@ -1934,14 +1789,10 @@ unsafe extern "C" fn xml_add_xml_catalog(
     0
 }
 
-/**
- * xmlGetSGMLCatalogEntryType:
- * @name:  the entry name
- *
- * Get the Catalog entry type for a given SGML Catalog name
- *
- * Returns Catalog entry type
- */
+/// Get the Catalog entry type for a given SGML Catalog name
+///
+/// Returns Catalog entry type
+#[doc(alias = "xmlGetSGMLCatalogEntryType")]
 unsafe extern "C" fn xml_get_sgml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntryType {
     let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
     if xml_str_equal(name, c"SYSTEM".as_ptr() as _) {
@@ -1970,18 +1821,10 @@ unsafe extern "C" fn xml_get_sgml_catalog_entry_type(name: *const XmlChar) -> Xm
     typ
 }
 
-/**
- * xmlACatalogAdd:
- * @catal:  a Catalog
- * @type:  the type of record to add to the catalog
- * @orig:  the system, public or prefix to match
- * @replace:  the replacement value for the match
- *
- * Add an entry in the catalog, it may overwrite existing but
- * different entries.
- *
- * Returns 0 if successful, -1 otherwise
- */
+/// Add an entry in the catalog, it may overwrite existing but different entries.
+///
+/// Returns 0 if successful, -1 otherwise
+#[doc(alias = "xmlACatalogAdd")]
 pub unsafe extern "C" fn xml_a_catalog_add(
     catal: XmlCatalogPtr,
     typ: *const XmlChar,
@@ -2019,16 +1862,10 @@ pub unsafe extern "C" fn xml_a_catalog_add(
     res
 }
 
-/**
- * xmlDelXMLCatalog:
- * @catal:  top of an XML catalog
- * @value:  the value to remove from the catalog
- *
- * Remove entries in the XML catalog where the value or the URI
- * is equal to @value
- *
- * Returns the number of entries removed if successful, -1 otherwise
- */
+/// Remove entries in the XML catalog where the value or the URI is equal to `value`.
+///
+/// Returns the number of entries removed if successful, -1 otherwise
+#[doc(alias = "xmlDelXMLCatalog")]
 unsafe extern "C" fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *const XmlChar) -> i32 {
     let mut cur: XmlCatalogEntryPtr;
     let ret: i32 = 0;
@@ -2076,15 +1913,10 @@ unsafe extern "C" fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *cons
     ret
 }
 
-/**
- * xmlACatalogRemove:
- * @catal:  a Catalog
- * @value:  the value to remove
- *
- * Remove an entry from the catalog
- *
- * Returns the number of entries removed if successful, -1 otherwise
- */
+/// Remove an entry from the catalog
+///
+/// Returns the number of entries removed if successful, -1 otherwise
+#[doc(alias = "xmlACatalogRemove")]
 pub unsafe extern "C" fn xml_a_catalog_remove(catal: XmlCatalogPtr, value: *const XmlChar) -> i32 {
     let mut res: i32;
 
@@ -2108,15 +1940,10 @@ const XML_URN_PUBID: &CStr = c"urn:publicid:";
 const MAX_DELEGATE: usize = 50;
 const MAX_CATAL_DEPTH: usize = 50;
 
-/**
- * xmlCatalogUnWrapURN:
- * @urn:  an "urn:publicid:" to unwrap
- *
- * Expand the URN into the equivalent Public Identifier
- *
- * Returns the new identifier or null_mut(), the string must be deallocated
- *         by the caller.
- */
+/// Expand the URN into the equivalent Public Identifier
+///
+/// Returns the new identifier or null_mut(), the string must be deallocated by the caller.
+#[doc(alias = "xmlCatalogUnWrapURN")]
 unsafe extern "C" fn xml_catalog_unwrap_urn(mut urn: *const XmlChar) -> *mut XmlChar {
     let mut result: [XmlChar; 2000] = [0; 2000];
     let mut i: usize = 0;
@@ -2194,20 +2021,13 @@ unsafe extern "C" fn xml_catalog_unwrap_urn(mut urn: *const XmlChar) -> *mut Xml
     xml_strdup(result.as_ptr() as _)
 }
 
-/**
- * xmlCatalogXMLResolve:
- * @catal:  a catalog list
- * @pubID:  the public ID string
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier for a
- * list of catalog entries.
- *
- * Implements (or tries to) 7.1. External Identifier Resolution
- * from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
- *
- * Returns the URI of the resource or null_mut() if not found
- */
+/// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
+///
+/// Implements (or tries to) 7.1. External Identifier Resolution
+/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+///
+/// Returns the URI of the resource or null_mut() if not found
+#[doc(alias = "xmlCatalogXMLResolve")]
 unsafe extern "C" fn xml_catalog_xml_resolve(
     catal: XmlCatalogEntryPtr,
     pub_id: *const XmlChar,
@@ -2454,20 +2274,13 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
     null_mut()
 }
 
-/**
- * xmlCatalogListXMLResolve:
- * @catal:  a catalog list
- * @pubID:  the public ID string
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier for a
- * list of catalogs
- *
- * Implements (or tries to) 7.1. External Identifier Resolution
- * from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
- *
- * Returns the URI of the resource or null_mut() if not found
- */
+/// Do a complete resolution lookup of an External Identifier for a list of catalogs
+///
+/// Implements (or tries to) 7.1. External Identifier Resolution
+/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+///
+/// Returns the URI of the resource or null_mut() if not found
+#[doc(alias = "xmlCatalogListXMLResolve")]
 unsafe extern "C" fn xml_catalog_list_xml_resolve(
     mut catal: XmlCatalogEntryPtr,
     mut pub_id: *const XmlChar,
@@ -2575,15 +2388,10 @@ unsafe extern "C" fn xml_catalog_list_xml_resolve(
     ret
 }
 
-/**
- * xmlCatalogGetSGMLPublic:
- * @catal:  an SGML catalog hash
- * @pubID:  the public ID string
- *
- * Try to lookup the catalog local reference associated to a public ID
- *
- * Returns the local resource if found or null_mut() otherwise.
- */
+/// Try to lookup the catalog local reference associated to a public ID.
+///
+/// Returns the local resource if found or null_mut() otherwise.
+#[doc(alias = "xmlCatalogGetSGMLPublic")]
 unsafe extern "C" fn xml_catalog_get_sgml_public(
     catal: XmlHashTablePtr,
     mut pub_id: *const XmlChar,
@@ -2616,15 +2424,10 @@ unsafe extern "C" fn xml_catalog_get_sgml_public(
     null_mut()
 }
 
-/**
- * xmlCatalogGetSGMLSystem:
- * @catal:  an SGML catalog hash
- * @sysID:  the system ID string
- *
- * Try to lookup the catalog local reference for a system ID
- *
- * Returns the local resource if found or null_mut() otherwise.
- */
+/// Try to lookup the catalog local reference for a system ID.
+///
+/// Returns the local resource if found or null_mut() otherwise.
+#[doc(alias = "xmlCatalogGetSGMLSystem")]
 unsafe extern "C" fn xml_catalog_get_sgml_system(
     catal: XmlHashTablePtr,
     sys_id: *const XmlChar,
@@ -2643,16 +2446,10 @@ unsafe extern "C" fn xml_catalog_get_sgml_system(
     null_mut()
 }
 
-/**
- * xmlCatalogSGMLResolve:
- * @catal:  the SGML catalog
- * @pubID:  the public ID string
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier
- *
- * Returns the URI of the resource or null_mut() if not found
- */
+/// Do a complete resolution lookup of an External Identifier.
+///
+/// Returns the URI of the resource or null_mut() if not found
+#[doc(alias = "xmlCatalogSGMLResolve")]
 unsafe extern "C" fn xml_catalog_sgml_resolve(
     catal: XmlCatalogPtr,
     pub_id: *const XmlChar,
@@ -2679,17 +2476,10 @@ unsafe extern "C" fn xml_catalog_sgml_resolve(
     null_mut()
 }
 
-/**
- * xmlACatalogResolve:
- * @catal:  a Catalog
- * @pubID:  the public ID string
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier
- *
- * Returns the URI of the resource or null_mut() if not found, it must be freed
- *      by the caller.
- */
+/// Do a complete resolution lookup of an External Identifier
+///
+/// Returns the URI of the resource or null_mut() if not found, it must be freed by the caller.
+#[doc(alias = "xmlACatalogResolve")]
 pub unsafe extern "C" fn xml_a_catalog_resolve(
     catal: XmlCatalogPtr,
     pub_id: *const XmlChar,
@@ -2735,16 +2525,11 @@ pub unsafe extern "C" fn xml_a_catalog_resolve(
     ret
 }
 
-/**
- * xmlACatalogResolvePublic:
- * @catal:  a Catalog
- * @pubID:  the public ID string
- *
- * Try to lookup the catalog local reference associated to a public ID in that catalog
- *
- * Returns the local resource if found or null_mut() otherwise, the value returned
- *      must be freed by the caller.
- */
+/// Try to lookup the catalog local reference associated to a public ID in that catalog
+///
+/// Returns the local resource if found or null_mut() otherwise,
+/// the value returned must be freed by the caller.
+#[doc(alias = "xmlACatalogResolvePublic")]
 pub unsafe extern "C" fn xml_a_catalog_resolve_public(
     catal: XmlCatalogPtr,
     pub_id: *const XmlChar,
@@ -2776,16 +2561,11 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_public(
     ret
 }
 
-/**
- * xmlACatalogResolveSystem:
- * @catal:  a Catalog
- * @sysID:  the system ID string
- *
- * Try to lookup the catalog resource for a system ID
- *
- * Returns the resource if found or null_mut() otherwise, the value returned
- *      must be freed by the caller.
- */
+/// Try to lookup the catalog resource for a system ID
+///
+/// Returns the resource if found or null_mut() otherwise,
+/// the value returned must be freed by the caller.
+#[doc(alias = "xmlACatalogResolveSystem")]
 pub unsafe extern "C" fn xml_a_catalog_resolve_system(
     catal: XmlCatalogPtr,
     sys_id: *const XmlChar,
@@ -2817,20 +2597,13 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_system(
     ret
 }
 
-/**
- * xmlCatalogXMLResolveURI:
- * @catal:  a catalog list
- * @URI:  the URI
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier for a
- * list of catalog entries.
- *
- * Implements (or tries to) 7.2.2. URI Resolution
- * from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
- *
- * Returns the URI of the resource or null_mut() if not found
- */
+/// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
+///
+/// Implements (or tries to) 7.2.2. URI Resolution
+/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+///
+/// Returns the URI of the resource or null_mut() if not found
+#[doc(alias = "xmlCatalogXMLResolveURI")]
 unsafe extern "C" fn xml_catalog_xml_resolve_uri(
     catal: XmlCatalogEntryPtr,
     uri: *const XmlChar,
@@ -2985,18 +2758,13 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
     null_mut()
 }
 
-/**
- * xmlCatalogListXMLResolveURI:
- * @catal:  a catalog list
- * @URI:  the URI
- *
- * Do a complete resolution lookup of an URI for a list of catalogs
- *
- * Implements (or tries to) 7.2. URI Resolution
- * from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
- *
- * Returns the URI of the resource or null_mut() if not found
- */
+/// Do a complete resolution lookup of an URI for a list of catalogs
+///
+/// Implements (or tries to) 7.2. URI Resolution
+/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+///
+/// Returns the URI of the resource or null_mut() if not found
+#[doc(alias = "xmlCatalogListXMLResolveURI")]
 unsafe extern "C" fn xml_catalog_list_xml_resolve_uri(
     mut catal: XmlCatalogEntryPtr,
     uri: *const XmlChar,
@@ -3054,16 +2822,11 @@ unsafe extern "C" fn xml_catalog_list_xml_resolve_uri(
     ret
 }
 
-/**
- * xmlACatalogResolveURI:
- * @catal:  a Catalog
- * @URI:  the URI
- *
- * Do a complete resolution lookup of an URI
- *
- * Returns the URI of the resource or null_mut() if not found, it must be freed
- *      by the caller.
- */
+/// Do a complete resolution lookup of an URI
+///
+/// Returns the URI of the resource or null_mut() if not found,
+/// it must be freed by the caller.
+#[doc(alias = "xmlACatalogResolveURI")]
 pub unsafe extern "C" fn xml_a_catalog_resolve_uri(
     catal: XmlCatalogPtr,
     uri: *const XmlChar,
@@ -3095,13 +2858,8 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_uri(
     ret
 }
 
-/**
- * xmlCatalogDumpEntry:
- * @entry:  the catalog entry
- * @out:  the file.
- *
- * Serialize an SGML Catalog entry
- */
+/// Serialize an SGML Catalog entry
+#[doc(alias = "xmlCatalogDumpEntry")]
 #[cfg(feature = "output")]
 extern "C" fn xml_catalog_dump_entry(
     payload: *mut c_void,
@@ -3191,17 +2949,8 @@ extern "C" fn xml_catalog_dump_entry(
     }
 }
 
-/**
- * xmlDumpXMLCatalogNode:
- * @catal:  top catalog entry
- * @catalog: pointer to the xml tree
- * @doc: the containing document
- * @ns: the current namespace
- * @cgroup: group node for group members
- *
- * Serializes a Catalog entry, called by xmlDumpXMLCatalog and recursively
- * for group entries
- */
+/// Serializes a Catalog entry, called by xmlDumpXMLCatalog and recursively for group entries
+#[doc(alias = "xmlDumpXMLCatalogNode")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_dump_xml_catalog_node(
     catal: XmlCatalogEntryPtr,
@@ -3361,6 +3110,7 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
     }
 }
 
+#[doc(alias = "xmlDumpXMLCatalog")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntryPtr) -> i32 {
     /*
@@ -3418,13 +3168,8 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
     ret
 }
 
-/**
- * xmlACatalogDump:
- * @catal:  a Catalog
- * @out:  the file.
- *
- * Dump the given catalog to the given file.
- */
+/// Dump the given catalog to the given file.
+#[doc(alias = "xmlACatalogDump")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_a_catalog_dump(catal: XmlCatalogPtr, out: *mut FILE) {
     if out.is_null() || catal.is_null() {
@@ -3438,12 +3183,8 @@ pub unsafe extern "C" fn xml_a_catalog_dump(catal: XmlCatalogPtr, out: *mut FILE
     }
 }
 
-/**
- * xmlFreeCatalogEntryList:
- * @ret:  a Catalog entry list
- *
- * Free the memory allocated to a full chained list of Catalog entries
- */
+/// Free the memory allocated to a full chained list of Catalog entries
+#[doc(alias = "xmlFreeCatalogEntryList")]
 unsafe extern "C" fn xml_free_catalog_entry_list(mut ret: XmlCatalogEntryPtr) {
     let mut next: XmlCatalogEntryPtr;
 
@@ -3454,12 +3195,8 @@ unsafe extern "C" fn xml_free_catalog_entry_list(mut ret: XmlCatalogEntryPtr) {
     }
 }
 
-/**
- * xmlFreeCatalog:
- * @catal:  a Catalog
- *
- * Free the memory allocated to a Catalog
- */
+/// Free the memory allocated to a Catalog
+#[doc(alias = "xmlFreeCatalog")]
 pub unsafe extern "C" fn xml_free_catalog(catal: XmlCatalogPtr) {
     if catal.is_null() {
         return;
@@ -3473,14 +3210,10 @@ pub unsafe extern "C" fn xml_free_catalog(catal: XmlCatalogPtr) {
     xml_free(catal as _);
 }
 
-/**
- * xmlCatalogIsEmpty:
- * @catal:  should this create an SGML catalog
- *
- * Check is a catalog is empty
- *
- * Returns 1 if the catalog is empty, 0 if not, amd -1 in case of error.
- */
+/// Check is a catalog is empty
+///
+/// Returns 1 if the catalog is empty, 0 if not, amd -1 in case of error.
+#[doc(alias = "xmlCatalogIsEmpty")]
 pub unsafe extern "C" fn xml_catalog_is_empty(catal: XmlCatalogPtr) -> i32 {
     if catal.is_null() {
         return -1;
@@ -3514,31 +3247,20 @@ pub unsafe extern "C" fn xml_catalog_is_empty(catal: XmlCatalogPtr) -> i32 {
     0
 }
 
-/*
- * Global operations.
- */
-
-/*
- * Whether the catalog support was initialized.
- */
+// Whether the catalog support was initialized.
 static XML_CATALOG_INITIALIZED: AtomicBool = AtomicBool::new(false);
-/*
- * The default catalog in use by the application
- */
+// The default catalog in use by the application
 static XML_DEFAULT_CATALOG: AtomicPtr<XmlCatalog> = AtomicPtr::new(null_mut());
 
 const XML_XML_DEFAULT_CATALOG: &CStr =
     unsafe { transmute(concatcp!("file://", SYSCONFDIR, "/xml/catalog", "\0")) };
 const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/catalog");
 
-/**
- * xmlInitializeCatalogData:
- *
- * Do the catalog initialization only of global data, doesn't try to load
- * any catalog actually.
- * this function is not thread safe, catalog initialization should
- * preferably be done once at startup
- */
+/// Do the catalog initialization only of global data, doesn't try to load
+/// any catalog actually.
+/// this function is not thread safe, catalog initialization should
+/// preferably be done once at startup
+#[doc(alias = "xmlInitializeCatalogData")]
 unsafe extern "C" fn xml_initialize_catalog_data() {
     let is_initialized = XML_CATALOG_INITIALIZED.load(Ordering::Acquire);
     if is_initialized {
@@ -3553,13 +3275,10 @@ unsafe extern "C" fn xml_initialize_catalog_data() {
     XML_CATALOG_INITIALIZED.store(true, Ordering::Release);
 }
 
-/**
- * xmlInitializeCatalog:
- *
- * Do the catalog initialization.
- * this function is not thread safe, catalog initialization should
- * preferably be done once at startup
- */
+/// Do the catalog initialization.  
+/// this function is not thread safe, catalog initialization should
+/// preferably be done once at startup
+#[doc(alias = "xmlInitializeCatalog")]
 pub unsafe extern "C" fn xml_initialize_catalog() {
     let is_initialized = XML_CATALOG_INITIALIZED.load(Ordering::Acquire);
     if is_initialized {
@@ -3659,17 +3378,13 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
     xml_rmutex_unlock(mutex);
 }
 
-/**
- * xmlLoadCatalog:
- * @filename:  a file path
- *
- * Load the catalog and makes its definitions effective for the default
- * external entity loader. It will recurse in SGML CATALOG entries.
- * this function is not thread safe, catalog initialization should
- * preferably be done once at startup
- *
- * Returns 0 in case of success -1 in case of error
- */
+/// Load the catalog and makes its definitions effective for the default
+/// external entity loader. It will recurse in SGML CATALOG entries.
+/// this function is not thread safe, catalog initialization should
+/// preferably be done once at startup
+///
+/// Returns 0 in case of success -1 in case of error
+#[doc(alias = "xmlLoadCatalog")]
 pub unsafe extern "C" fn xml_load_catalog(filename: *const c_char) -> i32 {
     let catal: XmlCatalogPtr;
 
@@ -3703,15 +3418,11 @@ const PATH_SEPARATOR: u8 = b';';
 #[cfg(not(target_os = "windows"))]
 const PATH_SEPARATOR: u8 = b':';
 
-/**
- * xmlLoadCatalogs:
- * @pathss:  a list of directories separated by a colon or a space.
- *
- * Load the catalogs and makes their definitions effective for the default
- * external entity loader.
- * this function is not thread safe, catalog initialization should
- * preferably be done once at startup
- */
+/// Load the catalogs and makes their definitions effective for the default
+/// external entity loader.
+/// this function is not thread safe, catalog initialization should
+/// preferably be done once at startup
+#[doc(alias = "xmlLoadCatalogs")]
 pub unsafe extern "C" fn xml_load_catalogs(pathss: *const c_char) {
     let mut cur: *const c_char;
     let mut paths: *const c_char;
@@ -3756,13 +3467,9 @@ pub unsafe extern "C" fn xml_load_catalogs(pathss: *const c_char) {
     }
 }
 
-/**
- * xmlFreeCatalogHashEntryList:
- * @payload:  a Catalog entry list
- *
- * Free the memory allocated to list of Catalog entries from the
- * catalog file hash.
- */
+/// Free the memory allocated to list of Catalog entries from the
+/// catalog file hash.
+#[doc(alias = "xmlFreeCatalogHashEntryList")]
 extern "C" fn xml_free_catalog_hash_entry_list(payload: *mut c_void, _name: *const XmlChar) {
     let catal: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     let mut children: XmlCatalogEntryPtr;
@@ -3786,11 +3493,8 @@ extern "C" fn xml_free_catalog_hash_entry_list(payload: *mut c_void, _name: *con
     }
 }
 
-/**
- * xmlCatalogCleanup:
- *
- * Free up all the memory associated with catalogs
- */
+/// Free up all the memory associated with catalogs
+#[doc(alias = "xmlCatalogCleanup")]
 pub unsafe extern "C" fn xml_catalog_cleanup() {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Acquire) {
         return;
@@ -3817,12 +3521,8 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
     xml_free_rmutex(mutex);
 }
 
-/**
- * xmlCatalogDump:
- * @out:  the file.
- *
- * Dump all the global catalog content to the given file.
- */
+/// Dump all the global catalog content to the given file.
+#[doc(alias = "xmlCatalogDump")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_catalog_dump(out: *mut FILE) {
     if out.is_null() {
@@ -3836,16 +3536,11 @@ pub unsafe extern "C" fn xml_catalog_dump(out: *mut FILE) {
     xml_a_catalog_dump(XML_DEFAULT_CATALOG.load(Ordering::Relaxed), out);
 }
 
-/**
- * xmlCatalogResolve:
- * @pubID:  the public ID string
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier
- *
- * Returns the URI of the resource or null_mut() if not found, it must be freed
- *      by the caller.
- */
+/// Do a complete resolution lookup of an External Identifier
+///
+/// Returns the URI of the resource or null_mut() if not found,
+/// it must be freed by the caller.
+#[doc(alias = "xmlCatalogResolve")]
 pub unsafe extern "C" fn xml_catalog_resolve(
     pub_id: *const XmlChar,
     sys_id: *const XmlChar,
@@ -3859,15 +3554,11 @@ pub unsafe extern "C" fn xml_catalog_resolve(
     ret
 }
 
-/**
- * xmlCatalogResolveSystem:
- * @sysID:  the system ID string
- *
- * Try to lookup the catalog resource for a system ID
- *
- * Returns the resource if found or null_mut() otherwise, the value returned
- *      must be freed by the caller.
- */
+/// Try to lookup the catalog resource for a system ID
+///
+/// Returns the resource if found or null_mut() otherwise,
+/// the value returned must be freed by the caller.
+#[doc(alias = "xmlCatalogResolveSystem")]
 pub unsafe extern "C" fn xml_catalog_resolve_system(sys_id: *const XmlChar) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -3878,15 +3569,11 @@ pub unsafe extern "C" fn xml_catalog_resolve_system(sys_id: *const XmlChar) -> *
     ret
 }
 
-/**
- * xmlCatalogResolvePublic:
- * @pubID:  the public ID string
- *
- * Try to lookup the catalog reference associated to a public ID
- *
- * Returns the resource if found or null_mut() otherwise, the value returned
- *      must be freed by the caller.
- */
+/// Try to lookup the catalog reference associated to a public ID
+///
+/// Returns the resource if found or null_mut() otherwise,
+/// the value returned must be freed by the caller.
+#[doc(alias = "xmlCatalogResolvePublic")]
 pub unsafe extern "C" fn xml_catalog_resolve_public(pub_id: *const XmlChar) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -3897,15 +3584,11 @@ pub unsafe extern "C" fn xml_catalog_resolve_public(pub_id: *const XmlChar) -> *
     ret
 }
 
-/**
- * xmlCatalogResolveURI:
- * @URI:  the URI
- *
- * Do a complete resolution lookup of an URI
- *
- * Returns the URI of the resource or null_mut() if not found, it must be freed
- *      by the caller.
- */
+/// Do a complete resolution lookup of an URI
+///
+/// Returns the URI of the resource or null_mut() if not found,
+/// it must be freed by the caller.
+#[doc(alias = "xmlCatalogResolveURI")]
 pub unsafe extern "C" fn xml_catalog_resolve_uri(uri: *const XmlChar) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -3916,19 +3599,13 @@ pub unsafe extern "C" fn xml_catalog_resolve_uri(uri: *const XmlChar) -> *mut Xm
     ret
 }
 
-/**
- * xmlCatalogAdd:
- * @type:  the type of record to add to the catalog
- * @orig:  the system, public or prefix to match
- * @replace:  the replacement value for the match
- *
- * Add an entry in the catalog, it may overwrite existing but
- * different entries.
- * If called before any other catalog routine, allows to override the
- * default shared catalog put in place by xmlInitializeCatalog();
- *
- * Returns 0 if successful, -1 otherwise
- */
+/// Add an entry in the catalog, it may overwrite existing but
+/// different entries.
+/// If called before any other catalog routine, allows to override the
+/// default shared catalog put in place by `xmlInitializeCatalog()`.
+///
+/// Returns 0 if successful, -1 otherwise
+#[doc(alias = "xmlCatalogAdd")]
 pub unsafe extern "C" fn xml_catalog_add(
     typ: *const XmlChar,
     orig: *const XmlChar,
@@ -3972,14 +3649,10 @@ pub unsafe extern "C" fn xml_catalog_add(
     res
 }
 
-/**
- * xmlCatalogRemove:
- * @value:  the value to remove
- *
- * Remove an entry from the catalog
- *
- * Returns the number of entries removed if successful, -1 otherwise
- */
+/// Remove an entry from the catalog
+///
+/// Returns the number of entries removed if successful, -1 otherwise
+#[doc(alias = "xmlCatalogRemove")]
 pub unsafe extern "C" fn xml_catalog_remove(value: *const XmlChar) -> i32 {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -3992,15 +3665,11 @@ pub unsafe extern "C" fn xml_catalog_remove(value: *const XmlChar) -> i32 {
     res
 }
 
-/**
- * xmlParseCatalogFile:
- * @filename:  the filename
- *
- * parse an XML file and build a tree. It's like xmlParseFile()
- * except it bypass all catalog lookups.
- *
- * Returns the resulting document tree or null_mut() in case of error
- */
+/// Parse an XML file and build a tree.
+/// It's like `xmlParseFile()` except it bypass all catalog lookups.
+///
+/// Returns the resulting document tree or null_mut() in case of error
+#[doc(alias = "xmlParseCatalogFile")]
 pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlDocPtr {
     let ret: XmlDocPtr;
     let mut directory: *mut c_char = null_mut();
@@ -4076,13 +3745,10 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
     ret
 }
 
-/**
- * xmlCatalogConvert:
- *
- * Convert all the SGML catalog entries as XML ones
- *
- * Returns the number of entries converted if successful, -1 otherwise
- */
+/// Convert all the SGML catalog entries as XML ones
+///
+/// Returns the number of entries converted if successful, -1 otherwise
+#[doc(alias = "xmlCatalogConvert")]
 pub unsafe extern "C" fn xml_catalog_convert() -> i32 {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -4095,16 +3761,8 @@ pub unsafe extern "C" fn xml_catalog_convert() -> i32 {
     res
 }
 
-/*
- * Strictly minimal interfaces for per-document catalogs used
- * by the parser.
- */
-/**
- * xmlCatalogFreeLocal:
- * @catalogs:  a document's list of catalogs
- *
- * Free up the memory associated to the catalog list
- */
+/// Free up the memory associated to the catalog list
+#[doc(alias = "xmlCatalogFreeLocal")]
 pub unsafe extern "C" fn xml_catalog_free_local(catalogs: *mut c_void) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -4116,15 +3774,10 @@ pub unsafe extern "C" fn xml_catalog_free_local(catalogs: *mut c_void) {
     }
 }
 
-/**
- * xmlCatalogAddLocal:
- * @catalogs:  a document's list of catalogs
- * @URL:  the URL to a new local catalog
- *
- * Add the new entry to the catalog list
- *
- * Returns the updated list
- */
+/// Add the new entry to the catalog list
+///
+/// Returns the updated list
+#[doc(alias = "xmlCatalogAddLocal")]
 pub unsafe extern "C" fn xml_catalog_add_local(
     catalogs: *mut c_void,
     url: *const XmlChar,
@@ -4170,18 +3823,12 @@ pub unsafe extern "C" fn xml_catalog_add_local(
     catalogs
 }
 
-/**
- * xmlCatalogLocalResolve:
- * @catalogs:  a document's list of catalogs
- * @pubID:  the public ID string
- * @sysID:  the system ID string
- *
- * Do a complete resolution lookup of an External Identifier using a
- * document's private catalog list
- *
- * Returns the URI of the resource or null_mut() if not found, it must be freed
- *      by the caller.
- */
+/// Do a complete resolution lookup of an External Identifier using a
+/// document's private catalog list
+///
+/// Returns the URI of the resource or null_mut() if not found,
+/// it must be freed by the caller.
+#[doc(alias = "xmlCatalogLocalResolve")]
 pub unsafe extern "C" fn xml_catalog_local_resolve(
     catalogs: *mut c_void,
     pub_id: *const XmlChar,
@@ -4226,17 +3873,12 @@ pub unsafe extern "C" fn xml_catalog_local_resolve(
     null_mut()
 }
 
-/**
- * xmlCatalogLocalResolveURI:
- * @catalogs:  a document's list of catalogs
- * @URI:  the URI
- *
- * Do a complete resolution lookup of an URI using a
- * document's private catalog list
- *
- * Returns the URI of the resource or null_mut() if not found, it must be freed
- *      by the caller.
- */
+/// Do a complete resolution lookup of an URI using a
+/// document's private catalog list
+///
+/// Returns the URI of the resource or null_mut() if not found,
+/// it must be freed by the caller.
+#[doc(alias = "xmlCatalogLocalResolveURI")]
 pub unsafe extern "C" fn xml_catalog_local_resolve_uri(
     catalogs: *mut c_void,
     uri: *const XmlChar,
@@ -4267,18 +3909,11 @@ pub unsafe extern "C" fn xml_catalog_local_resolve_uri(
     null_mut()
 }
 
-/*
- * Preference settings.
- */
-/**
- * xmlCatalogSetDebug:
- * @level:  the debug level of catalogs required
- *
- * Used to set the debug level for catalog operation, 0 disable
- * debugging, 1 enable it
- *
- * Returns the previous value of the catalog debugging level
- */
+/// Used to set the debug level for catalog operation, 0 disable
+/// debugging, 1 enable it
+///
+/// Returns the previous value of the catalog debugging level
+#[doc(alias = "xmlCatalogSetDebug")]
 pub unsafe extern "C" fn xml_catalog_set_debug(level: i32) -> i32 {
     let ret: i32 = XML_DEBUG_CATALOGS.load(Ordering::Acquire);
 
@@ -4290,16 +3925,12 @@ pub unsafe extern "C" fn xml_catalog_set_debug(level: i32) -> i32 {
     ret
 }
 
-/**
- * xmlCatalogSetDefaultPrefer:
- * @prefer:  the default preference for delegation
- *
- * Allows to set the preference between public and system for deletion
- * in XML Catalog resolution. C.f. section 4.1.1 of the spec
- * Values accepted are xmlCatalogPrefer::XML_CATA_PREFER_PUBLIC or xmlCatalogPrefer::XML_CATA_PREFER_SYSTEM
- *
- * Returns the previous value of the default preference for delegation
- */
+/// Allows to set the preference between public and system for deletion
+/// in XML Catalog resolution. C.f. section 4.1.1 of the spec
+/// Values accepted are xmlCatalogPrefer::XML_CATA_PREFER_PUBLIC or xmlCatalogPrefer::XML_CATA_PREFER_SYSTEM
+///
+/// Returns the previous value of the default preference for delegation
+#[doc(alias = "xmlCatalogSetDefaultPrefer")]
 pub unsafe extern "C" fn xml_catalog_set_default_prefer(
     prefer: XmlCatalogPrefer,
 ) -> XmlCatalogPrefer {
@@ -4326,13 +3957,8 @@ pub unsafe extern "C" fn xml_catalog_set_default_prefer(
     ret
 }
 
-/**
- * xmlCatalogSetDefaults:
- * @allow:  what catalogs should be accepted
- *
- * Used to set the user preference w.r.t. to what catalogs should
- * be accepted
- */
+/// Used to set the user preference w.r.t. to what catalogs should be accepted
+#[doc(alias = "xmlCatalogSetDefaults")]
 pub unsafe extern "C" fn xml_catalog_set_defaults(allow: XmlCatalogAllow) {
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         match allow {
@@ -4353,28 +3979,19 @@ pub unsafe extern "C" fn xml_catalog_set_defaults(allow: XmlCatalogAllow) {
     XML_CATALOG_DEFAULT_ALLOW = allow;
 }
 
-/**
- * xmlCatalogGetDefaults:
- *
- * Used to get the user preference w.r.t. to what catalogs should
- * be accepted
- *
- * Returns the current xmlCatalogAllow value
- */
+/// Used to get the user preference w.r.t. to what catalogs should be accepted
+///
+/// Returns the current xmlCatalogAllow value
+#[doc(alias = "xmlCatalogGetDefaults")]
 pub unsafe extern "C" fn xml_catalog_get_defaults() -> XmlCatalogAllow {
     XML_CATALOG_DEFAULT_ALLOW
 }
 
-/* DEPRECATED interfaces */
-/**
- * xmlCatalogGetSystem:
- * @sysID:  the system ID string
- *
- * Try to lookup the catalog reference associated to a system ID
- * DEPRECATED, use xmlCatalogResolveSystem()
- *
- * Returns the resource if found or null_mut() otherwise.
- */
+/// Try to lookup the catalog reference associated to a system ID
+///
+/// Returns the resource if found or null_mut() otherwise.
+#[deprecated = "use xmlCatalogResolveSystem()"]
+#[doc(alias = "xmlCatalogGetSystem")]
 pub unsafe extern "C" fn xml_catalog_get_system(sys_id: *const XmlChar) -> *const XmlChar {
     let ret: *mut XmlChar;
     static mut RESULT: [XmlChar; 1000] = [0; 1000];
@@ -4393,9 +4010,7 @@ pub unsafe extern "C" fn xml_catalog_get_system(sys_id: *const XmlChar) -> *cons
         return null_mut();
     }
 
-    /*
-     * Check first the XML catalogs
-     */
+    // Check first the XML catalogs
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if !default_catalog.is_null() {
         ret = xml_catalog_list_xml_resolve((*default_catalog).xml, null_mut(), sys_id);
@@ -4417,15 +4032,11 @@ pub unsafe extern "C" fn xml_catalog_get_system(sys_id: *const XmlChar) -> *cons
     null_mut()
 }
 
-/**
- * xmlCatalogGetPublic:
- * @pubID:  the public ID string
- *
- * Try to lookup the catalog reference associated to a public ID
- * DEPRECATED, use xmlCatalogResolvePublic()
- *
- * Returns the resource if found or null_mut() otherwise.
- */
+/// Try to lookup the catalog reference associated to a public ID
+///
+/// Returns the resource if found or null_mut() otherwise.
+#[deprecated = "use xmlCatalogResolvePublic()"]
+#[doc(alias = "xmlCatalogGetPublic")]
 pub unsafe extern "C" fn xml_catalog_get_public(pub_id: *const XmlChar) -> *const XmlChar {
     let ret: *mut XmlChar;
     static mut RESULT: [XmlChar; 1000] = [0; 1000];

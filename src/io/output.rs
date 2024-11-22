@@ -22,45 +22,27 @@ use super::{
     MINLEN,
 };
 
-/**
- * xmlOutputMatchCallback:
- * @filename: the filename or URI
- *
- * Callback used in the I/O Output API to detect if the current handler
- * can provide output functionality for this resource.
- *
- * Returns 1 if yes and 0 if another Output module should be used
- */
+/// Callback used in the I/O Output API to detect if the current handler
+/// can provide output functionality for this resource.
+///
+/// Returns 1 if yes and 0 if another Output module should be used
+#[doc(alias = "xmlOutputMatchCallback")]
 pub type XmlOutputMatchCallback = unsafe fn(filename: &str) -> i32;
-/**
- * xmlOutputOpenCallback:
- * @filename: the filename or URI
- *
- * Callback used in the I/O Output API to open the resource
- *
- * Returns an Output context or NULL in case or error
- */
+/// Callback used in the I/O Output API to open the resource
+///
+/// Returns an Output context or NULL in case or error
+#[doc(alias = "xmlOutputOpenCallback")]
 pub type XmlOutputOpenCallback = unsafe extern "C" fn(filename: *const i8) -> *mut c_void;
-/**
- * xmlOutputWriteCallback:
- * @context:  an Output context
- * @buffer:  the buffer of data to write
- * @len:  the length of the buffer in bytes
- *
- * Callback used in the I/O Output API to write to the resource
- *
- * Returns the number of bytes written or -1 in case of error
- */
+/// Callback used in the I/O Output API to write to the resource
+///
+/// Returns the number of bytes written or -1 in case of error
+#[doc(alias = "xmlOutputWriteCallback")]
 pub type XmlOutputWriteCallback =
     unsafe extern "C" fn(context: *mut c_void, buffer: *const i8, len: i32) -> i32;
-/**
- * xmlOutputCloseCallback:
- * @context:  an Output context
- *
- * Callback used in the I/O Output API to close the resource
- *
- * Returns 0 or -1 in case of error
- */
+/// Callback used in the I/O Output API to close the resource
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlOutputCloseCallback")]
 pub type XmlOutputCloseCallback = unsafe extern "C" fn(context: *mut c_void) -> i32;
 
 pub type XmlOutputBufferPtr = *mut XmlOutputBuffer;
@@ -615,12 +597,8 @@ pub(in crate::io) static XML_OUTPUT_CALLBACK_TABLE: Mutex<
 pub(in crate::io) static XML_OUTPUT_CALLBACK_NR: AtomicUsize = AtomicUsize::new(0);
 pub(in crate::io) static XML_OUTPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-/**
- * xmlCleanupOutputCallbacks:
- *
- * clears the entire output callback table. this includes the
- * compiled-in I/O callbacks.
- */
+/// clears the entire output callback table. this includes the compiled-in I/O callbacks.
+#[doc(alias = "xmlCleanupOutputCallbacks")]
 pub fn xml_cleanup_output_callbacks() {
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
@@ -640,14 +618,11 @@ pub fn xml_cleanup_output_callbacks() {
     XML_OUTPUT_CALLBACK_INITIALIZED.store(false, Ordering::Release);
 }
 
-/**
- * xmlPopOutputCallbacks:
- *
- * Remove the top output callbacks from the output stack. This includes the
- * compiled-in I/O.
- *
- * Returns the number of output callback registered or -1 in case of error.
- */
+/// Remove the top output callbacks from the output stack.  
+/// This includes the compiled-in I/O.
+///
+/// Returns the number of output callback registered or -1 in case of error.
+#[doc(alias = "xmlPopOutputCallbacks")]
 pub fn xml_pop_output_callbacks() -> i32 {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return -1;
@@ -669,11 +644,8 @@ pub fn xml_pop_output_callbacks() -> i32 {
     num_callbacks as _
 }
 
-/**
- * xmlRegisterDefaultOutputCallbacks:
- *
- * Registers the default compiled-in I/O handlers.
- */
+/// Registers the default compiled-in I/O handlers.
+#[doc(alias = "xmlRegisterDefaultOutputCallbacks")]
 pub unsafe extern "C" fn xml_register_default_output_callbacks() {
     if XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return;
@@ -715,17 +687,10 @@ pub unsafe extern "C" fn xml_register_default_output_callbacks() {
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
 }
 
-/**
- * xmlRegisterOutputCallbacks:
- * @matchFunc:  the xmlOutputMatchCallback
- * @openFunc:  the xmlOutputOpenCallback
- * @writeFunc:  the xmlOutputWriteCallback
- * @closeFunc:  the xmlOutputCloseCallback
- *
- * Register a new set of I/O callback for handling output.
- *
- * Returns the registered handler number or -1 in case of error
- */
+/// Register a new set of I/O callback for handling output.
+///
+/// Returns the registered handler number or -1 in case of error
+#[doc(alias = "xmlRegisterOutputCallbacks")]
 pub fn xml_register_output_callbacks(
     match_func: Option<XmlOutputMatchCallback>,
     open_func: Option<XmlOutputOpenCallback>,

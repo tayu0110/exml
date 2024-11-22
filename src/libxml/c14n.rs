@@ -39,12 +39,8 @@ use super::{
     xpath_internals::xml_xpath_node_set_contains,
 };
 
-/*
- * xmlC14NMode:
- *
- * Predefined values for C14N modes
- *
- */
+// Predefined values for C14N modes
+#[doc(alias = "xmlC14NMode")]
 #[repr(C)]
 pub enum XmlC14NMode {
     XmlC14N1_0 = 0,          /* Original C14N 1.0 spec */
@@ -152,27 +148,12 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
     1
 }
 
-/**
- * xmlC14NDocSaveTo:
- * @doc:        the XML document for canonization
- * @nodes:        the nodes set to be included in the canonized image
- *        or NULL if all document nodes should be included
- * @mode:        the c14n mode (see @xmlC14NMode)
- * @inclusive_ns_prefixes: the list of inclusive namespace prefixes
- *            ended with a NULL or NULL if there is no
- *            inclusive namespaces (only for exclusive
- *            canonicalization, ignored otherwise)
- * @with_comments:    include comments in the result (!=0) or not (==0)
- * @buf:        the output buffer to store canonical XML; this
- *            buffer MUST have encoder==NULL because C14N requires
- *            UTF-8 output
- *
- * Dumps the canonized image of given XML document into the provided buffer.
- * For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
- * "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
- *
- * Returns non-negative value on success or a negative value on fail
- */
+/// Dumps the canonized image of given XML document into the provided buffer.  
+/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
+/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+///
+/// Returns non-negative value on success or a negative value on fail
+#[doc(alias = "xmlC14NDocSaveTo")]
 pub unsafe extern "C" fn xml_c14n_doc_save_to(
     doc: XmlDocPtr,
     nodes: XmlNodeSetPtr,
@@ -192,12 +173,8 @@ pub unsafe extern "C" fn xml_c14n_doc_save_to(
     )
 }
 
-/**
- * xmlC14NErrParam:
- * @extra:  extra information
- *
- * Handle a redefinition of param error
- */
+/// Handle a redefinition of param error
+#[doc(alias = "xmlC14NErrParam")]
 unsafe extern "C" fn xml_c14n_err_param(extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -220,12 +197,8 @@ unsafe extern "C" fn xml_c14n_err_param(extra: *const c_char) {
     );
 }
 
-/**
- * xmlC14NErrMemory:
- * @extra:  extra information
- *
- * Handle a redefinition of memory error
- */
+/// Handle a redefinition of memory error
+#[doc(alias = "xmlC14NErrMemory")]
 unsafe extern "C" fn xml_c14n_err_memory(extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -248,12 +221,8 @@ unsafe extern "C" fn xml_c14n_err_memory(extra: *const c_char) {
     );
 }
 
-/**
- * xmlC14NErrInternal:
- * @extra:  extra information
- *
- * Handle a redefinition of internal error
- */
+/// Handle a redefinition of internal error
+#[doc(alias = "xmlC14NErrInternal")]
 unsafe extern "C" fn xml_c14n_err_internal(extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -276,27 +245,12 @@ unsafe extern "C" fn xml_c14n_err_internal(extra: *const c_char) {
     );
 }
 
-/**
- * xmlC14NDocDumpMemory:
- * @doc:        the XML document for canonization
- * @nodes:        the nodes set to be included in the canonized image
- *        or NULL if all document nodes should be included
- * @mode:        the c14n mode (see @xmlC14NMode)
- * @inclusive_ns_prefixes: the list of inclusive namespace prefixes
- *            ended with a NULL or NULL if there is no
- *            inclusive namespaces (only for exclusive
- *            canonicalization, ignored otherwise)
- * @with_comments:    include comments in the result (!=0) or not (==0)
- * @doc_txt_ptr:    the memory pointer for allocated canonical XML text;
- *            the caller of this functions is responsible for calling
- *            xmlFree() to free allocated memo as _ry
- *
- * Dumps the canonized image of given XML document into memory.
- * For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
- * "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
- *
- * Returns the number of bytes written on success or a negative value on fail
- */
+/// Dumps the canonized image of given XML document into memory.  
+/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
+/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+///
+/// Returns the number of bytes written on success or a negative value on fail
+#[doc(alias = "xmlC14NDocDumpMemory")]
 pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     doc: XmlDocPtr,
     nodes: XmlNodeSetPtr,
@@ -349,29 +303,12 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     ret
 }
 
-/**
- * xmlC14NDocSave:
- * @doc:        the XML document for canonization
- * @nodes:        the nodes set to be included in the canonized image
- *        or NULL if all document nodes should be included
- * @mode:        the c14n mode (see @xmlC14NMode)
- * @inclusive_ns_prefixes: the list of inclusive namespace prefixes
- *            ended with a NULL or NULL if there is no
- *            inclusive namespaces (only for exclusive
- *            canonicalization, ignored otherwise)
- * @with_comments:    include comments in the result (!=0) or not (==0)
- * @filename:        the filename to store canonical XML image
- * @compression:    the compression level (zlib required):
- *                -1 - libxml default,
- *                 0 - uncompressed,
- *                >0 - compression level
- *
- * Dumps the canonized image of given XML document into the file.
- * For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
- * "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
- *
- * Returns the number of bytes written success or a negative value on fail
- */
+/// Dumps the canonized image of given XML document into the file.  
+/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
+/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+///
+/// Returns the number of bytes written success or a negative value on fail
+#[doc(alias = "xmlC14NDocSave")]
 pub unsafe extern "C" fn xml_c14n_doc_save(
     doc: XmlDocPtr,
     nodes: XmlNodeSetPtr,
@@ -388,8 +325,8 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
         return -1;
     }
     // #ifdef LIBXML_ZLIB_ENABLED
-    //     if (compression < 0)
-    //         compression = xmlGetCompressMode();
+    // if (compression < 0)
+    //     compression = xmlGetCompressMode();
     // #endif
 
     /*
@@ -418,32 +355,15 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
     ret
 }
 
-/**
- * This is the core C14N function
- */
-/**
- * xmlC14NIsVisibleCallback:
- * @user_data: user data
- * @node: the current node
- * @parent: the parent node
- *
- * Signature for a C14N callback on visible nodes
- *
- * Returns 1 if the node should be included
- */
+/// Signature for a C14N callback on visible nodes
+///
+/// Returns 1 if the node should be included
+#[doc(alias = "xmlC14NIsVisibleCallback")]
 pub type XmlC14NIsVisibleCallback =
     unsafe extern "C" fn(user_data: *mut c_void, node: XmlNodePtr, parent: XmlNodePtr) -> i32;
 
-/**
- * xmlC14NErr:
- * @ctxt:  a C14N evaluation context
- * @node:  the context node
- * @error:  the error code
- * @msg:  the message
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlC14NErr")]
 unsafe extern "C" fn xml_c14n_err(
     ctxt: XmlC14NCtxPtr,
     node: XmlNodePtr,
@@ -509,12 +429,8 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStac
     xml_free(cur as _);
 }
 
-/**
- * xmlC14NFreeCtx:
- * @ctx: the pointer to C14N context object
- *
- * Cleanups the C14N context object.
- */
+/// Cleanups the C14N context object.
+#[doc(alias = "xmlC14NFreeCtx")]
 unsafe extern "C" fn xml_c14n_free_ctx(ctx: XmlC14NCtxPtr) {
     if ctx.is_null() {
         xml_c14n_err_param(c"freeing context".as_ptr() as _);
@@ -533,27 +449,10 @@ macro_rules! xml_c14n_is_exclusive {
     };
 }
 
-/**
- * xmlC14NNewCtx:
- * @doc:        the XML document for canonization
- * @is_visible_callback:the function to use to determine is node visible
- *            or not
- * @user_data:        the first parameter for @is_visible_callback function
- *            (in most cases, it is nodes set)
- * @mode:   the c14n mode (see @xmlC14NMode)
- * @inclusive_ns_prefixe the list of inclusive namespace prefixes
- *            ended with a NULL or NULL if there is no
- *            inclusive namespaces (only for `
- *            canonicalization)
- * @with_comments:    include comments in the result (!=0) or not (==0)
- * @buf:        the output buffer to store canonical XML; this
- *            buffer MUST have encoder==NULL because C14N requires
- *            UTF-8 output
- *
- * Creates new C14N context object to store C14N parameters.
- *
- * Returns pointer to newly created object (success) or NULL (fail)
- */
+/// Creates new C14N context object to store C14N parameters.
+///
+/// Returns pointer to newly created object (success) or NULL (fail)
+#[doc(alias = "xmlC14NNewCtx")]
 unsafe extern "C" fn xml_c14n_new_ctx(
     doc: XmlDocPtr,
     is_visible_callback: Option<XmlC14NIsVisibleCallback>,
@@ -570,9 +469,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
         return null_mut();
     }
 
-    /*
-     *  Validate the encoding output buffer encoding
-     */
+    // Validate the encoding output buffer encoding
     if (*buf).encoder.is_some() {
         xml_c14n_err(
             ctx,
@@ -584,9 +481,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
         return null_mut();
     }
 
-    /*
-     * Allocate a new xmlC14NCtxPtr and fill the fields.
-     */
+    // Allocate a new xmlC14NCtxPtr and fill the fields.
     ctx = xml_malloc(size_of::<XmlC14NCtx>()) as _;
     if ctx.is_null() {
         xml_c14n_err_memory(c"creating context".as_ptr() as _);
@@ -594,9 +489,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
     }
     memset(ctx as _, 0, size_of::<XmlC14NCtx>());
 
-    /*
-     * initialize C14N context
-     */
+    // initialize C14N context
     (*ctx).doc = doc;
     (*ctx).with_comments = with_comments;
     (*ctx).is_visible_callback = is_visible_callback;
@@ -617,10 +510,7 @@ unsafe extern "C" fn xml_c14n_new_ctx(
         return null_mut();
     }
 
-    /*
-     * Set "mode" flag and remember list of inclusive prefixes
-     * for exclusive c14n
-     */
+    // Set "mode" flag and remember list of inclusive prefixes for exclusive c14n
     (*ctx).mode = mode;
     if xml_c14n_is_exclusive!(ctx) {
         (*ctx).inclusive_ns_prefixes = inclusive_ns_prefixes;
@@ -642,12 +532,8 @@ macro_rules! xml_c14n_is_visible {
     };
 }
 
-/**
- * xmlC14NErrRelativeNamespace:
- * @extra:  extra information
- *
- * Handle a redefinition of relative namespace error
- */
+/// Handle a redefinition of relative namespace error
+#[doc(alias = "xmlC14NErrRelativeNamespace")]
 unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
     __xml_raise_error!(
         None,
@@ -670,15 +556,10 @@ unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
     );
 }
 
-/**
- * xmlC14NCheckForRelativeNamespaces:
- * @ctx:        the C14N context
- * @cur:        the current element node
- *
- * Checks that current element node has no relative namespaces defined
- *
- * Returns 0 if the node has no relative namespaces or -1 otherwise.
- */
+/// Checks that current element node has no relative namespaces defined
+///
+/// Returns 0 if the node has no relative namespaces or -1 otherwise.
+#[doc(alias = "xmlC14NCheckForRelativeNamespaces")]
 unsafe extern "C" fn xml_c14n_check_for_relative_namespaces(
     ctx: XmlC14NCtxPtr,
     cur: XmlNodePtr,
@@ -724,15 +605,10 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_save(
     (*state).ns_prev_end = (*cur).ns_prev_end;
 }
 
-/**
- * xmlC14NNsCompare:
- * @ns1:        the pointer to first namespace
- * @ns2:        the pointer to second namespace
- *
- * Compares the namespaces by names (prefixes).
- *
- * Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
- */
+/// Compares the namespaces by names (prefixes).
+///
+/// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
+#[doc(alias = "xmlC14NNsCompare")]
 extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) -> i32 {
     let ns1: XmlNsPtr = data1 as _;
     let ns2: XmlNsPtr = data2 as _;
@@ -754,12 +630,14 @@ extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) ->
 ///
 /// Please refer to the document of `xmlC14NIsXmlNs` for original libxml2.
 /* todo: make it a define? */
+#[doc(alias = "xmlC14NIsXmlNs")]
 unsafe extern "C" fn xml_c14n_is_xml_ns(ns: XmlNsPtr) -> bool {
     !ns.is_null()
         && xml_str_equal((*ns).prefix as _, c"xml".as_ptr() as _)
         && xml_str_equal((*ns).href as _, XML_XML_NAMESPACE.as_ptr() as _)
 }
 
+#[doc(alias = "xmlC14NStrEqual")]
 unsafe extern "C" fn xml_c14n_str_equal(
     mut str1: *const XmlChar,
     mut str2: *const XmlChar,
@@ -788,6 +666,7 @@ unsafe extern "C" fn xml_c14n_str_equal(
 /// Return `true` if already rendered, otherwise return `false`.
 ///
 /// Please refer to the document of `xmlC14NVisibleNsStackFind` for original libxml2.
+#[doc(alias = "xmlC14NVisibleNsStackFind")]
 unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
     cur: XmlC14NVisibleNsStackPtr,
     ns: Option<&XmlNs>,
@@ -850,6 +729,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
 
 const XML_NAMESPACES_DEFAULT: usize = 16;
 
+#[doc(alias = "xmlC14NVisibleNsStackAdd")]
 unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
     cur: XmlC14NVisibleNsStackPtr,
     ns: XmlNsPtr,
@@ -913,15 +793,10 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
     (*cur).ns_cur_end += 1;
 }
 
-/**
- * xmlC14NPrintNamespaces:
- * @ns:            the pointer to namespace
- * @ctx:        the C14N context
- *
- * Prints the given namespace to the output buffer from C14N context.
- *
- * Returns 1 on success or 0 on fail.
- */
+/// Prints the given namespace to the output buffer from C14N context.
+///
+/// Returns 1 on success or 0 on fail.
+#[doc(alias = "xmlC14NPrintNamespaces")]
 unsafe extern "C" fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -> i32 {
     if ctx.is_null() {
         xml_c14n_err_param(c"writing namespaces".as_ptr() as _);
@@ -947,49 +822,44 @@ unsafe extern "C" fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -
     1
 }
 
+#[doc(alias = "xmlC14NPrintNamespacesWalker")]
 extern "C" fn xml_c14n_print_namespaces_walker(ns: *const c_void, ctx: *mut c_void) -> i32 {
     unsafe { xml_c14n_print_namespaces(&*(ns as *const XmlNs), ctx as _) }
 }
 
-/**
- * xmlC14NProcessNamespacesAxis:
- * @ctx:        the C14N context
- * @node:        the current node
- *
- * Prints out canonical namespace axis of the current node to the
- * buffer from C14N context as follows
- *
- * Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
- *
- * Namespace Axis
- * Consider a list L containing only namespace nodes in the
- * axis and in the node-set in lexicographic order (ascending). To begin
- * processing L, if the first node is not the default namespace node (a node
- * with no namespace URI and no local name), then generate a space followed
- * by xmlns="" if and only if the following conditions are met:
- *    - the element E that owns the axis is in the node-set
- *    - The nearest ancestor element of E in the node-set has a default
- *        namespace node in the node-set (default namespace nodes always
- *      have non-empty values in XPath)
- *      The latter condition eliminates unnecessary occurrences of xmlns="" in
- *      the canonical form since an element only receives an xmlns="" if its
- *      default namespace is empty and if it has an immediate parent in the
- *      canonical form that has a non-empty default namespace. To finish
- *      processing  L, simply process every namespace node in L, except omit
- *      namespace node with local name xml, which defines the xml prefix,
- *      if its string value is http://www.w3.org/XML/1998/namespace.
- *
- * Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
- * Canonical XML applied to a document subset requires the search of the
- * ancestor nodes of each orphan element node for attributes in the xml
- * namespace, such as xml:lang and xml:space. These are copied into the
- * element node except if a declaration of the same attribute is already
- * in the attribute axis of the element (whether or not it is included in
- * the document subset). This search and copying are omitted from the
- * Exclusive XML Canonicalization method.
- *
- * Returns 0 on success or -1 on fail.
- */
+/// Prints out canonical namespace axis of the current node to the
+/// buffer from C14N context as follows
+///
+/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+///
+/// # Namespace Axis
+/// Consider a list L containing only namespace nodes in the
+/// axis and in the node-set in lexicographic order (ascending).  
+/// To begin processing L, if the first node is not the default namespace node
+/// (a node with no namespace URI and no local name), then generate a space followed
+/// by xmlns="" if and only if the following conditions are met:
+/// - the element E that owns the axis is in the node-set
+/// - The nearest ancestor element of E in the node-set has a default namespace node
+///   in the node-set (default namespace nodes always have non-empty values in XPath)
+///   
+/// The latter condition eliminates unnecessary occurrences of xmlns="" in
+/// the canonical form since an element only receives an xmlns="" if its
+/// default namespace is empty and if it has an immediate parent in the
+/// canonical form that has a non-empty default namespace.  
+/// To finish processing L, simply process every namespace node in L,
+/// except omit namespace node with local name xml, which defines the xml prefix,
+/// if its string value is http://www.w3.org/XML/1998/namespace.
+///
+/// Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
+/// Canonical XML applied to a document subset requires the search of the
+/// ancestor nodes of each orphan element node for attributes in the xml
+/// namespace, such as xml:lang and xml:space.  
+/// These are copied into the element node except if a declaration of the same attribute is already
+/// in the attribute axis of the element (whether or not it is included in the document subset).  
+/// This search and copying are omitted from the Exclusive XML Canonicalization method.
+///
+/// Returns 0 on success or -1 on fail.
+#[doc(alias = "xmlC14NProcessNamespacesAxis")]
 unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     ctx: XmlC14NCtxPtr,
     cur: XmlNodePtr,
@@ -1057,18 +927,15 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
         xml_c14n_print_namespaces(&XmlNs::default(), ctx);
     }
 
-    /*
-     * print out all elements from list
-     */
+    // print out all elements from list
     xml_list_walk(list, Some(xml_c14n_print_namespaces_walker), ctx as _);
 
-    /*
-     * Cleanup
-     */
+    // Cleanup
     xml_list_delete(list);
     0
 }
 
+#[doc(alias = "xmlC14NVisibleNsStackFind")]
 unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
     cur: XmlC14NVisibleNsStackPtr,
     ns: Option<&XmlNs>,
@@ -1079,10 +946,7 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
         return 0;
     }
 
-    /*
-     * if the default namespace xmlns="" is not defined yet then
-     * we do not want to print it out
-     */
+    // if the default namespace xmlns="" is not defined yet then we do not want to print it out
     let prefix: *const XmlChar =
         if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
             prefix
@@ -1129,36 +993,30 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
     has_empty_ns
 }
 
-/**
- * xmlExcC14NProcessNamespacesAxis:
- * @ctx:        the C14N context
- * @node:        the current node
- *
- * Prints out exclusive canonical namespace axis of the current node to the
- * buffer from C14N context as follows
- *
- * Exclusive XML Canonicalization
- * http://www.w3.org/TR/xml-exc-c14n
- *
- * If the element node is in the XPath subset then output the node in
- * accordance with Canonical XML except for namespace nodes which are
- * rendered as follows:
- *
- * 1. Render each namespace node iff:
- *    * it is visibly utilized by the immediate parent element or one of
- *      its attributes, or is present in InclusiveNamespaces PrefixList, and
- *    * its prefix and value do not appear in ns_rendered. ns_rendered is
- *      obtained by popping the state stack in order to obtain a list of
- *      prefixes and their values which have already been rendered by
- *      an output ancestor of the namespace node's parent element.
- * 2. Append the rendered namespace node to the list ns_rendered of namespace
- *    nodes rendered by output ancestors. Push ns_rendered on state stack and
- *    recurse.
- * 3. After the recursion returns, pop thestate stack.
- *
- *
- * Returns 0 on success or -1 on fail.
- */
+/// Prints out exclusive canonical namespace axis of the current node
+/// to the buffer from C14N context as follows
+///
+/// Exclusive XML Canonicalization
+/// http://www.w3.org/TR/xml-exc-c14n
+///
+/// If the element node is in the XPath subset then output the node in
+/// accordance with Canonical XML except for namespace nodes which are
+/// rendered as follows:
+///
+/// 1. Render each namespace node iff:
+///    * it is visibly utilized by the immediate parent element or one of
+///      its attributes, or is present in InclusiveNamespaces PrefixList, and
+///    * its prefix and value do not appear in ns_rendered. ns_rendered is
+///      obtained by popping the state stack in order to obtain a list of
+///      prefixes and their values which have already been rendered by
+///      an output ancestor of the namespace node's parent element.
+/// 2. Append the rendered namespace node to the list ns_rendered of namespace
+///    nodes rendered by output ancestors. Push ns_rendered on state stack and
+///    recurse.
+/// 3. After the recursion returns, pop thestate stack.
+///
+/// Returns 0 on success or -1 on fail.
+#[doc(alias = "xmlExcC14NProcessNamespacesAxis")]
 unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     ctx: XmlC14NCtxPtr,
     cur: XmlNodePtr,
@@ -1325,15 +1183,10 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_shift(cur: XmlC14NVisibleNsStackP
     (*cur).ns_prev_end = (*cur).ns_cur_end;
 }
 
-/**
- * xmlC14NAttrsCompare:
- * @attr1:        the pointer tls o first attr
- * @attr2:        the pointer to second attr
- *
- * Prints the given attribute to the output buffer from C14N context.
- *
- * Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
- */
+/// Prints the given attribute to the output buffer from C14N context.
+///
+/// Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
+#[doc(alias = "xmlC14NAttrsCompare")]
 extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void) -> i32 {
     let attr1: XmlAttrPtr = data1 as _;
     let attr2: XmlAttrPtr = data2 as _;
@@ -1384,20 +1237,16 @@ extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void)
 
 /// Checks whether `attr` is a default "xml:" namespace with href="http://www.w3.org/XML/1998/namespace".  
 /// Return `true` if so, otherwise return false.
-///
-/// Please refer to the document of `xmlC14NIsXmlAttr` for original libxml2.
 /* todo: make it a define? */
+#[doc(alias = "xmlC14NIsXmlAttr")]
 unsafe extern "C" fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
     !(*attr).ns.is_null() && xml_c14n_is_xml_ns((*attr).ns)
 }
 
-/**
- * xmlC14NFindHiddenParentAttr:
- *
- * Finds an attribute in a hidden parent node.
- *
- * Returns a pointer to the attribute node (if found) or NULL otherwise.
- */
+/// Finds an attribute in a hidden parent node.
+///
+/// Returns a pointer to the attribute node (if found) or NULL otherwise.
+#[doc(alias = "xmlC14NFindHiddenParentAttr")]
 unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
     ctx: XmlC14NCtxPtr,
     mut cur: XmlNodePtr,
@@ -1424,13 +1273,10 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
     null_mut()
 }
 
-/**
- * xmlC14NFixupBaseAttr:
- *
- * Fixes up the xml:base attribute
- *
- * Returns the newly created attribute or NULL
- */
+/// Fixes up the xml:base attribute
+///
+/// Returns the newly created attribute or NULL
+#[doc(alias = "xmlC14NFixupBaseAttr")]
 unsafe extern "C" fn xml_c14n_fixup_base_attr(
     ctx: XmlC14NCtxPtr,
     xml_base_attr: XmlAttrPtr,
@@ -1543,9 +1389,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     attr
 }
 
-/*
- * Macro used to grow the current buffer.
- */
+// Macro used to grow the current buffer.
 macro_rules! grow_buffer_reentrant {
     ($buffer:expr, $buffer_size:expr) => {
         $buffer_size *= 2;
@@ -1557,18 +1401,13 @@ macro_rules! grow_buffer_reentrant {
     };
 }
 
-/**
- * xmlC11NNormalizeString:
- * @input:        the input string
- * @mode:        the normalization mode (attribute, comment, PI or text)
- *
- * Converts a string to a canonical (normalized) format. The code is stolen
- * from xmlEncodeEntitiesReentrant(). Added normalization of \x09, \x0a, \x0A
- * and the @mode parameter
- *
- * Returns a normalized string (caller is responsible for calling xmlFree( as _))
- * or NULL if an error occurs
- */
+/// Converts a string to a canonical (normalized) format.  
+/// The code is stolen from xmlEncodeEntitiesReentrant().  
+/// Added normalization of \x09, \x0a, \x0A and the `mode` parameter
+///
+/// Returns a normalized string (caller is responsible for calling xmlFree())
+/// or NULL if an error occurs
+#[doc(alias = "xmlC11NNormalizeString")]
 unsafe extern "C" fn xml_c11n_normalize_string(
     input: *const XmlChar,
     mode: XmlC14NNormalizationMode,
@@ -1709,22 +1548,18 @@ unsafe extern "C" fn xml_c11n_normalize_string(
     buffer
 }
 
+#[doc(alias = "xmlC11NNormalizeAttr")]
 unsafe extern "C" fn xml_c11n_normalize_attr(a: *const u8) -> *mut XmlChar {
     xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
 }
 
-/**
- * xmlC14NPrintAttrs:
- * @attr:        the pointer to attr
- * @ctx:        the C14N context
- *
- * Prints out canonical attribute urrent node to the
- * buffer from C14N context as follows
- *
- * Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
- *
- * Returns 1 on success or 0 on fail.
- */
+/// Prints out canonical attribute urrent node to the
+/// buffer from C14N context as follows
+///
+/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+///
+/// Returns 1 on success or 0 on fail.
+#[doc(alias = "xmlC14NPrintAttrs")]
 extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i32 {
     let attr: XmlAttrPtr = data as _;
     let ctx: XmlC14NCtxPtr = user as _;
@@ -1769,39 +1604,31 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
     }
 }
 
-/**
- * xmlC14NProcessAttrsAxis:
- * @ctx:        the C14N context
- * @cur:        the current node
- * @parent_visible:    the visibility of parent node
- * @all_parents_visible: the visibility of all parent nodes
- *
- * Prints out canonical attribute axis of the current node to the
- * buffer from C14N context as follows
- *
- * Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
- *
- * Attribute Axis
- * In lexicographic order (ascending), process each node that
- * is in the element's attribute axis and in the node-set.
- *
- * The processing of an element node E MUST be modified slightly
- * when an XPath node-set is given as input and the element's
- * parent is omitted from the node-set.
- *
- *
- * Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
- *
- * Canonical XML applied to a document subset requires the search of the
- * ancestor nodes of each orphan element node for attributes in the xml
- * namespace, such as xml:lang and xml:space. These are copied into the
- * element node except if a declaration of the same attribute is already
- * in the attribute axis of the element (whether or not it is included in
- * the document subset). This search and copying are omitted from the
- * Exclusive XML Canonicalization method.
- *
- * Returns 0 on success or -1 on fail.
- */
+/// Prints out canonical attribute axis of the current node to the
+/// buffer from C14N context as follows
+///
+/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+///
+/// # Attribute Axis
+/// In lexicographic order (ascending), process each node that
+/// is in the element's attribute axis and in the node-set.
+///
+/// The processing of an element node E MUST be modified slightly
+/// when an XPath node-set is given as input and the element's
+/// parent is omitted from the node-set.
+///
+/// Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
+///
+/// Canonical XML applied to a document subset requires the search of the
+/// ancestor nodes of each orphan element node for attributes in the xml
+/// namespace, such as xml:lang and xml:space. These are copied into the
+/// element node except if a declaration of the same attribute is already
+/// in the attribute axis of the element (whether or not it is included in
+/// the document subset). This search and copying are omitted from the
+/// Exclusive XML Canonicalization method.
+///
+/// Returns 0 on success or -1 on fail.
+#[doc(alias = "xmlC14NProcessAttrsAxis")]
 unsafe extern "C" fn xml_c14n_process_attrs_axis(
     ctx: XmlC14NCtxPtr,
     cur: XmlNodePtr,
@@ -2055,29 +1882,22 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_restore(
     (*cur).ns_prev_end = (*state).ns_prev_end;
 }
 
-/**
- * xmlC14NProcessElementNode:
- * @ctx:        the pointer to C14N context object
- * @cur:        the node to process
- * @visible:    this node is visible
- * @all_parents_visible: whether all the parents of this node are visible
- *
- * Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
- *
- * Element Nodes
- * If the element is not in the node-set, then the result is obtained
- * by processing the namespace axis, then the attribute axis, then
- * processing the child nodes of the element that are in the node-set
- * (in document order). If the element is in the node-set, then the result
- * is an open angle bracket (<), the element QName, the result of
- * processing the namespace axis, the result of processing the attribute
- * axis, a close angle bracket (>), the result of processing the child
- * nodes of the element that are in the node-set (in document order), an
- * open angle bracket, a forward slash (/), the element QName, and a close
- * angle bracket.
- *
- * Returns non-negative value on success or negative value on fail
- */
+/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+///
+/// # Element Nodes
+/// If the element is not in the node-set, then the result is obtained
+/// by processing the namespace axis, then the attribute axis, then
+/// processing the child nodes of the element that are in the node-set
+/// (in document order). If the element is in the node-set, then the result
+/// is an open angle bracket (<), the element QName, the result of
+/// processing the namespace axis, the result of processing the attribute
+/// axis, a close angle bracket (>), the result of processing the child
+/// nodes of the element that are in the node-set (in document order), an
+/// open angle bracket, a forward slash (/), the element QName, and a close
+/// angle bracket.
+///
+/// Returns non-negative value on success or negative value on fail
+#[doc(alias = "xmlC14NProcessElementNode")]
 unsafe extern "C" fn xml_c14n_process_element_node(
     ctx: XmlC14NCtxPtr,
     cur: XmlNodePtr,
@@ -2198,12 +2018,8 @@ unsafe extern "C" fn xml_c11n_normalize_pi(a: *const u8) -> *mut XmlChar {
     xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizePI)
 }
 
-/**
- * xmlC14NErrInvalidNode:
- * @extra:  extra information
- *
- * Handle a redefinition of invalid node error
- */
+/// Handle a redefinition of invalid node error
+#[doc(alias = "xmlC14NErrInvalidNode")]
 unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -2227,12 +2043,8 @@ unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: 
     );
 }
 
-/**
- * xmlC14NErrUnknownNode:
- * @extra:  extra information
- *
- * Handle a redefinition of unknown node error
- */
+/// Handle a redefinition of unknown node error
+#[doc(alias = "xmlC14NErrUnknownNode")]
 unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: i32, extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -2256,15 +2068,10 @@ unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: i32, extra: *const c_c
     );
 }
 
-/**
- * xmlC14NProcessNode:
- * @ctx:        the pointer to C14N context object
- * @cur:        the node to process
- *
- * Processes the given node
- *
- * Returns non-negative value on success or negative value on fail
- */
+/// Processes the given node
+///
+/// Returns non-negative value on success or negative value on fail
+#[doc(alias = "xmlC14NProcessNode")]
 unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
 
@@ -2459,15 +2266,10 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
     ret
 }
 
-/**
- * xmlC14NProcessNodeList:
- * @ctx:        the pointer to C14N context object
- * @cur:        the node to start from
- *
- * Processes all nodes in the row starting from cur.
- *
- * Returns non-negative value on success or negative value on fail
- */
+/// Processes all nodes in the row starting from cur.
+///
+/// Returns non-negative value on success or negative value on fail
+#[doc(alias = "xmlC14NProcessNodeList")]
 unsafe extern "C" fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: XmlNodePtr) -> i32 {
     let mut ret: i32;
 
@@ -2484,29 +2286,12 @@ unsafe extern "C" fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: Xml
     ret
 }
 
-/**
- * xmlC14NExecute:
- * @doc:        the XML document for canonization
- * @is_visible_callback:the function to use to determine is node visible
- *            or not
- * @user_data:        the first parameter for @is_visible_callback function
- *            (in most cases, it is nodes set)
- * @mode:    the c14n mode (see @xmlC14NMode)
- * @inclusive_ns_prefixes: the list of inclusive namespace prefixes
- *            ended with a NULL or NULL if there is no
- *            inclusive namespaces (only for exclusive
- *            canonicalization, ignored otherwise)
- * @with_comments:    include comments in the result (!=0) or not (==0)
- * @buf:        the output buffer to store canonical XML; this
- *            buffer MUST have encoder==NULL because C14N requires
- *            UTF-8 output
- *
- * Dumps the canonized image of given XML document into the provided buffer.
- * For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
- * "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
- *
- * Returns non-negative value on success or a negative value on fail
- */
+/// Dumps the canonized image of given XML document into the provided buffer.
+/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
+/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+///
+/// Returns non-negative value on success or a negative value on fail
+#[doc(alias = "xmlC14NExecute")]
 pub unsafe extern "C" fn xml_c14n_execute(
     doc: XmlDocPtr,
     is_visible_callback: XmlC14NIsVisibleCallback,

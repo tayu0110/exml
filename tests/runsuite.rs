@@ -16,15 +16,15 @@ use exml::{
         xml_buf_set_allocation_scheme, xml_buf_use,
     },
     globals::{
-        reset_last_error, set_generic_error, set_get_warnings_default_value, GenericErrorContext,
+        reset_last_error, set_generic_error, set_get_warnings_default_value,
+        set_pedantic_parser_default_value, GenericErrorContext,
     },
     io::xml_no_net_external_entity_loader,
     libxml::{
         globals::xml_free,
         parser::{
-            xml_cleanup_parser, xml_init_parser, xml_pedantic_parser_default, xml_read_file,
-            xml_read_memory, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr,
-            XmlParserOption,
+            xml_cleanup_parser, xml_init_parser, xml_read_file, xml_read_memory,
+            xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
         },
         parser_internals::xml_new_string_input_stream,
         relaxng::{
@@ -213,7 +213,7 @@ static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
 
 unsafe extern "C" fn initialize_libxml2() {
     set_get_warnings_default_value(0);
-    xml_pedantic_parser_default(0);
+    set_pedantic_parser_default_value(0);
 
     xml_mem_setup(
         Some(xml_mem_free),

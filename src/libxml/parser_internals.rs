@@ -97,42 +97,27 @@ macro_rules! NXT {
     };
 }
 
-/**
- * xmlParserMaxDepth:
- *
- * arbitrary depth limit for the XML documents that we allow to
- * process. This is not a limitation of the parser but a safety
- * boundary feature, use XML_PARSE_HUGE option to override it.
- */
+/// Arbitrary depth limit for the XML documents that we allow to
+/// process. This is not a limitation of the parser but a safety
+/// boundary feature, use XML_PARSE_HUGE option to override it.
+#[doc(alias = "xmlParserMaxDepth")]
 pub static mut XML_PARSER_MAX_DEPTH: u32 = 256;
 
-/**
- * XML_MAX_TEXT_LENGTH:
- *
- * Maximum size allowed for a single text node when building a tree.
- * This is not a limitation of the parser but a safety boundary feature,
- * use XML_PARSE_HUGE option to override it.
- * Introduced in 2.9.0
- */
+/// Maximum size allowed for a single text node when building a tree.
+/// This is not a limitation of the parser but a safety boundary feature,
+/// use XML_PARSE_HUGE option to override it.
+/// Introduced in 2.9.0
 pub const XML_MAX_TEXT_LENGTH: usize = 10000000;
 
-/**
- * XML_MAX_HUGE_LENGTH:
- *
- * Maximum size allowed when XML_PARSE_HUGE is set.
- */
+/// Maximum size allowed when XML_PARSE_HUGE is set.
 pub const XML_MAX_HUGE_LENGTH: usize = 1000000000;
 
-/**
- * XML_MAX_NAME_LENGTH:
- *
- * Maximum size allowed for a markup identifier.
- * This is not a limitation of the parser but a safety boundary feature,
- * use XML_PARSE_HUGE option to override it.
- * Note that with the use of parsing dictionaries overriding the limit
- * may result in more runtime memory usage in face of "unfriendly' content
- * Introduced in 2.9.0
- */
+/// Maximum size allowed for a markup identifier.
+/// This is not a limitation of the parser but a safety boundary feature,
+/// use XML_PARSE_HUGE option to override it.
+/// Note that with the use of parsing dictionaries overriding the limit
+/// may result in more runtime memory usage in face of "unfriendly' content
+/// Introduced in 2.9.0
 pub const XML_MAX_NAME_LENGTH: usize = 50000;
 
 /**
@@ -145,37 +130,18 @@ pub const XML_MAX_NAME_LENGTH: usize = 50000;
  */
 pub const XML_MAX_DICTIONARY_LIMIT: usize = 10000000;
 
-/**
- * XML_MAX_LOOKUP_LIMIT:
- *
- * Maximum size allowed by the parser for ahead lookup
- * This is an upper boundary enforced by the parser to avoid bad
- * behaviour on "unfriendly' content
- * Introduced in 2.9.0
- */
+/// Maximum size allowed by the parser for ahead lookup
+/// This is an upper boundary enforced by the parser to avoid bad
+/// behaviour on "unfriendly' content
+/// Introduced in 2.9.0
 pub const XML_MAX_LOOKUP_LIMIT: usize = 10000000;
 
-/**
- * XML_MAX_NAMELEN:
- *
- * Identifiers can be longer, but this will be more costly
- * at runtime.
- */
+/// Identifiers can be longer, but this will be more costly at runtime.
 pub const XML_MAX_NAMELEN: usize = 100;
 
-/**
- * INPUT_CHUNK:
- *
- * The parser tries to always have that amount of input ready.
- * One of the point is providing context when reporting errors.
- */
+/// The parser tries to always have that amount of input ready.
+/// One of the point is providing context when reporting errors.
 pub const INPUT_CHUNK: usize = 250;
-
-/************************************************************************
- *									*
- * UNICODE version of the macros.					*
- *									*
- ************************************************************************/
 
 macro_rules! COPY_BUF {
     ($l:expr, $b:expr, $i:expr, $v:expr) => {
@@ -201,31 +167,20 @@ macro_rules! NEXTL {
     };
 }
 
-/**
- * Global variables used for predefined strings.
- */
+/// Global variables used for predefined strings.
 pub static XML_STRING_TEXT: &CStr = c"text";
 pub static XML_STRING_TEXT_NOENC: &CStr = c"textnoenc";
 pub static XML_STRING_COMMENT: &CStr = c"comment";
 
-/*
- * Function to finish the work of the macros where needed.
- */
 /// Check whether the character is allowed by the production
-/// [84] Letter ::= BaseChar | Ideographic
+/// `[84] Letter ::= BaseChar | Ideographic`
 #[doc(alias = "xmlIsLetter")]
 pub fn xml_is_letter(c: u32) -> bool {
     xml_is_base_char(c) || xml_is_ideographic(c)
 }
 
-/**
- * xmlErrInternal:
- * @ctxt:  an XML parser context
- * @msg:  the error message
- * @str:  error information
- *
- * Handle an internal error
- */
+/// Handle an internal error
+#[doc(alias = "xmlErrInternal")]
 pub(crate) unsafe extern "C" fn xml_err_internal(
     ctxt: XmlParserCtxtPtr,
     msg: *const c_char,
@@ -270,34 +225,26 @@ pub(crate) unsafe extern "C" fn xml_err_internal(
     }
 }
 
-/**
- * Parser context.
- */
-/**
- * xmlCreateFileParserCtxt:
- * @filename:  the filename
- *
- * Create a parser context for a file content.
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for a file content.
+///
+/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+/// by default if found at compile-time.  
+/// However, this crate does not support currently.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateFileParserCtxt")]
 pub unsafe extern "C" fn xml_create_file_parser_ctxt(filename: *const c_char) -> XmlParserCtxtPtr {
     xml_create_url_parser_ctxt(filename, 0)
 }
 
-/**
- * xmlCreateURLParserCtxt:
- * @filename:  the filename or URL
- * @options:  a combination of xmlParserOption
- *
- * Create a parser context for a file or URL content.
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time and for file accesses
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for a file or URL content.
+///
+/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+/// by default if found at compile-time.  
+/// However, this crate does not support currently.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateURLParserCtxt")]
 pub unsafe extern "C" fn xml_create_url_parser_ctxt(
     filename: *const c_char,
     options: i32,
@@ -337,15 +284,10 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
     ctxt
 }
 
-/**
- * xmlCreateMemoryParserCtxt:
- * @buffer:  a pointer to a c_char array
- * @size:  the size of the array
- *
- * Create a parser context for an XML in-memory document.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for an XML in-memory document.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateMemoryParserCtxt")]
 pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr {
     if buffer.is_empty() {
         return null_mut();
@@ -375,19 +317,14 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
     ctxt
 }
 
-/**
- * xmlCreateEntityParserCtxtInternal:
- * @URL:  the entity URL
- * @ID:  the entity PUBLIC ID
- * @base:  a possible base for the target URI
- * @pctx:  parser context used to set options on new context
- *
- * Create a parser context for an external entity
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for an external entity
+///
+/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+/// by default if found at compile-time.  
+/// However, this crate does not support currently.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateEntityParserCtxtInternal")]
 pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
@@ -455,18 +392,14 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     ctxt
 }
 
-/**
- * xmlCreateEntityParserCtxt:
- * @URL:  the entity URL
- * @ID:  the entity PUBLIC ID
- * @base:  a possible base for the target URI
- *
- * Create a parser context for an external entity
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for an external entity
+///
+/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+/// by default if found at compile-time.  
+/// However, this crate does not support currently.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "xmlCreateEntityParserCtxt")]
 pub unsafe extern "C" fn xml_create_entity_parser_ctxt(
     url: *const XmlChar,
     id: *const XmlChar,
@@ -545,16 +478,10 @@ unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingH
     Some(handler)
 }
 
-/**
- * xmlSwitchEncoding:
- * @ctxt:  the parser context
- * @enc:  the encoding value (number)
- *
- * change the input functions when discovering the character encoding
- * of a given entity.
- *
- * Returns 0 in case of success, -1 otherwise
- */
+/// Change the input functions when discovering the character encoding of a given entity.
+///
+/// Returns 0 in case of success, -1 otherwise
+#[doc(alias = "xmlSwitchEncoding")]
 pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) -> i32 {
     if ctxt.is_null() {
         return -1;
@@ -664,17 +591,10 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
     ret
 }
 
-/**
- * Input Streams.
- */
-/**
- * xmlNewStringInputStream:
- * @ctxt:  an XML parser context
- * @buffer:  an memory buffer
- *
- * Create a new input stream based on a memory buffer.
- * Returns the new input stream
- */
+/// Create a new input stream based on a memory buffer.
+///
+/// Returns the new input stream
+#[doc(alias = "xmlNewStringInputStream")]
 pub unsafe extern "C" fn xml_new_string_input_stream(
     ctxt: XmlParserCtxtPtr,
     buffer: *const XmlChar,
@@ -718,17 +638,10 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
     input
 }
 
-/**
- * xmlNewEntityInputStream:
- * @ctxt:  an XML parser context
- * @entity:  an Entity pointer
- *
- * DEPRECATED: Internal function, do not use.
- *
- * Create a new input stream based on an xmlEntityPtr
- *
- * Returns the new input stream or NULL
- */
+/// Create a new input stream based on an xmlEntityPtr
+///
+/// Returns the new input stream or NULL
+#[doc(alias = "xmlNewEntityInputStream")]
 pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
     ctxt: XmlParserCtxtPtr,
     entity: XmlEntityPtr,
@@ -822,14 +735,8 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
     input
 }
 
-/**
- * xmlFatalErr:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @extra:  extra information string
- *
- * Handle a fatal parser error, i.e. violating Well-Formedness constraints
- */
+/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[doc(alias = "xmlFatalErr")]
 pub(crate) unsafe extern "C" fn xml_fatal_err(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -1012,15 +919,10 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
     }
 }
 
-/**
- * xmlPushInput:
- * @ctxt:  an XML parser context
- * @input:  an XML parser input fragment (entity, XML fragment ...).
- *
- * xmlPushInput: match to a new input stream which is stacked on top
- *               of the previous one(s).
- * Returns -1 in case of error or the index in the input stack
- */
+/// Match to a new input stream which is stacked on top of the previous one(s).
+///
+/// Returns -1 in case of error or the index in the input stack
+#[doc(alias = "xmlPushInput")]
 pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParserInputPtr) -> i32 {
     if input.is_null() {
         return -1;
@@ -1059,12 +961,8 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
     ret
 }
 
-/**
- * xmlFreeInputStream:
- * @input:  an xmlParserInputPtr
- *
- * Free up an input stream.
- */
+/// Free up an input stream.
+#[doc(alias = "xmlFreeInputStream")]
 pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
     if input.is_null() {
         return;
@@ -1083,15 +981,10 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
     xml_free(input as _);
 }
 
-/**
- * xmlNewInputFromFile:
- * @ctxt:  an XML parser context
- * @filename:  the filename to use as entity
- *
- * Create a new input stream based on a file or an URL.
- *
- * Returns the new input stream or NULL in case of error
- */
+/// Create a new input stream based on a file or an URL.
+///
+/// Returns the new input stream or NULL in case of error
+#[doc(alias = "xmlNewInputFromFile")]
 pub unsafe extern "C" fn xml_new_input_from_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
@@ -1191,14 +1084,10 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     input_stream
 }
 
-/**
- * xmlNewInputStream:
- * @ctxt:  an XML parser context
- *
- * Create a new input stream structure.
- *
- * Returns the new input stream or NULL
- */
+/// Create a new input stream structure.
+///
+/// Returns the new input stream or NULL
+#[doc(alias = "xmlNewInputStream")]
 pub unsafe extern "C" fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlParserInputPtr {
     let input: XmlParserInputPtr = xml_malloc(size_of::<XmlParserInput>()) as XmlParserInputPtr;
     if input.is_null() {
@@ -1238,26 +1127,16 @@ macro_rules! CUR_SCHAR {
     };
 }
 
-/**
- * Namespaces.
- */
-/**
- * xmlSplitQName:
- * @ctxt:  an XML parser context
- * @name:  an XML parser context
- * @prefix:  a xmlChar **
- *
- * parse an UTF8 encoded XML qualified name string
- *
- * [NS 5] QName ::= (Prefix ':')? LocalPart
- *
- * [NS 6] Prefix ::= NCName
- *
- * [NS 7] LocalPart ::= NCName
- *
- * Returns the local part, and prefix is updated
- *   to get the Prefix if any.
- */
+/// parse an UTF8 encoded XML qualified name string
+///
+/// `[NS 5] QName ::= (Prefix ':')? LocalPart`
+///
+/// `[NS 6] Prefix ::= NCName`
+///
+/// `[NS 7] LocalPart ::= NCName`
+///
+/// Returns the local part, and prefix is updated to get the Prefix if any.
+#[doc(alias = "xmlSplitQName")]
 pub unsafe extern "C" fn xml_split_qname(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
@@ -1433,10 +1312,6 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         XML_MAX_NAME_LENGTH as i32
     };
 
-    // #ifdef DEBUG
-    //     nbParseNameComplex++;
-    // #endif
-
     /*
      * Handler for more complex cases
      */
@@ -1568,26 +1443,16 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
     xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur.sub(len as usize), len)
 }
 
-/**
- * Generic production rules.
- */
-/**
- * xmlParseName:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an XML name.
- *
- * [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' |
- *                  CombiningChar | Extender
- *
- * [5] Name ::= (Letter | '_' | ':') (NameChar)*
- *
- * [6] Names ::= Name (#x20 Name)*
- *
- * Returns the Name parsed or NULL
- */
+/// Parse an XML name.
+///
+/// `[4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender`
+///
+/// `[5] Name ::= (Letter | '_' | ':') (NameChar)*`
+///
+/// `[6] Names ::= Name (#x20 Name)*`
+///
+/// Returns the Name parsed or NULL
+#[doc(alias = "xmlParseName")]
 pub(crate) unsafe extern "C" fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut input: *const XmlChar;
     let ret: *const XmlChar;
@@ -1648,20 +1513,14 @@ pub(crate) unsafe extern "C" fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const
 
 const XML_PARSER_BUFFER_SIZE: usize = 100;
 
-/**
- * xmlParseNmtoken:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an XML Nmtoken.
- *
- * [7] Nmtoken ::= (NameChar)+
- *
- * [8] Nmtokens ::= Nmtoken (#x20 Nmtoken)*
- *
- * Returns the Nmtoken parsed or NULL
- */
+/// Parse an XML Nmtoken.
+///
+/// `[7] Nmtoken ::= (NameChar)+`
+///
+/// `[8] Nmtokens ::= Nmtoken (#x20 Nmtoken)*`
+///
+/// Returns the Nmtoken parsed or NULL
+#[doc(alias = "xmlParseNmtoken")]
 pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
     let mut len: i32 = 0;
@@ -1740,20 +1599,12 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
     xml_strndup(buf.as_ptr() as _, len)
 }
 
-/**
- * xmlParseEntityValue:
- * @ctxt:  an XML parser context
- * @orig:  if non-NULL store a copy of the original entity value
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse a value for ENTITY declarations
- *
- * [9] EntityValue ::= '"' ([^%&"] | PEReference | Reference)* '"' |
- *                   "'" ([^%&'] | PEReference | Reference)* "'"
- *
- * Returns the EntityValue parsed with reference substituted or NULL
- */
+/// Parse a value for ENTITY declarations
+///
+/// `[9] EntityValue ::= '"' ([^%&"] | PEReference | Reference)* '"' | "'" ([^%&'] | PEReference | Reference)* "'"`
+///
+/// Returns the EntityValue parsed with reference substituted or NULL
+#[doc(alias = "xmlParseEntityValue")]
 pub(crate) unsafe extern "C" fn xml_parse_entity_value(
     ctxt: XmlParserCtxtPtr,
     orig: *mut *mut XmlChar,
@@ -1946,40 +1797,33 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
     ret
 }
 
-/**
- * xmlParseAttValue:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse a value for an attribute
- * Note: the parser won't do substitution of entities here, this
- * will be handled later in xmlStringGetNodeList
- *
- * [10] AttValue ::= '"' ([^<&"] | Reference)* '"' |
- *                   "'" ([^<&'] | Reference)* "'"
- *
- * 3.3.3 Attribute-Value Normalization:
- * Before the value of an attribute is passed to the application or
- * checked for validity, the XML processor must normalize it as follows:
- * - a character reference is processed by appending the referenced
- *   character to the attribute value
- * - an entity reference is processed by recursively processing the
- *   replacement text of the entity
- * - a whitespace character (#x20, #xD, #xA, #x9) is processed by
- *   appending #x20 to the normalized value, except that only a single
- *   #x20 is appended for a "#xD#xA" sequence that is part of an external
- *   parsed entity or the literal entity value of an internal parsed entity
- * - other characters are processed by appending them to the normalized value
- *   If the declared value is not CDATA, then the XML processor must further
- *   process the normalized attribute value by discarding any leading and
- *   trailing space (#x20) characters, and by replacing sequences of space
- *   (#x20) characters by a single space (#x20) character.
- *   All attributes for which no declaration has been read should be treated
- *   by a non-validating parser as if declared CDATA.
- *
- * Returns the AttValue parsed or NULL. The value has to be freed by the caller.
- */
+/// parse a value for an attribute
+/// Note: the parser won't do substitution of entities here, this
+/// will be handled later in xmlStringGetNodeList
+///
+/// `[10] AttValue ::= '"' ([^<&"] | Reference)* '"' | "'" ([^<&'] | Reference)* "'"`
+///
+/// # 3.3.3 Attribute-Value Normalization:
+/// Before the value of an attribute is passed to the application or
+/// checked for validity, the XML processor must normalize it as follows:
+/// - a character reference is processed by appending the referenced
+///   character to the attribute value
+/// - an entity reference is processed by recursively processing the
+///   replacement text of the entity
+/// - a whitespace character (#x20, #xD, #xA, #x9) is processed by
+///   appending #x20 to the normalized value, except that only a single
+///   #x20 is appended for a "#xD#xA" sequence that is part of an external
+///   parsed entity or the literal entity value of an internal parsed entity
+/// - other characters are processed by appending them to the normalized value
+///   If the declared value is not CDATA, then the XML processor must further
+///   process the normalized attribute value by discarding any leading and
+///   trailing space (#x20) characters, and by replacing sequences of space
+///   (#x20) characters by a single space (#x20) character.
+///   All attributes for which no declaration has been read should be treated
+///   by a non-validating parser as if declared CDATA.
+///
+/// Returns the AttValue parsed or NULL. The value has to be freed by the caller.
+#[doc(alias = "xmlParseAttValue")]
 pub(crate) unsafe extern "C" fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     if ctxt.is_null() || (*ctxt).input.is_null() {
         return null_mut();
@@ -1987,18 +1831,12 @@ pub(crate) unsafe extern "C" fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *
     xml_parse_att_value_internal(ctxt, null_mut(), null_mut(), 0)
 }
 
-/**
- * xmlParseSystemLiteral:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an XML Literal
- *
- * [11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")
- *
- * Returns the SystemLiteral parsed or NULL
- */
+/// Parse an XML Literal
+///
+/// `[11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")`
+///
+/// Returns the SystemLiteral parsed or NULL
+#[doc(alias = "xmlParseSystemLiteral")]
 pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar;
     let mut len: i32 = 0;
@@ -2069,31 +1907,19 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
     buf
 }
 
-/**
- * xmlParseCharData:
- * @ctxt:  an XML parser context
- * @cdata:  unused
- *
- * DEPRECATED: Internal function, don't use.
- */
+#[doc(alias = "xmlParseCharData")]
 pub(crate) unsafe extern "C" fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
     xml_parse_char_data_internal(ctxt, 0);
 }
 
-/**
- * xmlParseCommentComplex:
- * @ctxt:  an XML parser context
- * @buf:  the already parsed part of the buffer
- * @len:  number of bytes in the buffer
- * @size:  allocated size of the buffer
- *
- * Skip an XML (SGML) comment <!-- .... -->
- *  The spec says that "For compatibility, the string "--" (double-hyphen)
- *  must not occur within comments. "
- * This is the slow routine in case the accelerator for ascii didn't work
- *
- * [15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
- */
+/// Skip an XML (SGML) comment `<!-- .... -->`.  
+/// The spec says that "For compatibility, the string `"--"` (double-hyphen)
+/// must not occur within comments."  
+///
+/// This is the slow routine in case the accelerator for ascii didn't work
+///
+/// `[15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'`
+#[doc(alias = "xmlParseCommentComplex")]
 unsafe extern "C" fn xml_parse_comment_complex(
     ctxt: XmlParserCtxtPtr,
     mut buf: *mut XmlChar,
@@ -2238,19 +2064,13 @@ unsafe extern "C" fn xml_parse_comment_complex(
     xml_free(buf as _);
 }
 
-/**
- * xmlParseComment:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Parse an XML (SGML) comment. Always consumes '<!'.
- *
- *  The spec says that "For compatibility, the string "--" (double-hyphen)
- *  must not occur within comments. "
- *
- * [15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
- */
+/// Parse an XML (SGML) comment. Always consumes '<!'.
+///
+/// The spec says that "For compatibility, the string "--" (double-hyphen)
+/// must not occur within comments. "
+///
+/// `[15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'`
+#[doc(alias = "xmlParseComment")]
 pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     let mut buf: *mut XmlChar = null_mut();
     let mut size: usize = XML_PARSER_BUFFER_SIZE;
@@ -2455,28 +2275,19 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     (*ctxt).instate = state;
 }
 
-/*
- * List of XML prefixed PI allowed by W3C specs
- */
-
+// List of XML prefixed PI allowed by W3C specs
 const XML_W3_CPIS: &[*const c_char] = &[
     c"xml-stylesheet".as_ptr() as _,
     c"xml-model".as_ptr() as _,
     null(),
 ];
 
-/**
- * xmlParsePITarget:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the name of a PI
- *
- * [17] PITarget ::= Name - (('X' | 'x') ('M' | 'm') ('L' | 'l'))
- *
- * Returns the PITarget name or NULL
- */
+/// Parse the name of a PI
+///
+/// `[17] PITarget ::= Name - (('X' | 'x') ('M' | 'm') ('L' | 'l'))`
+///
+/// Returns the PITarget name or NULL
+#[doc(alias = "xmlParsePITarget")]
 pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let name: *const XmlChar = xml_parse_name(ctxt);
     if !name.is_null()
@@ -2525,20 +2336,15 @@ pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *
     name
 }
 
-/**
- * xmlParseCatalogPI:
- * @ctxt:  an XML parser context
- * @catalog:  the PI value string
- *
- * parse an XML Catalog Processing Instruction.
- *
- * <?oasis-xml-catalog catalog="http://example.com/catalog.xml"?>
- *
- * Occurs only if allowed by the user and if happening in the Misc
- * part of the document before any doctype information
- * This will add the given catalog to the parsing context in order
- * to be used if there is a resolution need further down in the document
- */
+/// Parse an XML Catalog Processing Instruction.
+///
+/// `<?oasis-xml-catalog catalog="http://example.com/catalog.xml"?>`
+///
+/// Occurs only if allowed by the user and if happening in the Misc
+/// part of the document before any doctype information.  
+/// This will add the given catalog to the parsing context in order
+/// to be used if there is a resolution need further down in the document.
+#[doc(alias = "xmlParseCatalogPI")]
 #[cfg(feature = "catalog")]
 unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *const XmlChar) {
     let mut url: *mut XmlChar = null_mut();
@@ -2605,18 +2411,12 @@ unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *cons
     }
 }
 
-/**
- * xmlParsePI:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an XML Processing Instruction.
- *
- * [16] PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'
- *
- * The processing is transferred to SAX once parsed.
- */
+/// Parse an XML Processing Instruction.
+///
+/// `[16] PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'`
+///
+/// The processing is transferred to SAX once parsed.
+#[doc(alias = "xmlParsePI")]
 pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
     let mut len: usize = 0;
@@ -2769,36 +2569,29 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/**
- * xmlParseDefaultDecl:
- * @ctxt:  an XML parser context
- * @value:  Receive a possible fixed default value for the attribute
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Parse an attribute default declaration
- *
- * [60] DefaultDecl ::= '#REQUIRED' | '#IMPLIED' | (('#FIXED' S)? AttValue)
- *
- * [ VC: Required Attribute ]
- * if the default declaration is the keyword #REQUIRED, then the
- * attribute must be specified for all elements of the type in the
- * attribute-list declaration.
- *
- * [ VC: Attribute Default Legal ]
- * The declared default value must meet the lexical constraints of
- * the declared attribute type c.f. xmlValidateAttributeDecl()
- *
- * [ VC: Fixed Attribute Default ]
- * if an attribute has a default value declared with the #FIXED
- * keyword, instances of that attribute must match the default value.
- *
- * [ WFC: No < in Attribute Values ]
- * handled in xmlParseAttValue()
- *
- * returns: XML_ATTRIBUTE_NONE, XML_ATTRIBUTE_REQUIRED, XML_ATTRIBUTE_IMPLIED
- *          or XML_ATTRIBUTE_FIXED.
- */
+/// Parse an attribute default declaration
+///
+/// `[60] DefaultDecl ::= '#REQUIRED' | '#IMPLIED' | (('#FIXED' S)? AttValue)`
+///
+/// `[ VC: Required Attribute ]`  
+/// if the default declaration is the keyword #REQUIRED, then the
+/// attribute must be specified for all elements of the type in the
+/// attribute-list declaration.
+///
+/// `[ VC: Attribute Default Legal ]`  
+/// The declared default value must meet the lexical constraints of
+/// the declared attribute type c.f. xmlValidateAttributeDecl()
+///
+/// `[ VC: Fixed Attribute Default ]`  
+/// if an attribute has a default value declared with the #FIXED
+/// keyword, instances of that attribute must match the default value.
+///
+/// `[ WFC: No < in Attribute Values ]`  
+/// handled in xmlParseAttValue()
+///
+/// returns: XML_ATTRIBUTE_NONE, XML_ATTRIBUTE_REQUIRED, XML_ATTRIBUTE_IMPLIED
+///  or XML_ATTRIBUTE_FIXED.
+#[doc(alias = "xmlParseDefaultDecl")]
 pub(crate) unsafe extern "C" fn xml_parse_default_decl(
     ctxt: XmlParserCtxtPtr,
     value: *mut *mut XmlChar,
@@ -2840,24 +2633,19 @@ pub(crate) unsafe extern "C" fn xml_parse_default_decl(
     val
 }
 
-/**
- * xmlParseNotationType:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an Notation attribute type.
- *
- * Note: the leading 'NOTATION' S part has already being parsed...
- *
- * [58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'
- *
- * [ VC: Notation Attributes ]
- * Values of this type must match one of the notation names included
- * in the declaration; all notation names in the declaration must be declared.
- *
- * Returns: the notation attribute tree built while parsing
- */
+/// Parse an Notation attribute type.
+///
+/// # Note
+/// The leading 'NOTATION' S part has already being parsed...
+///
+/// `[58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'`
+///
+/// `[ VC: Notation Attributes ]`
+/// Values of this type must match one of the notation names included
+/// in the declaration; all notation names in the declaration must be declared.
+///
+/// Returns: the notation attribute tree built while parsing
+#[doc(alias = "xmlParseNotationType")]
 pub(crate) unsafe extern "C" fn xml_parse_notation_type(
     ctxt: XmlParserCtxtPtr,
 ) -> XmlEnumerationPtr {
@@ -2932,22 +2720,15 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
     ret
 }
 
-/**
- * xmlParseEnumerationType:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an Enumeration attribute type.
- *
- * [59] Enumeration ::= '(' S? Nmtoken (S? '|' S? Nmtoken)* S? ')'
- *
- * [ VC: Enumeration ]
- * Values of this type must match one of the Nmtoken tokens in
- * the declaration
- *
- * Returns: the enumeration attribute tree built while parsing
- */
+/// Parse an Enumeration attribute type.
+///
+/// `[59] Enumeration ::= '(' S? Nmtoken (S? '|' S? Nmtoken)* S? ')'`
+///
+/// `[ VC: Enumeration ]`  
+/// Values of this type must match one of the Nmtoken tokens in the declaration
+///
+/// Returns: the enumeration attribute tree built while parsing
+#[doc(alias = "xmlParseEnumerationType")]
 pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
     ctxt: XmlParserCtxtPtr,
 ) -> XmlEnumerationPtr {
@@ -3019,22 +2800,14 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
     ret
 }
 
-/**
- * xmlParseEnumeratedType:
- * @ctxt:  an XML parser context
- * @tree:  the enumeration tree built while parsing
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an Enumerated attribute type.
- *
- * [57] EnumeratedType ::= NotationType | Enumeration
- *
- * [58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'
- *
- *
- * Returns: XML_ATTRIBUTE_ENUMERATION or XML_ATTRIBUTE_NOTATION
- */
+/// Parse an Enumerated attribute type.
+///
+/// `[57] EnumeratedType ::= NotationType | Enumeration`
+///
+/// `[58] NotationType ::= 'NOTATION' S '(' S? Name (S? '|' S? Name)* S? ')'`
+///
+/// Returns: XML_ATTRIBUTE_ENUMERATION or XML_ATTRIBUTE_NOTATION
+#[doc(alias = "xmlParseEnumeratedType")]
 pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
     ctxt: XmlParserCtxtPtr,
     tree: *mut XmlEnumerationPtr,
@@ -3062,53 +2835,44 @@ pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
     XmlAttributeType::XmlAttributeEnumeration as i32
 }
 
-/**
- * xmlParseAttributeType:
- * @ctxt:  an XML parser context
- * @tree:  the enumeration tree built while parsing
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the Attribute list def for an element
- *
- * [54] AttType ::= StringType | TokenizedType | EnumeratedType
- *
- * [55] StringType ::= 'CDATA'
- *
- * [56] TokenizedType ::= 'ID' | 'IDREF' | 'IDREFS' | 'ENTITY' |
- *                        'ENTITIES' | 'NMTOKEN' | 'NMTOKENS'
- *
- * Validity constraints for attribute values syntax are checked in
- * xmlValidateAttributeValue()
- *
- * [ VC: ID ]
- * Values of type ID must match the Name production. A name must not
- * appear more than once in an XML document as a value of this type;
- * i.e., ID values must uniquely identify the elements which bear them.
- *
- * [ VC: One ID per Element Type ]
- * No element type may have more than one ID attribute specified.
- *
- * [ VC: ID Attribute Default ]
- * An ID attribute must have a declared default of #IMPLIED or #REQUIRED.
- *
- * [ VC: IDREF ]
- * Values of type IDREF must match the Name production, and values
- * of type IDREFS must match Names; each IDREF Name must match the value
- * of an ID attribute on some element in the XML document; i.e. IDREF
- * values must match the value of some ID attribute.
- *
- * [ VC: Entity Name ]
- * Values of type ENTITY must match the Name production, values
- * of type ENTITIES must match Names; each Entity Name must match the
- * name of an unparsed entity declared in the DTD.
- *
- * [ VC: Name Token ]
- * Values of type NMTOKEN must match the Nmtoken production; values
- * of type NMTOKENS must match Nmtokens.
- *
- * Returns the attribute type
- */
+/// Parse the Attribute list def for an element
+///
+/// `[54] AttType ::= StringType | TokenizedType | EnumeratedType`
+///
+/// `[55] StringType ::= 'CDATA'`
+///
+/// `[56] TokenizedType ::= 'ID' | 'IDREF' | 'IDREFS' | 'ENTITY' | 'ENTITIES' | 'NMTOKEN' | 'NMTOKENS'`
+///
+/// Validity constraints for attribute values syntax are checked in xmlValidateAttributeValue()
+///
+/// `[ VC: ID ]`  
+/// Values of type ID must match the Name production. A name must not
+/// appear more than once in an XML document as a value of this type;
+/// i.e., ID values must uniquely identify the elements which bear them.
+///
+/// `[ VC: One ID per Element Type ]`  
+/// No element type may have more than one ID attribute specified.
+///
+/// `[ VC: ID Attribute Default ]`  
+/// An ID attribute must have a declared default of #IMPLIED or #REQUIRED.
+///
+/// `[ VC: IDREF ]`  
+/// Values of type IDREF must match the Name production, and values
+/// of type IDREFS must match Names; each IDREF Name must match the value
+/// of an ID attribute on some element in the XML document; i.e. IDREF
+/// values must match the value of some ID attribute.
+///
+/// `[ VC: Entity Name ]`  
+/// Values of type ENTITY must match the Name production, values
+/// of type ENTITIES must match Names; each Entity Name must match the
+/// name of an unparsed entity declared in the DTD.
+///
+/// `[ VC: Name Token ]`  
+/// Values of type NMTOKEN must match the Nmtoken production; values
+/// of type NMTOKENS must match Nmtokens.
+///
+/// Returns the attribute type
+#[doc(alias = "xmlParseAttributeType")]
 pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
     ctxt: XmlParserCtxtPtr,
     tree: *mut XmlEnumerationPtr,
@@ -3141,15 +2905,8 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
     xml_parse_enumerated_type(ctxt, tree)
 }
 
-/**
- * xmlAddDefAttrs:
- * @ctxt:  an XML parser context
- * @fullname:  the element fullname
- * @fullattr:  the attribute fullname
- * @value:  the attribute value
- *
- * Add a defaulted attribute for an element
- */
+/// Add a defaulted attribute for an element
+#[doc(alias = "xmlAddDefAttrs")]
 pub(crate) unsafe extern "C" fn xml_add_def_attrs(
     ctxt: XmlParserCtxtPtr,
     fullname: *const XmlChar,
@@ -3277,15 +3034,8 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
     xml_err_memory(ctxt, null());
 }
 
-/**
- * xmlAddSpecialAttr:
- * @ctxt:  an XML parser context
- * @fullname:  the element fullname
- * @fullattr:  the attribute fullname
- * @type:  the attribute type
- *
- * Register this attribute type
- */
+/// Register this attribute type
+#[doc(alias = "xmlAddSpecialAttr")]
 pub(crate) unsafe extern "C" fn xml_add_special_attr(
     ctxt: XmlParserCtxtPtr,
     fullname: *const XmlChar,
@@ -3312,27 +3062,19 @@ pub(crate) unsafe extern "C" fn xml_add_special_attr(
     // return;
 }
 
-/**
- * xmlParseElementMixedContentDecl:
- * @ctxt:  an XML parser context
- * @inputchk:  the input used for the current entity, needed for boundary checks
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the declaration for a Mixed Element content
- * The leading '(' and spaces have been skipped in xmlParseElementContentDecl
- *
- * [51] Mixed ::= '(' S? '#PCDATA' (S? '|' S? Name)* S? ')*' |
- *                '(' S? '#PCDATA' S? ')'
- *
- * [ VC: Proper Group/PE Nesting ] applies to [51] too (see [49])
- *
- * [ VC: No Duplicate Types ]
- * The same name must not appear more than once in a single
- * mixed-content declaration.
- *
- * returns: the list of the xmlElementContentPtr describing the element choices
- */
+/// Parse the declaration for a Mixed Element content
+/// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
+///
+/// `[51] Mixed ::= '(' S? '#PCDATA' (S? '|' S? Name)* S? ')*' | '(' S? '#PCDATA' S? ')'`
+///
+/// `[ VC: Proper Group/PE Nesting ]` applies to [51] too (see [49])
+///
+/// `[ VC: No Duplicate Types ]`  
+/// The same name must not appear more than once in a single
+/// mixed-content declaration.
+///
+/// returns: the list of the xmlElementContentPtr describing the element choices
+#[doc(alias = "xmlParseElementMixedContentDecl")]
 pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
     ctxt: XmlParserCtxtPtr,
     inputchk: i32,
@@ -3473,38 +3215,31 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
     ret
 }
 
-/**
- * xmlParseElementChildrenContentDecl:
- * @ctxt:  an XML parser context
- * @inputchk:  the input used for the current entity, needed for boundary checks
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the declaration for a Mixed Element content
- * The leading '(' and spaces have been skipped in xmlParseElementContentDecl
- *
- * [47] children ::= (choice | seq) ('?' | '*' | '+')?
- *
- * [48] cp ::= (Name | choice | seq) ('?' | '*' | '+')?
- *
- * [49] choice ::= '(' S? cp ( S? '|' S? cp )* S? ')'
- *
- * [50] seq ::= '(' S? cp ( S? ',' S? cp )* S? ')'
- *
- * [ VC: Proper Group/PE Nesting ] applies to [49] and [50]
- * TODO Parameter-entity replacement text must be properly nested
- *    with parenthesized groups. That is to say, if either of the
- *    opening or closing parentheses in a choice, seq, or Mixed
- *    construct is contained in the replacement text for a parameter
- *    entity, both must be contained in the same replacement text. For
- *    interoperability, if a parameter-entity reference appears in a
- *    choice, seq, or Mixed construct, its replacement text should not
- *    be empty, and neither the first nor last non-blank character of
- *    the replacement text should be a connector (| or ,).
- *
- * Returns the tree of xmlElementContentPtr describing the element
- *          hierarchy.
- */
+/// Parse the declaration for a Mixed Element content
+/// The leading '(' and spaces have been skipped in xmlParseElementContentDecl
+///
+/// `[47] children ::= (choice | seq) ('?' | '*' | '+')?`
+///
+/// `[48] cp ::= (Name | choice | seq) ('?' | '*' | '+')?`
+///
+/// `[49] choice ::= '(' S? cp ( S? '|' S? cp )* S? ')'`
+///
+/// `[50] seq ::= '(' S? cp ( S? ',' S? cp )* S? ')'`
+///
+/// `[ VC: Proper Group/PE Nesting ]` applies to [49] and [50]
+///
+/// TODO Parameter-entity replacement text must be properly nested
+///    with parenthesized groups. That is to say, if either of the
+///    opening or closing parentheses in a choice, seq, or Mixed
+///    construct is contained in the replacement text for a parameter
+///    entity, both must be contained in the same replacement text. For
+///    interoperability, if a parameter-entity reference appears in a
+///    choice, seq, or Mixed construct, its replacement text should not
+///    be empty, and neither the first nor last non-blank character of
+///    the replacement text should be a connector (| or ,).
+///
+/// Returns the tree of xmlElementContentPtr describing the element hierarchy.
+#[doc(alias = "xmlParseElementChildrenContentDecl")]
 pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl(
     ctxt: XmlParserCtxtPtr,
     inputchk: i32,
@@ -3513,21 +3248,13 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl(
     xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
 }
 
-/**
- * xmlParseElementContentDecl:
- * @ctxt:  an XML parser context
- * @name:  the name of the element being defined.
- * @result:  the Element Content pointer will be stored here if any
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the declaration for an Element content either Mixed or Children,
- * the cases EMPTY and ANY are handled directly in xmlParseElementDecl
- *
- * [46] contentspec ::= 'EMPTY' | 'ANY' | Mixed | children
- *
- * returns: the type of element content XML_ELEMENT_TYPE_xxx
- */
+/// Parse the declaration for an Element content either Mixed or Children,
+/// the cases EMPTY and ANY are handled directly in xmlParseElementDecl
+///
+/// `[46] contentspec ::= 'EMPTY' | 'ANY' | Mixed | children`
+///
+/// returns: the type of element content XML_ELEMENT_TYPE_xxx
+#[doc(alias = "xmlParseElementContentDecl")]
 pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
@@ -3566,36 +3293,30 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
     res
 }
 
-/**
- * xmlParseEntityRef:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Parse an entitiy reference. Always consumes '&'.
- *
- * [68] EntityRef ::= '&' Name ';'
- *
- * [ WFC: Entity Declared ]
- * In a document without any DTD, a document with only an internal DTD
- * subset which contains no parameter entity references, or a document
- * with "standalone='yes'", the Name given in the entity reference
- * must match that in an entity declaration, except that well-formed
- * documents need not declare any of the following entities: amp, lt,
- * gt, apos, quot.  The declaration of a parameter entity must precede
- * any reference to it.  Similarly, the declaration of a general entity
- * must precede any reference to it which appears in a default value in an
- * attribute-list declaration. Note that if entities are declared in the
- * external subset or in external parameter entities, a non-validating
- * processor is not obligated to read and process their declarations;
- * for such documents, the rule that an entity must be declared is a
- * well-formedness constraint only if standalone='yes'.
- *
- * [ WFC: Parsed Entity ]
- * An entity reference must not contain the name of an unparsed entity
- *
- * Returns the xmlEntityPtr if found, or NULL otherwise.
- */
+/// Parse an entitiy reference. Always consumes '&'.
+///
+/// `[68] EntityRef ::= '&' Name ';'`
+///
+/// `[ WFC: Entity Declared ]`  
+/// In a document without any DTD, a document with only an internal DTD
+/// subset which contains no parameter entity references, or a document
+/// with "standalone='yes'", the Name given in the entity reference
+/// must match that in an entity declaration, except that well-formed
+/// documents need not declare any of the following entities: amp, lt,
+/// gt, apos, quot.  The declaration of a parameter entity must precede
+/// any reference to it.  Similarly, the declaration of a general entity
+/// must precede any reference to it which appears in a default value in an
+/// attribute-list declaration. Note that if entities are declared in the
+/// external subset or in external parameter entities, a non-validating
+/// processor is not obligated to read and process their declarations;
+/// for such documents, the rule that an entity must be declared is a
+/// well-formedness constraint only if standalone='yes'.
+///
+/// `[ WFC: Parsed Entity ]`  
+/// An entity reference must not contain the name of an unparsed entity
+///
+/// Returns the xmlEntityPtr if found, or NULL otherwise.
+#[doc(alias = "xmlParseEntityRef")]
 pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> XmlEntityPtr {
     let mut ent: XmlEntityPtr = null_mut();
 
@@ -3798,27 +3519,18 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
     ent
 }
 
-/**
- * xmlParseBalancedChunkMemoryInternal:
- * @oldctxt:  the existing parsing context
- * @string:  the input string in UTF8 or ISO-Latin (zero terminated)
- * @user_data:  the user data field for the parser context
- * @lst:  the return value for the set of parsed nodes
- *
- *
- * Parse a well-balanced chunk of an XML document
- * called by the parser
- * The allowed sequence for the Well Balanced Chunk is the one defined by
- * the content production in the XML grammar:
- *
- * [43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*
- *
- * Returns xmlParserErrors::XML_ERR_OK if the chunk is well balanced, and the parser
- * error code otherwise
- *
- * In case recover is set to 1, the nodelist will not be empty even if
- * the parsed chunk is not well balanced.
- */
+/// Parse a well-balanced chunk of an XML document called by the parser
+/// The allowed sequence for the Well Balanced Chunk is the one defined by
+/// the content production in the XML grammar:
+///
+/// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
+///
+/// Returns xmlParserErrors::XML_ERR_OK if the chunk is well balanced, and the parser
+/// error code otherwise
+///
+/// In case recover is set to 1, the nodelist will not be empty even if
+/// the parsed chunk is not well balanced.
+#[doc(alias = "xmlParseBalancedChunkMemoryInternal")]
 unsafe fn xml_parse_balanced_chunk_memory_internal(
     oldctxt: XmlParserCtxtPtr,
     string: *const XmlChar,
@@ -4037,21 +3749,15 @@ unsafe extern "C" fn xml_add_entity_reference(
     }
 }
 
-/**
- * xmlParseReference:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse and handle entity references in content, depending on the SAX
- * interface, this may end-up in a call to character() if this is a
- * CharRef, a predefined entity, if there is no reference() callback.
- * or if the parser was asked to match to that mode.
- *
- * Always consumes '&'.
- *
- * [67] Reference ::= EntityRef | CharRef
- */
+/// Parse and handle entity references in content, depending on the SAX interface,
+/// this may end-up in a call to character() if this is a CharRef,
+/// a predefined entity, if there is no reference() callback.
+/// or if the parser was asked to match to that mode.
+///
+/// Always consumes '&'.
+///
+/// `[67] Reference ::= EntityRef | CharRef`
+#[doc(alias = "xmlParseReference")]
 pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     let val: *mut XmlChar;
     let mut was_checked: i32;
@@ -4588,38 +4294,31 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/**
- * xmlParsePEReference:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Parse a parameter entity reference. Always consumes '%'.
- *
- * The entity content is handled directly by pushing it's content as
- * a new input stream.
- *
- * [69] PEReference ::= '%' Name ';'
- *
- * [ WFC: No Recursion ]
- * A parsed entity must not contain a recursive
- * reference to itself, either directly or indirectly.
- *
- * [ WFC: Entity Declared ]
- * In a document without any DTD, a document with only an internal DTD
- * subset which contains no parameter entity references, or a document
- * with "standalone='yes'", ...  ... The declaration of a parameter
- * entity must precede any reference to it...
- *
- * [ VC: Entity Declared ]
- * In a document with an external subset or external parameter entities
- * with "standalone='no'", ...  ... The declaration of a parameter entity
- * must precede any reference to it...
- *
- * [ WFC: In DTD ]
- * Parameter-entity references may only appear in the DTD.
- * NOTE: misleading but this is handled.
- */
+/// Parse a parameter entity reference. Always consumes '%'.
+///
+/// The entity content is handled directly by pushing it's content as a new input stream.
+///
+/// `[69] PEReference ::= '%' Name ';'`
+///
+/// `[ WFC: No Recursion ]`  
+/// A parsed entity must not contain a recursive
+/// reference to itself, either directly or indirectly.
+///
+/// `[ WFC: Entity Declared ]`  
+/// In a document without any DTD, a document with only an internal DTD
+/// subset which contains no parameter entity references, or a document
+/// with "standalone='yes'", ...  ... The declaration of a parameter
+/// entity must precede any reference to it...
+///
+/// `[ VC: Entity Declared ]`  
+/// In a document with an external subset or external parameter entities
+/// with "standalone='no'", ...  ... The declaration of a parameter entity
+/// must precede any reference to it...
+///
+/// `[ WFC: In DTD ]`  
+/// Parameter-entity references may only appear in the DTD.
+/// NOTE: misleading but this is handled.
+#[doc(alias = "xmlParsePEReference")]
 pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
     let mut entity: XmlEntityPtr = null_mut();
     let input: XmlParserInputPtr;
@@ -4807,21 +4506,13 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
     (*ctxt).has_perefs = 1;
 }
 
-/**
- * xmlParseDocTypeDecl:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse a DOCTYPE declaration
- *
- * [28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S?
- *                      ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
- *
- * [ VC: Root Element Type ]
- * The Name in the document type declaration must match the element
- * type of the root element.
- */
+/// Parse a DOCTYPE declaration
+///
+/// `[28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'`
+///
+/// `[ VC: Root Element Type ]`  
+/// The Name in the document type declaration must match the element type of the root element.
+#[doc(alias = "xmlParseDocTypeDecl")]
 pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
     let mut external_id: *mut XmlChar = null_mut();
 
@@ -4889,40 +4580,31 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
     (*ctxt).skip_char();
 }
 
-/**
- * xmlParseAttribute:
- * @ctxt:  an XML parser context
- * @value:  a xmlChar ** used to store the value of the attribute
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an attribute
- *
- * [41] Attribute ::= Name Eq AttValue
- *
- * [ WFC: No External Entity References ]
- * Attribute values cannot contain direct or indirect entity references
- * to external entities.
- *
- * [ WFC: No < in Attribute Values ]
- * The replacement text of any entity referred to directly or indirectly in
- * an attribute value (other than "&lt;") must not contain a <.
- *
- * [ VC: Attribute Value Type ]
- * The attribute must have been declared; the value must be of the type
- * declared for it.
- *
- * [25] Eq ::= S? '=' S?
- *
- * With namespace:
- *
- * [NS 11] Attribute ::= QName Eq AttValue
- *
- * Also the case QName == xmlns:??? is handled independently as a namespace
- * definition.
- *
- * Returns the attribute name, and the value in *value.
- */
+/// Parse an attribute
+///
+/// `[41] Attribute ::= Name Eq AttValue`
+///
+/// `[ WFC: No External Entity References ]`  
+/// Attribute values cannot contain direct or indirect entity references
+/// to external entities.
+///
+/// `[ WFC: No < in Attribute Values ]`  
+/// The replacement text of any entity referred to directly or indirectly in
+/// an attribute value (other than "&lt;") must not contain a <.
+///
+/// `[ VC: Attribute Value Type ]`  
+/// The attribute must have been declared; the value must be of the type declared for it.
+///
+/// `[25] Eq ::= S? '=' S?`
+///
+/// With namespace:
+///
+/// `[NS 11] Attribute ::= QName Eq AttValue`
+///
+/// Also the case QName == xmlns:??? is handled independently as a namespace definition.
+///
+/// Returns the attribute name, and the value in *value.
+#[doc(alias = "xmlParseAttribute")]
 #[cfg(feature = "sax1")]
 pub(crate) unsafe extern "C" fn xml_parse_attribute(
     ctxt: XmlParserCtxtPtr,
@@ -5003,34 +4685,26 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
     name
 }
 
-/**
- * xmlParseStartTag:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Parse a start tag. Always consumes '<'.
- *
- * [40] STag ::= '<' Name (S Attribute)* S? '>'
- *
- * [ WFC: Unique Att Spec ]
- * No attribute name may appear more than once in the same start-tag or
- * empty-element tag.
- *
- * [44] EmptyElemTag ::= '<' Name (S Attribute)* S? '/>'
- *
- * [ WFC: Unique Att Spec ]
- * No attribute name may appear more than once in the same start-tag or
- * empty-element tag.
- *
- * With namespace:
- *
- * [NS 8] STag ::= '<' QName (S Attribute)* S? '>'
- *
- * [NS 10] EmptyElement ::= '<' QName (S Attribute)* S? '/>'
- *
- * Returns the element name parsed
- */
+/// Parse a start tag. Always consumes '<'.
+///
+/// `[40] STag ::= '<' Name (S Attribute)* S? '>'`
+///
+/// `[ WFC: Unique Att Spec ]`  
+/// No attribute name may appear more than once in the same start-tag or empty-element tag.
+///
+/// `[44] EmptyElemTag ::= '<' Name (S Attribute)* S? '/>'`
+///
+/// `[ WFC: Unique Att Spec ]`  
+/// No attribute name may appear more than once in the same start-tag or empty-element tag.
+///
+/// With namespace:
+///
+/// `[NS 8] STag ::= '<' QName (S Attribute)* S? '>'`
+///
+/// `[NS 10] EmptyElement ::= '<' QName (S Attribute)* S? '/>'`
+///
+/// Returns the element name parsed
+#[doc(alias = "xmlParseStartTag")]
 #[cfg(feature = "sax1")]
 pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     use crate::libxml::parser::xml_err_attribute_dup;
@@ -5180,34 +4854,24 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
     name
 }
 
-/**
- * xmlParseEndTag:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an end of tag
- *
- * [42] ETag ::= '</' Name S? '>'
- *
- * With namespace
- *
- * [NS 9] ETag ::= '</' QName S? '>'
- */
+/// Parse an end of tag
+///
+/// `[42] ETag ::= '</' Name S? '>'`
+///
+/// With namespace
+///
+/// `[NS 9] ETag ::= '</' QName S? '>'`
+#[doc(alias = "xmlParseEndTag")]
 #[cfg(feature = "sax1")]
 pub(crate) unsafe extern "C" fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
     xml_parse_end_tag1(ctxt, 0);
 }
 
-/**
- * xmlParseElementStart:
- * @ctxt:  an XML parser context
- *
- * Parse the start of an XML element. Returns -1 in case of error, 0 if an
- * opening tag was parsed, 1 if an empty element was parsed.
- *
- * Always consumes '<'.
- */
+/// Parse the start of an XML element. Returns -1 in case of error, 0 if an
+/// opening tag was parsed, 1 if an empty element was parsed.
+///
+/// Always consumes '<'.
+#[doc(alias = "xmlParseElementStart")]
 pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
     let mut prefix: *const XmlChar = null_mut();
@@ -5370,12 +5034,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     0
 }
 
-/**
- * xmlParseElementEnd:
- * @ctxt:  an XML parser context
- *
- * Parse the end of an XML element. Always consumes '</'.
- */
+/// Parse the end of an XML element. Always consumes '</'.
+#[doc(alias = "xmlParseElementEnd")]
 pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     let cur: XmlNodePtr = (*ctxt).node;
 
@@ -5413,13 +5073,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/**
- * xmlParseContentInternal:
- * @ctxt:  an XML parser context
- *
- * Parse a content sequence. Stops at EOF or '</'. Leaves checking of
- * unexpected EOF to the caller.
- */
+/// Parse a content sequence. Stops at EOF or '</'. Leaves checking of unexpected EOF to the caller.
+#[doc(alias = "xmlParseContentInternal")]
 pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
     let name_nr = (*ctxt).name_tab.len();
 
@@ -5485,14 +5140,10 @@ pub(crate) unsafe extern "C" fn xml_parse_content_internal(ctxt: XmlParserCtxtPt
     }
 }
 
-/**
- * xmlParseContent:
- * @ctxt:  an XML parser context
- *
- * Parse a content sequence. Stops at EOF or '</'.
- *
- * [43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*
- */
+/// Parse a content sequence. Stops at EOF or '</'.
+///
+/// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
+#[doc(alias = "xmlParseContent")]
 pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
     let name_nr = (*ctxt).name_tab.len();
 
@@ -5514,20 +5165,14 @@ pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/**
- * xmlParseVersionInfo:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the XML version.
- *
- * [24] VersionInfo ::= S 'version' Eq (' VersionNum ' | " VersionNum ")
- *
- * [25] Eq ::= S? '=' S?
- *
- * Returns the version string, e.g. "1.0"
- */
+/// Parse the XML version.
+///
+/// `[24] VersionInfo ::= S 'version' Eq (' VersionNum ' | " VersionNum ")`
+///
+/// `[25] Eq ::= S? '=' S?`
+///
+/// Returns the version string, e.g. "1.0"
+#[doc(alias = "xmlParseVersionInfo")]
 pub(crate) unsafe fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -> Option<String> {
     let mut version = None;
 
@@ -5563,20 +5208,14 @@ pub(crate) unsafe fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -> Option<St
     version
 }
 
-/**
- * xmlParseEncodingDecl:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the XML encoding declaration
- *
- * [80] EncodingDecl ::= S 'encoding' Eq ('"' EncName '"' |  "'" EncName "'")
- *
- * this setups the conversion filters.
- *
- * Returns the encoding value or NULL
- */
+/// Parse the XML encoding declaration
+///
+/// `[80] EncodingDecl ::= S 'encoding' Eq ('"' EncName '"' |  "'" EncName "'")`
+///
+/// this setups the conversion filters.
+///
+/// Returns the encoding value or NULL
+#[doc(alias = "xmlParseEncodingDecl")]
 pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<String> {
     let mut encoding = None;
 
@@ -5684,38 +5323,31 @@ pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<S
     encoding
 }
 
-/**
- * xmlParseSDDecl:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse the XML standalone declaration
- *
- * [32] SDDecl ::= S 'standalone' Eq
- *                 (("'" ('yes' | 'no') "'") | ('"' ('yes' | 'no')'"'))
- *
- * [ VC: Standalone Document Declaration ]
- * TODO The standalone document declaration must have the value "no"
- * if any external markup declarations contain declarations of:
- *  - attributes with default values, if elements to which these
- *    attributes apply appear in the document without specifications
- *    of values for these attributes, or
- *  - entities (other than amp, lt, gt, apos, quot), if references
- *    to those entities appear in the document, or
- *  - attributes with values subject to normalization, where the
- *    attribute appears in the document with a value which will change
- *    as a result of normalization, or
- *  - element types with element content, if white space occurs directly
- *    within any instance of those types.
- *
- * Returns:
- *   1 if standalone="yes"
- *   0 if standalone="no"
- *  -2 if standalone attribute is missing or invalid
- *      (A standalone value of -2 means that the XML declaration was found,
- *       but no value was specified for the standalone attribute).
- */
+/// Parse the XML standalone declaration
+///
+/// `[32] SDDecl ::= S 'standalone' Eq (("'" ('yes' | 'no') "'") | ('"' ('yes' | 'no')'"'))`
+///
+/// `[ VC: Standalone Document Declaration ]`  
+/// TODO The standalone document declaration must have the value "no"
+/// if any external markup declarations contain declarations of:
+///  - attributes with default values, if elements to which these
+///    attributes apply appear in the document without specifications
+///    of values for these attributes, or
+///  - entities (other than amp, lt, gt, apos, quot), if references
+///    to those entities appear in the document, or
+///  - attributes with values subject to normalization, where the
+///    attribute appears in the document with a value which will change
+///    as a result of normalization, or
+///  - element types with element content, if white space occurs directly
+///    within any instance of those types.
+///
+/// Returns:
+/// - 1 if standalone="yes"
+/// - 0 if standalone="no"
+/// - -2 if standalone attribute is missing or invalid
+///      (A standalone value of -2 means that the XML declaration was found,
+///       but no value was specified for the standalone attribute).
+#[doc(alias = "xmlParseSDDecl")]
 pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut standalone: i32 = -2;
 
@@ -5774,16 +5406,10 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> i32 
     standalone
 }
 
-/**
- * xmlParseMisc:
- * @ctxt:  an XML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an XML Misc* optional field.
- *
- * [27] Misc ::= Comment | PI |  S
- */
+/// Parse an XML Misc* optional field.
+///
+/// `[27] Misc ::= Comment | PI |  S`
+#[doc(alias = "xmlParseMisc")]
 pub(crate) unsafe extern "C" fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
     #[allow(clippy::while_immutable_condition)]
     while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -5799,18 +5425,12 @@ pub(crate) unsafe extern "C" fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/**
- * xmlParseExternalSubset:
- * @ctxt:  an XML parser context
- * @ExternalID: the external identifier
- * @SystemID: the system identifier (or URL)
- *
- * parse Markup declarations from an external subset
- *
- * [30] extSubset ::= textDecl? extSubsetDecl
- *
- * [31] extSubsetDecl ::= (markupdecl | conditionalSect | PEReference | S) *
- */
+/// Parse Markup declarations from an external subset
+///
+/// `[30] extSubset ::= textDecl? extSubsetDecl`
+///
+/// `[31] extSubsetDecl ::= (markupdecl | conditionalSect | PEReference | S) *`
+#[doc(alias = "xmlParseExternalSubset")]
 pub unsafe extern "C" fn xml_parse_external_subset(
     ctxt: XmlParserCtxtPtr,
     external_id: *const XmlChar,
@@ -5890,51 +5510,23 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     }
 }
 
-/**
- * XML_SUBSTITUTE_NONE:
- *
- * If no entities need to be substituted.
- */
+/// If no entities need to be substituted.
 const XML_SUBSTITUTE_NONE: usize = 0;
-/**
- * XML_SUBSTITUTE_REF:
- *
- * Whether general entities need to be substituted.
- */
+/// Whether general entities need to be substituted.
 pub(crate) const XML_SUBSTITUTE_REF: usize = 1;
-/**
- * XML_SUBSTITUTE_PEREF:
- *
- * Whether parameter entities need to be substituted.
- */
+/// Whether parameter entities need to be substituted.
 pub(crate) const XML_SUBSTITUTE_PEREF: usize = 2;
-/**
- * XML_SUBSTITUTE_BOTH:
- *
- * Both general and parameter entities need to be substituted.
- */
+/// Both general and parameter entities need to be substituted.
 const XML_SUBSTITUTE_BOTH: usize = 3;
 
-/**
- * xmlStringDecodeEntities:
- * @ctxt:  the parser context
- * @str:  the input string
- * @what:  combination of XML_SUBSTITUTE_REF and XML_SUBSTITUTE_PEREF
- * @end:  an end marker xmlChar, 0 if none
- * @end2:  an end marker xmlChar, 0 if none
- * @end3:  an end marker xmlChar, 0 if none
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Takes a entity string content and process to do the adequate substitutions.
- *
- * [67] Reference ::= EntityRef | CharRef
- *
- * [69] PEReference ::= '%' Name ';'
- *
- * Returns A newly allocated string with the substitution done. The caller
- *      must deallocate it !
- */
+/// Takes a entity string content and process to do the adequate substitutions.
+///
+/// `[67] Reference ::= EntityRef | CharRef`
+///
+/// `[69] PEReference ::= '%' Name ';'`
+///
+/// Returns A newly allocated string with the substitution done. The caller must deallocate it !
+#[doc(alias = "xmlStringDecodeEntities")]
 pub(crate) unsafe extern "C" fn xml_string_decode_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
@@ -5949,27 +5541,14 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities(
     xml_string_decode_entities_int(ctxt, str, xml_strlen(str), what, end, end2, end3, 0)
 }
 
-/**
- * xmlStringLenDecodeEntities:
- * @ctxt:  the parser context
- * @str:  the input string
- * @len: the string length
- * @what:  combination of XML_SUBSTITUTE_REF and XML_SUBSTITUTE_PEREF
- * @end:  an end marker xmlChar, 0 if none
- * @end2:  an end marker xmlChar, 0 if none
- * @end3:  an end marker xmlChar, 0 if none
- *
- * DEPRECATED: Internal function, don't use.
- *
- * Takes a entity string content and process to do the adequate substitutions.
- *
- * [67] Reference ::= EntityRef | CharRef
- *
- * [69] PEReference ::= '%' Name ';'
- *
- * Returns A newly allocated string with the substitution done. The caller
- *      must deallocate it !
- */
+/// Takes a entity string content and process to do the adequate substitutions.
+///
+/// `[67] Reference ::= EntityRef | CharRef`
+///
+/// `[69] PEReference ::= '%' Name ';'`
+///
+/// Returns A newly allocated string with the substitution done. The caller must deallocate it !
+#[doc(alias = "xmlStringLenDecodeEntities")]
 pub(crate) unsafe extern "C" fn xml_string_len_decode_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
@@ -5985,22 +5564,8 @@ pub(crate) unsafe extern "C" fn xml_string_len_decode_entities(
     xml_string_decode_entities_int(ctxt, str, len, what, end, end2, end3, 0)
 }
 
-/*
- * Generated by MACROS on top of parser.c c.f. PUSH_AND_POP.
- */
-
-/*
- * other commodities shared between parser.c and parserInternals.
- */
-/**
- * xmlErrEncodingInt:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @msg:  the error message
- * @val:  an integer value
- *
- * n encoding error
- */
+/// n encoding error
+#[doc(alias = "xmlErrEncodingInt")]
 pub(crate) unsafe extern "C" fn xml_err_encoding_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -6043,19 +5608,11 @@ pub(crate) unsafe extern "C" fn xml_err_encoding_int(
     }
 }
 
-/**
- * xmlStringCurrentChar:
- * @ctxt:  the XML parser context
- * @cur:  pointer to the beginning of the c_char
- * @len:  pointer to the length of the c_char read
- *
- * DEPRECATED: Internal function, do not use.
- *
- * The current c_char value, if using UTF-8 this may actually span multiple
- * bytes in the input buffer.
- *
- * Returns the current c_char value and its length
- */
+/// The current c_char value, if using UTF-8 this may actually span multiple
+/// bytes in the input buffer.
+///
+/// Returns the current c_char value and its length
+#[doc(alias = "xmlStringCurrentChar")]
 pub(crate) unsafe extern "C" fn xml_string_current_char(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
@@ -6179,40 +5736,33 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
     *cur as _
 }
 
-/**
- * xmlParserHandlePEReference:
- * @ctxt:  the parser context
- *
- * DEPRECATED: Internal function, do not use.
- *
- * [69] PEReference ::= '%' Name ';'
- *
- * [ WFC: No Recursion ]
- * A parsed entity must not contain a recursive
- * reference to itself, either directly or indirectly.
- *
- * [ WFC: Entity Declared ]
- * In a document without any DTD, a document with only an internal DTD
- * subset which contains no parameter entity references, or a document
- * with "standalone='yes'", ...  ... The declaration of a parameter
- * entity must precede any reference to it...
- *
- * [ VC: Entity Declared ]
- * In a document with an external subset or external parameter entities
- * with "standalone='no'", ...  ... The declaration of a parameter entity
- * must precede any reference to it...
- *
- * [ WFC: In DTD ]
- * Parameter-entity references may only appear in the DTD.
- * NOTE: misleading but this is handled.
- *
- * A PEReference may have been detected in the current input stream
- * the handling is done accordingly to
- *      http://www.w3.org/TR/REC-xml#entproc
- * i.e.
- *   - Included in literal in entity values
- *   - Included as Parameter Entity reference within DTDs
- */
+/// `[69] PEReference ::= '%' Name ';'`
+///
+/// `[ WFC: No Recursion ]`
+/// A parsed entity must not contain a recursive reference to itself, either directly or indirectly.
+///
+/// `[ WFC: Entity Declared ]`
+/// In a document without any DTD, a document with only an internal DTD
+/// subset which contains no parameter entity references, or a document
+/// with "standalone='yes'", ...  ... The declaration of a parameter
+/// entity must precede any reference to it...
+///
+/// `[ VC: Entity Declared ]`
+/// In a document with an external subset or external parameter entities
+/// with "standalone='no'", ...  ... The declaration of a parameter entity
+/// must precede any reference to it...
+///
+/// `[ WFC: In DTD ]`
+/// Parameter-entity references may only appear in the DTD.
+/// NOTE: misleading but this is handled.
+///
+/// A PEReference may have been detected in the current input stream
+/// the handling is done accordingly to
+///      http://www.w3.org/TR/REC-xml#entproc
+/// i.e.
+///   - Included in literal in entity values
+///   - Included as Parameter Entity reference within DTDs
+#[doc(alias = "xmlParserHandlePEReference")]
 pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtxtPtr) {
     match (*ctxt).instate {
         XmlParserInputState::XmlParserCDATASection => {
@@ -6283,65 +5833,61 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
     xml_parse_pe_reference(ctxt);
 }
 
-/**
- * xmlCheckLanguageID:
- * @lang:  pointer to the string value
- *
- * DEPRECATED: Internal function, do not use.
- *
- * Checks that the value conforms to the LanguageID production:
- *
- * NOTE: this is somewhat deprecated, those productions were removed from
- *       the XML Second edition.
- *
- * [33] LanguageID ::= Langcode ('-' Subcode)*
- * [34] Langcode ::= ISO639Code |  IanaCode |  UserCode
- * [35] ISO639Code ::= ([a-z] | [A-Z]) ([a-z] | [A-Z])
- * [36] IanaCode ::= ('i' | 'I') '-' ([a-z] | [A-Z])+
- * [37] UserCode ::= ('x' | 'X') '-' ([a-z] | [A-Z])+
- * [38] Subcode ::= ([a-z] | [A-Z])+
- *
- * The current REC reference the successors of RFC 1766, currently 5646
- *
- * http://www.rfc-editor.org/rfc/rfc5646.txt
- * langtag       = language
- *                 ["-" script]
- *                 ["-" region]
- *                 *("-" variant)
- *                 *("-" extension)
- *                 ["-" privateuse]
- * language      = 2*3ALPHA            ; shortest ISO 639 code
- *                 ["-" extlang]       ; sometimes followed by
- *                                     ; extended language subtags
- *               / 4ALPHA              ; or reserved for future use
- *               / 5*8ALPHA            ; or registered language subtag
- *
- * extlang       = 3ALPHA              ; selected ISO 639 codes
- *                 *2("-" 3ALPHA)      ; permanently reserved
- *
- * script        = 4ALPHA              ; ISO 15924 code
- *
- * region        = 2ALPHA              ; ISO 3166-1 code
- *               / 3DIGIT              ; UN M.49 code
- *
- * variant       = 5*8alphanum         ; registered variants
- *               / (DIGIT 3alphanum)
- *
- * extension     = singleton 1*("-" (2*8alphanum))
- *                                     ; Single alphanumerics
- *                                     ; "x" reserved for private use
- * singleton     = DIGIT               ; 0 - 9
- *               / %x41-57             ; A - W
- *               / %x59-5A             ; Y - Z
- *               / %x61-77             ; a - w
- *               / %x79-7A             ; y - z
- *
- * it sounds right to still allow Irregular i-xxx IANA and user codes too
- * The parser below doesn't try to cope with extension or privateuse
- * that could be added but that's not interoperable anyway
- *
- * Returns 1 if correct 0 otherwise
- **/
+/// Checks that the value conforms to the LanguageID production:
+///
+/// # Note
+/// This is somewhat deprecated, those productions were removed from the XML Second edition.
+///
+/// `[33] LanguageID ::= Langcode ('-' Subcode)*`  
+/// `[34] Langcode ::= ISO639Code |  IanaCode |  UserCode`  
+/// `[35] ISO639Code ::= ([a-z] | [A-Z]) ([a-z] | [A-Z])`  
+/// `[36] IanaCode ::= ('i' | 'I') '-' ([a-z] | [A-Z])+`  
+/// `[37] UserCode ::= ('x' | 'X') '-' ([a-z] | [A-Z])+`  
+/// `[38] Subcode ::= ([a-z] | [A-Z])+`
+///
+/// The current REC reference the successors of RFC 1766, currently 5646
+///
+/// http://www.rfc-editor.org/rfc/rfc5646.txt
+/// ```ignore
+/// langtag       = language
+///                 ["-" script]
+///                 ["-" region]
+///                 *("-" variant)
+///                 *("-" extension)
+///                 ["-" privateuse]
+/// language      = 2*3ALPHA            ; shortest ISO 639 code
+///                 ["-" extlang]       ; sometimes followed by
+///                                     ; extended language subtags
+///               / 4ALPHA              ; or reserved for future use
+///               / 5*8ALPHA            ; or registered language subtag
+///
+/// extlang       = 3ALPHA              ; selected ISO 639 codes
+///                 *2("-" 3ALPHA)      ; permanently reserved
+///
+/// script        = 4ALPHA              ; ISO 15924 code
+///
+/// region        = 2ALPHA              ; ISO 3166-1 code
+///               / 3DIGIT              ; UN M.49 code
+///
+/// variant       = 5*8alphanum         ; registered variants
+///               / (DIGIT 3alphanum)
+///
+/// extension     = singleton 1*("-" (2*8alphanum))
+///                                     ; Single alphanumerics
+///                                     ; "x" reserved for private use
+/// singleton     = DIGIT               ; 0 - 9
+///               / %x41-57             ; A - W
+///               / %x59-5A             ; Y - Z
+///               / %x61-77             ; a - w
+///               / %x79-7A             ; y - z
+/// ```
+///
+/// it sounds right to still allow Irregular i-xxx IANA and user codes too
+/// The parser below doesn't try to cope with extension or privateuse
+/// that could be added but that's not interoperable anyway
+///
+/// Returns 1 if correct 0 otherwise
+#[doc(alias = "xmlCheckLanguageID")]
 pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i32 {
     let mut cur: *const XmlChar = lang;
     let mut nxt: *const XmlChar;
@@ -6551,19 +6097,10 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
     0
 }
 
-/*
- * Really core function shared with HTML parser.
- */
-
-/**
- * xmlCopyCharMultiByte:
- * @out:  pointer to an array of xmlChar
- * @val:  the c_char value
- *
- * append the c_char value in the array
- *
- * Returns the number of xmlChar written
- */
+/// Append the char value in the array
+///
+/// Returns the number of xmlChar written
+#[doc(alias = "xmlCopyCharMultiByte")]
 pub unsafe extern "C" fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i32) -> i32 {
     if out.is_null() || val < 0 {
         return 0;
@@ -6612,16 +6149,10 @@ pub unsafe extern "C" fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i3
     1
 }
 
-/**
- * xmlCopyChar:
- * @len:  Ignored, compatibility
- * @out:  pointer to an array of xmlChar
- * @val:  the c_char value
- *
- * append the c_char value in the array
- *
- * Returns the number of xmlChar written
- */
+/// Append the char value in the array
+///
+/// Returns the number of xmlChar written
+#[doc(alias = "xmlCopyChar")]
 pub unsafe extern "C" fn xml_copy_char(_len: i32, out: *mut XmlChar, val: i32) -> i32 {
     if out.is_null() || val < 0 {
         return 0;
@@ -6637,14 +6168,8 @@ pub unsafe extern "C" fn xml_copy_char(_len: i32, out: *mut XmlChar, val: i32) -
 /* we need to keep enough input to show errors in context */
 pub(crate) const LINE_LEN: usize = 80;
 
-/**
- * xmlParserInputShrink:
- * @in:  an XML parser input
- *
- * DEPRECATED: Don't use.
- *
- * This function removes used input for the parser.
- */
+/// This function removes used input for the parser.
+#[doc(alias = "xmlParserInputShrink")]
 pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr) {
     let mut used: usize;
 
@@ -7630,108 +7155,4 @@ mod tests {
             }
         }
     }
-
-    // #[test]
-    // fn test_xml_switch_encoding() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-    //             for n_enc in 0..GEN_NB_XML_CHAR_ENCODING {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-    //                 let enc = gen_xml_char_encoding(n_enc, 1);
-
-    //                 let ret_val = xml_switch_encoding(ctxt, enc);
-    //                 desret_int(ret_val);
-    //                 des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                 des_xml_char_encoding(n_enc, enc, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSwitchEncoding",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(leaks == 0, "{leaks} Leaks are found in xmlSwitchEncoding()");
-    //                     eprint!(" {}", n_ctxt);
-    //                     eprintln!(" {}", n_enc);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_switch_input_encoding() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-    //             for n_input in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-    //                 for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-    //                     let mem_base = xml_mem_blocks();
-    //                     let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-    //                     let input = gen_xml_parser_input_ptr(n_input, 1);
-    //                     let handler = gen_xml_char_encoding_handler_ptr(n_handler, 2);
-
-    //                     let ret_val = (*ctxt).switch_input_encoding(input, handler);
-    //                     desret_int(ret_val);
-    //                     des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                     des_xml_parser_input_ptr(n_input, input, 1);
-    //                     des_xml_char_encoding_handler_ptr(n_handler, handler, 2);
-    //                     reset_last_error();
-    //                     if mem_base != xml_mem_blocks() {
-    //                         leaks += 1;
-    //                         eprint!(
-    //                             "Leak of {} blocks found in xmlSwitchInputEncoding",
-    //                             xml_mem_blocks() - mem_base
-    //                         );
-    //                         assert!(
-    //                             leaks == 0,
-    //                             "{leaks} Leaks are found in xmlSwitchInputEncoding()"
-    //                         );
-    //                         eprint!(" {}", n_ctxt);
-    //                         eprint!(" {}", n_input);
-    //                         eprintln!(" {}", n_handler);
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_switch_to_encoding() {
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-    //             for n_handler in 0..GEN_NB_XML_CHAR_ENCODING_HANDLER_PTR {
-    //                 let mem_base = xml_mem_blocks();
-    //                 let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-    //                 let handler = gen_xml_char_encoding_handler_ptr(n_handler, 1);
-
-    //                 let ret_val = xml_switch_to_encoding(ctxt, handler);
-    //                 desret_int(ret_val);
-    //                 des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                 des_xml_char_encoding_handler_ptr(n_handler, handler, 1);
-    //                 reset_last_error();
-    //                 if mem_base != xml_mem_blocks() {
-    //                     leaks += 1;
-    //                     eprint!(
-    //                         "Leak of {} blocks found in xmlSwitchToEncoding",
-    //                         xml_mem_blocks() - mem_base
-    //                     );
-    //                     assert!(
-    //                         leaks == 0,
-    //                         "{leaks} Leaks are found in xmlSwitchToEncoding()"
-    //                     );
-    //                     eprint!(" {}", n_ctxt);
-    //                     eprintln!(" {}", n_handler);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }

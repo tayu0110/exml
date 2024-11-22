@@ -65,15 +65,10 @@ const HTML_PRESERVE_NODE: XmlElementType = XmlElementType::XmlCDATASectionNode;
  */
 const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPINode;
 
-/**
- * htmlNewDoc:
- * @URI:  URI for the dtd, or NULL
- * @ExternalID:  the external ID of the DTD, or NULL
- *
- * Creates a new HTML document
- *
- * Returns a new document
- */
+/// Creates a new HTML document
+///
+/// Returns a new document
+#[doc(alias = "htmlNewDoc")]
 pub unsafe extern "C" fn html_new_doc(
     uri: *const XmlChar,
     external_id: *const XmlChar,
@@ -88,16 +83,10 @@ pub unsafe extern "C" fn html_new_doc(
     html_new_doc_no_dtd(uri, external_id)
 }
 
-/**
- * htmlNewDocNoDtD:
- * @URI:  URI for the dtd, or NULL
- * @ExternalID:  the external ID of the DTD, or NULL
- *
- * Creates a new HTML document without a DTD node if @URI and @ExternalID
- * are NULL
- *
- * Returns a new document, do not initialize the DTD if not provided
- */
+/// Creates a new HTML document without a DTD node if `uri` and `external_id` are NULL.
+///
+/// Returns a new document, do not initialize the DTD if not provided
+#[doc(alias = "htmlNewDocNoDtD")]
 pub unsafe extern "C" fn html_new_doc_no_dtd(
     uri: *const XmlChar,
     external_id: *const XmlChar,
@@ -150,14 +139,10 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     cur
 }
 
-/**
- * htmlGetMetaEncoding:
- * @doc:  the document
- *
- * Encoding definition lookup in the Meta tags
- *
- * Returns the current encoding as flagged in the HTML source
- */
+/// Encoding definition lookup in the Meta tags
+///
+/// Returns the current encoding as flagged in the HTML source
+#[doc(alias = "htmlGetMetaEncoding")]
 pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     let mut cur: HtmlNodePtr;
     let mut content: *const XmlChar;
@@ -286,17 +271,13 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     None
 }
 
-/**
- * htmlSetMetaEncoding:
- * @doc:  the document
- * @encoding:  the encoding string
- *
- * Sets the current encoding in the Meta tags
- * NOTE: this will not change the document content encoding, just
- * the META flag associated.
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Sets the current encoding in the Meta tags
+///
+/// # Note
+/// This will not change the document content encoding, just the META flag associated.
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "htmlSetMetaEncoding")]
 pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) -> i32 {
     let mut cur: HtmlNodePtr;
     let mut meta: HtmlNodePtr = null_mut();
@@ -478,15 +459,9 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
     create(meta, encoding, head, &newcontent, content.as_deref())
 }
 
-/**
- * htmlDocDumpMemory:
- * @cur:  the document
- * @mem:  OUT: the memory pointer
- * @size:  OUT: the memory length
- *
- * Dump an HTML document in memory and return the xmlChar * and it's size.
- * It's up to the caller to free the memory.
- */
+/// Dump an HTML document in memory and return the xmlChar * and it's size.  
+/// It's up to the caller to free the memory.
+#[doc(alias = "htmlDocDumpMemory")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_doc_dump_memory(
     cur: XmlDocPtr,
@@ -496,14 +471,8 @@ pub unsafe extern "C" fn html_doc_dump_memory(
     html_doc_dump_memory_format(cur, mem, size, 1);
 }
 
-/**
- * htmlSaveErr:
- * @code:  the error number
- * @node:  the location of the error.
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "htmlSaveErr")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
     use crate::error::{XmlErrorDomain, __xml_simple_error};
@@ -518,16 +487,9 @@ unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extr
     __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, msg, extra);
 }
 
-/**
- * htmlDocDumpMemoryFormat:
- * @cur:  the document
- * @mem:  OUT: the memory pointer
- * @size:  OUT: the memory length
- * @format:  should formatting spaces been added
- *
- * Dump an HTML document in memory and return the xmlChar * and it's size.
- * It's up to the caller to free the memory.
- */
+/// Dump an HTML document in memory and return the xmlChar * and it's size.  
+/// It's up to the caller to free the memory.
+#[doc(alias = "htmlDocDumpMemoryFormat")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_doc_dump_memory_format(
     cur: XmlDocPtr,
@@ -613,15 +575,10 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
     xml_output_buffer_close(buf);
 }
 
-/**
- * htmlDocDump:
- * @f:  the FILE*
- * @cur:  the document
- *
- * Dump an HTML document to an open FILE.
- *
- * returns: the number of byte written or -1 in case of failure.
- */
+/// Dump an HTML document to an open FILE.
+///
+/// returns: the number of byte written or -1 in case of failure.
+#[doc(alias = "htmlDocDump")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
     use crate::{
@@ -667,15 +624,10 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
     xml_output_buffer_close(buf)
 }
 
-/**
- * htmlSaveFile:
- * @filename:  the filename (or URL)
- * @cur:  the document
- *
- * Dump an HTML document to a file. If @filename is "-" the stdout file is
- * used.
- * returns: the number of byte written or -1 in case of failure.
- */
+/// Dump an HTML document to a file. If `filename` is `"-"` the stdout file is used.
+///
+/// returns: the number of byte written or -1 in case of failure.
+#[doc(alias = "htmlSaveFile")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     use std::{cell::RefCell, rc::Rc};
@@ -731,12 +683,8 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
     xml_output_buffer_close(buf)
 }
 
-/**
- * htmlSaveErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "htmlSaveErrMemory")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
     use crate::error::{XmlErrorDomain, __xml_simple_error};
@@ -750,17 +698,10 @@ unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
     );
 }
 
-/**
- * htmlBufNodeDumpFormat:
- * @buf:  the xmlBufPtr output
- * @doc:  the document
- * @cur:  the current node
- * @format:  should formatting spaces been added
- *
- * Dump an HTML node, recursive behaviour,children are printed too.
- *
- * Returns the number of byte written or -1 in case of error
- */
+/// Dump an HTML node, recursive behaviour,children are printed too.
+///
+/// Returns the number of byte written or -1 in case of error
+#[doc(alias = "htmlBufNodeDumpFormat")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_buf_node_dump_format(
     buf: XmlBufPtr,
@@ -800,17 +741,10 @@ unsafe extern "C" fn html_buf_node_dump_format(
     (xml_buf_use(buf) as i32 - using as i32) as _
 }
 
-/**
- * htmlNodeDump:
- * @buf:  the HTML buffer output
- * @doc:  the document
- * @cur:  the current node
- *
- * Dump an HTML node, recursive behaviour,children are printed too,
- * and formatting returns are added.
- *
- * Returns the number of byte written or -1 in case of error
- */
+/// Dump an HTML node, recursive behaviour,children are printed too, and formatting returns are added.
+///
+/// Returns the number of byte written or -1 in case of error
+#[doc(alias = "htmlNodeDump")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
     use crate::libxml::parser::xml_init_parser;
@@ -836,34 +770,19 @@ pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: Xml
     ret as _
 }
 
-/**
- * htmlNodeDumpFile:
- * @out:  the FILE pointer
- * @doc:  the document
- * @cur:  the current node
- *
- * Dump an HTML node, recursive behaviour,children are printed too,
- * and formatting returns are added.
- */
+/// Dump an HTML node, recursive behaviour,children are printed too, and formatting returns are added.
+#[doc(alias = "htmlNodeDumpFile")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_node_dump_file(out: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
     html_node_dump_file_format(out, doc, cur, null_mut(), 1);
 }
 
-/**
- * htmlNodeDumpFileFormat:
- * @out:  the FILE pointer
- * @doc:  the document
- * @cur:  the current node
- * @encoding: the document encoding
- * @format:  should formatting spaces been added
- *
- * Dump an HTML node, recursive behaviour,children are printed too.
- *
- * TODO: if encoding.is_null() try to save in the doc encoding
- *
- * returns: the number of byte written or -1 in case of failure.
- */
+/// Dump an HTML node, recursive behaviour,children are printed too.
+///
+/// TODO: if encoding.is_null() try to save in the doc encoding
+///
+/// returns: the number of byte written or -1 in case of failure.
+#[doc(alias = "htmlNodeDumpFileFormat")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_node_dump_file_format(
     out: *mut FILE,
@@ -917,17 +836,10 @@ pub unsafe extern "C" fn html_node_dump_file_format(
     xml_output_buffer_close(buf)
 }
 
-/**
- * htmlSaveFileEnc:
- * @filename:  the filename
- * @cur:  the document
- * @encoding: the document encoding
- *
- * Dump an HTML document to a file using a given encoding
- * and formatting returns/spaces are added.
- *
- * returns: the number of byte written or -1 in case of failure.
- */
+/// Dump an HTML document to a file using a given encoding and formatting returns/spaces are added.
+///
+/// returns: the number of byte written or -1 in case of failure.
+#[doc(alias = "htmlSaveFileEnc")]
 #[cfg(feature = "output")]
 pub unsafe fn html_save_file_enc(
     filename: *const c_char,
@@ -937,17 +849,10 @@ pub unsafe fn html_save_file_enc(
     html_save_file_format(filename, cur, encoding, 1)
 }
 
-/**
- * htmlSaveFileFormat:
- * @filename:  the filename
- * @cur:  the document
- * @format:  should formatting spaces been added
- * @encoding: the document encoding
- *
- * Dump an HTML document to a file using a given encoding.
- *
- * returns: the number of byte written or -1 in case of failure.
- */
+/// Dump an HTML document to a file using a given encoding.
+///
+/// returns: the number of byte written or -1 in case of failure.
+#[doc(alias = "htmlSaveFileFormat")]
 #[cfg(feature = "output")]
 pub unsafe fn html_save_file_format(
     filename: *const c_char,
@@ -1011,16 +916,10 @@ pub unsafe fn html_save_file_format(
     xml_output_buffer_close(buf)
 }
 
-/**
- * htmlDtdDumpOutput:
- * @buf:  the HTML buffer output
- * @doc:  the document
- * @encoding:  the encoding string
- *
- * TODO: check whether encoding is needed
- *
- * Dump the HTML document DTD, if any.
- */
+/// TODO: check whether encoding is needed
+///
+/// Dump the HTML document DTD, if any.
+#[doc(alias = "htmlDtdDumpOutput")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_dtd_dump_output(
     buf: XmlOutputBufferPtr,
@@ -1067,14 +966,8 @@ unsafe extern "C" fn html_dtd_dump_output(
     (*buf).write_str(">\n");
 }
 
-/**
- * htmlAttrDumpOutput:
- * @buf:  the HTML buffer output
- * @doc:  the document
- * @cur:  the attribute pointer
- *
- * Dump an HTML attribute
- */
+/// Dump an HTML attribute
+#[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn html_attr_dump_output(
     buf: XmlOutputBufferPtr,
@@ -1162,16 +1055,8 @@ unsafe extern "C" fn html_attr_dump_output(
     }
 }
 
-/**
- * htmlNodeDumpFormatOutput:
- * @buf:  the HTML buffer output
- * @doc:  the document
- * @cur:  the current node
- * @encoding:  the encoding string (unused)
- * @format:  should formatting spaces been added
- *
- * Dump an HTML node, recursive behaviour,children are printed too.
- */
+/// Dump an HTML node, recursive behaviour,children are printed too.
+#[doc(alias = "htmlNodeDumpFormatOutput")]
 #[cfg(feature = "output")]
 pub unsafe fn html_node_dump_format_output(
     buf: XmlOutputBufferPtr,
@@ -1467,14 +1352,8 @@ pub unsafe fn html_node_dump_format_output(
     }
 }
 
-/**
- * htmlDocContentDumpOutput:
- * @buf:  the HTML buffer output
- * @cur:  the document
- * @encoding:  the encoding string (unused)
- *
- * Dump an HTML document. Formatting return/spaces are added.
- */
+/// Dump an HTML document. Formatting return/spaces are added.
+#[doc(alias = "htmlDocContentDumpOutput")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_doc_content_dump_output(
     buf: XmlOutputBufferPtr,
@@ -1484,15 +1363,8 @@ pub unsafe extern "C" fn html_doc_content_dump_output(
     html_node_dump_format_output(buf, cur, cur as _, None, 1);
 }
 
-/**
- * htmlDocContentDumpFormatOutput:
- * @buf:  the HTML buffer output
- * @cur:  the document
- * @encoding:  the encoding string (unused)
- * @format:  should formatting spaces been added
- *
- * Dump an HTML document.
- */
+/// Dump an HTML document.
+#[doc(alias = "htmlDocContentDumpFormatOutput")]
 #[cfg(feature = "output")]
 pub unsafe fn html_doc_content_dump_format_output(
     buf: XmlOutputBufferPtr,
@@ -1511,16 +1383,9 @@ pub unsafe fn html_doc_content_dump_format_output(
     }
 }
 
-/**
- * htmlNodeDumpOutput:
- * @buf:  the HTML buffer output
- * @doc:  the document
- * @cur:  the current node
- * @encoding:  the encoding string (unused)
- *
- * Dump an HTML node, recursive behaviour,children are printed too,
- * and formatting returns/spaces are added.
- */
+/// Dump an HTML node, recursive behaviour,children are printed too,
+/// and formatting returns/spaces are added.
+#[doc(alias = "htmlNodeDumpOutput")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn html_node_dump_output(
     buf: XmlOutputBufferPtr,
@@ -1531,14 +1396,9 @@ pub unsafe extern "C" fn html_node_dump_output(
     html_node_dump_format_output(buf, doc, cur, None, 1);
 }
 
-/**
- * booleanHTMLAttrs:
- *
- * These are the HTML attributes which will be output
- * in minimized form, i.e. <option selected="selected"> will be
- * output as <option selected>, as per XSLT 1.0 16.2 "HTML Output Method"
- *
- */
+/// These are the HTML attributes which will be output
+/// in minimized form, i.e. <option selected="selected"> will be
+/// output as <option selected>, as per XSLT 1.0 16.2 "HTML Output Method"
 const HTML_BOOLEAN_ATTRS: &[*const c_char] = &[
     c"checked".as_ptr() as _,
     c"compact".as_ptr() as _,
@@ -1556,14 +1416,10 @@ const HTML_BOOLEAN_ATTRS: &[*const c_char] = &[
     null(),
 ];
 
-/**
- * htmlIsBooleanAttr:
- * @name:  the name of the attribute to check
- *
- * Determine if a given attribute is a boolean attribute.
- *
- * returns: false if the attribute is not boolean, true otherwise.
- */
+/// Determine if a given attribute is a boolean attribute.
+///
+/// returns: false if the attribute is not boolean, true otherwise.
+#[doc(alias = "htmlIsBooleanAttr")]
 pub unsafe extern "C" fn html_is_boolean_attr(name: *const XmlChar) -> i32 {
     let mut i: usize = 0;
 

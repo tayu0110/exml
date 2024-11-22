@@ -67,7 +67,8 @@ use crate::{
         xml_buf_content, xml_build_qname, NodePtr, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
         XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
-    xmlXPathNodeSetGetLength, xmlXPathNodeSetIsEmpty, xmlXPathNodeSetItem, xml_str_printf,
+    xml_str_printf, xml_xpath_node_set_get_length, xml_xpath_node_set_is_empty,
+    xml_xpath_node_set_item,
 };
 
 use super::{
@@ -75,24 +76,12 @@ use super::{
     parser_internals::xml_is_letter,
 };
 
-/************************************************************************
- *									*
- *			Helpers						*
- *									*
- ************************************************************************/
+// Many of these macros may later turn into functions.
+// They shouldn't be used in #ifdef's preprocessor instructions.
 
-/*
- * Many of these macros may later turn into functions. They
- * shouldn't be used in #ifdef's preprocessor instructions.
- */
-/**
- * xmlXPathSetError:
- * @ctxt:  an XPath parser context
- * @err:  an XmlXPathError code
- *
- * Raises an error.
- */
-macro_rules! xmlXPathSetError {
+/// Raises an error.
+#[doc(alias = "xmlXPathSetError")]
+macro_rules! xml_xpath_set_error {
     ($ctxt:expr, $err:expr) => {{
         let file = std::ffi::CString::new(file!()).unwrap();
         xml_xpatherror($ctxt, file.as_ptr() as _, line!() as _, $err);
@@ -114,15 +103,11 @@ macro_rules! xmlXPathSetError {
 //     };
 // }
 
-/**
- * xmlXPathSetTypeError:
- * @ctxt:  an XPath parser context
- *
- * Raises an XPATH_INVALID_TYPE error.
- */
-macro_rules! xmlXPathSetTypeError {
+/// Raises an XPATH_INVALID_TYPE error.
+#[doc(alias = "xmlXPathSetTypeError")]
+macro_rules! xml_xpath_set_type_error {
     ($ctxt:expr) => {
-        xmlXPathSetError!($ctxt, XmlXPathError::XpathInvalidType as i32)
+        xml_xpath_set_error!($ctxt, XmlXPathError::XpathInvalidType as i32)
     };
 }
 
@@ -295,16 +280,11 @@ macro_rules! xmlXPathSetTypeError {
 //     };
 // }
 
-/**
- * xmlXPathStackIsNodeSet:
- * @ctxt: an XPath parser context
- *
- * Check if the current value on the XPath stack is a node set or
- * an XSLT value tree.
- *
- * Returns true if the current object on the stack is a node-set.
- */
-macro_rules! xmlXPathStackIsNodeSet {
+/// Check if the current value on the XPath stack is a node set or an XSLT value tree.
+///
+/// Returns true if the current object on the stack is a node-set.
+#[doc(alias = "xmlXPathStackIsNodeSet")]
+macro_rules! xml_xpath_stack_is_node_set {
     ($ctxt:expr) => {
         !(*$ctxt).value.is_null()
             && ((*(*$ctxt).value).typ == XmlXPathObjectType::XpathNodeset
@@ -340,11 +320,7 @@ macro_rules! xmlXPathStackIsNodeSet {
 // 	}
 // }
 
-/**
- * CHECK_ERROR:
- *
- * Macro to return from the function if an XPath error was detected.
- */
+/// Macro to return from the function if an XPath error was detected.
 #[macro_export]
 macro_rules! CHECK_ERROR {
     ($ctxt:expr) => {
@@ -354,11 +330,7 @@ macro_rules! CHECK_ERROR {
     };
 }
 
-/**
- * CHECK_ERROR0:
- *
- * Macro to return 0 from the function if an XPath error was detected.
- */
+/// Macro to return 0 from the function if an XPath error was detected.
 macro_rules! CHECK_ERROR0 {
     ($ctxt:expr) => {
         if (*$ctxt).error != XmlXPathError::XpathExpressionOk as i32 {
@@ -367,12 +339,7 @@ macro_rules! CHECK_ERROR0 {
     };
 }
 
-/**
- * XP_ERROR:
- * @X:  the error code
- *
- * Macro to raise an XPath error and return.
- */
+/// Macro to raise an XPath error and return.
 #[macro_export]
 macro_rules! XP_ERROR {
     ($ctxt:expr, $x:expr) => {{
@@ -381,12 +348,7 @@ macro_rules! XP_ERROR {
     }};
 }
 
-/**
- * XP_ERROR0:
- * @X:  the error code
- *
- * Macro to raise an XPath error and return 0.
- */
+/// Macro to raise an XPath error and return 0.
 macro_rules! XP_ERROR0 {
     ($ctxt:expr, $x:expr) => {{
         xml_xpath_err($ctxt, $x);
@@ -394,13 +356,7 @@ macro_rules! XP_ERROR0 {
     }};
 }
 
-/**
- * CHECK_TYPE:
- * @typeval:  the XPath type
- *
- * Macro to check that the value on top of the XPath stack is of a given
- * type.
- */
+/// Macro to check that the value on top of the XPath stack is of a given type.
 #[macro_export]
 macro_rules! CHECK_TYPE {
     ($ctxt:expr, $typeval:expr) => {
@@ -413,13 +369,8 @@ macro_rules! CHECK_TYPE {
     };
 }
 
-/**
- * CHECK_TYPE0:
- * @typeval:  the XPath type
- *
- * Macro to check that the value on top of the XPath stack is of a given
- * type. Return(0) in case of failure
- */
+/// Macro to check that the value on top of the XPath stack is of a given type.  
+/// Return(0) in case of failure
 macro_rules! CHECK_TYPE0 {
     ($ctxt:expr, $typeval:expr) => {
         if (*$ctxt).value.is_null() || (*(*$ctxt).value).typ != $typeval {
@@ -428,12 +379,7 @@ macro_rules! CHECK_TYPE0 {
     };
 }
 
-/**
- * CHECK_ARITY:
- * @x:  the number of expected args
- *
- * Macro to check that the number of args passed to an XPath function matches.
- */
+/// Macro to check that the number of args passed to an XPath function matches.
 #[macro_export]
 macro_rules! CHECK_ARITY {
     ($ctxt:expr, $nargs:expr, $x:expr) => {
@@ -455,11 +401,7 @@ macro_rules! CHECK_ARITY {
     };
 }
 
-/**
- * CAST_TO_STRING:
- *
- * Macro to try to cast the value on the top of the XPath stack to a string.
- */
+/// Macro to try to cast the value on the top of the XPath stack to a string.
 macro_rules! CAST_TO_STRING {
     ($ctxt:expr) => {
         if !(*$ctxt).value.is_null() && (*(*$ctxt).value).typ != XmlXPathObjectType::XpathString {
@@ -468,11 +410,7 @@ macro_rules! CAST_TO_STRING {
     };
 }
 
-/**
- * CAST_TO_NUMBER:
- *
- * Macro to try to cast the value on the top of the XPath stack to a number.
- */
+/// Macro to try to cast the value on the top of the XPath stack to a number.
 macro_rules! CAST_TO_NUMBER {
     ($ctxt:expr) => {
         if !(*$ctxt).value.is_null() && (*(*$ctxt).value).typ != XmlXPathObjectType::XpathNumber {
@@ -481,11 +419,7 @@ macro_rules! CAST_TO_NUMBER {
     };
 }
 
-/**
- * CAST_TO_BOOLEAN:
- *
- * Macro to try to cast the value on the top of the XPath stack to a boolean.
- */
+/// Macro to try to cast the value on the top of the XPath stack to a boolean.
 macro_rules! CAST_TO_BOOLEAN {
     ($ctxt:expr) => {
         if !(*$ctxt).value.is_null() && (*(*$ctxt).value).typ != XmlXPathObjectType::XpathBoolean {
@@ -494,12 +428,7 @@ macro_rules! CAST_TO_BOOLEAN {
     };
 }
 
-/**
- * XP_ERRORNULL:
- * @X:  the error code
- *
- * Macro to raise an XPath error and return NULL.
- */
+/// Macro to raise an XPath error and return NULL.
 macro_rules! XP_ERRORNULL {
     ($ctxt:expr, $x:expr) => {{
         xml_xpath_err($ctxt, $x);
@@ -527,12 +456,9 @@ macro_rules! XP_ERRORNULL {
 //     };
 // }
 
-/**
- * xsltPointerList:
- *
- * Pointer-list for various purposes.
- */
 pub type XmlPointerListPtr = *mut XmlPointerList;
+/// Pointer-list for various purposes.
+#[doc(alias = "xsltPointerList")]
 #[repr(C)]
 pub struct XmlPointerList {
     pub(crate) items: *mut *mut c_void,
@@ -555,10 +481,8 @@ pub struct XmlXpathContextCache {
     pub(crate) max_misc: i32,
 }
 
-/*
-* TODO: Since such a list-handling is used in xmlschemas.c and libxslt
-* and here, we should make the functions public.
-*/
+// TODO: Since such a list-handling is used in xmlschemas.c and libxslt
+// and here, we should make the functions public.
 unsafe extern "C" fn xml_pointer_list_add_size(
     list: XmlPointerListPtr,
     item: *mut c_void,
@@ -600,13 +524,10 @@ unsafe extern "C" fn xml_pointer_list_add_size(
     0
 }
 
-/**
- * xsltPointerListCreate:
- *
- * Creates an xsltPointerList structure.
- *
- * Returns a xsltPointerList structure or NULL in case of an error.
- */
+/// Creates an xsltPointerList structure.
+///
+/// Returns a xsltPointerList structure or NULL in case of an error.
+#[doc(alias = "xsltPointerListCreate")]
 unsafe extern "C" fn xml_pointer_list_create(initial_size: i32) -> XmlPointerListPtr {
     let ret: XmlPointerListPtr = xml_malloc(size_of::<XmlPointerList>()) as _;
     if ret.is_null() {
@@ -658,13 +579,9 @@ macro_rules! XP_CACHE_ADD {
     };
 }
 
-/**
- * xmlXPathReleaseObject:
- * @obj:  the let to: xmlXPathObjectPtr free or to cache
- *
- * Depending on the state of the cache this frees the given
- * XPath object or stores it in the cache.
- */
+/// Depending on the state of the cache this frees the given
+/// XPath object or stores it in the cache.
+#[doc(alias = "xmlXPathReleaseObject")]
 pub(crate) unsafe extern "C" fn xml_xpath_release_object(
     ctxt: XmlXPathContextPtr,
     obj: XmlXPathObjectPtr,
@@ -805,19 +722,15 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
     }
 }
 
-/**
- * xmlXPathPopBoolean:
- * @ctxt:  an XPath parser context
- *
- * Pops a boolean from the stack, handling conversion if needed.
- * Check error with #xmlXPathCheckError.
- *
- * Returns the boolean
- */
+/// Pops a boolean from the stack, handling conversion if needed.
+/// Check error with #xmlXPathCheckError.
+///
+/// Returns the boolean
+#[doc(alias = "xmlXPathPopBoolean")]
 pub unsafe extern "C" fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -> i32 {
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     if obj.is_null() {
-        xmlXPathSetError!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
+        xml_xpath_set_error!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
         return 0;
     }
     let ret = if (*obj).typ != XmlXPathObjectType::XpathBoolean {
@@ -829,19 +742,15 @@ pub unsafe extern "C" fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -
     ret
 }
 
-/**
- * xmlXPathPopNumber:
- * @ctxt:  an XPath parser context
- *
- * Pops a number from the stack, handling conversion if needed.
- * Check error with #xmlXPathCheckError.
- *
- * Returns the number
- */
+/// Pops a number from the stack, handling conversion if needed.
+/// Check error with #xmlXPathCheckError.
+///
+/// Returns the number
+#[doc(alias = "xmlXPathPopNumber")]
 pub unsafe extern "C" fn xml_xpath_pop_number(ctxt: XmlXPathParserContextPtr) -> f64 {
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     if obj.is_null() {
-        xmlXPathSetError!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
+        xml_xpath_set_error!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
         return 0.0;
     }
     let ret = if (*obj).typ != XmlXPathObjectType::XpathNumber {
@@ -853,19 +762,15 @@ pub unsafe extern "C" fn xml_xpath_pop_number(ctxt: XmlXPathParserContextPtr) ->
     ret
 }
 
-/**
- * xmlXPathPopString:
- * @ctxt:  an XPath parser context
- *
- * Pops a string from the stack, handling conversion if needed.
- * Check error with #xmlXPathCheckError.
- *
- * Returns the string
- */
+/// Pops a string from the stack, handling conversion if needed.
+/// Check error with #xmlXPathCheckError.
+///
+/// Returns the string
+#[doc(alias = "xmlXPathPopString")]
 pub unsafe extern "C" fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     if obj.is_null() {
-        xmlXPathSetError!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
+        xml_xpath_set_error!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
         return null_mut();
     }
     let ret: *mut XmlChar = xml_xpath_cast_to_string(obj); /* this does required strdup */
@@ -877,25 +782,21 @@ pub unsafe extern "C" fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) ->
     ret
 }
 
-/**
- * xmlXPathPopNodeSet:
- * @ctxt:  an XPath parser context
- *
- * Pops a node-set from the stack, handling conversion if needed.
- * Check error with #xmlXPathCheckError.
- *
- * Returns the node-set
- */
+/// Pops a node-set from the stack, handling conversion if needed.
+/// Check error with #xmlXPathCheckError.
+///
+/// Returns the node-set
+#[doc(alias = "xmlXPathPopNodeSet")]
 pub unsafe extern "C" fn xml_xpath_pop_node_set(ctxt: XmlXPathParserContextPtr) -> XmlNodeSetPtr {
     if ctxt.is_null() {
         return null_mut();
     }
     if (*ctxt).value.is_null() {
-        xmlXPathSetError!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
+        xml_xpath_set_error!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
         return null_mut();
     }
-    if !xmlXPathStackIsNodeSet!(ctxt) {
-        xmlXPathSetTypeError!(ctxt);
+    if !xml_xpath_stack_is_node_set!(ctxt) {
+        xml_xpath_set_type_error!(ctxt);
         return null_mut();
     }
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
@@ -910,22 +811,18 @@ pub unsafe extern "C" fn xml_xpath_pop_node_set(ctxt: XmlXPathParserContextPtr) 
     ret
 }
 
-/**
- * xmlXPathPopExternal:
- * @ctxt:  an XPath parser context
- *
- * Pops an external object from the stack, handling conversion if needed.
- * Check error with #xmlXPathCheckError.
- *
- * Returns the object
- */
+/// Pops an external object from the stack, handling conversion if needed.
+/// Check error with #xmlXPathCheckError.
+///
+/// Returns the object
+#[doc(alias = "xmlXPathPopExternal")]
 pub unsafe extern "C" fn xml_xpath_pop_external(ctxt: XmlXPathParserContextPtr) -> *mut c_void {
     if ctxt.is_null() || (*ctxt).value.is_null() {
-        xmlXPathSetError!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
+        xml_xpath_set_error!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
         return null_mut();
     }
     if (*(*ctxt).value).typ != XmlXPathObjectType::XpathUsers {
-        xmlXPathSetTypeError!(ctxt);
+        xml_xpath_set_type_error!(ctxt);
         return null_mut();
     }
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
@@ -935,18 +832,8 @@ pub unsafe extern "C" fn xml_xpath_pop_external(ctxt: XmlXPathParserContextPtr) 
     ret
 }
 
-/*
- * Variable Lookup forwarding.
- */
-
-/**
- * xmlXPathRegisterVariableLookup:
- * @ctxt:  the XPath context
- * @f:  the lookup function
- * @data:  the lookup data
- *
- * register an external mechanism to do variable lookup
- */
+/// Register an external mechanism to do variable lookup
+#[doc(alias = "xmlXPathRegisterVariableLookup")]
 pub unsafe extern "C" fn xml_xpath_register_variable_lookup(
     ctxt: XmlXPathContextPtr,
     f: XmlXPathVariableLookupFunc,
@@ -959,18 +846,8 @@ pub unsafe extern "C" fn xml_xpath_register_variable_lookup(
     (*ctxt).var_lookup_data = data;
 }
 
-/*
- * Function Lookup forwarding.
- */
-
-/**
- * xmlXPathRegisterFuncLookup:
- * @ctxt:  the XPath context
- * @f:  the lookup function
- * @funcCtxt:  the lookup data
- *
- * Registers an external mechanism to do function lookup.
- */
+/// Registers an external mechanism to do function lookup.
+#[doc(alias = "xmlXPathRegisterFuncLookup")]
 pub unsafe extern "C" fn xml_xpath_register_func_lookup(
     ctxt: XmlXPathContextPtr,
     f: XmlXPathFuncLookupFunc,
@@ -983,18 +860,8 @@ pub unsafe extern "C" fn xml_xpath_register_func_lookup(
     (*ctxt).func_lookup_data = func_ctxt;
 }
 
-/*
- * Error reporting.
- */
-/**
- * xmlXPatherror:
- * @ctxt:  the XPath Parser context
- * @file:  the file name
- * @line:  the line number
- * @no:  the error number
- *
- * Formats an error message.
- */
+/// Formats an error message.
+#[doc(alias = "xmlXPatherror")]
 pub unsafe extern "C" fn xml_xpatherror(
     ctxt: XmlXPathParserContextPtr,
     _file: *const c_char,
@@ -1004,9 +871,7 @@ pub unsafe extern "C" fn xml_xpatherror(
     xml_xpath_err(ctxt, no);
 }
 
-/*
- * The array xmlXPathErrorMessages corresponds to the enum XmlXPathError
- */
+// The array xmlXPathErrorMessages corresponds to the enum XmlXPathError
 const XML_XPATH_ERROR_MESSAGES: &[*const c_char] = &[
     c"Ok\n".as_ptr(),
     c"Number encoding\n".as_ptr(),
@@ -1039,13 +904,8 @@ const XML_XPATH_ERROR_MESSAGES: &[*const c_char] = &[
 ];
 const MAXERRNO: i32 = XML_XPATH_ERROR_MESSAGES.len() as i32 - 1;
 
-/**
- * xmlXPathErr:
- * @ctxt:  a XPath parser context
- * @error:  the error code
- *
- * Handle an XPath error
- */
+/// Handle an XPath error
+#[doc(alias = "xmlXPathErr")]
 pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error: i32) {
     if !(0..=MAXERRNO).contains(&error) {
         error = MAXERRNO;
@@ -1319,14 +1179,8 @@ unsafe extern "C" fn xml_xpath_debug_dump_location_set(
     }
 }
 
-/**
- * xmlXPathDebugDumpObject:
- * @output:  the FILE * to dump the output
- * @cur:  the object to inspect
- * @depth:  indentation level
- *
- * Dump the content of the object for debugging purposes
- */
+/// Dump the content of the object for debugging purposes
+#[doc(alias = "xmlXPathDebugDumpObject")]
 #[cfg(feature = "libxml_debug")]
 pub unsafe extern "C" fn xml_xpath_debug_dump_object(
     output: *mut FILE,
@@ -1712,14 +1566,8 @@ unsafe extern "C" fn xml_xpath_debug_dump_step_op(
     }
 }
 
-/**
- * xmlXPathDebugDumpCompExpr:
- * @output:  the FILE * for the output
- * @comp:  the precompiled XPath expression
- * @depth:  the indentation level.
- *
- * Dumps the tree of the compiled XPath expression.
- */
+/// Dumps the tree of the compiled XPath expression.
+#[doc(alias = "xmlXPathDebugDumpCompExpr")]
 #[cfg(feature = "libxml_debug")]
 pub unsafe extern "C" fn xml_xpath_debug_dump_comp_expr(
     output: *mut FILE,
@@ -1758,18 +1606,10 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_comp_expr(
     }
 }
 
-/**
- * NodeSet handling.
- */
-/**
- * xmlXPathNodeSetContains:
- * @cur:  the node-set
- * @val:  the node
- *
- * checks whether @cur contains @val
- *
- * Returns true (1) if @cur contains @val, false (0) otherwise
- */
+/// checks whether @cur contains @val
+///
+/// Returns true (1) if @cur contains @val, false (0) otherwise
+#[doc(alias = "xmlXPathNodeSetContains")]
 pub unsafe extern "C" fn xml_xpath_node_set_contains(cur: XmlNodeSetPtr, val: XmlNodePtr) -> i32 {
     if cur.is_null() || val.is_null() {
         return 0;
@@ -1803,37 +1643,31 @@ pub unsafe extern "C" fn xml_xpath_node_set_contains(cur: XmlNodeSetPtr, val: Xm
     0
 }
 
-/**
- * xmlXPathDifference:
- * @nodes1:  a node-set
- * @nodes2:  a node-set
- *
- * Implements the EXSLT - Sets difference() function:
- *    node-set set:difference (node-set, node-set)
- *
- * Returns the difference between the two node sets, or nodes1 if
- *         nodes2 is empty
- */
+/// Implements the EXSLT - Sets difference() function:
+///    node-set set:difference (node-set, node-set)
+///
+/// Returns the difference between the two node sets, or nodes1 if nodes2 is empty
+#[doc(alias = "xmlXPathDifference")]
 pub unsafe extern "C" fn xml_xpath_difference(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
 ) -> XmlNodeSetPtr {
     let mut cur: XmlNodePtr;
 
-    if xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes2) {
         return nodes1;
     }
 
     /* TODO: Check memory error. */
     let ret: XmlNodeSetPtr = xml_xpath_node_set_create(null_mut());
-    if xmlXPathNodeSetIsEmpty!(nodes1) {
+    if xml_xpath_node_set_is_empty!(nodes1) {
         return ret;
     }
 
-    let l1: i32 = xmlXPathNodeSetGetLength!(nodes1);
+    let l1: i32 = xml_xpath_node_set_get_length!(nodes1);
 
     for i in 0..l1 {
-        cur = xmlXPathNodeSetItem!(nodes1, i);
+        cur = xml_xpath_node_set_item!(nodes1, i);
         if xml_xpath_node_set_contains(nodes2, cur) == 0 {
             /* TODO: Propagate memory error. */
             if xml_xpath_node_set_add_unique(ret, cur) < 0 {
@@ -1844,17 +1678,12 @@ pub unsafe extern "C" fn xml_xpath_difference(
     ret
 }
 
-/**
- * xmlXPathIntersection:
- * @nodes1:  a node-set
- * @nodes2:  a node-set
- *
- * Implements the EXSLT - Sets intersection() function:
- *    node-set set:intersection (node-set, node-set)
- *
- * Returns a node set comprising the nodes that are within both the
- *         node sets passed as arguments
- */
+/// Implements the EXSLT - Sets intersection() function:
+///    node-set set:intersection (node-set, node-set)
+///
+/// Returns a node set comprising the nodes that are within both the
+/// node sets passed as arguments
+#[doc(alias = "xmlXPathIntersection")]
 pub unsafe extern "C" fn xml_xpath_intersection(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
@@ -1865,17 +1694,17 @@ pub unsafe extern "C" fn xml_xpath_intersection(
     if ret.is_null() {
         return ret;
     }
-    if xmlXPathNodeSetIsEmpty!(nodes1) {
+    if xml_xpath_node_set_is_empty!(nodes1) {
         return ret;
     }
-    if xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes2) {
         return ret;
     }
 
-    let l1: i32 = xmlXPathNodeSetGetLength!(nodes1);
+    let l1: i32 = xml_xpath_node_set_get_length!(nodes1);
 
     for i in 0..l1 {
-        cur = xmlXPathNodeSetItem!(nodes1, i);
+        cur = xml_xpath_node_set_item!(nodes1, i);
         if xml_xpath_node_set_contains(nodes2, cur) != 0 {
             /* TODO: Propagate memory error. */
             if xml_xpath_node_set_add_unique(ret, cur) < 0 {
@@ -1886,21 +1715,16 @@ pub unsafe extern "C" fn xml_xpath_intersection(
     ret
 }
 
-/**
- * xmlXPathDistinctSorted:
- * @nodes:  a node-set, sorted by document order
- *
- * Implements the EXSLT - Sets distinct() function:
- *    node-set set:distinct (node-set)
- *
- * Returns a subset of the nodes contained in @nodes, or @nodes if
- *         it is empty
- */
+/// Implements the EXSLT - Sets distinct() function:
+///    node-set set:distinct (node-set)
+///
+/// Returns a subset of the nodes contained in @nodes, or @nodes if it is empty
+#[doc(alias = "xmlXPathDistinctSorted")]
 pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlNodeSetPtr {
     let mut strval: *mut XmlChar;
     let mut cur: XmlNodePtr;
 
-    if xmlXPathNodeSetIsEmpty!(nodes) {
+    if xml_xpath_node_set_is_empty!(nodes) {
         return nodes;
     }
 
@@ -1908,10 +1732,10 @@ pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlN
     if ret.is_null() {
         return ret;
     }
-    let l: i32 = xmlXPathNodeSetGetLength!(nodes);
+    let l: i32 = xml_xpath_node_set_get_length!(nodes);
     let hash: XmlHashTablePtr = xml_hash_create(l);
     for i in 0..l {
-        cur = xmlXPathNodeSetItem!(nodes, i);
+        cur = xml_xpath_node_set_item!(nodes, i);
         strval = xml_xpath_cast_node_to_string(cur);
         if xml_hash_lookup(hash, strval).is_null() {
             if xml_hash_add_entry(hash, strval, strval as _) < 0 {
@@ -1940,20 +1764,15 @@ pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlN
     // return null_mut();
 }
 
-/**
- * xmlXPathDistinct:
- * @nodes:  a node-set
- *
- * Implements the EXSLT - Sets distinct() function:
- *    node-set set:distinct (node-set)
- * @nodes is sorted by document order, then #exslSetsDistinctSorted
- * is called with the sorted node-set
- *
- * Returns a subset of the nodes contained in @nodes, or @nodes if
- *         it is empty
- */
+/// Implements the EXSLT - Sets distinct() function:
+///    node-set set:distinct (node-set)
+/// @nodes is sorted by document order, then #exslSetsDistinctSorted
+/// is called with the sorted node-set
+///
+/// Returns a subset of the nodes contained in @nodes, or @nodes if it is empty
+#[doc(alias = "xmlXPathDistinct")]
 pub unsafe extern "C" fn xml_xpath_distinct(nodes: XmlNodeSetPtr) -> XmlNodeSetPtr {
-    if xmlXPathNodeSetIsEmpty!(nodes) {
+    if xml_xpath_node_set_is_empty!(nodes) {
         return nodes;
     }
 
@@ -1961,30 +1780,24 @@ pub unsafe extern "C" fn xml_xpath_distinct(nodes: XmlNodeSetPtr) -> XmlNodeSetP
     xml_xpath_distinct_sorted(nodes)
 }
 
-/**
- * xmlXPathHasSameNodes:
- * @nodes1:  a node-set
- * @nodes2:  a node-set
- *
- * Implements the EXSLT - Sets has-same-nodes function:
- *    boolean set:has-same-node(node-set, node-set)
- *
- * Returns true (1) if @nodes1 shares any node with @nodes2, false (0)
- *         otherwise
- */
+/// Implements the EXSLT - Sets has-same-nodes function:
+///    boolean set:has-same-node(node-set, node-set)
+///
+/// Returns true (1) if @nodes1 shares any node with @nodes2, false (0) otherwise
+#[doc(alias = "xmlXPathHasSameNodes")]
 pub unsafe extern "C" fn xml_xpath_has_same_nodes(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
 ) -> i32 {
     let mut cur: XmlNodePtr;
 
-    if xmlXPathNodeSetIsEmpty!(nodes1) || xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes1) || xml_xpath_node_set_is_empty!(nodes2) {
         return 0;
     }
 
-    let l: i32 = xmlXPathNodeSetGetLength!(nodes1);
+    let l: i32 = xml_xpath_node_set_get_length!(nodes1);
     for i in 0..l {
-        cur = xmlXPathNodeSetItem!(nodes1, i);
+        cur = xml_xpath_node_set_item!(nodes1, i);
         if xml_xpath_node_set_contains(nodes2, cur) != 0 {
             return 1;
         }
@@ -1992,18 +1805,12 @@ pub unsafe extern "C" fn xml_xpath_has_same_nodes(
     0
 }
 
-/**
- * xmlXPathNodeLeadingSorted:
- * @nodes: a node-set, sorted by document order
- * @node: a node
- *
- * Implements the EXSLT - Sets leading() function:
- *    node-set set:leading (node-set, node-set)
- *
- * Returns the nodes in @nodes that precede @node in document order,
- *         @nodes if @node is NULL or an empty node-set if @nodes
- *         doesn't contain @node
- */
+/// Implements the EXSLT - Sets leading() function:
+///    node-set set:leading (node-set, node-set)
+///
+/// Returns the nodes in @nodes that precede @node in document order,
+/// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+#[doc(alias = "xmlXPathNodeLeadingSorted")]
 pub unsafe extern "C" fn xml_xpath_node_leading_sorted(
     nodes: XmlNodeSetPtr,
     node: XmlNodePtr,
@@ -2018,13 +1825,13 @@ pub unsafe extern "C" fn xml_xpath_node_leading_sorted(
     if ret.is_null() {
         return ret;
     }
-    if xmlXPathNodeSetIsEmpty!(nodes) || xml_xpath_node_set_contains(nodes, node) == 0 {
+    if xml_xpath_node_set_is_empty!(nodes) || xml_xpath_node_set_contains(nodes, node) == 0 {
         return ret;
     }
 
-    let l: i32 = xmlXPathNodeSetGetLength!(nodes);
+    let l: i32 = xml_xpath_node_set_get_length!(nodes);
     for i in 0..l {
-        cur = xmlXPathNodeSetItem!(nodes, i);
+        cur = xml_xpath_node_set_item!(nodes, i);
         if cur == node {
             break;
         }
@@ -2036,42 +1843,31 @@ pub unsafe extern "C" fn xml_xpath_node_leading_sorted(
     ret
 }
 
-/**
- * xmlXPathLeadingSorted:
- * @nodes1:  a node-set, sorted by document order
- * @nodes2:  a node-set, sorted by document order
- *
- * Implements the EXSLT - Sets leading() function:
- *    node-set set:leading (node-set, node-set)
- *
- * Returns the nodes in @nodes1 that precede the first node in @nodes2
- *         in document order, @nodes1 if @nodes2 is NULL or empty or
- *         an empty node-set if @nodes1 doesn't contain @nodes2
- */
+/// Implements the EXSLT - Sets leading() function:
+///    node-set set:leading (node-set, node-set)
+///
+/// Returns the nodes in @nodes1 that precede the first node in @nodes2
+///         in document order, @nodes1 if @nodes2 is NULL or empty or
+///         an empty node-set if @nodes1 doesn't contain @nodes2
+#[doc(alias = "xmlXPathLeadingSorted")]
 pub unsafe extern "C" fn xml_xpath_leading_sorted(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
 ) -> XmlNodeSetPtr {
-    if xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes2) {
         return nodes1;
     }
-    xml_xpath_node_leading_sorted(nodes1, xmlXPathNodeSetItem!(nodes2, 1))
+    xml_xpath_node_leading_sorted(nodes1, xml_xpath_node_set_item!(nodes2, 1))
 }
 
-/**
- * xmlXPathNodeLeading:
- * @nodes:  a node-set
- * @node:  a node
- *
- * Implements the EXSLT - Sets leading() function:
- *    node-set set:leading (node-set, node-set)
- * @nodes is sorted by document order, then #exslSetsNodeLeadingSorted
- * is called.
- *
- * Returns the nodes in @nodes that precede @node in document order,
- *         @nodes if @node is NULL or an empty node-set if @nodes
- *         doesn't contain @node
- */
+/// Implements the EXSLT - Sets leading() function:
+///    node-set set:leading (node-set, node-set)
+/// @nodes is sorted by document order, then #exslSetsNodeLeadingSorted
+/// is called.
+///
+/// Returns the nodes in @nodes that precede @node in document order,
+/// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+#[doc(alias = "xmlXPathNodeLeading")]
 pub unsafe extern "C" fn xml_xpath_node_leading(
     nodes: XmlNodeSetPtr,
     node: XmlNodePtr,
@@ -2080,47 +1876,36 @@ pub unsafe extern "C" fn xml_xpath_node_leading(
     xml_xpath_node_leading_sorted(nodes, node)
 }
 
-/**
- * xmlXPathLeading:
- * @nodes1:  a node-set
- * @nodes2:  a node-set
- *
- * Implements the EXSLT - Sets leading() function:
- *    node-set set:leading (node-set, node-set)
- * @nodes1 and @nodes2 are sorted by document order, then
- * #exslSetsLeadingSorted is called.
- *
- * Returns the nodes in @nodes1 that precede the first node in @nodes2
- *         in document order, @nodes1 if @nodes2 is NULL or empty or
- *         an empty node-set if @nodes1 doesn't contain @nodes2
- */
+/// Implements the EXSLT - Sets leading() function:
+///    node-set set:leading (node-set, node-set)
+/// @nodes1 and @nodes2 are sorted by document order, then
+/// #exslSetsLeadingSorted is called.
+///
+/// Returns the nodes in @nodes1 that precede the first node in @nodes2
+/// in document order, @nodes1 if @nodes2 is NULL or empty or
+/// an empty node-set if @nodes1 doesn't contain @nodes2
+#[doc(alias = "xmlXPathLeading")]
 pub unsafe extern "C" fn xml_xpath_leading(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
 ) -> XmlNodeSetPtr {
-    if xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes2) {
         return nodes1;
     }
-    if xmlXPathNodeSetIsEmpty!(nodes1) {
+    if xml_xpath_node_set_is_empty!(nodes1) {
         return xml_xpath_node_set_create(null_mut());
     }
     xml_xpath_node_set_sort(nodes1);
     xml_xpath_node_set_sort(nodes2);
-    xml_xpath_node_leading_sorted(nodes1, xmlXPathNodeSetItem!(nodes2, 1))
+    xml_xpath_node_leading_sorted(nodes1, xml_xpath_node_set_item!(nodes2, 1))
 }
 
-/**
- * xmlXPathNodeTrailingSorted:
- * @nodes: a node-set, sorted by document order
- * @node: a node
- *
- * Implements the EXSLT - Sets trailing() function:
- *    node-set set:trailing (node-set, node-set)
- *
- * Returns the nodes in @nodes that follow @node in document order,
- *         @nodes if @node is NULL or an empty node-set if @nodes
- *         doesn't contain @node
- */
+/// Implements the EXSLT - Sets trailing() function:
+///    node-set set:trailing (node-set, node-set)
+///
+/// Returns the nodes in @nodes that follow @node in document order,
+/// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+#[doc(alias = "xmlXPathNodeTrailingSorted")]
 pub unsafe extern "C" fn xml_xpath_node_trailing_sorted(
     nodes: XmlNodeSetPtr,
     node: XmlNodePtr,
@@ -2135,13 +1920,13 @@ pub unsafe extern "C" fn xml_xpath_node_trailing_sorted(
     if ret.is_null() {
         return ret;
     }
-    if xmlXPathNodeSetIsEmpty!(nodes) || xml_xpath_node_set_contains(nodes, node) == 0 {
+    if xml_xpath_node_set_is_empty!(nodes) || xml_xpath_node_set_contains(nodes, node) == 0 {
         return ret;
     }
 
-    let l: i32 = xmlXPathNodeSetGetLength!(nodes);
+    let l: i32 = xml_xpath_node_set_get_length!(nodes);
     for i in (0..l).rev() {
-        cur = xmlXPathNodeSetItem!(nodes, i);
+        cur = xml_xpath_node_set_item!(nodes, i);
         if cur == node {
             break;
         }
@@ -2154,42 +1939,31 @@ pub unsafe extern "C" fn xml_xpath_node_trailing_sorted(
     ret
 }
 
-/**
- * xmlXPathTrailingSorted:
- * @nodes1:  a node-set, sorted by document order
- * @nodes2:  a node-set, sorted by document order
- *
- * Implements the EXSLT - Sets trailing() function:
- *    node-set set:trailing (node-set, node-set)
- *
- * Returns the nodes in @nodes1 that follow the first node in @nodes2
- *         in document order, @nodes1 if @nodes2 is NULL or empty or
- *         an empty node-set if @nodes1 doesn't contain @nodes2
- */
+/// Implements the EXSLT - Sets trailing() function:
+///    node-set set:trailing (node-set, node-set)
+///
+/// Returns the nodes in @nodes1 that follow the first node in @nodes2
+/// in document order, @nodes1 if @nodes2 is NULL or empty or
+/// an empty node-set if @nodes1 doesn't contain @nodes2
+#[doc(alias = "xmlXPathTrailingSorted")]
 pub unsafe extern "C" fn xml_xpath_trailing_sorted(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
 ) -> XmlNodeSetPtr {
-    if xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes2) {
         return nodes1;
     }
-    xml_xpath_node_trailing_sorted(nodes1, xmlXPathNodeSetItem!(nodes2, 0))
+    xml_xpath_node_trailing_sorted(nodes1, xml_xpath_node_set_item!(nodes2, 0))
 }
 
-/**
- * xmlXPathNodeTrailing:
- * @nodes:  a node-set
- * @node:  a node
- *
- * Implements the EXSLT - Sets trailing() function:
- *    node-set set:trailing (node-set, node-set)
- * @nodes is sorted by document order, then #xmlXPathNodeTrailingSorted
- * is called.
- *
- * Returns the nodes in @nodes that follow @node in document order,
- *         @nodes if @node is NULL or an empty node-set if @nodes
- *         doesn't contain @node
- */
+/// Implements the EXSLT - Sets trailing() function:
+///    node-set set:trailing (node-set, node-set)
+/// @nodes is sorted by document order, then #xmlXPathNodeTrailingSorted
+/// is called.
+///
+/// Returns the nodes in @nodes that follow @node in document order,
+/// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+#[doc(alias = "xmlXPathNodeTrailing")]
 pub unsafe extern "C" fn xml_xpath_node_trailing(
     nodes: XmlNodeSetPtr,
     node: XmlNodePtr,
@@ -2198,50 +1972,34 @@ pub unsafe extern "C" fn xml_xpath_node_trailing(
     xml_xpath_node_trailing_sorted(nodes, node)
 }
 
-/**
- * xmlXPathTrailing:
- * @nodes1:  a node-set
- * @nodes2:  a node-set
- *
- * Implements the EXSLT - Sets trailing() function:
- *    node-set set:trailing (node-set, node-set)
- * @nodes1 and @nodes2 are sorted by document order, then
- * #xmlXPathTrailingSorted is called.
- *
- * Returns the nodes in @nodes1 that follow the first node in @nodes2
- *         in document order, @nodes1 if @nodes2 is NULL or empty or
- *         an empty node-set if @nodes1 doesn't contain @nodes2
- */
+/// Implements the EXSLT - Sets trailing() function:
+///    node-set set:trailing (node-set, node-set)
+/// @nodes1 and @nodes2 are sorted by document order, then
+/// #xmlXPathTrailingSorted is called.
+///
+/// Returns the nodes in @nodes1 that follow the first node in @nodes2
+/// in document order, @nodes1 if @nodes2 is NULL or empty or
+/// an empty node-set if @nodes1 doesn't contain @nodes2
+#[doc(alias = "xmlXPathTrailing")]
 pub unsafe extern "C" fn xml_xpath_trailing(
     nodes1: XmlNodeSetPtr,
     nodes2: XmlNodeSetPtr,
 ) -> XmlNodeSetPtr {
-    if xmlXPathNodeSetIsEmpty!(nodes2) {
+    if xml_xpath_node_set_is_empty!(nodes2) {
         return nodes1;
     }
-    if xmlXPathNodeSetIsEmpty!(nodes1) {
+    if xml_xpath_node_set_is_empty!(nodes1) {
         return xml_xpath_node_set_create(null_mut());
     }
     xml_xpath_node_set_sort(nodes1);
     xml_xpath_node_set_sort(nodes2);
-    xml_xpath_node_trailing_sorted(nodes1, xmlXPathNodeSetItem!(nodes2, 0))
+    xml_xpath_node_trailing_sorted(nodes1, xml_xpath_node_set_item!(nodes2, 0))
 }
 
-/**
- * Extending a context.
- */
-
-/**
- * xmlXPathRegisterNs:
- * @ctxt:  the XPath context
- * @prefix:  the namespace prefix cannot be NULL or empty string
- * @ns_uri:  the namespace name
- *
- * Register a new namespace. If @ns_uri is NULL it unregisters
- * the namespace
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Register a new namespace. If @ns_uri is NULL it unregisters the namespace
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlXPathRegisterNs")]
 pub unsafe extern "C" fn xml_xpath_register_ns(
     ctxt: XmlXPathContextPtr,
     prefix: *const XmlChar,
@@ -2285,16 +2043,11 @@ pub unsafe extern "C" fn xml_xpath_register_ns(
     0
 }
 
-/**
- * xmlXPathNsLookup:
- * @ctxt:  the XPath context
- * @prefix:  the namespace prefix value
- *
- * Search in the namespace declaration array of the context for the given
- * namespace name associated to the given prefix
- *
- * Returns the value or NULL if not found
- */
+/// Search in the namespace declaration array of the context for the given
+/// namespace name associated to the given prefix
+///
+/// Returns the value or NULL if not found
+#[doc(alias = "xmlXPathNsLookup")]
 pub unsafe extern "C" fn xml_xpath_ns_lookup(
     ctxt: XmlXPathContextPtr,
     prefix: *const XmlChar,
@@ -2323,12 +2076,8 @@ pub unsafe extern "C" fn xml_xpath_ns_lookup(
     xml_hash_lookup((*ctxt).ns_hash, prefix) as _
 }
 
-/**
- * xmlXPathRegisteredNsCleanup:
- * @ctxt:  the XPath context
- *
- * Cleanup the XPath context data associated to registered variables
- */
+/// Cleanup the XPath context data associated to registered variables
+#[doc(alias = "xmlXPathRegisteredNsCleanup")]
 pub unsafe extern "C" fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPtr) {
     if ctxt.is_null() {
         return;
@@ -2338,16 +2087,10 @@ pub unsafe extern "C" fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPt
     (*ctxt).ns_hash = null_mut();
 }
 
-/**
- * xmlXPathRegisterFunc:
- * @ctxt:  the XPath context
- * @name:  the function name
- * @f:  the function implementation or NULL
- *
- * Register a new function. If @f is NULL it unregisters the function
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Register a new function. If @f is NULL it unregisters the function
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlXPathRegisterFunc")]
 pub unsafe extern "C" fn xml_xpath_register_func(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2356,17 +2099,10 @@ pub unsafe extern "C" fn xml_xpath_register_func(
     xml_xpath_register_func_ns(ctxt, name, null(), Some(f))
 }
 
-/**
- * xmlXPathRegisterFuncNS:
- * @ctxt:  the XPath context
- * @name:  the function name
- * @ns_uri:  the function namespace URI
- * @f:  the function implementation or NULL
- *
- * Register a new function. If @f is NULL it unregisters the function
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Register a new function. If @f is NULL it unregisters the function
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlXPathRegisterFuncNS")]
 pub unsafe extern "C" fn xml_xpath_register_func_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2398,17 +2134,10 @@ pub unsafe extern "C" fn xml_xpath_register_func_ns(
     }
 }
 
-/**
- * xmlXPathRegisterVariable:
- * @ctxt:  the XPath context
- * @name:  the variable name
- * @value:  the variable value or NULL
- *
- * Register a new variable value. If @value is NULL it unregisters
- * the variable
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Register a new variable value. If @value is NULL it unregisters the variable
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlXPathRegisterVariable")]
 pub unsafe extern "C" fn xml_xpath_register_variable(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2423,18 +2152,10 @@ extern "C" fn xml_xpath_free_object_entry(obj: *mut c_void, _name: *const XmlCha
     }
 }
 
-/**
- * xmlXPathRegisterVariableNS:
- * @ctxt:  the XPath context
- * @name:  the variable name
- * @ns_uri:  the variable namespace URI
- * @value:  the variable value or NULL
- *
- * Register a new variable value. If @value is NULL it unregisters
- * the variable
- *
- * Returns 0 in case of success, -1 in case of error
- */
+/// Register a new variable value. If @value is NULL it unregisters the variable
+///
+/// Returns 0 in case of success, -1 in case of error
+#[doc(alias = "xmlXPathRegisterVariableNS")]
 pub unsafe extern "C" fn xml_xpath_register_variable_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2471,16 +2192,10 @@ pub unsafe extern "C" fn xml_xpath_register_variable_ns(
     )
 }
 
-/**
- * xmlXPathFunctionLookup:
- * @ctxt:  the XPath context
- * @name:  the function name
- *
- * Search in the Function array of the context for the given
- * function.
- *
- * Returns the xmlXPathFunction or NULL if not found
- */
+/// Search in the Function array of the context for the given function.
+///
+/// Returns the xmlXPathFunction or NULL if not found
+#[doc(alias = "xmlXPathFunctionLookup")]
 pub unsafe extern "C" fn xml_xpath_function_lookup(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2497,17 +2212,10 @@ pub unsafe extern "C" fn xml_xpath_function_lookup(
     xml_xpath_function_lookup_ns(ctxt, name, null())
 }
 
-/**
- * xmlXPathFunctionLookupNS:
- * @ctxt:  the XPath context
- * @name:  the function name
- * @ns_uri:  the function namespace URI
- *
- * Search in the Function array of the context for the given
- * function.
- *
- * Returns the xmlXPathFunction or NULL if not found
- */
+/// Search in the Function array of the context for the given function.
+///
+/// Returns the xmlXPathFunction or NULL if not found
+#[doc(alias = "xmlXPathFunctionLookupNS")]
 pub unsafe extern "C" fn xml_xpath_function_lookup_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2534,12 +2242,8 @@ pub unsafe extern "C" fn xml_xpath_function_lookup_ns(
     (!ret.is_null()).then(|| *(addr_of!(ret) as *const XmlXPathFunction))
 }
 
-/**
- * xmlXPathRegisteredFuncsCleanup:
- * @ctxt:  the XPath context
- *
- * Cleanup the XPath context data associated to registered functions
- */
+/// Cleanup the XPath context data associated to registered functions
+#[doc(alias = "xmlXPathRegisteredFuncsCleanup")]
 pub unsafe extern "C" fn xml_xpath_registered_funcs_cleanup(ctxt: XmlXPathContextPtr) {
     if ctxt.is_null() {
         return;
@@ -2549,16 +2253,10 @@ pub unsafe extern "C" fn xml_xpath_registered_funcs_cleanup(ctxt: XmlXPathContex
     (*ctxt).func_hash = null_mut();
 }
 
-/**
- * xmlXPathVariableLookup:
- * @ctxt:  the XPath context
- * @name:  the variable name
- *
- * Search in the Variable array of the context for the given
- * variable value.
- *
- * Returns a copy of the value or NULL if not found
- */
+/// Search in the Variable array of the context for the given variable value.
+///
+/// Returns a copy of the value or NULL if not found
+#[doc(alias = "xmlXPathVariableLookup")]
 pub unsafe extern "C" fn xml_xpath_variable_lookup(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2579,18 +2277,13 @@ macro_rules! XP_HAS_CACHE {
     };
 }
 
-/**
- * xmlXPathCacheWrapNodeSet:
- * @ctxt: the XPath context
- * @val:  the NodePtr value
- *
- * This is the cached version of xmlXPathWrapNodeSet().
- * Wrap the Nodeset @val in a new xmlXPathObjectPtr
- *
- * Returns the created or reused object.
- *
- * In case of error the node set is destroyed and NULL is returned.
- */
+/// This is the cached version of xmlXPathWrapNodeSet().
+/// Wrap the Nodeset @val in a new xmlXPathObjectPtr
+///
+/// Returns the created or reused object.
+///
+/// In case of error the node set is destroyed and NULL is returned.
+#[doc(alias = "xmlXPathCacheWrapNodeSet")]
 unsafe extern "C" fn xml_xpath_cache_wrap_node_set(
     ctxt: XmlXPathContextPtr,
     val: XmlNodeSetPtr,
@@ -2616,13 +2309,8 @@ unsafe extern "C" fn xml_xpath_cache_wrap_node_set(
     xml_xpath_wrap_node_set(val)
 }
 
-/**
- * xmlXPathErrMemory:
- * @ctxt:  an XPath context
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlXPathErrMemory")]
 pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *const c_char) {
     if !ctxt.is_null() {
         (*ctxt).last_error.reset();
@@ -2693,16 +2381,11 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
     }
 }
 
-/**
- * xmlXPathCacheNewString:
- * @ctxt: the XPath context
- * @val:  the xmlChar * value
- *
- * This is the cached version of xmlXPathNewString().
- * Acquire an xmlXPathObjectPtr of type string and of value @val
- *
- * Returns the created or reused object.
- */
+/// This is the cached version of xmlXPathNewString().
+/// Acquire an xmlXPathObjectPtr of type string and of value @val
+///
+/// Returns the created or reused object.
+#[doc(alias = "xmlXPathCacheNewString")]
 unsafe extern "C" fn xml_xpath_cache_new_string(
     ctxt: XmlXPathContextPtr,
     mut val: *const XmlChar,
@@ -2727,9 +2410,6 @@ unsafe extern "C" fn xml_xpath_cache_new_string(
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XpathString;
             (*ret).stringval = copy;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathString);
-            // #endif
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             if val.is_null() {
@@ -2749,25 +2429,17 @@ unsafe extern "C" fn xml_xpath_cache_new_string(
 
             (*ret).typ = XmlXPathObjectType::XpathString;
             (*ret).stringval = copy;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathString);
-            // #endif
             return ret;
         }
     }
     xml_xpath_new_string(val)
 }
 
-/**
- * xmlXPathCacheNewBoolean:
- * @ctxt: the XPath context
- * @val:  the boolean value
- *
- * This is the cached version of xmlXPathNewBoolean().
- * Acquires an xmlXPathObjectPtr of type boolean and of value @val
- *
- * Returns the created or reused object.
- */
+/// This is the cached version of xmlXPathNewBoolean().
+/// Acquires an xmlXPathObjectPtr of type boolean and of value @val
+///
+/// Returns the created or reused object.
+#[doc(alias = "xmlXPathCacheNewBoolean")]
 unsafe extern "C" fn xml_xpath_cache_new_boolean(
     ctxt: XmlXPathContextPtr,
     val: i32,
@@ -2783,9 +2455,6 @@ unsafe extern "C" fn xml_xpath_cache_new_boolean(
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XpathBoolean;
             (*ret).boolval = (val != 0) as i32;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathBoolean);
-            // #endif
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             (*(*cache).misc_objs).number -= 1;
@@ -2796,25 +2465,17 @@ unsafe extern "C" fn xml_xpath_cache_new_boolean(
 
             (*ret).typ = XmlXPathObjectType::XpathBoolean;
             (*ret).boolval = (val != 0) as i32;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathBoolean);
-            // #endif
             return ret;
         }
     }
     xml_xpath_new_boolean(val)
 }
 
-/**
- * xmlXPathCacheNewFloat:
- * @ctxt: the XPath context
- * @val:  the let value: f64
- *
- * This is the cached version of xmlXPathNewFloat().
- * Acquires an xmlXPathObjectPtr of type f64 and of value @val
- *
- * Returns the created or reused object.
- */
+/// This is the cached version of xmlXPathNewFloat().
+/// Acquires an xmlXPathObjectPtr of type f64 and of value @val
+///
+/// Returns the created or reused object.
+#[doc(alias = "xmlXPathCacheNewFloat")]
 unsafe extern "C" fn xml_xpath_cache_new_float(
     ctxt: XmlXPathContextPtr,
     val: f64,
@@ -2830,9 +2491,6 @@ unsafe extern "C" fn xml_xpath_cache_new_float(
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XpathNumber;
             (*ret).floatval = val;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathNumber);
-            // #endif
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             (*(*cache).misc_objs).number -= 1;
@@ -2843,25 +2501,17 @@ unsafe extern "C" fn xml_xpath_cache_new_float(
 
             (*ret).typ = XmlXPathObjectType::XpathNumber;
             (*ret).floatval = val;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathNumber);
-            // #endif
             return ret;
         }
     }
     xml_xpath_new_float(val)
 }
 
-/**
- * xmlXPathCacheObjectCopy:
- * @ctxt: the XPath context
- * @val:  the original object
- *
- * This is the cached version of xmlXPathObjectCopy().
- * Acquire a copy of a given object
- *
- * Returns a created or reused created object.
- */
+/// This is the cached version of xmlXPathObjectCopy().
+/// Acquire a copy of a given object
+///
+/// Returns a created or reused created object.
+#[doc(alias = "xmlXPathCacheObjectCopy")]
 unsafe extern "C" fn xml_xpath_cache_object_copy(
     ctxt: XmlXPathContextPtr,
     val: XmlXPathObjectPtr,
@@ -2893,17 +2543,10 @@ unsafe extern "C" fn xml_xpath_cache_object_copy(
     xml_xpath_object_copy(val)
 }
 
-/**
- * xmlXPathVariableLookupNS:
- * @ctxt:  the XPath context
- * @name:  the variable name
- * @ns_uri:  the variable namespace URI
- *
- * Search in the Variable array of the context for the given
- * variable value.
- *
- * Returns the a copy of the value or NULL if not found
- */
+/// Search in the Variable array of the context for the given variable value.
+///
+/// Returns the a copy of the value or NULL if not found
+#[doc(alias = "xmlXPathVariableLookupNS")]
 pub unsafe extern "C" fn xml_xpath_variable_lookup_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
@@ -2933,12 +2576,8 @@ pub unsafe extern "C" fn xml_xpath_variable_lookup_ns(
     )
 }
 
-/**
- * xmlXPathRegisteredVariablesCleanup:
- * @ctxt:  the XPath context
- *
- * Cleanup the XPath context data associated to registered variables
- */
+/// Cleanup the XPath context data associated to registered variables
+#[doc(alias = "xmlXPathRegisteredVariablesCleanup")]
 pub unsafe extern "C" fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathContextPtr) {
     if ctxt.is_null() {
         return;
@@ -2948,13 +2587,10 @@ pub unsafe extern "C" fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathCo
     (*ctxt).var_hash = null_mut();
 }
 
-/**
- * xmlXPathNewCompExpr:
- *
- * Create a new Xpath component
- *
- * Returns the newly allocated xmlXPathCompExprPtr or NULL in case of error
- */
+/// Create a new Xpath component
+///
+/// Returns the newly allocated xmlXPathCompExprPtr or NULL in case of error
+#[doc(alias = "xmlXPathNewCompExpr")]
 unsafe extern "C" fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
     let cur: XmlXPathCompExprPtr = xml_malloc(size_of::<XmlXPathCompExpr>()) as XmlXPathCompExprPtr;
     if cur.is_null() {
@@ -2977,24 +2613,13 @@ unsafe extern "C" fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
         (*cur).max_step as usize * size_of::<XmlXPathStepOp>(),
     );
     (*cur).last = -1;
-    // #ifdef DEBUG_EVAL_COUNTS
-    //     (*cur).nb = 0;
-    // #endif
     cur
 }
 
-/**
- * Utilities to extend XPath.
- */
-/**
- * xmlXPathNewParserContext:
- * @str:  the XPath expression
- * @ctxt:  the XPath context
- *
- * Create a new xmlXPathParserContext
- *
- * Returns the xmlXPathParserContext just allocated.
- */
+/// Create a new xmlXPathParserContext
+///
+/// Returns the xmlXPathParserContext just allocated.
+#[doc(alias = "xmlXPathNewParserContext")]
 pub unsafe extern "C" fn xml_xpath_new_parser_context(
     str: *const XmlChar,
     ctxt: XmlXPathContextPtr,
@@ -3024,12 +2649,8 @@ pub unsafe extern "C" fn xml_xpath_new_parser_context(
     ret
 }
 
-/**
- * xmlXPathFreeParserContext:
- * @ctxt:  the context to free
- *
- * Free up an xmlXPathParserContext
- */
+/// Free up an xmlXPathParserContext
+#[doc(alias = "xmlXPathFreeParserContext")]
 pub unsafe extern "C" fn xml_xpath_free_parser_context(ctxt: XmlXPathParserContextPtr) {
     if !(*ctxt).value_tab.is_null() {
         for i in 0..(*ctxt).value_nr {
@@ -3052,15 +2673,11 @@ pub unsafe extern "C" fn xml_xpath_free_parser_context(ctxt: XmlXPathParserConte
     xml_free(ctxt as _);
 }
 
-/* TODO: remap to xmlXPathValuePop and Push. */
-/**
- * valuePop:
- * @ctxt: an XPath evaluation context
- *
- * Pops the top XPath object from the value stack
- *
- * Returns the XPath object just removed
- */
+// TODO: remap to xmlXPathValuePop and Push.
+/// Pops the top XPath object from the value stack
+///
+/// Returns the XPath object just removed
+#[doc(alias = "valuePop")]
 pub unsafe extern "C" fn value_pop(ctxt: XmlXPathParserContextPtr) -> XmlXPathObjectPtr {
     if ctxt.is_null() || (*ctxt).value_nr <= 0 {
         return null_mut();
@@ -3077,13 +2694,8 @@ pub unsafe extern "C" fn value_pop(ctxt: XmlXPathParserContextPtr) -> XmlXPathOb
     ret
 }
 
-/**
- * xmlXPathPErrMemory:
- * @ctxt:  an XPath parser context
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlXPathPErrMemory")]
 unsafe extern "C" fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: *const c_char) {
     if ctxt.is_null() {
         xml_xpath_err_memory(null_mut(), extra);
@@ -3093,18 +2705,13 @@ unsafe extern "C" fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra
     }
 }
 
-/**
- * valuePush:
- * @ctxt:  an XPath evaluation context
- * @value:  the XPath object
- *
- * Pushes a new XPath object on top of the value stack. If value is NULL,
- * a memory error is recorded in the parser context.
- *
- * Returns the number of items on the value stack, or -1 in case of error.
- *
- * The object is destroyed in case of error.
- */
+/// Pushes a new XPath object on top of the value stack. If value is NULL,
+/// a memory error is recorded in the parser context.
+///
+/// Returns the number of items on the value stack, or -1 in case of error.
+///
+/// The object is destroyed in case of error.
+#[doc(alias = "valuePush")]
 pub unsafe extern "C" fn value_push(
     ctxt: XmlXPathParserContextPtr,
     value: XmlXPathObjectPtr,
@@ -3145,14 +2752,10 @@ pub unsafe extern "C" fn value_push(
     res
 }
 
-/**
- * xmlXPathNewString:
- * @val:  the xmlChar * value
- *
- * Create a new xmlXPathObjectPtr of type string and of value @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type string and of value @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewString")]
 pub unsafe extern "C" fn xml_xpath_new_string(mut val: *const XmlChar) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -3172,28 +2775,20 @@ pub unsafe extern "C" fn xml_xpath_new_string(mut val: *const XmlChar) -> XmlXPa
     ret
 }
 
-/**
- * xmlXPathNewCString:
- * @val:  the c_char * value
- *
- * Create a new xmlXPathObjectPtr of type string and of value @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type string and of value @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewCString")]
 pub unsafe extern "C" fn xml_xpath_new_cstring(val: *const c_char) -> XmlXPathObjectPtr {
     xml_xpath_new_string(val as _)
 }
 
-/**
- * xmlXPathWrapString:
- * @val:  the xmlChar * value
- *
- * Wraps the @val string into an XPath object.
- *
- * Returns the newly created object.
- *
- * Frees @val in case of error.
- */
+/// Wraps the @val string into an XPath object.
+///
+/// Returns the newly created object.
+///
+/// Frees @val in case of error.
+#[doc(alias = "xmlXPathWrapString")]
 pub unsafe extern "C" fn xml_xpath_wrap_string(val: *mut XmlChar) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -3207,28 +2802,18 @@ pub unsafe extern "C" fn xml_xpath_wrap_string(val: *mut XmlChar) -> XmlXPathObj
     ret
 }
 
-/**
- * xmlXPathWrapCString:
- * @val:  the c_char * value
- *
- * Wraps a string into an XPath object.
- *
- * Returns the newly created object.
- */
+/// Wraps a string into an XPath object.
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathWrapCString")]
 pub unsafe extern "C" fn xml_xpath_wrap_cstring(val: *mut c_char) -> XmlXPathObjectPtr {
     xml_xpath_wrap_string(val as *mut XmlChar)
 }
 
-/* Allocations are terrible, one needs to optimize all this !!! */
-
-/**
- * xmlXPathNewFloat:
- * @val:  the let value: f64
- *
- * Create a new xmlXPathObjectPtr of type f64 and of value @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type f64 and of value @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewFloat")]
 pub unsafe extern "C" fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -3238,20 +2823,13 @@ pub unsafe extern "C" fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
     memset(ret as _, 0, size_of::<XmlXPathObject>());
     (*ret).typ = XmlXPathObjectType::XpathNumber;
     (*ret).floatval = val;
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageRequested(NULL, XpathNumber);
-    // #endif
     ret
 }
 
-/**
- * xmlXPathNewBoolean:
- * @val:  the boolean value
- *
- * Create a new xmlXPathObjectPtr of type boolean and of value @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type boolean and of value @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewBoolean")]
 pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -3264,15 +2842,11 @@ pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
     ret
 }
 
-/**
- * xmlXPathNewNodeSet:
- * @val:  the NodePtr value
- *
- * Create a new xmlXPathObjectPtr of type NodeSet and initialize
- * it with the single Node @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type NodeSet and initialize
+/// it with the single Node @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewNodeSet")]
 pub unsafe extern "C" fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -3285,21 +2859,14 @@ pub unsafe extern "C" fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObje
     /* TODO: Check memory error. */
     (*ret).nodesetval = xml_xpath_node_set_create(val);
     /* @@ with_ns to check whether namespace nodes should be looked at @@ */
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageRequested(NULL, XpathNodeset);
-    // #endif
     ret
 }
 
-/**
- * xmlXPathNewValueTree:
- * @val:  the NodePtr value
- *
- * Create a new xmlXPathObjectPtr of type Value Tree (XSLT) and initialize
- * it with the tree root @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type Value Tree (XSLT) and initialize
+/// it with the tree root @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewValueTree")]
 pub unsafe extern "C" fn xml_xpath_new_value_tree(val: XmlNodePtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -3311,25 +2878,17 @@ pub unsafe extern "C" fn xml_xpath_new_value_tree(val: XmlNodePtr) -> XmlXPathOb
     (*ret).boolval = 1;
     (*ret).user = val as *mut c_void;
     (*ret).nodesetval = xml_xpath_node_set_create(val);
-    // #ifdef XP_DEBUG_OBJ_USAGE
-    //     xmlXPathDebugObjUsageRequested(NULL, XpathXsltTree);
-    // #endif
     ret
 }
 
 pub const XML_NODESET_DEFAULT: usize = 10;
 
-/**
- * xmlXPathNodeSetDupNs:
- * @node:  the parent node of the namespace XPath node
- * @ns:  the libxml namespace declaration node.
- *
- * Namespace node in libxml don't match the XPath semantic. In a node set
- * the namespace nodes are duplicated and the next pointer is set to the
- * parent node in the XPath semantic.
- *
- * Returns the newly created object.
- */
+/// Namespace node in libxml don't match the XPath semantic. In a node set
+/// the namespace nodes are duplicated and the next pointer is set to the
+/// parent node in the XPath semantic.
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNodeSetDupNs")]
 pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPtr) -> XmlNodePtr {
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
@@ -3358,15 +2917,10 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
     cur as XmlNodePtr
 }
 
-/**
- * xmlXPathNodeSetAdd:
- * @cur:  the initial node set
- * @val:  a new xmlNodePtr
- *
- * add a new xmlNodePtr to an existing NodeSet
- *
- * Returns 0 in case of success, and -1 in case of error
- */
+/// Add a new xmlNodePtr to an existing NodeSet
+///
+/// Returns 0 in case of success, and -1 in case of error
+#[doc(alias = "xmlXPathNodeSetAdd")]
 pub unsafe extern "C" fn xml_xpath_node_set_add(cur: XmlNodeSetPtr, val: XmlNodePtr) -> i32 {
     if cur.is_null() || val.is_null() {
         return -1;
@@ -3430,16 +2984,11 @@ pub unsafe extern "C" fn xml_xpath_node_set_add(cur: XmlNodeSetPtr, val: XmlNode
     0
 }
 
-/**
- * xmlXPathNodeSetAddUnique:
- * @cur:  the initial node set
- * @val:  a new xmlNodePtr
- *
- * add a new xmlNodePtr to an existing NodeSet, optimized version
- * when we are sure the node is not already in the set.
- *
- * Returns 0 in case of success and -1 in case of failure
- */
+/// Add a new xmlNodePtr to an existing NodeSet, optimized version
+/// when we are sure the node is not already in the set.
+///
+/// Returns 0 in case of success and -1 in case of failure
+#[doc(alias = "xmlXPathNodeSetAddUnique")]
 pub unsafe extern "C" fn xml_xpath_node_set_add_unique(cur: XmlNodeSetPtr, val: XmlNodePtr) -> i32 {
     if cur.is_null() || val.is_null() {
         return -1;
@@ -3494,16 +3043,10 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_unique(cur: XmlNodeSetPtr, val: 
     0
 }
 
-/**
- * xmlXPathNodeSetAddNs:
- * @cur:  the initial node set
- * @node:  the hosting node
- * @ns:  a the namespace node
- *
- * add a new namespace node to an existing NodeSet
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Add a new namespace node to an existing NodeSet
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "xmlXPathNodeSetAddNs")]
 pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
     cur: XmlNodeSetPtr,
     node: XmlNodePtr,
@@ -3579,17 +3122,12 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
     0
 }
 
-/**
- * xmlXPathCmpNodesExt:
- * @node1:  the first node
- * @node2:  the second node
- *
- * Compare two nodes w.r.t document order.
- * This one is optimized for handling of non-element nodes.
- *
- * Returns -2 in case of error 1 if first point < second point, 0 if
- *         it's the same node, -1 otherwise
- */
+/// Compare two nodes w.r.t document order.
+/// This one is optimized for handling of non-element nodes.
+///
+/// Returns -2 in case of error 1 if first point < second point, 0
+/// if it's the same node, -1 otherwise
+#[doc(alias = "xmlXPathCmpNodesExt")]
 unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
     let mut depth1: i32;
     let mut depth2: i32;
@@ -3910,12 +3448,8 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     -1 /* assume there is no sibling list corruption */
 }
 
-/**
- * xmlXPathNodeSetSort:
- * @set:  the node set
- *
- * Sort the node set in document order
- */
+/// Sort the node set in document order
+#[doc(alias = "xmlXPathNodeSetSort")]
 pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
     // #ifndef WITH_TIM_SORT
 
@@ -3961,17 +3495,12 @@ pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
     }
 }
 
-/**
- * xmlXPathCacheNewNodeSet:
- * @ctxt: the XPath context
- * @val:  the NodePtr value
- *
- * This is the cached version of xmlXPathNewNodeSet().
- * Acquire an xmlXPathObjectPtr of type NodeSet and initialize
- * it with the single Node @val
- *
- * Returns the created or reused object.
- */
+/// This is the cached version of xmlXPathNewNodeSet().
+/// Acquire an xmlXPathObjectPtr of type NodeSet and initialize
+/// it with the single Node @val
+///
+/// Returns the created or reused object.
+#[doc(alias = "xmlXPathCacheNewNodeSet")]
 unsafe extern "C" fn xml_xpath_cache_new_node_set(
     ctxt: XmlXPathContextPtr,
     val: XmlNodePtr,
@@ -4029,12 +3558,8 @@ unsafe extern "C" fn xml_xpath_cache_new_node_set(
     xml_xpath_new_node_set(val)
 }
 
-/**
- * xmlXPathRoot:
- * @ctxt:  the XPath Parser context
- *
- * Initialize the context to the root of the document
- */
+/// Initialize the context to the root of the document
+#[doc(alias = "xmlXPathRoot")]
 pub unsafe extern "C" fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return;
@@ -4045,15 +3570,10 @@ pub unsafe extern "C" fn xml_xpath_root(ctxt: XmlXPathParserContextPtr) {
     );
 }
 
-/**
- * xmlXPathTryStreamCompile:
- * @ctxt: an XPath context
- * @str:  the XPath expression
- *
- * Try to compile the XPath expression as a streamable subset.
- *
- * Returns the compiled expression or NULL if failed to compile.
- */
+/// Try to compile the XPath expression as a streamable subset.
+///
+/// Returns the compiled expression or NULL if failed to compile.
+#[doc(alias = "xmlXPathTryStreamCompile")]
 #[cfg(feature = "libxml_pattern")]
 pub unsafe extern "C" fn xml_xpath_try_stream_compile(
     ctxt: XmlXPathContextPtr,
@@ -4195,22 +3715,10 @@ macro_rules! PUSH_BINARY_EXPR {
     };
 }
 
-/**
- * xmlXPathCompExprAdd:
- * @comp:  the compiled expression
- * @ch1: first child index
- * @ch2: second child index
- * @op:  an op
- * @value:  the first value: int
- * @value2:  the second value: int
- * @value3:  the third value: int
- * @value4:  the first string value
- * @value5:  the second string value
- *
- * Add a step to an XPath Compiled Expression
- *
- * Returns -1 in case of failure, the index otherwise
- */
+/// Add a step to an XPath Compiled Expression
+///
+/// Returns -1 in case of failure, the index otherwise
+#[doc(alias = "xmlXPathCompExprAdd")]
 unsafe extern "C" fn xml_xpath_comp_expr_add(
     ctxt: XmlXPathParserContextPtr,
     ch1: i32,
@@ -4463,18 +3971,11 @@ macro_rules! NEXTL {
     };
 }
 
-/**
- * xmlXPathCurrentChar:
- * @ctxt:  the XPath parser context
- * @cur:  pointer to the beginning of the c_char
- * @len:  pointer to the length of the c_char read
- *
- * The current c_char value, if using UTF-8 this may actually span multiple
- * bytes in the input buffer.
- *
- * Returns the current c_char value and its length
- */
-
+/// The current c_char value, if using UTF-8 this may actually span multiple
+/// bytes in the input buffer.
+///
+/// Returns the current c_char value and its length
+#[doc(alias = "xmlXPathCurrentChar")]
 unsafe extern "C" fn xml_xpath_current_char(ctxt: XmlXPathParserContextPtr, len: *mut i32) -> i32 {
     let mut val: u32;
 
@@ -4553,23 +4054,17 @@ unsafe extern "C" fn xml_xpath_current_char(ctxt: XmlXPathParserContextPtr, len:
     XP_ERROR0!(ctxt, XmlXPathError::XpathEncodingError as i32);
 }
 
-/**
- * xmlXPathScanName:
- * @ctxt:  the XPath Parser context
- *
- * Trickery: parse an XML name but without consuming the input flow
- * Needed to avoid insanity in the parser state.
- *
- * [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' |
- *                  CombiningChar | Extender
- *
- * [5] Name ::= (Letter | '_' | ':') (NameChar)*
- *
- * [6] Names ::= Name (S Name)*
- *
- * Returns the Name parsed or NULL
- */
-
+/// Trickery: parse an XML name but without consuming the input flow
+/// Needed to avoid insanity in the parser state.
+///
+/// `[4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender`
+///
+/// `[5] Name ::= (Letter | '_' | ':') (NameChar)*`
+///
+/// `[6] Names ::= Name (S Name)*`
+///
+/// Returns the Name parsed or NULL
+#[doc(alias = "xmlXPathScanName")]
 unsafe extern "C" fn xml_xpath_scan_name(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     let mut l: i32 = 0;
     let mut c: i32;
@@ -4621,26 +4116,24 @@ macro_rules! PUSH_FULL_EXPR {
     };
 }
 
-/**
- * xmlXPathIsAxisName:
- * @name:  a preparsed name token
- *
- * [6] AxisName ::=   'ancestor'
- *                  | 'ancestor-or-self'
- *                  | 'attribute'
- *                  | 'child'
- *                  | 'descendant'
- *                  | 'descendant-or-self'
- *                  | 'following'
- *                  | 'following-sibling'
- *                  | 'namespace'
- *                  | 'parent'
- *                  | 'preceding'
- *                  | 'preceding-sibling'
- *                  | 'self'
- *
- * Returns the axis or 0
- */
+/// ```ignore
+/// [6] AxisName ::=   'ancestor'
+///                  | 'ancestor-or-self'
+///                  | 'attribute'
+///                  | 'child'
+///                  | 'descendant'
+///                  | 'descendant-or-self'
+///                  | 'following'
+///                  | 'following-sibling'
+///                  | 'namespace'
+///                  | 'parent'
+///                  | 'preceding'
+///                  | 'preceding-sibling'
+///                  | 'self'
+/// ```
+///
+/// Returns the axis or 0
+#[doc(alias = "xmlXPathIsAxisName")]
 unsafe fn xml_xpath_is_axis_name(name: *const XmlChar) -> Option<XmlXPathAxisVal> {
     let mut ret: Option<XmlXPathAxisVal> = None;
     match *name.add(0) {
@@ -4702,17 +4195,12 @@ unsafe fn xml_xpath_is_axis_name(name: *const XmlChar) -> Option<XmlXPathAxisVal
     ret
 }
 
-/**
- * xmlXPathParseLiteral:
- * @ctxt:  the XPath Parser context
- *
- * Parse a Literal
- *
- *  [29]   Literal ::=   '"' [^"]* '"'
- *                    | "'" [^']* "'"
- *
- * Returns the value found or NULL in case of error
- */
+/// Parse a Literal
+///
+/// `[29]   Literal ::=   '"' [^"]* '"' | "'" [^']* "'"`
+///
+/// Returns the value found or NULL in case of error
+#[doc(alias = "xmlXPathParseLiteral")]
 unsafe extern "C" fn xml_xpath_parse_literal(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     let q: *const XmlChar;
     let ret: *mut XmlChar;
@@ -4747,27 +4235,22 @@ unsafe extern "C" fn xml_xpath_parse_literal(ctxt: XmlXPathParserContextPtr) -> 
     ret
 }
 
-/**
- * xmlXPathCompNodeTest:
- * @ctxt:  the XPath Parser context
- * @test:  pointer to a xmlXPathTestVal
- * @type:  pointer to a xmlXPathTypeVal
- * @prefix:  placeholder for a possible name prefix
- *
- * [7] NodeTest ::=   NameTest
- *            | NodeType '(' ')'
- *            | 'processing-instruction' '(' Literal ')'
- *
- * [37] NameTest ::=  '*'
- *            | NCName ':' '*'
- *            | QName
- * [38] NodeType ::= 'comment'
- *           | 'text'
- *           | 'processing-instruction'
- *           | 'node'
- *
- * Returns the name found and updates @test, @type and @prefix appropriately
- */
+/// ```ignore
+/// [7] NodeTest ::=   NameTest
+///            | NodeType '(' ')'
+///            | 'processing-instruction' '(' Literal ')'
+///
+/// [37] NameTest ::=  '*'
+///            | NCName ':' '*'
+///            | QName
+/// [38] NodeType ::= 'comment'
+///           | 'text'
+///           | 'processing-instruction'
+///           | 'node'
+/// ```
+///
+/// Returns the name found and updates @test, @type and @prefix appropriately
+#[doc(alias = "xmlXPathCompNodeTest")]
 unsafe extern "C" fn xml_xpath_comp_node_test(
     ctxt: XmlXPathParserContextPtr,
     test: *mut XmlXPathTestVal,
@@ -4891,16 +4374,13 @@ unsafe extern "C" fn xml_xpath_comp_node_test(
     name
 }
 
-/**
- * xmlXPathCompPredicate:
- * @ctxt:  the XPath Parser context
- * @filter:  act as a filter
- *
- *  [8]   Predicate ::=   '[' PredicateExpr ']'
- *  [9]   PredicateExpr ::=   Expr
- *
- * Compile a predicate expression
- */
+/// ```ignore
+/// [8]   Predicate ::=   '[' PredicateExpr ']'
+/// [9]   PredicateExpr ::=   Expr
+/// ```
+///
+/// Compile a predicate expression
+#[doc(alias = "xmlXPathCompPredicate")]
 unsafe extern "C" fn xml_xpath_comp_predicate(ctxt: XmlXPathParserContextPtr, filter: i32) {
     let op1: i32 = (*(*ctxt).comp).last;
 
@@ -4956,38 +4436,31 @@ unsafe extern "C" fn xml_xpath_comp_predicate(ctxt: XmlXPathParserContextPtr, fi
     SKIP_BLANKS!(ctxt);
 }
 
-/**
- * xmlXPathCompStep:
- * @ctxt:  the XPath Parser context
- *
- * [4] Step ::=   AxisSpecifier NodeTest Predicate*
- *                  | AbbreviatedStep
- *
- * [12] AbbreviatedStep ::=   '.' | '..'
- *
- * [5] AxisSpecifier ::= AxisName '::'
- *                  | AbbreviatedAxisSpecifier
- *
- * [13] AbbreviatedAxisSpecifier ::= '@'?
- *
- * Modified for XPtr range support as:
- *
- *  [4xptr] Step ::= AxisSpecifier NodeTest Predicate*
- *                     | AbbreviatedStep
- *                     | 'range-to' '(' Expr ')' Predicate*
- *
- * Compile one step in a Location Path
- * A location step of . is short for self::node(). This is
- * particularly useful in conjunction with //. For example, the
- * location path .//para is short for
- * self::node()/descendant-or-self::node()/child::para
- * and so will select all para descendant elements of the context
- * node.
- * Similarly, a location step of .. is short for parent::node().
- * For example, ../title is short for parent::node()/child::title
- * and so will select the title children of the parent of the context
- * node.
- */
+/// ```ignore
+/// [4] Step ::=   AxisSpecifier NodeTest Predicate* | AbbreviatedStep
+///
+/// [12] AbbreviatedStep ::=   '.' | '..'
+///
+/// [5] AxisSpecifier ::= AxisName '::' | AbbreviatedAxisSpecifier
+///
+/// [13] AbbreviatedAxisSpecifier ::= '@'?
+///
+/// Modified for XPtr range support as:
+///
+///  [4xptr] Step ::= AxisSpecifier NodeTest Predicate* | AbbreviatedStep
+///                     | 'range-to' '(' Expr ')' Predicate*
+/// ```
+///
+/// Compile one step in a Location Path
+/// A location step of . is short for self::node(). This is
+/// particularly useful in conjunction with //. For example, the
+/// location path .//para is short for
+/// self::node()/descendant-or-self::node()/child::para
+/// and so will select all para descendant elements of the context node.
+/// Similarly, a location step of .. is short for parent::node().
+/// For example, ../title is short for parent::node()/child::title
+/// and so will select the title children of the parent of the context node.
+#[doc(alias = "xmlXPathCompStep")]
 unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
     #[cfg(feature = "libxml_xptr_locs")]
     let mut rangeto: i32 = 0;
@@ -5140,17 +4613,15 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/**
- * xmlXPathCompRelativeLocationPath:
- * @ctxt:  the XPath Parser context
- *
- *  [3]   RelativeLocationPath ::=   Step
- *                     | RelativeLocationPath '/' Step
- *                     | AbbreviatedRelativeLocationPath
- *  [11]  AbbreviatedRelativeLocationPath ::=   RelativeLocationPath '//' Step
- *
- * Compile a relative location path.
- */
+/// ```ignore
+/// [3]   RelativeLocationPath ::=   Step
+///                     | RelativeLocationPath '/' Step
+///                     | AbbreviatedRelativeLocationPath
+/// [11]  AbbreviatedRelativeLocationPath ::=   RelativeLocationPath '//' Step
+/// ```
+///
+/// Compile a relative location path.
+#[doc(alias = "xmlXPathCompRelativeLocationPath")]
 unsafe extern "C" fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'/' && NXT!(ctxt, 1) == b'/' {
@@ -5195,27 +4666,25 @@ unsafe extern "C" fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserC
     }
 }
 
-/**
- * xmlXPathCompLocationPath:
- * @ctxt:  the XPath Parser context
- *
- *  [1]   LocationPath ::=   RelativeLocationPath
- *                     | AbsoluteLocationPath
- *  [2]   AbsoluteLocationPath ::=   '/' RelativeLocationPath?
- *                     | AbbreviatedAbsoluteLocationPath
- *  [10]   AbbreviatedAbsoluteLocationPath ::=
- *                           '//' RelativeLocationPath
- *
- * Compile a location path
- *
- * // is short for /descendant-or-self::node()/. For example,
- * //para is short for /descendant-or-self::node()/child::para and
- * so will select any para element in the document (even a para element
- * that is a document element will be selected by //para since the
- * document element node is a child of the root node); div//para is
- * short for div/descendant-or-self::node()/child::para and so will
- * select all para descendants of div children.
- */
+/// ```ignore
+/// [1]   LocationPath ::=   RelativeLocationPath
+///                    | AbsoluteLocationPath
+/// [2]   AbsoluteLocationPath ::=   '/' RelativeLocationPath?
+///                    | AbbreviatedAbsoluteLocationPath
+/// [10]   AbbreviatedAbsoluteLocationPath ::=
+///                          '//' RelativeLocationPath
+/// ```
+///
+/// Compile a location path
+///
+/// // is short for /descendant-or-self::node()/. For example,
+/// //para is short for /descendant-or-self::node()/child::para and
+/// so will select any para element in the document (even a para element
+/// that is a document element will be selected by //para since the
+/// document element node is a child of the root node); div//para is
+/// short for div/descendant-or-self::node()/child::para and so will
+/// select all para descendants of div children.
+#[doc(alias = "xmlXPathCompLocationPath")]
 unsafe extern "C" fn xml_xpath_comp_location_path(ctxt: XmlXPathParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) != b'/' {
@@ -5253,23 +4722,19 @@ unsafe extern "C" fn xml_xpath_comp_location_path(ctxt: XmlXPathParserContextPtr
     }
 }
 
-/**
- * xmlXPathParseQName:
- * @ctxt:  the XPath Parser context
- * @prefix:  a xmlChar **
- *
- * parse an XML qualified name
- *
- * [NS 5] QName ::= (Prefix ':')? LocalPart
- *
- * [NS 6] Prefix ::= NCName
- *
- * [NS 7] LocalPart ::= NCName
- *
- * Returns the function returns the local part, and prefix is updated
- *   to get the Prefix if any.
- */
-
+/// parse an XML qualified name
+///
+/// ```ignore
+/// [NS 5] QName ::= (Prefix ':')? LocalPart
+///
+/// [NS 6] Prefix ::= NCName
+///
+/// [NS 7] LocalPart ::= NCName
+/// ```
+///
+/// Returns the function returns the local part, and prefix is updated
+/// to get the Prefix if any.
+#[doc(alias = "xmlXPathParseQName")]
 unsafe extern "C" fn xml_xpath_parse_qname(
     ctxt: XmlXPathParserContextPtr,
     prefix: *mut *mut XmlChar,
@@ -5286,23 +4751,19 @@ unsafe extern "C" fn xml_xpath_parse_qname(
     ret
 }
 
-/**
- * xmlXPathCompVariableReference:
- * @ctxt:  the XPath Parser context
- *
- * Parse a VariableReference, evaluate it and push it on the stack.
- *
- * The variable bindings consist of a mapping from variable names
- * to variable values. The value of a variable is an object, which can be
- * of any of the types that are possible for the value of an expression,
- * and may also be of additional types not specified here.
- *
- * Early evaluation is possible since:
- * The variable bindings [...] used to evaluate a subexpression are
- * always the same as those used to evaluate the containing expression.
- *
- *  [36]   VariableReference ::=   '$' QName
- */
+/// Parse a VariableReference, evaluate it and push it on the stack.
+///
+/// The variable bindings consist of a mapping from variable names
+/// to variable values. The value of a variable is an object, which can be
+/// of any of the types that are possible for the value of an expression,
+/// and may also be of additional types not specified here.
+///
+/// Early evaluation is possible since:
+/// The variable bindings [...] used to evaluate a subexpression are
+/// always the same as those used to evaluate the containing expression.
+///
+/// `[36]   VariableReference ::=   '$' QName`
+#[doc(alias = "xmlXPathCompVariableReference")]
 unsafe extern "C" fn xml_xpath_comp_variable_reference(ctxt: XmlXPathParserContextPtr) {
     let mut prefix: *mut XmlChar = null_mut();
 
@@ -5336,17 +4797,14 @@ unsafe extern "C" fn xml_xpath_comp_variable_reference(ctxt: XmlXPathParserConte
     }
 }
 
-/**
- * xmlXPathCompNumber:
- * @ctxt:  the XPath Parser context
- *
- *  [30]   Number ::=   Digits ('.' Digits?)?
- *                    | '.' Digits
- *  [31]   Digits ::=   [0-9]+
- *
- * Compile a Number, then push it on the stack
- *
- */
+/// ```ignore
+/// [30]   Number ::=   Digits ('.' Digits?)?
+///                   | '.' Digits
+/// [31]   Digits ::=   [0-9]+
+/// ```
+///
+/// Compile a Number, then push it on the stack
+#[doc(alias = "xmlXPathCompNumber")]
 unsafe extern "C" fn xml_xpath_comp_number(ctxt: XmlXPathParserContextPtr) {
     let mut ret: f64;
     let mut ok: i32 = 0;
@@ -5425,17 +4883,12 @@ unsafe extern "C" fn xml_xpath_comp_number(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/**
- * xmlXPathCompLiteral:
- * @ctxt:  the XPath Parser context
- *
- * Parse a Literal and push it on the stack.
- *
- *  [29]   Literal ::=   '"' [^"]* '"'
- *                    | "'" [^']* "'"
- *
- * TODO: xmlXPathCompLiteral memory allocation could be improved.
- */
+/// Parse a Literal and push it on the stack.
+///
+/// `[29]   Literal ::=   '"' [^"]* '"' | "'" [^']* "'"`
+///
+/// TODO: xmlXPathCompLiteral memory allocation could be improved.
+#[doc(alias = "xmlXPathCompLiteral")]
 unsafe extern "C" fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
     let q: *const XmlChar;
     let ret: *mut XmlChar;
@@ -5489,16 +4942,14 @@ unsafe extern "C" fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
     xml_free(ret as _);
 }
 
-/**
- * xmlXPathCompFunctionCall:
- * @ctxt:  the XPath Parser context
- *
- *  [16]   FunctionCall ::=   FunctionName '(' ( Argument ( ',' Argument)*)? ')'
- *  [17]   Argument ::=   Expr
- *
- * Compile a function call, the evaluation of all arguments are
- * pushed on the stack
- */
+/// ```ignore
+/// [16]   FunctionCall ::=   FunctionName '(' ( Argument ( ',' Argument)*)? ')'
+/// [17]   Argument ::=   Expr
+/// ```
+///
+/// Compile a function call, the evaluation of all arguments are
+/// pushed on the stack
+#[doc(alias = "xmlXPathCompFunctionCall")]
 unsafe extern "C" fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr) {
     let mut prefix: *mut XmlChar = null_mut();
     let mut nbargs: i32 = 0;
@@ -5574,18 +5025,16 @@ unsafe extern "C" fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr
     SKIP_BLANKS!(ctxt);
 }
 
-/**
- * xmlXPathCompPrimaryExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [15]   PrimaryExpr ::=   VariableReference
- *                | '(' Expr ')'
- *                | Literal
- *                | Number
- *                | FunctionCall
- *
- * Compile a primary expression.
- */
+/// ```ignore
+/// [15]   PrimaryExpr ::=   VariableReference
+///                | '(' Expr ')'
+///                | Literal
+///                | Number
+///                | FunctionCall
+/// ```
+///
+/// Compile a primary expression.
+#[doc(alias = "xmlXPathCompPrimaryExpr")]
 unsafe extern "C" fn xml_xpath_comp_primary_expr(ctxt: XmlXPathParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'$' {
@@ -5611,21 +5060,15 @@ unsafe extern "C" fn xml_xpath_comp_primary_expr(ctxt: XmlXPathParserContextPtr)
     SKIP_BLANKS!(ctxt);
 }
 
-/**
- * xmlXPathCompFilterExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [20]   FilterExpr ::=   PrimaryExpr
- *               | FilterExpr Predicate
- *
- * Compile a filter expression.
- * Square brackets are used to filter expressions in the same way that
- * they are used in location paths. It is an error if the expression to
- * be filtered does not evaluate to a node-set. The context node list
- * used for evaluating the expression in square brackets is the node-set
- * to be filtered listed in document order.
- */
-
+/// `[20]   FilterExpr ::=   PrimaryExpr | FilterExpr Predicate`
+///
+/// Compile a filter expression.
+/// Square brackets are used to filter expressions in the same way that
+/// they are used in location paths. It is an error if the expression to
+/// be filtered does not evaluate to a node-set. The context node list
+/// used for evaluating the expression in square brackets is the node-set
+/// to be filtered listed in document order.
+#[doc(alias = "xmlXPathCompFilterExpr")]
 unsafe extern "C" fn xml_xpath_comp_filter_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_primary_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -5637,24 +5080,21 @@ unsafe extern "C" fn xml_xpath_comp_filter_expr(ctxt: XmlXPathParserContextPtr) 
     }
 }
 
-/**
- * xmlXPathCompPathExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [19]   PathExpr ::=   LocationPath
- *               | FilterExpr
- *               | FilterExpr '/' RelativeLocationPath
- *               | FilterExpr '//' RelativeLocationPath
- *
- * Compile a path expression.
- * The / operator and // operators combine an arbitrary expression
- * and a relative location path. It is an error if the expression
- * does not evaluate to a node-set.
- * The / operator does composition in the same way as when / is
- * used in a location path. As in location paths, // is short for
- * /descendant-or-self::node()/.
- */
-
+/// ```ignore
+/// [19]   PathExpr ::=   LocationPath
+///               | FilterExpr
+///               | FilterExpr '/' RelativeLocationPath
+///               | FilterExpr '//' RelativeLocationPath
+/// ```
+///
+/// Compile a path expression.
+/// The / operator and // operators combine an arbitrary expression
+/// and a relative location path. It is an error if the expression
+/// does not evaluate to a node-set.
+/// The / operator does composition in the same way as when / is
+/// used in a location path. As in location paths, // is short for
+/// /descendant-or-self::node()/.
+#[doc(alias = "xmlXPathCompPathExpr")]
 unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
     let mut lc: i32 = 1; /* Should we branch to LocationPath ?         */
     let name: *mut XmlChar; /* we may have to preparse a name to find out */
@@ -5781,16 +5221,10 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
     SKIP_BLANKS!(ctxt);
 }
 
-/**
- * xmlXPathCompUnionExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [18]   UnionExpr ::=   PathExpr
- *               | UnionExpr '|' PathExpr
- *
- * Compile an union expression.
- */
-
+/// `[18]   UnionExpr ::=   PathExpr | UnionExpr '|' PathExpr`
+///
+/// Compile an union expression.
+#[doc(alias = "xmlXPathCompUnionExpr")]
 unsafe extern "C" fn xml_xpath_comp_union_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_path_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -5816,16 +5250,10 @@ unsafe extern "C" fn xml_xpath_comp_union_expr(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/**
- * xmlXPathCompUnaryExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [27]   UnaryExpr ::=   UnionExpr
- *                   | '-' UnaryExpr
- *
- * Compile an unary expression.
- */
-
+/// `[27]   UnaryExpr ::=   UnionExpr | '-' UnaryExpr`
+///
+/// Compile an unary expression.
+#[doc(alias = "xmlXPathCompUnaryExpr")]
 unsafe extern "C" fn xml_xpath_comp_unary_expr(ctxt: XmlXPathParserContextPtr) {
     let mut minus: i32 = 0;
     let mut found: i32 = 0;
@@ -5849,19 +5277,16 @@ unsafe extern "C" fn xml_xpath_comp_unary_expr(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/**
- * xmlXPathCompMultiplicativeExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [26]   MultiplicativeExpr ::=   UnaryExpr
- *                   | MultiplicativeExpr MultiplyOperator UnaryExpr
- *                   | MultiplicativeExpr 'div' UnaryExpr
- *                   | MultiplicativeExpr 'mod' UnaryExpr
- *  [34]   MultiplyOperator ::=   '*'
- *
- * Compile an Additive expression.
- */
-
+/// ```ignore
+/// [26]   MultiplicativeExpr ::=   UnaryExpr
+///                  | MultiplicativeExpr MultiplyOperator UnaryExpr
+///                  | MultiplicativeExpr 'div' UnaryExpr
+///                  | MultiplicativeExpr 'mod' UnaryExpr
+/// [34]   MultiplyOperator ::=   '*'
+/// ```
+///
+/// Compile an Additive expression.
+#[doc(alias = "xmlXPathCompMultiplicativeExpr")]
 unsafe extern "C" fn xml_xpath_comp_multiplicative_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_unary_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -5898,17 +5323,14 @@ unsafe extern "C" fn xml_xpath_comp_multiplicative_expr(ctxt: XmlXPathParserCont
     }
 }
 
-/**
- * xmlXPathCompAdditiveExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [25]   AdditiveExpr ::=   MultiplicativeExpr
- *                   | AdditiveExpr '+' MultiplicativeExpr
- *                   | AdditiveExpr '-' MultiplicativeExpr
- *
- * Compile an Additive expression.
- */
-
+/// ```ignore
+/// [25]   AdditiveExpr ::=   MultiplicativeExpr
+///                   | AdditiveExpr '+' MultiplicativeExpr
+///                   | AdditiveExpr '-' MultiplicativeExpr
+/// ```
+///
+/// Compile an Additive expression.
+#[doc(alias = "xmlXPathCompAdditiveExpr")]
 unsafe extern "C" fn xml_xpath_comp_additive_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_multiplicative_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -5933,24 +5355,20 @@ unsafe extern "C" fn xml_xpath_comp_additive_expr(ctxt: XmlXPathParserContextPtr
     }
 }
 
-/**
- * xmlXPathCompRelationalExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [24]   RelationalExpr ::=   AdditiveExpr
- *                 | RelationalExpr '<' AdditiveExpr
- *                 | RelationalExpr '>' AdditiveExpr
- *                 | RelationalExpr '<=' AdditiveExpr
- *                 | RelationalExpr '>=' AdditiveExpr
- *
- *  A <= B > C is allowed ? Answer from James, yes with
- *  (AdditiveExpr <= AdditiveExpr) > AdditiveExpr
- *  which is basically what got implemented.
- *
- * Compile a Relational expression, then push the result
- * on the stack
- */
-
+/// ```ignore
+/// [24]   RelationalExpr ::=   AdditiveExpr
+///                | RelationalExpr '<' AdditiveExpr
+///                | RelationalExpr '>' AdditiveExpr
+///                | RelationalExpr '<=' AdditiveExpr
+///                | RelationalExpr '>=' AdditiveExpr
+/// ```
+///
+///  A <= B > C is allowed ? Answer from James, yes with
+///  (AdditiveExpr <= AdditiveExpr) > AdditiveExpr
+///  which is basically what got implemented.
+///
+/// Compile a Relational expression, then push the result on the stack
+#[doc(alias = "xmlXPathCompRelationalExpr")]
 unsafe extern "C" fn xml_xpath_comp_relational_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_additive_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -5979,22 +5397,20 @@ unsafe extern "C" fn xml_xpath_comp_relational_expr(ctxt: XmlXPathParserContextP
     }
 }
 
-/**
- * xmlXPathCompEqualityExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [23]   EqualityExpr ::=   RelationalExpr
- *                 | EqualityExpr '=' RelationalExpr
- *                 | EqualityExpr '!=' RelationalExpr
- *
- *  A != B != C is allowed ? Answer from James, yes with
- *  (RelationalExpr = RelationalExpr) = RelationalExpr
- *  (RelationalExpr != RelationalExpr) != RelationalExpr
- *  which is basically what got implemented.
- *
- * Compile an Equality expression.
- *
- */
+/// ```ignore
+/// [23]   EqualityExpr ::=   RelationalExpr
+///                | EqualityExpr '=' RelationalExpr
+///                | EqualityExpr '!=' RelationalExpr
+/// ```
+///
+///  A != B != C is allowed ? Answer from James, yes with
+///  (RelationalExpr = RelationalExpr) = RelationalExpr
+///  (RelationalExpr != RelationalExpr) != RelationalExpr
+///  which is basically what got implemented.
+///
+/// Compile an Equality expression.
+///
+#[doc(alias = "xmlXPathCompEqualityExpr")]
 unsafe extern "C" fn xml_xpath_comp_equality_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_relational_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -6022,16 +5438,10 @@ unsafe extern "C" fn xml_xpath_comp_equality_expr(ctxt: XmlXPathParserContextPtr
     }
 }
 
-/**
- * xmlXPathCompAndExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [22]   AndExpr ::=   EqualityExpr
- *                 | AndExpr 'and' EqualityExpr
- *
- * Compile an AND expression.
- *
- */
+/// `[22]   AndExpr ::=   EqualityExpr | AndExpr 'and' EqualityExpr`
+///
+/// Compile an AND expression.
+#[doc(alias = "xmlXPathCompAndExpr")]
 unsafe extern "C" fn xml_xpath_comp_and_expr(ctxt: XmlXPathParserContextPtr) {
     xml_xpath_comp_equality_expr(ctxt);
     CHECK_ERROR!(ctxt);
@@ -6054,16 +5464,13 @@ unsafe extern "C" fn xml_xpath_comp_and_expr(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/**
- * xmlXPathCompileExpr:
- * @ctxt:  the XPath Parser context
- *
- *  [14]   Expr ::=   OrExpr
- *  [21]   OrExpr ::=   AndExpr
- *                 | OrExpr 'or' AndExpr
- *
- * Parse and compile an expression
- */
+/// ```ignore
+/// [14]   Expr ::=   OrExpr
+/// [21]   OrExpr ::=   AndExpr | OrExpr 'or' AndExpr
+/// ```
+///
+/// Parse and compile an expression
+#[doc(alias = "xmlXPathCompileExpr")]
 pub unsafe extern "C" fn xml_xpath_compile_expr(ctxt: XmlXPathParserContextPtr, sort: i32) {
     let xpctxt: XmlXPathContextPtr = (*ctxt).context;
 
@@ -6184,12 +5591,8 @@ pub unsafe extern "C" fn xml_xpath_optimize_expression(
     }
 }
 
-/**
- * xmlXPathRunStreamEval:
- * @ctxt:  the XPath parser context with the compiled expression
- *
- * Evaluate the Precompiled Streamable XPath expression in the given context.
- */
+/// Evaluate the Precompiled Streamable XPath expression in the given context.
+#[doc(alias = "xmlXPathRunStreamEval")]
 #[cfg(feature = "libxml_pattern")]
 unsafe extern "C" fn xml_xpath_run_stream_eval(
     ctxt: XmlXPathContextPtr,
@@ -6476,14 +5879,9 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
     // return 1;
 }
 
-/**
- * xmlXPathCheckOpLimit:
- * @ctxt:  the XPath Parser context
- * @opCount:  the number of operations to be added
- *
- * Adds opCount to the running total of operations and returns -1 if the
- * operation limit is exceeded. Returns 0 otherwise.
- */
+/// Adds opCount to the running total of operations and returns -1 if the
+/// operation limit is exceeded. Returns 0 otherwise.
+#[doc(alias = "xmlXPathCheckOpLimit")]
 unsafe extern "C" fn xml_xpath_check_op_limit(
     ctxt: XmlXPathParserContextPtr,
     op_count: u64,
@@ -6506,30 +5904,21 @@ macro_rules! OP_LIMIT_EXCEEDED {
     };
 }
 
-/*
- * xmlXPathNodeSetMergeFunction:
- * Used for merging node sets in xmlXPathCollectAndTest().
- */
+// Used for merging node sets in xmlXPathCollectAndTest().
+#[doc(alias = "xmlXPathNodeSetMergeFunction")]
 pub type XmlXPathNodeSetMergeFunction =
     unsafe extern "C" fn(XmlNodeSetPtr, XmlNodeSetPtr) -> XmlNodeSetPtr;
 
-/*
- * A traversal function enumerates nodes along an axis.
- * Initially it must be called with NULL, and it indicates
- * termination on the axis by returning NULL.
- */
+// A traversal function enumerates nodes along an axis.
+// Initially it must be called with NULL, and it indicates
+// termination on the axis by returning NULL.
 pub type XmlXPathTraversalFunction =
     unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, cur: XmlNodePtr) -> XmlNodePtr;
 
-/**
- * xmlXPathNodeSetClearFromPos:
- * @set: the node set to be cleared
- * @pos: the start position to clear from
- *
- * Clears the list from temporary XPath objects (e.g. namespace nodes
- * are feed) starting with the entry at @pos, but does *not* free the list
- * itself. Sets the length of the list to @pos.
- */
+/// Clears the list from temporary XPath objects (e.g. namespace nodes
+/// are feed) starting with the entry at @pos, but does *not* free the list
+/// itself. Sets the length of the list to @pos.
+#[doc(alias = "xmlXPathNodeSetClearFromPos")]
 unsafe extern "C" fn xml_xpath_node_set_clear_from_pos(
     set: XmlNodeSetPtr,
     pos: i32,
@@ -6550,30 +5939,20 @@ unsafe extern "C" fn xml_xpath_node_set_clear_from_pos(
     (*set).node_nr = pos;
 }
 
-/**
- * xmlXPathNodeSetClear:
- * @set:  the node set to clear
- *
- * Clears the list from all temporary XPath objects (e.g. namespace nodes
- * are feed), but does *not* free the list itself. Sets the length of the
- * list to 0.
- */
+/// Clears the list from all temporary XPath objects (e.g. namespace nodes
+/// are feed), but does *not* free the list itself. Sets the length of the list to 0.
+#[doc(alias = "xmlXPathNodeSetClear")]
 unsafe extern "C" fn xml_xpath_node_set_clear(set: XmlNodeSetPtr, has_ns_nodes: i32) {
     xml_xpath_node_set_clear_from_pos(set, 0, has_ns_nodes);
 }
 
-/**
- * xmlXPathNodeSetMergeAndClear:
- * @set1:  the first NodeSet or NULL
- * @set2:  the second NodeSet
- *
- * Merges two nodesets, all nodes from @set2 are added to @set1.
- * Checks for duplicate nodes. Clears set2.
- *
- * Returns @set1 once extended or NULL in case of error.
- *
- * Frees @set1 in case of error.
- */
+/// Merges two nodesets, all nodes from @set2 are added to @set1.
+/// Checks for duplicate nodes. Clears set2.
+///
+/// Returns @set1 once extended or NULL in case of error.
+///
+/// Frees @set1 in case of error.
+#[doc(alias = "xmlXPathNodeSetMergeAndClear")]
 unsafe extern "C" fn xml_xpath_node_set_merge_and_clear(
     set1: XmlNodeSetPtr,
     set2: XmlNodeSetPtr,
@@ -6662,18 +6041,13 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear(
     // return null_mut();
 }
 
-/**
- * xmlXPathNodeSetMergeAndClearNoDupls:
- * @set1:  the first NodeSet or NULL
- * @set2:  the second NodeSet
- *
- * Merges two nodesets, all nodes from @set2 are added to @set1.
- * Doesn't check for duplicate nodes. Clears set2.
- *
- * Returns @set1 once extended or NULL in case of error.
- *
- * Frees @set1 in case of error.
- */
+/// Merges two nodesets, all nodes from @set2 are added to @set1.
+/// Doesn't check for duplicate nodes. Clears set2.
+///
+/// Returns @set1 once extended or NULL in case of error.
+///
+/// Frees @set1 in case of error.
+#[doc(alias = "xmlXPathNodeSetMergeAndClearNoDupls")]
 unsafe extern "C" fn xml_xpath_node_set_merge_and_clear_no_dupls(
     set1: XmlNodeSetPtr,
     set2: XmlNodeSetPtr,
@@ -6733,16 +6107,11 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear_no_dupls(
     //     return null_mut();
 }
 
-/**
- * xmlXPathNextChildElement:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "child" direction and nodes of type element.
- * The child axis contains the children of the context node in document order.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "child" direction and nodes of type element.
+/// The child axis contains the children of the context node in document order.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextChildElement")]
 unsafe extern "C" fn xml_xpath_next_child_element(
     ctxt: XmlXPathParserContextPtr,
     mut cur: XmlNodePtr,
@@ -6816,21 +6185,16 @@ unsafe extern "C" fn xml_xpath_next_child_element(
     null_mut()
 }
 
-/**
- * xmlXPathNextPrecedingInternal:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "preceding" direction
- * the preceding axis contains all nodes in the same document as the context
- * node that are before the context node in document order, excluding any
- * ancestors and excluding attribute nodes and namespace nodes; the nodes are
- * ordered in reverse document order
- * This is a faster implementation but internal only since it requires a
- * state kept in the parser context: (*ctxt).ancestor.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "preceding" direction
+/// the preceding axis contains all nodes in the same document as the context
+/// node that are before the context node in document order, excluding any
+/// ancestors and excluding attribute nodes and namespace nodes; the nodes are
+/// ordered in reverse document order
+/// This is a faster implementation but internal only since it requires a
+/// state kept in the parser context: (*ctxt).ancestor.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextPrecedingInternal")]
 unsafe extern "C" fn xml_xpath_next_preceding_internal(
     ctxt: XmlXPathParserContextPtr,
     mut cur: XmlNodePtr,
@@ -6947,19 +6311,10 @@ unsafe extern "C" fn xml_xpath_is_positional_predicate(
     0
 }
 
-/**
- * xmlXPathNodeSetFilter:
- * @ctxt:  the XPath Parser context
- * @set: the node set to filter
- * @filterOpIndex: the index of the predicate/filter op
- * @minPos: minimum position in the filtered set (1-based)
- * @maxPos: maximum position in the filtered set (1-based)
- * @hasNsNodes: true if the node set may contain namespace nodes
- *
- * Filter a node set, keeping only nodes for which the predicate expression
- * matches. Afterwards, keep only nodes between minPos and maxPos in the
- * filtered result.
- */
+/// Filter a node set, keeping only nodes for which the predicate expression
+/// matches. Afterwards, keep only nodes between minPos and maxPos in the
+/// filtered result.
+#[doc(alias = "xmlXPathNodeSetFilter")]
 unsafe extern "C" fn xml_xpath_node_set_filter(
     ctxt: XmlXPathParserContextPtr,
     set: XmlNodeSetPtr,
@@ -7089,19 +6444,10 @@ unsafe extern "C" fn xml_xpath_node_set_filter(
     (*xpctxt).proximity_position = oldpp;
 }
 
-/**
- * xmlXPathCompOpEvalPredicate:
- * @ctxt:  the XPath Parser context
- * @op: the predicate op
- * @set: the node set to filter
- * @minPos: minimum position in the filtered set (1-based)
- * @maxPos: maximum position in the filtered set (1-based)
- * @hasNsNodes: true if the node set may contain namespace nodes
- *
- * Filter a node set, keeping only nodes for which the sequence of predicate
- * expressions matches. Afterwards, keep only nodes between minPos and maxPos
- * in the filtered result.
- */
+/// Filter a node set, keeping only nodes for which the sequence of predicate
+/// expressions matches. Afterwards, keep only nodes between minPos and maxPos
+/// in the filtered result.
+#[doc(alias = "xmlXPathCompOpEvalPredicate")]
 unsafe extern "C" fn xml_xpath_comp_op_eval_predicate(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
@@ -7797,13 +7143,8 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
 #[cfg(not(feature = "thread"))]
 pub(crate) static mut XML_XPATH_DISABLE_OPTIMIZER: i32 = 0;
 
-/**
- * xmlXPathCompSwap:
- * @comp:  the compiled expression
- * @op: operation index
- *
- * Swaps 2 operations in the compiled expression
- */
+/// Swaps 2 operations in the compiled expression
+#[doc(alias = "xmlXPathCompSwap")]
 unsafe extern "C" fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
     /*
      * Since this manipulates possibly shared variables, this is
@@ -7818,17 +7159,11 @@ unsafe extern "C" fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
     std::mem::swap(&mut (*op).ch1, &mut (*op).ch2);
 }
 
-/**
- * xmlXPathCompOpEvalLast:
- * @ctxt:  the XPath parser context with the compiled expression
- * @op:  an XPath compiled operation
- * @last:  the last elem found so far
- *
- * Evaluate the Precompiled XPath operation searching only the last
- * element in document order
- *
- * Returns the number of nodes traversed
- */
+/// Evaluate the Precompiled XPath operation searching only the last
+/// element in document order
+///
+/// Returns the number of nodes traversed
+#[doc(alias = "xmlXPathCompOpEvalLast")]
 unsafe extern "C" fn xml_xpath_comp_op_eval_last(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
@@ -7964,14 +7299,9 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_last(
     total
 }
 
-/**
- * xmlXPathNodeSetKeepLast:
- * @set: the node set to be cleared
- *
- * Move the last node to the first position and clear temporary XPath objects
- * (e.g. namespace nodes) from all other nodes. Sets the length of the list
- * to 1.
- */
+/// Move the last node to the first position and clear temporary XPath objects
+/// (e.g. namespace nodes) from all other nodes. Sets the length of the list to 1.
+#[doc(alias = "xmlXPathNodeSetKeepLast")]
 unsafe extern "C" fn xml_xpath_node_set_keep_last(set: XmlNodeSetPtr) {
     let mut node: XmlNodePtr;
 
@@ -7989,18 +7319,9 @@ unsafe extern "C" fn xml_xpath_node_set_keep_last(set: XmlNodeSetPtr) {
     (*set).node_nr = 1;
 }
 
-/**
- * xmlXPathLocationSetFilter:
- * @ctxt:  the XPath Parser context
- * @locset: the location set to filter
- * @filterOpIndex: the index of the predicate/filter op
- * @minPos: minimum position in the filtered set (1-based)
- * @maxPos: maximum position in the filtered set (1-based)
- *
- * Filter a location set, keeping only nodes for which the predicate
- * expression matches. Afterwards, keep only nodes between minPos and maxPos
- * in the filtered result.
- */
+/// Filter a location set, keeping only nodes for which the predicate expression matches.  
+/// Afterwards, keep only nodes between minPos and maxPos in the filtered result.
+#[doc(alias = "xmlXPathLocationSetFilter")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xpath_location_set_filter(
     ctxt: XmlXPathParserContextPtr,
@@ -8228,17 +7549,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
     total
 }
 
-/**
- * xmlXPathCompOpEvalFirst:
- * @ctxt:  the XPath parser context with the compiled expression
- * @op:  an XPath compiled operation
- * @first:  the first elem found so far
- *
- * Evaluate the Precompiled XPath operation searching only the first
- * element in document order
- *
- * Returns the number of examined objects.
- */
+/// Evaluate the Precompiled XPath operation searching only the first element in document order
+///
+/// Returns the number of examined objects.
+#[doc(alias = "xmlXPathCompOpEvalFirst")]
 unsafe extern "C" fn xml_xpath_comp_op_eval_first(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
@@ -8381,14 +7695,9 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_first(
     total
 }
 
-/**
- * xmlXPathCompOpEval:
- * @ctxt:  the XPath parser context with the compiled expression
- * @op:  an XPath compiled operation
- *
- * Evaluate the Precompiled XPath operation
- * Returns the number of nodes traversed
- */
+/// Evaluate the Precompiled XPath operation
+/// Returns the number of nodes traversed
+#[doc(alias = "xmlXPathCompOpEval")]
 unsafe extern "C" fn xml_xpath_comp_op_eval(
     ctxt: XmlXPathParserContextPtr,
     op: XmlXPathStepOpPtr,
@@ -9021,14 +8330,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
     total
 }
 
-/**
- * xmlXPathCompOpEvalToBoolean:
- * @ctxt:  the XPath parser context
- *
- * Evaluates if the expression evaluates to true.
- *
- * Returns 1 if true, 0 if false and -1 on API or internal errors.
- */
+/// Evaluates if the expression evaluates to true.
+///
+/// Returns 1 if true, 0 if false and -1 on API or internal errors.
+#[doc(alias = "xmlXPathCompOpEvalToBoolean")]
 unsafe extern "C" fn xml_xpath_comp_op_eval_to_boolean(
     ctxt: XmlXPathParserContextPtr,
     mut op: XmlXPathStepOpPtr,
@@ -9127,13 +8432,8 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_to_boolean(
     0
 }
 
-/**
- * xmlXPathRunEval:
- * @ctxt:  the XPath parser context with the compiled expression
- * @toBool:  evaluate to a boolean result
- *
- * Evaluate the Precompiled XPath expression in the given context.
- */
+/// Evaluate the Precompiled XPath expression in the given context.
+#[doc(alias = "xmlXPathRunEval")]
 pub(crate) unsafe extern "C" fn xml_xpath_run_eval(
     ctxt: XmlXPathParserContextPtr,
     to_bool: i32,
@@ -9212,13 +8512,9 @@ pub(crate) unsafe extern "C" fn xml_xpath_run_eval(
     0
 }
 
-/**
- * xmlXPathEvalExpr:
- * @ctxt:  the XPath Parser context
- *
- * Parse and evaluate an XPath expression in the given context,
- * then push the result on the context stack
- */
+/// Parse and evaluate an XPath expression in the given context,
+/// then push the result on the context stack
+#[doc(alias = "xmlXPathEvalExpr")]
 pub unsafe extern "C" fn xml_xpath_eval_expr(ctxt: XmlXPathParserContextPtr) {
     let mut old_depth: i32 = 0;
 
@@ -9376,19 +8672,16 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
     xml_strndup(buf.as_ptr() as _, len)
 }
 
-/**
- * xmlXPathParseName:
- * @ctxt:  the XPath Parser context
- *
- * parse an XML name
- *
- * [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' |
- *                  CombiningChar | Extender
- *
- * [5] Name ::= (Letter | '_' | ':') (NameChar)*
- *
- * Returns the namespace name or NULL
- */
+/// Parse an XML name
+///
+/// ```ignore
+/// [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender
+///
+/// [5] Name ::= (Letter | '_' | ':') (NameChar)*
+/// ```
+///
+/// Returns the namespace name or NULL
+#[doc(alias = "xmlXPathParseName")]
 pub unsafe extern "C" fn xml_xpath_parse_name(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     let mut input: *const XmlChar;
     let ret: *mut XmlChar;
@@ -9431,19 +8724,16 @@ pub unsafe extern "C" fn xml_xpath_parse_name(ctxt: XmlXPathParserContextPtr) ->
     xml_xpath_parse_name_complex(ctxt, 1)
 }
 
-/**
- * xmlXPathParseNCName:
- * @ctxt:  the XPath Parser context
- *
- * parse an XML namespace non qualified name.
- *
- * [NS 3] NCName ::= (Letter | '_') (NCNameChar)*
- *
- * [NS 4] NCNameChar ::= Letter | Digit | '.' | '-' | '_' |
- *                       CombiningChar | Extender
- *
- * Returns the namespace name or NULL
- */
+/// Parse an XML namespace non qualified name.
+///
+/// ```ignore
+/// [NS 3] NCName ::= (Letter | '_') (NCNameChar)*
+///
+/// [NS 4] NCNameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender
+/// ```
+///
+/// Returns the namespace name or NULL
+#[doc(alias = "xmlXPathParseNCName")]
 pub unsafe extern "C" fn xml_xpath_parse_ncname(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
     let mut input: *const XmlChar;
     let ret: *mut XmlChar;
@@ -9490,25 +8780,20 @@ pub unsafe extern "C" fn xml_xpath_parse_ncname(ctxt: XmlXPathParserContextPtr) 
 
 const MAX_FRAC: usize = 20;
 
-/*
- * Existing functions.
- */
-/**
- * xmlXPathStringEvalNumber:
- * @str:  A string to scan
- *
- *  [30a]  Float  ::= Number ('e' Digits?)?
- *
- *  [30]   Number ::=   Digits ('.' Digits?)?
- *                    | '.' Digits
- *  [31]   Digits ::=   [0-9]+
- *
- * Compile a Number in the string
- * In complement of the Number expression, this function also handles
- * negative values : '-' Number.
- *
- * Returns the let value: f64.
- */
+/// ```ignore
+/// [30a]  Float  ::= Number ('e' Digits?)?
+///
+/// [30]   Number ::=   Digits ('.' Digits?)?
+///                    | '.' Digits
+/// [31]   Digits ::=   [0-9]+
+/// ```
+///
+/// Compile a Number in the string
+/// In complement of the Number expression, this function also handles
+/// negative values : '-' Number.
+///
+/// Returns the let value: f64.
+#[doc(alias = "xmlXPathStringEvalNumber")]
 pub unsafe extern "C" fn xml_xpath_string_eval_number(str: *const XmlChar) -> f64 {
     let mut cur: *const XmlChar = str;
     let mut ret: f64;
@@ -9594,22 +8879,17 @@ pub unsafe extern "C" fn xml_xpath_string_eval_number(str: *const XmlChar) -> f6
     ret
 }
 
-/**
- * xmlXPathEvaluatePredicateResult:
- * @ctxt:  the XPath Parser context
- * @res:  the Predicate Expression evaluation result
- *
- * Evaluate a predicate result for the current node.
- * A PredicateExpr is evaluated by evaluating the Expr and converting
- * the result to a boolean. If the result is a number, the result will
- * be converted to true if the number is equal to the position of the
- * context node in the context node list (as returned by the position
- * function) and will be converted to false otherwise; if the result
- * is not a number, then the result will be converted as if by a call
- * to the boolean function.
- *
- * Returns 1 if predicate is true, 0 otherwise
- */
+/// Evaluate a predicate result for the current node.
+/// A PredicateExpr is evaluated by evaluating the Expr and converting
+/// the result to a boolean. If the result is a number, the result will
+/// be converted to true if the number is equal to the position of the
+/// context node in the context node list (as returned by the position
+/// function) and will be converted to false otherwise; if the result
+/// is not a number, then the result will be converted as if by a call
+/// to the boolean function.
+///
+/// Returns 1 if predicate is true, 0 otherwise
+#[doc(alias = "xmlXPathEvaluatePredicateResult")]
 pub unsafe extern "C" fn xml_xpath_evaluate_predicate_result(
     ctxt: XmlXPathParserContextPtr,
     res: XmlXPathObjectPtr,
@@ -9648,16 +8928,11 @@ pub unsafe extern "C" fn xml_xpath_evaluate_predicate_result(
     0
 }
 
-/**
- * xmlXPathCacheNewCString:
- * @ctxt: the XPath context
- * @val:  the c_char * value
- *
- * This is the cached version of xmlXPathNewCString().
- * Acquire an xmlXPathObjectPtr of type string and of value @val
- *
- * Returns the created or reused object.
- */
+/// This is the cached version of xmlXPathNewCString().
+/// Acquire an xmlXPathObjectPtr of type string and of value @val
+///
+/// Returns the created or reused object.
+#[doc(alias = "xmlXPathCacheNewCString")]
 unsafe extern "C" fn xml_xpath_cache_new_cstring(
     ctxt: XmlXPathContextPtr,
     val: *const c_char,
@@ -9665,16 +8940,11 @@ unsafe extern "C" fn xml_xpath_cache_new_cstring(
     xml_xpath_cache_new_string(ctxt, val as _)
 }
 
-/**
- * xmlXPathCacheWrapString:
- * @ctxt: the XPath context
- * @val:  the xmlChar * value
- *
- * This is the cached version of xmlXPathWrapString().
- * Wraps the @val string into an XPath object.
- *
- * Returns the created or reused object.
- */
+/// This is the cached version of xmlXPathWrapString().
+/// Wraps the @val string into an XPath object.
+///
+/// Returns the created or reused object.
+#[doc(alias = "xmlXPathCacheWrapString")]
 unsafe extern "C" fn xml_xpath_cache_wrap_string(
     ctxt: XmlXPathContextPtr,
     val: *mut XmlChar,
@@ -9709,28 +8979,22 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
     xml_xpath_wrap_string(val)
 }
 
-/**
- * xmlXPathNameFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the name() XPath function
- *    string name(node-set?)
- * The name function returns a string containing a QName representing
- * the name of the node in the argument node-set that is first in document
- * order. The QName must represent the name with respect to the namespace
- * declarations in effect on the node whose name is being represented.
- * Typically, this will be the form in which the name occurred in the XML
- * source. This need not be the case if there are namespace declarations
- * in effect on the node that associate multiple prefixes with the same
- * namespace. However, an implementation may include information about
- * the original prefix in its representation of nodes; in this case, an
- * implementation can ensure that the returned string is always the same
- * as the QName used in the XML source. If the argument it omitted it
- * defaults to the context node.
- * Libxml keep the original prefix so the "real qualified name" used is
- * returned.
- */
+/// Implement the name() XPath function
+///    string name(node-set?)
+/// The name function returns a string containing a QName representing
+/// the name of the node in the argument node-set that is first in document
+/// order. The QName must represent the name with respect to the namespace
+/// declarations in effect on the node whose name is being represented.
+/// Typically, this will be the form in which the name occurred in the XML
+/// source. This need not be the case if there are namespace declarations
+/// in effect on the node that associate multiple prefixes with the same
+/// namespace. However, an implementation may include information about
+/// the original prefix in its representation of nodes; in this case, an
+/// implementation can ensure that the returned string is always the same
+/// as the QName used in the XML source. If the argument it omitted it
+/// defaults to the context node.
+/// Libxml keep the original prefix so the "real qualified name" used is returned.
+#[doc(alias = "xmlXPathNameFunction")]
 unsafe extern "C" fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     if nargs == 0 {
         value_push(
@@ -9818,54 +9082,47 @@ unsafe extern "C" fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut
     xml_xpath_release_object((*ctxt).context, cur);
 }
 
-/**
- * xmlXPathEscapeUriFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the escape-uri() XPath function
- *    string escape-uri(string $str, bool $escape-reserved)
- *
- * This function applies the URI escaping rules defined in section 2 of [RFC
- * 2396] to the string supplied as $uri-part, which typically represents all
- * or part of a URI. The effect of the function is to replace any special
- * character in the string by an escape sequence of the form %xx%yy...,
- * where xxyy... is the hexadecimal representation of the octets used to
- * represent the character in UTF-8.
- *
- * The set of characters that are escaped depends on the setting of the
- * boolean argument $escape-reserved.
- *
- * If $escape-reserved is true, all characters are escaped other than lower
- * case letters a-z, upper case letters A-Z, digits 0-9, and the characters
- * referred to in [RFC 2396] as "marks": specifically, "-" | "_" | "." | "!"
- * | "~" | "*" | "'" | "(" | ")". The "%" character itself is escaped only
- * if it is not followed by two hexadecimal digits (that is, 0-9, a-f, and
- * A-F).
- *
- * If $escape-reserved is false, the behavior differs in that characters
- * referred to in [RFC 2396] as reserved characters are not escaped. These
- * characters are ";" | "/" | "?" | ":" | "@" | "&" | "=" | "+" | "$" | ",".
- *
- * [RFC 2396] does not define whether escaped URIs should use lower case or
- * upper case for hexadecimal digits. To ensure that escaped URIs can be
- * compared using string comparison functions, this function must always use
- * the upper-case letters A-F.
- *
- * Generally, $escape-reserved should be set to true when escaping a string
- * that is to form a single part of a URI, and to false when escaping an
- * entire URI or URI reference.
- *
- * In the case of non-ascii characters, the string is encoded according to
- * utf-8 and then converted according to RFC 2396.
- *
- * Examples
- *  xf:escape-uri ("gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles#ocean"), true())
- *  returns "gopher%3A%2F%2Fspinaltap.micro.umn.edu%2F00%2FWeather%2FCalifornia%2FLos%20Angeles%23ocean"
- *  xf:escape-uri ("gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles#ocean"), false())
- *  returns "gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles%23ocean"
- *
- */
+/// Implement the escape-uri() XPath function
+///    string escape-uri(string $str, bool $escape-reserved)
+///
+/// This function applies the URI escaping rules defined in section 2 of [RFC
+/// 2396] to the string supplied as $uri-part, which typically represents all
+/// or part of a URI. The effect of the function is to replace any special
+/// character in the string by an escape sequence of the form %xx%yy...,
+/// where xxyy... is the hexadecimal representation of the octets used to
+/// represent the character in UTF-8.
+///
+/// The set of characters that are escaped depends on the setting of the
+/// boolean argument $escape-reserved.
+///
+/// If $escape-reserved is true, all characters are escaped other than lower
+/// case letters a-z, upper case letters A-Z, digits 0-9, and the characters
+/// referred to in [RFC 2396] as "marks": specifically, "-" | "_" | "." | "!"
+/// | "~" | "*" | "'" | "(" | ")". The "%" character itself is escaped only
+/// if it is not followed by two hexadecimal digits (that is, 0-9, a-f, and A-F).
+///
+/// If $escape-reserved is false, the behavior differs in that characters
+/// referred to in [RFC 2396] as reserved characters are not escaped. These
+/// characters are ";" | "/" | "?" | ":" | "@" | "&" | "=" | "+" | "$" | ",".
+///
+/// [RFC 2396] does not define whether escaped URIs should use lower case or
+/// upper case for hexadecimal digits. To ensure that escaped URIs can be
+/// compared using string comparison functions, this function must always use
+/// the upper-case letters A-F.
+///
+/// Generally, $escape-reserved should be set to true when escaping a string
+/// that is to form a single part of a URI, and to false when escaping an
+/// entire URI or URI reference.
+///
+/// In the case of non-ascii characters, the string is encoded according to
+/// utf-8 and then converted according to RFC 2396.
+///
+/// Examples
+///  xf:escape-uri ("gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles#ocean"), true())
+///  returns "gopher%3A%2F%2Fspinaltap.micro.umn.edu%2F00%2FWeather%2FCalifornia%2FLos%20Angeles%23ocean"
+///  xf:escape-uri ("gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles#ocean"), false())
+///  returns "gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles%23ocean"
+#[doc(alias = "xmlXPathEscapeUriFunction")]
 unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut cptr: *mut XmlChar;
     let mut escape: [XmlChar; 4] = [0; 4];
@@ -9942,12 +9199,8 @@ unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPt
     xml_xpath_release_object((*ctxt).context, str);
 }
 
-/**
- * xmlXPathRegisterAllFunctions:
- * @ctxt:  the XPath context
- *
- * Registers all default XPath functions in this context
- */
+/// Registers all default XPath functions in this context
+#[doc(alias = "xmlXPathRegisterAllFunctions")]
 pub unsafe extern "C" fn xml_xpath_register_all_functions(ctxt: XmlXPathContextPtr) {
     xml_xpath_register_func(ctxt, c"boolean".as_ptr() as _, xml_xpath_boolean_function);
     xml_xpath_register_func(ctxt, c"ceiling".as_ptr() as _, xml_xpath_ceiling_function);
@@ -10021,18 +9274,13 @@ pub unsafe extern "C" fn xml_xpath_register_all_functions(ctxt: XmlXPathContextP
     );
 }
 
-/**
- * xmlXPathNodeSetMerge:
- * @val1:  the first NodeSet or NULL
- * @val2:  the second NodeSet
- *
- * Merges two nodesets, all nodes from @val2 are added to @val1
- * if @val1 is NULL, a new set is created and copied from @val2
- *
- * Returns @val1 once extended or NULL in case of error.
- *
- * Frees @val1 in case of error.
- */
+/// Merges two nodesets, all nodes from @val2 are added to @val1
+/// if @val1 is NULL, a new set is created and copied from @val2
+///
+/// Returns @val1 once extended or NULL in case of error.
+///
+/// Frees @val1 in case of error.
+#[doc(alias = "xmlXPathNodeSetMerge")]
 pub unsafe extern "C" fn xml_xpath_node_set_merge(
     mut val1: XmlNodeSetPtr,
     val2: XmlNodeSetPtr,
@@ -10141,13 +9389,8 @@ pub unsafe extern "C" fn xml_xpath_node_set_merge(
     // return null_mut();
 }
 
-/**
- * xmlXPathNodeSetDel:
- * @cur:  the initial node set
- * @val:  an xmlNodePtr
- *
- * Removes an xmlNodePtr from an existing NodeSet
- */
+/// Removes an xmlNodePtr from an existing NodeSet
+#[doc(alias = "xmlXPathNodeSetDel")]
 pub unsafe extern "C" fn xml_xpath_node_set_del(cur: XmlNodeSetPtr, val: XmlNodePtr) {
     if cur.is_null() {
         return;
@@ -10188,13 +9431,8 @@ pub unsafe extern "C" fn xml_xpath_node_set_del(cur: XmlNodeSetPtr, val: XmlNode
     *(*cur).node_tab.add((*cur).node_nr as usize) = null_mut();
 }
 
-/**
- * xmlXPathNodeSetRemove:
- * @cur:  the initial node set
- * @val:  the index to remove
- *
- * Removes an entry from an existing NodeSet list.
- */
+/// Removes an entry from an existing NodeSet list.
+#[doc(alias = "xmlXPathNodeSetRemove")]
 pub unsafe extern "C" fn xml_xpath_node_set_remove(cur: XmlNodeSetPtr, val: i32) {
     if cur.is_null() {
         return;
@@ -10217,15 +9455,11 @@ pub unsafe extern "C" fn xml_xpath_node_set_remove(cur: XmlNodeSetPtr, val: i32)
     *(*cur).node_tab.add((*cur).node_nr as usize) = null_mut();
 }
 
-/**
- * xmlXPathNewNodeSetList:
- * @val:  an existing NodeSet
- *
- * Create a new xmlXPathObjectPtr of type NodeSet and initialize
- * it with the Nodeset @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type NodeSet and initialize
+/// it with the Nodeset @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNewNodeSetList")]
 pub unsafe extern "C" fn xml_xpath_new_node_set_list(val: XmlNodeSetPtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr;
 
@@ -10252,16 +9486,12 @@ pub unsafe extern "C" fn xml_xpath_new_node_set_list(val: XmlNodeSetPtr) -> XmlX
     ret
 }
 
-/**
- * xmlXPathWrapNodeSet:
- * @val:  the NodePtr value
- *
- * Wrap the Nodeset @val in a new xmlXPathObjectPtr
- *
- * Returns the newly created object.
- *
- * In case of error the node set is destroyed and NULL is returned.
- */
+/// Wrap the Nodeset @val in a new xmlXPathObjectPtr
+///
+/// Returns the newly created object.
+///
+/// In case of error the node set is destroyed and NULL is returned.
+#[doc(alias = "xmlXPathWrapNodeSet")]
 pub unsafe extern "C" fn xml_xpath_wrap_node_set(val: XmlNodeSetPtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -10275,14 +9505,10 @@ pub unsafe extern "C" fn xml_xpath_wrap_node_set(val: XmlNodeSetPtr) -> XmlXPath
     ret
 }
 
-/**
- * xmlXPathWrapExternal:
- * @val:  the user data
- *
- * Wraps the @val data into an XPath object.
- *
- * Returns the newly created object.
- */
+/// Wraps the @val data into an XPath object.
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathWrapExternal")]
 pub unsafe extern "C" fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
@@ -10295,15 +9521,11 @@ pub unsafe extern "C" fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathOb
     ret
 }
 
-/**
- * xmlXPathNodeValHash:
- * @node:  a node pointer
- *
- * Function computing the beginning of the string value of the node,
- * used to speed up comparisons
- *
- * Returns an int usable as a hash
- */
+/// Function computing the beginning of the string value of the node,
+/// used to speed up comparisons
+///
+/// Returns an int usable as a hash
+#[doc(alias = "xmlXPathNodeValHash")]
 unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
     let mut len: i32 = 2;
     let mut string: *const XmlChar;
@@ -10422,23 +9644,17 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
     ret
 }
 
-/**
- * xmlXPathEqualNodeSets:
- * @arg1:  first nodeset object argument
- * @arg2:  second nodeset object argument
- * @neq:   flag to show whether to test '=' (0) or '!=' (1)
- *
- * Implement the equal / not equal operation on XPath nodesets:
- * @arg1 == @arg2  or  @arg1 != @arg2
- * If both objects to be compared are node-sets, then the comparison
- * will be true if and only if there is a node in the first node-set and
- * a node in the second node-set such that the result of performing the
- * comparison on the string-values of the two nodes is true.
- *
- * (needless to say, this is a costly operation)
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the equal / not equal operation on XPath nodesets:
+/// @arg1 == @arg2  or  @arg1 != @arg2
+/// If both objects to be compared are node-sets, then the comparison
+/// will be true if and only if there is a node in the first node-set and
+/// a node in the second node-set such that the result of performing the
+/// comparison on the string-values of the two nodes is true.
+///
+/// (needless to say, this is a costly operation)
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathEqualNodeSets")]
 unsafe extern "C" fn xml_xpath_equal_node_sets(
     arg1: XmlXPathObjectPtr,
     arg2: XmlXPathObjectPtr,
@@ -10574,21 +9790,15 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
     ret
 }
 
-/**
- * xmlXPathEqualNodeSetFloat:
- * @arg:  the nodeset object argument
- * @f:  the float to compare to
- * @neq:  flag to show whether to compare '=' (0) or '!=' (1)
- *
- * Implement the equal operation on XPath objects content: @arg1 == @arg2
- * If one object to be compared is a node-set and the other is a number,
- * then the comparison will be true if and only if there is a node in
- * the node-set such that the result of performing the comparison on the
- * number to be compared and on the result of converting the string-value
- * of that node to a number using the number function is true.
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the equal operation on XPath objects content: @arg1 == @arg2
+/// If one object to be compared is a node-set and the other is a number,
+/// then the comparison will be true if and only if there is a node in
+/// the node-set such that the result of performing the comparison on the
+/// number to be compared and on the result of converting the string-value
+/// of that node to a number using the number function is true.
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathEqualNodeSetFloat")]
 unsafe extern "C" fn xml_xpath_equal_node_set_float(
     ctxt: XmlXPathParserContextPtr,
     arg: XmlXPathObjectPtr,
@@ -10640,15 +9850,11 @@ unsafe extern "C" fn xml_xpath_equal_node_set_float(
     ret
 }
 
-/**
- * xmlXPathStringHash:
- * @string:  a string
- *
- * Function computing the beginning of the string value of the node,
- * used to speed up comparisons
- *
- * Returns an int usable as a hash
- */
+/// Function computing the beginning of the string value of the node,
+/// used to speed up comparisons
+///
+/// Returns an int usable as a hash
+#[doc(alias = "xmlXPathStringHash")]
 unsafe extern "C" fn xml_xpath_string_hash(string: *const XmlChar) -> u32 {
     if string.is_null() {
         return 0;
@@ -10659,20 +9865,14 @@ unsafe extern "C" fn xml_xpath_string_hash(string: *const XmlChar) -> u32 {
     *string.add(0) as u32 + ((*string.add(1) as u32) << 8)
 }
 
-/**
- * xmlXPathEqualNodeSetString:
- * @arg:  the nodeset object argument
- * @str:  the string to compare to.
- * @neq:  flag to show whether for '=' (0) or '!=' (1)
- *
- * Implement the equal operation on XPath objects content: @arg1 == @arg2
- * If one object to be compared is a node-set and the other is a string,
- * then the comparison will be true if and only if there is a node in
- * the node-set such that the result of performing the comparison on the
- * string-value of the node and the other string is true.
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the equal operation on XPath objects content: @arg1 == @arg2
+/// If one object to be compared is a node-set and the other is a string,
+/// then the comparison will be true if and only if there is a node in
+/// the node-set such that the result of performing the comparison on the
+/// string-value of the node and the other string is true.
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathEqualNodeSetString")]
 unsafe extern "C" fn xml_xpath_equal_node_set_string(
     arg: XmlXPathObjectPtr,
     str: *const XmlChar,
@@ -10916,14 +10116,10 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
     ret
 }
 
-/**
- * xmlXPathEqualValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the equal operation on XPath objects content: @arg1 == @arg2
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the equal operation on XPath objects content: @arg1 == @arg2
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathEqualValues")]
 pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
     let mut arg1: XmlXPathObjectPtr;
     let mut arg2: XmlXPathObjectPtr;
@@ -11006,14 +10202,10 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
     xml_xpath_equal_values_common(ctxt, arg1, arg2)
 }
 
-/**
- * xmlXPathNotEqualValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the equal operation on XPath objects content: @arg1 == @arg2
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the equal operation on XPath objects content: @arg1 == @arg2
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathNotEqualValues")]
 pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextPtr) -> i32 {
     let mut arg1: XmlXPathObjectPtr;
     let mut arg2: XmlXPathObjectPtr;
@@ -11097,34 +10289,27 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
     (xml_xpath_equal_values_common(ctxt, arg1, arg2) == 0) as i32
 }
 
-/**
- * xmlXPathCompareNodeSets:
- * @inf:  less than (1) or greater than (0)
- * @strict:  is the comparison strict
- * @arg1:  the first node set object
- * @arg2:  the second node set object
- *
- * Implement the compare operation on nodesets:
- *
- * If both objects to be compared are node-sets, then the comparison
- * will be true if and only if there is a node in the first node-set
- * and a node in the second node-set such that the result of performing
- * the comparison on the string-values of the two nodes is true.
- * ....
- * When neither object to be compared is a node-set and the operator
- * is <=, <, >= or >, then the objects are compared by converting both
- * objects to numbers and comparing the numbers according to IEEE 754.
- * ....
- * The number function converts its argument to a number as follows:
- *  - a string that consists of optional whitespace followed by an
- *    optional minus sign followed by a Number followed by whitespace
- *    is converted to the IEEE 754 number that is nearest (according
- *    to the IEEE 754 round-to-nearest rule) to the mathematical value
- *    represented by the string; any other string is converted to NaN
- *
- * Conclusion all nodes need to be converted first to their string value
- * and then the comparison must be done when possible
- */
+/// Implement the compare operation on nodesets:
+///
+/// If both objects to be compared are node-sets, then the comparison
+/// will be true if and only if there is a node in the first node-set
+/// and a node in the second node-set such that the result of performing
+/// the comparison on the string-values of the two nodes is true.
+/// ....
+/// When neither object to be compared is a node-set and the operator
+/// is <=, <, >= or >, then the objects are compared by converting both
+/// objects to numbers and comparing the numbers according to IEEE 754.
+/// ....
+/// The number function converts its argument to a number as follows:
+///  - a string that consists of optional whitespace followed by an
+///    optional minus sign followed by a Number followed by whitespace
+///    is converted to the IEEE 754 number that is nearest (according
+///    to the IEEE 754 round-to-nearest rule) to the mathematical value
+///    represented by the string; any other string is converted to NaN
+///
+/// Conclusion all nodes need to be converted first to their string value
+/// and then the comparison must be done when possible
+#[doc(alias = "xmlXPathCompareNodeSets")]
 unsafe extern "C" fn xml_xpath_compare_node_sets(
     inf: i32,
     strict: i32,
@@ -11214,28 +10399,20 @@ unsafe extern "C" fn xml_xpath_compare_node_sets(
     ret
 }
 
-/**
- * xmlXPathCompareNodeSetFloat:
- * @ctxt:  the XPath Parser context
- * @inf:  less than (1) or greater than (0)
- * @strict:  is the comparison strict
- * @arg:  the node set
- * @f:  the value
- *
- * Implement the compare operation between a nodeset and a number
- *     @ns < @val    (1, 1, ...
- *     @ns <= @val   (1, 0, ...
- *     @ns > @val    (0, 1, ...
- *     @ns >= @val   (0, 0, ...
- *
- * If one object to be compared is a node-set and the other is a number,
- * then the comparison will be true if and only if there is a node in the
- * node-set such that the result of performing the comparison on the number
- * to be compared and on the result of converting the string-value of that
- * node to a number using the number function is true.
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the compare operation between a nodeset and a number
+///     @ns < @val    (1, 1, ...
+///     @ns <= @val   (1, 0, ...
+///     @ns > @val    (0, 1, ...
+///     @ns >= @val   (0, 0, ...
+///
+/// If one object to be compared is a node-set and the other is a number,
+/// then the comparison will be true if and only if there is a node in the
+/// node-set such that the result of performing the comparison on the number
+/// to be compared and on the result of converting the string-value of that
+/// node to a number using the number function is true.
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathCompareNodeSetFloat")]
 unsafe extern "C" fn xml_xpath_compare_node_set_float(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
@@ -11278,27 +10455,19 @@ unsafe extern "C" fn xml_xpath_compare_node_set_float(
     ret
 }
 
-/**
- * xmlXPathCompareNodeSetString:
- * @ctxt:  the XPath Parser context
- * @inf:  less than (1) or greater than (0)
- * @strict:  is the comparison strict
- * @arg:  the node set
- * @s:  the value
- *
- * Implement the compare operation between a nodeset and a string
- *     @ns < @val    (1, 1, ...
- *     @ns <= @val   (1, 0, ...
- *     @ns > @val    (0, 1, ...
- *     @ns >= @val   (0, 0, ...
- *
- * If one object to be compared is a node-set and the other is a string,
- * then the comparison will be true if and only if there is a node in
- * the node-set such that the result of performing the comparison on the
- * string-value of the node and the other string is true.
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the compare operation between a nodeset and a string
+///     @ns < @val    (1, 1, ...
+///     @ns <= @val   (1, 0, ...
+///     @ns > @val    (0, 1, ...
+///     @ns >= @val   (0, 0, ...
+///
+/// If one object to be compared is a node-set and the other is a string,
+/// then the comparison will be true if and only if there is a node in
+/// the node-set such that the result of performing the comparison on the
+/// string-value of the node and the other string is true.
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathCompareNodeSetString")]
 unsafe extern "C" fn xml_xpath_compare_node_set_string(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
@@ -11340,27 +10509,19 @@ unsafe extern "C" fn xml_xpath_compare_node_set_string(
     ret
 }
 
-/**
- * xmlXPathCompareNodeSetValue:
- * @ctxt:  the XPath Parser context
- * @inf:  less than (1) or greater than (0)
- * @strict:  is the comparison strict
- * @arg:  the node set
- * @val:  the value
- *
- * Implement the compare operation between a nodeset and a value
- *     @ns < @val    (1, 1, ...
- *     @ns <= @val   (1, 0, ...
- *     @ns > @val    (0, 1, ...
- *     @ns >= @val   (0, 0, ...
- *
- * If one object to be compared is a node-set and the other is a boolean,
- * then the comparison will be true if and only if the result of performing
- * the comparison on the boolean and on the result of converting
- * the node-set to a boolean using the boolean function is true.
- *
- * Returns 0 or 1 depending on the results of the test.
- */
+/// Implement the compare operation between a nodeset and a value
+///     @ns < @val    (1, 1, ...
+///     @ns <= @val   (1, 0, ...
+///     @ns > @val    (0, 1, ...
+///     @ns >= @val   (0, 0, ...
+///
+/// If one object to be compared is a node-set and the other is a boolean,
+/// then the comparison will be true if and only if the result of performing
+/// the comparison on the boolean and on the result of converting
+/// the node-set to a boolean using the boolean function is true.
+///
+/// Returns 0 or 1 depending on the results of the test.
+#[doc(alias = "xmlXPathCompareNodeSetValue")]
 unsafe extern "C" fn xml_xpath_compare_node_set_value(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
@@ -11406,30 +10567,24 @@ unsafe extern "C" fn xml_xpath_compare_node_set_value(
     }
 }
 
-/**
- * xmlXPathCompareValues:
- * @ctxt:  the XPath Parser context
- * @inf:  less than (1) or greater than (0)
- * @strict:  is the comparison strict
- *
- * Implement the compare operation on XPath objects:
- *     @arg1 < @arg2    (1, 1, ...
- *     @arg1 <= @arg2   (1, 0, ...
- *     @arg1 > @arg2    (0, 1, ...
- *     @arg1 >= @arg2   (0, 0, ...
- *
- * When neither object to be compared is a node-set and the operator is
- * <=, <, >=, >, then the objects are compared by converted both objects
- * to numbers and comparing the numbers according to IEEE 754. The <
- * comparison will be true if and only if the first number is less than the
- * second number. The <= comparison will be true if and only if the first
- * number is less than or equal to the second number. The > comparison
- * will be true if and only if the first number is greater than the second
- * number. The >= comparison will be true if and only if the first number
- * is greater than or equal to the second number.
- *
- * Returns 1 if the comparison succeeded, 0 if it failed
- */
+/// Implement the compare operation on XPath objects:
+///     @arg1 < @arg2    (1, 1, ...
+///     @arg1 <= @arg2   (1, 0, ...
+///     @arg1 > @arg2    (0, 1, ...
+///     @arg1 >= @arg2   (0, 0, ...
+///
+/// When neither object to be compared is a node-set and the operator is
+/// <=, <, >=, >, then the objects are compared by converted both objects
+/// to numbers and comparing the numbers according to IEEE 754. The <
+/// comparison will be true if and only if the first number is less than the
+/// second number. The <= comparison will be true if and only if the first
+/// number is less than or equal to the second number. The > comparison
+/// will be true if and only if the first number is greater than the second
+/// number. The >= comparison will be true if and only if the first number
+/// is greater than or equal to the second number.
+///
+/// Returns 1 if the comparison succeeded, 0 if it failed
+#[doc(alias = "xmlXPathCompareValues")]
 pub unsafe extern "C" fn xml_xpath_compare_values(
     ctxt: XmlXPathParserContextPtr,
     inf: i32,
@@ -11552,14 +10707,10 @@ pub unsafe extern "C" fn xml_xpath_compare_values(
     ret
 }
 
-/**
- * xmlXPathValueFlipSign:
- * @ctxt:  the XPath Parser context
- *
- * Implement the unary - operation on an XPath object
- * The numeric operators convert their operands to numbers as if
- * by calling the number function.
- */
+/// Implement the unary - operation on an XPath object
+/// The numeric operators convert their operands to numbers as if
+/// by calling the number function.
+#[doc(alias = "xmlXPathValueFlipSign")]
 pub unsafe extern "C" fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPtr) {
     if ctxt.is_null() || (*ctxt).context.is_null() {
         return;
@@ -11569,14 +10720,10 @@ pub unsafe extern "C" fn xml_xpath_value_flip_sign(ctxt: XmlXPathParserContextPt
     (*(*ctxt).value).floatval = -(*(*ctxt).value).floatval;
 }
 
-/**
- * xmlXPathAddValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the add operation on XPath objects:
- * The numeric operators convert their operands to numbers as if
- * by calling the number function.
- */
+/// Implement the add operation on XPath objects:
+/// The numeric operators convert their operands to numbers as if
+/// by calling the number function.
+#[doc(alias = "xmlXPathAddValues")]
 pub unsafe extern "C" fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
     let arg: XmlXPathObjectPtr = value_pop(ctxt);
     if arg.is_null() {
@@ -11589,14 +10736,10 @@ pub unsafe extern "C" fn xml_xpath_add_values(ctxt: XmlXPathParserContextPtr) {
     (*(*ctxt).value).floatval += val;
 }
 
-/**
- * xmlXPathSubValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the subtraction operation on XPath objects:
- * The numeric operators convert their operands to numbers as if
- * by calling the number function.
- */
+/// Implement the subtraction operation on XPath objects:
+/// The numeric operators convert their operands to numbers as if
+/// by calling the number function.
+#[doc(alias = "xmlXPathSubValues")]
 pub unsafe extern "C" fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
     let arg: XmlXPathObjectPtr = value_pop(ctxt);
     if arg.is_null() {
@@ -11609,14 +10752,10 @@ pub unsafe extern "C" fn xml_xpath_sub_values(ctxt: XmlXPathParserContextPtr) {
     (*(*ctxt).value).floatval -= val;
 }
 
-/**
- * xmlXPathMultValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the multiply operation on XPath objects:
- * The numeric operators convert their operands to numbers as if
- * by calling the number function.
- */
+/// Implement the multiply operation on XPath objects:
+/// The numeric operators convert their operands to numbers as if
+/// by calling the number function.
+#[doc(alias = "xmlXPathMultValues")]
 pub unsafe extern "C" fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
     let arg: XmlXPathObjectPtr = value_pop(ctxt);
     if arg.is_null() {
@@ -11629,15 +10768,10 @@ pub unsafe extern "C" fn xml_xpath_mult_values(ctxt: XmlXPathParserContextPtr) {
     (*(*ctxt).value).floatval *= val;
 }
 
-/**
- * xmlXPathDivValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the div operation on XPath objects @arg1 / @arg2:
- * The numeric operators convert their operands to numbers as if
- * by calling the number function.
- */
-// ATTRIBUTE_NO_SANITIZE("float-divide-by-zero")
+/// Implement the div operation on XPath objects @arg1 / @arg2:
+/// The numeric operators convert their operands to numbers as if
+/// by calling the number function.
+#[doc(alias = "xmlXPathDivValues")]
 pub unsafe extern "C" fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
     let arg: XmlXPathObjectPtr = value_pop(ctxt);
     if arg.is_null() {
@@ -11650,14 +10784,10 @@ pub unsafe extern "C" fn xml_xpath_div_values(ctxt: XmlXPathParserContextPtr) {
     (*(*ctxt).value).floatval /= val;
 }
 
-/**
- * xmlXPathModValues:
- * @ctxt:  the XPath Parser context
- *
- * Implement the mod operation on XPath objects: @arg1 / @arg2
- * The numeric operators convert their operands to numbers as if
- * by calling the number function.
- */
+/// Implement the mod operation on XPath objects: @arg1 / @arg2
+/// The numeric operators convert their operands to numbers as if
+/// by calling the number function.
+#[doc(alias = "xmlXPathModValues")]
 pub unsafe extern "C" fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
     let arg: XmlXPathObjectPtr = value_pop(ctxt);
     if arg.is_null() {
@@ -11675,19 +10805,17 @@ pub unsafe extern "C" fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/**
- * xmlXPathIsNodeType:
- * @name:  a name string
- *
- * Is the name given a NodeType one.
- *
- *  [38]   NodeType ::=   'comment'
- *                    | 'text'
- *                    | 'processing-instruction'
- *                    | 'node'
- *
- * Returns 1 if true 0 otherwise
- */
+/// Is the name given a NodeType one.
+///
+/// ```ignore
+/// [38]   NodeType ::=   'comment'
+///                   | 'text'
+///                   | 'processing-instruction'
+///                   | 'node'
+/// ```
+///
+/// Returns 1 if true 0 otherwise
+#[doc(alias = "xmlXPathIsNodeType")]
 pub unsafe extern "C" fn xml_xpath_is_node_type(name: *const XmlChar) -> i32 {
     if name.is_null() {
         return 0;
@@ -11708,19 +10836,11 @@ pub unsafe extern "C" fn xml_xpath_is_node_type(name: *const XmlChar) -> i32 {
     0
 }
 
-/*
- * Some of the axis navigation routines.
- */
-/**
- * xmlXPathNextSelf:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "self" direction
- * The self axis contains just the context node itself
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "self" direction
+/// The self axis contains just the context node itself
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextSelf")]
 pub unsafe extern "C" fn xml_xpath_next_self(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -11734,16 +10854,11 @@ pub unsafe extern "C" fn xml_xpath_next_self(
     null_mut()
 }
 
-/**
- * xmlXPathNextChild:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "child" direction
- * The child axis contains the children of the context node in document order.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "child" direction
+/// The child axis contains the children of the context node in document order.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextChild")]
 pub unsafe extern "C" fn xml_xpath_next_child(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -11798,17 +10913,12 @@ pub unsafe extern "C" fn xml_xpath_next_child(
     (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
 
-/**
- * xmlXPathNextDescendant:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "descendant" direction
- * the descendant axis contains the descendants of the context node in document
- * order; a descendant is a child or a child of a child and so on.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "descendant" direction
+/// the descendant axis contains the descendants of the context node in document
+/// order; a descendant is a child or a child of a child and so on.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextDescendant")]
 pub unsafe extern "C" fn xml_xpath_next_descendant(
     ctxt: XmlXPathParserContextPtr,
     mut cur: XmlNodePtr,
@@ -11884,19 +10994,14 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
     cur
 }
 
-/**
- * xmlXPathNextDescendantOrSelf:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "descendant-or-self" direction
- * the descendant-or-self axis contains the context node and the descendants
- * of the context node in document order; thus the context node is the first
- * node on the axis, and the first child of the context node is the second node
- * on the axis
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "descendant-or-self" direction
+/// the descendant-or-self axis contains the context node and the descendants
+/// of the context node in document order; thus the context node is the first
+/// node on the axis, and the first child of the context node is the second node
+/// on the axis
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextDescendantOrSelf")]
 pub unsafe extern "C" fn xml_xpath_next_descendant_or_self(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -11921,16 +11026,11 @@ pub unsafe extern "C" fn xml_xpath_next_descendant_or_self(
     xml_xpath_next_descendant(ctxt, cur)
 }
 
-/**
- * xmlXPathNextParent:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "parent" direction
- * The parent axis contains the parent of the context node, if there is one.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "parent" direction
+/// The parent axis contains the parent of the context node, if there is one.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextParent")]
 pub unsafe extern "C" fn xml_xpath_next_parent(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -12000,19 +11100,14 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
     null_mut()
 }
 
-/**
- * xmlXPathNextAncestorOrSelf:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "ancestor-or-self" direction
- * he ancestor-or-self axis contains the context node and ancestors of
- * the context node in reverse document order; thus the context node is
- * the first node on the axis, and the context node's parent the second;
- * parent here is defined the same as with the parent axis.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "ancestor-or-self" direction
+/// he ancestor-or-self axis contains the context node and ancestors of
+/// the context node in reverse document order; thus the context node is
+/// the first node on the axis, and the context node's parent the second;
+/// parent here is defined the same as with the parent axis.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextAncestorOrSelf")]
 pub unsafe extern "C" fn xml_xpath_next_ancestor_or_self(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -12026,17 +11121,12 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor_or_self(
     xml_xpath_next_ancestor(ctxt, cur)
 }
 
-/**
- * xmlXPathNextFollowingSibling:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "following-sibling" direction
- * The following-sibling axis contains the following siblings of the context
- * node in document order.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "following-sibling" direction
+/// The following-sibling axis contains the following siblings of the context
+/// node in document order.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextFollowingSibling")]
 pub unsafe extern "C" fn xml_xpath_next_following_sibling(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -12061,19 +11151,14 @@ pub unsafe extern "C" fn xml_xpath_next_following_sibling(
     (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
 
-/**
- * xmlXPathNextFollowing:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "following" direction
- * The following axis contains all nodes in the same document as the context
- * node that are after the context node in document order, excluding any
- * descendants and excluding attribute nodes and namespace nodes; the nodes
- * are ordered in document order
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "following" direction
+/// The following axis contains all nodes in the same document as the context
+/// node that are after the context node in document order, excluding any
+/// descendants and excluding attribute nodes and namespace nodes; the nodes
+/// are ordered in document order
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextFollowing")]
 pub unsafe extern "C" fn xml_xpath_next_following(
     ctxt: XmlXPathParserContextPtr,
     mut cur: XmlNodePtr,
@@ -12140,20 +11225,15 @@ thread_local! {
     } };
 }
 
-/**
- * xmlXPathNextNamespace:
- * @ctxt:  the XPath Parser context
- * @cur:  the current attribute in the traversal
- *
- * Traversal function for the "namespace" direction
- * the namespace axis contains the namespace nodes of the context node;
- * the order of nodes on this axis is implementation-defined; the axis will
- * be empty unless the context node is an element
- *
- * We keep the XML namespace node at the end of the list.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "namespace" direction
+/// the namespace axis contains the namespace nodes of the context node;
+/// the order of nodes on this axis is implementation-defined; the axis will
+/// be empty unless the context node is an element
+///
+/// We keep the XML namespace node at the end of the list.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextNamespace")]
 pub unsafe extern "C" fn xml_xpath_next_namespace(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -12201,16 +11281,11 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
     }
 }
 
-/**
- * xmlXPathNextAttribute:
- * @ctxt:  the XPath Parser context
- * @cur:  the current attribute in the traversal
- *
- * Traversal function for the "attribute" direction
- * TODO: support DTD inherited default attributes
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "attribute" direction
+/// TODO: support DTD inherited default attributes
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextAttribute")]
 pub unsafe extern "C" fn xml_xpath_next_attribute(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -12236,15 +11311,10 @@ pub unsafe extern "C" fn xml_xpath_next_attribute(
     (*cur).next.map_or(null_mut(), |n| n.as_ptr())
 }
 
-/*
- * xmlXPathIsAncestor:
- * @ancestor:  the ancestor node
- * @node:  the current node
- *
- * Check that @ancestor is a @node's ancestor
- *
- * returns 1 if @ancestor is a @node's ancestor, 0 otherwise.
- */
+/// Check that @ancestor is a @node's ancestor
+///
+/// returns 1 if @ancestor is a @node's ancestor, 0 otherwise.
+#[doc(alias = "xmlXPathIsAncestor")]
 unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: XmlNodePtr, mut node: XmlNodePtr) -> i32 {
     if ancestor.is_null() || node.is_null() {
         return 0;
@@ -12275,19 +11345,14 @@ unsafe extern "C" fn xml_xpath_is_ancestor(ancestor: XmlNodePtr, mut node: XmlNo
     0
 }
 
-/**
- * xmlXPathNextPreceding:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "preceding" direction
- * the preceding axis contains all nodes in the same document as the context
- * node that are before the context node in document order, excluding any
- * ancestors and excluding attribute nodes and namespace nodes; the nodes are
- * ordered in reverse document order
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "preceding" direction
+/// the preceding axis contains all nodes in the same document as the context
+/// node that are before the context node in document order, excluding any
+/// ancestors and excluding attribute nodes and namespace nodes; the nodes are
+/// ordered in reverse document order
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextPreceding")]
 pub unsafe extern "C" fn xml_xpath_next_preceding(
     ctxt: XmlXPathParserContextPtr,
     mut cur: XmlNodePtr,
@@ -12341,20 +11406,15 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
     cur
 }
 
-/**
- * xmlXPathNextAncestor:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "ancestor" direction
- * the ancestor axis contains the ancestors of the context node; the ancestors
- * of the context node consist of the parent of context node and the parent's
- * parent and so on; the nodes are ordered in reverse document order; thus the
- * parent is the first node on the axis, and the parent's parent is the second
- * node on the axis
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "ancestor" direction
+/// the ancestor axis contains the ancestors of the context node; the ancestors
+/// of the context node consist of the parent of context node and the parent's
+/// parent and so on; the nodes are ordered in reverse document order; thus the
+/// parent is the first node on the axis, and the parent's parent is the second
+/// node on the axis
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextAncestor")]
 pub unsafe extern "C" fn xml_xpath_next_ancestor(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlNodePtr,
@@ -12478,18 +11538,13 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
     }
 }
 
-/**
- * xmlXPathNextPrecedingSibling:
- * @ctxt:  the XPath Parser context
- * @cur:  the current node in the traversal
- *
- * Traversal function for the "preceding-sibling" direction
- * The preceding-sibling axis contains the preceding siblings of the context
- * node in reverse document order; the first preceding sibling is first on the
- * axis; the sibling preceding that node is the second on the axis and so on.
- *
- * Returns the next element following that axis
- */
+/// Traversal function for the "preceding-sibling" direction
+/// The preceding-sibling axis contains the preceding siblings of the context
+/// node in reverse document order; the first preceding sibling is first on the
+/// axis; the sibling preceding that node is the second on the axis and so on.
+///
+/// Returns the next element following that axis
+#[doc(alias = "xmlXPathNextPrecedingSibling")]
 pub unsafe extern "C" fn xml_xpath_next_preceding_sibling(
     ctxt: XmlXPathParserContextPtr,
     mut cur: XmlNodePtr,
@@ -12525,18 +11580,10 @@ pub unsafe extern "C" fn xml_xpath_next_preceding_sibling(
     (*cur).prev.map_or(null_mut(), |p| p.as_ptr())
 }
 
-/*
- * The official core of XPath functions.
- */
-/**
- * xmlXPathLastFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the last() XPath function
- *    number last()
- * The last function returns the number of nodes in the context node list.
- */
+/// Implement the last() XPath function
+///    number last()
+/// The last function returns the number of nodes in the context node list.
+#[doc(alias = "xmlXPathLastFunction")]
 pub unsafe extern "C" fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     if (*(*ctxt).context).context_size >= 0 {
@@ -12549,17 +11596,12 @@ pub unsafe extern "C" fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr,
     }
 }
 
-/**
- * xmlXPathPositionFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the position() XPath function
- *    number position()
- * The position function returns the position of the context node in the
- * context node list. The first position is 1, and so the last position
- * will be equal to last().
- */
+/// Implement the position() XPath function
+///    number position()
+/// The position function returns the position of the context node in the
+/// context node list. The first position is 1, and so the last position
+/// will be equal to last().
+#[doc(alias = "xmlXPathPositionFunction")]
 pub unsafe extern "C" fn xml_xpath_position_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     if (*(*ctxt).context).proximity_position >= 0 {
@@ -12575,14 +11617,9 @@ pub unsafe extern "C" fn xml_xpath_position_function(ctxt: XmlXPathParserContext
     }
 }
 
-/**
- * xmlXPathCountFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the count() XPath function
- *    number count(node-set)
- */
+/// Implement the count() XPath function
+///    number count(node-set)
+#[doc(alias = "xmlXPathCountFunction")]
 pub unsafe extern "C" fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     if (*ctxt).value.is_null()
@@ -12606,15 +11643,10 @@ pub unsafe extern "C" fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr
     xml_xpath_release_object((*ctxt).context, cur);
 }
 
-/**
- * xmlXPathGetElementsByIds:
- * @doc:  the document
- * @ids:  a whitespace separated list of IDs
- *
- * Selects elements by their unique ID.
- *
- * Returns a node-set of selected elements.
- */
+/// Selects elements by their unique ID.
+///
+/// Returns a node-set of selected elements.
+#[doc(alias = "xmlXPathGetElementsByIds")]
 unsafe extern "C" fn xml_xpath_get_elements_by_ids(
     doc: XmlDocPtr,
     mut ids: *const XmlChar,
@@ -12675,18 +11707,12 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
     ret
 }
 
-/**
- * xmlXPathCacheConvertString:
- * @ctxt: the XPath context
- * @val:  an XPath object
- *
- * This is the cached version of xmlXPathConvertString().
- * Converts an existing object to its string() equivalent
- *
- * Returns a created or reused object, the old one is freed (cached)
- *         (or the operation is done directly on @val)
- */
-
+/// This is the cached version of xmlXPathConvertString().
+/// Converts an existing object to its string() equivalent
+///
+/// Returns a created or reused object, the old one is freed (cached)
+///         (or the operation is done directly on @val)
+#[doc(alias = "xmlXPathCacheConvertString")]
 unsafe extern "C" fn xml_xpath_cache_convert_string(
     ctxt: XmlXPathContextPtr,
     val: XmlXPathObjectPtr,
@@ -12728,24 +11754,19 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
     xml_xpath_cache_wrap_string(ctxt, res)
 }
 
-/**
- * xmlXPathIdFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the id() XPath function
- *    node-set id(object)
- * The id function selects elements by their unique ID
- * (see [5.2.1 Unique IDs]). When the argument to id is of type node-set,
- * then the result is the union of the result of applying id to the
- * string value of each of the nodes in the argument node-set. When the
- * argument to id is of any other type, the argument is converted to a
- * string as if by a call to the string function; the string is split
- * into a whitespace-separated list of tokens (whitespace is any sequence
- * of characters matching the production S); the result is a node-set
- * containing the elements in the same document as the context node that
- * have a unique ID equal to any of the tokens in the list.
- */
+/// Implement the id() XPath function
+///    node-set id(object)
+/// The id function selects elements by their unique ID
+/// (see [5.2.1 Unique IDs]). When the argument to id is of type node-set,
+/// then the result is the union of the result of applying id to the
+/// string value of each of the nodes in the argument node-set. When the
+/// argument to id is of any other type, the argument is converted to a
+/// string as if by a call to the string function; the string is split
+/// into a whitespace-separated list of tokens (whitespace is any sequence
+/// of characters matching the production S); the result is a node-set
+/// containing the elements in the same document as the context node that
+/// have a unique ID equal to any of the tokens in the list.
+#[doc(alias = "xmlXPathIdFunction")]
 pub unsafe extern "C" fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tokens: *mut XmlChar;
     let mut ret: XmlNodeSetPtr;
@@ -12791,19 +11812,14 @@ pub unsafe extern "C" fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, n
     xml_xpath_release_object((*ctxt).context, obj);
 }
 
-/**
- * xmlXPathLocalNameFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the local-name() XPath function
- *    string local-name(node-set?)
- * The local-name function returns a string containing the local part
- * of the name of the node in the argument node-set that is first in
- * document order. If the node-set is empty or the first node has no
- * name, an empty string is returned. If the argument is omitted it
- * defaults to the context node.
- */
+/// Implement the local-name() XPath function
+///    string local-name(node-set?)
+/// The local-name function returns a string containing the local part
+/// of the name of the node in the argument node-set that is first in
+/// document order. If the node-set is empty or the first node has no
+/// name, an empty string is returned. If the argument is omitted it
+/// defaults to the context node.
+#[doc(alias = "xmlXPathLocalNameFunction")]
 pub unsafe extern "C" fn xml_xpath_local_name_function(
     ctxt: XmlXPathParserContextPtr,
     mut nargs: i32,
@@ -12881,20 +11897,15 @@ pub unsafe extern "C" fn xml_xpath_local_name_function(
     xml_xpath_release_object((*ctxt).context, cur);
 }
 
-/**
- * xmlXPathNamespaceURIFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the namespace-uri() XPath function
- *    string namespace-uri(node-set?)
- * The namespace-uri function returns a string containing the
- * namespace URI of the expanded name of the node in the argument
- * node-set that is first in document order. If the node-set is empty,
- * the first node has no name, or the expanded name has no namespace
- * URI, an empty string is returned. If the argument is omitted it
- * defaults to the context node.
- */
+/// Implement the namespace-uri() XPath function
+///    string namespace-uri(node-set?)
+/// The namespace-uri function returns a string containing the
+/// namespace URI of the expanded name of the node in the argument
+/// node-set that is first in document order. If the node-set is empty,
+/// the first node has no name, or the expanded name has no namespace
+/// URI, an empty string is returned. If the argument is omitted it
+/// defaults to the context node.
+#[doc(alias = "xmlXPathNamespaceURIFunction")]
 pub unsafe extern "C" fn xml_xpath_namespace_uri_function(
     ctxt: XmlXPathParserContextPtr,
     mut nargs: i32,
@@ -12959,42 +11970,37 @@ pub unsafe extern "C" fn xml_xpath_namespace_uri_function(
     xml_xpath_release_object((*ctxt).context, cur);
 }
 
-/**
- * xmlXPathStringFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the string() XPath function
- *    string string(object?)
- * The string function converts an object to a string as follows:
- *    - A node-set is converted to a string by returning the value of
- *      the node in the node-set that is first in document order.
- *      If the node-set is empty, an empty string is returned.
- *    - A number is converted to a string as follows
- *      + NaN is converted to the string NaN
- *      + positive zero is converted to the string 0
- *      + negative zero is converted to the string 0
- *      + positive infinity is converted to the string Infinity
- *      + negative infinity is converted to the string -Infinity
- *      + if the number is an integer, the number is represented in
- *        decimal form as a Number with no decimal point and no leading
- *        zeros, preceded by a minus sign (-) if the number is negative
- *      + otherwise, the number is represented in decimal form as a
- *        Number including a decimal point with at least one digit
- *        before the decimal point and at least one digit after the
- *        decimal point, preceded by a minus sign (-) if the number
- *        is negative; there must be no leading zeros before the decimal
- *        point apart possibly from the one required digit immediately
- *        before the decimal point; beyond the one required digit
- *        after the decimal point there must be as many, but only as
- *        many, more digits as are needed to uniquely distinguish the
- *        number from all other IEEE 754 numeric values.
- *    - The boolean false value is converted to the string false.
- *      The boolean true value is converted to the string true.
- *
- * If the argument is omitted, it defaults to a node-set with the
- * context node as its only member.
- */
+/// Implement the string() XPath function
+///    string string(object?)
+/// The string function converts an object to a string as follows:
+///    - A node-set is converted to a string by returning the value of
+///      the node in the node-set that is first in document order.
+///      If the node-set is empty, an empty string is returned.
+///    - A number is converted to a string as follows
+///      + NaN is converted to the string NaN
+///      + positive zero is converted to the string 0
+///      + negative zero is converted to the string 0
+///      + positive infinity is converted to the string Infinity
+///      + negative infinity is converted to the string -Infinity
+///      + if the number is an integer, the number is represented in
+///        decimal form as a Number with no decimal point and no leading
+///        zeros, preceded by a minus sign (-) if the number is negative
+///      + otherwise, the number is represented in decimal form as a
+///        Number including a decimal point with at least one digit
+///        before the decimal point and at least one digit after the
+///        decimal point, preceded by a minus sign (-) if the number
+///        is negative; there must be no leading zeros before the decimal
+///        point apart possibly from the one required digit immediately
+///        before the decimal point; beyond the one required digit
+///        after the decimal point there must be as many, but only as
+///        many, more digits as are needed to uniquely distinguish the
+///        number from all other IEEE 754 numeric values.
+///    - The boolean false value is converted to the string false.
+///      The boolean true value is converted to the string true.
+///
+/// If the argument is omitted, it defaults to a node-set with the
+/// context node as its only member.
+#[doc(alias = "xmlXPathStringFunction")]
 pub unsafe extern "C" fn xml_xpath_string_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     if ctxt.is_null() {
         return;
@@ -13018,18 +12024,13 @@ pub unsafe extern "C" fn xml_xpath_string_function(ctxt: XmlXPathParserContextPt
     value_push(ctxt, xml_xpath_cache_convert_string((*ctxt).context, cur));
 }
 
-/**
- * xmlXPathStringLengthFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the string-length() XPath function
- *    number string-length(string?)
- * The string-length returns the number of characters in the string
- * (see [3.6 Strings]). If the argument is omitted, it defaults to
- * the context node converted to a string, in other words the value
- * of the context node.
- */
+/// Implement the string-length() XPath function
+///    number string-length(string?)
+/// The string-length returns the number of characters in the string
+/// (see [3.6 Strings]). If the argument is omitted, it defaults to
+/// the context node converted to a string, in other words the value
+/// of the context node.
+#[doc(alias = "xmlXPathStringLengthFunction")]
 pub unsafe extern "C" fn xml_xpath_string_length_function(
     ctxt: XmlXPathParserContextPtr,
     nargs: i32,
@@ -13061,15 +12062,10 @@ pub unsafe extern "C" fn xml_xpath_string_length_function(
     xml_xpath_release_object((*ctxt).context, cur);
 }
 
-/**
- * xmlXPathConcatFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the concat() XPath function
- *    string concat(string, string, string*)
- * The concat function returns the concatenation of its arguments.
- */
+/// Implement the concat() XPath function
+///    string concat(string, string, string*)
+/// The concat function returns the concatenation of its arguments.
+#[doc(alias = "xmlXPathConcatFunction")]
 pub unsafe extern "C" fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     let mut newobj: XmlXPathObjectPtr;
     let mut tmp: *mut XmlChar;
@@ -13106,16 +12102,11 @@ pub unsafe extern "C" fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPt
     value_push(ctxt, cur);
 }
 
-/**
- * xmlXPathContainsFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the contains() XPath function
- *    boolean contains(string, string)
- * The contains function returns true if the first argument string
- * contains the second argument string, and otherwise returns false.
- */
+/// Implement the contains() XPath function
+///    boolean contains(string, string)
+/// The contains function returns true if the first argument string
+/// contains the second argument string, and otherwise returns false.
+#[doc(alias = "xmlXPathContainsFunction")]
 pub unsafe extern "C" fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 2);
     CAST_TO_STRING!(ctxt);
@@ -13138,16 +12129,11 @@ pub unsafe extern "C" fn xml_xpath_contains_function(ctxt: XmlXPathParserContext
     xml_xpath_release_object((*ctxt).context, needle);
 }
 
-/**
- * xmlXPathStartsWithFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the starts-with() XPath function
- *    boolean starts-with(string, string)
- * The starts-with function returns true if the first argument string
- * starts with the second argument string, and otherwise returns false.
- */
+/// Implement the starts-with() XPath function
+///    boolean starts-with(string, string)
+/// The starts-with function returns true if the first argument string
+/// starts with the second argument string, and otherwise returns false.
+#[doc(alias = "xmlXPathStartsWithFunction")]
 pub unsafe extern "C" fn xml_xpath_starts_with_function(
     ctxt: XmlXPathParserContextPtr,
     nargs: i32,
@@ -13174,34 +12160,29 @@ pub unsafe extern "C" fn xml_xpath_starts_with_function(
     xml_xpath_release_object((*ctxt).context, needle);
 }
 
-/**
- * xmlXPathSubstringFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the substring() XPath function
- *    string substring(string, number, number?)
- * The substring function returns the substring of the first argument
- * starting at the position specified in the second argument with
- * length specified in the third argument. For example,
- * substring("12345",2,3) returns "234". If the third argument is not
- * specified, it returns the substring starting at the position specified
- * in the second argument and continuing to the end of the string. For
- * example, substring("12345",2) returns "2345".  More precisely, each
- * character in the string (see [3.6 Strings]) is considered to have a
- * numeric position: the position of the first character is 1, the position
- * of the second character is 2 and so on. The returned substring contains
- * those characters for which the position of the character is greater than
- * or equal to the second argument and, if the third argument is specified,
- * less than the sum of the second and third arguments; the comparisons
- * and addition used for the above follow the standard IEEE 754 rules. Thus:
- *  - substring("12345", 1.5, 2.6) returns "234"
- *  - substring("12345", 0, 3) returns "12"
- *  - substring("12345", 0 div 0, 3) returns ""
- *  - substring("12345", 1, 0 div 0) returns ""
- *  - substring("12345", -42, 1 div 0) returns "12345"
- *  - substring("12345", -1 div 0, 1 div 0) returns ""
- */
+/// Implement the substring() XPath function
+///    string substring(string, number, number?)
+/// The substring function returns the substring of the first argument
+/// starting at the position specified in the second argument with
+/// length specified in the third argument. For example,
+/// substring("12345",2,3) returns "234". If the third argument is not
+/// specified, it returns the substring starting at the position specified
+/// in the second argument and continuing to the end of the string. For
+/// example, substring("12345",2) returns "2345".  More precisely, each
+/// character in the string (see [3.6 Strings]) is considered to have a
+/// numeric position: the position of the first character is 1, the position
+/// of the second character is 2 and so on. The returned substring contains
+/// those characters for which the position of the character is greater than
+/// or equal to the second argument and, if the third argument is specified,
+/// less than the sum of the second and third arguments; the comparisons
+/// and addition used for the above follow the standard IEEE 754 rules. Thus:
+///  - substring("12345", 1.5, 2.6) returns "234"
+///  - substring("12345", 0, 3) returns "12"
+///  - substring("12345", 0 div 0, 3) returns ""
+///  - substring("12345", 1, 0 div 0) returns ""
+///  - substring("12345", -42, 1 div 0) returns "12345"
+///  - substring("12345", -1 div 0, 1 div 0) returns ""
+#[doc(alias = "xmlXPathSubstringFunction")]
 pub unsafe extern "C" fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let len: XmlXPathObjectPtr;
     let mut le: f64 = 0.0;
@@ -13287,19 +12268,14 @@ pub unsafe extern "C" fn xml_xpath_substring_function(ctxt: XmlXPathParserContex
     xml_xpath_release_object((*ctxt).context, str);
 }
 
-/**
- * xmlXPathSubstringBeforeFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the substring-before() XPath function
- *    string substring-before(string, string)
- * The substring-before function returns the substring of the first
- * argument string that precedes the first occurrence of the second
- * argument string in the first argument string, or the empty string
- * if the first argument string does not contain the second argument
- * string. For example, substring-before("1999/04/01","/") returns 1999.
- */
+/// Implement the substring-before() XPath function
+///    string substring-before(string, string)
+/// The substring-before function returns the substring of the first
+/// argument string that precedes the first occurrence of the second
+/// argument string in the first argument string, or the empty string
+/// if the first argument string does not contain the second argument
+/// string. For example, substring-before("1999/04/01","/") returns 1999.
+#[doc(alias = "xmlXPathSubstringBeforeFunction")]
 pub unsafe extern "C" fn xml_xpath_substring_before_function(
     ctxt: XmlXPathParserContextPtr,
     nargs: i32,
@@ -13330,20 +12306,15 @@ pub unsafe extern "C" fn xml_xpath_substring_before_function(
     xml_xpath_release_object((*ctxt).context, find);
 }
 
-/**
- * xmlXPathSubstringAfterFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the substring-after() XPath function
- *    string substring-after(string, string)
- * The substring-after function returns the substring of the first
- * argument string that follows the first occurrence of the second
- * argument string in the first argument string, or the empty stringi
- * if the first argument string does not contain the second argument
- * string. For example, substring-after("1999/04/01","/") returns 04/01,
- * and substring-after("1999/04/01","19") returns 99/04/01.
- */
+/// Implement the substring-after() XPath function
+///    string substring-after(string, string)
+/// The substring-after function returns the substring of the first
+/// argument string that follows the first occurrence of the second
+/// argument string in the first argument string, or the empty stringi
+/// if the first argument string does not contain the second argument
+/// string. For example, substring-after("1999/04/01","/") returns 04/01,
+/// and substring-after("1999/04/01","19") returns 99/04/01.
+#[doc(alias = "xmlXPathSubstringAfterFunction")]
 pub unsafe extern "C" fn xml_xpath_substring_after_function(
     ctxt: XmlXPathParserContextPtr,
     nargs: i32,
@@ -13379,20 +12350,15 @@ pub unsafe extern "C" fn xml_xpath_substring_after_function(
     xml_xpath_release_object((*ctxt).context, find);
 }
 
-/**
- * xmlXPathNormalizeFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the normalize-space() XPath function
- *    string normalize-space(string?)
- * The normalize-space function returns the argument string with white
- * space normalized by stripping leading and trailing whitespace
- * and replacing sequences of whitespace characters by a single
- * space. Whitespace characters are the same allowed by the S production
- * in XML. If the argument is omitted, it defaults to the context
- * node converted to a string, in other words the value of the context node.
- */
+/// Implement the normalize-space() XPath function
+///    string normalize-space(string?)
+/// The normalize-space function returns the argument string with white
+/// space normalized by stripping leading and trailing whitespace
+/// and replacing sequences of whitespace characters by a single
+/// space. Whitespace characters are the same allowed by the S production
+/// in XML. If the argument is omitted, it defaults to the context
+/// node converted to a string, in other words the value of the context node.
+#[doc(alias = "xmlXPathNormalizeFunction")]
 pub unsafe extern "C" fn xml_xpath_normalize_function(
     ctxt: XmlXPathParserContextPtr,
     mut nargs: i32,
@@ -13449,27 +12415,22 @@ pub unsafe extern "C" fn xml_xpath_normalize_function(
     *target = 0;
 }
 
-/**
- * xmlXPathTranslateFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the translate() XPath function
- *    string translate(string, string, string)
- * The translate function returns the first argument string with
- * occurrences of characters in the second argument string replaced
- * by the character at the corresponding position in the third argument
- * string. For example, translate("bar","abc","ABC") returns the string
- * BAr. If there is a character in the second argument string with no
- * character at a corresponding position in the third argument string
- * (because the second argument string is longer than the third argument
- * string), then occurrences of that character in the first argument
- * string are removed. For example, translate("-=1aaa-=1","abc-","ABC")
- * returns "AAA". If a character occurs more than once in second
- * argument string, then the first occurrence determines the replacement
- * character. If the third argument string is longer than the second
- * argument string, then excess characters are ignored.
- */
+/// Implement the translate() XPath function
+///    string translate(string, string, string)
+/// The translate function returns the first argument string with
+/// occurrences of characters in the second argument string replaced
+/// by the character at the corresponding position in the third argument
+/// string. For example, translate("bar","abc","ABC") returns the string
+/// BAr. If there is a character in the second argument string with no
+/// character at a corresponding position in the third argument string
+/// (because the second argument string is longer than the third argument
+/// string), then occurrences of that character in the first argument
+/// string are removed. For example, translate("-=1aaa-=1","abc-","ABC")
+/// returns "AAA". If a character occurs more than once in second
+/// argument string, then the first occurrence determines the replacement
+/// character. If the third argument string is longer than the second
+/// argument string, then excess characters are ignored.
+#[doc(alias = "xmlXPathTranslateFunction")]
 pub unsafe extern "C" fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut offset: i32;
     let max: i32;
@@ -13545,16 +12506,11 @@ pub unsafe extern "C" fn xml_xpath_translate_function(ctxt: XmlXPathParserContex
     xml_xpath_release_object((*ctxt).context, to);
 }
 
-/**
- * xmlXPathNotFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the not() XPath function
- *    boolean not(boolean)
- * The not function returns true if its argument is false,
- * and false otherwise.
- */
+/// Implement the not() XPath function
+///    boolean not(boolean)
+/// The not function returns true if its argument is false,
+/// and false otherwise.
+#[doc(alias = "xmlXPathNotFunction")]
 pub unsafe extern "C" fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_BOOLEAN!(ctxt);
@@ -13562,53 +12518,38 @@ pub unsafe extern "C" fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, 
     (*(*ctxt).value).boolval = ((*(*ctxt).value).boolval == 0) as i32;
 }
 
-/**
- * xmlXPathTrueFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the true() XPath function
- *    boolean true()
- */
+/// Implement the true() XPath function
+///    boolean true()
+#[doc(alias = "xmlXPathTrueFunction")]
 pub unsafe extern "C" fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
 }
 
-/**
- * xmlXPathFalseFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the false() XPath function
- *    boolean false()
- */
+/// Implement the false() XPath function
+///    boolean false()
+#[doc(alias = "xmlXPathFalseFunction")]
 pub unsafe extern "C" fn xml_xpath_false_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
 }
 
-/**
- * xmlXPathLangFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the lang() XPath function
- *    boolean lang(string)
- * The lang function returns true or false depending on whether the
- * language of the context node as specified by xml:lang attributes
- * is the same as or is a sublanguage of the language specified by
- * the argument string. The language of the context node is determined
- * by the value of the xml:lang attribute on the context node, or, if
- * the context node has no xml:lang attribute, by the value of the
- * xml:lang attribute on the nearest ancestor of the context node that
- * has an xml:lang attribute. If there is no such attribute, then lang
- * returns false. If there is such an attribute, then lang returns
- * true if the attribute value is equal to the argument ignoring case,
- * or if there is some suffix starting with - such that the attribute
- * value is equal to the argument ignoring that suffix of the attribute
- * value and ignoring case.
- */
+/// Implement the lang() XPath function
+///    boolean lang(string)
+/// The lang function returns true or false depending on whether the
+/// language of the context node as specified by xml:lang attributes
+/// is the same as or is a sublanguage of the language specified by
+/// the argument string. The language of the context node is determined
+/// by the value of the xml:lang attribute on the context node, or, if
+/// the context node has no xml:lang attribute, by the value of the
+/// xml:lang attribute on the nearest ancestor of the context node that
+/// has an xml:lang attribute. If there is no such attribute, then lang
+/// returns false. If there is such an attribute, then lang returns
+/// true if the attribute value is equal to the argument ignoring case,
+/// or if there is some suffix starting with - such that the attribute
+/// value is equal to the argument ignoring that suffix of the attribute
+/// value and ignoring case.
+#[doc(alias = "xmlXPathLangFunction")]
 pub unsafe extern "C" fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut ret: i32 = 0;
 
@@ -13641,17 +12582,12 @@ pub unsafe extern "C" fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr,
     value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret));
 }
 
-/**
- * xmlXPathCacheConvertNumber:
- * @ctxt: the XPath context
- * @val:  an XPath object
- *
- * This is the cached version of xmlXPathConvertNumber().
- * Converts an existing object to its number() equivalent
- *
- * Returns a created or reused object, the old one is freed (or the operation
- *         is done directly on @val)
- */
+/// This is the cached version of xmlXPathConvertNumber().
+/// Converts an existing object to its number() equivalent
+///
+/// Returns a created or reused object, the old one is freed (or the operation
+///         is done directly on @val)
+#[doc(alias = "xmlXPathCacheConvertNumber")]
 unsafe extern "C" fn xml_xpath_cache_convert_number(
     ctxt: XmlXPathContextPtr,
     val: XmlXPathObjectPtr,
@@ -13667,14 +12603,9 @@ unsafe extern "C" fn xml_xpath_cache_convert_number(
     ret
 }
 
-/**
- * xmlXPathNumberFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the number() XPath function
- *    number number(object?)
- */
+/// Implement the number() XPath function
+///    number number(object?)
+#[doc(alias = "xmlXPathNumberFunction")]
 pub unsafe extern "C" fn xml_xpath_number_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let res: f64;
 
@@ -13699,16 +12630,11 @@ pub unsafe extern "C" fn xml_xpath_number_function(ctxt: XmlXPathParserContextPt
     value_push(ctxt, xml_xpath_cache_convert_number((*ctxt).context, cur));
 }
 
-/**
- * xmlXPathSumFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the sum() XPath function
- *    number sum(node-set)
- * The sum function returns the sum of the values of the nodes in
- * the argument node-set.
- */
+/// Implement the sum() XPath function
+///    number sum(node-set)
+/// The sum function returns the sum of the values of the nodes in
+/// the argument node-set.
+#[doc(alias = "xmlXPathSumFunction")]
 pub unsafe extern "C" fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut res: f64 = 0.0;
 
@@ -13732,16 +12658,11 @@ pub unsafe extern "C" fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, 
     xml_xpath_release_object((*ctxt).context, cur);
 }
 
-/**
- * xmlXPathFloorFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the floor() XPath function
- *    number floor(number)
- * The floor function returns the largest (closest to positive infinity)
- * number that is not greater than the argument and that is an integer.
- */
+/// Implement the floor() XPath function
+///    number floor(number)
+/// The floor function returns the largest (closest to positive infinity)
+/// number that is not greater than the argument and that is an integer.
+#[doc(alias = "xmlXPathFloorFunction")]
 pub unsafe extern "C" fn xml_xpath_floor_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_NUMBER!(ctxt);
@@ -13750,16 +12671,11 @@ pub unsafe extern "C" fn xml_xpath_floor_function(ctxt: XmlXPathParserContextPtr
     (*(*ctxt).value).floatval = (*(*ctxt).value).floatval.floor();
 }
 
-/**
- * xmlXPathCeilingFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the ceiling() XPath function
- *    number ceiling(number)
- * The ceiling function returns the smallest (closest to negative infinity)
- * number that is not less than the argument and that is an integer.
- */
+/// Implement the ceiling() XPath function
+///    number ceiling(number)
+/// The ceiling function returns the smallest (closest to negative infinity)
+/// number that is not less than the argument and that is an integer.
+#[doc(alias = "xmlXPathCeilingFunction")]
 pub unsafe extern "C" fn xml_xpath_ceiling_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_NUMBER!(ctxt);
@@ -13768,17 +12684,12 @@ pub unsafe extern "C" fn xml_xpath_ceiling_function(ctxt: XmlXPathParserContextP
     (*(*ctxt).value).floatval = (*(*ctxt).value).floatval.ceil();
 }
 
-/**
- * xmlXPathRoundFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the round() XPath function
- *    number round(number)
- * The round function returns the number that is closest to the
- * argument and that is an integer. If there are two such numbers,
- * then the one that is closest to positive infinity is returned.
- */
+/// Implement the round() XPath function
+///    number round(number)
+/// The round function returns the number that is closest to the
+/// argument and that is an integer. If there are two such numbers,
+/// then the one that is closest to positive infinity is returned.
+#[doc(alias = "xmlXPathRoundFunction")]
 pub unsafe extern "C" fn xml_xpath_round_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_NUMBER!(ctxt);
@@ -13798,17 +12709,12 @@ pub unsafe extern "C" fn xml_xpath_round_function(ctxt: XmlXPathParserContextPtr
     }
 }
 
-/**
- * xmlXPathCacheConvertBoolean:
- * @ctxt: the XPath context
- * @val:  an XPath object
- *
- * This is the cached version of xmlXPathConvertBoolean().
- * Converts an existing object to its boolean() equivalent
- *
- * Returns a created or reused object, the old one is freed (or the operation
- *         is done directly on @val)
- */
+/// This is the cached version of xmlXPathConvertBoolean().
+/// Converts an existing object to its boolean() equivalent
+///
+/// Returns a created or reused object, the old one is freed (or the operation
+/// is done directly on @val)
+#[doc(alias = "xmlXPathCacheConvertBoolean")]
 unsafe extern "C" fn xml_xpath_cache_convert_boolean(
     ctxt: XmlXPathContextPtr,
     val: XmlXPathObjectPtr,
@@ -13824,19 +12730,14 @@ unsafe extern "C" fn xml_xpath_cache_convert_boolean(
     ret
 }
 
-/**
- * xmlXPathBooleanFunction:
- * @ctxt:  the XPath Parser context
- * @nargs:  the number of arguments
- *
- * Implement the boolean() XPath function
- *    boolean boolean(object)
- * The boolean function converts its argument to a boolean as follows:
- *    - a number is true if and only if it is neither positive or
- *      negative zero nor NaN
- *    - a node-set is true if and only if it is non-empty
- *    - a string is true if and only if its length is non-zero
- */
+/// Implement the boolean() XPath function
+///    boolean boolean(object)
+/// The boolean function converts its argument to a boolean as follows:
+///    - a number is true if and only if it is neither positive or
+///      negative zero nor NaN
+///    - a node-set is true if and only if it is non-empty
+///    - a string is true if and only if its length is non-zero
+#[doc(alias = "xmlXPathBooleanFunction")]
 pub unsafe extern "C" fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut cur: XmlXPathObjectPtr;
 
@@ -13849,17 +12750,10 @@ pub unsafe extern "C" fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextP
     value_push(ctxt, cur);
 }
 
-/**
- * Really internal functions
- */
-/**
- * xmlXPathNodeSetFreeNs:
- * @ns:  the XPath namespace node found in a nodeset.
- *
- * Namespace nodes in libxml don't match the XPath semantic. In a node set
- * the namespace nodes are duplicated and the next pointer is set to the
- * parent node in the XPath semantic. Check if such a node needs to be freed
- */
+/// Namespace nodes in libxml don't match the XPath semantic. In a node set
+/// the namespace nodes are duplicated and the next pointer is set to the
+/// parent node in the XPath semantic. Check if such a node needs to be freed
+#[doc(alias = "xmlXPathNodeSetFreeNs")]
 #[cfg(feature = "xpath")]
 pub(crate) unsafe extern "C" fn xml_xpath_node_set_free_ns(ns: XmlNsPtr) {
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {

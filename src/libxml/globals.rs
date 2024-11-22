@@ -47,92 +47,53 @@ use super::{
     xmlversion::LIBXML_VERSION_STRING,
 };
 
-/**
-* xmlInitGlobals:
-*
-* DEPRECATED: Alias for xmlInitParser.
-*/
-#[deprecated]
+#[doc(alias = "xmlInitGlobals")]
+#[deprecated = "Alias for xmlInitParser"]
 pub unsafe extern "C" fn xml_init_globals() {
     xml_init_parser();
 }
 
-/**
- * xmlCleanupGlobals:
- *
- * DEPRECATED: This function is a no-op. Call xmlCleanupParser
- * to free global state but see the warnings there. xmlCleanupParser
- * should be only called once at program exit. In most cases, you don't
- * have call cleanup functions at all.
- */
-#[deprecated]
+/// DEPRECATED: This function is a no-op. Call xmlCleanupParser
+/// to free global state but see the warnings there. xmlCleanupParser
+/// should be only called once at program exit. In most cases, you don't
+/// have call cleanup functions at all.
+#[doc(alias = "xmlCleanupGlobals")]
+#[deprecated = "This function is a no-op"]
 pub unsafe extern "C" fn xml_cleanup_globals() {}
 
-/**
- * xmlParserInputBufferCreateFilenameFunc:
- * @URI: the URI to read from
- * @enc: the requested source encoding
- *
- * Signature for the function doing the lookup for a suitable input method
- * corresponding to an URI.
- *
- * Returns the new xmlParserInputBufferPtr in case of success or NULL if no
- *         method was found.
- */
-// pub type XmlParserInputBufferCreateFilenameFunc =
-//     unsafe fn(URI: *const c_char, enc: XmlCharEncoding) -> XmlParserInputBufferPtr;
-
-/**
- * xmlOutputBufferCreateFilenameFunc:
- * @URI: the URI to write to
- * @enc: the requested target encoding
- *
- * Signature for the function doing the lookup for a suitable output method
- * corresponding to an URI.
- *
- * Returns the new xmlOutputBufferPtr in case of success or NULL if no
- *         method was found.
- */
+/// Signature for the function doing the lookup for a suitable output method
+/// corresponding to an URI.
+///
+/// Returns the new xmlOutputBufferPtr in case of success or NULL if no method was found.
+#[doc(alias = "xmlOutputBufferCreateFilenameFunc")]
 pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
     URI: *const c_char,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: i32,
 ) -> XmlOutputBufferPtr;
 
-/**
-* xmlOutputBufferCreateFilenameDefault:
-* @func: function pointer to the new OutputBufferCreateFilenameFunc
-*
-* Registers a callback for URI output file handling
-*
-* Returns the old value of the registration function
-*/
+/// Registers a callback for URI output file handling
+///
+/// Returns the old value of the registration function
+#[doc(alias = "xmlOutputBufferCreateFilenameDefault")]
 pub unsafe fn xml_output_buffer_create_filename_default(
     func: Option<XmlOutputBufferCreateFilenameFunc>,
 ) -> Option<XmlOutputBufferCreateFilenameFunc> {
     let old = _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE;
     // #ifdef LIBXML_OUTPUT_ENABLED
-    //    if old.is_null() {
-    //        old = __xmlOutputBufferCreateFilename;
-    //    }
+    // if old.is_null() {
+    //     old = __xmlOutputBufferCreateFilename;
+    // }
     // #endif
     _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE = func;
     old
 }
 
-/**
- * xmlRegisterNodeFunc:
- * @node: the current node
- *
- * Signature for the registration callback of a created node
- */
+/// Signature for the registration callback of a created node
+#[doc(alias = "xmlRegisterNodeFunc")]
 pub type XmlRegisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
-/**
- * xmlDeregisterNodeFunc:
- * @node: the current node
- *
- * Signature for the deregistration callback of a discarded node
- */
+/// Signature for the deregistration callback of a discarded node
+#[doc(alias = "xmlDeregisterNodeFunc")]
 pub type XmlDeregisterNodeFunc = unsafe extern "C" fn(node: XmlNodePtr);
 
 pub type XmlGlobalStatePtr = *mut XmlGlobalState;
@@ -150,9 +111,6 @@ pub struct XmlGlobalState {
     pub(crate) xml_mem_strdup: Option<XmlStrdupFunc>,
     pub(crate) xml_realloc: Option<XmlReallocFunc>,
 
-    // pub(crate) xml_generic_error: Option<XmlGenericErrorFunc>,
-    // pub(crate) xml_structured_error: Option<XmlStructuredErrorFunc>,
-    // pub(crate) xml_generic_error_context: AtomicPtr<c_void>,
     pub(crate) old_xml_wd_compatibility: i32,
 
     pub(crate) xml_buffer_alloc_scheme: XmlBufferAllocationScheme,
@@ -167,25 +125,19 @@ pub struct XmlGlobalState {
     pub(crate) xml_parser_debug_entities: i32,
     pub(crate) xml_pedantic_parser_default_value: i32,
 
-    // pub(crate) xml_save_no_empty_tags: i32,
     pub(crate) xml_indent_tree_output: i32,
-    // pub(crate) xml_tree_indent_string: *const c_char,
     pub(crate) xml_register_node_default_value: Option<XmlRegisterNodeFunc>,
     pub(crate) xml_deregister_node_default_value: Option<XmlDeregisterNodeFunc>,
 
     pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
     pub(crate) xml_last_error: XmlError,
 
-    // pub(crate) xml_parser_input_buffer_create_filename_value:
-    //     Option<XmlParserInputBufferCreateFilenameFunc>,
     pub(crate) xml_output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
 
     pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
 }
 
-/*
- * Mutex to protect "ForNewThreads" variables
- */
+/// Mutex to protect "ForNewThreads" variables
 static mut XML_THR_DEF_MUTEX: XmlMutex = unsafe { zeroed() };
 
 /**
@@ -402,13 +354,9 @@ pub(crate) static mut XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF: Option<
     XmlOutputBufferCreateFilenameFunc,
 > = None;
 
-/**
- * xmlInitializeGlobalState:
- * @gs: a pointer to a newly allocated global state
- *
- * xmlInitializeGlobalState() initialize a global state with all the
- * default values of the library.
- */
+/// xmlInitializeGlobalState() initialize a global state with all the
+/// default values of the library.
+#[doc(alias = "xmlInitializeGlobalState")]
 pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
@@ -429,39 +377,20 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_default_sax_locator.get_line_number = xml_sax2_get_line_number;
     (*gs).xml_default_sax_locator.get_column_number = xml_sax2_get_column_number;
     (*gs).xml_do_validity_checking_default_value = XML_DO_VALIDITY_CHECKING_DEFAULT_VALUE_THR_DEF;
-    // #if defined(DEBUG_MEMORY_LOCATION) | defined(DEBUG_MEMORY)
-    //     {
-    //         (*gs).xmlFree = (xmlFreeFunc) xmlMemFree;
-    //         (*gs).xmlMalloc = (xmlMallocFunc) xmlMemMalloc;
-    //         (*gs).xmlMallocAtomic = (xmlMallocFunc) xmlMemMalloc;
-    //         (*gs).xmlRealloc = (xmlReallocFunc) xmlMemRealloc;
-    //         (*gs).xmlMemStrdup = (xmlStrdupFunc) xmlMemoryStrdup;
-    //     }
-    // #else
     (*gs).xml_free = Some(free as XmlFreeFunc);
     (*gs).xml_malloc = Some(malloc as XmlMallocFunc);
     (*gs).xml_malloc_atomic = Some(malloc as XmlMallocFunc);
     (*gs).xml_realloc = Some(realloc as XmlReallocFunc);
     (*gs).xml_mem_strdup = Some(xml_strdup as XmlStrdupFunc);
-    // #endif
     (*gs).xml_get_warnings_default_value = XML_GET_WARNINGS_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_indent_tree_output = XML_INDENT_TREE_OUTPUT_THR_DEF;
-    // (*gs).xml_tree_indent_string = XML_TREE_INDENT_STRING_THR_DEF.load(Ordering::Relaxed) as _;
     (*gs).xml_keep_blanks_default_value = XML_KEEP_BLANKS_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_line_numbers_default_value = XML_LINE_NUMBERS_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_load_ext_dtd_default_value = XML_LOAD_EXT_DTD_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_parser_debug_entities = XML_PARSER_DEBUG_ENTITIES_THR_DEF;
     (*gs).xml_parser_version = LIBXML_VERSION_STRING.as_ptr();
     (*gs).xml_pedantic_parser_default_value = XML_PEDANTIC_PARSER_DEFAULT_VALUE_THR_DEF;
-    // (*gs).xml_save_no_empty_tags = XML_SAVE_NO_EMPTY_TAGS_THR_DEF;
     (*gs).xml_substitute_entities_default_value = XML_SUBSTITUTE_ENTITIES_DEFAULT_VALUE_THR_DEF;
-
-    // (*gs).xml_generic_error = XML_GENERIC_ERROR_THR_DEF;
-    // (*gs).xml_structured_error = XML_STRUCTURED_ERROR_THR_DEF;
-    // (*gs).xml_generic_error_context.store(
-    //     XML_GENERIC_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
-    //     Ordering::Relaxed,
-    // );
     (*gs).xml_structured_error_context.store(
         XML_STRUCTURED_ERROR_CONTEXT_THR_DEF.load(Ordering::Relaxed),
         Ordering::Relaxed,
@@ -469,8 +398,6 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    // (*gs).xml_parser_input_buffer_create_filename_value =
-    //     XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     (*gs).xml_output_buffer_create_filename_value = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     memset(
         addr_of_mut!((*gs).xml_last_error) as _,
@@ -481,14 +408,10 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
 }
 
-/**
- * xmlRegisterNodeDefault:
- * @func: function pointer to the new RegisterNodeFunc
- *
- * Registers a callback for node creation
- *
- * Returns the old value of the registration function
- */
+/// Registers a callback for node creation
+///
+/// Returns the old value of the registration function
+#[doc(alias = "xmlRegisterNodeDefault")]
 pub unsafe extern "C" fn xml_register_node_default(
     func: Option<XmlRegisterNodeFunc>,
 ) -> Option<XmlRegisterNodeFunc> {
@@ -512,14 +435,10 @@ pub unsafe extern "C" fn xml_thr_def_register_node_default(
     old
 }
 
-/**
- * xmlDeregisterNodeDefault:
- * @func: function pointer to the new DeregisterNodeFunc
- *
- * Registers a callback for node destruction
- *
- * Returns the previous value of the deregistration function
- */
+/// Registers a callback for node destruction
+///
+/// Returns the previous value of the deregistration function
+#[doc(alias = "xmlDeregisterNodeDefault")]
 pub unsafe extern "C" fn xml_deregister_node_default(
     func: XmlDeregisterNodeFunc,
 ) -> Option<XmlDeregisterNodeFunc> {
@@ -560,22 +479,7 @@ pub unsafe fn xml_thr_def_output_buffer_create_filename_default(
     old
 }
 
-// pub unsafe fn xml_thr_def_parser_input_buffer_create_filename_default(
-//     func: Option<XmlParserInputBufferCreateFilenameFunc>,
-// ) -> XmlParserInputBufferCreateFilenameFunc {
-//     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
-//     let old = XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF
-//         .unwrap_or(__xml_parser_input_buffer_create_filename);
-
-//     XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF = func;
-//     xml_mutex_unlock(addr_of_mut!(XML_THR_DEF_MUTEX));
-
-//     old
-// }
-
-/*
- * Helpful Macro
- */
+// Helpful Macro
 #[macro_export]
 #[cfg(feature = "thread")]
 macro_rules! IS_MAIN_THREAD {
@@ -591,23 +495,10 @@ macro_rules! IS_MAIN_THREAD {
     };
 }
 
-/*
- * In general the memory allocation entry points are not kept
- * thread specific but this can be overridden by LIBXML_THREAD_ALLOC_ENABLED
- *    - xmlMalloc
- *    - xmlMallocAtomic
- *    - xmlRealloc
- *    - xmlMemStrdup
- *    - xmlFree
- */
-/**
- * xmlMalloc:
- * @size:  the size requested in bytes
- *
- * The variable holding the libxml malloc() implementation
- *
- * Returns a pointer to the newly allocated block or NULL in case of error
- */
+/// The variable holding the libxml malloc() implementation
+///
+/// Returns a pointer to the newly allocated block or NULL in case of error
+#[doc(alias = "xmlMalloc")]
 pub(in crate::libxml) static mut _XML_MALLOC: Option<XmlMallocFunc> = Some(malloc);
 #[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_malloc(size: usize) -> *mut c_void {
@@ -624,16 +515,12 @@ pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
         (*xml_get_global_state()).xml_malloc = malloc;
     }
 }
-/**
- * xmlMallocAtomic:
- * @size:  the size requested in bytes
- *
- * The variable holding the libxml malloc() implementation for atomic
- * data (i.e. blocks not containing pointers), useful when using a
- * garbage collecting allocator.
- *
- * Returns a pointer to the newly allocated block or NULL in case of error
- */
+/// The variable holding the libxml malloc() implementation for atomic
+/// data (i.e. blocks not containing pointers), useful when using a
+/// garbage collecting allocator.
+///
+/// Returns a pointer to the newly allocated block or NULL in case of error
+#[doc(alias = "xmlMallocAtomic")]
 pub(in crate::libxml) static mut _XML_MALLOC_ATOMIC: XmlMallocFunc = malloc;
 #[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
@@ -643,15 +530,10 @@ pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
 pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
     __xml_malloc_atomic()(size)
 }
-/**
- * xmlRealloc:
- * @mem: an already allocated block of memory
- * @size:  the new size requested in bytes
- *
- * The variable holding the libxml realloc() implementation
- *
- * Returns a pointer to the newly reallocated block or NULL in case of error
- */
+/// The variable holding the libxml realloc() implementation
+///
+/// Returns a pointer to the newly reallocated block or NULL in case of error
+#[doc(alias = "xmlRealloc")]
 pub(in crate::libxml) static mut _XML_REALLOC: Option<XmlReallocFunc> = Some(realloc);
 #[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_realloc(mem: *mut c_void, size: usize) -> *mut c_void {
@@ -667,12 +549,8 @@ pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
         (*xml_get_global_state()).xml_realloc = realloc;
     }
 }
-/**
- * xmlFree:
- * @mem: an already allocated block of memory
- *
- * The variable holding the libxml free() implementation
- */
+/// The variable holding the libxml free() implementation
+#[doc(alias = "xmlFree")]
 pub(in crate::libxml) static mut _XML_FREE: Option<XmlFreeFunc> = Some(free);
 #[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_free(mem: *mut c_void) {
@@ -689,25 +567,17 @@ pub fn set_xml_free(free: Option<XmlFreeFunc>) {
     }
 }
 
-/**
- * xmlPosixStrdup
- * @cur:  the input c_char *
- *
- * a strdup implementation with a type signature matching POSIX
- *
- * Returns a new xmlChar * or NULL
- */
+/// a strdup implementation with a type signature matching POSIX
+///
+/// Returns a new xmlChar * or NULL
+#[doc(alias = "xmlPosixStrdup")]
 unsafe extern "C" fn xml_posix_strdup(cur: *const XmlChar) -> *mut XmlChar {
     xml_char_strdup(cur as _) as _
 }
-/**
- * xmlMemStrdup:
- * @str: a zero terminated string
- *
- * The variable holding the libxml strdup() implementation
- *
- * Returns the copy of the string or NULL in case of error
- */
+/// The variable holding the libxml strdup() implementation
+///
+/// Returns the copy of the string or NULL in case of error
+#[doc(alias = "xmlMemStrdup")]
 pub(in crate::libxml) static mut _XML_MEM_STRDUP: Option<XmlStrdupFunc> = Some(xml_posix_strdup);
 #[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_mem_strdup(str: *const XmlChar) -> *mut XmlChar {
@@ -797,14 +667,9 @@ mod __globals_internal_for_thread_alloc {
 #[cfg(feature = "thread_alloc")]
 pub use __globals_internal_for_thread_alloc::*;
 
-/**
- * htmlDefaultSAXHandler:
- *
- * DEPRECATED: This handler is unused and will be removed from future
- * versions.
- *
- * Default old SAX v1 handler for HTML, builds the DOM tree
- */
+/// Default old SAX v1 handler for HTML, builds the DOM tree
+#[doc(alias = "htmlDefaultSAXHandler")]
+#[deprecated = "This handler is unused and will be removed from future versions."]
 #[cfg(all(feature = "html", feature = "sax1"))]
 static mut _HTML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     internal_subset: Some(xml_sax2_internal_subset),
@@ -862,12 +727,6 @@ mod __globals_internal_for_html {
 #[cfg(feature = "html")]
 pub use __globals_internal_for_html::*;
 
-/*
- * Everything starting from the line below is
- * Automatically generated by build_glob.py.
- * Do not modify the previous line.
- */
-
 #[deprecated]
 pub unsafe extern "C" fn __xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
     if IS_MAIN_THREAD!() != 0 {
@@ -877,14 +736,9 @@ pub unsafe extern "C" fn __xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
     }
 }
 
-/**
- * xmlDefaultSAXHandler:
- *
- * DEPRECATED: This handler is unused and will be removed from future
- * versions.
- *
- * Default SAX version1 handler for XML, builds the DOM tree
- */
+/// Default SAX version1 handler for XML, builds the DOM tree
+#[doc(alias = "xmlDefaultSAXHandler")]
+#[deprecated = "This handler is unused and will be removed from future versions"]
 #[cfg(feature = "sax1")]
 static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     internal_subset: Some(xml_sax2_internal_subset),
@@ -961,27 +815,6 @@ pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
     addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
 }
 
-// /**
-//  * xmlParserVersion:
-//  *
-//  * Constant string describing the internal version of the library
-//  */
-// static _xmlParserVersion: AtomicPtr<c_char> =
-//     AtomicPtr::new(concatcp!(LIBXML_VERSION_STRING, LIBXML_VERSION_EXTRA));
-
-// pub unsafe extern "C" fn __xmlParserVersion() -> *mut *const c_char {
-//     if IS_MAIN_THREAD!() != 0 {
-//         _xmlParserVersion
-//     } else {
-//         addr_of_mut!((*xmlGetGlobalState()).xmlParserVersion)
-//     }
-// }
-
-// #[cfg(feature = "thread")]
-// pub static mut xmlParserVersion: *const c_char = unsafe { *(__xmlParserVersion()) };
-// #[cfg(not(feature = "thread"))]
-// pub static mut xmlParserVersion: *const c_char;
-
 #[deprecated]
 pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeFunc {
     if IS_MAIN_THREAD!() != 0 {
@@ -1023,35 +856,6 @@ pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
 pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
     _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
-
-// pub(crate) unsafe fn __xml_parser_input_buffer_create_filename_value(
-// ) -> Option<XmlParserInputBufferCreateFilenameFunc> {
-//     if IS_MAIN_THREAD!() != 0 {
-//         _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE
-//     } else {
-//         (*xml_get_global_state()).xml_parser_input_buffer_create_filename_value
-//     }
-// }
-
-// #[cfg(feature = "thread")]
-// pub unsafe fn xml_parser_input_buffer_create_filename_value(
-//     uri: *const c_char,
-//     enc: XmlCharEncoding,
-// ) -> XmlParserInputBufferPtr {
-//     if let Some(f) = __xml_parser_input_buffer_create_filename_value() {
-//         f(uri, enc)
-//     } else {
-//         null_mut()
-//     }
-// }
-// #[deprecated]
-// #[cfg(not(feature = "thread"))]
-// pub unsafe extern "C" fn xml_parser_input_buffer_create_filename_value(
-//     uri: *const c_char,
-//     enc: XmlCharEncoding,
-// ) -> XmlParserInputBufferPtr {
-//     _XML_PARSER_INPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, enc)
-// }
 
 #[deprecated]
 pub unsafe fn __xml_output_buffer_create_filename_value(

@@ -67,20 +67,8 @@ pub use input::*;
 #[cfg(feature = "output")]
 pub use output::*;
 
-/*
- * Those are the functions and datatypes for the library output
- * I/O structures.
- */
-
-/*
- * Input I/O callback sets
- */
-/**
- * xmlIOErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+///  Handle an out of memory condition
+#[doc(alias = "xmlIOErrMemory")]
 pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromIO,
@@ -151,14 +139,8 @@ const IOERR: &[*const c_char] = &[
     c"unknown address family".as_ptr() as _, /* EAFNOSUPPORT */
 ];
 
-/**
- * __xmlIOErr:
- * @code:  the error number
- * @
- * @extra:  extra information
- *
- * Handle an I/O error
- */
+/// Handle an I/O error
+#[doc(alias = "__xmlIOErr")]
 pub(crate) unsafe fn __xml_ioerr(
     domain: XmlErrorDomain,
     mut code: XmlParserErrors,
@@ -281,24 +263,15 @@ pub(crate) unsafe fn __xml_ioerr(
     __xml_simple_error(domain, code, null_mut(), IOERR[idx as usize], extra);
 }
 
-/**
- * xmlIOErr:
- * @code:  the error number
- * @extra:  extra information
- *
- * Handle an I/O error
- */
+/// Handle an I/O error
+#[doc(alias = "xmlIOErr")]
 unsafe extern "C" fn xml_ioerr(code: XmlParserErrors, extra: *const c_char) {
     __xml_ioerr(XmlErrorDomain::XmlFromIO, code, extra);
 }
 
-/**
- * xmlFileFlush:
- * @context:  the I/O context
- *
- * Flush an I/O channel
- */
+/// Flush an I/O channel
 #[doc(hidden)]
+#[doc(alias = "xmlFileFlush")]
 pub unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
     if context.is_null() {
         return -1;
@@ -316,14 +289,10 @@ pub unsafe extern "C" fn xml_file_flush(context: *mut c_void) -> c_int {
 
 const MINLEN: usize = 4000;
 
-/**
- * xmlParserGetDirectory:
- * @filename:  the path to a file
- *
- * lookup the directory for that file
- *
- * Returns a new allocated string containing the directory, or NULL.
- */
+/// lookup the directory for that file
+///
+/// Returns a new allocated string containing the directory, or NULL.
+#[doc(alias = "xmlParserGetDirectory")]
 pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *mut c_char {
     let mut ret: *mut c_char = null_mut();
     let mut dir: [c_char; 1024] = [0; 1024];
@@ -369,24 +338,11 @@ pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *m
     ret
 }
 
-/*
- * Interfaces for output
- */
-
-/*
- * Output I/O callback sets
- */
-
-/**
- * xmlFileOpenW:
- * @filename:  the URI for matching
- *
- * output to from FILE *,
- * if @filename is "-" then the standard output is used
- *
- * Returns an I/O context or NULL in case of error
- */
+/// output to from `*mut FILE`, if `filename` is `"-"` then the standard output is used
+///
+/// Returns an I/O context or NULL in case of error
 #[cfg(feature = "output")]
+#[doc(alias = "xmlFileOpenW")]
 unsafe extern "C" fn xml_file_open_w(filename: *const c_char) -> *mut c_void {
     let path: *const c_char;
     let fd: *mut FILE;
@@ -440,17 +396,11 @@ unsafe extern "C" fn xml_file_open_w(filename: *const c_char) -> *mut c_void {
     fd as _
 }
 
-/**
- * xmlFileWrite:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
- *
- * Write @len bytes from @buffer to the I/O channel.
- *
- * Returns the number of bytes written
- */
+/// Write @len bytes from @buffer to the I/O channel.
+///
+/// Returns the number of bytes written
 #[doc(hidden)]
+#[doc(alias = "xmlFileWrite")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_file_write(
     context: *mut c_void,
@@ -468,16 +418,12 @@ pub unsafe extern "C" fn xml_file_write(
     items * len
 }
 
-/**
- * xmlIOHTTPDfltOpenW
- * @post_uri:  The destination URI for this document.
- *
- * Calls xmlIOHTTPOpenW with no compression to set up for a subsequent
- * HTTP post command.  This function should generally not be used as
- * the open callback is short circuited in xmlOutputBufferCreateFile.
- *
- * Returns a poc_inter to the new IO context.
- */
+/// Calls xmlIOHTTPOpenW with no compression to set up for a subsequent HTTP post command.  
+/// This function should generally not be used as
+/// the open callback is short circuited in xmlOutputBufferCreateFile.
+///
+/// Returns a poc_inter to the new IO context.
+#[doc(alias = "xmlIOHTTPDfltOpenW")]
 #[cfg(all(feature = "output", feature = "http"))]
 unsafe extern "C" fn xml_io_http_dflt_open_w(post_uri: *const c_char) -> *mut c_void {
     xml_io_http_open_w(post_uri, 0)
@@ -493,17 +439,11 @@ pub struct XmlIOHTTPWriteCtxt {
     doc_buff: *mut c_void,
 }
 
-/**
- * xmlIOHTTPWrite
- * @context:  previously opened writing context
- * @buffer:   data to output to temporary buffer
- * @len:      bytes to output
- *
- * Collect data from memory buffer c_into a temporary file for later
- * processing.
- *
- * Returns number of bytes written.
- */
+/// Collect data from memory buffer c_into a temporary file for later
+/// processing.
+///
+/// Returns number of bytes written.
+#[doc(alias = "xmlIOHTTPWrite")]
 #[cfg(all(feature = "output", feature = "http"))]
 unsafe extern "C" fn xml_io_http_write(
     context: *mut c_void,
@@ -518,12 +458,10 @@ unsafe extern "C" fn xml_io_http_write(
 
     if len > 0 {
         /*  Use gzwrite or fwrite as previously setup in the open call  */
-
         //  #ifdef LIBXML_ZLIB_ENABLED
-        //      if ( (*ctxt).compression > 0 )
-        //          len = xmlZMemBuffAppend( (*ctxt).doc_buff, buffer, len );
-
-        //      else
+        //  if ( (*ctxt).compression > 0 )
+        //      len = xmlZMemBuffAppend( (*ctxt).doc_buff, buffer, len );
+        //  else
         //  #endif
         len = (*((*ctxt).doc_buff as *mut XmlOutputBuffer))
             .write_bytes(from_raw_parts(buffer as *const u8, len as usize));
@@ -545,14 +483,10 @@ unsafe extern "C" fn xml_io_http_write(
     len
 }
 
-/**
- * xmlFreeHTTPWriteCtxt
- * @ctxt:  Context to cleanup
- *
- * Free allocated memory and reclaim system resources.
- *
- * No return value.
- */
+/// Free allocated memory and reclaim system resources.
+///
+/// No return value.
+#[doc(alias = "xmlFreeHTTPWriteCtxt")]
 #[cfg(all(feature = "output", feature = "http"))]
 unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
     if !(*ctxt).uri.is_null() {
@@ -561,10 +495,10 @@ unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
 
     if !(*ctxt).doc_buff.is_null() {
         // #ifdef LIBXML_ZLIB_ENABLED
-        // 	if ( (*ctxt).compression > 0 ) {
-        // 	    xmlFreeZMemBuff( (*ctxt).doc_buff );
-        // 	}
-        // 	else
+        // if ( (*ctxt).compression > 0 ) {
+        //     xmlFreeZMemBuff( (*ctxt).doc_buff );
+        // }
+        // else
         // #endif
         {
             xml_output_buffer_close((*ctxt).doc_buff as _);
@@ -574,13 +508,8 @@ unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
     xml_free(ctxt as _);
 }
 
-/**
- * xmlIOHTTCloseWrite
- * @context:  The I/O context
- * @http_mthd: The HTTP method to be used when sending the data
- *
- * Close the transmit HTTP I/O channel and actually send the data.
- */
+/// Close the transmit HTTP I/O channel and actually send the data.
+#[doc(alias = "xmlIOHTTCloseWrite")]
 #[cfg(all(feature = "output", feature = "http"))]
 unsafe extern "C" fn xml_io_http_close_write(
     context: *mut c_void,
@@ -601,14 +530,12 @@ unsafe extern "C" fn xml_io_http_close_write(
     }
 
     /*  Retrieve the content from the appropriate buffer  */
-
     // #ifdef LIBXML_ZLIB_ENABLED
-
-    //     if ( (*ctxt).compression > 0 ) {
-    // 	content_lgth = xmlZMemBuffGetContent( (*ctxt).doc_buff, &http_content );
-    // 	content_encoding = (c_char *) "Content-Encoding: gzip";
-    //     }
-    //     else
+    // if ( (*ctxt).compression > 0 ) {
+    // 	   content_lgth = xmlZMemBuffGetContent( (*ctxt).doc_buff, &http_content );
+    // 	   content_encoding = (c_char *) "Content-Encoding: gzip";
+    // }
+    // else
     // #endif
     {
         /*  Pull the data out of the memory output buffer  */
@@ -678,27 +605,17 @@ unsafe extern "C" fn xml_io_http_close_write(
     close_rc
 }
 
-/**
- * xmlIOHTTPClosePut
- *
- * @context:  The I/O context
- *
- * Close the transmit HTTP I/O channel and actually send data using a PUT
- * HTTP method.
- */
+/// Close the transmit HTTP I/O channel and actually send data using a PUT HTTP method.
+#[doc(alias = "xmlIOHTTPClosePut")]
 #[cfg(all(feature = "output", feature = "http"))]
 unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
     xml_io_http_close_write(ctxt, c"PUT".as_ptr() as _)
 }
 
-/**
- * xmlAllocOutputBuffer:
- * @encoder:  the encoding converter or NULL
- *
- * Create a buffered parser output
- *
- * Returns the new parser output or NULL
- */
+/// Create a buffered parser output
+///
+/// Returns the new parser output or NULL
+#[doc(alias = "xmlAllocOutputBuffer")]
 #[cfg(feature = "output")]
 pub unsafe fn xml_alloc_output_buffer(
     encoder: Option<XmlCharEncodingHandler>,
@@ -740,21 +657,14 @@ pub unsafe fn xml_alloc_output_buffer(
     ret
 }
 
-/**
- * xmlOutputBufferCreateFilename:
- * @URI:  a C string containing the URI or filename
- * @encoder:  the encoding converter or NULL
- * @compression:  the compression ration (0 none, 9 max).
- *
- * Create a buffered  output for the progressive saving of a file
- * If filename is "-' then we use stdout as the output.
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time.
- * TODO: currently if compression is set, the library only support
- *       writing to a local file.
- *
- * Returns the new output or NULL
- */
+/// Create a buffered  output for the progressive saving of a file
+/// If filename is `"-"` then we use stdout as the output.
+/// Automatic support for ZLIB/Compress compressed document is provided
+/// by default if found at compile-time.
+/// TODO: currently if compression is set, the library only support writing to a local file.
+///
+/// Returns the new output or NULL
+#[doc(alias = "xmlOutputBufferCreateFilename")]
 #[cfg(feature = "output")]
 pub unsafe fn xml_output_buffer_create_filename(
     uri: *const c_char,
@@ -768,16 +678,11 @@ pub unsafe fn xml_output_buffer_create_filename(
     __xml_output_buffer_create_filename(uri, encoder, compression)
 }
 
-/**
- * xmlOutputBufferCreateFile:
- * @file:  a FILE*
- * @encoder:  the encoding converter or NULL
- *
- * Create a buffered output for the progressive saving to a FILE *
- * buffered C I/O
- *
- * Returns the new parser output or NULL
- */
+/// Create a buffered output for the progressive saving to a FILE *
+/// buffered C I/O
+///
+/// Returns the new parser output or NULL
+#[doc(alias = "xmlOutputBufferCreateFile")]
 #[cfg(feature = "output")]
 pub unsafe fn xml_output_buffer_create_file(
     file: *mut FILE,
@@ -802,16 +707,10 @@ pub unsafe fn xml_output_buffer_create_file(
     ret
 }
 
-/**
- * xmlFdWrite:
- * @context:  the I/O context
- * @buffer:  where to get data
- * @len:  number of bytes to write
- *
- * Write @len bytes from @buffer to the I/O channel.
- *
- * Returns the number of bytes written
- */
+/// Write `len` bytes from `buffer` to the I/O channel.
+///
+/// Returns the number of bytes written
+#[doc(alias = "xmlFdWrite")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_fd_write(
     context: *mut c_void,
@@ -829,18 +728,10 @@ unsafe extern "C" fn xml_fd_write(
     ret
 }
 
-/**
- * xmlOutputBufferCreateIO:
- * @iowrite:  an I/O write function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @encoder:  the charset encoding if known
- *
- * Create a buffered output for the progressive saving
- * to an I/O handler
- *
- * Returns the new parser output or NULL
- */
+/// Create a buffered output for the progressive saving to an I/O handler
+///
+/// Returns the new parser output or NULL
+#[doc(alias = "xmlOutputBufferCreateIO")]
 #[cfg(feature = "output")]
 pub unsafe fn xml_output_buffer_create_io(
     iowrite: Option<XmlOutputWriteCallback>,
@@ -862,21 +753,13 @@ pub unsafe fn xml_output_buffer_create_io(
     ret
 }
 
-/* Couple of APIs to get the output without digging into the buffers */
-
-/**
- * xmlEscapeContent:
- * @out:  a poc_inter to an array of bytes to store the result
- * @outlen:  the length of @out
- * @in:  a poc_inter to an array of unescaped UTF-8 bytes
- * @inlen:  the length of @in
- *
- * Take a block of UTF-8 chars in and escape them.
- * Returns 0 if success, or -1 otherwise
- * The value of @inlen after return is the number of octets consumed
- *     if the return value is positive, else unpredictable.
- * The value of @outlen after return is the number of octets consumed.
- */
+/// Take a block of UTF-8 chars in and escape them.
+/// Returns 0 if success, or -1 otherwise
+///
+/// The value of `inlen` after return is the number of octets consumed
+/// if the return value is positive, else unpredictable.
+/// The value of `outlen` after return is the number of octets consumed.
+#[doc(alias = "xmlEscapeContent")]
 #[cfg(feature = "output")]
 fn xml_escape_content(input: &str, output: &mut String) -> i32 {
     for input in input.chars() {
@@ -891,15 +774,11 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
     0
 }
 
-/**
- * xmlOutputBufferClose:
- * @out:  a buffered output
- *
- * flushes and close the output I/O channel
- * and free up all the associated resources
- *
- * Returns the number of byte written or -1 in case of error.
- */
+/// flushes and close the output I/O channel
+/// and free up all the associated resources
+///
+/// Returns the number of byte written or -1 in case of error.
+#[doc(alias = "xmlOutputBufferClose")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_int {
     let mut err_rc: c_int = 0;
@@ -933,14 +812,10 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
     }
 }
 
-/**
- * xmlAllocOutputBufferInternal:
- * @encoder:  the encoding converter or NULL
- *
- * Create a buffered parser output
- *
- * Returns the new parser output or NULL
- */
+/// Create a buffered parser output
+///
+/// Returns the new parser output or NULL
+#[doc(alias = "xmlAllocOutputBufferInternal")]
 #[cfg(feature = "output")]
 pub(crate) unsafe fn xml_alloc_output_buffer_internal(
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
@@ -996,7 +871,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     let mut context: *mut c_void = null_mut();
     let mut unescaped: *mut c_char = null_mut();
     // #ifdef LIBXML_ZLIB_ENABLED
-    //     let is_file_uri: c_int = 1;
+    // let is_file_uri: c_int = 1;
     // #endif
 
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
@@ -1011,14 +886,11 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     let puri: XmlURIPtr = xml_parse_uri(uri);
     if !puri.is_null() {
         // #ifdef LIBXML_ZLIB_ENABLED
-        //         if (!(*puri).scheme.is_null() &&
-        // 	    (!xmlStrEqual((*puri).scheme, "file"))) {
-        //             is_file_uri = 0;
-        //         }
+        // if (!(*puri).scheme.is_null() && (!xmlStrEqual((*puri).scheme, "file"))) {
+        //     is_file_uri = 0;
+        // }
         // #endif
-        /*
-         * try to limit the damages of the URI unescaping code.
-         */
+        // try to limit the damages of the URI unescaping code.
         if (*puri).scheme.is_null() || xml_str_equal((*puri).scheme as _, c"file".as_ptr() as _) {
             unescaped = xml_uri_unescape_string(uri, 0, null_mut());
         }
@@ -1120,9 +992,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 // #endif
                 context = (callbacks[i].opencallback.unwrap())(uri);
                 if !context.is_null() {
-                    /*
-                     * Allocate the Output buffer front-end.
-                     */
+                    // Allocate the Output buffer front-end.
                     ret = xml_alloc_output_buffer_internal(encoder);
                     if !ret.is_null() {
                         (*ret).context = context;
@@ -1138,28 +1008,17 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     null_mut()
 }
 
-/**
- * xmlIOHTTPClosePost
- *
- * @context:  The I/O context
- *
- * Close the transmit HTTP I/O channel and actually send data using a POST
- * HTTP method.
- */
+/// Close the transmit HTTP I/O channel and actually send data using a POST HTTP method.
+#[doc(alias = "xmlIOHTTPClosePost")]
 #[cfg(all(feature = "output", feature = "http"))]
 unsafe extern "C" fn xml_io_http_close_post(ctxt: *mut c_void) -> c_int {
     xml_io_http_close_write(ctxt, c"POST".as_ptr() as _)
 }
 
-/*  This function only exists if HTTP support built into the library  */
-/**
- * xmlRegisterHTTPPostCallbacks:
- *
- * By default, libxml submits HTTP output requests using the "PUT" method.
- * Calling this method changes the HTTP output method to use the "POST"
- * method instead.
- *
- */
+/// By default, libxml submits HTTP output requests using the "PUT" method.
+/// Calling this method changes the HTTP output method to use the "POST"
+/// method instead.
+#[doc(alias = "xmlRegisterHTTPPostCallbacks")]
 #[cfg(all(feature = "output", feature = "http"))]
 pub unsafe extern "C" fn xml_register_http_post_callbacks() {
     /*  Register defaults if not done previously  */
@@ -1176,13 +1035,8 @@ pub unsafe extern "C" fn xml_register_http_post_callbacks() {
     );
 }
 
-/**
- * __xmlLoaderErr:
- * @ctx: the parser context
- * @extra:  extra information
- *
- * Handle a resource access error
- */
+/// Handle a resource access error
+#[doc(alias = "__xmlLoaderErr")]
 pub(crate) unsafe extern "C" fn __xml_loader_err(
     ctx: *mut c_void,
     msg: *const c_char,
@@ -1237,18 +1091,13 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
     );
 }
 
-/**
- * xmlCheckHTTPInput:
- * @ctxt: an XML parser context
- * @ret: an XML parser input
- *
- * Check an input in case it was created from an HTTP stream, in that
- * case it will handle encoding and update of the base URL in case of
- * redirection. It also checks for HTTP errors in which case the input
- * is cleanly freed up and an appropriate error is raised in context
- *
- * Returns the input or NULL in case of HTTP error.
- */
+/// Check an input in case it was created from an HTTP stream,
+/// in that case it will handle encoding and update of the base URL in case of redirection.  
+/// It also checks for HTTP errors in which case the input is cleanly freed up
+/// and an appropriate error is raised in context
+///
+/// Returns the input or NULL in case of HTTP error.
+#[doc(alias = "xmlCheckHTTPInput")]
 pub unsafe extern "C" fn xml_check_http_input(
     ctxt: XmlParserCtxtPtr,
     mut ret: XmlParserInputPtr,
@@ -1313,16 +1162,10 @@ pub unsafe extern "C" fn xml_check_http_input(
     ret
 }
 
-/**
- * xmlDefaultExternalEntityLoader:
- * @URL:  the URL for the entity to load
- * @ID:  the System ID for the entity to load
- * @ctxt:  the context in which the entity is called or NULL
- *
- * By default we don't load external entities, yet.
- *
- * Returns a new allocated xmlParserInputPtr, or NULL.
- */
+/// By default we don't load external entities, yet.
+///
+/// Returns a new allocated xmlParserInputPtr, or NULL.
+#[doc(alias = "xmlDefaultExternalEntityLoader")]
 pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
     url: *const c_char,
     mut id: *const c_char,
@@ -1398,18 +1241,12 @@ pub(crate) unsafe extern "C" fn xml_no_net_exists(url: *const c_char) -> c_int {
     xml_check_filename(CStr::from_ptr(path).to_string_lossy().as_ref())
 }
 
-/**
- * xmlResolveResourceFromCatalog:
- * @URL:  the URL for the entity to load
- * @ID:  the System ID for the entity to load
- * @ctxt:  the context in which the entity is called or NULL
- *
- * Resolves the URL and ID against the appropriate catalog.
- * This function is used by xmlDefaultExternalEntityLoader and
- * xmlNoNetExternalEntityLoader.
- *
- * Returns a new allocated URL, or NULL.
- */
+/// Resolves the URL and ID against the appropriate catalog.
+/// This function is used by xmlDefaultExternalEntityLoader and
+/// xmlNoNetExternalEntityLoader.
+///
+/// Returns a new allocated URL, or NULL.
+#[doc(alias = "xmlResolveResourceFromCatalog")]
 #[cfg(feature = "catalog")]
 unsafe extern "C" fn xml_resolve_resource_from_catalog(
     url: *const c_char,
@@ -1418,25 +1255,19 @@ unsafe extern "C" fn xml_resolve_resource_from_catalog(
 ) -> *mut XmlChar {
     let mut resource: *mut XmlChar = null_mut();
 
-    /*
-     * If the resource doesn't exists as a file,
-     * try to load it from the resource poc_inted in the catalogs
-     */
+    // If the resource doesn't exists as a file,
+    // try to load it from the resource poc_inted in the catalogs
     let pref: XmlCatalogAllow = xml_catalog_get_defaults();
 
     if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
-        /*
-         * Do a local lookup
-         */
+        // Do a local lookup
         if !ctxt.is_null()
             && !(*ctxt).catalogs.is_null()
             && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
         {
             resource = xml_catalog_local_resolve((*ctxt).catalogs, id as _, url as _);
         }
-        /*
-         * Try a global lookup
-         */
+        // Try a global lookup
         if resource.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
             resource = xml_catalog_resolve(id as _, url as _);
         }
@@ -1444,9 +1275,7 @@ unsafe extern "C" fn xml_resolve_resource_from_catalog(
             resource = xml_strdup(url as _);
         }
 
-        /*
-         * TODO: do an URI lookup on the reference
-         */
+        // TODO: do an URI lookup on the reference
         if !resource.is_null() && xml_no_net_exists(resource as _) == 0 {
             let mut tmp: *mut XmlChar = null_mut();
 
@@ -1470,20 +1299,11 @@ unsafe extern "C" fn xml_resolve_resource_from_catalog(
     resource
 }
 
-/*
- * A predefined entity loader disabling network accesses
- */
-/**
- * xmlNoNetExternalEntityLoader:
- * @URL:  the URL for the entity to load
- * @ID:  the System ID for the entity to load
- * @ctxt:  the context in which the entity is called or NULL
- *
- * A specific entity loader disabling network accesses, though still
- * allowing local catalog accesses for resolution.
- *
- * Returns a new allocated xmlParserInputPtr, or NULL.
- */
+/// A specific entity loader disabling network accesses,
+/// though still allowing local catalog accesses for resolution.
+///
+/// Returns a new allocated xmlParserInputPtr, or NULL.
+#[doc(alias = "xmlNoNetExternalEntityLoader")]
 pub unsafe extern "C" fn xml_no_net_external_entity_loader(
     url: *const c_char,
     id: *const c_char,
@@ -1521,19 +1341,11 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
     input
 }
 
-/*
- * xmlNormalizeWindowsPath is obsolete, don't use it.
- * Check xmlCanonicPath in uri.h for a better alternative.
- */
-/**
- * xmlNormalizeWindowsPath:
- * @path: the input file path
- *
- * This function is obsolete. Please see xmlURIFromPath in uri.c for
- * a better solution.
- *
- * Returns a canonicalized version of the path
- */
+/// This function is obsolete.
+/// Please see `xmlURIFromPath` in uri.c for a better solution.
+///
+/// Returns a canonicalized version of the path
+#[doc(alias = "xmlNormalizeWindowsPath")]
 pub unsafe extern "C" fn xml_normalize_windows_path(path: *const XmlChar) -> *mut XmlChar {
     xml_canonic_path(path)
 }
@@ -1594,19 +1406,13 @@ macro_rules! S_ISDIR {
     };
 }
 
-/**
- * xmlCheckFilename:
- * @path:  the path to check
- *
- * function checks to see if @path is a valid source
- * (file, socket...) for XML.
- *
- * if stat is not available on the target machine,
- * returns 1.  if stat fails, returns 0 (if calling
- * stat on the filename fails, it can't be right).
- * if stat succeeds and the file is a directory,
- * returns 2.  otherwise returns 1.
- */
+/// function checks to see if `path` is a valid source (file, socket...) for XML.
+///
+/// if stat is not available on the target machine, returns 1.  
+/// if stat fails, returns 0 (if calling stat on the filename fails, it can't be right).  
+/// if stat succeeds and the file is a directory, returns 2.  
+/// otherwise returns 1.
+#[doc(alias = "xmlCheckFilename")]
 pub fn xml_check_filename(path: impl AsRef<Path>) -> i32 {
     fn check_filename(path: &Path) -> i32 {
         match metadata(path) {
@@ -1623,30 +1429,19 @@ pub fn xml_check_filename(path: impl AsRef<Path>) -> i32 {
     check_filename(path.as_ref())
 }
 
-/**
- * Default 'file://' protocol callbacks
- */
-/**
- * xmlFileMatch:
- * @filename:  the URI for matching
- *
- * input from FILE *
- *
- * Returns 1 if matches, 0 otherwise
- */
+/// input from `*mut FILE`
+///
+/// Returns 1 if matches, 0 otherwise
+#[doc(alias = "xmlFileMatch")]
 pub fn xml_file_match(_filename: &str) -> c_int {
     1
 }
 
-/**
- * xmlFileOpen_real:
- * @filename:  the URI for matching
- *
- * input from FILE *, supports compressed input
- * if @filename is " " then the standard input is used
- *
- * Returns an I/O context or NULL in case of error
- */
+/// input from `*mut FILE`, supports compressed input
+/// if `filename` is `"-"` then the standard input is used
+///
+/// Returns an I/O context or NULL in case of error
+#[doc(alias = "xmlFileOpen_real")]
 unsafe fn xml_file_open_real(mut filename: &str) -> *mut c_void {
     if filename == "-" {
         extern "C" {
@@ -1708,16 +1503,10 @@ pub unsafe fn xml_file_open(filename: &str) -> *mut c_void {
     retval
 }
 
-/**
- * xmlFileRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
- *
- * Read @len bytes to @buffer from the I/O channel.
- *
- * Returns the number of bytes written or < 0 in case of failure
- */
+/// Read `len` bytes to `buffer` from the I/O channel.
+///
+/// Returns the number of bytes written or < 0 in case of failure
+#[doc(alias = "xmlFileRead")]
 pub unsafe extern "C" fn xml_file_read(
     context: *mut c_void,
     buffer: *mut c_char,
@@ -1733,14 +1522,10 @@ pub unsafe extern "C" fn xml_file_read(
     ret
 }
 
-/**
- * xmlFileClose:
- * @context:  the I/O context
- *
- * Close an I/O channel
- *
- * Returns 0 or -1 in case of error
- */
+/// Close an I/O channel
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlFileClose")]
 pub unsafe extern "C" fn xml_file_close(context: *mut c_void) -> c_int {
     let ret: c_int;
 
@@ -1775,46 +1560,30 @@ pub unsafe extern "C" fn xml_file_close(context: *mut c_void) -> c_int {
     ret
 }
 
-/**
- * Default 'http://' protocol callbacks
- */
-/**
- * xmlIOHTTPMatch:
- * @filename:  the URI for matching
- *
- * check if the URI matches an HTTP one
- *
- * Returns 1 if matches, 0 otherwise
- */
+/// check if the URI matches an HTTP one
+///
+/// Returns 1 if matches, 0 otherwise
+#[doc(alias = "xmlIOHTTPMatch")]
 #[cfg(feature = "http")]
 pub fn xml_io_http_match(filename: &str) -> c_int {
     filename.starts_with("http://") as i32
 }
 
-/**
- * xmlIOHTTPOpen:
- * @filename:  the URI for matching
- *
- * open an HTTP I/O channel
- *
- * Returns an I/O context or NULL in case of error
- */
+/// open an HTTP I/O channel
+///
+/// Returns an I/O context or NULL in case of error
+#[doc(alias = "xmlIOHTTPOpen")]
 #[cfg(feature = "http")]
 pub unsafe fn xml_io_http_open(filename: &str) -> *mut c_void {
     let filename = CString::new(filename).unwrap();
     xml_nanohttp_open(filename.as_ptr(), null_mut())
 }
 
-/**
- * xmlIOHTTPOpenW:
- * @post_uri:  The destination URI for the document
- * @compression:  The compression desired for the document.
- *
- * Open a temporary buffer to collect the document for a subsequent HTTP POST
- * request.  Non-static as is called from the output buffer creation routine.
- *
- * Returns an I/O context or NULL in case of error.
- */
+/// Open a temporary buffer to collect the document for a subsequent HTTP POST request.  
+/// Non-static as is called from the output buffer creation routine.
+///
+/// Returns an I/O context or NULL in case of error.
+#[doc(alias = "xmlIOHTTPOpenW")]
 #[cfg(all(feature = "http", feature = "output"))]
 pub unsafe extern "C" fn xml_io_http_open_w(
     post_uri: *const c_char,
@@ -1847,11 +1616,10 @@ pub unsafe extern "C" fn xml_io_http_open_w(
      * **  is being used to avoid pushing the data to disk and back.
      */
     // #ifdef LIBXML_ZLIB_ENABLED
-    //     if ((compression > 0) && (compression <= 9)) {
-
-    //         (*ctxt).compression = compression;
-    //         (*ctxt).doc_buff = xmlCreateZMemBuff(compression);
-    //     } else
+    // if ((compression > 0) && (compression <= 9)) {
+    //     (*ctxt).compression = compression;
+    //     (*ctxt).doc_buff = xmlCreateZMemBuff(compression);
+    // } else
     // #endif
     {
         /*  Any character conversions should have been done before this  */
@@ -1867,16 +1635,10 @@ pub unsafe extern "C" fn xml_io_http_open_w(
     ctxt as _
 }
 
-/**
- * xmlIOHTTPRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
- *
- * Read @len bytes to @buffer from the I/O channel.
- *
- * Returns the number of bytes written
- */
+/// Read `len` bytes to `buffer` from the I/O channel.
+///
+/// Returns the number of bytes written
+#[doc(alias = "xmlIOHTTPRead")]
 #[cfg(feature = "http")]
 pub unsafe extern "C" fn xml_io_http_read(
     context: *mut c_void,
@@ -1889,59 +1651,39 @@ pub unsafe extern "C" fn xml_io_http_read(
     xml_nanohttp_read(context, buffer.add(0) as _, len)
 }
 
-/**
- * xmlIOHTTPClose:
- * @context:  the I/O context
- *
- * Close an HTTP I/O channel
- *
- * Returns 0
- */
+/// Close an HTTP I/O channel
+///
+/// Returns 0
+#[doc(alias = "xmlIOHTTPClose")]
 #[cfg(feature = "http")]
 pub unsafe extern "C" fn xml_io_http_close(context: *mut c_void) -> c_int {
     xml_nanohttp_close(context);
     0
 }
 
-/**
- * Default 'ftp://' protocol callbacks
- */
-/**
- * xmlIOFTPMatch:
- * @filename:  the URI for matching
- *
- * check if the URI matches an FTP one
- *
- * Returns 1 if matches, 0 otherwise
- */
+/// check if the URI matches an FTP one
+///
+/// Returns 1 if matches, 0 otherwise
+#[doc(alias = "xmlIOFTPMatch")]
 #[cfg(feature = "ftp")]
 pub fn xml_io_ftp_match(filename: &str) -> c_int {
     filename.starts_with("ftp://") as i32
 }
-/**
- * xmlIOFTPOpen:
- * @filename:  the URI for matching
- *
- * open an FTP I/O channel
- *
- * Returns an I/O context or NULL in case of error
- */
+
+/// open an FTP I/O channel
+///
+/// Returns an I/O context or NULL in case of error
+#[doc(alias = "xmlIOFTPOpen")]
 #[cfg(feature = "ftp")]
 pub unsafe fn xml_io_ftp_open(filename: &str) -> *mut c_void {
     let filename = CString::new(filename).unwrap();
     xml_nanoftp_open(filename.as_ptr())
 }
 
-/**
- * xmlIOFTPRead:
- * @context:  the I/O context
- * @buffer:  where to drop data
- * @len:  number of bytes to write
- *
- * Read @len bytes to @buffer from the I/O channel.
- *
- * Returns the number of bytes written
- */
+/// Read `len` bytes to `buffer` from the I/O channel.
+///
+/// Returns the number of bytes written
+#[doc(alias = "xmlIOFTPRead")]
 #[cfg(feature = "ftp")]
 pub unsafe extern "C" fn xml_io_ftp_read(
     context: *mut c_void,
@@ -1954,14 +1696,10 @@ pub unsafe extern "C" fn xml_io_ftp_read(
     xml_nanoftp_read(context, buffer.add(0) as _, len)
 }
 
-/**
- * xmlIOFTPClose:
- * @context:  the I/O context
- *
- * Close an FTP I/O channel
- *
- * Returns 0
- */
+/// Close an FTP I/O channel
+///
+/// Returns 0
+#[doc(alias = "xmlIOFTPClose")]
 #[cfg(feature = "ftp")]
 pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> c_int {
     xml_nanoftp_close(context)

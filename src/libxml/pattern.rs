@@ -39,9 +39,6 @@ const XML_STREAM_FINAL_IS_ANY_NODE: usize = 1 << 14;
 const XML_STREAM_FROM_ROOT: usize = 1 << 15;
 const XML_STREAM_DESC: usize = 1 << 16;
 
-/*
- * Types are private:
- */
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlPatOp {
@@ -85,11 +82,8 @@ pub struct XmlStreamComp {
     flags: i32,
 }
 
-/**
- * xmlPattern:
- *
- * A compiled (XPath based) pattern to select nodes
- */
+/// A compiled (XPath based) pattern to select nodes
+#[doc(alias = "xmlPattern")]
 pub type XmlPatternPtr = *mut XmlPattern;
 #[repr(C)]
 pub struct XmlPattern {
@@ -104,19 +98,12 @@ pub struct XmlPattern {
     stream: XmlStreamCompPtr, /* the streaming data if any */
 }
 
-/*
-* XML_STREAM_ANY_NODE is used for comparison against
-* xmlElementType enums, to indicate a node of any type.
-*/
+// XML_STREAM_ANY_NODE is used for comparison against
+// xmlElementType enums, to indicate a node of any type.
 const XML_STREAM_ANY_NODE: usize = 100;
 
-/**
- * XmlPatternFlags:
- *
- * This is the set of options affecting the behaviour of pattern
- * matching with this module
- *
- */
+/// This is the set of options affecting the behaviour of pattern matching with this module
+#[doc(alias = "xmlPatternFlags")]
 #[repr(C)]
 pub enum XmlPatternFlags {
     XmlPatternDefault = 0,      /* simple pattern match */
@@ -125,22 +112,14 @@ pub enum XmlPatternFlags {
     XmlPatternXsfield = 1 << 2, /* XPath subset for schema field */
 }
 
-/**
- * xmlFreePattern:
- * @comp:  an XSLT comp
- *
- * Free up the memory allocated by @comp
- */
+/// Free up the memory allocated by @comp
+#[doc(alias = "xmlFreePattern")]
 pub unsafe extern "C" fn xml_free_pattern(comp: XmlPatternPtr) {
     xml_free_pattern_list(comp);
 }
 
-/**
- * xmlFreeStreamComp:
- * @comp: the compiled pattern for streaming
- *
- * Free the compiled pattern for streaming
- */
+/// Free the compiled pattern for streaming
+#[doc(alias = "xmlFreeStreamComp")]
 unsafe extern "C" fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
     if !comp.is_null() {
         if !(*comp).steps.is_null() {
@@ -187,12 +166,8 @@ unsafe extern "C" fn xml_free_pattern_internal(comp: XmlPatternPtr) {
     xml_free(comp as _);
 }
 
-/**
- * xmlFreePatternList:
- * @comp:  an XSLT comp list
- *
- * Free up the memory allocated by all the elements of @comp
- */
+/// Free up the memory allocated by all the elements of @comp
+#[doc(alias = "xmlFreePatternList")]
 pub unsafe extern "C" fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
     let mut cur: XmlPatternPtr;
 
@@ -217,17 +192,10 @@ pub struct XmlPatParserContext {
     nb_namespaces: i32,              /* the number of namespaces */
 }
 
-/**
- * xmlNewPatParserContext:
- * @pattern:  the pattern context
- * @dict:  the inherited dictionary or NULL
- * @namespaces: the prefix definitions, array of [URI, prefix] terminated
- *              with [NULL, NULL] or NULL if no namespace is used
- *
- * Create a new XML pattern parser context
- *
- * Returns the newly allocated xmlPatParserContextPtr or NULL in case of error
- */
+/// Create a new XML pattern parser context
+///
+/// Returns the newly allocated xmlPatParserContextPtr or NULL in case of error
+#[doc(alias = "xmlNewPatParserContext")]
 unsafe extern "C" fn xml_new_pat_parser_context(
     pattern: *const XmlChar,
     dict: XmlDictPtr,
@@ -261,12 +229,8 @@ unsafe extern "C" fn xml_new_pat_parser_context(
     cur
 }
 
-/**
- * xmlFreePatParserContext:
- * @ctxt:  an XSLT parser context
- *
- * Free up the memory allocated by @ctxt
- */
+/// Free up the memory allocated by @ctxt
+#[doc(alias = "xmlFreePatParserContext")]
 unsafe extern "C" fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
     if ctxt.is_null() {
         return;
@@ -275,13 +239,10 @@ unsafe extern "C" fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
     xml_free(ctxt as _);
 }
 
-/**
- * xmlNewPattern:
- *
- * Create a new XSLT Pattern
- *
- * Returns the newly allocated xmlPatternPtr or NULL in case of error
- */
+/// Create a new XSLT Pattern
+///
+/// Returns the newly allocated xmlPatternPtr or NULL in case of error
+#[doc(alias = "xmlNewPattern")]
 unsafe extern "C" fn xml_new_pattern() -> XmlPatternPtr {
     let cur: XmlPatternPtr = xml_malloc(size_of::<XmlPattern>()) as XmlPatternPtr;
     if cur.is_null() {
@@ -338,17 +299,10 @@ macro_rules! SKIP_BLANKS {
 const PAT_FROM_ROOT: usize = 1 << 8;
 const PAT_FROM_CUR: usize = 1 << 9;
 
-/**
- * xmlPatternAdd:
- * @comp:  the compiled is_match expression
- * @op:  an op
- * @value:  the first value
- * @value2:  the second value
- *
- * Add a step to an XSLT Compiled Match
- *
- * Returns -1 in case of failure, 0 otherwise.
- */
+/// Add a step to an XSLT Compiled Match
+///
+/// Returns -1 in case of failure, 0 otherwise.
+#[doc(alias = "xmlPatternAdd")]
 unsafe extern "C" fn xml_pattern_add(
     _ctxt: XmlPatParserContextPtr,
     comp: XmlPatternPtr,
@@ -421,15 +375,10 @@ macro_rules! CUR_PTR {
     };
 }
 
-/**
- * xmlPatScanNCName:
- * @ctxt:  the XPath Parser context
- *
- * Parses a non qualified name
- *
- * Returns the Name parsed or NULL
- */
-
+/// Parses a non qualified name
+///
+/// Returns the Name parsed or NULL
+#[doc(alias = "xmlPatScanNCName")]
 unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
     let mut cur: *const XmlChar;
     let mut val: i32;
@@ -464,20 +413,14 @@ unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut X
     ret
 }
 
-/**
- * xmlPatScanName:
- * @ctxt:  the XPath Parser context
- *
- * [4] NameChar ::= Letter | Digit | '.' | '-' | '_' |
- *                  CombiningChar | Extender
- *
- * [5] Name ::= (Letter | '_' | ':') (NameChar)*
- *
- * [6] Names ::= Name (S Name)*
- *
- * Returns the Name parsed or NULL
- */
-
+/// `[4] NameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender`
+///
+/// `[5] Name ::= (Letter | '_' | ':') (NameChar)*`
+///
+/// `[6] Names ::= Name (S Name)*`
+///
+/// Returns the Name parsed or NULL
+#[doc(alias = "xmlPatScanName")]
 unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
     let mut cur: *const XmlChar;
     let mut val: i32;
@@ -512,12 +455,8 @@ unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut Xml
     ret
 }
 
-/**
- * xmlCompileAttributeTest:
- * @ctxt:  the compilation context
- *
- * Compile an attribute test.
- */
+/// Compile an attribute test.
+#[doc(alias = "xmlCompileAttributeTest")]
 unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
     let mut token: *mut XmlChar = null_mut();
     let mut url: *mut XmlChar = null_mut();
@@ -604,17 +543,12 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
     }
 }
 
-/**
- * xmlCompileStepPattern:
- * @ctxt:  the compilation context
- *
- * Compile the Step Pattern and generates a precompiled
- * form suitable for fast matching.
- *
- * [3]    Step    ::=    '.' | NameTest
- * [4]    NameTest    ::=    QName | '*' | NCName ':' '*'
- */
-
+/// Compile the Step Pattern and generates a precompiled
+/// form suitable for fast matching.
+///
+/// `[3]    Step    ::=    '.' | NameTest`
+/// `[4]    NameTest    ::=    QName | '*' | NCName ':' '*'`
+#[doc(alias = "xmlCompileStepPattern")]
 unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     let mut token: *mut XmlChar = null_mut();
     let mut name: *mut XmlChar = null_mut();
@@ -846,15 +780,11 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     }
 }
 
-/**
- * xmlCompileIDCXPathPath:
- * @ctxt:  the compilation context
- *
- * Compile the Path Pattern and generates a precompiled
- * form suitable for fast matching.
- *
- * [5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )
- */
+/// Compile the Path Pattern and generates a precompiled
+/// form suitable for fast matching.
+///
+/// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
+#[doc(alias = "xmlCompileIDCXPathPath")]
 unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     'error_unfinished: {
@@ -965,15 +895,11 @@ macro_rules! NXT {
     };
 }
 
-/**
- * xmlCompilePathPattern:
- * @ctxt:  the compilation context
- *
- * Compile the Path Pattern and generates a precompiled
- * form suitable for fast matching.
- *
- * [5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )
- */
+/// Compile the Path Pattern and generates a precompiled
+/// form suitable for fast matching.
+///
+/// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
+#[doc(alias = "xmlCompilePathPattern")]
 unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'/' {
@@ -1067,14 +993,10 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
     // return;
 }
 
-/**
- * xmlNewStreamComp:
- * @size: the number of expected steps
- *
- * build a new compiled pattern for streaming
- *
- * Returns the new structure or NULL in case of error.
- */
+/// Build a new compiled pattern for streaming
+///
+/// Returns the new structure or NULL in case of error.
+#[doc(alias = "xmlNewStreamComp")]
 unsafe extern "C" fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
     if size < 4 {
         size = 4;
@@ -1099,17 +1021,10 @@ unsafe extern "C" fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
     cur
 }
 
-/**
- * xmlStreamCompAddStep:
- * @comp: the compiled pattern for streaming
- * @name: the first string, the name, or NULL for *
- * @ns: the second step, the namespace name
- * @flags: the flags for that step
- *
- * Add a new step to the compiled pattern
- *
- * Returns -1 in case of error or the step index if successful
- */
+/// Add a new step to the compiled pattern
+///
+/// Returns -1 in case of error or the step index if successful
+#[doc(alias = "xmlStreamCompAddStep")]
 unsafe extern "C" fn xml_stream_comp_add_step(
     comp: XmlStreamCompPtr,
     name: *const XmlChar,
@@ -1141,14 +1056,10 @@ unsafe extern "C" fn xml_stream_comp_add_step(
     (*comp).nb_step - 1
 }
 
-/**
- * xmlStreamCompile:
- * @comp: the precompiled pattern
- *
- * Tries to stream compile a pattern
- *
- * Returns -1 in case of failure and 0 in case of success.
- */
+/// Tries to stream compile a pattern
+///
+/// Returns -1 in case of failure and 0 in case of success.
+#[doc(alias = "xmlStreamCompile")]
 unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
     let stream: XmlStreamCompPtr;
     let mut s: i32 = 0;
@@ -1369,14 +1280,10 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
     0
 }
 
-/**
- * xmlReversePattern:
- * @comp:  the compiled is_match expression
- *
- * reverse all the stack of expressions
- *
- * returns 0 in case of success and -1 in case of error.
- */
+/// Reverse all the stack of expressions
+///
+/// Returns 0 in case of success and -1 in case of error.
+#[doc(alias = "xmlReversePattern")]
 unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
     let mut i: i32;
     let mut j: i32;
@@ -1428,17 +1335,10 @@ unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
     0
 }
 
-/**
- * xmlPatterncompile:
- * @pattern: the pattern to compile
- * @dict: an optional dictionary for interned strings
- * @flags: compilation flags, see XmlPatternFlags
- * @namespaces: the prefix definitions, array of [URI, prefix] or NULL
- *
- * Compile a pattern.
- *
- * Returns the compiled form of the pattern or NULL in case of error
- */
+/// Compile a pattern.
+///
+/// Returns the compiled form of the pattern or NULL in case of error
+#[doc(alias = "xmlPatterncompile")]
 pub unsafe extern "C" fn xml_patterncompile(
     pattern: *const XmlChar,
     dict: *mut XmlDict,
@@ -1599,15 +1499,10 @@ unsafe extern "C" fn xml_pat_push_state(
     0
 }
 
-/**
- * xmlPatMatch:
- * @comp: the precompiled pattern
- * @node: a node
- *
- * Test whether the node matches the pattern
- *
- * Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
- */
+/// Test whether the node matches the pattern
+///
+/// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
+#[doc(alias = "xmlPatMatch")]
 unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
     let mut i: i32;
     let mut step: XmlStepOpPtr;
@@ -1879,15 +1774,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
     }
 }
 
-/**
- * xmlPatternMatch:
- * @comp: the precompiled pattern
- * @node: a node
- *
- * Test whether the node matches the pattern
- *
- * Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
- */
+/// Test whether the node matches the pattern
+///
+/// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
+#[doc(alias = "xmlPatternMatch")]
 pub unsafe extern "C" fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
 
@@ -1905,7 +1795,7 @@ pub unsafe extern "C" fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNod
     ret
 }
 
-/* streaming interfaces */
+// streaming interfaces
 pub type XmlStreamCtxtPtr = *mut XmlStreamCtxt;
 #[repr(C)]
 pub struct XmlStreamCtxt {
@@ -1919,15 +1809,10 @@ pub struct XmlStreamCtxt {
     block_level: i32,
 }
 
-/**
- * xmlPatternStreamable:
- * @comp: the precompiled pattern
- *
- * Check if the pattern is streamable i.e. xmlPatternGetStreamCtxt()
- * should work.
- *
- * Returns 1 if streamable, 0 if not and -1 in case of error.
- */
+/// Check if the pattern is streamable i.e. xmlPatternGetStreamCtxt() should work.
+///
+/// Returns 1 if streamable, 0 if not and -1 in case of error.
+#[doc(alias = "xmlPatternStreamable")]
 pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> i32 {
     if comp.is_null() {
         return -1;
@@ -1941,15 +1826,10 @@ pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> i32 
     1
 }
 
-/**
- * xmlPatternMaxDepth:
- * @comp: the precompiled pattern
- *
- * Check the maximum depth reachable by a pattern
- *
- * Returns -2 if no limit (using //), otherwise the depth,
- *         and -1 in case of error
- */
+/// Check the maximum depth reachable by a pattern
+///
+/// Returns -2 if no limit (using //), otherwise the depth, and -1 in case of error
+#[doc(alias = "xmlPatternMaxDepth")]
 pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
     let mut ret: i32 = 0;
 
@@ -1974,16 +1854,10 @@ pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
     ret
 }
 
-/**
- * xmlPatternMinDepth:
- * @comp: the precompiled pattern
- *
- * Check the minimum depth reachable by a pattern, 0 mean the / or . are
- * part of the set.
- *
- * Returns -1 in case of error otherwise the depth,
- *
- */
+/// Check the minimum depth reachable by a pattern, 0 mean the / or . are part of the set.
+///
+/// Returns -1 in case of error otherwise the depth,
+#[doc(alias = "xmlPatternMinDepth")]
 pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
     let mut ret: i32 = 12345678;
     if comp.is_null() {
@@ -2004,14 +1878,10 @@ pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
     ret
 }
 
-/**
- * xmlPatternFromRoot:
- * @comp: the precompiled pattern
- *
- * Check if the pattern must be looked at from the root.
- *
- * Returns 1 if true, 0 if false and -1 in case of error
- */
+/// Check if the pattern must be looked at from the root.
+///
+/// Returns 1 if true, 0 if false and -1 in case of error
+#[doc(alias = "xmlPatternFromRoot")]
 pub unsafe extern "C" fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> i32 {
     if comp.is_null() {
         return -1;
@@ -2028,14 +1898,10 @@ pub unsafe extern "C" fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> i32 {
     0
 }
 
-/**
- * xmlNewStreamCtxt:
- * @size: the number of expected states
- *
- * build a new stream context
- *
- * Returns the new structure or NULL in case of error.
- */
+/// Build a new stream context
+///
+/// Returns the new structure or NULL in case of error.
+#[doc(alias = "xmlNewStreamCtxt")]
 unsafe extern "C" fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamCtxtPtr {
     let cur: XmlStreamCtxtPtr = xml_malloc(size_of::<XmlStreamCtxt>()) as XmlStreamCtxtPtr;
     if cur.is_null() {
@@ -2058,15 +1924,11 @@ unsafe extern "C" fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamC
     cur
 }
 
-/**
- * xmlPatternGetStreamCtxt:
- * @comp: the precompiled pattern
- *
- * Get a streaming context for that pattern
- * Use xmlFreeStreamCtxt to free the context.
- *
- * Returns a pointer to the context or NULL in case of failure
- */
+/// Get a streaming context for that pattern
+/// Use xmlFreeStreamCtxt to free the context.
+///
+/// Returns a pointer to the context or NULL in case of failure
+#[doc(alias = "xmlPatternGetStreamCtxt")]
 pub unsafe extern "C" fn xml_pattern_get_stream_ctxt(mut comp: XmlPatternPtr) -> XmlStreamCtxtPtr {
     let mut ret: XmlStreamCtxtPtr = null_mut();
     let mut cur: XmlStreamCtxtPtr;
@@ -2102,12 +1964,8 @@ pub unsafe extern "C" fn xml_pattern_get_stream_ctxt(mut comp: XmlPatternPtr) ->
     // return null_mut();
 }
 
-/**
- * xmlFreeStreamCtxt:
- * @stream: the stream context
- *
- * Free the stream context
- */
+/// Free the stream context
+#[doc(alias = "xmlFreeStreamCtxt")]
 pub unsafe extern "C" fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
     let mut next: XmlStreamCtxtPtr;
 
@@ -2121,15 +1979,10 @@ pub unsafe extern "C" fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
     }
 }
 
-/**
- * xmlStreamCtxtAddState:
- * @comp: the stream context
- * @idx: the step index for that streaming state
- *
- * Add a new state to the stream context
- *
- * Returns -1 in case of error or the state index if successful
- */
+/// Add a new state to the stream context
+///
+/// Returns -1 in case of error or the state index if successful
+#[doc(alias = "xmlStreamCtxtAddState")]
 unsafe extern "C" fn xml_stream_ctxt_add_state(
     comp: XmlStreamCtxtPtr,
     idx: i32,
@@ -2160,22 +2013,14 @@ unsafe extern "C" fn xml_stream_ctxt_add_state(
     (*comp).nb_state - 1
 }
 
-/**
- * xmlStreamPushInternal:
- * @stream: the stream context
- * @name: the current name
- * @ns: the namespace name
- * @nodeType: the type of the node
- *
- * Push new data onto the stream. NOTE: if the call xmlPatterncompile()
- * indicated a dictionary, then strings for name and ns will be expected
- * to come from the dictionary.
- * Both @name and @ns being NULL means the / i.e. the root of the document.
- * This can also act as a reset.
- *
- * Returns: -1 in case of error, 1 if the current state in the stream is a
- *    is_match and 0 otherwise.
- */
+/// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
+/// indicated a dictionary, then strings for name and ns will be expected
+/// to come from the dictionary.
+/// Both @name and @ns being NULL means the / i.e. the root of the document.
+/// This can also act as a reset.
+///
+/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+#[doc(alias = "xmlStreamPushInternal")]
 unsafe extern "C" fn xml_stream_push_internal(
     mut stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
@@ -2378,15 +2223,15 @@ unsafe extern "C" fn xml_stream_push_internal(
                     // *  values are in the same dict; especially if it's the namespace name,
                     // *  normally coming from ns->href. We need a namespace dict mechanism !
                     // */
-                    // 	    } else if ((*comp).dict) {
-                    // 		if (step.name.is_null()) {
-                    // 		    if (step.ns.is_null())
-                    // 			is_match = 1;
-                    // 		    else
-                    // 			is_match = (step.ns == ns);
-                    // 		} else {
-                    // 		    is_match = ((step.name == name) && (step.ns == ns));
-                    // 		}
+                    //  } else if ((*comp).dict) {
+                    //      if (step.name.is_null()) {
+                    //          if (step.ns.is_null())
+                    //      	is_match = 1;
+                    //          else
+                    //      	is_match = (step.ns == ns);
+                    //      } else {
+                    //          is_match = ((step.name == name) && (step.ns == ns));
+                    //      }
                     // #endif /* if 0 ------------------------------------------------------- */
                     if is_match != 0 {
                         is_final = step.flags & XML_STREAM_STEP_FINAL as i32;
@@ -2533,25 +2378,17 @@ unsafe extern "C" fn xml_stream_push_internal(
     ret
 }
 
-/**
- * xmlStreamPushNode:
- * @stream: the stream context
- * @name: the current name
- * @ns: the namespace name
- * @nodeType: the type of the node being pushed
- *
- * Push new data onto the stream. NOTE: if the call xmlPatterncompile()
- * indicated a dictionary, then strings for name and ns will be expected
- * to come from the dictionary.
- * Both @name and @ns being NULL means the / i.e. the root of the document.
- * This can also act as a reset.
- * Different from xmlStreamPush() this function can be fed with nodes of type:
- * element-, attribute-, text-, cdata-section-, comment- and
- * processing-instruction-node.
- *
- * Returns: -1 in case of error, 1 if the current state in the stream is a
- *    is_match and 0 otherwise.
- */
+/// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
+/// indicated a dictionary, then strings for name and ns will be expected
+/// to come from the dictionary.
+/// Both @name and @ns being NULL means the / i.e. the root of the document.
+/// This can also act as a reset.
+/// Different from xmlStreamPush() this function can be fed with nodes of type:
+/// element-, attribute-, text-, cdata-section-, comment- and
+/// processing-instruction-node.
+///
+/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+#[doc(alias = "xmlStreamPushNode")]
 pub unsafe extern "C" fn xml_stream_push_node(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
@@ -2561,22 +2398,15 @@ pub unsafe extern "C" fn xml_stream_push_node(
     xml_stream_push_internal(stream, name, ns, node_type)
 }
 
-/**
- * xmlStreamPush:
- * @stream: the stream context
- * @name: the current name
- * @ns: the namespace name
- *
- * Push new data onto the stream. NOTE: if the call xmlPatterncompile()
- * indicated a dictionary, then strings for name and ns will be expected
- * to come from the dictionary.
- * Both @name and @ns being NULL means the / i.e. the root of the document.
- * This can also act as a reset.
- * Otherwise the function will act as if it has been given an element-node.
- *
- * Returns: -1 in case of error, 1 if the current state in the stream is a
- *    is_match and 0 otherwise.
- */
+/// Push new data onto the stream. NOTE: if the call xmlPatterncompile()
+/// indicated a dictionary, then strings for name and ns will be expected
+/// to come from the dictionary.
+/// Both @name and @ns being NULL means the / i.e. the root of the document.
+/// This can also act as a reset.
+/// Otherwise the function will act as if it has been given an element-node.
+///
+/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+#[doc(alias = "xmlStreamPush")]
 pub unsafe extern "C" fn xml_stream_push(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
@@ -2585,22 +2415,15 @@ pub unsafe extern "C" fn xml_stream_push(
     xml_stream_push_internal(stream, name, ns, XmlElementType::XmlElementNode as i32)
 }
 
-/**
-* xmlStreamPushAttr:
-* @stream: the stream context
-* @name: the current name
-* @ns: the namespace name
-*
-* Push new attribute data onto the stream. NOTE: if the call xmlPatterncompile()
-* indicated a dictionary, then strings for name and ns will be expected
-* to come from the dictionary.
-* Both @name and @ns being NULL means the / i.e. the root of the document.
-* This can also act as a reset.
-* Otherwise the function will act as if it has been given an attribute-node.
-*
-* Returns: -1 in case of error, 1 if the current state in the stream is a
-*    is_match and 0 otherwise.
-*/
+/// Push new attribute data onto the stream. NOTE: if the call xmlPatterncompile()
+/// indicated a dictionary, then strings for name and ns will be expected
+/// to come from the dictionary.
+/// Both @name and @ns being NULL means the / i.e. the root of the document.
+/// This can also act as a reset.
+/// Otherwise the function will act as if it has been given an attribute-node.
+///
+/// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
+#[doc(alias = "xmlStreamPushAttr")]
 pub unsafe extern "C" fn xml_stream_push_attr(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
@@ -2609,14 +2432,10 @@ pub unsafe extern "C" fn xml_stream_push_attr(
     xml_stream_push_internal(stream, name, ns, XmlElementType::XmlAttributeNode as i32)
 }
 
-/**
- * xmlStreamPop:
- * @stream: the stream context
- *
- * push one level from the stream.
- *
- * Returns: -1 in case of error, 0 otherwise.
- */
+/// Push one level from the stream.
+///
+/// Returns: -1 in case of error, 0 otherwise.
+#[doc(alias = "xmlStreamPop")]
 pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
     let mut lev: i32;
 
@@ -2657,18 +2476,14 @@ pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
     0
 }
 
-/**
- * xmlStreamWantsAnyNode:
- * @stream: the stream context
- *
- * Query if the streaming pattern additionally needs to be fed with
- * text-, cdata-section-, comment- and processing-instruction-nodes.
- * If the result is 0 then only element-nodes and attribute-nodes
- * need to be pushed.
- *
- * Returns: 1 in case of need of nodes of the above described types,
- *          0 otherwise. -1 on API errors.
- */
+/// Query if the streaming pattern additionally needs to be fed with
+/// text-, cdata-section-, comment- and processing-instruction-nodes.
+/// If the result is 0 then only element-nodes and attribute-nodes
+/// need to be pushed.
+///
+/// Returns 1 in case of need of nodes of the above described types,
+/// 0 otherwise. -1 on API errors.
+#[doc(alias = "xmlStreamWantsAnyNode")]
 pub unsafe extern "C" fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr) -> i32 {
     if stream.is_null() {
         return -1;

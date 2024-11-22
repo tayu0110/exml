@@ -19,16 +19,15 @@ use super::{
     xmlstring::{xml_str_equal, XmlChar},
 };
 
-/**
- * Various defines for the various Link properties.
- *
- * NOTE: the link detection layer will try to resolve QName expansion
- *       of namespaces. If "foo" is the prefix for "http://foo.com/"
- *       then the link detection layer will expand role="foo:myrole"
- *       to "http://foo.com/:myrole".
- * NOTE: the link detection layer will expand URI-References found on
- *       href attributes by using the base mechanism if found.
- */
+// Various defines for the various Link properties.
+//
+// # Note
+// - the link detection layer will try to resolve QName expansion
+//   of namespaces. If "foo" is the prefix for "http://foo.com/"
+//   then the link detection layer will expand role="foo:myrole"
+//   to "http://foo.com/:myrole".
+// - the link detection layer will expand URI-References found on
+//   href attributes by using the base mechanism if found.
 pub type XlinkHRef = *mut XmlChar;
 pub type XlinkRole = *mut XmlChar;
 pub type XlinkTitle = *mut XmlChar;
@@ -59,31 +58,13 @@ pub enum XlinkActuate {
     XlinkActuateOnrequest,
 }
 
-/**
- * xlinkNodeDetectFunc:
- * @ctx:  user data pointer
- * @node:  the node to check
- *
- * This is the prototype for the link detection routine.
- * It calls the default link detection callbacks upon link detection.
- */
+/// This is the prototype for the link detection routine.
+/// It calls the default link detection callbacks upon link detection.
+#[doc(alias = "xlinkNodeDetectFunc")]
 pub type XlinkNodeDetectFunc = unsafe extern "C" fn(ctx: *mut c_void, node: XmlNodePtr);
 
-/*
- * The link detection module interact with the upper layers using
- * a set of callback registered at parsing time.
- */
-
-/**
- * xlinkSimpleLinkFunk:
- * @ctx:  user data pointer
- * @node:  the node carrying the link
- * @href:  the target of the link
- * @role:  the role string
- * @title:  the link title
- *
- * This is the prototype for a simple link detection callback.
- */
+/// This is the prototype for a simple link detection callback.
+#[doc(alias = "xlinkSimpleLinkFunk")]
 pub type XlinkSimpleLinkFunk = unsafe extern "C" fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
@@ -92,24 +73,8 @@ pub type XlinkSimpleLinkFunk = unsafe extern "C" fn(
     title: *const XmlChar,
 );
 
-/**
- * xlinkExtendedLinkFunk:
- * @ctx:  user data pointer
- * @node:  the node carrying the link
- * @nbLocators: the number of locators detected on the link
- * @hrefs:  pointer to the array of locator hrefs
- * @roles:  pointer to the array of locator roles
- * @nbArcs: the number of arcs detected on the link
- * @from:  pointer to the array of source roles found on the arcs
- * @to:  pointer to the array of target roles found on the arcs
- * @show:  array of values for the show attributes found on the arcs
- * @actuate:  array of values for the actuate attributes found on the arcs
- * @nbTitles: the number of titles detected on the link
- * @title:  array of titles detected on the link
- * @langs:  array of xml:lang values for the titles
- *
- * This is the prototype for a extended link detection callback.
- */
+/// This is the prototype for a extended link detection callback.
+#[doc(alias = "xlinkExtendedLinkFunk")]
 pub type XlinkExtendedLinkFunk = unsafe extern "C" fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
@@ -126,19 +91,8 @@ pub type XlinkExtendedLinkFunk = unsafe extern "C" fn(
     langs: *mut *const XmlChar,
 );
 
-/**
- * xlinkExtendedLinkSetFunk:
- * @ctx:  user data pointer
- * @node:  the node carrying the link
- * @nbLocators: the number of locators detected on the link
- * @hrefs:  pointer to the array of locator hrefs
- * @roles:  pointer to the array of locator roles
- * @nbTitles: the number of titles detected on the link
- * @title:  array of titles detected on the link
- * @langs:  array of xml:lang values for the titles
- *
- * This is the prototype for a extended link set detection callback.
- */
+/// This is the prototype for a extended link set detection callback.
+#[doc(alias = "xlinkExtendedLinkSetFunk")]
 pub type XlinkExtendedLinkSetFunk = unsafe extern "C" fn(
     ctx: *mut c_void,
     node: XmlNodePtr,
@@ -150,13 +104,11 @@ pub type XlinkExtendedLinkSetFunk = unsafe extern "C" fn(
     langs: *mut *const XmlChar,
 );
 
-/**
- * This is the structure containing a set of Links detection callbacks.
- *
- * There is no default xlink callbacks, if one want to get link
- * recognition activated, those call backs must be provided before parsing.
- */
 pub type XlinkHandlerPtr = *mut XlinkHandler;
+/// This is the structure containing a set of Links detection callbacks.
+///
+/// There is no default xlink callbacks, if one want to get link
+/// recognition activated, those call backs must be provided before parsing.
 #[repr(C)]
 pub struct XlinkHandler {
     simple: XlinkSimpleLinkFunk,
@@ -167,52 +119,30 @@ pub struct XlinkHandler {
 static XLINK_DEFAULT_HANDLER: AtomicPtr<XlinkHandler> = AtomicPtr::new(null_mut());
 static mut XLINK_DEFAULT_DETECT: Option<XlinkNodeDetectFunc> = None;
 
-/*
- * The default detection routine, can be overridden, they call the default
- * detection callbacks.
- */
-
-/**
- * xlinkGetDefaultDetect:
- *
- * Get the default xlink detection routine
- *
- * Returns the current function or NULL;
- */
+/// Get the default xlink detection routine
+///
+/// Returns the current function or NULL;
+#[doc(alias = "xlinkGetDefaultDetect")]
 pub unsafe extern "C" fn xlink_get_default_detect() -> Option<XlinkNodeDetectFunc> {
     XLINK_DEFAULT_DETECT
 }
 
-/**
- * xlinkSetDefaultDetect:
- * @func: pointer to the new detection routine.
- *
- * Set the default xlink detection routine
- */
+/// Set the default xlink detection routine
+#[doc(alias = "xlinkSetDefaultDetect")]
 pub unsafe extern "C" fn xlink_set_default_detect(func: Option<XlinkNodeDetectFunc>) {
     XLINK_DEFAULT_DETECT = func;
 }
 
-/*
- * Routines to set/get the default handlers.
- */
-/**
- * xlinkGetDefaultHandler:
- *
- * Get the default xlink handler.
- *
- * Returns the current xlinkHandlerPtr value.
- */
+/// Get the default xlink handler.
+///
+/// Returns the current xlinkHandlerPtr value.
+#[doc(alias = "xlinkGetDefaultHandler")]
 pub unsafe extern "C" fn xlink_get_default_handler() -> XlinkHandlerPtr {
     XLINK_DEFAULT_HANDLER.load(Ordering::Acquire)
 }
 
-/**
- * xlinkSetDefaultHandler:
- * @handler:  the new value for the xlink handler block
- *
- * Set the default xlink handlers
- */
+/// Set the default xlink handlers
+#[doc(alias = "xlinkSetDefaultHandler")]
 pub unsafe extern "C" fn xlink_set_default_handler(handler: XlinkHandlerPtr) {
     XLINK_DEFAULT_HANDLER.store(handler, Ordering::Release);
 }
@@ -220,23 +150,14 @@ pub unsafe extern "C" fn xlink_set_default_handler(handler: XlinkHandlerPtr) {
 const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink/namespace/";
 const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 
-/*
- * Link detection module itself.
- */
-/**
- * xlinkIsLink:
- * @doc:  the document containing the node
- * @node:  the node pointer itself
- *
- * Check whether the given node carries the attributes needed
- * to be a link element (or is one of the linking elements issued
- * from the (X)HTML DtDs).
- * This routine don't try to do full checking of the link validity
- * but tries to detect and return the appropriate link type.
- *
- * Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no
- *         link detected.
- */
+/// Check whether the given node carries the attributes needed
+/// to be a link element (or is one of the linking elements issued
+/// from the (X)HTML DtDs).
+/// This routine don't try to do full checking of the link validity
+/// but tries to detect and return the appropriate link type.
+///
+/// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
+#[doc(alias = "xlinkIsLink")]
 pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> XlinkType {
     let mut role: *mut XmlChar = null_mut();
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;

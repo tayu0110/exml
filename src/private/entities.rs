@@ -8,30 +8,21 @@ use crate::{
     tree::XmlDocPtr,
 };
 
-/*
- * Entity flags
- *
- * XML_ENT_PARSED: The entity was parsed and `children` points to the
- * content.
- * XML_ENT_CHECKED: The entity was checked for loops.
- */
+// Entity flags
+//
+// XML_ENT_PARSED: The entity was parsed and `children` points to the content.
+// XML_ENT_CHECKED: The entity was checked for loops.
 pub(crate) const XML_ENT_PARSED: usize = 1 << 0;
 pub(crate) const XML_ENT_CHECKED: usize = 1 << 1;
 pub(crate) const XML_ENT_EXPANDING: usize = 1 << 2;
 pub(crate) const XML_ENT_CHECKED_LT: usize = 1 << 3;
 pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
 
-/**
- * xmlEncodeAttributeEntities:
- * @doc:  the document containing the string
- * @input:  A string to convert to XML.
- *
- * Do a global encoding of a string, replacing the predefined entities
- * and non ASCII values with their entities and CharRef counterparts for
- * attribute values.
- *
- * Returns A newly allocated string with the substitution done.
- */
+/// Do a global encoding of a string, replacing the predefined entities
+/// and non ASCII values with their entities and CharRef counterparts for attribute values.
+///
+/// Returns A newly allocated string with the substitution done.
+#[doc(alias = "xmlEncodeAttributeEntities")]
 pub(crate) unsafe extern "C" fn xml_encode_attribute_entities(
     doc: XmlDocPtr,
     input: *const XmlChar,

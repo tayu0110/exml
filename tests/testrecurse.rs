@@ -18,15 +18,16 @@ use exml::{
         XmlParserErrors,
     },
     globals::{
-        reset_last_error, set_get_warnings_default_value, set_structured_error, GenericErrorContext,
+        reset_last_error, set_get_warnings_default_value, set_pedantic_parser_default_value,
+        set_structured_error, GenericErrorContext,
     },
     io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
-            xml_new_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
+            xml_new_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
+            XmlParserInputPtr, XmlParserOption,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -374,7 +375,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
 unsafe extern "C" fn initialize_libxml2() {
     set_get_warnings_default_value(0);
-    xml_pedantic_parser_default(0);
+    set_pedantic_parser_default_value(0);
 
     xml_mem_setup(
         Some(xml_mem_free),

@@ -42,16 +42,11 @@ const XML_NANO_HTTP_WRITE: usize = 1;
 const XML_NANO_HTTP_READ: usize = 2;
 const XML_NANO_HTTP_NONE: usize = 4;
 
-/**
- * A couple portability macros
- */
-// #ifndef _WINSOCKAPI_
 unsafe fn closesocket(s: i32) -> i32 {
     close(s)
 }
 type Socket = c_int;
 const INVALID_SOCKET: i32 = -1;
-// #endif
 
 pub type XmlNanoHttpctxtPtr = *mut XmlNanoHttpctxt;
 #[repr(C)]
@@ -90,27 +85,15 @@ static PROXY: AtomicPtr<c_char> = AtomicPtr::new(null_mut()); /* the proxy name 
 static PROXY_PORT: AtomicI32 = AtomicI32::new(0); /* the proxy port if any */
 static TIMEOUT: c_uint = 60; /* the select() timeout in seconds */
 
-/**
- * xmlNanoHTTPInit:
- *
- * Initialize the HTTP protocol layer.
- * Currently it just checks for proxy information
- */
+/// Initialize the HTTP protocol layer.
+/// Currently it just checks for proxy information
+#[doc(alias = "xmlNanoHTTPInit")]
 pub unsafe extern "C" fn xml_nanohttp_init() {
     let mut env: *const c_char;
-    // #ifdef _WINSOCKAPI_
-    //     WSADATA wsaData;
-    // #endif
 
     if INITIALIZED.load(Ordering::Acquire) {
         return;
     }
-
-    // #ifdef _WINSOCKAPI_
-    //     if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
-    //         return;
-    //     }
-    // #endif
 
     if PROXY.load(Ordering::Relaxed).is_null() {
         PROXY_PORT.store(80, Ordering::Relaxed);
@@ -133,34 +116,22 @@ pub unsafe extern "C" fn xml_nanohttp_init() {
     INITIALIZED.store(true, Ordering::Release);
 }
 
-/**
- * xmlNanoHTTPCleanup:
- *
- * Cleanup the HTTP protocol layer.
- */
+/// Cleanup the HTTP protocol layer.
+#[doc(alias = "xmlNanoHTTPCleanup")]
 pub unsafe extern "C" fn xml_nanohttp_cleanup() {
     let p = PROXY.load(Ordering::Acquire);
     if !p.is_null() {
         xml_free(p as _);
         PROXY.store(null_mut(), Ordering::Release);
     }
-    // #ifdef _WINSOCKAPI_
-    //     if (initialized) {
-    //         WSACleanup();
-    //     }
-    // #endif
     INITIALIZED.store(false, Ordering::Relaxed);
 }
 
-/**
- * xmlNanoHTTPScanProxy:
- * @URL:  The proxy URL used to initialize the proxy context
- *
- * (Re)Initialize the HTTP Proxy context by parsing the URL and finding
- * the protocol host port it indicates.
- * Should be like http://myproxy/ or http://myproxy:3128/
- * A NULL URL cleans up proxy information.
- */
+/// (Re)Initialize the HTTP Proxy context by parsing the URL and finding
+/// the protocol host port it indicates.
+/// Should be like http://myproxy/ or http://myproxy:3128/
+/// A NULL URL cleans up proxy information.
+#[doc(alias = "xmlNanoHTTPScanProxy")]
 pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
     let p = PROXY.load(Ordering::Acquire);
     if !p.is_null() {
@@ -198,12 +169,8 @@ pub unsafe extern "C" fn xml_nanohttp_scan_proxy(url: *const c_char) {
     xml_free_uri(uri);
 }
 
-/**
- * xmlHTTPErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlHTTPErrMemory")]
 unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromHTTP,
@@ -214,16 +181,11 @@ unsafe extern "C" fn xml_http_err_memory(extra: *const c_char) {
     );
 }
 
-/**
- * xmlNanoHTTPRecv:
- * @ctxt:  an HTTP context
- *
- * Read information coming from the HTTP connection.
- * This is a blocking call (but it blocks in select(), not read()).
- *
- * Returns the number of byte read or -1 in case of error.
- */
-
+/// Read information coming from the HTTP connection.
+/// This is a blocking call (but it blocks in select(), not read()).
+///
+/// Returns the number of byte read or -1 in case of error.
+#[doc(alias = "xmlNanoHTTPRecv")]
 unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
     let mut p: pollfd = unsafe { zeroed() };
 
@@ -302,18 +264,12 @@ unsafe extern "C" fn xml_nanohttp_recv(ctxt: XmlNanoHttpctxtPtr) -> c_int {
     0
 }
 
-/**
- * xmlNanoHTTPFetchContent:
- * @ctx:  the HTTP context
- * @ptr:  pointer to set to the content buffer.
- * @len:  integer pointer to hold the length of the content
- *
- * Check if all the content was read
- *
- * Returns 0 if all the content was read and available, returns
- * -1 if received content length was less than specified or an error
- * occurred.
- */
+/// Check if all the content was read
+///
+/// Returns 0 if all the content was read and available, returns
+/// -1 if received content length was less than specified or an error
+/// occurred.
+#[doc(alias = "xmlNanoHTTPFetchContent")]
 unsafe extern "C" fn xml_nanohttp_fetch_content(
     ctx: *mut c_void,
     mut ptr: *mut *mut c_char,
@@ -367,19 +323,12 @@ unsafe extern "C" fn xml_nanohttp_fetch_content(
     rc
 }
 
-/**
- * xmlNanoHTTPFetch:
- * @URL:  The URL to load
- * @filename:  the filename where the content should be saved
- * @contentType:  if available the Content-Type information will be
- *                returned at that location
- *
- * This function try to fetch the indicated resource via HTTP GET
- * and save it's content in the file.
- *
- * Returns -1 in case of failure, 0 in case of success. The contentType,
- *     if provided must be freed by the caller
- */
+/// This function try to fetch the indicated resource via HTTP GET
+/// and save it's content in the file.
+///
+/// Returns -1 in case of failure, 0 in case of success. The contentType,
+/// if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPFetch")]
 pub unsafe extern "C" fn xml_nanohttp_fetch(
     url: *const c_char,
     filename: *const c_char,
@@ -422,22 +371,13 @@ pub unsafe extern "C" fn xml_nanohttp_fetch(
     ret
 }
 
-/**
- * xmlNanoHTTPMethod:
- * @URL:  The URL to load
- * @method:  the HTTP method to use
- * @input:  the input string if any
- * @contentType:  the Content-Type information IN and OUT
- * @headers:  the extra headers
- * @ilen:  input length
- *
- * This function try to open a connection to the indicated resource
- * via HTTP using the given @method, adding the given extra headers
- * and the input buffer for the request content.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource
+/// via HTTP using the given @method, adding the given extra headers
+/// and the input buffer for the request content.
+///
+/// Returns NULL in case of failure, otherwise a request handler.  
+/// The contentType, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPMethod")]
 pub unsafe extern "C" fn xml_nanohttp_method(
     url: *const c_char,
     method: *const c_char,
@@ -449,14 +389,9 @@ pub unsafe extern "C" fn xml_nanohttp_method(
     xml_nanohttp_method_redir(url, method, input, content_type, null_mut(), headers, ilen)
 }
 
-/**
- * xmlNanoHTTPScanURL:
- * @ctxt:  an HTTP context
- * @URL:  The URL used to initialize the context
- *
- * (Re)Initialize an HTTP context by parsing the URL and finding
- * the protocol host port and path it indicates.
- */
+/// (Re)Initialize an HTTP context by parsing the URL and finding
+/// the protocol host port and path it indicates.
+#[doc(alias = "xmlNanoHTTPScanURL")]
 unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHttpctxtPtr, url: *const c_char) {
     let len: usize;
 
@@ -520,14 +455,10 @@ unsafe extern "C" fn xml_nanohttp_scan_url(ctxt: XmlNanoHttpctxtPtr, url: *const
     xml_free_uri(uri);
 }
 
-/**
- * xmlNanoHTTPNewCtxt:
- * @URL:  The URL used to initialize the context
- *
- * Allocate and initialize a new HTTP context.
- *
- * Returns an HTTP context or NULL in case of error.
- */
+/// Allocate and initialize a new HTTP context.
+///
+/// Returns an HTTP context or NULL in case of error.
+#[doc(alias = "xmlNanoHTTPNewCtxt")]
 unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHttpctxtPtr {
     let ret: XmlNanoHttpctxtPtr = xml_malloc(size_of::<XmlNanoHttpctxt>()) as XmlNanoHttpctxtPtr;
     if ret.is_null() {
@@ -546,12 +477,8 @@ unsafe extern "C" fn xml_nanohttp_new_ctxt(url: *const c_char) -> XmlNanoHttpctx
     ret
 }
 
-/**
- * xmlNanoHTTPFreeCtxt:
- * @ctxt:  an HTTP context
- *
- * Frees the context after closing the connection.
- */
+/// Frees the context after closing the connection.
+#[doc(alias = "xmlNanoHTTPFreeCtxt")]
 unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHttpctxtPtr) {
     if ctxt.is_null() {
         return;
@@ -604,17 +531,12 @@ unsafe extern "C" fn xml_nanohttp_free_ctxt(ctxt: XmlNanoHttpctxtPtr) {
     xml_free(ctxt as _);
 }
 
-/**
- * xmlNanoHTTPHostnameMatch:
- * @pattern: The pattern as it appears in no_proxy environment variable
- * @hostname: The hostname to test as it appears in the URL
- *
- * This function tests whether a given hostname matches a pattern. The pattern
- * usually is a token from the no_proxy environment variable. Wildcards in the
- * pattern are not supported.
- *
- * Returns true, iff hostname matches the pattern.
- */
+/// This function tests whether a given hostname matches a pattern. The pattern
+/// usually is a token from the no_proxy environment variable. Wildcards in the
+/// pattern are not supported.
+///
+/// Returns true, iff hostname matches the pattern.
+#[doc(alias = "xmlNanoHTTPHostnameMatch")]
 unsafe extern "C" fn xml_nanohttp_hostname_match(
     pattern: *const c_char,
     hostname: *const c_char,
@@ -649,15 +571,11 @@ unsafe extern "C" fn xml_nanohttp_hostname_match(
         || (idx_pattern < idx_hostname && *hostname.add(idx_hostname) == b'.' as i8)) as i32
 }
 
-/**
- * xmlNanoHTTPBypassProxy:
- * @hostname: The hostname as it appears in the URL
- *
- * This function evaluates the no_proxy environment variable and returns
- * whether the proxy server should be bypassed for a given host.
- *
- * Returns true, iff a proxy server should be bypassed for the given hostname.
- */
+/// This function evaluates the no_proxy environment variable and returns
+/// whether the proxy server should be bypassed for a given host.
+///
+/// Returns true, iff a proxy server should be bypassed for the given hostname.
+#[doc(alias = "xmlNanoHTTPBypassProxy")]
 unsafe extern "C" fn xml_nanohttp_bypass_proxy(hostname: *const c_char) -> c_int {
     let mut env: *mut c_char = getenv(c"no_proxy".as_ptr() as _);
     let mut p: *mut c_char;
@@ -711,17 +629,12 @@ unsafe extern "C" fn xml_nanohttp_bypass_proxy(hostname: *const c_char) -> c_int
 
 pub type XmlSocklenT = c_uint;
 
-/**
- * xmlNanoHTTPConnectAttempt:
- * @addr:  a socket address structure
- *
- * Attempt a connection to the given IP:port endpoint. It forces
- * non-blocking semantic on the socket, and allow 60 seconds for
- * the host to answer.
- *
- * Returns -1 in case of failure, the file descriptor number otherwise
- */
-
+/// Attempt a connection to the given IP:port endpoint. It forces
+/// non-blocking semantic on the socket, and allow 60 seconds for
+/// the host to answer.
+///
+/// Returns -1 in case of failure, the file descriptor number otherwise
+#[doc(alias = "xmlNanoHTTPConnectAttempt")]
 unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket {
     let mut p: pollfd = unsafe { zeroed() };
     let mut status: c_int;
@@ -738,9 +651,6 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         addrlen = size_of::<sockaddr_in>() as _;
     }
     if s == INVALID_SOCKET {
-        //  #ifdef DEBUG_HTTP
-        //          perror(c"socket".as_ptr() as _);
-        //  #endif
         __xml_ioerr(
             XmlErrorDomain::XmlFromHTTP,
             XmlParserErrors::default(),
@@ -748,22 +658,12 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         );
         return INVALID_SOCKET;
     }
-    //  #ifdef _WINSOCKAPI_
-    //      {
-    //          u_long one = 1;
-
-    //          status = ioctlsocket(s, FIONBIO, &one) == SOCKET_ERROR ? -1 : 0;
-    //      }
-    //  #else /* _WINSOCKAPI_ */
     status = fcntl(s, F_GETFL, 0);
     if status != -1 {
         status |= O_NONBLOCK;
         status = fcntl(s, F_SETFL, status);
     }
     if status < 0 {
-        //  #ifdef DEBUG_HTTP
-        //          perror(c"nonblocking".as_ptr() as _);
-        //  #endif
         __xml_ioerr(
             XmlErrorDomain::XmlFromHTTP,
             XmlParserErrors::default(),
@@ -772,7 +672,6 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
         closesocket(s);
         return INVALID_SOCKET;
     }
-    //  #endif /* !_WINSOCKAPI_ */
     if connect(s, addr, addrlen as _) == -1 {
         match *__errno_location() {
             EINPROGRESS | EWOULDBLOCK => {}
@@ -858,17 +757,11 @@ unsafe extern "C" fn xml_nanohttp_connect_attempt(addr: *mut sockaddr) -> Socket
     s
 }
 
-/**
- * xmlNanoHTTPConnectHost:
- * @host:  the host name
- * @port:  the port number
- *
- * Attempt a connection to the given host:port endpoint. It tries
- * the multiple IP provided by the DNS if available.
- *
- * Returns -1 in case of failure, the file descriptor number otherwise
- */
-
+/// Attempt a connection to the given host:port endpoint. It tries
+/// the multiple IP provided by the DNS if available.
+///
+/// Returns -1 in case of failure, the file descriptor number otherwise
+#[doc(alias = "xmlNanoHTTPConnectHost")]
 unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int) -> Socket {
     let mut addr: *mut sockaddr;
     let mut sockin: sockaddr_in = unsafe { zeroed() };
@@ -963,13 +856,9 @@ unsafe extern "C" fn xml_nanohttp_connect_host(host: *const c_char, port: c_int)
     INVALID_SOCKET
 }
 
-/**
- * xmlNanoHTTPSend:
- * @ctxt:  an HTTP context
- *
- * Send the input needed to initiate the processing on the server side
- * Returns number of bytes sent or -1 on error.
- */
+/// Send the input needed to initiate the processing on the server side
+/// Returns number of bytes sent or -1 on error.
+#[doc(alias = "xmlNanoHTTPSend")]
 unsafe extern "C" fn xml_nanohttp_send(
     ctxt: XmlNanoHttpctxtPtr,
     xmt_ptr: *const c_char,
@@ -1019,16 +908,12 @@ unsafe extern "C" fn xml_nanohttp_send(
     total_sent
 }
 
-/**
- * xmlNanoHTTPReadLine:
- * @ctxt:  an HTTP context
- *
- * Read one line in the HTTP server output, usually for extracting
- * the HTTP protocol information from the answer header.
- *
- * Returns a newly allocated string with a copy of the line, or NULL
- *         which indicate the end of the input.
- */
+/// Read one line in the HTTP server output, usually for extracting
+/// the HTTP protocol information from the answer header.
+///
+/// Returns a newly allocated string with a copy of the line, or NULL
+/// which indicate the end of the input.
+#[doc(alias = "xmlNanoHTTPReadLine")]
 unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHttpctxtPtr) -> *mut c_char {
     let mut buf: [c_char; 4096] = [0; 4096];
     let mut bp: *mut c_char = buf.as_mut_ptr();
@@ -1062,19 +947,14 @@ unsafe extern "C" fn xml_nanohttp_read_line(ctxt: XmlNanoHttpctxtPtr) -> *mut c_
     xml_mem_strdup(buf.as_mut_ptr() as _) as _
 }
 
-/**
- * xmlNanoHTTPScanAnswer:
- * @ctxt:  an HTTP context
- * @line:  an HTTP header line
- *
- * Try to extract useful information from the server answer.
- * We currently parse and process:
- *  - The HTTP revision/ return code
- *  - The Content-Type, Mime-Type and charset used
- *  - The Location for redirect processing.
- *
- * Returns -1 in case of failure, the file descriptor number otherwise
- */
+/// Try to extract useful information from the server answer.
+/// We currently parse and process:
+///  - The HTTP revision/ return code
+///  - The Content-Type, Mime-Type and charset used
+///  - The Location for redirect processing.
+///
+/// Returns -1 in case of failure, the file descriptor number otherwise
+#[doc(alias = "xmlNanoHTTPScanAnswer")]
 unsafe extern "C" fn xml_nanohttp_scan_answer(ctxt: XmlNanoHttpctxtPtr, line: *const c_char) {
     let mut cur: *const c_char = line;
 
@@ -1251,23 +1131,13 @@ unsafe extern "C" fn xml_nanohttp_scan_answer(ctxt: XmlNanoHttpctxtPtr, line: *c
     }
 }
 
-/**
- * xmlNanoHTTPMethodRedir:
- * @URL:  The URL to load
- * @method:  the HTTP method to use
- * @input:  the input string if any
- * @contentType:  the Content-Type information IN and OUT
- * @redir:  the redirected URL OUT
- * @headers:  the extra headers
- * @ilen:  input length
- *
- * This function try to open a connection to the indicated resource
- * via HTTP using the given @method, adding the given extra headers
- * and the input buffer for the request content.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, or redir, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource
+/// via HTTP using the given @method, adding the given extra headers
+/// and the input buffer for the request content.
+///
+/// Returns NULL in case of failure, otherwise a request handler.
+///     The contentType, or redir, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPMethodRedir")]
 pub unsafe extern "C" fn xml_nanohttp_method_redir(
     url: *const c_char,
     mut method: *const c_char,
@@ -1285,9 +1155,6 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
     let mut nb_redirects: c_int = 0;
     let mut use_proxy: c_int;
     let mut redir_url: *mut c_char = null_mut();
-    // #ifdef DEBUG_HTTP
-    //     c_int xmt_bytes;
-    // #endif
 
     if url.is_null() {
         return null_mut();
@@ -1558,18 +1425,11 @@ pub unsafe extern "C" fn xml_nanohttp_method_redir(
     ctxt as _
 }
 
-/**
- * xmlNanoHTTPOpen:
- * @URL:  The URL to load
- * @contentType:  if available the Content-Type information will be
- *                returned at that location
- *
- * This function try to open a connection to the indicated resource
- * via HTTP GET.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource via HTTP GET.
+///
+/// Returns NULL in case of failure, otherwise a request handler.
+/// The contentType, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPOpen")]
 pub unsafe extern "C" fn xml_nanohttp_open(
     url: *const c_char,
     content_type: *mut *mut c_char,
@@ -1580,19 +1440,11 @@ pub unsafe extern "C" fn xml_nanohttp_open(
     xml_nanohttp_method(url, null_mut(), null_mut(), content_type, null_mut(), 0)
 }
 
-/**
- * xmlNanoHTTPOpenRedir:
- * @URL:  The URL to load
- * @contentType:  if available the Content-Type information will be
- *                returned at that location
- * @redir: if available the redirected URL will be returned
- *
- * This function try to open a connection to the indicated resource
- * via HTTP GET.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource via HTTP GET.
+///
+/// Returns NULL in case of failure, otherwise a request handler.
+/// The contentType, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPOpenRedir")]
 pub unsafe extern "C" fn xml_nanohttp_open_redir(
     url: *const c_char,
     content_type: *mut *mut c_char,
@@ -1615,14 +1467,10 @@ pub unsafe extern "C" fn xml_nanohttp_open_redir(
     )
 }
 
-/**
- * xmlNanoHTTPReturnCode:
- * @ctx:  the HTTP context
- *
- * Get the latest HTTP return code received
- *
- * Returns the HTTP return code for the request.
- */
+/// Get the latest HTTP return code received
+///
+/// Returns the HTTP return code for the request.
+#[doc(alias = "xmlNanoHTTPReturnCode")]
 pub unsafe extern "C" fn xml_nanohttp_return_code(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
@@ -1633,15 +1481,10 @@ pub unsafe extern "C" fn xml_nanohttp_return_code(ctx: *mut c_void) -> c_int {
     (*ctxt).return_value
 }
 
-/**
- * xmlNanoHTTPAuthHeader:
- * @ctx:  the HTTP context
- *
- * Get the authentication header of an HTTP context
- *
- * Returns the stashed value of the WWW-Authenticate or Proxy-Authenticate
- * header.
- */
+/// Get the authentication header of an HTTP context
+///
+/// Returns the stashed value of the WWW-Authenticate or Proxy-Authenticate header.
+#[doc(alias = "xmlNanoHTTPAuthHeader")]
 pub unsafe extern "C" fn xml_nanohttp_auth_header(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
@@ -1652,14 +1495,10 @@ pub unsafe extern "C" fn xml_nanohttp_auth_header(ctx: *mut c_void) -> *const c_
     (*ctxt).auth_header
 }
 
-/**
- * xmlNanoHTTPRedir:
- * @ctx:  the HTTP context
- *
- * Provides the specified redirection URL if available from the HTTP header.
- *
- * Return the specified redirection URL or NULL if not redirected.
- */
+/// Provides the specified redirection URL if available from the HTTP header.
+///
+/// Return the specified redirection URL or NULL if not redirected.
+#[doc(alias = "xmlNanoHTTPRedir")]
 pub unsafe extern "C" fn xml_nanohttp_redir(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
@@ -1670,16 +1509,12 @@ pub unsafe extern "C" fn xml_nanohttp_redir(ctx: *mut c_void) -> *const c_char {
     }
 }
 
-/**
- * xmlNanoHTTPContentLength:
- * @ctx:  the HTTP context
- *
- * Provides the specified content length from the HTTP header.
- *
- * Return the specified content length from the HTTP header.  Note that
- * a value of -1 indicates that the content length element was not included in
- * the response header.
- */
+/// Provides the specified content length from the HTTP header.
+///
+/// Return the specified content length from the HTTP header.  Note that
+/// a value of -1 indicates that the content length element was not included in
+/// the response header.
+#[doc(alias = "xmlNanoHTTPContentLength")]
 pub unsafe extern "C" fn xml_nanohttp_content_length(ctx: *mut c_void) -> c_int {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
@@ -1690,14 +1525,10 @@ pub unsafe extern "C" fn xml_nanohttp_content_length(ctx: *mut c_void) -> c_int 
     }
 }
 
-/**
- * xmlNanoHTTPEncoding:
- * @ctx:  the HTTP context
- *
- * Provides the specified encoding if specified in the HTTP headers.
- *
- * Return the specified encoding or NULL if not available
- */
+/// Provides the specified encoding if specified in the HTTP headers.
+///
+/// Return the specified encoding or NULL if not available
+#[doc(alias = "xmlNanoHTTPEncoding")]
 pub unsafe extern "C" fn xml_nanohttp_encoding(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
@@ -1708,14 +1539,10 @@ pub unsafe extern "C" fn xml_nanohttp_encoding(ctx: *mut c_void) -> *const c_cha
     }
 }
 
-/**
- * xmlNanoHTTPMimeType:
- * @ctx:  the HTTP context
- *
- * Provides the specified Mime-Type if specified in the HTTP headers.
- *
- * Return the specified Mime-Type or NULL if not available
- */
+/// Provides the specified Mime-Type if specified in the HTTP headers.
+///
+/// Return the specified Mime-Type or NULL if not available
+#[doc(alias = "xmlNanoHTTPMimeType")]
 pub unsafe extern "C" fn xml_nanohttp_mime_type(ctx: *mut c_void) -> *const c_char {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 
@@ -1726,18 +1553,12 @@ pub unsafe extern "C" fn xml_nanohttp_mime_type(ctx: *mut c_void) -> *const c_ch
     }
 }
 
-/**
- * xmlNanoHTTPRead:
- * @ctx:  the HTTP context
- * @dest:  a buffer
- * @len:  the buffer length
- *
- * This function tries to read @len bytes from the existing HTTP connection
- * and saves them in @dest. This is a blocking call.
- *
- * Returns the number of byte read. 0 is an indication of an end of connection.
- *         -1 indicates a parameter error.
- */
+/// This function tries to read @len bytes from the existing HTTP connection
+/// and saves them in @dest. This is a blocking call.
+///
+/// Returns the number of byte read. 0 is an indication of an end of connection.
+/// -1 indicates a parameter error.
+#[doc(alias = "xmlNanoHTTPRead")]
 pub unsafe extern "C" fn xml_nanohttp_read(
     ctx: *mut c_void,
     dest: *mut c_void,
@@ -1802,16 +1623,11 @@ pub unsafe extern "C" fn xml_nanohttp_read(
     len
 }
 
-/**
- * xmlNanoHTTPSave:
- * @ctxt:  the HTTP context
- * @filename:  the filename where the content should be saved
- *
- * This function saves the output of the HTTP transaction to a file
- * It closes and free the context at the end
- *
- * Returns -1 in case of failure, 0 in case of success.
- */
+/// This function saves the output of the HTTP transaction to a file
+/// It closes and free the context at the end
+///
+/// Returns -1 in case of failure, 0 in case of success.
+#[doc(alias = "xmlNanoHTTPSave")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c_char) -> c_int {
     let mut buf: *mut c_char = null_mut();
@@ -1843,13 +1659,9 @@ pub unsafe extern "C" fn xml_nanohttp_save(ctxt: *mut c_void, filename: *const c
     ret
 }
 
-/**
- * xmlNanoHTTPClose:
- * @ctx:  the HTTP context
- *
- * This function closes an HTTP context, it ends up the connection and
- * free all data related to it.
- */
+/// This function closes an HTTP context, it ends up the connection and
+/// free all data related to it.
+#[doc(alias = "xmlNanoHTTPClose")]
 pub unsafe extern "C" fn xml_nanohttp_close(ctx: *mut c_void) {
     let ctxt: XmlNanoHttpctxtPtr = ctx as XmlNanoHttpctxtPtr;
 

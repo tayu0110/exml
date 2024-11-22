@@ -13,15 +13,17 @@ use std::{
 
 use exml::{
     error::{parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel},
-    globals::{set_get_warnings_default_value, set_structured_error, GenericErrorContext},
+    globals::{
+        set_get_warnings_default_value, set_pedantic_parser_default_value, set_structured_error,
+        GenericErrorContext,
+    },
     io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
         entities::XmlEntityPtr,
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
-            xml_new_sax_parser_ctxt, xml_pedantic_parser_default, xml_set_external_entity_loader,
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr,
-            XML_SAX2_MAGIC,
+            xml_new_sax_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
+            XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         xmlmemory::{
@@ -587,7 +589,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
 
 unsafe extern "C" fn initialize_libxml2() {
     set_get_warnings_default_value(0);
-    xml_pedantic_parser_default(0);
+    set_pedantic_parser_default_value(0);
 
     xml_mem_setup(
         Some(xml_mem_free),

@@ -25,13 +25,9 @@ use crate::libxml::{
     xmlstring::{xml_strdup, XmlChar},
 };
 
-/**
- * xmlAutomataPtr:
- *
- * A libxml automata description, It can be compiled into a regexp
- */
+/// A libxml automata description, It can be compiled into a regexp
+#[doc(alias = "xmlAutomataPtr")]
 pub type XmlAutomataPtr = *mut XmlAutomata;
-
 #[repr(C)]
 pub struct XmlAutomata {
     pub(crate) string: *mut XmlChar,
@@ -57,11 +53,8 @@ pub struct XmlAutomata {
     pub(crate) depth: i32,
 }
 
-/**
- * xmlAutomataStatePtr:
- *
- * A state int the automata description,
- */
+/// A state int the automata description,
+#[doc(alias = "xmlAutomataStatePtr")]
 pub type XmlAutomataStatePtr = *mut XmlAutomataState;
 #[repr(C)]
 pub struct XmlAutomataState {
@@ -79,16 +72,10 @@ pub struct XmlAutomataState {
     pub(crate) trans_to: *mut i32,
 }
 
-/*
- * Building API
- */
-/**
- * xmlNewAutomata:
- *
- * Create a new automata
- *
- * Returns the new object or NULL in case of failure
- */
+/// Create a new automata
+///
+/// Returns the new object or NULL in case of failure
+#[doc(alias = "xmlNewAutomata")]
 pub unsafe extern "C" fn xml_new_automata() -> XmlAutomataPtr {
     let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(null());
     if ctxt.is_null() {
@@ -110,12 +97,8 @@ pub unsafe extern "C" fn xml_new_automata() -> XmlAutomataPtr {
     ctxt
 }
 
-/**
- * xmlFreeAutomata:
- * @am: an automata
- *
- * Free an automata
- */
+/// Free an automata
+#[doc(alias = "xmlFreeAutomata")]
 pub unsafe extern "C" fn xml_free_automata(am: XmlAutomataPtr) {
     if am.is_null() {
         return;
@@ -123,14 +106,10 @@ pub unsafe extern "C" fn xml_free_automata(am: XmlAutomataPtr) {
     xml_reg_free_parser_ctxt(am);
 }
 
-/**
- * xmlAutomataGetInitState:
- * @am: an automata
- *
- * Initial state lookup
- *
- * Returns the initial state of the automata
- */
+/// Initial state lookup
+///
+/// Returns the initial state of the automata
+#[doc(alias = "xmlAutomataGetInitState")]
 pub unsafe extern "C" fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
     if am.is_null() {
         return null_mut();
@@ -138,15 +117,10 @@ pub unsafe extern "C" fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlA
     (*am).start
 }
 
-/**
- * xmlAutomataSetFinalState:
- * @am: an automata
- * @state: a state in this automata
- *
- * Makes that state a final state
- *
- * Returns 0 or -1 in case of error
- */
+/// Makes that state a final state
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "xmlAutomataSetFinalState")]
 pub unsafe extern "C" fn xml_automata_set_final_state(
     am: XmlAutomataPtr,
     state: XmlAutomataStatePtr,
@@ -158,14 +132,10 @@ pub unsafe extern "C" fn xml_automata_set_final_state(
     0
 }
 
-/**
- * xmlAutomataNewState:
- * @am: an automata
- *
- * Create a new disconnected state in the automata
- *
- * Returns the new state or NULL in case of error
- */
+/// Create a new disconnected state in the automata
+///
+/// Returns the new state or NULL in case of error
+#[doc(alias = "xmlAutomataNewState")]
 pub unsafe extern "C" fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
     if am.is_null() {
         return null_mut();
@@ -173,20 +143,12 @@ pub unsafe extern "C" fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutoma
     xml_reg_state_push(am)
 }
 
-/**
- * xmlAutomataNewTransition:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @token: the input string associated to that transition
- * @data: data passed to the callback function if the transition is activated
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a transition from the @from state to the target state
- * activated by the value of @token
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by the value of @token
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewTransition")]
 pub unsafe extern "C" fn xml_automata_new_transition(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -214,21 +176,12 @@ pub unsafe extern "C" fn xml_automata_new_transition(
     to
 }
 
-/**
- * xmlAutomataNewTransition2:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @token: the first input string associated to that transition
- * @token2: the second input string associated to that transition
- * @data: data passed to the callback function if the transition is activated
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a transition from the @from state to the target state
- * activated by the value of @token
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by the value of @token
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewTransition2")]
 pub unsafe extern "C" fn xml_automata_new_transition2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -274,23 +227,14 @@ pub unsafe extern "C" fn xml_automata_new_transition2(
     to
 }
 
-/**
-* xmlAutomataNewNegTrans:
-* @am: an automata
-* @from: the starting point of the transition
-* @to: the target point of the transition or NULL
-* @token: the first input string associated to that transition
-* @token2: the second input string associated to that transition
-* @data: data passed to the callback function if the transition is activated
-*
-* If @to is NULL, this creates first a new target state in the automata
-* and then adds a transition from the @from state to the target state
-* activated by any value except (@token,@token2)
-* Note that if @token2 is not NULL, then (X, NULL) won't match to follow
-# the semantic of XSD ##other
-*
-* Returns the target state or NULL in case of error
-*/
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by any value except (@token,@token2)
+/// Note that if @token2 is not NULL, then (X, NULL) won't match to follow
+/// the semantic of XSD ##other
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewNegTrans")]
 pub unsafe extern "C" fn xml_automata_new_neg_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -348,23 +292,13 @@ pub unsafe extern "C" fn xml_automata_new_neg_trans(
     to
 }
 
-/**
- * xmlAutomataNewCountTrans:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @token: the input string associated to that transition
- * @min:  the minimum successive occurrences of token
- * @max:  the maximum successive occurrences of token
- * @data:  data associated to the transition
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a transition from the @from state to the target state
- * activated by a succession of input of value @token and whose number
- * is between @min and @max
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by a succession of input of value @token and whose number
+/// is between @min and @max
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewCountTrans")]
 pub unsafe extern "C" fn xml_automata_new_count_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -446,24 +380,13 @@ pub unsafe extern "C" fn xml_automata_new_count_trans(
     //     return null_mut();
 }
 
-/**
- * xmlAutomataNewCountTrans2:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @token: the input string associated to that transition
- * @token2: the second input string associated to that transition
- * @min:  the minimum successive occurrences of token
- * @max:  the maximum successive occurrences of token
- * @data:  data associated to the transition
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a transition from the @from state to the target state
- * activated by a succession of input of value @token and @token2 and
- * whose number is between @min and @max
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by a succession of input of value @token and @token2 and
+/// whose number is between @min and @max
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewCountTrans2")]
 pub unsafe extern "C" fn xml_automata_new_count_trans2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -564,24 +487,13 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
     //     return null_mut();
 }
 
-/**
- * xmlAutomataNewOnceTrans:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @token: the input string associated to that transition
- * @min:  the minimum successive occurrences of token
- * @max:  the maximum successive occurrences of token
- * @data:  data associated to the transition
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a transition from the @from state to the target state
- * activated by a succession of input of value @token and whose number
- * is between @min and @max, moreover that transition can only be crossed
- * once.
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by a succession of input of value @token and whose number
+/// is between @min and @max, moreover that transition can only be crossed once.
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewOnceTrans")]
 pub unsafe extern "C" fn xml_automata_new_once_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -644,25 +556,13 @@ pub unsafe extern "C" fn xml_automata_new_once_trans(
     //     return null_mut();
 }
 
-/**
- * xmlAutomataNewOnceTrans2:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @token: the input string associated to that transition
- * @token2: the second input string associated to that transition
- * @min:  the minimum successive occurrences of token
- * @max:  the maximum successive occurrences of token
- * @data:  data associated to the transition
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a transition from the @from state to the target state
- * activated by a succession of input of value @token and @token2 and whose
- * number is between @min and @max, moreover that transition can only be
- * crossed once.
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a transition from the @from state to the target state
+/// activated by a succession of input of value @token and @token2 and whose
+/// number is between @min and @max, moreover that transition can only be crossed once.
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewOnceTrans2")]
 pub unsafe extern "C" fn xml_automata_new_once_trans2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -749,14 +649,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
     //     return null_mut();
 }
 
-/**
- * xmlFAGenerateAllTransition:
- * @ctxt:  a regexp parser context
- * @from:  the from state
- * @to:  the target state or NULL for building a new one
- * @lax:
- *
- */
+#[doc(alias = "xmlFAGenerateAllTransition")]
 unsafe extern "C" fn xml_fa_generate_all_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
@@ -778,20 +671,13 @@ unsafe extern "C" fn xml_fa_generate_all_transition(
     0
 }
 
-/**
- * xmlAutomataNewAllTrans:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @lax: allow to transition if not all all transitions have been activated
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds a an ALL transition from the @from state to the
- * target state. That transition is an epsilon transition allowed only when
- * all transitions from the @from node have been activated.
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds a an ALL transition from the @from state to the
+/// target state. That transition is an epsilon transition allowed only when
+/// all transitions from the @from node have been activated.
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewAllTrans")]
 pub unsafe extern "C" fn xml_automata_new_all_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -808,18 +694,11 @@ pub unsafe extern "C" fn xml_automata_new_all_trans(
     to
 }
 
-/**
- * xmlAutomataNewEpsilon:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds an epsilon transition from the @from state to the
- * target state
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds an epsilon transition from the @from state to the target state
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewEpsilon")]
 pub unsafe extern "C" fn xml_automata_new_epsilon(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -835,19 +714,12 @@ pub unsafe extern "C" fn xml_automata_new_epsilon(
     to
 }
 
-/**
- * xmlAutomataNewCountedTrans:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @counter: the counter associated to that transition
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds an epsilon transition from the @from state to the target state
- * which will increment the counter provided
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds an epsilon transition from the @from state to the target state
+/// which will increment the counter provided
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewCountedTrans")]
 pub unsafe extern "C" fn xml_automata_new_counted_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -864,19 +736,12 @@ pub unsafe extern "C" fn xml_automata_new_counted_trans(
     to
 }
 
-/**
- * xmlAutomataNewCounterTrans:
- * @am: an automata
- * @from: the starting point of the transition
- * @to: the target point of the transition or NULL
- * @counter: the counter associated to that transition
- *
- * If @to is NULL, this creates first a new target state in the automata
- * and then adds an epsilon transition from the @from state to the target state
- * which will be allowed only if the counter is within the right range.
- *
- * Returns the target state or NULL in case of error
- */
+/// If @to is NULL, this creates first a new target state in the automata
+/// and then adds an epsilon transition from the @from state to the target state
+/// which will be allowed only if the counter is within the right range.
+///
+/// Returns the target state or NULL in case of error
+#[doc(alias = "xmlAutomataNewCounterTrans")]
 pub unsafe extern "C" fn xml_automata_new_counter_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
@@ -893,16 +758,10 @@ pub unsafe extern "C" fn xml_automata_new_counter_trans(
     to
 }
 
-/**
- * xmlAutomataNewCounter:
- * @am: an automata
- * @min:  the minimal value on the counter
- * @max:  the maximal value on the counter
- *
- * Create a new counter
- *
- * Returns the counter number or -1 in case of error
- */
+/// Create a new counter
+///
+/// Returns the counter number or -1 in case of error
+#[doc(alias = "xmlAutomataNewCounter")]
 pub unsafe extern "C" fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -> i32 {
     if am.is_null() {
         return -1;
@@ -917,15 +776,11 @@ pub unsafe extern "C" fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, 
     ret
 }
 
-/**
- * xmlAutomataCompile:
- * @am: an automata
- *
- * Compile the automata into a Reg Exp ready for being executed.
- * The automata should be free after this point.
- *
- * Returns the compiled regexp or NULL in case of error
- */
+/// Compile the automata into a Reg Exp ready for being executed.
+/// The automata should be free after this point.
+///
+/// Returns the compiled regexp or NULL in case of error
+#[doc(alias = "xmlAutomataCompile")]
 pub unsafe extern "C" fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlRegexp {
     if am.is_null() || (*am).error != 0 {
         return null_mut();
@@ -935,14 +790,10 @@ pub unsafe extern "C" fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlReg
     xml_reg_epx_from_parse(am)
 }
 
-/**
- * xmlAutomataIsDeterminist:
- * @am: an automata
- *
- * Checks if an automata is determinist.
- *
- * Returns 1 if true, 0 if not, and -1 in case of error
- */
+/// Checks if an automata is determinist.
+///
+/// Returns 1 if true, 0 if not, and -1 in case of error
+#[doc(alias = "xmlAutomataIsDeterminist")]
 pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 {
     if am.is_null() {
         return -1;
@@ -952,13 +803,8 @@ pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 
     ret
 }
 
-/**
- * xmlAutomataSetFlags:
- * @am: an automata
- * @flags:  a set of internal flags
- *
- * Set some flags on the automata
- */
+/// Set some flags on the automata
+#[doc(alias = "xmlAutomataSetFlags")]
 pub(crate) unsafe extern "C" fn xml_automata_set_flags(am: XmlAutomataPtr, flags: i32) {
     if am.is_null() {
         return;

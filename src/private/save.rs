@@ -18,15 +18,8 @@ use crate::{
 
 use super::buf::xml_buf_add;
 
-/**
- * xmlBufAttrSerializeTxtContent:
- * @buf:  and xmlBufPtr output
- * @doc:  the document
- * @attr: the attribute node
- * @string: the text content
- *
- * Serialize text attribute values to an xmlBufPtr
- */
+/// Serialize text attribute values to an xmlBufPtr
+#[doc(alias = "xmlBufAttrSerializeTxtContent")]
 pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
     buf: XmlBufPtr,
     doc: XmlDocPtr,

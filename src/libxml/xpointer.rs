@@ -49,9 +49,7 @@ use crate::{
     CHECK_ARITY,
 };
 
-/*
- * A Location Set
- */
+// A Location Set
 #[cfg(feature = "libxml_xptr_locs")]
 pub type XmlLocationSetPtr = *mut XmlLocationSet;
 #[cfg(feature = "libxml_xptr_locs")]
@@ -78,12 +76,8 @@ macro_rules! STRANGE {
     };
 }
 
-/**
- * xmlXPtrErrMemory:
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlXPtrErrMemory")]
 unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
     __xml_raise_error!(
         None,
@@ -106,16 +100,11 @@ unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
     );
 }
 
-/**
- * xmlXPtrNewLocationSetNodes:
- * @start:  the start NodePtr value
- * @end:  the end NodePtr value or NULL
- *
- * Create a new xmlXPathObjectPtr of type LocationSet and initialize
- * it with the single range made of the two nodes @start and @end
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type LocationSet and initialize
+/// it with the single range made of the two nodes @start and @end
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewLocationSetNodes")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_new_location_set_nodes(
     start: XmlNodePtr,
@@ -136,18 +125,10 @@ unsafe extern "C" fn xml_xptr_new_location_set_nodes(
     ret
 }
 
-/*
- * Handling of location sets.
- */
-
-/**
- * xmlXPtrLocationSetCreate:
- * @val:  an initial xmlXPathObjectPtr, or NULL
- *
- * Create a new xmlLocationSetPtr of type double and of value @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlLocationSetPtr of type double and of value @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrLocationSetCreate")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_location_set_create(
     val: XmlXPathObjectPtr,
@@ -178,12 +159,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_create(
     ret
 }
 
-/**
- * xmlXPtrFreeLocationSet:
- * @obj:  the xmlLocationSetPtr to free
- *
- * Free the LocationSet compound (not the actual ranges !).
- */
+/// Free the LocationSet compound (not the actual ranges !).
+#[doc(alias = "xmlXPtrFreeLocationSet")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_free_location_set(obj: XmlLocationSetPtr) {
     if obj.is_null() {
@@ -198,15 +175,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_free_location_set(obj: XmlLocationSetPt
     xml_free(obj as _);
 }
 
-/**
- * xmlXPtrLocationSetMerge:
- * @val1:  the first LocationSet
- * @val2:  the second LocationSet
- *
- * Merges two rangesets, all ranges from @val2 are added to @val1
- *
- * Returns val1 once extended or NULL in case of error.
- */
+/// Merges two rangesets, all ranges from @val2 are added to @val1
+///
+/// Returns val1 once extended or NULL in case of error.
+#[doc(alias = "xmlXPtrLocationSetMerge")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_location_set_merge(
     val1: XmlLocationSetPtr,
@@ -230,17 +202,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_merge(
     val1
 }
 
-/**
- * xmlXPtrNewRangeInternal:
- * @start:  the starting node
- * @startindex:  the start index
- * @end:  the ending point
- * @endindex:  the ending index
- *
- * Internal function to create a new xmlXPathObjectPtr of type range
- *
- * Returns the newly created object.
- */
+/// Internal function to create a new xmlXPathObjectPtr of type range
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRangeInternal")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_new_range_internal(
     start: XmlNodePtr,
@@ -273,18 +238,11 @@ unsafe extern "C" fn xml_xptr_new_range_internal(
     ret
 }
 
-/**
- * xmlXPtrCmpPoints:
- * @node1:  the first node
- * @index1:  the first index
- * @node2:  the second node
- * @index2:  the second index
- *
- * Compare two points w.r.t document order
- *
- * Returns -2 in case of error 1 if first point < second point, 0 if
- *         that's the same point, -1 otherwise
- */
+/// Compare two points w.r.t document order
+///
+/// Returns -2 in case of error 1 if first point < second point, 0 if
+///         that's the same point, -1 otherwise
+#[doc(alias = "xmlXPtrCmpPoints")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_cmp_points(
     node1: XmlNodePtr,
@@ -310,12 +268,8 @@ unsafe extern "C" fn xml_xptr_cmp_points(
     xml_xpath_cmp_nodes(node1, node2)
 }
 
-/**
- * xmlXPtrRangeCheckOrder:
- * @range:  an object range
- *
- * Make sure the points in the range are in the right order
- */
+/// Make sure the points in the range are in the right order
+#[doc(alias = "xmlXPtrRangeCheckOrder")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
     let mut tmp: i32;
@@ -345,17 +299,10 @@ unsafe extern "C" fn xml_xptr_range_check_order(range: XmlXPathObjectPtr) {
     }
 }
 
-/**
- * xmlXPtrNewRange:
- * @start:  the starting node
- * @startindex:  the start index
- * @end:  the ending point
- * @endindex:  the ending index
- *
- * Create a new xmlXPathObjectPtr of type range
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRange")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range(
     start: XmlNodePtr,
@@ -381,15 +328,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range(
     ret
 }
 
-/**
- * xmlXPtrNewRangePoints:
- * @start:  the starting point
- * @end:  the ending point
- *
- * Create a new xmlXPathObjectPtr of type range using 2 Points
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range using 2 Points
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRangePoints")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range_points(
     start: XmlXPathObjectPtr,
@@ -418,15 +360,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_points(
     ret
 }
 
-/**
- * xmlXPtrNewRangeNodePoint:
- * @start:  the starting node
- * @end:  the ending point
- *
- * Create a new xmlXPathObjectPtr of type range from a node to a point
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range from a node to a point
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRangeNodePoint")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_point(
     start: XmlNodePtr,
@@ -448,15 +385,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_point(
     ret
 }
 
-/**
- * xmlXPtrNewRangePointNode:
- * @start:  the starting point
- * @end:  the ending node
- *
- * Create a new xmlXPathObjectPtr of type range from a point to a node
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range from a point to a node
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRangePointNode")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range_point_node(
     start: XmlXPathObjectPtr,
@@ -478,15 +410,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_point_node(
     ret
 }
 
-/**
- * xmlXPtrNewRangeNodes:
- * @start:  the starting node
- * @end:  the ending node
- *
- * Create a new xmlXPathObjectPtr of type range using 2 nodes
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range using 2 nodes
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRangeNodes")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range_nodes(
     start: XmlNodePtr,
@@ -504,15 +431,11 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_nodes(
     ret
 }
 
-/**
- * xmlXPtrNewLocationSetNodeSet:
- * @set:  a node set
- *
- * Create a new xmlXPathObjectPtr of type LocationSet and initialize
- * it with all the nodes from @set
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type LocationSet and initialize
+/// it with all the nodes from @set
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewLocationSetNodeSet")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_location_set_node_set(
     set: XmlNodeSetPtr,
@@ -542,15 +465,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_location_set_node_set(
     ret
 }
 
-/**
- * xmlXPtrNewRangeNodeObject:
- * @start:  the starting node
- * @end:  the ending object
- *
- * Create a new xmlXPathObjectPtr of type range from a not to an object
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range from a not to an object
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewRangeNodeObject")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_object(
     start: XmlNodePtr,
@@ -597,14 +515,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_range_node_object(
     ret
 }
 
-/**
- * xmlXPtrNewCollapsedRange:
- * @start:  the starting and ending node
- *
- * Create a new xmlXPathObjectPtr of type range using a single nodes
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type range using a single nodes
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewCollapsedRange")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_new_collapsed_range(
     start: XmlNodePtr,
@@ -617,15 +531,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_collapsed_range(
     ret
 }
 
-/**
- * xmlXPtrRangesEqual:
- * @range1:  the first range
- * @range2:  the second range
- *
- * Compare two ranges
- *
- * Returns 1 if equal, 0 otherwise
- */
+/// Compare two ranges
+///
+/// Returns 1 if equal, 0 otherwise
+#[doc(alias = "xmlXPtrRangesEqual")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_ranges_equal(
     range1: XmlXPathObjectPtr,
@@ -658,14 +567,9 @@ unsafe extern "C" fn xml_xptr_ranges_equal(
     1
 }
 
-/**
- * xmlXPtrLocationSetAdd:
- * @cur:  the initial range set
- * @val:  a new xmlXPathObjectPtr
- *
- * add a new xmlXPathObjectPtr to an existing LocationSet
- * If the location already exist in the set @val is freed.
- */
+/// Add a new xmlXPathObjectPtr to an existing LocationSet
+/// If the location already exist in the set @val is freed.
+#[doc(alias = "xmlXPtrLocationSetAdd")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_location_set_add(
     cur: XmlLocationSetPtr,
@@ -717,14 +621,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_add(
     (*cur).loc_nr += 1;
 }
 
-/**
- * xmlXPtrWrapLocationSet:
- * @val:  the LocationSet value
- *
- * Wrap the LocationSet @val in a new xmlXPathObjectPtr
- *
- * Returns the newly created object.
- */
+/// Wrap the LocationSet @val in a new xmlXPathObjectPtr
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrWrapLocationSet")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_wrap_location_set(
     val: XmlLocationSetPtr,
@@ -740,13 +640,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_wrap_location_set(
     ret
 }
 
-/**
- * xmlXPtrLocationSetDel:
- * @cur:  the initial range set
- * @val:  an xmlXPathObjectPtr
- *
- * Removes an xmlXPathObjectPtr from an existing LocationSet
- */
+/// Removes an xmlXPathObjectPtr from an existing LocationSet
+#[doc(alias = "xmlXPtrLocationSetDel")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
     cur: XmlLocationSetPtr,
@@ -772,10 +667,6 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
     }
 
     if i >= (*cur).loc_nr {
-        // #ifdef DEBUG
-        //         xmlGenericError(xmlGenericErrorContext,
-        // 	        "xmlXPtrLocationSetDel: Range wasn't found in RangeList\n");
-        // #endif
         return;
     }
     (*cur).loc_nr -= 1;
@@ -785,13 +676,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_del(
     *(*cur).loc_tab.add((*cur).loc_nr as usize) = null_mut();
 }
 
-/**
- * xmlXPtrLocationSetRemove:
- * @cur:  the initial range set
- * @val:  the index to remove
- *
- * Removes an entry from an existing LocationSet list.
- */
+/// Removes an entry from an existing LocationSet list.
+#[doc(alias = "xmlXPtrLocationSetRemove")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_location_set_remove(cur: XmlLocationSetPtr, val: i32) {
     if cur.is_null() {
@@ -807,12 +693,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_remove(cur: XmlLocationSet
     *(*cur).loc_tab.add((*cur).loc_nr as usize) = null_mut();
 }
 
-/**
- * xmlXPtrGetArity:
- * @cur:  the node
- *
- * Returns the number of child for an element, -1 in case of error
- */
+/// Returns the number of child for an element, -1 in case of error
+#[doc(alias = "xmlXPtrGetArity")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_get_arity(mut cur: XmlNodePtr) -> i32 {
     let mut i: i32;
@@ -835,13 +717,8 @@ unsafe extern "C" fn xml_xptr_get_arity(mut cur: XmlNodePtr) -> i32 {
     i
 }
 
-/**
- * xmlXPtrGetIndex:
- * @cur:  the node
- *
- * Returns the index of the node in its parent children list, -1
- *         in case of error
- */
+/// Returns the index of the node in its parent children list, -1 in case of error
+#[doc(alias = "xmlXPtrGetIndex")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_get_index(mut cur: XmlNodePtr) -> i32 {
     let mut i: i32;
@@ -863,17 +740,12 @@ unsafe extern "C" fn xml_xptr_get_index(mut cur: XmlNodePtr) -> i32 {
     i
 }
 
-/**
- * xmlXPtrCoveringRange:
- * @ctxt:  the XPointer Parser context
- * @loc:  the location for which the covering range must be computed
- *
- * A covering range is a range that wholly encompasses a location
- * Section 5.3.3. Covering Ranges for All Location Types
- *        http://www.w3.org/TR/xptr#N2267
- *
- * Returns a new location or NULL in case of error
- */
+/// A covering range is a range that wholly encompasses a location
+/// Section 5.3.3. Covering Ranges for All Location Types
+///        http://www.w3.org/TR/xptr#N2267
+///
+/// Returns a new location or NULL in case of error
+#[doc(alias = "xmlXPtrCoveringRange")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_covering_range(
     ctxt: XmlXPathParserContextPtr,
@@ -938,19 +810,14 @@ unsafe extern "C" fn xml_xptr_covering_range(
     null_mut()
 }
 
-/**
- * xmlXPtrRangeFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing the range() function 5.4.3
- *  location-set range(location-set )
- *
- *  The range function returns ranges covering the locations in
- *  the argument location-set. For each location x in the argument
- *  location-set, a range location representing the covering range of
- *  x is added to the result location-set.
- */
+/// Function implementing the range() function 5.4.3
+///  location-set range(location-set )
+///
+///  The range function returns ranges covering the locations in
+///  the argument location-set. For each location x in the argument
+///  location-set, a range location representing the covering range of
+///  x is added to the result location-set.
+#[doc(alias = "xmlXPtrRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut set: XmlXPathObjectPtr;
@@ -1003,15 +870,10 @@ unsafe extern "C" fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nar
     xml_xpath_free_object(set);
 }
 
-/**
- * xmlXPtrInsideRange:
- * @ctxt:  the XPointer Parser context
- * @loc:  the location for which the inside range must be computed
- *
- * A inside range is a range described in the range-inside() description
- *
- * Returns a new location or NULL in case of error
- */
+/// A inside range is a range described in the range-inside() description
+///
+/// Returns a new location or NULL in case of error
+#[doc(alias = "xmlXPtrInsideRange")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_inside_range(
     ctxt: XmlXPathParserContextPtr,
@@ -1085,26 +947,20 @@ unsafe extern "C" fn xml_xptr_inside_range(
     null_mut()
 }
 
-/**
- * xmlXPtrRangeInsideFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing the range-inside() function 5.4.3
- *  location-set range-inside(location-set )
- *
- *  The range-inside function returns ranges covering the contents of
- *  the locations in the argument location-set. For each location x in
- *  the argument location-set, a range location is added to the result
- *  location-set. If x is a range location, then x is added to the
- *  result location-set. If x is not a range location, then x is used
- *  as the container location of the start and end points of the range
- *  location to be added; the index of the start point of the range is
- *  zero; if the end point is a character point then its index is the
- *  length of the string-value of x, and otherwise is the number of
- *  location children of x.
- *
- */
+/// Function implementing the range-inside() function 5.4.3
+///  location-set range-inside(location-set )
+///
+///  The range-inside function returns ranges covering the contents of
+///  the locations in the argument location-set. For each location x in
+///  the argument location-set, a range location is added to the result
+///  location-set. If x is a range location, then x is added to the
+///  result location-set. If x is not a range location, then x is used
+///  as the container location of the start and end points of the range
+///  location to be added; the index of the start point of the range is
+///  zero; if the end point is a character point then its index is the
+///  length of the string-value of x, and otherwise is the number of
+///  location children of x.
+#[doc(alias = "xmlXPtrRangeInsideFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut set: XmlXPathObjectPtr;
@@ -1157,16 +1013,10 @@ unsafe extern "C" fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextP
     xml_xpath_free_object(set);
 }
 
-/**
- * xmlXPtrGetStartPoint:
- * @obj:  an range
- * @node:  the resulting node
- * @indx:  the resulting index
- *
- * read the object and return the start point coordinates.
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Read the object and return the start point coordinates.
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlXPtrGetStartPoint")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_get_start_point(
     obj: XmlXPathObjectPtr,
@@ -1201,16 +1051,10 @@ unsafe extern "C" fn xml_xptr_get_start_point(
     -1
 }
 
-/**
- * xmlXPtrGetEndPoint:
- * @obj:  an range
- * @node:  the resulting node
- * @indx:  the resulting indx
- *
- * read the object and return the end point coordinates.
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Read the object and return the end point coordinates.
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlXPtrGetEndPoint")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_get_end_point(
     obj: XmlXPathObjectPtr,
@@ -1245,13 +1089,8 @@ unsafe extern "C" fn xml_xptr_get_end_point(
     -1
 }
 
-/**
- * xmlXPtrGetNthChild:
- * @cur:  the node
- * @no:  the child number
- *
- * Returns the @no'th element child of @cur or NULL
- */
+/// Returns the @no'th element child of @cur or NULL
+#[doc(alias = "xmlXPtrGetNthChild")]
 unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> XmlNodePtr {
     let mut i: i32;
     if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
@@ -1280,16 +1119,11 @@ unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> Xml
     cur
 }
 
-/**
- * xmlXPtrAdvanceNode:
- * @cur:  the node
- * @level: incremented/decremented to show level in tree
- *
- * Advance to the next element or text node in document order
- * TODO: add a stack for entering/exiting entities
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Advance to the next element or text node in document order
+/// TODO: add a stack for entering/exiting entities
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlXPtrAdvanceNode")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
     mut cur: XmlNodePtr,
@@ -1377,16 +1211,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
     }
 }
 
-/**
- * xmlXPtrAdvanceChar:
- * @node:  the node
- * @indx:  the indx
- * @bytes:  the number of bytes
- *
- * Advance a point of the associated number of bytes (not UTF8 chars)
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Advance a point of the associated number of bytes (not UTF8 chars)
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlXPtrAdvanceChar")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_advance_char(
     node: *mut XmlNodePtr,
@@ -1471,15 +1299,10 @@ unsafe extern "C" fn xml_xptr_advance_char(
     -1
 }
 
-/**
- * xmlXPtrGetLastChar:
- * @node:  the node
- * @index:  the index
- *
- * Computes the point coordinates of the last c_char of this point
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Computes the point coordinates of the last c_char of this point
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlXPtrGetLastChar")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut i32) -> i32 {
     let mut cur: XmlNodePtr;
@@ -1522,22 +1345,14 @@ unsafe extern "C" fn xml_xptr_get_last_char(node: *mut XmlNodePtr, indx: *mut i3
     0
 }
 
-/**
- * xmlXPtrMatchString:
- * @string:  the string to search
- * @start:  the start textnode
- * @startindex:  the start index
- * @end:  the end textnode IN/OUT
- * @endindex:  the end index IN/OUT
- *
- * Check whether the document contains @string at the position
- * (@start, @startindex) and limited by the (@end, @endindex) point
- *
- * Returns -1 in case of failure, 0 if not found, 1 if found in which case
- *            (@start, @startindex) will indicate the position of the beginning
- *            of the range and (@end, @endindex) will indicate the end
- *            of the range
- */
+/// Check whether the document contains @string at the position
+/// (@start, @startindex) and limited by the (@end, @endindex) point
+///
+/// Returns -1 in case of failure, 0 if not found, 1 if found in which case
+///            (@start, @startindex) will indicate the position of the beginning
+///            of the range and (@end, @endindex) will indicate the end
+///            of the range
+#[doc(alias = "xmlXPtrMatchString")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_match_string(
     mut string: *const XmlChar,
@@ -1606,22 +1421,14 @@ unsafe extern "C" fn xml_xptr_match_string(
     1
 }
 
-/**
- * xmlXPtrSearchString:
- * @string:  the string to search
- * @start:  the start textnode IN/OUT
- * @startindex:  the start index IN/OUT
- * @end:  the end textnode
- * @endindex:  the end index
- *
- * Search the next occurrence of @string within the document content
- * until the (@end, @endindex) point is reached
- *
- * Returns -1 in case of failure, 0 if not found, 1 if found in which case
- *            (@start, @startindex) will indicate the position of the beginning
- *            of the range and (@end, @endindex) will indicate the end
- *            of the range
- */
+/// Search the next occurrence of @string within the document content
+/// until the (@end, @endindex) point is reached
+///
+/// Returns -1 in case of failure, 0 if not found, 1 if found in which case
+///            (@start, @startindex) will indicate the position of the beginning
+///            of the range and (@end, @endindex) will indicate the end
+///            of the range
+#[doc(alias = "xmlXPtrSearchString")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_search_string(
     string: *const XmlChar,
@@ -1660,13 +1467,6 @@ unsafe extern "C" fn xml_xptr_search_string(
                     str = xml_strchr((*cur).content.add(pos as usize), first);
                     if !str.is_null() {
                         pos = str.offset_from((*cur).content as *mut XmlChar) as _;
-                        // #ifdef DEBUG_RANGES
-                        // 			xmlGenericError(xmlGenericErrorContext,
-                        // 				"found '%c' at index %d of ->",
-                        // 				first, pos + 1);
-                        // 			xmlDebugDumpString(stdout, (*cur).content);
-                        // 			xmlGenericError(xmlGenericErrorContext, "\n");
-                        // #endif
                         if xml_xptr_match_string(string, cur, pos + 1, end, endindex) != 0 {
                             *start = cur;
                             *startindex = pos + 1;
@@ -1682,13 +1482,6 @@ unsafe extern "C" fn xml_xptr_search_string(
                      * character of the string-value and after the final
                      * character.
                      */
-                    // #ifdef DEBUG_RANGES
-                    // 		    xmlGenericError(xmlGenericErrorContext,
-                    // 			    "found '' at index %d of ->",
-                    // 			    pos + 1);
-                    // 		    xmlDebugDumpString(stdout, (*cur).content);
-                    // 		    xmlGenericError(xmlGenericErrorContext, "\n");
-                    // #endif
                     *start = cur;
                     *startindex = pos + 1;
                     *end = cur;
@@ -1709,42 +1502,37 @@ unsafe extern "C" fn xml_xptr_search_string(
     0
 }
 
-/**
- * xmlXPtrStringRangeFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing the string-range() function
- * range as described in 5.4.2
- *
- * ------------------------------
- * [Definition: For each location in the location-set argument,
- * string-range returns a set of string ranges, a set of substrings in a
- * string. Specifically, the string-value of the location is searched for
- * substrings that match the string argument, and the resulting location-set
- * will contain a range location for each non-overlapping match.]
- * An empty string is considered to match before each character of the
- * string-value and after the final character. Whitespace in a string
- * is matched literally, with no normalization except that provided by
- * XML for line ends. The third argument gives the position of the first
- * character to be in the resulting range, relative to the start of the
- * match. The default value is 1, which makes the range start immediately
- * before the first character of the matched string. The fourth argument
- * gives the number of characters in the range; the default is that the
- * range extends to the end of the matched string.
- *
- * Element boundaries, as well as entire embedded nodes such as processing
- * instructions and comments, are ignored as defined in [XPath].
- *
- * If the string in the second argument is not found in the string-value
- * of the location, or if a value in the third or fourth argument indicates
- * a string that is beyond the beginning or end of the document, the
- * expression fails.
- *
- * The points of the range-locations in the returned location-set will
- * all be character points.
- * ------------------------------
- */
+/// Function implementing the string-range() function
+/// range as described in 5.4.2
+///
+/// ------------------------------
+/// [Definition: For each location in the location-set argument,
+/// string-range returns a set of string ranges, a set of substrings in a
+/// string. Specifically, the string-value of the location is searched for
+/// substrings that match the string argument, and the resulting location-set
+/// will contain a range location for each non-overlapping match.]
+/// An empty string is considered to match before each character of the
+/// string-value and after the final character. Whitespace in a string
+/// is matched literally, with no normalization except that provided by
+/// XML for line ends. The third argument gives the position of the first
+/// character to be in the resulting range, relative to the start of the
+/// match. The default value is 1, which makes the range start immediately
+/// before the first character of the matched string. The fourth argument
+/// gives the number of characters in the range; the default is that the
+/// range extends to the end of the matched string.
+///
+/// Element boundaries, as well as entire embedded nodes such as processing
+/// instructions and comments, are ignored as defined in [XPath].
+///
+/// If the string in the second argument is not found in the string-value
+/// of the location, or if a value in the third or fourth argument indicates
+/// a string that is beyond the beginning or end of the document, the
+/// expression fails.
+///
+/// The points of the range-locations in the returned location-set will
+/// all be character points.
+/// ------------------------------
+#[doc(alias = "xmlXPtrStringRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut startindex: i32 = 0;
@@ -1859,16 +1647,6 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
             xml_xptr_advance_char(addr_of_mut!(start), addr_of_mut!(startindex), 0);
             xml_xptr_get_last_char(addr_of_mut!(end), addr_of_mut!(endindex));
 
-            // #ifdef DEBUG_RANGES
-            // 	xmlGenericError(xmlGenericErrorContext,
-            // 		"from index %d of ->", startindex);
-            // 	xmlDebugDumpString(stdout, (*start).content);
-            // 	xmlGenericError(xmlGenericErrorContext, "\n");
-            // 	xmlGenericError(xmlGenericErrorContext,
-            // 		"to index %d of ->", endindex);
-            // 	xmlDebugDumpString(stdout, (*end).content);
-            // 	xmlGenericError(xmlGenericErrorContext, "\n");
-            // #endif
             while {
                 fend = end;
                 fendindex = endindex;
@@ -1945,15 +1723,10 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
     }
 }
 
-/**
- * xmlXPtrNewPoint:
- * @node:  the xmlNodePtr
- * @indx:  the indx within the node
- *
- * Create a new xmlXPathObjectPtr of type point
- *
- * Returns the newly created object.
- */
+/// Create a new xmlXPathObjectPtr of type point
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPtrNewPoint")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPathObjectPtr {
     if node.is_null() {
@@ -1975,29 +1748,23 @@ unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPath
     ret
 }
 
-/**
- * xmlXPtrStartPointFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing start-point() operation
- * as described in 5.4.3
- * ----------------
- * location-set start-point(location-set)
- *
- * For each location x in the argument location-set, start-point adds a
- * location of type point to the result location-set. That point represents
- * the start point of location x and is determined by the following rules:
- *
- * - If x is of type point, the start point is x.
- * - If x is of type range, the start point is the start point of x.
- * - If x is of type root, element, text, comment, or processing instruction,
- * - the container node of the start point is x and the index is 0.
- * - If x is of type attribute or namespace, the function must signal a
- *   syntax error.
- * ----------------
- *
- */
+/// Function implementing start-point() operation
+/// as described in 5.4.3
+/// ----------------
+/// location-set start-point(location-set)
+///
+/// For each location x in the argument location-set, start-point adds a
+/// location of type point to the result location-set. That point represents
+/// the start point of location x and is determined by the following rules:
+///
+/// - If x is of type point, the start point is x.
+/// - If x is of type range, the start point is the start point of x.
+/// - If x is of type root, element, text, comment, or processing instruction,
+/// - the container node of the start point is x and the index is 0.
+/// - If x is of type attribute or namespace, the function must signal a
+///   syntax error.
+/// ----------------
+#[doc(alias = "xmlXPtrStartPointFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tmp: XmlXPathObjectPtr;
@@ -2075,15 +1842,11 @@ unsafe extern "C" fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPt
     value_push(ctxt, xml_xptr_wrap_location_set(newset));
 }
 
-/**
- * xmlXPtrNbLocChildren:
- * @node:  an xmlNodePtr
- *
- * Count the number of location children of @node or the length of the
- * string value in case of text/PI/Comments nodes
- *
- * Returns the number of location children
- */
+/// Count the number of location children of @node or the length of the
+/// string value in case of text/PI/Comments nodes
+///
+/// Returns the number of location children
+#[doc(alias = "xmlXPtrNbLocChildren")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
@@ -2113,31 +1876,26 @@ unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> i32 {
     ret
 }
 
-/**
- * xmlXPtrEndPointFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing end-point() operation
- * as described in 5.4.3
- * ----------------------------
- * location-set end-point(location-set)
- *
- * For each location x in the argument location-set, end-point adds a
- * location of type point to the result location-set. That point represents
- * the end point of location x and is determined by the following rules:
- *
- * - If x is of type point, the resulting point is x.
- * - If x is of type range, the resulting point is the end point of x.
- * - If x is of type root or element, the container node of the resulting
- *   point is x and the index is the number of location children of x.
- * - If x is of type text, comment, or processing instruction, the container
- *   node of the resulting point is x and the index is the length of the
- *   string-value of x.
- * - If x is of type attribute or namespace, the function must signal a
- *   syntax error.
- * ----------------------------
- */
+/// Function implementing end-point() operation
+/// as described in 5.4.3
+/// ----------------------------
+/// location-set end-point(location-set)
+///
+/// For each location x in the argument location-set, end-point adds a
+/// location of type point to the result location-set. That point represents
+/// the end point of location x and is determined by the following rules:
+///
+/// - If x is of type point, the resulting point is x.
+/// - If x is of type range, the resulting point is the end point of x.
+/// - If x is of type root or element, the container node of the resulting
+///   point is x and the index is the number of location children of x.
+/// - If x is of type text, comment, or processing instruction, the container
+///   node of the resulting point is x and the index is the length of the
+///   string-value of x.
+/// - If x is of type attribute or namespace, the function must signal a
+///   syntax error.
+/// ----------------------------
+#[doc(alias = "xmlXPtrEndPointFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tmp: XmlXPathObjectPtr;
@@ -2217,14 +1975,8 @@ unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr,
     value_push(ctxt, xml_xptr_wrap_location_set(newset));
 }
 
-/**
- * xmlXPtrHereFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing here() operation
- * as described in 5.4.3
- */
+/// Function implementing here() operation as described in 5.4.3
+#[doc(alias = "xmlXPtrHereFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
@@ -2239,14 +1991,9 @@ unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, narg
     );
 }
 
-/**
- * xmlXPtrOriginFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Function implementing origin() operation
- * as described in 5.4.3
- */
+/// Function implementing origin() operation
+/// as described in 5.4.3
+#[doc(alias = "xmlXPtrOriginFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
@@ -2358,13 +2105,8 @@ macro_rules! NEXT {
     };
 }
 
-/**
- * xmlXPtrErr:
- * @ctxt:  an XPTR evaluation context
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlXPtrErr")]
 unsafe extern "C" fn xml_xptr_err(
     ctxt: XmlXPathParserContextPtr,
     error: XmlParserErrors,
@@ -2449,14 +2191,8 @@ unsafe extern "C" fn xml_xptr_err(
     }
 }
 
-/*
- * xmlXPtrGetChildNo:
- * @ctxt:  the XPointer Parser context
- * @index:  the child number
- *
- * Move the current node of the nodeset on the stack to the
- * given child if found
- */
+/// Move the current node of the nodeset on the stack to the given child if found
+#[doc(alias = "xmlXPtrGetChildNo")]
 unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathNodeset);
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
@@ -2476,17 +2212,11 @@ unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx:
     value_push(ctxt, obj);
 }
 
-/**
- * xmlXPtrEvalChildSeq:
- * @ctxt:  the XPointer Parser context
- * @name:  a possible ID name of the child sequence
- *
- *  ChildSeq ::= '/1' ('/' [0-9]*)*
- *             | Name ('/' [0-9]*)+
- *
- * Parse and evaluate a Child Sequence. This routine also handle the
- * case of a Bare Name used to get a document ID.
- */
+/// `ChildSeq ::= '/1' ('/' [0-9]*)* | Name ('/' [0-9]*)+`
+///
+/// Parse and evaluate a Child Sequence. This routine also handle the
+/// case of a Bare Name used to get a document ID.
+#[doc(alias = "xmlXPtrEvalChildSeq")]
 unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: *mut XmlChar) {
     /*
      * XPointer don't allow by syntax to address in multirooted trees
@@ -2534,39 +2264,36 @@ unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, nam
     }
 }
 
-/**
- * xmlXPtrEvalXPtrPart:
- * @ctxt:  the XPointer Parser context
- * @name:  the preparsed Scheme for the XPtrPart
- *
- * XPtrPart ::= 'xpointer' '(' XPtrExpr ')'
- *            | Scheme '(' SchemeSpecificExpr ')'
- *
- * Scheme   ::=  NCName - 'xpointer' [VC: Non-XPointer schemes]
- *
- * SchemeSpecificExpr ::= StringWithBalancedParens
- *
- * StringWithBalancedParens ::=
- *              [^()]* ('(' StringWithBalancedParens ')' [^()]*)*
- *              [VC: Parenthesis escaping]
- *
- * XPtrExpr ::= Expr [VC: Parenthesis escaping]
- *
- * VC: Parenthesis escaping:
- *   The end of an XPointer part is signaled by the right parenthesis ")"
- *   character that is balanced with the left parenthesis "(" character
- *   that began the part. Any unbalanced parenthesis character inside the
- *   expression, even within literals, must be escaped with a circumflex (^)
- *   character preceding it. If the expression contains any literal
- *   occurrences of the circumflex, each must be escaped with an additional
- *   circumflex (that is, ^^). If the unescaped parentheses in the expression
- *   are not balanced, a syntax error results.
- *
- * Parse and evaluate an XPtrPart. Basically it generates the unescaped
- * string and if the scheme is 'xpointer' it will call the XPath interpreter.
- *
- * TODO: there is no new scheme registration mechanism
- */
+/// ```ignore
+/// XPtrPart ::= 'xpointer' '(' XPtrExpr ')'
+///            | Scheme '(' SchemeSpecificExpr ')'
+///
+/// Scheme   ::=  NCName - 'xpointer' [VC: Non-XPointer schemes]
+///
+/// SchemeSpecificExpr ::= StringWithBalancedParens
+///
+/// StringWithBalancedParens ::=
+///              [^()]* ('(' StringWithBalancedParens ')' [^()]*)*
+///              [VC: Parenthesis escaping]
+///
+/// XPtrExpr ::= Expr [VC: Parenthesis escaping]
+/// ```
+///
+/// VC: Parenthesis escaping:
+///   The end of an XPointer part is signaled by the right parenthesis ")"
+///   character that is balanced with the left parenthesis "(" character
+///   that began the part. Any unbalanced parenthesis character inside the
+///   expression, even within literals, must be escaped with a circumflex (^)
+///   character preceding it. If the expression contains any literal
+///   occurrences of the circumflex, each must be escaped with an additional
+///   circumflex (that is, ^^). If the unescaped parentheses in the expression
+///   are not balanced, a syntax error results.
+///
+/// Parse and evaluate an XPtrPart. Basically it generates the unescaped
+/// string and if the scheme is 'xpointer' it will call the XPath interpreter.
+///
+/// TODO: there is no new scheme registration mechanism
+#[doc(alias = "xmlXPtrEvalXPtrPart")]
 unsafe extern "C" fn xml_xptr_eval_xptr_part(
     ctxt: XmlXPathParserContextPtr,
     mut name: *mut XmlChar,
@@ -2714,33 +2441,28 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
     xml_free(name as _);
 }
 
-/**
- * xmlXPtrEvalFullXPtr:
- * @ctxt:  the XPointer Parser context
- * @name:  the preparsed Scheme for the first XPtrPart
- *
- * FullXPtr ::= XPtrPart (S? XPtrPart)*
- *
- * As the specs says:
- * -----------
- * When multiple XPtrParts are provided, they must be evaluated in
- * left-to-right order. If evaluation of one part fails, the nexti
- * is evaluated. The following conditions cause XPointer part failure:
- *
- * - An unknown scheme
- * - A scheme that does not locate any sub-resource present in the resource
- * - A scheme that is not applicable to the media type of the resource
- *
- * The XPointer application must consume a failed XPointer part and
- * attempt to evaluate the next one, if any. The result of the first
- * XPointer part whose evaluation succeeds is taken to be the fragment
- * located by the XPointer as a whole. If all the parts fail, the result
- * for the XPointer as a whole is a sub-resource error.
- * -----------
- *
- * Parse and evaluate a Full XPtr i.e. possibly a cascade of XPath based
- * expressions or other schemes.
- */
+/// `FullXPtr ::= XPtrPart (S? XPtrPart)*`
+///
+/// As the specs says:
+/// -----------
+/// When multiple XPtrParts are provided, they must be evaluated in
+/// left-to-right order. If evaluation of one part fails, the nexti
+/// is evaluated. The following conditions cause XPointer part failure:
+///
+/// - An unknown scheme
+/// - A scheme that does not locate any sub-resource present in the resource
+/// - A scheme that is not applicable to the media type of the resource
+///
+/// The XPointer application must consume a failed XPointer part and
+/// attempt to evaluate the next one, if any. The result of the first
+/// XPointer part whose evaluation succeeds is taken to be the fragment
+/// located by the XPointer as a whole. If all the parts fail, the result
+/// for the XPointer as a whole is a sub-resource error.
+/// -----------
+///
+/// Parse and evaluate a Full XPtr i.e. possibly a cascade of XPath based
+/// expressions or other schemes.
+#[doc(alias = "xmlXPtrEvalFullXPtr")]
 unsafe extern "C" fn xml_xptr_eval_full_xptr(
     ctxt: XmlXPathParserContextPtr,
     mut name: *mut XmlChar,
@@ -2808,16 +2530,10 @@ unsafe extern "C" fn xml_xptr_eval_full_xptr(
     }
 }
 
-/**
- * xmlXPtrEvalXPointer:
- * @ctxt:  the XPointer Parser context
- *
- *  XPointer ::= Name
- *             | ChildSeq
- *             | FullXPtr
- *
- * Parse and evaluate an XPointer
- */
+/// `XPointer ::= Name | ChildSeq | FullXPtr`
+///
+/// Parse and evaluate an XPointer
+#[doc(alias = "xmlXPtrEvalXPointer")]
 unsafe extern "C" fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
     if (*ctxt).value_tab.is_null() {
         /* Allocate the value stack */
@@ -2943,16 +2659,11 @@ pub unsafe extern "C" fn xml_xptr_eval(
     res
 }
 
-/**
- * xmlXPtrRangeToFunction:
- * @ctxt:  the XPointer Parser context
- * @nargs:  the number of args
- *
- * Implement the range-to() XPointer function
- *
- * Obsolete. range-to is not a real function but a special type of location
- * step which is handled in xpath.c.
- */
+/// Implement the range-to() XPointer function
+///
+/// Obsolete. range-to is not a real function but a special type of location
+/// step which is handled in xpath.c.
+#[doc(alias = "xmlXPtrRangeToFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_range_to_function(
     ctxt: XmlXPathParserContextPtr,
@@ -2961,15 +2672,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_range_to_function(
     XP_ERROR!(ctxt, XmlXPathError::XpathExprError as i32);
 }
 
-/**
- * xmlXPtrBuildRangeNodeList:
- * @range:  a range object
- *
- * Build a node list tree copy of the range
- *
- * Returns an xmlNodePtr list or NULL.
- *         the caller has to free the node tree.
- */
+/// Build a node list tree copy of the range
+///
+/// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
+#[doc(alias = "xmlXPtrBuildRangeNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> XmlNodePtr {
     /* pointers to generated nodes */
@@ -3143,16 +2849,11 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
     list
 }
 
-/**
- * xmlXPtrBuildNodeList:
- * @obj:  the XPointer result from the evaluation.
- *
- * Build a node list tree copy of the XPointer result.
- * This will drop Attributes and Namespace declarations.
- *
- * Returns an xmlNodePtr list or NULL.
- *         the caller has to free the node tree.
- */
+/// Build a node list tree copy of the XPointer result.
+/// This will drop Attributes and Namespace declarations.
+///
+/// Returns an xmlNodePtr list or NULL. The caller has to free the node tree.
+#[doc(alias = "xmlXPtrBuildNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> XmlNodePtr {
     let mut list: XmlNodePtr = null_mut();
@@ -3234,16 +2935,14 @@ pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr)
     list
 }
 
-/**
- * xmlXPtrEvalRangePredicate:
- * @ctxt:  the XPointer Parser context
- *
- *  [8]   Predicate ::=   '[' PredicateExpr ']'
- *  [9]   PredicateExpr ::=   Expr
- *
- * Evaluate a predicate as in xmlXPathEvalPredicate() but for
- * a Location Set instead of a node set
- */
+/// ```ignore
+/// [8]   Predicate ::=   '[' PredicateExpr ']'
+/// [9]   PredicateExpr ::=   Expr
+/// ```
+///
+/// Evaluate a predicate as in xmlXPathEvalPredicate() but for
+/// a Location Set instead of a node set
+#[doc(alias = "xmlXPtrEvalRangePredicate")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_eval_range_predicate(ctxt: XmlXPathParserContextPtr) {
     let cur: *const XmlChar;

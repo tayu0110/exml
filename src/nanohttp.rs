@@ -101,12 +101,9 @@ static INITIALIZED: AtomicBool = AtomicBool::new(false);
 static PROXY: Mutex<String> = Mutex::new(String::new()); /* the proxy name if any */
 static PROXY_PORT: AtomicI32 = AtomicI32::new(0); /* the proxy port if any */
 
-/**
- * xmlNanoHTTPInit:
- *
- * Initialize the HTTP protocol layer.
- * Currently it just checks for proxy information
- */
+/// Initialize the HTTP protocol layer.
+/// Currently it just checks for proxy information
+#[doc(alias = "xmlNanoHTTPInit")]
 pub fn xml_nanohttp_init() {
     if INITIALIZED.load(Ordering::Acquire) {
         return;
@@ -138,26 +135,19 @@ pub fn xml_nanohttp_init() {
     INITIALIZED.store(true, Ordering::Release);
 }
 
-/**
- * xmlNanoHTTPCleanup:
- *
- * Cleanup the HTTP protocol layer.
- */
+/// Cleanup the HTTP protocol layer.
+#[doc(alias = "xmlNanoHTTPCleanup")]
 pub fn xml_nanohttp_cleanup() {
     let mut p = PROXY.lock().unwrap();
     p.clear();
     INITIALIZED.store(false, Ordering::Relaxed);
 }
 
-/**
- * xmlNanoHTTPScanProxy:
- * @URL:  The proxy URL used to initialize the proxy context
- *
- * (Re)Initialize the HTTP Proxy context by parsing the URL and finding
- * the protocol host port it indicates.
- * Should be like http://myproxy/ or http://myproxy:3128/
- * A NULL URL cleans up proxy information.
- */
+/// (Re)Initialize the HTTP Proxy context by parsing the URL and finding
+/// the protocol host port it indicates.
+/// Should be like http://myproxy/ or http://myproxy:3128/
+/// A NULL URL cleans up proxy information.
+#[doc(alias = "xmlNanoHTTPScanProxy")]
 pub fn xml_nanohttp_scan_proxy(url: &str) {
     let mut p = PROXY.lock().unwrap();
     p.clear();
@@ -184,15 +174,11 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
     }
 }
 
-/**
- * xmlNanoHTTPRecv:
- * @ctxt:  an HTTP context
- *
- * Read information coming from the HTTP connection.
- * This is a blocking call (but it blocks in select(), not read()).
- *
- * Returns the number of byte read or -1 in case of error.
- */
+/// Read information coming from the HTTP connection.
+/// This is a blocking call (but it blocks in select(), not read()).
+///
+/// Returns the number of byte read or -1 in case of error.
+#[doc(alias = "xmlNanoHTTPRecv")]
 fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> io::Result<usize> {
     let Some(stream) = ctxt.socket.as_mut() else {
         return Err(io::Error::new(ErrorKind::Other, "Socket is invalid."));
@@ -252,18 +238,11 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> io::Result<usize> {
     Ok(0)
 }
 
-/**
- * xmlNanoHTTPFetchContent:
- * @ctx:  the HTTP context
- * @ptr:  pointer to set to the content buffer.
- * @len:  integer pointer to hold the length of the content
- *
- * Check if all the content was read
- *
- * Returns 0 if all the content was read and available, returns
- * -1 if received content length was less than specified or an error
- * occurred.
- */
+/// Check if all the content was read
+///
+/// Returns 0 if all the content was read and available, returns
+/// -1 if received content length was less than specified or an error occurred.
+#[doc(alias = "xmlNanoHTTPFetchContent")]
 fn xml_nanohttp_fetch_content(ctxt: &mut XmlNanoHTTPCtxt, ptr: &mut usize, len: &mut usize) -> i32 {
     let mut rcvd_lgth = ctxt.inptr - ctxt.content;
 
@@ -284,19 +263,12 @@ fn xml_nanohttp_fetch_content(ctxt: &mut XmlNanoHTTPCtxt, ptr: &mut usize, len: 
     }
 }
 
-/**
- * xmlNanoHTTPFetch:
- * @URL:  The URL to load
- * @filename:  the filename where the content should be saved
- * @contentType:  if available the Content-Type information will be
- *                returned at that location
- *
- * This function try to fetch the indicated resource via HTTP GET
- * and save it's content in the file.
- *
- * Returns -1 in case of failure, 0 in case of success. The contentType,
- *     if provided must be freed by the caller
- */
+/// This function try to fetch the indicated resource via HTTP GET
+/// and save it's content in the file.
+///
+/// Returns -1 in case of failure, 0 in case of success. The contentType,
+/// if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPFetch")]
 pub fn xml_nanohttp_fetch(
     url: &str,
     filename: &str,
@@ -327,22 +299,13 @@ pub fn xml_nanohttp_fetch(
     Ok(())
 }
 
-/**
- * xmlNanoHTTPMethod:
- * @URL:  The URL to load
- * @method:  the HTTP method to use
- * @input:  the input string if any
- * @contentType:  the Content-Type information IN and OUT
- * @headers:  the extra headers
- * @ilen:  input length
- *
- * This function try to open a connection to the indicated resource
- * via HTTP using the given @method, adding the given extra headers
- * and the input buffer for the request content.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource
+/// via HTTP using the given @method, adding the given extra headers
+/// and the input buffer for the request content.
+///
+/// Returns NULL in case of failure, otherwise a request handler.
+/// The contentType, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPMethod")]
 pub fn xml_nanohttp_method(
     url: &str,
     method: Option<&str>,
@@ -353,14 +316,9 @@ pub fn xml_nanohttp_method(
     xml_nanohttp_method_redir(url, method, input, content_type, &mut None, headers)
 }
 
-/**
- * xmlNanoHTTPScanURL:
- * @ctxt:  an HTTP context
- * @URL:  The URL used to initialize the context
- *
- * (Re)Initialize an HTTP context by parsing the URL and finding
- * the protocol host port and path it indicates.
- */
+/// (Re)Initialize an HTTP context by parsing the URL and finding
+/// the protocol host port and path it indicates.
+#[doc(alias = "xmlNanoHTTPScanURL")]
 fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
     /*
      * Clear any existing data from the context
@@ -390,14 +348,10 @@ fn xml_nanohttp_scan_url(ctxt: &mut XmlNanoHTTPCtxt, url: &str) {
     }
 }
 
-/**
- * xmlNanoHTTPNewCtxt:
- * @URL:  The URL used to initialize the context
- *
- * Allocate and initialize a new HTTP context.
- *
- * Returns an HTTP context or NULL in case of error.
- */
+/// Allocate and initialize a new HTTP context.
+///
+/// Returns an HTTP context or NULL in case of error.
+#[doc(alias = "xmlNanoHTTPNewCtxt")]
 fn xml_nanohttp_new_ctxt(url: &str) -> XmlNanoHTTPCtxt {
     let mut ret = XmlNanoHTTPCtxt {
         protocol: None,
@@ -433,17 +387,12 @@ fn xml_nanohttp_new_ctxt(url: &str) -> XmlNanoHTTPCtxt {
     ret
 }
 
-/**
- * xmlNanoHTTPHostnameMatch:
- * @pattern: The pattern as it appears in no_proxy environment variable
- * @hostname: The hostname to test as it appears in the URL
- *
- * This function tests whether a given hostname matches a pattern. The pattern
- * usually is a token from the no_proxy environment variable. Wildcards in the
- * pattern are not supported.
- *
- * Returns true, iff hostname matches the pattern.
- */
+/// This function tests whether a given hostname matches a pattern. The pattern
+/// usually is a token from the no_proxy environment variable. Wildcards in the
+/// pattern are not supported.
+///
+/// Returns true, iff hostname matches the pattern.
+#[doc(alias = "xmlNanoHTTPHostnameMatch")]
 fn xml_nanohttp_hostname_match(pattern: &str, hostname: &str) -> bool {
     if pattern.is_empty() {
         return false;
@@ -467,15 +416,11 @@ fn xml_nanohttp_hostname_match(pattern: &str, hostname: &str) -> bool {
     pc.next().is_none() && matches!(hc.next(), None | Some('.'))
 }
 
-/**
- * xmlNanoHTTPBypassProxy:
- * @hostname: The hostname as it appears in the URL
- *
- * This function evaluates the no_proxy environment variable and returns
- * whether the proxy server should be bypassed for a given host.
- *
- * Returns true, iff a proxy server should be bypassed for the given hostname.
- */
+/// This function evaluates the no_proxy environment variable and returns
+/// whether the proxy server should be bypassed for a given host.
+///
+/// Returns true, iff a proxy server should be bypassed for the given hostname.
+#[doc(alias = "xmlNanoHTTPBypassProxy")]
 fn xml_nanohttp_bypass_proxy(hostname: &str) -> bool {
     if let Ok(env) = std::env::var("no_proxy") {
         return env
@@ -486,16 +431,11 @@ fn xml_nanohttp_bypass_proxy(hostname: &str) -> bool {
     false
 }
 
-/**
- * xmlNanoHTTPConnectHost:
- * @host:  the host name
- * @port:  the port number
- *
- * Attempt a connection to the given host:port endpoint. It tries
- * the multiple IP provided by the DNS if available.
- *
- * Returns -1 in case of failure, the file descriptor number otherwise
- */
+/// Attempt a connection to the given host:port endpoint. It tries
+/// the multiple IP provided by the DNS if available.
+///
+/// Returns -1 in case of failure, the file descriptor number otherwise
+#[doc(alias = "xmlNanoHTTPConnectHost")]
 fn xml_nanohttp_connect_host(host: &str, port: i32) -> io::Result<TcpStream> {
     let host = format!("{host}:{port}");
     for addr in host.to_socket_addrs()? {
@@ -510,13 +450,9 @@ fn xml_nanohttp_connect_host(host: &str, port: i32) -> io::Result<TcpStream> {
     ))
 }
 
-/**
- * xmlNanoHTTPSend:
- * @ctxt:  an HTTP context
- *
- * Send the input needed to initiate the processing on the server side
- * Returns number of bytes sent or -1 on error.
- */
+/// Send the input needed to initiate the processing on the server side
+/// Returns number of bytes sent or -1 on error.
+#[doc(alias = "xmlNanoHTTPSend")]
 fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
     let mut total_sent = 0;
 
@@ -563,16 +499,12 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
     total_sent
 }
 
-/**
- * xmlNanoHTTPReadLine:
- * @ctxt:  an HTTP context
- *
- * Read one line in the HTTP server output, usually for extracting
- * the HTTP protocol information from the answer header.
- *
- * Returns a newly allocated string with a copy of the line, or NULL
- *         which indicate the end of the input.
- */
+/// Read one line in the HTTP server output, usually for extracting
+/// the HTTP protocol information from the answer header.
+///
+/// Returns a newly allocated string with a copy of the line, or NULL
+/// which indicate the end of the input.
+#[doc(alias = "xmlNanoHTTPReadLine")]
 fn xml_nanohttp_read_line(ctxt: &mut XmlNanoHTTPCtxt) -> Option<Vec<u8>> {
     let mut buf: [u8; 4096] = [0; 4096];
     let mut bp = 0;
@@ -602,19 +534,14 @@ fn xml_nanohttp_read_line(ctxt: &mut XmlNanoHTTPCtxt) -> Option<Vec<u8>> {
     Some(buf.to_vec())
 }
 
-/**
- * xmlNanoHTTPScanAnswer:
- * @ctxt:  an HTTP context
- * @line:  an HTTP header line
- *
- * Try to extract useful information from the server answer.
- * We currently parse and process:
- *  - The HTTP revision/ return code
- *  - The Content-Type, Mime-Type and charset used
- *  - The Location for redirect processing.
- *
- * Returns -1 in case of failure, the file descriptor number otherwise
- */
+/// Try to extract useful information from the server answer.
+/// We currently parse and process:
+///  - The HTTP revision/ return code
+///  - The Content-Type, Mime-Type and charset used
+///  - The Location for redirect processing.
+///
+/// Returns -1 in case of failure, the file descriptor number otherwise
+#[doc(alias = "xmlNanoHTTPScanAnswer")]
 fn xml_nanohttp_scan_answer(ctxt: &mut XmlNanoHTTPCtxt, line: &str) {
     if let Some(line) = line.strip_prefix("HTTP/") {
         let mut version = 0;
@@ -704,23 +631,13 @@ fn xml_nanohttp_scan_answer(ctxt: &mut XmlNanoHTTPCtxt, line: &str) {
     }
 }
 
-/**
- * xmlNanoHTTPMethodRedir:
- * @URL:  The URL to load
- * @method:  the HTTP method to use
- * @input:  the input string if any
- * @contentType:  the Content-Type information IN and OUT
- * @redir:  the redirected URL OUT
- * @headers:  the extra headers
- * @ilen:  input length
- *
- * This function try to open a connection to the indicated resource
- * via HTTP using the given @method, adding the given extra headers
- * and the input buffer for the request content.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, or redir, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource
+/// via HTTP using the given @method, adding the given extra headers
+/// and the input buffer for the request content.
+///
+/// Returns NULL in case of failure, otherwise a request handler.
+///     The contentType, or redir, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPMethodRedir")]
 pub fn xml_nanohttp_method_redir(
     url: &str,
     method: Option<&str>,
@@ -892,19 +809,11 @@ pub fn xml_nanohttp_method_redir(
     Ok(ctxt)
 }
 
-/**
- * xmlNanoHTTPOpenRedir:
- * @URL:  The URL to load
- * @contentType:  if available the Content-Type information will be
- *                returned at that location
- * @redir: if available the redirected URL will be returned
- *
- * This function try to open a connection to the indicated resource
- * via HTTP GET.
- *
- * Returns NULL in case of failure, otherwise a request handler.
- *     The contentType, if provided must be freed by the caller
- */
+/// This function try to open a connection to the indicated resource via HTTP GET.
+///
+/// Returns NULL in case of failure, otherwise a request handler.
+/// The contentType, if provided must be freed by the caller
+#[doc(alias = "xmlNanoHTTPOpenRedir")]
 pub fn xml_nanohttp_open_redir(
     url: &str,
     content_type: &mut Option<Cow<'static, str>>,
@@ -913,45 +822,30 @@ pub fn xml_nanohttp_open_redir(
     xml_nanohttp_method_redir(url, None, None, content_type, redir, None)
 }
 
-/**
- * xmlNanoHTTPAuthHeader:
- * @ctx:  the HTTP context
- *
- * Get the authentication header of an HTTP context
- *
- * Returns the stashed value of the WWW-Authenticate or Proxy-Authenticate
- * header.
- */
+/// Get the authentication header of an HTTP context
+///
+/// Returns the stashed value of the WWW-Authenticate or Proxy-Authenticate header.
+#[doc(alias = "xmlNanoHTTPAuthHeader")]
 pub fn xml_nanohttp_auth_header(ctxt: &mut XmlNanoHTTPCtxt) -> Option<String> {
     ctxt.auth_header.as_deref().map(|s| s.to_owned())
 }
 
-/**
- * xmlNanoHTTPContentLength:
- * @ctx:  the HTTP context
- *
- * Provides the specified content length from the HTTP header.
- *
- * Return the specified content length from the HTTP header.  Note that
- * a value of -1 indicates that the content length element was not included in
- * the response header.
- */
+/// Provides the specified content length from the HTTP header.
+///
+/// Return the specified content length from the HTTP header.  Note that
+/// a value of -1 indicates that the content length element was not included in
+/// the response header.
+#[doc(alias = "xmlNanoHTTPContentLength")]
 pub fn xml_nanohttp_content_length(ctxt: &mut XmlNanoHTTPCtxt) -> i32 {
     ctxt.content_length
 }
 
-/**
- * xmlNanoHTTPRead:
- * @ctx:  the HTTP context
- * @dest:  a buffer
- * @len:  the buffer length
- *
- * This function tries to read @len bytes from the existing HTTP connection
- * and saves them in @dest. This is a blocking call.
- *
- * Returns the number of byte read. 0 is an indication of an end of connection.
- *         -1 indicates a parameter error.
- */
+/// This function tries to read @len bytes from the existing HTTP connection
+/// and saves them in @dest. This is a blocking call.
+///
+/// Returns the number of byte read. 0 is an indication of an end of connection.
+/// -1 indicates a parameter error.
+#[doc(alias = "xmlNanoHTTPRead")]
 pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
     if dest.is_empty() {
         return 0;
@@ -975,16 +869,11 @@ pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
     len
 }
 
-/**
- * xmlNanoHTTPSave:
- * @ctxt:  the HTTP context
- * @filename:  the filename where the content should be saved
- *
- * This function saves the output of the HTTP transaction to a file
- * It closes and free the context at the end
- *
- * Returns -1 in case of failure, 0 in case of success.
- */
+/// This function saves the output of the HTTP transaction to a file
+/// It closes and free the context at the end
+///
+/// Returns -1 in case of failure, 0 in case of success.
+#[doc(alias = "xmlNanoHTTPSave")]
 #[cfg(feature = "output")]
 pub fn xml_nanohttp_save(ctxt: &mut XmlNanoHTTPCtxt, filename: &str) -> i32 {
     use std::{fs::Permissions, os::unix::fs::PermissionsExt};

@@ -71,28 +71,20 @@ use super::{
     xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
 };
 
-/**
- * xmlSAX2GetPublicId:
- * @ctx: the user data (XML parser context)
- *
- * Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
- *
- * Returns a xmlChar *
- */
+/// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
+///
+/// Returns a xmlChar *
+#[doc(alias = "xmlSAX2GetPublicId")]
 pub unsafe extern "C" fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
     null()
 }
 
-/**
- * xmlSAX2GetSystemId:
- * @ctx: the user data (XML parser context)
- *
- * Provides the system ID, basically URL or filename e.g.
- * http://www.sgmlsource.com/dtds/memo.dtd
- *
- * Returns a xmlChar *
- */
+/// Provides the system ID, basically URL or filename e.g.
+/// http://www.sgmlsource.com/dtds/memo.dtd
+///
+/// Returns a xmlChar *
+#[doc(alias = "xmlSAX2GetSystemId")]
 pub unsafe fn xml_sax2_get_system_id(ctx: *mut c_void) -> Option<String> {
     let ctxt: XmlParserCtxtPtr = ctx as _;
     if ctx.is_null() || (*ctxt).input.is_null() {
@@ -101,14 +93,9 @@ pub unsafe fn xml_sax2_get_system_id(ctx: *mut c_void) -> Option<String> {
     (*(*ctxt).input).filename.clone()
 }
 
-/**
- * xmlSAX2SetDocumentLocator:
- * @ctx: the user data (XML parser context)
- * @loc: A SAX Locator
- *
- * Receive the document locator at startup, actually xmlDefaultSAXLocator
- * Everything is available on the context, so this is useless in our case.
- */
+/// Receive the document locator at startup, actually xmlDefaultSAXLocator
+/// Everything is available on the context, so this is useless in our case.
+#[doc(alias = "xmlSAX2SetDocumentLocator")]
 pub unsafe fn xml_sax2_set_document_locator(
     _ctx: Option<GenericErrorContext>,
     _loc: XmlSAXLocatorPtr,
@@ -116,14 +103,10 @@ pub unsafe fn xml_sax2_set_document_locator(
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
 }
 
-/**
- * xmlSAX2GetLineNumber:
- * @ctx: the user data (XML parser context)
- *
- * Provide the line number of the current parsing point.
- *
- * Returns an int
- */
+/// Provide the line number of the current parsing point.
+///
+/// Returns an int
+#[doc(alias = "xmlSAX2GetLineNumber")]
 pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
@@ -132,14 +115,10 @@ pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
     (*(*ctxt).input).line
 }
 
-/**
- * xmlSAX2GetColumnNumber:
- * @ctx: the user data (XML parser context)
- *
- * Provide the column number of the current parsing point.
- *
- * Returns an int
- */
+/// Provide the column number of the current parsing point.
+///
+/// Returns an int
+#[doc(alias = "xmlSAX2GetColumnNumber")]
 pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
@@ -148,14 +127,10 @@ pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
     (*(*ctxt).input).col
 }
 
-/**
- * xmlSAX2IsStandalone:
- * @ctx: the user data (XML parser context)
- *
- * Is this document tagged standalone ?
- *
- * Returns 1 if true
- */
+/// Is this document tagged standalone ?
+///
+/// Returns 1 if true
+#[doc(alias = "xmlSAX2IsStandalone")]
 pub unsafe fn xml_sax2_is_standalone(ctx: Option<GenericErrorContext>) -> i32 {
     if ctx.is_none() {
         return 0;
@@ -171,14 +146,10 @@ pub unsafe fn xml_sax2_is_standalone(ctx: Option<GenericErrorContext>) -> i32 {
     ((*(*ctxt).my_doc).standalone == 1) as i32
 }
 
-/**
- * xmlSAX2HasInternalSubset:
- * @ctx: the user data (XML parser context)
- *
- * Does this document has an internal subset
- *
- * Returns 1 if true
- */
+/// Does this document has an internal subset
+///
+/// Returns 1 if true
+#[doc(alias = "xmlSAX2HasInternalSubset")]
 pub unsafe fn xml_sax2_has_internal_subset(ctx: Option<GenericErrorContext>) -> i32 {
     if ctx.is_none() {
         return 0;
@@ -194,14 +165,10 @@ pub unsafe fn xml_sax2_has_internal_subset(ctx: Option<GenericErrorContext>) -> 
     (!(*(*ctxt).my_doc).int_subset.is_null()) as i32
 }
 
-/**
- * xmlSAX2HasExternalSubset:
- * @ctx: the user data (XML parser context)
- *
- * Does this document has an external subset
- *
- * Returns 1 if true
- */
+/// Does this document has an external subset
+///
+/// Returns 1 if true
+#[doc(alias = "xmlSAX2HasExternalSubset")]
 pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> i32 {
     if ctx.is_none() {
         return 0;
@@ -217,11 +184,7 @@ pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> 
     (!(*(*ctxt).my_doc).ext_subset.is_null()) as i32
 }
 
-/*
- * xmlSAX2ErrMemory:
- * @ctxt:  an XML validation parser context
- * @msg:   a string to accompany the error message
- */
+#[doc(alias = "xmlSAX2ErrMemory")]
 unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_char) {
     let mut schannel: Option<StructuredError> = None;
     let str1: *const c_char = c"out of memory\n".as_ptr() as _;
@@ -278,15 +241,8 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
     }
 }
 
-/**
- * xmlSAX2InternalSubset:
- * @ctx:  the user data (XML parser context)
- * @name:  the root element name
- * @ExternalID:  the external ID
- * @SystemID:  the SYSTEM ID (e.g. filename or URL)
- *
- * Callback on internal subset declaration.
- */
+/// Callback on internal subset declaration.
+#[doc(alias = "xmlSAX2InternalSubset")]
 pub unsafe fn xml_sax2_internal_subset(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -329,15 +285,8 @@ pub unsafe fn xml_sax2_internal_subset(
     }
 }
 
-/**
- * xmlSAX2ExternalSubset:
- * @ctx: the user data (XML parser context)
- * @name:  the root element name
- * @ExternalID:  the external ID
- * @SystemID:  the SYSTEM ID (e.g. filename or URL)
- *
- * Callback on external subset declaration.
- */
+/// Callback on external subset declaration.
+#[doc(alias = "xmlSAX2ExternalSubset")]
 pub unsafe fn xml_sax2_external_subset(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -465,16 +414,8 @@ pub unsafe fn xml_sax2_external_subset(
     }
 }
 
-/**
- * xmlFatalErrMsg:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @msg:  the error message
- * @str1:  an error string
- * @str2:  an error string
- *
- * Handle a fatal parser error, i.e. violating Well-Formedness constraints
- */
+/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[doc(alias = "xmlFatalErrMsg")]
 unsafe extern "C" fn xml_fatal_err_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -526,15 +467,10 @@ unsafe extern "C" fn xml_fatal_err_msg(
     }
 }
 
-/**
- * xmlSAX2GetEntity:
- * @ctx: the user data (XML parser context)
- * @name: The entity name
- *
- * Get an entity by name
- *
- * Returns the xmlEntityPtr if found.
- */
+/// Get an entity by name
+///
+/// Returns the xmlEntityPtr if found.
+#[doc(alias = "xmlSAX2GetEntity")]
 pub unsafe fn xml_sax2_get_entity(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -585,15 +521,10 @@ pub unsafe fn xml_sax2_get_entity(
     ret
 }
 
-/**
- * xmlSAX2GetParameterEntity:
- * @ctx: the user data (XML parser context)
- * @name: The entity name
- *
- * Get a parameter entity by name
- *
- * Returns the xmlEntityPtr if found.
- */
+/// Get a parameter entity by name
+///
+/// Returns the xmlEntityPtr if found.
+#[doc(alias = "xmlSAX2GetParameterEntity")]
 pub unsafe fn xml_sax2_get_parameter_entity(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -610,20 +541,14 @@ pub unsafe fn xml_sax2_get_parameter_entity(
     xml_get_parameter_entity((*ctxt).my_doc, name)
 }
 
-/**
- * xmlSAX2ResolveEntity:
- * @ctx: the user data (XML parser context)
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * The entity loader, to control the loading of external entities,
- * the application can either:
- *    - override this xmlSAX2ResolveEntity() callback in the SAX block
- *    - or better use the xmlSetExternalEntityLoader() function to
- *      set up it's own entity resolution routine
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// The entity loader, to control the loading of external entities,
+/// the application can either:
+///    - override this xmlSAX2ResolveEntity() callback in the SAX block
+///    - or better use the xmlSetExternalEntityLoader() function to
+///      set up it's own entity resolution routine
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "xmlSAX2ResolveEntity")]
 pub unsafe fn xml_sax2_resolve_entity(
     ctx: Option<GenericErrorContext>,
     public_id: *const XmlChar,
@@ -666,16 +591,8 @@ pub unsafe fn xml_sax2_resolve_entity(
     ret
 }
 
-/**
- * xmlWarnMsg:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @msg:  the error message
- * @str1:  an error string
- * @str2:  an error string
- *
- * Handle a parser warning
- */
+/// Handle a parser warning
+#[doc(alias = "xmlWarnMsg")]
 unsafe extern "C" fn xml_warn_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -715,17 +632,8 @@ unsafe extern "C" fn xml_warn_msg(
     );
 }
 
-/**
- * xmlSAX2EntityDecl:
- * @ctx: the user data (XML parser context)
- * @name:  the entity name
- * @type:  the entity type
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @content: the entity value (without processing).
- *
- * An entity definition has been parsed
- */
+/// An entity definition has been parsed
+#[doc(alias = "xmlSAX2EntityDecl")]
 pub unsafe fn xml_sax2_entity_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -823,16 +731,8 @@ pub unsafe fn xml_sax2_entity_decl(
     }
 }
 
-/**
- * xmlValidError:
- * @ctxt:  an XML validation parser context
- * @error:  the error number
- * @msg:  the error message
- * @str1:  extra data
- * @str2:  extra data
- *
- * Handle a validation error
- */
+/// Handle a validation error
+#[doc(alias = "xmlValidError")]
 unsafe extern "C" fn xml_err_valid(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -898,18 +798,8 @@ unsafe extern "C" fn xml_err_valid(
     }
 }
 
-/**
- * xmlSAX2AttributeDecl:
- * @ctx: the user data (XML parser context)
- * @elem:  the name of the element
- * @fullname:  the attribute name
- * @type:  the attribute type
- * @def:  the type of default value
- * @defaultValue: the attribute default value
- * @tree:  the tree of enumerated value set
- *
- * An attribute definition has been parsed
- */
+/// An attribute definition has been parsed
+#[doc(alias = "xmlSAX2AttributeDecl")]
 pub unsafe fn xml_sax2_attribute_decl(
     ctx: Option<GenericErrorContext>,
     elem: *const XmlChar,
@@ -1012,15 +902,8 @@ pub unsafe fn xml_sax2_attribute_decl(
     }
 }
 
-/**
- * xmlSAX2ElementDecl:
- * @ctx: the user data (XML parser context)
- * @name:  the element name
- * @type:  the element type
- * @content: the element value tree
- *
- * An element definition has been parsed
- */
+/// An element definition has been parsed
+#[doc(alias = "xmlSAX2ElementDecl")]
 pub unsafe fn xml_sax2_element_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -1083,15 +966,8 @@ pub unsafe fn xml_sax2_element_decl(
     }
 }
 
-/**
- * xmlSAX2NotationDecl:
- * @ctx: the user data (XML parser context)
- * @name: The name of the notation
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * What to do when a notation declaration has been parsed.
- */
+/// What to do when a notation declaration has been parsed.
+#[doc(alias = "xmlSAX2NotationDecl")]
 pub unsafe fn xml_sax2_notation_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -1162,16 +1038,8 @@ pub unsafe fn xml_sax2_notation_decl(
     }
 }
 
-/**
- * xmlSAX2UnparsedEntityDecl:
- * @ctx: the user data (XML parser context)
- * @name: The name of the entity
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @notationName: the name of the notation
- *
- * What to do when an unparsed entity declaration is parsed
- */
+/// What to do when an unparsed entity declaration is parsed
+#[doc(alias = "xmlSAX2UnparsedEntityDecl")]
 pub unsafe fn xml_sax2_unparsed_entity_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -1288,12 +1156,8 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
     }
 }
 
-/**
- * xmlSAX2StartDocument:
- * @ctx: the user data (XML parser context)
- *
- * called when the document start being processed.
- */
+/// called when the document start being processed.
+#[doc(alias = "xmlSAX2StartDocument")]
 pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
     let doc: XmlDocPtr;
 
@@ -1373,12 +1237,8 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
     }
 }
 
-/**
- * xmlSAX2EndDocument:
- * @ctx: the user data (XML parser context)
- *
- * called when the document end has been detected.
- */
+/// called when the document end has been detected.
+#[doc(alias = "xmlSAX2EndDocument")]
 pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
     if ctx.is_none() {
         return;
@@ -1427,15 +1287,8 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
     }
 }
 
-/**
- * xmlNsWarnMsg:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @msg:  the error message
- * @str1:  an error string
- *
- * Handle a namespace warning
- */
+/// Handle a namespace warning
+#[doc(alias = "xmlNsWarnMsg")]
 unsafe extern "C" fn xml_ns_warn_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -1480,16 +1333,8 @@ unsafe extern "C" fn xml_ns_warn_msg(
     );
 }
 
-/**
- * xmlNsErrMsg:
- * @ctxt:  an XML parser context
- * @error:  the error number
- * @msg:  the error message
- * @str1:  an error string
- * @str2:  an error string
- *
- * Handle a namespace error
- */
+/// Handle a namespace error
+#[doc(alias = "xmlNsErrMsg")]
 #[cfg(any(
     feature = "sax1",
     feature = "html",
@@ -1540,18 +1385,11 @@ unsafe extern "C" fn xml_ns_err_msg(
     );
 }
 
-/**
- * xmlSAX2AttributeInternal:
- * @ctx: the user data (XML parser context)
- * @fullname:  The attribute name, including namespace prefix
- * @value:  The attribute value
- * @prefix: the prefix on the element node
- *
- * Handle an attribute that has been read by the parser.
- * The default handling is to convert the attribute into an
- * DOM subtree and past it in a new xmlAttr element added to
- * the element.
- */
+/// Handle an attribute that has been read by the parser.
+/// The default handling is to convert the attribute into an
+/// DOM subtree and past it in a new xmlAttr element added to
+/// the element.
+#[doc(alias = "xmlSAX2AttributeInternal")]
 #[cfg(any(
     feature = "sax1",
     feature = "html",
@@ -2065,11 +1903,8 @@ unsafe fn xml_sax2_attribute_internal(
     }
 }
 
-/*
- * xmlCheckDefaultedAttributes:
- *
- * Check defaulted attributes from the DTD
- */
+/// Check defaulted attributes from the DTD
+#[doc(alias = "xmlCheckDefaultedAttributes")]
 #[cfg(any(
     feature = "sax1",
     feature = "html",
@@ -2260,14 +2095,8 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
     }
 }
 
-/**
- * xmlSAX2StartElement:
- * @ctx: the user data (XML parser context)
- * @fullname:  The element name, including namespace prefix
- * @atts:  An array of name/value attributes pairs, NULL terminated
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "xmlSAX2StartElement")]
 #[cfg(any(
     feature = "sax1",
     feature = "html",
@@ -2514,13 +2343,8 @@ pub unsafe fn xml_sax2_start_element(
     }
 }
 
-/**
- * xmlSAX2EndElement:
- * @ctx: the user data (XML parser context)
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
+/// called when the end of an element has been detected.
+#[doc(alias = "xmlSAX2EndElement")]
 #[cfg(any(
     feature = "sax1",
     feature = "html",
@@ -2558,23 +2382,10 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: *con
     (*ctxt).node_pop();
 }
 
-/**
- * xmlSAX2StartElementNs:
- * @ctx:  the user data (XML parser context)
- * @localname:  the local name of the element
- * @prefix:  the element namespace prefix if available
- * @URI:  the element namespace name if available
- * @nb_namespaces:  number of namespace definitions on that node
- * @namespaces:  pointer to the array of prefix/URI pairs namespace definitions
- * @nb_attributes:  the number of attributes on that node
- * @nb_defaulted:  the number of defaulted attributes.
- * @attributes:  pointer to the array of (localname/prefix/URI/value/end)
- *               attribute values.
- *
- * SAX2 callback when an element start has been detected by the parser.
- * It provides the namespace information for the element, as well as
- * the new namespace declarations on the element.
- */
+/// SAX2 callback when an element start has been detected by the parser.
+/// It provides the namespace information for the element, as well as
+/// the new namespace declarations on the element.
+#[doc(alias = "xmlSAX2StartElementNs")]
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn xml_sax2_start_element_ns(
     ctx: Option<GenericErrorContext>,
@@ -2879,16 +2690,8 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 }
 
-/*
- * xmlSAX2TextNode:
- * @ctxt:  the parser context
- * @str:  the input string
- * @len: the string length
- *
- * Callback for a text node
- *
- * Returns the newly allocated string or NULL if not needed or error
- */
+/// Returns the newly allocated string or NULL if not needed or error
+#[doc(alias = "xmlSAX2TextNode")]
 unsafe extern "C" fn xml_sax2_text_node(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
@@ -2983,16 +2786,10 @@ unsafe extern "C" fn xml_sax2_text_node(
     ret
 }
 
-/*
- * xmlSAX2DecodeAttrEntities:
- * @ctxt:  the parser context
- * @str:  the input string
- * @len: the string length
- *
- * Remove the entities from an attribute value
- *
- * Returns the newly allocated string or NULL if not needed or error
- */
+/// Remove the entities from an attribute value
+///
+/// Returns the newly allocated string or NULL if not needed or error
+#[doc(alias = "xmlSAX2DecodeAttrEntities")]
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_sax2_decode_attr_entities(
     ctxt: XmlParserCtxtPtr,
@@ -3027,20 +2824,10 @@ unsafe extern "C" fn xml_sax2_decode_attr_entities(
     null_mut()
 }
 
-/**
- * xmlSAX2AttributeNs:
- * @ctx: the user data (XML parser context)
- * @localname:  the local name of the attribute
- * @prefix:  the attribute namespace prefix if available
- * @URI:  the attribute namespace name if available
- * @value:  Start of the attribute value
- * @valueend: end of the attribute value
- *
- * Handle an attribute that has been read by the parser.
- * The default handling is to convert the attribute into an
- * DOM subtree and past it in a new xmlAttr element added to
- * the element.
- */
+/// Handle an attribute that has been read by the parser.
+/// The default handling is to convert the attribute into an
+/// DOM subtree and past it in a new xmlAttr element added to the element.
+#[doc(alias = "xmlSAX2AttributeNs")]
 unsafe extern "C" fn xml_sax2_attribute_ns(
     ctxt: XmlParserCtxtPtr,
     localname: *const XmlChar,
@@ -3331,16 +3118,9 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
     }
 }
 
-/**
- * xmlSAX2EndElementNs:
- * @ctx:  the user data (XML parser context)
- * @localname:  the local name of the element
- * @prefix:  the element namespace prefix if available
- * @URI:  the element namespace name if available
- *
- * SAX2 callback when an element end has been detected by the parser.
- * It provides the namespace information for the element.
- */
+/// SAX2 callback when an element end has been detected by the parser.
+/// It provides the namespace information for the element.
+#[doc(alias = "xmlSAX2EndElementNs")]
 pub unsafe fn xml_sax2_end_element_ns(
     ctx: Option<GenericErrorContext>,
     _localname: *const XmlChar,
@@ -3378,13 +3158,8 @@ pub unsafe fn xml_sax2_end_element_ns(
     (*ctxt).node_pop();
 }
 
-/**
- * xmlSAX2Reference:
- * @ctx: the user data (XML parser context)
- * @name:  The entity name
- *
- * called when an entity xmlSAX2Reference is detected.
- */
+/// Called when an entity xmlSAX2Reference is detected.
+#[doc(alias = "xmlSAX2Reference")]
 pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     if ctx.is_none() {
         return;
@@ -3405,18 +3180,8 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const 
     }
 }
 
-/**
- * xmlSAX2Text:
- * @ctx: the user data (XML parser context)
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- * @type: text or cdata
- *
- * Append characters.
- */
-// static void
-// xmlSAX2Text(xmlParserCtxtPtr ctxt, const xmlChar *ch, int len,
-//             xmlElementType type)
+/// Append characters.
+#[doc(alias = "xmlSAX2Text")]
 unsafe extern "C" fn xml_sax2_text(
     ctxt: XmlParserCtxtPtr,
     ch: *const XmlChar,
@@ -3552,14 +3317,8 @@ unsafe extern "C" fn xml_sax2_text(
     }
 }
 
-/**
- * xmlSAX2Characters:
- * @ctx: the user data (XML parser context)
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- *
- * receiving some chars from the parser.
- */
+/// Receiving some chars from the parser.
+#[doc(alias = "xmlSAX2Characters")]
 pub unsafe fn xml_sax2_characters(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     let ctxt = if let Some(ctx) = ctx {
         let lock = ctx.lock();
@@ -3575,15 +3334,9 @@ pub unsafe fn xml_sax2_characters(ctx: Option<GenericErrorContext>, ch: *const X
     );
 }
 
-/**
- * xmlSAX2IgnorableWhitespace:
- * @ctx: the user data (XML parser context)
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- *
- * receiving some ignorable whitespaces from the parser.
- * UNUSED: by default the DOM building will use xmlSAX2Characters
- */
+/// Receiving some ignorable whitespaces from the parser.
+/// UNUSED: by default the DOM building will use xmlSAX2Characters
+#[doc(alias = "xmlSAX2IgnorableWhitespace")]
 pub unsafe fn xml_sax2_ignorable_whitespace(
     _ctx: Option<GenericErrorContext>,
     _ch: *const XmlChar,
@@ -3592,14 +3345,8 @@ pub unsafe fn xml_sax2_ignorable_whitespace(
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
 }
 
-/**
- * xmlSAX2ProcessingInstruction:
- * @ctx: the user data (XML parser context)
- * @target:  the target name
- * @data: the PI data's
- *
- * A processing instruction has been parsed.
- */
+/// A processing instruction has been parsed.
+#[doc(alias = "xmlSAX2ProcessingInstruction")]
 pub unsafe fn xml_sax2_processing_instruction(
     ctx: Option<GenericErrorContext>,
     target: *const XmlChar,
@@ -3646,13 +3393,8 @@ pub unsafe fn xml_sax2_processing_instruction(
     }
 }
 
-/**
- * xmlSAX2Comment:
- * @ctx: the user data (XML parser context)
- * @value:  the xmlSAX2Comment content
- *
- * A xmlSAX2Comment has been parsed.
- */
+/// A xmlSAX2Comment has been parsed.
+#[doc(alias = "xmlSAX2Comment")]
 pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
     if ctx.is_none() {
         return;
@@ -3693,14 +3435,8 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
     }
 }
 
-/**
- * xmlSAX2CDataBlock:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
+/// Called when a pcdata block has been parsed
+#[doc(alias = "xmlSAX2CDataBlock")]
 pub unsafe fn xml_sax2_cdata_block(
     ctx: Option<GenericErrorContext>,
     value: *const XmlChar,
@@ -3717,21 +3453,15 @@ pub unsafe fn xml_sax2_cdata_block(
 
 static mut XML_SAX2_DEFAULT_VERSION_VALUE: i32 = 2;
 
-/**
- * xmlSAXDefaultVersion:
- * @version:  the version, 1 or 2
- *
- * DEPRECATED: Use parser option XML_PARSE_SAX1.
- *
- * Set the default version of SAX used globally by the library.
- * By default, during initialization the default is set to 2.
- * Note that it is generally a better coding style to use
- * xmlSAXVersion() to set up the version explicitly for a given
- * parsing context.
- *
- * Returns the previous value in case of success and -1 in case of error.
- */
-#[deprecated]
+/// Set the default version of SAX used globally by the library.
+/// By default, during initialization the default is set to 2.
+/// Note that it is generally a better coding style to use
+/// xmlSAXVersion() to set up the version explicitly for a given
+/// parsing context.
+///
+/// Returns the previous value in case of success and -1 in case of error.
+#[doc(alias = "xmlSAXDefaultVersion")]
+#[deprecated = "Use parser option XML_PARSE_SAX1"]
 #[cfg(feature = "sax1")]
 pub unsafe extern "C" fn xml_sax_default_version(version: i32) -> i32 {
     let ret: i32 = XML_SAX2_DEFAULT_VERSION_VALUE;
@@ -3743,15 +3473,10 @@ pub unsafe extern "C" fn xml_sax_default_version(version: i32) -> i32 {
     ret
 }
 
-/**
- * xmlSAXVersion:
- * @hdlr:  the SAX handler
- * @version:  the version, 1 or 2
- *
- * Initialize the default XML SAX handler according to the version
- *
- * Returns 0 in case of success and -1 in case of error.
- */
+/// Initialize the default XML SAX handler according to the version
+///
+/// Returns 0 in case of success and -1 in case of error.
+#[doc(alias = "xmlSAXVersion")]
 pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32) -> i32 {
     if hdlr.is_null() {
         return -1;
@@ -3802,13 +3527,8 @@ pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32)
     0
 }
 
-/**
- * xmlSAX2InitDefaultSAXHandler:
- * @hdlr:  the SAX handler
- * @warning:  flag if non-zero sets the handler warning procedure
- *
- * Initialize the default XML SAX2 handler
- */
+/// Initialize the default XML SAX2 handler
+#[doc(alias = "xmlSAX2InitDefaultSAXHandler")]
 pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHandler, warning: i32) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
         return;
@@ -3822,12 +3542,8 @@ pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHand
     }
 }
 
-/**
- * xmlSAX2InitHtmlDefaultSAXHandler:
- * @hdlr:  the SAX handler
- *
- * Initialize the default HTML SAX2 handler
- */
+/// Initialize the default HTML SAX2 handler
+#[doc(alias = "xmlSAX2InitHtmlDefaultSAXHandler")]
 #[cfg(feature = "html")]
 pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSAXHandler) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
@@ -3865,25 +3581,14 @@ pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSA
     (*hdlr).initialized = 1;
 }
 
-/**
- * htmlDefaultSAXHandlerInit:
- *
- * DEPRECATED: This function is a no-op. Call xmlInitParser to
- * initialize the library.
- */
-#[deprecated]
+#[doc(alias = "htmlDefaultSAXHandlerInit")]
+#[deprecated = "This function is a no-op. Call xmlInitParser to initialize the library"]
 #[cfg(feature = "html")]
 pub unsafe extern "C" fn html_default_sax_handler_init() {}
 
-/**
- * xmlDefaultSAXHandlerInit:
- *
- * DEPRECATED: This function is a no-op. Call xmlInitParser to
- * initialize the library.
- *
- * Initialize the default SAX2 handler
- */
-#[deprecated]
+/// Initialize the default SAX2 handler
+#[doc(alias = "xmlDefaultSAXHandlerInit")]
+#[deprecated = "This function is a no-op. Call xmlInitParser to initialize the library"]
 pub unsafe extern "C" fn xml_default_sax_handler_init() {}
 
 #[cfg(test)]

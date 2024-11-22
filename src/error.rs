@@ -13,13 +13,10 @@ use crate::{
     tree::{XmlElementType, XmlNode, XmlNodePtr},
 };
 
-/**
- * xmlParserError:
- *
- * This is an error that the XML (or HTML) parser can generate
- */
 macro_rules! impl_xml_parser_errors {
     ( $( $variant:ident $( = $default:literal )? ),* ) => {
+        /// This is an error that the XML (or HTML) parser can generate
+        #[doc(alias = "xmlParserError")]
         #[repr(C)]
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         pub enum XmlParserErrors {
@@ -1377,30 +1374,28 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
     }
 }
 
-/**
- * __xmlRaiseError:
- * @schannel: the structured callback channel
- * @channel: the old callback channel
- * @data: the callback data
- * @ctx: the parser context or NULL
- * @ctx: the parser context or NULL
- * @domain: the domain for the error
- * @code: the code for the error
- * @level: the XmlErrorLevel for the error
- * @file: the file source of the error (or NULL)
- * @line: the line of the error or 0 if N/A
- * @str1: extra string info
- * @str2: extra string info
- * @str3: extra string info
- * @int1: extra int info
- * @col: column number of the error or 0 if N/A
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Update the appropriate global or contextual error structure,
- * then forward the error message down the parser or generic
- * error callback handler
- */
+/// @schannel: the structured callback channel
+/// @channel: the old callback channel
+/// @data: the callback data
+/// @ctx: the parser context or NULL
+/// @ctx: the parser context or NULL
+/// @domain: the domain for the error
+/// @code: the code for the error
+/// @level: the XmlErrorLevel for the error
+/// @file: the file source of the error (or NULL)
+/// @line: the line of the error or 0 if N/A
+/// @str1: extra string info
+/// @str2: extra string info
+/// @str3: extra string info
+/// @int1: extra int info
+/// @col: column number of the error or 0 if N/A
+/// @msg:  the message to display/transmit
+/// @...:  extra parameters for the message display
+///
+/// Update the appropriate global or contextual error structure,
+/// then forward the error message down the parser or generic
+/// error callback handler
+#[doc(alias = "__xmlRaiseError")]
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __xml_raise_error {
@@ -1665,15 +1660,8 @@ macro_rules! __xml_raise_error {
     }};
 }
 
-/**
- * __xmlSimpleError:
- * @domain: where the error comes from
- * @code: the error code
- * @node: the context node
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "__xmlSimpleError")]
 #[doc(hidden)]
 pub(crate) unsafe fn __xml_simple_error(
     domain: XmlErrorDomain,

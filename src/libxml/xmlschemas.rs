@@ -127,9 +127,7 @@ use crate::{
     },
 };
 
-/**
- * This error codes are obsolete; not used any more.
- */
+/// This error codes are obsolete; not used any more.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlSchemaValidError {
@@ -161,40 +159,29 @@ pub enum XmlSchemaValidError {
     XmlSchemasErrXxx,
 }
 
-/*
-* ATTENTION: Change xmlSchemaSetValidOptions's check
-* for invalid values, if adding to the validation
-* options below.
-*/
-/**
- * xmlSchemaValidOption:
- *
- * This is the set of XML Schema validation options.
- */
+// ATTENTION: Change xmlSchemaSetValidOptions's check
+// for invalid values, if adding to the validation
+// options below.
+
+/// This is the set of XML Schema validation options.
+#[doc(alias = "xmlSchemaValidOption")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlSchemaValidOption {
     XmlSchemaValVcICreate = 1 << 0, /* Default/fixed: create an attribute node
-                                    	* or an element's text node on the instance.
-                                    	*/
+                                    * or an element's text node on the instance.
+                                    */
+                                    /*
+                                        XML_SCHEMA_VAL_XSI_ASSEMBLE			= 1<<1,
+                                        * assemble schemata using
+                                        * xsi:schemaLocation and
+                                        * xsi:noNamespaceSchemaLocation
+                                    */
 }
 
-/*
-    XML_SCHEMA_VAL_XSI_ASSEMBLE			= 1<<1,
-    * assemble schemata using
-    * xsi:schemaLocation and
-    * xsi:noNamespaceSchemaLocation
-*/
-
-/**
- * The schemas related types are kept internal
- */
 pub type XmlSchemaPtr = *mut XmlSchema;
-/**
- * XmlSchema:
- *
- * A Schemas definition
- */
+/// A Schemas definition
+#[doc(alias = "xmlSchema")]
 #[repr(C)]
 pub struct XmlSchema {
     pub(crate) name: *const XmlChar,             /* schema name */
@@ -223,39 +210,20 @@ pub struct XmlSchema {
     pub(crate) volatiles: *mut c_void, /* Obsolete */
 }
 
-/**
- * xmlSchemaValidityErrorFunc:
- * @ctx: the validation context
- * @msg: the message
- * @...: extra arguments
- *
- * Signature of an error callback from an XSD validation
- */
+/// Signature of an error callback from an XSD validation
+#[doc(alias = "xmlSchemaValidityErrorFunc")]
 pub type XmlSchemaValidityErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/**
- * xmlSchemaValidityWarningFunc:
- * @ctx: the validation context
- * @msg: the message
- * @...: extra arguments
- *
- * Signature of a warning callback from an XSD validation
- */
+/// Signature of a warning callback from an XSD validation
+#[doc(alias = "xmlSchemaValidityWarningFunc")]
 pub type XmlSchemaValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/**
- * xmlSchemaValidityLocatorFunc:
- * @ctx: user provided context
- * @file: returned file information
- * @line: returned line information
- *
- * A schemas validation locator, a callback called by the validator.
- * This is used when file or node information are not available
- * to find out what file and line number are affected
- *
- * Returns: 0 in case of success and -1 in case of error
- */
-
+/// A schemas validation locator, a callback called by the validator.
+/// This is used when file or node information are not available
+/// to find out what file and line number are affected
+///
+/// Returns: 0 in case of success and -1 in case of error
+#[doc(alias = "xmlSchemaValidityLocatorFunc")]
 pub type XmlSchemaValidityLocatorFunc =
     unsafe extern "C" fn(ctx: *mut c_void, file: *mut Option<String>, line: *mut u64) -> i32;
 
@@ -263,18 +231,14 @@ const UNBOUNDED: usize = 1 << 30;
 
 const XML_SCHEMAS_NO_NAMESPACE: &CStr = c"##";
 
-/*
- * The XML Schemas namespaces
- */
+// The XML Schemas namespaces
 const XML_SCHEMA_NS: &CStr = c"http://www.w3.org/2001/XMLSchema";
 
 const XML_SCHEMA_INSTANCE_NS: &CStr = c"http://www.w3.org/2001/XMLSchema-instance";
 
 const XML_NAMESPACE_NS: &CStr = c"http://www.w3.org/2000/xmlns/";
 
-/*
-* Macros to query common properties of components.
-*/
+// Macros to query common properties of components.
 macro_rules! WXS_ITEM_NODE {
     ($i:expr) => {
         xml_schema_get_component_node($i as _)
@@ -287,9 +251,7 @@ macro_rules! WXS_ITEM_TYPE_NAME {
     };
 }
 
-/*
-* Macros for element declarations.
-*/
+// Macros for element declarations.
 macro_rules! WXS_ELEM_TYPEDEF {
     ($e:expr) => {
         (*$e).subtypes
@@ -301,17 +263,13 @@ macro_rules! WXS_SUBST_HEAD {
         (*$item).ref_decl
     };
 }
-/*
-* Macros for attribute declarations.
-*/
+// Macros for attribute declarations.
 macro_rules! WXS_ATTR_TYPEDEF {
     ($a:expr) => {
         (*$a).subtypes
     };
 }
-/*
-* Macros for attribute uses.
-*/
+// Macros for attribute uses.
 macro_rules! WXS_ATTRUSE_DECL {
     ($au:expr) => {
         (*($au as XmlSchemaAttributeUsePtr)).attr_decl
@@ -335,9 +293,7 @@ macro_rules! WXS_ATTRUSE_DECL_TNS {
         (*WXS_ATTRUSE_DECL!($au)).target_namespace
     };
 }
-/*
-* Macros for attribute groups.
-*/
+// Macros for attribute groups.
 macro_rules! WXS_ATTR_GROUP_HAS_REFS {
     ($ag:expr) => {
         (*($ag as XmlSchemaAttributeGroupPtr)).flags & XML_SCHEMAS_ATTRGROUP_HAS_REFS != 0
@@ -348,9 +304,7 @@ macro_rules! WXS_ATTR_GROUP_EXPANDED {
         (*($ag as XmlSchemaAttributeGroupPtr)).flags & XML_SCHEMAS_ATTRGROUP_WILDCARD_BUILDED != 0
     };
 }
-/*
-* Macros for particles.
-*/
+// Macros for particles.
 macro_rules! WXS_PARTICLE {
     ($p:expr) => {
         $p as XmlSchemaParticlePtr
@@ -374,17 +328,14 @@ macro_rules! WXS_PARTICLE_TERM {
 //         (*WXS_PARTICLE!($p)).children as XmlSchemaModelGroupPtr
 //     };
 // }
-/*
-* Macros for model groups definitions.
-*/
+
+// Macros for model groups definitions.
 macro_rules! WXS_MODELGROUPDEF_MODEL {
     ($mgd:expr) => {
         (*($mgd as XmlSchemaModelGroupPtr)).children
     };
 }
-/*
-* Macros for model groups.
-*/
+// Macros for model groups.
 macro_rules! WXS_IS_MODEL_GROUP {
     ($i:expr) => {
         (*$i).typ == XmlSchemaTypeType::XmlSchemaTypeSequence
@@ -398,9 +349,7 @@ macro_rules! WXS_MODELGROUP_PARTICLE {
         (*$mg).children as XmlSchemaParticlePtr
     };
 }
-/*
-* Macros for schema buckets.
-*/
+// Macros for schema buckets.
 macro_rules! WXS_IS_BUCKET_INCREDEF {
     ($t:expr) => {
         $t == XML_SCHEMA_SCHEMA_INCLUDE || $t == XML_SCHEMA_SCHEMA_REDEFINE
@@ -425,9 +374,7 @@ macro_rules! WXS_INCBUCKET {
     };
 }
 
-/*
-* Macros for complex/simple types.
-*/
+// Macros for complex/simple types.
 macro_rules! WXS_IS_ANYTYPE {
     ($i:expr) => {
         (*$i).typ == XmlSchemaTypeType::XmlSchemaTypeBasic
@@ -542,9 +489,7 @@ macro_rules! WXS_TYPE_PARTICLE_TERM {
         WXS_PARTICLE_TERM!(WXS_TYPE_PARTICLE!($t))
     };
 }
-/*
-* Macros for exclusively for simple types.
-*/
+// Macros for exclusively for simple types.
 macro_rules! WXS_LIST_ITEMTYPE {
     ($t:expr) => {
         (*$t).subtypes
@@ -568,9 +513,7 @@ macro_rules! WXS_IS_UNION {
         (*$t).flags & $crate::libxml::schemas_internals::XML_SCHEMAS_TYPE_VARIETY_UNION != 0
     };
 }
-/*
-* Misc parser context macros.
-*/
+// Misc parser context macros.
 macro_rules! WXS_CONSTRUCTOR {
     ($ctx:expr) => {
         (*$ctx).constructor
@@ -625,17 +568,13 @@ macro_rules! WXS_ADD_PENDING {
         xml_schema_add_item_size(addr_of_mut!((*(*$ctx).constructor).pending), 10, $item as _)
     };
 }
-/*
-* xmlSchemaItemList macros.
-*/
+// xmlSchemaItemList macros.
 macro_rules! WXS_ILIST_IS_EMPTY {
     ($l:expr) => {
         $l.is_null() || (*$l).nb_items == 0
     };
 }
-/*
-* Misc macros.
-*/
+// Misc macros.
 macro_rules! IS_SCHEMA {
     ($node:expr, $type:expr) => {
         !$node.is_null()
@@ -657,11 +596,9 @@ macro_rules! FREE_AND_NULL {
     };
 }
 
-/*
-* Since we put the default/fixed values into the dict, we can
-* use pointer comparison for those values.
-* REMOVED: (xml_str_equal((v1), (v2)))
-*/
+// Since we put the default/fixed values into the dict, we can
+// use pointer comparison for those values.
+// REMOVED: (xml_str_equal((v1), (v2)))
 macro_rules! WXS_ARE_DEFAULT_STR_EQUAL {
     ($v1:expr, $v2:expr) => {
         $v1 == $v2
@@ -707,9 +644,8 @@ macro_rules! HERROR {
 // 		}
 // 	}
 // }
-/*
-* Some flags used for various schema constraints.
-*/
+
+// Some flags used for various schema constraints.
 const SUBSET_RESTRICTION: i32 = 1 << 0;
 const SUBSET_EXTENSION: i32 = 1 << 1;
 const SUBSET_SUBSTITUTION: i32 = 1 << 2;
@@ -739,12 +675,9 @@ const XML_SCHEMA_SCHEMA_IMPORT: i32 = 1;
 const XML_SCHEMA_SCHEMA_INCLUDE: i32 = 2;
 const XML_SCHEMA_SCHEMA_REDEFINE: i32 = 3;
 
-/**
- * xmlSchemaSchemaRelation:
- *
- * Used to create a graph of schema relationships.
- */
 pub type XmlSchemaSchemaRelationPtr = *mut XmlSchemaSchemaRelation;
+/// Used to create a graph of schema relationships.
+#[doc(alias = "xmlSchemaSchemaRelation")]
 #[repr(C)]
 pub struct XmlSchemaSchemaRelation {
     next: XmlSchemaSchemaRelationPtr,
@@ -774,14 +707,12 @@ pub struct XmlSchemaBucket {
     locals: XmlSchemaItemListPtr,  /* Local components. */
 }
 
-/**
- * xmlSchemaImport:
- * (extends xmlSchemaBucket)
- *
- * Reflects a schema. Holds some information
- * about the schema and its toplevel components. Duplicate
- * toplevel components are not checked at this level.
- */
+/// Extends xmlSchemaBucket
+///
+/// Reflects a schema. Holds some information
+/// about the schema and its toplevel components. Duplicate
+/// toplevel components are not checked at this level.
+#[doc(alias = "xmlSchemaImport")]
 pub type XmlSchemaImportPtr = *mut XmlSchemaImport;
 #[repr(C)]
 pub struct XmlSchemaImport {
@@ -808,9 +739,7 @@ pub struct XmlSchemaImport {
     schema: XmlSchemaPtr,
 }
 
-/*
-* (extends xmlSchemaBucket)
-*/
+// Extends xmlSchemaBucket
 pub type XmlSchemaIncludePtr = *mut XmlSchemaInclude;
 #[repr(C)]
 pub struct XmlSchemaInclude {
@@ -832,11 +761,8 @@ pub struct XmlSchemaInclude {
     owner_import: XmlSchemaImportPtr,
 }
 
-/**
- * xmlSchemaBasicItem:
- *
- * The abstract base type for schema components.
- */
+/// The abstract base type for schema components.
+#[doc(alias = "xmlSchemaBasicItem")]
 pub type XmlSchemaBasicItemPtr = *mut XmlSchemaBasicItem;
 #[repr(C)]
 pub struct XmlSchemaBasicItem {
@@ -844,12 +770,9 @@ pub struct XmlSchemaBasicItem {
     pub(crate) dummy: *mut c_void, /* Fix alignment issues */
 }
 
-/**
- * xmlSchemaAnnotItem:
- *
- * The abstract base type for annotated schema components.
- * (Extends xmlSchemaBasicItem)
- */
+/// The abstract base type for annotated schema components.
+/// (Extends xmlSchemaBasicItem)
+#[doc(alias = "xmlSchemaAnnotItem")]
 pub type XmlSchemaAnnotItemPtr = *mut XmlSchemaAnnotItem;
 #[repr(C)]
 pub struct XmlSchemaAnnotItem {
@@ -857,12 +780,9 @@ pub struct XmlSchemaAnnotItem {
     annot: XmlSchemaAnnotPtr,
 }
 
-/**
- * xmlSchemaTreeItem:
- *
- * The abstract base type for tree-like structured schema components.
- * (Extends xmlSchemaAnnotItem)
- */
+/// The abstract base type for tree-like structured schema components.
+/// (Extends xmlSchemaAnnotItem)
+#[doc(alias = "xmlSchemaTreeItem")]
 pub type XmlSchemaTreeItemPtr = *mut XmlSchemaTreeItem;
 #[repr(C)]
 pub struct XmlSchemaTreeItem {
@@ -873,12 +793,10 @@ pub struct XmlSchemaTreeItem {
 }
 
 const XML_SCHEMA_ATTR_USE_FIXED: i32 = 1 << 0;
-/**
- * XmlSchemaAttributeUsePtr:
- *
- * The abstract base type for tree-like structured schema components.
- * (Extends xmlSchemaTreeItem)
- */
+
+/// The abstract base type for tree-like structured schema components.
+/// (Extends xmlSchemaTreeItem)
+#[doc(alias = "xmlSchemaAttributeUsePtr")]
 pub type XmlSchemaAttributeUsePtr = *mut XmlSchemaAttributeUse;
 #[repr(C)]
 pub struct XmlSchemaAttributeUse {
@@ -898,12 +816,9 @@ pub struct XmlSchemaAttributeUse {
     def_val: XmlSchemaValPtr,
 }
 
-/**
- * xmlSchemaAttributeUseProhibPtr:
- *
- * A helper component to reflect attribute prohibitions.
- * (Extends xmlSchemaBasicItem)
- */
+/// A helper component to reflect attribute prohibitions.
+/// (Extends xmlSchemaBasicItem)
+#[doc(alias = "xmlSchemaAttributeUseProhibPtr")]
 pub type XmlSchemaAttributeUseProhibPtr = *mut XmlSchemaAttributeUseProhib;
 #[repr(C)]
 pub struct XmlSchemaAttributeUseProhib {
@@ -914,10 +829,8 @@ pub struct XmlSchemaAttributeUseProhib {
     is_ref: i32,
 }
 
-/**
- * xmlSchemaRedef:
- */
 pub type XmlSchemaRedefPtr = *mut XmlSchemaRedef;
+#[doc(alias = "xmlSchemaRedef")]
 #[repr(C)]
 pub struct XmlSchemaRedef {
     next: XmlSchemaRedefPtr,
@@ -930,10 +843,8 @@ pub struct XmlSchemaRedef {
     target_bucket: XmlSchemaBucketPtr, /* The redefined schema. */
 }
 
-/**
- * xmlSchemaConstructionCtxt:
- */
 pub type XmlSchemaConstructionCtxtPtr = *mut XmlSchemaConstructionCtxt;
+#[doc(alias = "xmlSchemaConstructionCtxt")]
 #[repr(C)]
 pub struct XmlSchemaConstructionCtxt {
     main_schema: XmlSchemaPtr,       /* The main schema. */
@@ -952,9 +863,7 @@ pub struct XmlSchemaConstructionCtxt {
 const XML_SCHEMAS_PARSE_ERROR: i32 = 1;
 const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoent as i32;
 
-/**
- * A schemas validation context
- */
+/// A schemas validation context
 pub type XmlSchemaParserCtxtPtr = *mut XmlSchemaParserCtxt;
 #[repr(C)]
 pub struct XmlSchemaParserCtxt {
@@ -1005,13 +914,10 @@ pub struct XmlSchemaParserCtxt {
     attr_prohibs: XmlSchemaItemListPtr,
 }
 
-/**
- * xmlSchemaQNameRef:
- *
- * A component reference item (not a schema component)
- * (Extends xmlSchemaBasicItem)
- */
 pub type XmlSchemaQnameRefPtr = *mut XmlSchemaQnameRef;
+/// A component reference item (not a schema component)
+/// (Extends xmlSchemaBasicItem)
+#[doc(alias = "xmlSchemaQNameRef")]
 #[repr(C)]
 pub struct XmlSchemaQnameRef {
     typ: XmlSchemaTypeType,
@@ -1022,13 +928,10 @@ pub struct XmlSchemaQnameRef {
     node: XmlNodePtr,
 }
 
-/**
- * xmlSchemaParticle:
- *
- * A particle component.
- * (Extends xmlSchemaTreeItem)
- */
 pub type XmlSchemaParticlePtr = *mut XmlSchemaParticle;
+/// A particle component.
+/// (Extends xmlSchemaTreeItem)
+#[doc(alias = "xmlSchemaParticle")]
 #[repr(C)]
 pub struct XmlSchemaParticle {
     pub(crate) typ: XmlSchemaTypeType,
@@ -1042,13 +945,10 @@ pub struct XmlSchemaParticle {
     pub(crate) node: XmlNodePtr,
 }
 
-/**
- * xmlSchemaModelGroup:
- *
- * A model group component.
- * (Extends xmlSchemaTreeItem)
- */
 pub type XmlSchemaModelGroupPtr = *mut XmlSchemaModelGroup;
+/// A model group component.
+/// (Extends xmlSchemaTreeItem)
+#[doc(alias = "xmlSchemaModelGroup")]
 #[repr(C)]
 pub struct XmlSchemaModelGroup {
     pub(crate) typ: XmlSchemaTypeType, /* XmlSchemaTypeSequence, XmlSchemaTypeChoice, XmlSchemaTypeAll */
@@ -1060,13 +960,10 @@ pub struct XmlSchemaModelGroup {
 
 const XML_SCHEMA_MODEL_GROUP_DEF_MARKED: i32 = 1 << 0;
 const XML_SCHEMA_MODEL_GROUP_DEF_REDEFINED: i32 = 1 << 1;
-/**
- * xmlSchemaModelGroupDef:
- *
- * A model group definition component.
- * (Extends xmlSchemaTreeItem)
- */
 pub type XmlSchemaModelGroupDefPtr = *mut XmlSchemaModelGroupDef;
+/// A model group definition component.
+/// (Extends xmlSchemaTreeItem)
+#[doc(alias = "xmlSchemaModelGroupDef")]
 #[repr(C)]
 pub struct XmlSchemaModelGroupDef {
     typ: XmlSchemaTypeType, /* XML_SCHEMA_TYPE_GROUP */
@@ -1079,13 +976,9 @@ pub struct XmlSchemaModelGroupDef {
     flags: i32,
 }
 
-/**
- * xmlSchemaIDCSelect:
- *
- * The identity-constraint "field" and "selector" item, holding the
- * XPath expression.
- */
 pub type XmlSchemaIdcselectPtr = *mut XmlSchemaIdcselect;
+/// The identity-constraint "field" and "selector" item, holding the XPath expression.
+#[doc(alias = "xmlSchemaIDCSelect")]
 #[repr(C)]
 pub struct XmlSchemaIdcselect {
     next: XmlSchemaIdcselectPtr,
@@ -1095,13 +988,10 @@ pub struct XmlSchemaIdcselect {
     xpath_comp: *mut c_void, /* the compiled XPath expression */
 }
 
-/**
- * xmlSchemaIDC:
- *
- * The identity-constraint definition component.
- * (Extends xmlSchemaAnnotItem)
- */
 pub type XmlSchemaIDCPtr = *mut XmlSchemaIDC;
+/// The identity-constraint definition component.
+/// (Extends xmlSchemaAnnotItem)
+#[doc(alias = "xmlSchemaIDC")]
 #[repr(C)]
 pub struct XmlSchemaIDC {
     typ: XmlSchemaTypeType,
@@ -1116,12 +1006,9 @@ pub struct XmlSchemaIDC {
     refe: XmlSchemaQnameRefPtr,
 }
 
-/**
- * xmlSchemaIDCAug:
- *
- * The augmented IDC information used for validation.
- */
 pub type XmlSchemaIDCAugPtr = *mut XmlSchemaIDCAug;
+/// The augmented IDC information used for validation.
+#[doc(alias = "xmlSchemaIDCAug")]
 #[repr(C)]
 pub struct XmlSchemaIDCAug {
     next: XmlSchemaIDCAugPtr, /* next in a list */
@@ -1130,24 +1017,18 @@ pub struct XmlSchemaIDCAug {
                               tables need to be bubbled upwards */
 }
 
-/**
- * xmlSchemaPSVIIDCKeySequence:
- *
- * The key sequence of a node table item.
- */
 pub type XmlSchemaPSVIIDCKeyPtr = *mut XmlSchemaPSVIIDCKey;
+/// The key sequence of a node table item.
+#[doc(alias = "xmlSchemaPSVIIDCKeySequence")]
 #[repr(C)]
 pub struct XmlSchemaPSVIIDCKey {
     typ: XmlSchemaTypePtr,
     val: XmlSchemaValPtr,
 }
 
-/**
- * xmlSchemaPSVIIDCNode:
- *
- * The node table item of a node table.
- */
 pub type XmlSchemaPSVIIDCNodePtr = *mut XmlSchemaPSVIIDCNode;
+/// The node table item of a node table.
+#[doc(alias = "xmlSchemaPSVIIDCNode")]
 #[repr(C)]
 pub struct XmlSchemaPSVIIDCNode {
     node: XmlNodePtr,
@@ -1156,12 +1037,9 @@ pub struct XmlSchemaPSVIIDCNode {
     node_qname_id: i32,
 }
 
-/**
- * xmlSchemaPSVIIDCBinding:
- *
- * The identity-constraint binding item of the [identity-constraint table].
- */
 pub type XmlSchemaPSVIIDCBindingPtr = *mut XmlSchemaPSVIIDCBinding;
+/// The identity-constraint binding item of the [identity-constraint table].
+#[doc(alias = "xmlSchemaPSVIIDCBinding")]
 #[repr(C)]
 pub struct XmlSchemaPSVIIDCBinding {
     next: XmlSchemaPSVIIDCBindingPtr, /* next binding of a specific node */
@@ -1178,12 +1056,9 @@ const XPATH_STATE_OBJ_TYPE_IDC_FIELD: i32 = 2;
 const XPATH_STATE_OBJ_MATCHES: i32 = -2;
 const XPATH_STATE_OBJ_BLOCKED: i32 = -3;
 
-/**
- * xmlSchemaIDCStateObj:
- *
- * The state object used to evaluate XPath expressions.
- */
 pub type XmlSchemaIDCStateObjPtr = *mut XmlSchemaIDCStateObj;
+/// The state object used to evaluate XPath expressions.
+#[doc(alias = "xmlSchemaIDCStateObj")]
 #[repr(C)]
 pub struct XmlSchemaIDCStateObj {
     typ: i32,
@@ -1200,12 +1075,9 @@ pub struct XmlSchemaIDCStateObj {
 
 const IDC_MATCHER: i32 = 0;
 
-/**
- * xmlSchemaIDCMatcher:
- *
- * Used to evaluate IDC selectors (and fields).
- */
 pub type XmlSchemaIDCMatcherPtr = *mut XmlSchemaIDCMatcher;
+/// Used to evaluate IDC selectors (and fields).
+#[doc(alias = "xmlSchemaIDCMatcher")]
 #[repr(C)]
 pub struct XmlSchemaIDCMatcher {
     typ: i32,
@@ -1222,9 +1094,7 @@ pub struct XmlSchemaIDCMatcher {
     htab: XmlHashTablePtr,
 }
 
-/*
-* Element info flags.
-*/
+// Element info flags.
 const XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES: i32 = 1 << 0;
 const XML_SCHEMA_NODE_INFO_FLAG_OWNED_VALUES: i32 = 1 << 1;
 const XML_SCHEMA_ELEM_INFO_NILLED: i32 = 1 << 2;
@@ -1239,12 +1109,9 @@ const XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT: i32 = 1 << 8;
 const XML_SCHEMA_NODE_INFO_ERR_NOT_EXPECTED: i32 = 1 << 9;
 const XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE: i32 = 1 << 10;
 
-/**
- * xmlSchemaNodeInfo:
- *
- * Holds information of an element node.
- */
 pub type XmlSchemaNodeInfoPtr = *mut XmlSchemaNodeInfo;
+/// Holds information of an element node.
+#[doc(alias = "xmlSchemaNodeInfo")]
 #[repr(C)]
 pub struct XmlSchemaNodeInfo {
     node_type: i32,
@@ -1294,9 +1161,7 @@ const XML_SCHEMAS_ATTR_WILD_LAX_NO_DECL: i32 = 14;
 const XML_SCHEMAS_ATTR_ERR_WILD_DUPLICATE_ID: i32 = 15;
 const XML_SCHEMAS_ATTR_ERR_WILD_AND_USE_ID: i32 = 16;
 const XML_SCHEMAS_ATTR_META: i32 = 17;
-/*
-* @metaType values of xmlSchemaAttrInfo.
-*/
+// @metaType values of xmlSchemaAttrInfo.
 const XML_SCHEMA_ATTR_INFO_META_XSI_TYPE: i32 = 1;
 const XML_SCHEMA_ATTR_INFO_META_XSI_NIL: i32 = 2;
 const XML_SCHEMA_ATTR_INFO_META_XSI_SCHEMA_LOC: i32 = 3;
@@ -1325,11 +1190,8 @@ pub struct XmlSchemaAttrInfo {
 }
 
 const XML_SCHEMA_VALID_CTXT_FLAG_STREAM: i32 = 1;
-/**
- * xmlSchemaValidCtxt:
- *
- * A Schemas validation context
- */
+/// A Schemas validation context
+#[doc(alias = "xmlSchemaValidCtxt")]
 pub type XmlSchemaValidCtxtPtr = *mut XmlSchemaValidCtxt;
 #[repr(C)]
 pub struct XmlSchemaValidCtxt {
@@ -1404,45 +1266,25 @@ pub struct XmlSchemaValidCtxt {
     loc_ctxt: *mut c_void,
 }
 
-/**
- * xmlSchemaSubstGroup:
- *
- *
- */
 pub type XmlSchemaSubstGroupPtr = *mut XmlSchemaSubstGroup;
+#[doc(alias = "xmlSchemaSubstGroup")]
 #[repr(C)]
 pub struct XmlSchemaSubstGroup {
     head: XmlSchemaElementPtr,
     members: XmlSchemaItemListPtr,
 }
 
-/**
- * xmlIDCHashEntry:
- *
- * an entry in hash tables to quickly look up keys/uniques
- */
 pub type XmlIDCHashEntryPtr = *mut XmlIDCHashEntry;
+/// an entry in hash tables to quickly look up keys/uniques
+#[doc(alias = "xmlIDCHashEntry")]
 #[repr(C)]
 pub struct XmlIDCHashEntry {
     next: XmlIDCHashEntryPtr, /* next item with same hash */
     index: i32,               /* index into associated item list */
 }
 
-/**
- * xmlSchemaErr4Line:
- * @ctxt: the validation context
- * @errorLevel: the error level
- * @error: the error code
- * @node: the context node
- * @line: the line number
- * @msg: the error message
- * @str1: extra data
- * @str2: extra data
- * @str3: extra data
- * @str4: extra data
- *
- * Handle a validation error
- */
+/// Handle a validation error
+#[doc(alias = "xmlSchemaErr4Line")]
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_err4_line(
     ctxt: XmlSchemaAbstractCtxtPtr,
@@ -1622,18 +1464,8 @@ unsafe fn xml_schema_err4_line(
     }
 }
 
-/**
- * xmlSchemaErr3:
- * @ctxt: the validation context
- * @node: the context node
- * @error: the error code
- * @msg: the error message
- * @str1: extra data
- * @str2: extra data
- * @str3: extra data
- *
- * Handle a validation error
- */
+/// Handle a validation error
+#[doc(alias = "xmlSchemaErr3")]
 unsafe extern "C" fn xml_schema_err3(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
@@ -1749,12 +1581,8 @@ unsafe extern "C" fn xml_schema_add_item_size(
     xml_schema_item_list_add_size(*list, initial_size, item)
 }
 
-/**
- * xmlSchemaItemTypeToStr:
- * @type: the type of the schema item
- *
- * Returns the component name of a schema item.
- */
+/// Returns the component name of a schema item.
+#[doc(alias = "xmlSchemaItemTypeToStr")]
 unsafe extern "C" fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *const XmlChar {
     match typ {
         XmlSchemaTypeType::XmlSchemaTypeBasic => c"simple type definition".as_ptr() as _,
@@ -1795,12 +1623,7 @@ unsafe extern "C" fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *con
     }
 }
 
-/**
- * xml_schema_get_component_type_str:
- * @type: the type of the schema item
- *
- * Returns the component name of a schema item.
- */
+/// Returns the component name of a schema item.
 unsafe extern "C" fn xml_schema_get_component_type_str(
     item: XmlSchemaBasicItemPtr,
 ) -> *const XmlChar {
@@ -1948,13 +1771,8 @@ unsafe extern "C" fn xml_schema_get_component_designation(
     *buf
 }
 
-/**
- * xmlSchemaWildcardPCToString:
- * @pc: the type of processContents
- *
- * Returns a string representation of the type of
- * processContents.
- */
+/// Returns a string representation of the type of processContents.
+#[doc(alias = "xmlSchemaWildcardPCToString")]
 unsafe extern "C" fn xml_schema_wildcard_pcto_string(pc: i32) -> *const XmlChar {
     match pc {
         _ if XML_SCHEMAS_ANY_SKIP == pc => c"skip".as_ptr() as _,
@@ -1964,32 +1782,22 @@ unsafe extern "C" fn xml_schema_wildcard_pcto_string(pc: i32) -> *const XmlChar 
     }
 }
 
-/**
- * xmlSchemaFormatItemForReport:
- * @buf: the string buffer
- * @itemDes: the designation of the item
- * @itemName: the name of the item
- * @item: the item as an object
- * @itemNode: the node of the item
- * @local: the local name
- * @parsing: if the function is used during the parse
- *
- * Returns a representation of the given item used
- * for error reports.
- *
- * The following order is used to build the resulting
- * designation if the arguments are not NULL:
- * 1a. If itemDes not NULL -> itemDes
- * 1b. If (itemDes not NULL) and (itemName not NULL)
- *     -> itemDes + itemName
- * 2. If the preceding was NULL and (item not NULL) -> item
- * 3. If the preceding was NULL and (itemNode not NULL) -> itemNode
- *
- * If the itemNode is an attribute node, the name of the attribute
- * will be appended to the result.
- *
- * Returns the formatted string and sets @buf to the resulting value.
- */
+/// Returns a representation of the given item used
+/// for error reports.
+///
+/// The following order is used to build the resulting
+/// designation if the arguments are not NULL:
+/// 1a. If itemDes not NULL -> itemDes
+/// 1b. If (itemDes not NULL) and (itemName not NULL)
+///     -> itemDes + itemName
+/// 2. If the preceding was NULL and (item not NULL) -> item
+/// 3. If the preceding was NULL and (itemNode not NULL) -> itemNode
+///
+/// If the itemNode is an attribute node, the name of the attribute
+/// will be appended to the result.
+///
+/// Returns the formatted string and sets @buf to the resulting value.
+#[doc(alias = "xmlSchemaFormatItemForReport")]
 unsafe extern "C" fn xml_schema_format_item_for_report(
     buf: *mut *mut XmlChar,
     item_des: *const XmlChar,
@@ -2531,16 +2339,11 @@ unsafe extern "C" fn xml_schema_normalize_value(
     }
 }
 
-/**
- * xml_schema_get_component_node:
- * @item: a schema component
- *
- * Returns node associated with the schema component.
- * NOTE that such a node need not be available; plus, a component's
- * node need not to reflect the component directly, since there is no
- * one-to-one relationship between the XML Schema representation and
- * the component representation.
- */
+/// Returns node associated with the schema component.
+/// NOTE that such a node need not be available; plus, a component's
+/// node need not to reflect the component directly, since there is no
+/// one-to-one relationship between the XML Schema representation and
+/// the component representation.
 unsafe extern "C" fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> XmlNodePtr {
     match (*item).typ {
         XmlSchemaTypeType::XmlSchemaTypeElement => (*(item as XmlSchemaElementPtr)).node,
@@ -2684,9 +2487,7 @@ unsafe extern "C" fn xml_schema_get_notation(
     ret
 }
 
-/*
-* This one works on the schema of the validation context.
-*/
+// This one works on the schema of the validation context.
 unsafe extern "C" fn xml_schema_validate_notation(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
@@ -2843,13 +2644,8 @@ unsafe extern "C" fn xml_schema_validate_qname(
     0
 }
 
-/**
- * xmlSchemaGetPrimitiveType:
- * @type:  the simpleType definition
- *
- * Returns the primitive type of the given type or
- * NULL in case of error.
- */
+/// Returns the primitive type of the given type or NULL in case of error.
+#[doc(alias = "xmlSchemaGetPrimitiveType")]
 unsafe extern "C" fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) -> XmlSchemaTypePtr {
     while !typ.is_null() {
         /*
@@ -2893,19 +2689,12 @@ unsafe extern "C" fn xml_schema_err(
     xml_schema_err4(actxt, error, node, msg, str1, str2, null(), null());
 }
 
-/**
- * xmlSchemaGetCanonValueWhtspExt:
- * @val: the precomputed value
- * @retValue: the returned value
- * @ws: the whitespace type of the value
- * @for_hash: non-zero if this is supposed to generate a string for hashing
- *
- * Get a the canonical representation of the value.
- * The caller has to free the returned retValue.
- *
- * Returns 0 if the value could be built and -1 in case of
- *         API errors or if the value type is not supported yet.
- */
+/// Get a the canonical representation of the value.
+/// The caller has to free the returned retValue.
+///
+/// Returns 0 if the value could be built and -1 in case of
+/// API errors or if the value type is not supported yet.
+#[doc(alias = "xmlSchemaGetCanonValueWhtspExt")]
 unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
     mut val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
@@ -3013,15 +2802,10 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext(
     xml_schema_get_canon_value_whtsp_ext_1(val, ws, ret_value, 0)
 }
 
-/**
- * xmlSchemaFormatFacetEnumSet:
- * @buf: the string buffer
- * @type: the type holding the enumeration facets
- *
- * Builds a string consisting of all enumeration elements.
- *
- * Returns a string of all enumeration elements.
- */
+/// Builds a string consisting of all enumeration elements.
+///
+/// Returns a string of all enumeration elements.
+#[doc(alias = "xmlSchemaFormatFacetEnumSet")]
 unsafe extern "C" fn xml_schema_format_facet_enum_set(
     actxt: XmlSchemaAbstractCtxtPtr,
     buf: *mut *mut XmlChar,
@@ -3793,13 +3577,9 @@ unsafe extern "C" fn xml_schema_simple_type_err(
     FREE_AND_NULL!(msg)
 }
 
-/**
- * xmlSchemaGetUnionSimpleTypeMemberTypes:
- * @type:  the Union Simple Type
- *
- * Returns a list of member types of @type if existing,
- * returns NULL otherwise.
- */
+/// Returns a list of member types of @type if existing,
+/// returns NULL otherwise.
+#[doc(alias = "xmlSchemaGetUnionSimpleTypeMemberTypes")]
 unsafe extern "C" fn xml_schema_get_union_simple_type_member_types(
     mut typ: XmlSchemaTypePtr,
 ) -> XmlSchemaTypeLinkPtr {
@@ -3833,9 +3613,7 @@ macro_rules! NORMALIZE {
     };
 }
 
-/*
-* cvc-simple-type
-*/
+// cvc-simple-type
 pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
@@ -4311,18 +4089,11 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
     -1
 }
 
-/**
- * xmlSchemaFormatQName:
- * @buf: the string buffer
- * @namespaceName:  the namespace name
- * @localName: the local name
- *
- * Returns the given QName in the format "{namespaceName}localName" or
- * just "localName" if @namespaceName is NULL.
- *
- * Returns the localName if @namespaceName is NULL, a formatted
- * string otherwise.
- */
+/// Returns the given QName in the format "{namespaceName}localName" or
+/// just "localName" if @namespaceName is NULL.
+///
+/// Returns the localName if @namespaceName is NULL, a formatted string otherwise.
+#[doc(alias = "xmlSchemaFormatQName")]
 pub(crate) unsafe extern "C" fn xml_schema_format_qname(
     buf: *mut *mut XmlChar,
     namespace_name: *const XmlChar,
@@ -4345,15 +4116,10 @@ pub(crate) unsafe extern "C" fn xml_schema_format_qname(
     *buf
 }
 
-/**
- * xml_schema_facet_type_to_string:
- * @type:  the facet type
- *
- * Convert the XmlSchemaTypeType to a c_char string.
- *
- * Returns the c_char string representation of the facet type if the
- *     type is a facet and an "Internal Error" string otherwise.
- */
+/// Convert the XmlSchemaTypeType to a c_char string.
+///
+/// Returns the c_char string representation of the facet type if the
+/// type is a facet and an "Internal Error" string otherwise.
 pub(crate) unsafe extern "C" fn xml_schema_facet_type_to_string(
     typ: XmlSchemaTypeType,
 ) -> *const XmlChar {
@@ -4399,13 +4165,8 @@ pub(crate) unsafe extern "C" fn xml_schema_facet_type_to_string(
     c"Internal Error".as_ptr() as _
 }
 
-/**
- * xmlSchemaPErrMemory:
- * @node: a context node
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchemaPErrMemory")]
 unsafe extern "C" fn xml_schema_perr_memory(
     ctxt: XmlSchemaParserCtxtPtr,
     extra: *const c_char,
@@ -4458,18 +4219,11 @@ unsafe extern "C" fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
     ret
 }
 
-/*
- * Interfaces for parsing.
- */
-/**
- * xmlSchemaNewParserCtxt:
- * @URL:  the location of the schema
- *
- * Create an XML Schemas parse context for that file/resource expected
- * to contain an XML Schemas file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schemas parse context for that file/resource expected
+/// to contain an XML Schemas file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchemaNewParserCtxt")]
 pub unsafe extern "C" fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSchemaParserCtxtPtr {
     if url.is_null() {
         return null_mut();
@@ -4484,16 +4238,11 @@ pub unsafe extern "C" fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSc
     ret
 }
 
-/**
- * xmlSchemaNewMemParserCtxt:
- * @buffer:  a pointer to a c_char array containing the schemas
- * @size:  the size of the array
- *
- * Create an XML Schemas parse context for that memory buffer expected
- * to contain an XML Schemas file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schemas parse context for that memory buffer expected
+/// to contain an XML Schemas file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchemaNewMemParserCtxt")]
 pub unsafe extern "C" fn xml_schema_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: i32,
@@ -4511,15 +4260,11 @@ pub unsafe extern "C" fn xml_schema_new_mem_parser_ctxt(
     ret
 }
 
-/**
- * xmlSchemaNewDocParserCtxt:
- * @doc:  a preparsed document tree
- *
- * Create an XML Schemas parse context for that document.
- * NB. The document may be modified during the parsing process.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schemas parse context for that document.
+/// NB. The document may be modified during the parsing process.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchemaNewDocParserCtxt")]
 pub unsafe extern "C" fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchemaParserCtxtPtr {
     if doc.is_null() {
         return null_mut();
@@ -4536,12 +4281,8 @@ pub unsafe extern "C" fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSc
     ret
 }
 
-/**
- * xmlSchemaFreeParserCtxt:
- * @ctxt:  the schema parser context
- *
- * Free the resources associated to the schema parser context
- */
+/// Free the resources associated to the schema parser context
+#[doc(alias = "xmlSchemaFreeParserCtxt")]
 pub unsafe extern "C" fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -4564,15 +4305,8 @@ pub unsafe extern "C" fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPt
     xml_free(ctxt as _);
 }
 
-/**
- * xmlSchemaSetParserErrors:
- * @ctxt:  a schema validation context
- * @err:  the error callback
- * @warn:  the warning callback
- * @ctx:  contextual data for the callbacks
- *
- * Set the callback functions used to handle errors for a validation context
- */
+/// Set the callback functions used to handle errors for a validation context
+#[doc(alias = "xmlSchemaSetParserErrors")]
 pub unsafe fn xml_schema_set_parser_errors(
     ctxt: XmlSchemaParserCtxtPtr,
     err: Option<GenericError>,
@@ -4590,14 +4324,8 @@ pub unsafe fn xml_schema_set_parser_errors(
     }
 }
 
-/**
- * xmlSchemaSetParserStructuredErrors:
- * @ctxt:  a schema parser context
- * @serror:  the structured error function
- * @ctx: the functions context
- *
- * Set the structured error callback
- */
+/// Set the structured error callback
+#[doc(alias = "xmlSchemaSetParserStructuredErrors")]
 pub unsafe fn xml_schema_set_parser_structured_errors(
     ctxt: XmlSchemaParserCtxtPtr,
     serror: Option<StructuredError>,
@@ -4613,17 +4341,10 @@ pub unsafe fn xml_schema_set_parser_structured_errors(
     }
 }
 
-/**
- * xmlSchemaGetParserErrors:
- * @ctxt:  a XMl-Schema parser context
- * @err: the error callback result
- * @warn: the warning callback result
- * @ctx: contextual data for the callbacks result
- *
- * Get the callback information used to handle errors for a parser context
- *
- * Returns -1 in case of failure, 0 otherwise
- */
+/// Get the callback information used to handle errors for a parser context
+///
+/// Returns -1 in case of failure, 0 otherwise
+#[doc(alias = "xmlSchemaGetParserErrors")]
 pub unsafe extern "C" fn xml_schema_get_parser_errors(
     ctxt: XmlSchemaParserCtxtPtr,
     err: *mut Option<GenericError>,
@@ -4645,15 +4366,10 @@ pub unsafe extern "C" fn xml_schema_get_parser_errors(
     0
 }
 
-/**
- * xmlSchemaIsValid:
- * @ctxt: the schema validation context
- *
- * Check if any error was detected during validation.
- *
- * Returns 1 if valid so far, 0 if errors were detected, and -1 in case
- *         of internal error.
- */
+/// Check if any error was detected during validation.
+///
+/// Returns 1 if valid so far, 0 if errors were detected, and -1 in case of internal error.
+#[doc(alias = "xmlSchemaIsValid")]
 pub unsafe extern "C" fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
@@ -4661,14 +4377,10 @@ pub unsafe extern "C" fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32
     ((*ctxt).err == 0) as i32
 }
 
-/**
- * xmlSchemaNewSchema:
- * @ctxt:  a schema validation context
- *
- * Allocate a new Schema structure.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new Schema structure.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlSchemaNewSchema")]
 unsafe extern "C" fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
     let ret: XmlSchemaPtr = xml_malloc(size_of::<XmlSchema>()) as _;
     if ret.is_null() {
@@ -4773,16 +4485,10 @@ unsafe extern "C" fn xml_schema_construction_ctxt_create(
     ret
 }
 
-/**
- * xmlSchemaGetSchemaBucket:
- * @pctxt: the schema parser context
- * @schemaLocation: the URI of the schema document
- *
- * Returns a schema bucket if it was already parsed.
- *
- * Returns a schema bucket if it was already parsed from
- *         @schemaLocation, NULL otherwise.
- */
+/// Returns a schema bucket if it was already parsed.
+///
+/// Returns a schema bucket if it was already parsed from @schemaLocation, NULL otherwise.
+#[doc(alias = "xmlSchemaGetSchemaBucket")]
 unsafe extern "C" fn xml_schema_get_schema_bucket(
     pctxt: XmlSchemaParserCtxtPtr,
     schema_location: *const XmlChar,
@@ -4924,17 +4630,8 @@ unsafe extern "C" fn xml_schema_get_chameleon_schema_bucket(
     null_mut()
 }
 
-/**
- * xmlSchemaPErr:
- * @ctxt: the parsing context
- * @node: the context node
- * @error: the error code
- * @msg: the error message
- * @str1: extra data
- * @str2: extra data
- *
- * Handle a parser error
- */
+/// Handle a parser error
+#[doc(alias = "xmlSchemaPErr")]
 unsafe extern "C" fn xml_schema_perr(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -4988,15 +4685,9 @@ macro_rules! IS_BLANK_NODE {
     };
 }
 
-/**
- * xml_schema_is_blank:
- * @str:  a string
- * @len: the length of the string or -1
- *
- * Check if a string is ignorable
- *
- * Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
- */
+/// Check if a string is ignorable
+///
+/// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
 unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) -> i32 {
     if str.is_null() {
         return 1;
@@ -5021,13 +4712,8 @@ unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) ->
     1
 }
 
-/**
- * xmlSchemaCleanupDoc:
- * @ctxt:  a schema validation context
- * @node:  the root of the document.
- *
- * removes unwanted nodes in a schemas document tree
- */
+/// Removes unwanted nodes in a schemas document tree
+#[doc(alias = "xmlSchemaCleanupDoc")]
 unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr) {
     let mut delete: XmlNodePtr;
     let mut cur: XmlNodePtr;
@@ -5106,12 +4792,8 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
     }
 }
 
-/**
- * xmlSchemaFreeAttribute:
- * @attr:  an attribute declaration
- *
- * Deallocates an attribute declaration structure.
- */
+/// Deallocates an attribute declaration structure.
+#[doc(alias = "xmlSchemaFreeAttribute")]
 unsafe extern "C" fn xml_schema_free_attribute(attr: XmlSchemaAttributePtr) {
     if attr.is_null() {
         return;
@@ -5125,12 +4807,8 @@ unsafe extern "C" fn xml_schema_free_attribute(attr: XmlSchemaAttributePtr) {
     xml_free(attr as _);
 }
 
-/**
- * xmlSchemaFreeAttributeUse:
- * @use:  an attribute use
- *
- * Deallocates an attribute use structure.
- */
+/// Deallocates an attribute use structure.
+#[doc(alias = "xmlSchemaFreeAttributeUse")]
 unsafe extern "C" fn xml_schema_free_attribute_use(using: XmlSchemaAttributeUsePtr) {
     if using.is_null() {
         return;
@@ -5144,12 +4822,8 @@ unsafe extern "C" fn xml_schema_free_attribute_use(using: XmlSchemaAttributeUseP
     xml_free(using as _);
 }
 
-/**
- * xmlSchemaFreeElement:
- * @schema:  a schema element structure
- *
- * Deallocate a Schema Element structure.
- */
+/// Deallocate a Schema Element structure.
+#[doc(alias = "xmlSchemaFreeElement")]
 unsafe extern "C" fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
     if elem.is_null() {
         return;
@@ -5166,12 +4840,8 @@ unsafe extern "C" fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
     xml_free(elem as _);
 }
 
-/**
- * xmlSchemaFreeAttributeUseProhib:
- * @prohib:  an attribute use prohibition
- *
- * Deallocates an attribute use structure.
- */
+/// Deallocates an attribute use structure.
+#[doc(alias = "xmlSchemaFreeAttributeUseProhib")]
 unsafe extern "C" fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttributeUseProhibPtr) {
     if prohib.is_null() {
         return;
@@ -5179,12 +4849,8 @@ unsafe extern "C" fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttri
     xml_free(prohib as _);
 }
 
-/**
- * xmlSchemaFreeModelGroup:
- * @item:  a schema model group
- *
- * Deallocates a schema model group structure.
- */
+/// Deallocates a schema model group structure.
+#[doc(alias = "xmlSchemaFreeModelGroup")]
 unsafe extern "C" fn xml_schema_free_model_group(item: XmlSchemaModelGroupPtr) {
     if !(*item).annot.is_null() {
         xml_schema_free_annot((*item).annot);
@@ -5192,12 +4858,8 @@ unsafe extern "C" fn xml_schema_free_model_group(item: XmlSchemaModelGroupPtr) {
     xml_free(item as _);
 }
 
-/**
- * xmlSchemaFreeAttributeGroup:
- * @schema:  a schema attribute group structure
- *
- * Deallocate a Schema Attribute Group structure.
- */
+/// Deallocate a Schema Attribute Group structure.
+#[doc(alias = "xmlSchemaFreeAttributeGroup")]
 unsafe extern "C" fn xml_schema_free_attribute_group(attr_gr: XmlSchemaAttributeGroupPtr) {
     if attr_gr.is_null() {
         return;
@@ -5211,12 +4873,8 @@ unsafe extern "C" fn xml_schema_free_attribute_group(attr_gr: XmlSchemaAttribute
     xml_free(attr_gr as _);
 }
 
-/**
- * xmlSchemaFreeModelGroupDef:
- * @item:  a schema model group definition
- *
- * Deallocates a schema model group definition.
- */
+/// Deallocates a schema model group definition.
+#[doc(alias = "xmlSchemaFreeModelGroupDef")]
 unsafe extern "C" fn xml_schema_free_model_group_def(item: XmlSchemaModelGroupDefPtr) {
     if !(*item).annot.is_null() {
         xml_schema_free_annot((*item).annot);
@@ -5224,12 +4882,8 @@ unsafe extern "C" fn xml_schema_free_model_group_def(item: XmlSchemaModelGroupDe
     xml_free(item as _);
 }
 
-/**
- * xmlSchemaFreeIDC:
- * @idc: a identity-constraint definition
- *
- * Deallocates an identity-constraint definition.
- */
+/// Deallocates an identity-constraint definition.
+#[doc(alias = "xmlSchemaFreeIDC")]
 unsafe extern "C" fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
     let mut cur: XmlSchemaIdcselectPtr;
     let mut prev: XmlSchemaIdcselectPtr;
@@ -5264,12 +4918,8 @@ unsafe extern "C" fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
     xml_free(idc_def as _);
 }
 
-/**
- * xmlSchemaFreeNotation:
- * @schema:  a schema notation structure
- *
- * Deallocate a Schema Notation structure.
- */
+/// Deallocate a Schema Notation structure.
+#[doc(alias = "xmlSchemaFreeNotation")]
 unsafe extern "C" fn xml_schema_free_notation(nota: XmlSchemaNotationPtr) {
     if nota.is_null() {
         return;
@@ -5277,12 +4927,8 @@ unsafe extern "C" fn xml_schema_free_notation(nota: XmlSchemaNotationPtr) {
     xml_free(nota as _);
 }
 
-/**
- * xmlSchemaFreeQNameRef:
- * @item: a QName reference structure
- *
- * Deallocatea a QName reference structure.
- */
+/// Deallocatea a QName reference structure.
+#[doc(alias = "xmlSchemaFreeQNameRef")]
 unsafe extern "C" fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
     xml_free(item as _);
 }
@@ -5404,16 +5050,10 @@ unsafe extern "C" fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
     xml_free(bucket as _);
 }
 
-/**
- * xmlSchemaGetProp:
- * @ctxt: the parser context
- * @node: the node
- * @name: the property name
- *
- * Read a attribute value and internalize the string
- *
- * Returns the string or NULL if not present.
- */
+/// Read a attribute value and internalize the string
+///
+/// Returns the string or NULL if not present.
+#[doc(alias = "xmlSchemaGetProp")]
 unsafe extern "C" fn xml_schema_get_prop(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -5605,17 +5245,11 @@ unsafe extern "C" fn xml_schema_bucket_create(
     ret
 }
 
-/**
- * xmlSchemaAddSchemaDoc:
- * @pctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parse an included (and to-be-redefined) XML schema document.
- *
- * Returns 0 on success, a positive error code on errors and
- *         -1 in case of an internal or API error.
- */
+/// Parse an included (and to-be-redefined) XML schema document.
+///
+/// Returns 0 on success, a positive error code on errors and
+/// -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaAddSchemaDoc")]
 unsafe extern "C" fn xml_schema_add_schema_doc(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: i32, /* import or include or redefine */
@@ -6107,16 +5741,10 @@ unsafe extern "C" fn xml_schema_clear_schema_defaults(schema: XmlSchemaPtr) {
     }
 }
 
-/**
- * xmlSchemaGetPropNode:
- * @node: the element node
- * @name: the name of the attribute
- *
- * Seeks an attribute with a name of @name in
- * no namespace.
- *
- * Returns the attribute or NULL if not present.
- */
+/// Seeks an attribute with a name of @name in no namespace.
+///
+/// Returns the attribute or NULL if not present.
+#[doc(alias = "xmlSchemaGetPropNode")]
 unsafe extern "C" fn xml_schema_get_prop_node(node: XmlNodePtr, name: *const c_char) -> XmlAttrPtr {
     let mut prop: XmlAttrPtr;
 
@@ -6137,23 +5765,8 @@ unsafe extern "C" fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> *c
     (*node).get_content()
 }
 
-/**
- * xmlSchemaPErrExt:
- * @ctxt: the parsing context
- * @node: the context node
- * @error: the error code
- * @strData1: extra data
- * @strData2: extra data
- * @strData3: extra data
- * @msg: the message
- * @str1:  extra parameter for the message display
- * @str2:  extra parameter for the message display
- * @str3:  extra parameter for the message display
- * @str4:  extra parameter for the message display
- * @str5:  extra parameter for the message display
- *
- * Handle a parser error
- */
+/// Handle a parser error
+#[doc(alias = "xmlSchemaPErrExt")]
 unsafe extern "C" fn xml_schema_perr_ext(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -6213,18 +5826,9 @@ unsafe extern "C" fn xml_schema_perr_ext(
     );
 }
 
-/**
- * xmlSchemaPSimpleTypeErr:
- * @ctxt:  the schema validation context
- * @error: the error code
- * @type: the type specifier
- * @ownerItem: the schema object if existent
- * @node: the validated node
- * @value: the validated value
- *
- * Reports a simple type validation error.
- * TODO: Should this report the value of an element as well?
- */
+/// Reports a simple type validation error.
+/// TODO: Should this report the value of an element as well?
+#[doc(alias = "xmlSchemaPSimpleTypeErr")]
 unsafe extern "C" fn xml_schema_psimple_type_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -6331,15 +5935,11 @@ unsafe extern "C" fn xml_schema_psimple_type_err(
     FREE_AND_NULL!(msg)
 }
 
-/**
- * xmlSchemaPValAttrID:
- * @ctxt:  a schema parser context
- *
- * Extracts and validates the ID of an attribute value.
- *
- * Returns 0, in case the ID is valid, a positive error code
- * if not valid and -1 if an internal error occurs.
- */
+/// Extracts and validates the ID of an attribute value.
+///
+/// Returns 0, in case the ID is valid, a positive error code
+/// if not valid and -1 if an internal error occurs.
+#[doc(alias = "xmlSchemaPValAttrID")]
 unsafe extern "C" fn xml_schema_pval_attr_node_id(
     ctxt: XmlSchemaParserCtxtPtr,
     attr: XmlAttrPtr,
@@ -6443,22 +6043,13 @@ unsafe extern "C" fn xml_schema_get_node_content(
     ret
 }
 
-/**
- * xmlSchemaPValAttrNodeValue:
- *
- * @pctxt:  a schema parser context
- * @ownerItem: the schema object owner if existent
- * @attr:  the schema attribute node being validated
- * @value: the value
- * @type: the built-in type to be validated against
- *
- * Validates a value against the given built-in type.
- * This one is intended to be used internally for validation
- * of schema attribute values during parsing of the schema.
- *
- * Returns 0 if the value is valid, a positive error code
- * number otherwise and -1 in case of an internal or API error.
- */
+/// Validates a value against the given built-in type.
+/// This one is intended to be used internally for validation
+/// of schema attribute values during parsing of the schema.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaPValAttrNodeValue")]
 unsafe extern "C" fn xml_schema_pval_attr_node_value(
     pctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
@@ -6537,22 +6128,13 @@ unsafe extern "C" fn xml_schema_pval_attr_node_value(
     ret
 }
 
-/**
- * xmlSchemaPValAttrNode:
- *
- * @ctxt:  a schema parser context
- * @ownerItem: the schema object owner if existent
- * @attr:  the schema attribute node being validated
- * @type: the built-in type to be validated against
- * @value: the resulting value if any
- *
- * Extracts and validates a value against the given built-in type.
- * This one is intended to be used internally for validation
- * of schema attribute values during parsing of the schema.
- *
- * Returns 0 if the value is valid, a positive error code
- * number otherwise and -1 in case of an internal or API error.
- */
+/// Extracts and validates a value against the given built-in type.
+/// This one is intended to be used internally for validation
+/// of schema attribute values during parsing of the schema.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaPValAttrNode")]
 unsafe extern "C" fn xml_schema_pval_attr_node(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
@@ -6572,14 +6154,8 @@ unsafe extern "C" fn xml_schema_pval_attr_node(
     xml_schema_pval_attr_node_value(ctxt, owner_item, attr, val, typ)
 }
 
-/**
- * xmlSchemaPValAttrFormDefault:
- * @value:  the value
- * @flags: the flags to be modified
- * @flagQualified: the specific flag for "qualified"
- *
- * Returns 0 if the value is valid, 1 otherwise.
- */
+/// Returns 0 if the value is valid, 1 otherwise.
+#[doc(alias = "xmlSchemaPValAttrFormDefault")]
 unsafe extern "C" fn xml_schema_pval_attr_form_default(
     value: *const XmlChar,
     flags: *mut i32,
@@ -6596,22 +6172,11 @@ unsafe extern "C" fn xml_schema_pval_attr_form_default(
     0
 }
 
-/**
- * xmlSchemaPValAttrBlockFinal:
- * @value:  the value
- * @flags: the flags to be modified
- * @flagAll: the specific flag for "#all"
- * @flagExtension: the specific flag for "extension"
- * @flagRestriction: the specific flag for "restriction"
- * @flagSubstitution: the specific flag for "substitution"
- * @flagList: the specific flag for "list"
- * @flagUnion: the specific flag for "union"
- *
- * Validates the value of the attribute "final" and "block". The value
- * is converted into the specified flag values and returned in @flags.
- *
- * Returns 0 if the value is valid, 1 otherwise.
- */
+/// Validates the value of the attribute "final" and "block". The value
+/// is converted into the specified flag values and returned in @flags.
+///
+/// Returns 0 if the value is valid, 1 otherwise.
+#[doc(alias = "xmlSchemaPValAttrBlockFinal")]
 unsafe extern "C" fn xml_schema_pval_attr_block_final(
     value: *const XmlChar,
     flags: *mut i32,
@@ -6893,15 +6458,10 @@ unsafe extern "C" fn xml_schema_parse_schema_element(
     -1
 }
 
-/**
- * xmlSchemaNewAnnot:
- * @ctxt:  a schema validation context
- * @node:  a node
- *
- * Allocate a new annotation structure.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new annotation structure.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlSchemaNewAnnot")]
 unsafe extern "C" fn xml_schema_new_annot(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -6928,15 +6488,8 @@ unsafe extern "C" fn xml_schema_format_qname_ns(
     }
 }
 
-/**
- * xmlSchemaPIllegalAttrErr:
- * @ctxt: the schema parser context
- * @error: the error code
- * @ownerItem: the attribute's owner item
- * @attr: the illegal attribute node
- *
- * Reports an illegal attribute during the parse.
- */
+/// Reports an illegal attribute during the parse.
+#[doc(alias = "xmlSchemaPIllegalAttrErr")]
 unsafe extern "C" fn xml_schema_pillegal_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -6965,24 +6518,13 @@ unsafe extern "C" fn xml_schema_pillegal_attr_err(
     FREE_AND_NULL!(str_b);
 }
 
-/**
- * xmlSchemaPValAttr:
- *
- * @ctxt:  a schema parser context
- * @node: the element node of the attribute
- * @ownerItem: the schema object owner if existent
- * @ownerElem: the owner element node
- * @name:  the name of the schema attribute node
- * @type: the built-in type to be validated against
- * @value: the resulting value if any
- *
- * Extracts and validates a value against the given built-in type.
- * This one is intended to be used internally for validation
- * of schema attribute values during parsing of the schema.
- *
- * Returns 0 if the value is valid, a positive error code
- * number otherwise and -1 in case of an internal or API error.
- */
+/// Extracts and validates a value against the given built-in type.
+/// This one is intended to be used internally for validation
+/// of schema attribute values during parsing of the schema.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaPValAttr")]
 unsafe extern "C" fn xml_schema_pval_attr(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
@@ -7022,17 +6564,10 @@ unsafe extern "C" fn xml_schema_pval_attr(
     xml_schema_pval_attr_node(ctxt, owner_item, attr, typ, value)
 }
 
-/**
- * xmlSchemaGetPropNodeNs:
- * @node: the element node
- * @uri: the uri
- * @name: the name of the attribute
- *
- * Seeks an attribute with a local name of @name and
- * a namespace URI of @uri.
- *
- * Returns the attribute or NULL if not present.
- */
+/// Seeks an attribute with a local name of @name and a namespace URI of @uri.
+///
+/// Returns the attribute or NULL if not present.
+#[doc(alias = "xmlSchemaGetPropNodeNs")]
 unsafe extern "C" fn xml_schema_get_prop_node_ns(
     node: XmlNodePtr,
     uri: *const c_char,
@@ -7056,18 +6591,8 @@ unsafe extern "C" fn xml_schema_get_prop_node_ns(
     null_mut()
 }
 
-/**
- * xmlSchemaPErr2:
- * @ctxt: the parsing context
- * @node: the context node
- * @node: the current child
- * @error: the error code
- * @msg: the error message
- * @str1: extra data
- * @str2: extra data
- *
- * Handle a parser error
- */
+/// Handle a parser error
+#[doc(alias = "xmlSchemaPErr2")]
 unsafe extern "C" fn xml_schema_perr2(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -7084,18 +6609,8 @@ unsafe extern "C" fn xml_schema_perr2(
     }
 }
 
-/**
- * xmlSchemaPContentErr:
- * @ctxt: the schema parser context
- * @error: the error code
- * @ownerItem: the owner item of the holder of the content
- * @ownerElem: the node of the holder of the content
- * @child: the invalid child node
- * @message: the optional error message
- * @content: the optional string describing the correct content
- *
- * Reports an error concerning the content of a schema element.
- */
+/// Reports an error concerning the content of a schema element.
+#[doc(alias = "xmlSchemaPContentErr")]
 unsafe extern "C" fn xml_schema_pcontent_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -7142,18 +6657,11 @@ unsafe extern "C" fn xml_schema_pcontent_err(
     FREE_AND_NULL!(des)
 }
 
-/**
- * xmlSchemaParseAnnotation:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Attribute declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns -1 in case of error, 0 if the declaration is improper and
- *         1 in case of success.
- */
+/// parse a XML schema Attribute declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns -1 in case of error, 0 if the declaration is improper and 1 in case of success.
+#[doc(alias = "xmlSchemaParseAnnotation")]
 unsafe extern "C" fn xml_schema_parse_annotation(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -7300,20 +6808,7 @@ unsafe extern "C" fn xml_schema_parse_annotation(
     ret
 }
 
-/**
- * xml_schema_pcustom_err:
- * @ctxt: the schema parser context
- * @error: the error code
- * @itemDes: the designation of the schema item
- * @item: the schema item
- * @itemElem: the node of the schema item
- * @message: the error message
- * @str1: an optional param for the error message
- * @str2: an optional param for the error message
- * @str3: an optional param for the error message
- *
- * Reports an error during parsing.
- */
+/// Reports an error during parsing.
 unsafe extern "C" fn xml_schema_pcustom_err_ext(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -7352,18 +6847,7 @@ unsafe extern "C" fn xml_schema_pcustom_err_ext(
     FREE_AND_NULL!(msg);
 }
 
-/**
- * xml_schema_pcustom_err:
- * @ctxt: the schema parser context
- * @error: the error code
- * @itemDes: the designation of the schema item
- * @item: the schema item
- * @itemElem: the node of the schema item
- * @message: the error message
- * @str1: the optional param for the error message
- *
- * Reports an error during parsing.
- */
+/// Reports an error during parsing.
 unsafe extern "C" fn xml_schema_pcustom_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -7420,16 +6904,11 @@ unsafe extern "C" fn xml_schema_build_absolute_uri(
     null_mut()
 }
 
-/**
- * xmlSchemaNewParserCtxtUseDict:
- * @URL:  the location of the schema
- * @dict: the dictionary to be used
- *
- * Create an XML Schemas parse context for that file/resource expected
- * to contain an XML Schemas file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schemas parse context for that file/resource expected
+/// to contain an XML Schemas file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchemaNewParserCtxtUseDict")]
 unsafe extern "C" fn xml_schema_new_parser_ctxt_use_dict(
     url: *const c_char,
     dict: XmlDictPtr,
@@ -7514,16 +6993,8 @@ unsafe extern "C" fn xml_schema_parse_new_doc(
     res
 }
 
-/**
- * xmlSchemaPMissingAttrErr:
- * @ctxt: the schema validation context
- * @ownerItem: the owner as a schema object
- * @ownerElem: the owner as an element node
- * @node: the parent element node of the missing attribute node
- * @type: the corresponding type of the attribute node
- *
- * Reports an illegal attribute.
- */
+/// Reports an illegal attribute.
+#[doc(alias = "xmlSchemaPMissingAttrErr")]
 unsafe extern "C" fn xml_schema_pmissing_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -7693,12 +7164,9 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
     //     return -1;
 }
 
-/*
-* xmlSchemaAddRedef:
-*
-* Adds a redefinition information. This is used at a later stage to:
-* resolve references to the redefined components and to check constraints.
-*/
+/// Adds a redefinition information. This is used at a later stage to:
+/// resolve references to the redefined components and to check constraints.
+#[doc(alias = "xmlSchemaAddRedef")]
 unsafe extern "C" fn xml_schema_add_redef(
     pctxt: XmlSchemaParserCtxtPtr,
     target_bucket: XmlSchemaBucketPtr,
@@ -7730,18 +7198,11 @@ unsafe extern "C" fn xml_schema_add_redef(
     ret
 }
 
-/**
- * xmlSchemaAddType:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @name:  the item name
- * @namespace:  the namespace
- *
- * Add an XML schema item
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema item
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddType")]
 unsafe extern "C" fn xml_schema_add_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -7784,22 +7245,13 @@ unsafe extern "C" fn xml_schema_add_type(
     ret
 }
 
-/**
- * xmlSchemaPValAttrNodeQNameValue:
- * @ctxt:  a schema parser context
- * @schema: the schema context
- * @ownerItem: the parent as a schema object
- * @value:  the QName value
- * @uri:  the resulting namespace URI if found
- * @local: the resulting local part if found, the attribute value otherwise
- *
- * Extracts the local name and the URI of a QName value and validates it.
- * This one is intended to be used on attribute values that
- * should resolve to schema components.
- *
- * Returns 0, in case the QName is valid, a positive error code
- * if not valid and -1 if an internal error occurs.
- */
+/// Extracts the local name and the URI of a QName value and validates it.
+/// This one is intended to be used on attribute values that
+/// should resolve to schema components.
+///
+/// Returns 0, in case the QName is valid, a positive error code
+/// if not valid and -1 if an internal error occurs.
+#[doc(alias = "xmlSchemaPValAttrNodeQNameValue")]
 unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -7873,22 +7325,13 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname_value(
     0
 }
 
-/**
- * xmlSchemaPValAttrNodeQName:
- * @ctxt:  a schema parser context
- * @schema: the schema context
- * @ownerItem: the owner as a schema object
- * @attr:  the attribute node
- * @uri:  the resulting namespace URI if found
- * @local: the resulting local part if found, the attribute value otherwise
- *
- * Extracts and validates the QName of an attribute value.
- * This one is intended to be used on attribute values that
- * should resolve to schema components.
- *
- * Returns 0, in case the QName is valid, a positive error code
- * if not valid and -1 if an internal error occurs.
- */
+/// Extracts and validates the QName of an attribute value.
+/// This one is intended to be used on attribute values that
+/// should resolve to schema components.
+///
+/// Returns 0, in case the QName is valid, a positive error code
+/// if not valid and -1 if an internal error occurs.
+#[doc(alias = "xmlSchemaPValAttrNodeQName")]
 unsafe extern "C" fn xml_schema_pval_attr_node_qname(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -7901,21 +7344,11 @@ unsafe extern "C" fn xml_schema_pval_attr_node_qname(
     xml_schema_pval_attr_node_qname_value(ctxt, schema, owner_item, attr, value, uri, local)
 }
 
-/**
- * xmlSchemaPValAttrQName:
- * @ctxt:  a schema parser context
- * @schema: the schema context
- * @ownerItem: the owner as a schema object
- * @ownerElem:  the parent node of the attribute
- * @name:  the name of the attribute
- * @uri:  the resulting namespace URI if found
- * @local: the resulting local part if found, the attribute value otherwise
- *
- * Extracts and validates the QName of an attribute value.
- *
- * Returns 0, in case the QName is valid, a positive error code
- * if not valid and -1 if an internal error occurs.
- */
+/// Extracts and validates the QName of an attribute value.
+///
+/// Returns 0, in case the QName is valid, a positive error code
+/// if not valid and -1 if an internal error occurs.
+#[doc(alias = "xmlSchemaPValAttrQName")]
 unsafe extern "C" fn xml_schema_pval_attr_qname(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -7949,15 +7382,10 @@ macro_rules! ADD_ANNOTATION {
     };
 }
 
-/**
- * xmlSchemaAssignAnnotation:
- * @item: the schema component
- * @annot: the annotation
- *
- * Adds the annotation to the given schema component.
- *
- * Returns the given annotation.
- */
+/// Adds the annotation to the given schema component.
+///
+/// Returns the given annotation.
+#[doc(alias = "xmlSchemaAssignAnnotation")]
 unsafe extern "C" fn xml_schema_add_annotation(
     ann_item: XmlSchemaAnnotItemPtr,
     annot: XmlSchemaAnnotPtr,
@@ -8029,18 +7457,11 @@ unsafe extern "C" fn xml_schema_add_annotation(
     annot
 }
 
-/**
- * xmlSchemaAddModelGroup:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @type: the "compositor" type of the model group
- * @node: the node in the schema doc
- *
- * Adds a schema model group
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Adds a schema model group
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddModelGroup")]
 unsafe extern "C" fn xml_schema_add_model_group(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -8075,15 +7496,10 @@ unsafe extern "C" fn xml_schema_add_model_group(
     ret
 }
 
-/**
- * xmlGetMinOccurs:
- * @ctxt:  a schema validation context
- * @node:  a subtree containing XML Schema information
- *
- * Get the minOccurs property
- *
- * Returns the default if not found, or the value
- */
+/// Get the minOccurs property
+///
+/// Returns the default if not found, or the value
+#[doc(alias = "xmlGetMinOccurs")]
 unsafe extern "C" fn xml_get_min_occurs(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -8162,15 +7578,10 @@ unsafe extern "C" fn xml_get_min_occurs(
     ret
 }
 
-/**
- * xmlGetMaxOccurs:
- * @ctxt:  a schema validation context
- * @node:  a subtree containing XML Schema information
- *
- * Get the maxOccurs property
- *
- * Returns the default if not found, or the value
- */
+/// Get the maxOccurs property
+///
+/// Returns the default if not found, or the value
+#[doc(alias = "xmlGetMaxOccurs")]
 unsafe extern "C" fn xml_get_max_occurs(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -8271,16 +7682,8 @@ unsafe extern "C" fn xml_get_max_occurs(
     ret
 }
 
-/**
- * xmlSchemaPCustomAttrErr:
- * @ctxt: the schema parser context
- * @error: the error code
- * @ownerDes: the designation of the owner
- * @ownerItem: the owner as a schema object
- * @attr: the illegal attribute node
- *
- * Reports an illegal attribute during the parse.
- */
+/// Reports an illegal attribute during the parse.
+#[doc(alias = "xmlSchemaPCustomAttrErr")]
 unsafe extern "C" fn xml_schema_pcustom_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -8396,19 +7799,11 @@ unsafe extern "C" fn xml_schema_pcheck_particle_correct_2(
     0
 }
 
-/**
- * xmlSchemaAddParticle:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @node: the corresponding node in the schema doc
- * @min: the minOccurs
- * @max: the maxOccurs
- *
- * Adds an XML schema particle component.
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Adds an XML schema particle component.
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddParticle")]
 unsafe extern "C" fn xml_schema_add_particle(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -8497,16 +7892,8 @@ unsafe extern "C" fn xml_schema_check_reference(
     XmlParserErrors::XmlSchemapSrcResolve as i32
 }
 
-/**
- * xmlSchemaPMutualExclAttrErr:
- * @ctxt: the schema validation context
- * @error: the error code
- * @elemDes: the designation of the parent element node
- * @attr: the bad attribute node
- * @type: the corresponding type of the attribute node
- *
- * Reports an illegal attribute.
- */
+/// Reports an illegal attribute.
+#[doc(alias = "xmlSchemaPMutualExclAttrErr")]
 unsafe extern "C" fn xml_schema_pmutual_excl_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -8570,18 +7957,11 @@ unsafe extern "C" fn xml_schema_new_qname_ref(
     ret
 }
 
-/**
- * xmlSchemaAddElement:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @name:  the type name
- * @namespace:  the type namespace
- *
- * Add an XML schema Element declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema Element declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddElement")]
 unsafe extern "C" fn xml_schema_add_element(
     ctxt: XmlSchemaParserCtxtPtr,
     name: *const XmlChar,
@@ -8615,16 +7995,10 @@ unsafe extern "C" fn xml_schema_add_element(
     ret
 }
 
-/**
- * xmlSchemaPGetBoolNodeValue:
- * @ctxt:  a schema validation context
- * @ownerItem:  the owner as a schema item
- * @node: the node holding the value
- *
- * Converts a boolean string value into 1 or 0.
- *
- * Returns 0 or 1.
- */
+/// Converts a boolean string value into 1 or 0.
+///
+/// Returns 0 or 1.
+#[doc(alias = "xmlSchemaPGetBoolNodeValue")]
 unsafe extern "C" fn xml_schema_pget_bool_node_value(
     ctxt: XmlSchemaParserCtxtPtr,
     owner_item: XmlSchemaBasicItemPtr,
@@ -8666,17 +8040,10 @@ unsafe extern "C" fn xml_schema_pget_bool_node_value(
     res
 }
 
-/**
- * xmlSchemaParseModelGroupDefRef:
- * @ctxt:  the parser context
- * @schema: the schema being built
- * @node:  the node
- *
- * Parses a reference to a model group definition.
- *
- * We will return a particle component with a qname-component or
- * NULL in case of an error.
- */
+/// Parses a reference to a model group definition.
+///
+/// We will return a particle component with a qname-component or NULL in case of an error.
+#[doc(alias = "xmlSchemaParseModelGroupDefRef")]
 unsafe extern "C" fn xml_schema_parse_model_group_def_ref(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -8797,18 +8164,11 @@ unsafe extern "C" fn xml_schema_parse_model_group_def_ref(
     item as XmlSchemaTreeItemPtr
 }
 
-/**
- * xmlSchemaAddAttributeUse:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @name:  the item name
- * @namespace:  the namespace
- *
- * Add an XML schema Attribute declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema Attribute declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddAttributeUse")]
 unsafe extern "C" fn xml_schema_add_attribute_use(
     pctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -8832,18 +8192,11 @@ unsafe extern "C" fn xml_schema_add_attribute_use(
     ret
 }
 
-/**
- * xmlSchemaAddAttribute:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @name:  the item name
- * @namespace:  the namespace
- *
- * Add an XML schema Attribute declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema Attribute declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddAttribute")]
 unsafe extern "C" fn xml_schema_add_attribute(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -8898,17 +8251,11 @@ unsafe extern "C" fn xml_schema_add_attribute_use_prohib(
     ret
 }
 
-/**
- * xmlSchemaParseAttribute:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Attribute declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the attribute declaration.
- */
+/// Parse a XML schema Attribute declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the attribute declaration.
+#[doc(alias = "xmlSchemaParseAttribute")]
 unsafe extern "C" fn xml_schema_parse_local_attribute(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -9407,19 +8754,13 @@ unsafe extern "C" fn xml_schema_parse_local_attribute(
     using as XmlSchemaBasicItemPtr
 }
 
-/**
- * xmlSchemaParseAttributeGroupRef:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parse an attribute group definition reference.
- * Note that a reference to an attribute group does not
- * correspond to any component at all.
- * *WARNING* this interface is highly subject to change
- *
- * Returns the attribute group or NULL in case of error.
- */
+/// Parse an attribute group definition reference.
+/// Note that a reference to an attribute group does not
+/// correspond to any component at all.
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the attribute group or NULL in case of error.
+#[doc(alias = "xmlSchemaParseAttributeGroupRef")]
 unsafe extern "C" fn xml_schema_parse_attribute_group_ref(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -9572,16 +8913,8 @@ unsafe extern "C" fn xml_schema_parse_attribute_group_ref(
     ret
 }
 
-/**
- * xmlSchemaParseLocalAttributes:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- * @type:  the hosting type where the attributes will be anchored
- *
- * Parses attribute uses and attribute declarations and
- * attribute group references.
- */
+/// Parses attribute uses and attribute declarations and attribute group references.
+#[doc(alias = "xmlSchemaParseLocalAttributes")]
 unsafe extern "C" fn xml_schema_parse_local_attributes(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -9620,16 +8953,11 @@ unsafe extern "C" fn xml_schema_parse_local_attributes(
     0
 }
 
-/**
- * xmlSchemaAddWildcard:
- * @ctxt:  a schema validation context
- * @schema: a schema
- *
- * Adds a wildcard.
- * It corresponds to a xsd:anyAttribute and xsd:any.
- *
- * Returns the new structure or NULL in case of error
- */
+/// Adds a wildcard.
+/// It corresponds to a xsd:anyAttribute and xsd:any.
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddWildcard")]
 unsafe extern "C" fn xml_schema_add_wildcard(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -9654,14 +8982,10 @@ unsafe extern "C" fn xml_schema_add_wildcard(
     ret
 }
 
-/**
- * xmlSchemaNewWildcardNs:
- * @ctxt:  a schema validation context
- *
- * Creates a new wildcard namespace constraint.
- *
- * Returns the new structure or NULL in case of error
- */
+/// Creates a new wildcard namespace constraint.
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaNewWildcardNs")]
 unsafe extern "C" fn xml_schema_new_wildcard_ns_constraint(
     ctxt: XmlSchemaParserCtxtPtr,
 ) -> XmlSchemaWildcardNsPtr {
@@ -9680,19 +9004,13 @@ unsafe extern "C" fn xml_schema_new_wildcard_ns_constraint(
     ret
 }
 
-/**
- * xmlSchemaParseWildcardNs:
- * @ctxt:  a schema parser context
- * @wildc:  the wildcard, already created
- * @node:  a subtree containing XML Schema information
- *
- * Parses the attribute "processContents" and "namespace"
- * of a xsd:anyAttribute and xsd:any.
- * *WARNING* this interface is highly subject to change
- *
- * Returns 0 if everything goes fine, a positive error code
- * if something is not valid and -1 if an internal error occurs.
- */
+/// Parses the attribute "processContents" and "namespace"
+/// of a xsd:anyAttribute and xsd:any.
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns 0 if everything goes fine, a positive error code
+/// if something is not valid and -1 if an internal error occurs.
+#[doc(alias = "xmlSchemaParseWildcardNs")]
 unsafe extern "C" fn xml_schema_parse_wildcard_ns(
     ctxt: XmlSchemaParserCtxtPtr,
     _schema: XmlSchemaPtr,
@@ -9833,17 +9151,11 @@ unsafe extern "C" fn xml_schema_parse_wildcard_ns(
     ret
 }
 
-/**
- * xmlSchemaParseAnyAttribute:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema AnyAttribute declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns a wildcard or NULL.
- */
+/// parse a XML schema AnyAttribute declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns a wildcard or NULL.
+#[doc(alias = "xmlSchemaParseAnyAttribute")]
 unsafe extern "C" fn xml_schema_parse_any_attribute(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -9922,18 +9234,12 @@ unsafe extern "C" fn xml_schema_parse_any_attribute(
     ret
 }
 
-/**
- * xmlSchemaParseExtension:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parses an <extension>, which is found inside a
- * <simpleContent> or <complexContent>.
- * *WARNING* this interface is highly subject to change.
- *
- * TODO: Returns the type definition or NULL in case of error
- */
+/// Parses an <extension>, which is found inside a
+/// <simpleContent> or <complexContent>.
+/// *WARNING* this interface is highly subject to change.
+///
+/// TODO: Returns the type definition or NULL in case of error
+#[doc(alias = "xmlSchemaParseExtension")]
 unsafe extern "C" fn xml_schema_parse_extension(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -10103,17 +9409,11 @@ unsafe extern "C" fn xml_schema_parse_extension(
     null_mut()
 }
 
-/**
- * xmlSchemaParseSimpleContent:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema SimpleContent definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns the type definition or NULL in case of error
- */
+/// Parse a XML schema SimpleContent definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the type definition or NULL in case of error
+#[doc(alias = "xmlSchemaParseSimpleContent")]
 unsafe extern "C" fn xml_schema_parse_simple_content(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -10230,17 +9530,11 @@ unsafe extern "C" fn xml_schema_parse_simple_content(
     0
 }
 
-/**
- * xmlSchemaParseComplexContent:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema ComplexContent definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns the type definition or NULL in case of error
- */
+/// Parse a XML schema ComplexContent definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the type definition or NULL in case of error
+#[doc(alias = "xmlSchemaParseComplexContent")]
 unsafe extern "C" fn xml_schema_parse_complex_content(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -10363,17 +9657,11 @@ unsafe extern "C" fn xml_schema_parse_complex_content(
     0
 }
 
-/**
- * xmlSchemaParseComplexType:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Complex Type definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns the type definition or NULL in case of error
- */
+/// Parse a XML schema Complex Type definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the type definition or NULL in case of error
+#[doc(alias = "xmlSchemaParseComplexType")]
 unsafe extern "C" fn xml_schema_parse_complex_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -10735,18 +10023,10 @@ unsafe extern "C" fn xml_schema_parse_complex_type(
     typ
 }
 
-/**
- * xmlGetBooleanProp:
- * @ctxt:  a schema validation context
- * @node:  a subtree containing XML Schema information
- * @name:  the attribute name
- * @def:  the default value
- *
- * Evaluate if a boolean property is set
- *
- * Returns the default if not found, 0 if found to be false,
- * 1 if found to be true
- */
+/// Evaluate if a boolean property is set
+///
+/// Returns the default if not found, 0 if found to be false, 1 if found to be true
+#[doc(alias = "xmlGetBooleanProp")]
 unsafe extern "C" fn xml_get_boolean_prop(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -10951,17 +10231,11 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
     0
 }
 
-/**
- * xmlSchemaParseIDCSelectorAndField:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parses a XML Schema identity-constraint definition's
- * <selector> and <field> elements.
- *
- * Returns the parsed identity-constraint definition.
- */
+/// Parses a XML Schema identity-constraint definition's
+/// <selector> and <field> elements.
+///
+/// Returns the parsed identity-constraint definition.
+#[doc(alias = "xmlSchemaParseIDCSelectorAndField")]
 unsafe extern "C" fn xml_schema_parse_idcselector_and_field(
     ctxt: XmlSchemaParserCtxtPtr,
     idc: XmlSchemaIDCPtr,
@@ -11064,16 +10338,10 @@ unsafe extern "C" fn xml_schema_parse_idcselector_and_field(
     item
 }
 
-/**
- * xmlSchemaParseIDC:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parses a XML Schema identity-constraint definition.
- *
- * Returns the parsed identity-constraint definition.
- */
+/// Parses a XML Schema identity-constraint definition.
+///
+/// Returns the parsed identity-constraint definition.
+#[doc(alias = "xmlSchemaParseIDC")]
 unsafe extern "C" fn xml_schema_parse_idc(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -11257,19 +10525,12 @@ unsafe extern "C" fn xml_schema_parse_idc(
     item
 }
 
-/**
- * xmlSchemaParseElement:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- * @topLevel: indicates if this is global declaration
- *
- * Parses a XML schema element declaration.
- * *WARNING* this interface is highly subject to change
- *
- * Returns the element declaration or a particle; NULL in case
- * of an error or if the particle has minOccurs==maxOccurs==0.
- */
+/// Parses a XML schema element declaration.
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the element declaration or a particle; NULL in case
+/// of an error or if the particle has minOccurs==maxOccurs==0.
+#[doc(alias = "xmlSchemaParseElement")]
 unsafe extern "C" fn xml_schema_parse_element(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -11831,19 +11092,13 @@ unsafe extern "C" fn xml_schema_get_qname_ref_target_ns(refe: *mut c_void) -> *c
     (*(refe as XmlSchemaQnameRefPtr)).target_namespace
 }
 
-/**
- * xmlSchemaParseAny:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parsea a XML schema <any> element. A particle and wildcard
- * will be created (except if minOccurs==maxOccurs==0, in this case
- * nothing will be created).
- * *WARNING* this interface is highly subject to change
- *
- * Returns the particle or NULL in case of error or if minOccurs==maxOccurs==0
- */
+/// Parsea a XML schema <any> element. A particle and wildcard
+/// will be created (except if minOccurs==maxOccurs==0, in this case
+/// nothing will be created).
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the particle or NULL in case of error or if minOccurs==maxOccurs==0
+#[doc(alias = "xmlSchemaParseAny")]
 unsafe extern "C" fn xml_schema_parse_any(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -11948,31 +11203,23 @@ unsafe extern "C" fn xml_schema_parse_any(
     particle
 }
 
-/**
- * xmlSchemaParseModelGroup:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- * @type: the "compositor" type
- * @particleNeeded: if a a model group with a particle
- *
- * parse a XML schema Sequence definition.
- * Applies parts of:
- *   Schema Representation Constraint:
- *     Redefinition Constraints and Semantics (src-redefine)
- *     (6.1), (6.1.1), (6.1.2)
- *
- *   Schema Component Constraint:
- *     All Group Limited (cos-all-limited) (2)
- *     TODO: Actually this should go to component-level checks,
- *     but is done here due to performance. Move it to an other layer
- *     is schema construction via an API is implemented.
- *
- * *WARNING* this interface is highly subject to change
- *
- * Returns -1 in case of error, 0 if the declaration is improper and
- *         1 in case of success.
- */
+/// Parse a XML schema Sequence definition.
+/// Applies parts of:
+///   Schema Representation Constraint:
+///     Redefinition Constraints and Semantics (src-redefine)
+///     (6.1), (6.1.1), (6.1.2)
+///
+///   Schema Component Constraint:
+///     All Group Limited (cos-all-limited) (2)
+///     TODO: Actually this should go to component-level checks,
+///     but is done here due to performance. Move it to an other layer
+///     is schema construction via an API is implemented.
+///
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns -1 in case of error, 0 if the declaration is improper and
+///         1 in case of success.
+#[doc(alias = "xmlSchemaParseModelGroup")]
 unsafe extern "C" fn xml_schema_parse_model_group(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -12274,17 +11521,11 @@ unsafe extern "C" fn xml_schema_parse_model_group(
     }
 }
 
-/**
- * xmlSchemaParseFacet:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Facet declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new type structure or NULL in case of error
- */
+/// Parse a XML schema Facet declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new type structure or NULL in case of error
+#[doc(alias = "xmlSchemaParseFacet")]
 unsafe extern "C" fn xml_schema_parse_facet(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -12383,17 +11624,11 @@ unsafe extern "C" fn xml_schema_parse_facet(
     facet
 }
 
-/**
- * xmlSchemaParseRestriction:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Restriction definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns the type definition or NULL in case of error
- */
+/// Parse a XML schema Restriction definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the type definition or NULL in case of error
+#[doc(alias = "xmlSchemaParseRestriction")]
 unsafe extern "C" fn xml_schema_parse_restriction(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -12733,18 +11968,11 @@ unsafe extern "C" fn xml_schema_parse_restriction(
     null_mut()
 }
 
-/**
- * xmlSchemaParseList:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema List definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns -1 in case of error, 0 if the declaration is improper and
- *         1 in case of success.
- */
+/// parse a XML schema List definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns -1 in case of error, 0 if the declaration is improper and 1 in case of success.
+#[doc(alias = "xmlSchemaParseList")]
 unsafe extern "C" fn xml_schema_parse_list(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -12882,18 +12110,12 @@ unsafe extern "C" fn xml_schema_parse_list(
     null_mut()
 }
 
-/**
- * xmlSchemaParseUnion:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Union definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns -1 in case of internal error, 0 in case of success and a positive
- * error code otherwise.
- */
+/// Parse a XML schema Union definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns -1 in case of internal error, 0 in case of success and a positive
+/// error code otherwise.
+#[doc(alias = "xmlSchemaParseUnion")]
 unsafe extern "C" fn xml_schema_parse_union(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -13108,18 +12330,12 @@ unsafe extern "C" fn xml_schema_parse_union(
     0
 }
 
-/**
- * xmlSchemaParseSimpleType:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Simple Type definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns -1 in case of error, 0 if the declaration is improper and
- * 1 in case of success.
- */
+/// Parse a XML schema Simple Type definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns -1 in case of error, 0 if the declaration is improper and
+/// 1 in case of success.
+#[doc(alias = "xmlSchemaParseSimpleType")]
 unsafe extern "C" fn xml_schema_parse_simple_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -13402,16 +12618,10 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
     typ
 }
 
-/**
- * xmlSchemaAddModelGroupDefinition:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @name:  the group name
- *
- * Add an XML schema Group definition
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema Group definition
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddModelGroupDefinition")]
 unsafe extern "C" fn xml_schema_add_model_group_definition(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -13449,23 +12659,16 @@ unsafe extern "C" fn xml_schema_add_model_group_definition(
     ret
 }
 
-/**
- * xmlSchemaParseModelGroupDefinition:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * Parses a XML schema model group definition.
- *
- * Note that the constraint src-redefine (6.2) can't be applied until
- * references have been resolved. So we will do this at the
- * component fixup level.
- *
- * *WARNING* this interface is highly subject to change
- *
- * Returns -1 in case of error, 0 if the declaration is improper and
- *         1 in case of success.
- */
+/// Parses a XML schema model group definition.
+///
+/// Note that the constraint src-redefine (6.2) can't be applied until
+/// references have been resolved. So we will do this at the
+/// component fixup level.
+///
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns -1 in case of error, 0 if the declaration is improper and 1 in case of success.
+#[doc(alias = "xmlSchemaParseModelGroupDefinition")]
 unsafe extern "C" fn xml_schema_parse_model_group_definition(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -13583,18 +12786,10 @@ unsafe extern "C" fn xml_schema_parse_model_group_definition(
     item
 }
 
-/**
- * xmlSchemaAddAttributeGroupDefinition:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @name:  the item name
- * @nsName:  the target namespace
- * @node: the corresponding node
- *
- * Add an XML schema Attribute Group definition.
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema Attribute Group definition.
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddAttributeGroupDefinition")]
 unsafe extern "C" fn xml_schema_add_attribute_group_definition(
     pctxt: XmlSchemaParserCtxtPtr,
     _schema: XmlSchemaPtr,
@@ -13638,17 +12833,11 @@ unsafe extern "C" fn xml_schema_add_attribute_group_definition(
     ret
 }
 
-/**
- * xmlSchemaParseAttributeGroupDefinition:
- * @pctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Attribute Group declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the attribute group definition or NULL in case of error.
- */
+/// Parse a XML schema Attribute Group declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the attribute group definition or NULL in case of error.
+#[doc(alias = "xmlSchemaParseAttributeGroupDefinition")]
 unsafe extern "C" fn xml_schema_parse_attribute_group_definition(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -13999,18 +13188,12 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine(
     // return ((*pctxt).err);
 }
 
-/**
- * xmlSchemaParseImport:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Import definition
- * *WARNING* this interface is highly subject to change
- *
- * Returns 0 in case of success, a positive error code if
- * not valid and -1 in case of an internal error.
- */
+/// Parse a XML schema Import definition
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns 0 in case of success, a positive error code if
+/// not valid and -1 in case of an internal error.
+#[doc(alias = "xmlSchemaParseImport")]
 unsafe extern "C" fn xml_schema_parse_import(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -14223,10 +13406,6 @@ unsafe extern "C" fn xml_schema_parse_redefine(
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
 ) -> i32 {
-    // #ifndef ENABLE_REDEFINE
-    //     TODO
-    //     return 0;
-    // #endif
     let res: i32 =
         xml_schema_parse_include_or_redefine(pctxt, schema, node, XML_SCHEMA_SCHEMA_REDEFINE);
     if res != 0 {
@@ -14445,17 +13624,11 @@ unsafe extern "C" fn xml_schema_parse_global_attribute(
     ret
 }
 
-/**
- * xmlSchemaAddNotation:
- * @ctxt:  a schema parser context
- * @schema:  the schema being built
- * @name:  the item name
- *
- * Add an XML schema annotation declaration
- * *WARNING* this interface is highly subject to change
- *
- * Returns the new structure or NULL in case of error
- */
+/// Add an XML schema annotation declaration
+/// *WARNING* this interface is highly subject to change
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaAddNotation")]
 unsafe extern "C" fn xml_schema_add_notation(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -14484,16 +13657,10 @@ unsafe extern "C" fn xml_schema_add_notation(
     ret
 }
 
-/**
- * xmlSchemaParseNotation:
- * @ctxt:  a schema validation context
- * @schema:  the schema being built
- * @node:  a subtree containing XML Schema information
- *
- * parse a XML schema Notation declaration
- *
- * Returns the new structure or NULL in case of error
- */
+/// Parse a XML schema Notation declaration
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlSchemaParseNotation")]
 unsafe extern "C" fn xml_schema_parse_notation(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -14544,15 +13711,8 @@ unsafe extern "C" fn xml_schema_parse_notation(
     ret
 }
 
-/**
- * xmlSchemaParseSchemaTopLevel:
- * @ctxt:  a schema validation context
- * @schema:  the schemas
- * @nodes:  the list of top level nodes
- *
- * Returns the internal XML Schema structure built from the resource or
- *         NULL in case of error
- */
+/// Returns the internal XML Schema structure built from the resource or NULL in case of error
+#[doc(alias = "xmlSchemaParseSchemaTopLevel")]
 unsafe extern "C" fn xml_schema_parse_schema_top_level(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
@@ -14769,10 +13929,8 @@ macro_rules! WXS_COMP_TNS {
     };
 }
 
-/*
-* xmlSchemaFindRedefCompInGraph:
-* ATTENTION TODO: This uses pointer comp. for strings.
-*/
+// ATTENTION TODO: This uses pointer comp. for strings.
+#[doc(alias = "xmlSchemaFindRedefCompInGraph")]
 unsafe extern "C" fn xml_schema_find_redef_comp_in_graph(
     bucket: XmlSchemaBucketPtr,
     typ: XmlSchemaTypeType,
@@ -15188,16 +14346,10 @@ unsafe extern "C" fn xml_schema_add_components(
     0
 }
 
-/**
- * xmlSchemaGetType:
- * @schema:  the main schema
- * @name:  the type's name
- * nsName:  the type's namespace
- *
- * Lookup a type in the schemas or the predefined types
- *
- * Returns the group definition or NULL if not found.
- */
+/// Lookup a type in the schemas or the predefined types
+///
+/// Returns the group definition or NULL if not found.
+#[doc(alias = "xmlSchemaGetType")]
 unsafe extern "C" fn xml_schema_get_type(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
@@ -15230,20 +14382,8 @@ unsafe extern "C" fn xml_schema_get_type(
     ret
 }
 
-/**
- * xmlSchemaPResCompAttrErr:
- * @ctxt: the schema validation context
- * @error: the error code
- * @ownerItem: the owner as a schema object
- * @ownerElem: the owner as an element node
- * @name: the name of the attribute holding the QName
- * @refName: the referenced local name
- * @refURI: the referenced namespace URI
- * @message: optional message
- *
- * Used to report QName attribute values that failed to resolve
- * to schema components.
- */
+/// Used to report QName attribute values that failed to resolve to schema components.
+#[doc(alias = "xmlSchemaPResCompAttrErr")]
 unsafe extern "C" fn xml_schema_pres_comp_attr_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -15280,16 +14420,10 @@ unsafe extern "C" fn xml_schema_pres_comp_attr_err(
     FREE_AND_NULL!(str_a);
 }
 
-/**
- * xmlSchemaGetElem:
- * @schema:  the schema context
- * @name:  the element name
- * @ns:  the element namespace
- *
- * Lookup a global element declaration in the schema.
- *
- * Returns the element declaration or NULL if not found.
- */
+/// Lookup a global element declaration in the schema.
+///
+/// Returns the element declaration or NULL if not found.
+#[doc(alias = "xmlSchemaGetElem")]
 unsafe extern "C" fn xml_schema_get_elem(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
@@ -15308,15 +14442,9 @@ unsafe extern "C" fn xml_schema_get_elem(
     ret
 }
 
-/**
- * xmlSchemaResolveElementReferences:
- * @elem:  the schema element context
- * @ctxt:  the schema parser context
- *
- * Resolves the references of an element declaration
- * or particle, which has an element declaration as it's
- * term.
- */
+/// Resolves the references of an element declaration or particle,
+/// which has an element declaration as it's term.
+#[doc(alias = "xmlSchemaResolveElementReferences")]
 unsafe extern "C" fn xml_schema_resolve_element_references(
     elem_decl: XmlSchemaElementPtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -15416,17 +14544,12 @@ unsafe extern "C" fn xml_schema_resolve_element_references(
     }
 }
 
-/**
- * xmlSchemaResolveUnionMemberTypes:
- * @ctxt:  the schema parser context
- * @type:  the schema simple type definition
- *
- * Checks and builds the "member type definitions" property of the union
- * simple type. This handles part (1), part (2) is done in
- * xmlSchemaFinishMemberTypeDefinitionsProperty()
- *
- * Returns -1 in case of an internal error, 0 otherwise.
- */
+/// Checks and builds the "member type definitions" property of the union
+/// simple type. This handles part (1), part (2) is done in
+/// xmlSchemaFinishMemberTypeDefinitionsProperty()
+///
+/// Returns -1 in case of an internal error, 0 otherwise.
+#[doc(alias = "xmlSchemaResolveUnionMemberTypes")]
 unsafe extern "C" fn xml_schema_resolve_union_member_types(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -15505,16 +14628,10 @@ unsafe extern "C" fn xml_schema_resolve_union_member_types(
     0
 }
 
-/**
- * xmlSchemaGetGroup:
- * @schema:  the context of the schema
- * @name:  the name of the group
- * @ns:  the target namespace of the group
- *
- * Lookup a group in the schema or imported schemas
- *
- * Returns the group definition or NULL if not found.
- */
+/// Lookup a group in the schema or imported schemas
+///
+/// Returns the group definition or NULL if not found.
+#[doc(alias = "xmlSchemaGetGroup")]
 unsafe extern "C" fn xml_schema_get_group(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
@@ -15533,16 +14650,10 @@ unsafe extern "C" fn xml_schema_get_group(
     ret
 }
 
-/**
- * xmlSchemaGetNamedComponent:
- * @schema:  the schema
- * @name:  the name of the group
- * @ns:  the target namespace of the group
- *
- * Lookup a group in the schema or imported schemas
- *
- * Returns the group definition or NULL if not found.
- */
+/// Lookup a group in the schema or imported schemas
+///
+/// Returns the group definition or NULL if not found.
+#[doc(alias = "xmlSchemaGetNamedComponent")]
 unsafe extern "C" fn xml_schema_get_named_component(
     schema: XmlSchemaPtr,
     item_type: XmlSchemaTypeType,
@@ -15563,14 +14674,8 @@ unsafe extern "C" fn xml_schema_get_named_component(
     }
 }
 
-/**
- * xmlSchemaResolveTypeReferences:
- * @item:  the complex/simple type definition
- * @ctxt:  the parser context
- * @name:  the name
- *
- * Resolves type definition references
- */
+/// Resolves type definition references
+#[doc(alias = "xmlSchemaResolveTypeReferences")]
 unsafe extern "C" fn xml_schema_resolve_type_references(
     type_def: XmlSchemaTypePtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -15697,13 +14802,8 @@ unsafe extern "C" fn xml_schema_resolve_type_references(
     }
 }
 
-/**
- * xmlSchemaResolveAttrTypeReferences:
- * @item:  an attribute declaration
- * @ctxt:  a parser context
- *
- * Resolves the referenced type definition component.
- */
+/// Resolves the referenced type definition component.
+#[doc(alias = "xmlSchemaResolveAttrTypeReferences")]
 unsafe extern "C" fn xml_schema_resolve_attr_type_references(
     item: XmlSchemaAttributePtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -15749,16 +14849,10 @@ unsafe extern "C" fn xml_schema_resolve_attr_type_references(
     0
 }
 
-/**
- * xmlSchemaGetAttributeDecl:
- * @schema:  the context of the schema
- * @name:  the name of the attribute
- * @ns:  the target namespace of the attribute
- *
- * Lookup a an attribute in the schema or imported schemas
- *
- * Returns the attribute declaration or NULL if not found.
- */
+/// Lookup a an attribute in the schema or imported schemas
+///
+/// Returns the attribute declaration or NULL if not found.
+#[doc(alias = "xmlSchemaGetAttributeDecl")]
 unsafe extern "C" fn xml_schema_get_attribute_decl(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
@@ -15777,13 +14871,8 @@ unsafe extern "C" fn xml_schema_get_attribute_decl(
     ret
 }
 
-/**
- * xmlSchemaResolveAttrUseReferences:
- * @item:  an attribute use
- * @ctxt:  a parser context
- *
- * Resolves the referenced attribute declaration.
- */
+/// Resolves the referenced attribute declaration.
+#[doc(alias = "xmlSchemaResolveAttrUseReferences")]
 unsafe extern "C" fn xml_schema_resolve_attr_use_references(
     ause: XmlSchemaAttributeUsePtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -15823,16 +14912,10 @@ unsafe extern "C" fn xml_schema_resolve_attr_use_references(
     0
 }
 
-/**
- * xmlSchemaGetAttributeGroup:
- * @schema:  the context of the schema
- * @name:  the name of the attribute group
- * @ns:  the target namespace of the attribute group
- *
- * Lookup a an attribute group in the schema or imported schemas
- *
- * Returns the attribute group definition or NULL if not found.
- */
+/// Lookup a an attribute group in the schema or imported schemas
+///
+/// Returns the attribute group definition or NULL if not found.
+#[doc(alias = "xmlSchemaGetAttributeGroup")]
 unsafe extern "C" fn xml_schema_get_attribute_group(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
@@ -15857,14 +14940,8 @@ unsafe extern "C" fn xml_schema_get_attribute_group(
     ret
 }
 
-/**
- * xmlSchemaResolveAttrGroupReferences:
- * @attrgrpDecl:  the schema attribute definition
- * @ctxt:  the schema parser context
- * @name:  the attribute name
- *
- * Resolves references to attribute group definitions.
- */
+/// Resolves references to attribute group definitions.
+#[doc(alias = "xmlSchemaResolveAttrGroupReferences")]
 unsafe extern "C" fn xml_schema_resolve_attr_group_references(
     refe: XmlSchemaQnameRefPtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -15892,14 +14969,9 @@ unsafe extern "C" fn xml_schema_resolve_attr_group_references(
     0
 }
 
-/**
- * xmlSchemaResolveModelGroupParticleReferences:
- * @particle:  a particle component
- * @ctxt:  a parser context
- *
- * Resolves references of a model group's {particles} to
- * model group definitions and to element declarations.
- */
+/// Resolves references of a model group's {particles} to
+/// model group definitions and to element declarations.
+#[doc(alias = "xmlSchemaResolveModelGroupParticleReferences")]
 unsafe extern "C" fn xml_schema_resolve_model_group_particle_references(
     ctxt: XmlSchemaParserCtxtPtr,
     mg: XmlSchemaModelGroupPtr,
@@ -16007,16 +15079,10 @@ unsafe extern "C" fn xml_schema_get_idc(
     ret
 }
 
-/**
- * xmlSchemaResolveIDCKeyReferences:
- * @idc:  the identity-constraint definition
- * @ctxt:  the schema parser context
- * @name:  the attribute name
- *
- * Resolve keyRef references to key/unique IDCs.
- * Schema Component Constraint:
- *   Identity-constraint Definition Properties Correct (c-props-correct)
- */
+/// Resolve keyRef references to key/unique IDCs.
+/// Schema Component Constraint:
+///   Identity-constraint Definition Properties Correct (c-props-correct)
+#[doc(alias = "xmlSchemaResolveIDCKeyReferences")]
 unsafe extern "C" fn xml_schema_resolve_idckey_references(
     idc: XmlSchemaIDCPtr,
     pctxt: XmlSchemaParserCtxtPtr,
@@ -16103,18 +15169,11 @@ unsafe extern "C" fn xml_schema_resolve_attr_use_prohib_references(
     0
 }
 
-/**
- * xmlSchemaCheckTypeDefCircularInternal:
- * @pctxt:  the schema parser context
- * @ctxtType:  the type definition
- * @ancestor: an ancestor of @ctxtType
- *
- * Checks st-props-correct (2) + ct-props-correct (3).
- * Circular type definitions are not allowed.
- *
- * Returns XML_SCHEMAP_ST_PROPS_CORRECT_2 if the given type is
- * circular, 0 otherwise.
- */
+/// Checks st-props-correct (2) + ct-props-correct (3).
+/// Circular type definitions are not allowed.
+///
+/// Returns XML_SCHEMAP_ST_PROPS_CORRECT_2 if the given type is circular, 0 otherwise.
+#[doc(alias = "xmlSchemaCheckTypeDefCircularInternal")]
 unsafe extern "C" fn xml_schema_check_type_def_circular_internal(
     pctxt: XmlSchemaParserCtxtPtr,
     ctxt_type: XmlSchemaTypePtr,
@@ -16148,14 +15207,8 @@ unsafe extern "C" fn xml_schema_check_type_def_circular_internal(
     ret
 }
 
-/**
- * xmlSchemaCheckTypeDefCircular:
- * @item:  the complex/simple type definition
- * @ctxt:  the parser context
- * @name:  the name
- *
- * Checks for circular type definitions.
- */
+/// Checks for circular type definitions.
+#[doc(alias = "xmlSchemaCheckTypeDefCircular")]
 unsafe extern "C" fn xml_schema_check_type_def_circular(
     item: XmlSchemaTypePtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -16169,18 +15222,10 @@ unsafe extern "C" fn xml_schema_check_type_def_circular(
     xml_schema_check_type_def_circular_internal(ctxt, item, (*item).base_type);
 }
 
-/**
- * xmlSchemaGetCircModelGrDefRef:
- * @ctxtMGroup: the searched model group
- * @selfMGroup: the second searched model group
- * @particle: the first particle
- *
- * This one is intended to be used by
- * xmlSchemaCheckGroupDefCircular only.
- *
- * Returns the particle with the circular model group definition reference,
- * otherwise NULL.
- */
+/// This one is intended to be used by xmlSchemaCheckGroupDefCircular only.
+///
+/// Returns the particle with the circular model group definition reference, otherwise NULL.
+#[doc(alias = "xmlSchemaGetCircModelGrDefRef")]
 unsafe extern "C" fn xml_schema_get_circ_model_gr_def_ref(
     group_def: XmlSchemaModelGroupDefPtr,
     mut particle: XmlSchemaTreeItemPtr,
@@ -16236,14 +15281,8 @@ unsafe extern "C" fn xml_schema_get_circ_model_gr_def_ref(
     null_mut()
 }
 
-/**
- * xmlSchemaCheckGroupDefCircular:
- * @item:  the model group definition
- * @ctxt:  the parser context
- * @name:  the name
- *
- * Checks for circular references to model group definitions.
- */
+/// Checks for circular references to model group definitions.
+#[doc(alias = "xmlSchemaCheckGroupDefCircular")]
 unsafe extern "C" fn xml_schema_check_group_def_circular(
     item: XmlSchemaModelGroupDefPtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -16290,16 +15329,10 @@ unsafe extern "C" fn xml_schema_check_group_def_circular(
     }
 }
 
-/**
- * xmlSchemaCheckAttrGroupCircularRecur:
- * @ctxtGr: the searched attribute group
- * @attr: the current attribute list to be processed
- *
- * This one is intended to be used by
- * xmlSchemaCheckAttrGroupCircular only.
- *
- * Returns the circular attribute group reference, otherwise NULL.
- */
+/// This one is intended to be used by xmlSchemaCheckAttrGroupCircular only.
+///
+/// Returns the circular attribute group reference, otherwise NULL.
+#[doc(alias = "xmlSchemaCheckAttrGroupCircularRecur")]
 unsafe extern "C" fn xml_schema_check_attr_group_circular_recur(
     ctxt_gr: XmlSchemaAttributeGroupPtr,
     list: XmlSchemaItemListPtr,
@@ -16344,14 +15377,8 @@ unsafe extern "C" fn xml_schema_check_attr_group_circular_recur(
     null_mut()
 }
 
-/**
- * xmlSchemaCheckAttrGroupCircular:
- * attrGr:  the attribute group definition
- * @ctxt:  the parser context
- * @name:  the name
- *
- * Checks for circular references of attribute groups.
- */
+/// Checks for circular references of attribute groups.
+#[doc(alias = "xmlSchemaCheckAttrGroupCircular")]
 unsafe extern "C" fn xml_schema_check_attr_group_circular(
     attr_gr: XmlSchemaAttributeGroupPtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -16403,20 +15430,15 @@ unsafe extern "C" fn xml_schema_check_attr_group_circular(
     0
 }
 
-/**
- * xmlSchemaModelGroupToModelGroupDefFixup:
- * @ctxt:  the parser context
- * @mg:  the model group
- *
- * Assigns the model group of model group definitions to the "term"
- * of the referencing particle.
- * In xmlSchemaResolveModelGroupParticleReferences the model group
- * definitions were assigned to the "term", since needed for the
- * circularity check.
- *
- * Schema Component Constraint:
- *     All Group Limited (cos-all-limited) (1.2)
- */
+/// Assigns the model group of model group definitions to the "term"
+/// of the referencing particle.
+/// In xmlSchemaResolveModelGroupParticleReferences the model group
+/// definitions were assigned to the "term", since needed for the
+/// circularity check.
+///
+/// Schema Component Constraint:
+///     All Group Limited (cos-all-limited) (1.2)
+#[doc(alias = "xmlSchemaModelGroupToModelGroupDefFixup")]
 unsafe extern "C" fn xml_schema_model_group_to_model_group_def_fixup(
     _ctxt: XmlSchemaParserCtxtPtr,
     mg: XmlSchemaModelGroupPtr,
@@ -16483,16 +15505,9 @@ unsafe extern "C" fn xml_schema_item_list_remove(list: XmlSchemaItemListPtr, idx
     0
 }
 
-/**
- * xmlSchemaCloneWildcardNsConstraints:
- * @ctxt:  the schema parser context
- * @dest:  the destination wildcard
- * @source: the source wildcard
- *
- * Clones the namespace constraints of source
- * and assigns them to dest.
- * Returns -1 on internal error, 0 otherwise.
- */
+/// Clones the namespace constraints of source and assigns them to dest.
+/// Returns -1 on internal error, 0 otherwise.
+#[doc(alias = "xmlSchemaCloneWildcardNsConstraints")]
 unsafe extern "C" fn xml_schema_clone_wildcard_ns_constraints(
     ctxt: XmlSchemaParserCtxtPtr,
     dest: XmlSchemaWildcardPtr,
@@ -16537,17 +15552,11 @@ unsafe extern "C" fn xml_schema_clone_wildcard_ns_constraints(
     0
 }
 
-/**
- * xmlSchemaIntersectWildcards:
- * @ctxt:  the schema parser context
- * @completeWild:  the first wildcard
- * @curWild: the second wildcard
- *
- * Intersects the namespace constraints of the given wildcards.
- * @completeWild will hold the resulting intersection.
- * Returns a positive error code on failure, -1 in case of an
- * internal error, 0 otherwise.
- */
+/// Intersects the namespace constraints of the given wildcards.
+/// @completeWild will hold the resulting intersection.
+/// Returns a positive error code on failure, -1 in case of an
+/// internal error, 0 otherwise.
+#[doc(alias = "xmlSchemaIntersectWildcards")]
 unsafe extern "C" fn xml_schema_intersect_wildcards(
     ctxt: XmlSchemaParserCtxtPtr,
     complete_wild: XmlSchemaWildcardPtr,
@@ -16770,20 +15779,12 @@ unsafe extern "C" fn xml_schema_item_list_insert(
     0
 }
 
-/**
- * xmlSchemaExpandAttributeGroupRefs:
- * @pctxt: the parser context
- * @node: the node of the component holding the attribute uses
- * @completeWild: the intersected wildcard to be returned
- * @list: the attribute uses
- *
- * Substitutes contained attribute group references
- * for their attribute uses. Wildcards are intersected.
- * Attribute use prohibitions are removed from the list
- * and returned via the @prohibs list.
- * Pointlessness of attr. prohibs, if a matching attr. decl
- * is existent a well, are checked.
- */
+/// Substitutes contained attribute group references
+/// for their attribute uses. Wildcards are intersected.
+/// Attribute use prohibitions are removed from the list
+/// and returned via the @prohibs list.
+/// Pointlessness of attr. prohibs, if a matching attr. decl is existent a well, are checked.
+#[doc(alias = "xmlSchemaExpandAttributeGroupRefs")]
 unsafe extern "C" fn xml_schema_expand_attribute_group_refs(
     pctxt: XmlSchemaParserCtxtPtr,
     item: XmlSchemaBasicItemPtr,
@@ -16962,18 +15963,13 @@ unsafe extern "C" fn xml_schema_expand_attribute_group_refs(
     0
 }
 
-/**
- * xmlSchemaAttributeGroupExpandRefs:
- * @pctxt:  the parser context
- * @attrGr:  the attribute group definition
- *
- * Computation of:
- * {attribute uses} property
- * {attribute wildcard} property
- *
- * Substitutes contained attribute group references
- * for their attribute uses. Wildcards are intersected.
- */
+/// Computation of:
+/// {attribute uses} property
+/// {attribute wildcard} property
+///
+/// Substitutes contained attribute group references
+/// for their attribute uses. Wildcards are intersected.
+#[doc(alias = "xmlSchemaAttributeGroupExpandRefs")]
 unsafe extern "C" fn xml_schema_attribute_group_expand_refs(
     pctxt: XmlSchemaParserCtxtPtr,
     attr_gr: XmlSchemaAttributeGroupPtr,
@@ -17082,19 +16078,17 @@ unsafe extern "C" fn xml_schema_fixup_simple_type_stage_one(
     0
 }
 
-/*
-* Simple Type Definition Representation OK (src-simple-type) 4
-*
-* "4 Circular union type definition is disallowed. That is, if the
-* <union> alternative is chosen, there must not be any entries in the
-* memberTypes [attribute] at any depth which resolve to the component
-* corresponding to the <simpleType>."
-*
-* Note that this should work on the *representation* of a component,
-* thus assumes any union types in the member types not being yet
-* substituted. At this stage we need the variety of the types
-* to be already computed.
-*/
+// Simple Type Definition Representation OK (src-simple-type) 4
+//
+// "4 Circular union type definition is disallowed. That is, if the
+// <union> alternative is chosen, there must not be any entries in the
+// memberTypes [attribute] at any depth which resolve to the component
+// corresponding to the <simpleType>."
+//
+// Note that this should work on the *representation* of a component,
+// thus assumes any union types in the member types not being yet
+// substituted. At this stage we need the variety of the types
+// to be already computed.
 unsafe extern "C" fn xml_schema_check_union_type_def_circular_recur(
     pctxt: XmlSchemaParserCtxtPtr,
     ctx_type: XmlSchemaTypePtr,
@@ -17148,17 +16142,10 @@ unsafe extern "C" fn xml_schema_check_union_type_def_circular(
     xml_schema_check_union_type_def_circular_recur(pctxt, typ, (*typ).member_types)
 }
 
-/**
- * xmlSchemaUnionWildcards:
- * @ctxt:  the schema parser context
- * @completeWild:  the first wildcard
- * @curWild: the second wildcard
- *
- * Unions the namespace constraints of the given wildcards.
- * @completeWild will hold the resulting union.
- * Returns a positive error code on failure, -1 in case of an
- * internal error, 0 otherwise.
- */
+/// Unions the namespace constraints of the given wildcards.
+/// @completeWild will hold the resulting union.
+/// Returns a positive error code on failure, -1 in case of an internal error, 0 otherwise.
+#[doc(alias = "xmlSchemaUnionWildcards")]
 unsafe extern "C" fn xml_schema_union_wildcards(
     ctxt: XmlSchemaParserCtxtPtr,
     complete_wild: XmlSchemaWildcardPtr,
@@ -17421,12 +16408,8 @@ unsafe extern "C" fn xml_schema_union_wildcards(
     0
 }
 
-/**
- * xmlSchemaGetParticleEmptiable:
- * @particle: the particle
- *
- * Returns 1 if emptiable, 0 otherwise.
- */
+/// Returns 1 if emptiable, 0 otherwise.
+#[doc(alias = "xmlSchemaGetParticleEmptiable")]
 unsafe extern "C" fn xml_schema_get_particle_emptiable(particle: XmlSchemaParticlePtr) -> i32 {
     let mut part: XmlSchemaParticlePtr;
     let mut emptiable: i32;
@@ -17468,15 +16451,10 @@ unsafe extern "C" fn xml_schema_get_particle_emptiable(particle: XmlSchemaPartic
     }
 }
 
-/**
- * xml_schema_is_particle_emptiable:
- * @particle: the particle
- *
- * Schema Component Constraint: Particle Emptiable
- * Checks whether the given particle is emptiable.
- *
- * Returns 1 if emptiable, 0 otherwise.
- */
+/// Schema Component Constraint: Particle Emptiable
+/// Checks whether the given particle is emptiable.
+///
+/// Returns 1 if emptiable, 0 otherwise.
 unsafe extern "C" fn xml_schema_is_particle_emptiable(particle: XmlSchemaParticlePtr) -> i32 {
     /*
      * SPEC (1) "Its {min occurs} is 0."
@@ -17494,18 +16472,13 @@ unsafe extern "C" fn xml_schema_is_particle_emptiable(particle: XmlSchemaParticl
     0
 }
 
-/**
- * xmlSchemaCheckSRCCT:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- *
- * (3.4.3) Constraints on XML Representations of Complex Type Definitions:
- * Schema Representation Constraint:
- * Complex Type Definition Representation OK (src-ct)
- *
- * Returns 0 if the constraints are satisfied, a positive
- * error code if not and -1 if an internal error occurred.
- */
+/// (3.4.3) Constraints on XML Representations of Complex Type Definitions:
+/// Schema Representation Constraint:
+/// Complex Type Definition Representation OK (src-ct)
+///
+/// Returns 0 if the constraints are satisfied, a positive
+/// error code if not and -1 if an internal error occurred.
+#[doc(alias = "xmlSchemaCheckSRCCT")]
 unsafe extern "C" fn xml_schema_check_srcct(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -17627,20 +16600,14 @@ unsafe extern "C" fn xml_schema_check_srcct(
     ret
 }
 
-/**
- * xmlSchemaFixupTypeAttributeUses:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- *
- *
- * Builds the wildcard and the attribute uses on the given complex type.
- * Returns -1 if an internal error occurs, 0 otherwise.
- *
- * ATTENTION TODO: Experimentally this uses pointer comparisons for
- * strings, so recheck this if we start to hardcode some schemata, since
- * they might not be in the same dict.
- * NOTE: It is allowed to "extend" the xs:anyType type.
- */
+/// Builds the wildcard and the attribute uses on the given complex type.
+/// Returns -1 if an internal error occurs, 0 otherwise.
+///
+/// ATTENTION TODO: Experimentally this uses pointer comparisons for
+/// strings, so recheck this if we start to hardcode some schemata, since
+/// they might not be in the same dict.
+/// NOTE: It is allowed to "extend" the xs:anyType type.
+#[doc(alias = "xmlSchemaFixupTypeAttributeUses")]
 unsafe extern "C" fn xml_schema_fixup_type_attribute_uses(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -17842,16 +16809,8 @@ unsafe extern "C" fn xml_schema_fixup_type_attribute_uses(
     // return -1;
 }
 
-/**
- * xmlSchemaIsDerivedFromBuiltInType:
- * @ctxt:  the schema parser context
- * @type:  the type definition
- * @valType: the value type
- *
- *
- * Returns 1 if the type has the given value type, or
- * is derived from such a type.
- */
+/// Returns 1 if the type has the given value type, or is derived from such a type.
+#[doc(alias = "xmlSchemaIsDerivedFromBuiltInType")]
 unsafe extern "C" fn xml_schema_is_derived_from_built_in_type(
     typ: XmlSchemaTypePtr,
     val_type: i32,
@@ -17876,19 +16835,14 @@ unsafe extern "C" fn xml_schema_is_derived_from_built_in_type(
     xml_schema_is_derived_from_built_in_type((*typ).subtypes, val_type)
 }
 
-/**
- * xmlSchemaCheckCTPropsCorrect:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- *
- *.(4.6) Constraints on Complex Type Definition Schema Components
- * Schema Component Constraint:
- * Complex Type Definition Properties Correct (ct-props-correct)
- * STATUS: (seems) complete
- *
- * Returns 0 if the constraints are satisfied, a positive
- * error code if not and -1 if an internal error occurred.
- */
+/// (4.6) Constraints on Complex Type Definition Schema Components
+/// Schema Component Constraint:
+/// Complex Type Definition Properties Correct (ct-props-correct)
+/// STATUS: (seems) complete
+///
+/// Returns 0 if the constraints are satisfied, a positive
+/// error code if not and -1 if an internal error occurred.
+#[doc(alias = "xmlSchemaCheckCTPropsCorrect")]
 unsafe extern "C" fn xml_schema_check_ctprops_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -18009,23 +16963,18 @@ unsafe extern "C" fn xml_schema_check_ctprops_correct(
     //     return -1;
 }
 
-/**
- * xmlSchemaCheckCOSCTExtends:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- *
- * (3.4.6) Constraints on Complex Type Definition Schema Components
- * Schema Component Constraint:
- * Derivation Valid (Extension) (cos-ct-extends)
- *
- * STATUS:
- *   missing:
- *     (1.5)
- *     (1.4.3.2.2.2) "Particle Valid (Extension)"
- *
- * Returns 0 if the constraints are satisfied, a positive
- * error code if not and -1 if an internal error occurred.
- */
+/// (3.4.6) Constraints on Complex Type Definition Schema Components
+/// Schema Component Constraint:
+/// Derivation Valid (Extension) (cos-ct-extends)
+///
+/// STATUS:
+///   missing:
+///     (1.5)
+///     (1.4.3.2.2.2) "Particle Valid (Extension)"
+///
+/// Returns 0 if the constraints are satisfied, a positive
+/// error code if not and -1 if an internal error occurred.
+#[doc(alias = "xmlSchemaCheckCOSCTExtends")]
 unsafe extern "C" fn xml_schema_check_cosctextends(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -18197,19 +17146,8 @@ macro_rules! WXS_ACTION_STR {
     };
 }
 
-/**
- * xmlSchemaPAttrUseErr:
- * @ctxt: the schema parser context
- * @error: the error code
- * @itemDes: the designation of the schema type
- * @item: the schema type
- * @itemElem: the node of the schema type
- * @attr: the invalid schema attribute
- * @message: the error message
- * @str1: the optional param for the error message
- *
- * Reports an attribute use error during parsing.
- */
+/// Reports an attribute use error during parsing.
+#[doc(alias = "xmlSchemaPAttrUseErr")]
 unsafe extern "C" fn xml_schema_pattr_use_err4(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -18253,18 +17191,11 @@ unsafe extern "C" fn xml_schema_pattr_use_err4(
     xml_free(msg as _);
 }
 
-/**
- * xmlSchemaTypeFinalContains:
- * @schema:  the schema
- * @type:  the type definition
- * @final: the final
- *
- * Evaluates if a type definition contains the given "final".
- * This does take "finalDefault" into account as well.
- *
- * Returns 1 if the type does contain the given "final".as_ptr() as _,
- * 0 otherwise.
- */
+/// Evaluates if a type definition contains the given "final".
+/// This does take "finalDefault" into account as well.
+///
+/// Returns 1 if the type does contain the given "final", 0 otherwise.
+#[doc(alias = "xmlSchemaTypeFinalContains")]
 unsafe extern "C" fn xml_schema_type_final_contains(typ: XmlSchemaTypePtr, is_final: i32) -> i32 {
     if typ.is_null() {
         return 0;
@@ -18276,21 +17207,14 @@ unsafe extern "C" fn xml_schema_type_final_contains(typ: XmlSchemaTypePtr, is_fi
     }
 }
 
-/**
- * xmlSchemaCheckCOSSTDerivedOK:
- * @actxt: a context
- * @type:  the derived simple type definition
- * @baseType:  the base type definition
- * @subset: the subset of ('restriction', etc.)
- *
- * Schema Component Constraint:
- * Type Derivation OK (Simple) (cos-st-derived-OK)
- *
- * Checks whether @type can be validly
- * derived from @baseType.
- *
- * Returns 0 on success, an positive error code otherwise.
- */
+/// Schema Component Constraint:
+/// Type Derivation OK (Simple) (cos-st-derived-OK)
+///
+/// Checks whether @type can be validly
+/// derived from @baseType.
+///
+/// Returns 0 on success, an positive error code otherwise.
+#[doc(alias = "xmlSchemaCheckCOSSTDerivedOK")]
 unsafe extern "C" fn xml_schema_check_cosstderived_ok(
     actxt: XmlSchemaAbstractCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -18412,17 +17336,12 @@ unsafe extern "C" fn xml_schema_get_effective_value_constraint(
     0
 }
 
-/**
- * xmlSchemaCheckCVCWildcardNamespace:
- * @wild:  the wildcard
- * @ns:  the namespace
- *
- * Validation Rule: Wildcard allows Namespace Name
- * (cvc-wildcard-namespace)
- *
- * Returns 0 if the given namespace matches the wildcard,
- * 1 otherwise and -1 on API errors.
- */
+/// Validation Rule: Wildcard allows Namespace Name
+/// (cvc-wildcard-namespace)
+///
+/// Returns 0 if the given namespace matches the wildcard,
+/// 1 otherwise and -1 on API errors.
+#[doc(alias = "xmlSchemaCheckCVCWildcardNamespace")]
 unsafe extern "C" fn xml_schema_check_cvcwildcard_namespace(
     wild: XmlSchemaWildcardPtr,
     ns: *const XmlChar,
@@ -18453,17 +17372,10 @@ unsafe extern "C" fn xml_schema_check_cvcwildcard_namespace(
     1
 }
 
-/**
- * xmlSchemaIsWildcardNsConstraintSubset:
- * @ctxt:  the schema parser context
- * @sub:  the first wildcard
- * @super: the second wildcard
- *
- * Schema Component Constraint: Wildcard Subset (cos-ns-subset)
- *
- * Returns 0 if the namespace constraint of @sub is an intensional
- * subset of @super, 1 otherwise.
- */
+/// Schema Component Constraint: Wildcard Subset (cos-ns-subset)
+///
+/// Returns 0 if the namespace constraint of @sub is an intensional subset of @super, 1 otherwise.
+#[doc(alias = "xmlSchemaIsWildcardNsConstraintSubset")]
 unsafe extern "C" fn xml_schema_check_cosnssubset(
     sub: XmlSchemaWildcardPtr,
     sper: XmlSchemaWildcardPtr,
@@ -18534,17 +17446,15 @@ unsafe extern "C" fn xml_schema_check_cosnssubset(
     1
 }
 
-/*
-* Schema Component Constraint:
-*   Derivation Valid (Restriction, Complex)
-*   derivation-ok-restriction (2) - (4)
-*
-* ATTENTION:
-* In XML Schema 1.1 this will be:
-* Validation Rule:
-*     Checking complex type subsumption (practicalSubsumption) (1, 2 and 3)
-*
-*/
+// Schema Component Constraint:
+//   Derivation Valid (Restriction, Complex)
+//   derivation-ok-restriction (2) - (4)
+//
+// ATTENTION:
+// In XML Schema 1.1 this will be:
+// Validation Rule:
+//     Checking complex type subsumption (practicalSubsumption) (1, 2 and 3)
+//
 unsafe extern "C" fn xml_schema_check_derivation_okrestriction2to4(
     pctxt: XmlSchemaParserCtxtPtr,
     action: i32,
@@ -18805,26 +17715,21 @@ unsafe extern "C" fn xml_schema_check_derivation_okrestriction2to4(
     0
 }
 
-/**
- * xmlSchemaCheckDerivationOKRestriction:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- *
- * (3.4.6) Constraints on Complex Type Definition Schema Components
- * Schema Component Constraint:
- * Derivation Valid (Restriction, Complex) (derivation-ok-restriction)
- *
- * STATUS:
- *   missing:
- *     (5.4.2) ???
- *
- * ATTENTION:
- * In XML Schema 1.1 this will be:
- * Validation Rule: Checking complex type subsumption
- *
- * Returns 0 if the constraints are satisfied, a positive
- * error code if not and -1 if an internal error occurred.
- */
+/// (3.4.6) Constraints on Complex Type Definition Schema Components
+/// Schema Component Constraint:
+/// Derivation Valid (Restriction, Complex) (derivation-ok-restriction)
+///
+/// STATUS:
+///   missing:
+///     (5.4.2) ???
+///
+/// ATTENTION:
+/// In XML Schema 1.1 this will be:
+/// Validation Rule: Checking complex type subsumption
+///
+/// Returns 0 if the constraints are satisfied, a positive
+/// error code if not and -1 if an internal error occurred.
+#[doc(alias = "xmlSchemaCheckDerivationOKRestriction")]
 unsafe extern "C" fn xml_schema_check_derivation_okrestriction(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -19012,16 +17917,11 @@ unsafe extern "C" fn xml_schema_check_derivation_okrestriction(
     0
 }
 
-/**
- * xmlSchemaCheckCTComponent:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- *
- * (3.4.6) Constraints on Complex Type Definition Schema Components
- *
- * Returns 0 if the constraints are satisfied, a positive
- * error code if not and -1 if an internal error occurred.
- */
+/// (3.4.6) Constraints on Complex Type Definition Schema Components
+///
+/// Returns 0 if the constraints are satisfied, a positive
+/// error code if not and -1 if an internal error occurred.
+#[doc(alias = "xmlSchemaCheckCTComponent")]
 unsafe extern "C" fn xml_schema_check_ctcomponent(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -19482,28 +18382,17 @@ unsafe extern "C" fn xml_schema_fixup_complex_type(
 
         // exit_error:
         (*typ).flags |= XML_SCHEMAS_TYPE_INTERNAL_INVALID;
-        // #ifdef DEBUG_TYPE
-        //     xmlSchemaDebugFixedType(pctxt, typ);
-        // #endif
         return (*pctxt).err;
     }
 
     // exit_failure:
     (*typ).flags |= XML_SCHEMAS_TYPE_INTERNAL_INVALID;
-    // // #ifdef DEBUG_TYPE
-    // //     xmlSchemaDebugFixedType(pctxt, typ);
-    // // #endif
     -1
 }
 
-/**
- * xmlSchemaTypeFixup:
- * @typeDecl:  the schema type definition
- * @ctxt:  the schema parser context
- *
- * Fixes the content model of the type.
- * URGENT TODO: We need an i32 result!
- */
+/// Fixes the content model of the type.
+/// URGENT TODO: We need an i32 result!
+#[doc(alias = "xmlSchemaTypeFixup")]
 unsafe extern "C" fn xml_schema_type_fixup(
     typ: XmlSchemaTypePtr,
     actxt: XmlSchemaAbstractCtxtPtr,
@@ -19588,17 +18477,11 @@ unsafe extern "C" fn xml_schema_finish_member_type_definitions_property(
     0
 }
 
-/**
- * xmlSchemaCheckSTPropsCorrect:
- * @ctxt:  the schema parser context
- * @type:  the simple type definition
- *
- * Checks st-props-correct.
- *
- * Returns 0 if the properties are correct,
- * if not, a positive error code and -1 on internal
- * errors.
- */
+/// Checks st-props-correct.
+///
+/// Returns 0 if the properties are correct,
+/// if not, a positive error code and -1 on internal errors.
+#[doc(alias = "xmlSchemaCheckSTPropsCorrect")]
 unsafe extern "C" fn xml_schema_check_st_props_correct(
     ctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -19696,16 +18579,8 @@ unsafe extern "C" fn xml_schema_check_st_props_correct(
     0
 }
 
-/**
- * xmlSchemaPIllegalFacetAtomicErr:
- * @ctxt: the schema parser context
- * @error: the error code
- * @type: the schema type
- * @baseType: the base type of type
- * @facet: the illegal facet
- *
- * Reports an illegal facet for atomic simple types.
- */
+/// Reports an illegal facet for atomic simple types.
+#[doc(alias = "xmlSchemaPIllegalFacetAtomicErr")]
 unsafe extern "C" fn xml_schema_pillegal_facet_atomic_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -19745,16 +18620,8 @@ unsafe extern "C" fn xml_schema_pillegal_facet_atomic_err(
     FREE_AND_NULL!(str_t);
 }
 
-/**
- * xmlSchemaPIllegalFacetListUnionErr:
- * @ctxt: the schema parser context
- * @error: the error code
- * @itemDes: the designation of the schema item involved
- * @item: the schema item involved
- * @facet: the illegal facet
- *
- * Reports an illegal facet for <list> and <union>.
- */
+/// Reports an illegal facet for <list> and <union>.
+#[doc(alias = "xmlSchemaPIllegalFacetListUnionErr")]
 unsafe extern "C" fn xml_schema_pillegal_facet_list_union_err(
     ctxt: XmlSchemaParserCtxtPtr,
     error: XmlParserErrors,
@@ -19780,20 +18647,15 @@ unsafe extern "C" fn xml_schema_pillegal_facet_list_union_err(
     FREE_AND_NULL!(des);
 }
 
-/**
-* xmlSchemaCheckCOSSTRestricts:
-* @ctxt:  the schema parser context
-* @type:  the simple type definition
-*
-* Schema Component Constraint:
-* Derivation Valid (Restriction, Simple) (cos-st-restricts)
-
-* Checks if the given @type (simpleType) is derived validly by restriction.
-* STATUS:
-*
-* Returns -1 on internal errors, 0 if the type is validly derived,
-* a positive error code otherwise.
-*/
+/// Schema Component Constraint:
+/// Derivation Valid (Restriction, Simple) (cos-st-restricts)
+///
+/// Checks if the given @type (simpleType) is derived validly by restriction.
+/// STATUS:
+///
+/// Returns -1 on internal errors, 0 if the type is validly derived,
+/// a positive error code otherwise.
+#[doc(alias = "xmlSchemaCheckCOSSTRestricts")]
 unsafe extern "C" fn xml_schema_check_cosstrestricts(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -20336,13 +19198,8 @@ unsafe extern "C" fn xml_schema_create_vctxt_on_pctxt(ctxt: XmlSchemaParserCtxtP
     0
 }
 
-/**
- * xmlSchemaCheckFacetValues:
- * @typeDecl:  the schema type definition
- * @ctxt:  the schema parser context
- *
- * Checks the default values types, especially for facets
- */
+/// Checks the default values types, especially for facets
+#[doc(alias = "xmlSchemaCheckFacetValues")]
 unsafe extern "C" fn xml_schema_check_facet_values(
     type_decl: XmlSchemaTypePtr,
     pctxt: XmlSchemaParserCtxtPtr,
@@ -20536,12 +19393,9 @@ unsafe extern "C" fn xml_schema_derive_facet_err(
     }
 }
 
-/*
-* xmlSchemaDeriveAndValidateFacets:
-*
-* Schema Component Constraint: Simple Type Restriction (Facets)
-* (st-restrict-facets)
-*/
+// Schema Component Constraint: Simple Type Restriction (Facets)
+// (st-restrict-facets)
+#[doc(alias = "xmlSchemaDeriveAndValidateFacets")]
 unsafe extern "C" fn xml_schema_derive_and_validate_facets(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -21218,9 +20072,7 @@ unsafe extern "C" fn xml_schema_type_fixup_optim_facets(typ: XmlSchemaTypePtr) {
     }
 }
 
-/*
-* 3.14.6 Constraints on Simple Type Definition Schema Components
-*/
+// 3.14.6 Constraints on Simple Type Definition Schema Components
 unsafe extern "C" fn xml_schema_fixup_simple_type_stage_two(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -21319,9 +20171,6 @@ unsafe extern "C" fn xml_schema_fixup_simple_type_stage_two(
         }
 
         // exit_error:
-        // #ifdef DEBUG_TYPE
-        //     xmlSchemaDebugFixedType(pctxt, typ);
-        // #endif
         if olderrs != (*pctxt).nberrors {
             return (*pctxt).err;
         }
@@ -21329,26 +20178,15 @@ unsafe extern "C" fn xml_schema_fixup_simple_type_stage_two(
     }
 
     // exit_failure:
-    // #ifdef DEBUG_TYPE
-    //     xmlSchemaDebugFixedType(pctxt, typ);
-    // #endif
     -1
 }
 
-/**
- * xmlSchemaCheckAttrPropsCorrect:
- * @item:  an schema attribute declaration/use
- * @ctxt:  a schema parser context
- * @name:  the name of the attribute
- *
- *
- * Schema Component Constraint:
- *    Attribute Declaration Properties Correct (a-props-correct)
- *
- * Validates the value constraints of an attribute declaration/use.
- * NOTE that this needs the simple type definitions to be already
- *   built and checked.
- */
+/// Schema Component Constraint:
+///    Attribute Declaration Properties Correct (a-props-correct)
+///
+/// Validates the value constraints of an attribute declaration/use.
+/// NOTE that this needs the simple type definitions to be already built and checked.
+#[doc(alias = "xmlSchemaCheckAttrPropsCorrect")]
 unsafe extern "C" fn xml_schema_check_attr_props_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     attr: XmlSchemaAttributePtr,
@@ -21422,15 +20260,9 @@ unsafe extern "C" fn xml_schema_check_attr_props_correct(
     0
 }
 
-/**
- * xmlSchemaCheckAttrUsePropsCorrect:
- * @ctxt:  a parser context
- * @use:  an attribute use
- *
- * Schema Component Constraint:
- * Attribute Use Correct (au-props-correct)
- *
- */
+/// Schema Component Constraint:
+/// Attribute Use Correct (au-props-correct)
+#[doc(alias = "xmlSchemaCheckAttrUsePropsCorrect")]
 unsafe extern "C" fn xml_schema_check_attr_use_props_correct(
     ctxt: XmlSchemaParserCtxtPtr,
     using: XmlSchemaAttributeUsePtr,
@@ -21529,17 +20361,12 @@ unsafe extern "C" fn xml_schema_check_attr_use_props_correct(
     0
 }
 
-/**
- * xmlSchemaAttributeGroupExpandRefs:
- * @pctxt:  the parser context
- * @attrGr:  the attribute group definition
- *
- * Substitutes contained attribute group references
- * for their attribute uses. Wildcards are intersected.
- *
- * Schema Component Constraint:
- *    Attribute Group Definition Properties Correct (ag-props-correct)
- */
+/// Substitutes contained attribute group references
+/// for their attribute uses. Wildcards are intersected.
+///
+/// Schema Component Constraint:
+///    Attribute Group Definition Properties Correct (ag-props-correct)
+#[doc(alias = "xmlSchemaAttributeGroupExpandRefs")]
 unsafe extern "C" fn xml_schema_check_agprops_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     attr_gr: XmlSchemaAttributeGroupPtr,
@@ -21743,21 +20570,13 @@ unsafe extern "C" fn xml_schema_are_equal_types(
     (type_a == type_b) as i32
 }
 
-/**
- * xmlSchemaCheckCOSCTDerivedOK:
- * @ctxt:  the schema parser context
- * @type:  the to-be derived complex type definition
- * @baseType:  the base complex type definition
- * @set: the given set
- *
- * Schema Component Constraint:
- * Type Derivation OK (Complex) (cos-ct-derived-ok)
- *
- * STATUS: completed
- *
- * Returns 0 if the constraints are satisfied, or 1
- * if not.
- */
+/// Schema Component Constraint:
+/// Type Derivation OK (Complex) (cos-ct-derived-ok)
+///
+/// STATUS: completed
+///
+/// Returns 0 if the constraints are satisfied, or 1 if not.
+#[doc(alias = "xmlSchemaCheckCOSCTDerivedOK")]
 unsafe extern "C" fn xml_schema_check_cos_ct_derived_ok(
     actxt: XmlSchemaAbstractCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -21819,18 +20638,13 @@ unsafe extern "C" fn xml_schema_check_cos_ct_derived_ok(
     }
 }
 
-/**
- * xmlSchemaCheckCOSDerivedOK:
- * @type:  the derived simple type definition
- * @baseType:  the base type definition
- *
- * Calls:
- * Type Derivation OK (Simple) AND Type Derivation OK (Complex)
- *
- * Checks whether @type can be validly derived from @baseType.
- *
- * Returns 0 on success, an positive error code otherwise.
- */
+/// Calls:
+/// Type Derivation OK (Simple) AND Type Derivation OK (Complex)
+///
+/// Checks whether @type can be validly derived from @baseType.
+///
+/// Returns 0 on success, an positive error code otherwise.
+#[doc(alias = "xmlSchemaCheckCOSDerivedOK")]
 unsafe extern "C" fn xml_schema_check_cos_derived_ok(
     actxt: XmlSchemaAbstractCtxtPtr,
     typ: XmlSchemaTypePtr,
@@ -21844,22 +20658,13 @@ unsafe extern "C" fn xml_schema_check_cos_derived_ok(
     }
 }
 
-/**
- * xmlSchemaParseCheckCOSValidDefault:
- * @pctxt:  the schema parser context
- * @type:  the simple type definition
- * @value: the default value
- * @node: an optional node (the holder of the value)
- *
- * Schema Component Constraint: Element Default Valid (Immediate)
- * (cos-valid-default)
- * This will be used by the parser only. For the validator there's
- * an other version.
- *
- * Returns 0 if the constraints are satisfied,
- * if not, a positive error code and -1 on internal
- * errors.
- */
+/// Schema Component Constraint: Element Default Valid (Immediate)
+/// (cos-valid-default)
+/// This will be used by the parser only. For the validator there's an other version.
+///
+/// Returns 0 if the constraints are satisfied,
+/// if not, a positive error code and -1 on internal errors.
+#[doc(alias = "xmlSchemaParseCheckCOSValidDefault")]
 unsafe extern "C" fn xml_schema_parse_check_cos_valid_default(
     pctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
@@ -21939,18 +20744,12 @@ unsafe extern "C" fn xml_schema_parse_check_cos_valid_default(
     ret
 }
 
-/**
- * xmlSchemaCheckElemPropsCorrect:
- * @ctxt:  a schema parser context
- * @decl: the element declaration
- * @name:  the name of the attribute
- *
- * Schema Component Constraint:
- * Element Declaration Properties Correct (e-props-correct)
- *
- * STATUS:
- *   missing: (6)
- */
+/// Schema Component Constraint:
+/// Element Declaration Properties Correct (e-props-correct)
+///
+/// STATUS:
+///   missing: (6)
+#[doc(alias = "xmlSchemaCheckElemPropsCorrect")]
 unsafe extern "C" fn xml_schema_check_elem_props_correct(
     pctxt: XmlSchemaParserCtxtPtr,
     elem_decl: XmlSchemaElementPtr,
@@ -22187,16 +20986,10 @@ unsafe extern "C" fn xml_schema_subst_group_add(
     ret
 }
 
-/**
- * xmlSchemaAddElementSubstitutionMember:
- * @pctxt:  a schema parser context
- * @head:  the head of the substitution group
- * @member: the new member of the substitution group
- *
- * Allocate a new annotation structure.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new annotation structure.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlSchemaAddElementSubstitutionMember")]
 unsafe extern "C" fn xml_schema_add_element_substitution_member(
     pctxt: XmlSchemaParserCtxtPtr,
     head: XmlSchemaElementPtr,
@@ -22221,25 +21014,19 @@ unsafe extern "C" fn xml_schema_add_element_substitution_member(
     0
 }
 
-/**
- * xmlSchemaCheckElemSubstGroup:
- * @ctxt:  a schema parser context
- * @decl: the element declaration
- * @name:  the name of the attribute
- *
- * Schema Component Constraint:
- * Substitution Group (cos-equiv-class)
- *
- * In Libxml2 the subst. groups will be precomputed, in terms of that
- * a list will be built for each subst. group head, holding all direct
- * referents to this head.
- * NOTE that this function needs:
- *   1. circular subst. groups to be checked beforehand
- *   2. the declaration's type to be derived from the head's type
- *
- * STATUS:
- *
- */
+/// Schema Component Constraint:
+/// Substitution Group (cos-equiv-class)
+///
+/// In Libxml2 the subst. groups will be precomputed, in terms of that
+/// a list will be built for each subst. group head, holding all direct
+/// referents to this head.
+/// NOTE that this function needs:
+///   1. circular subst. groups to be checked beforehand
+///   2. the declaration's type to be derived from the head's type
+///
+/// STATUS:
+///
+#[doc(alias = "xmlSchemaCheckElemSubstGroup")]
 unsafe extern "C" fn xml_schema_check_elem_subst_group(
     ctxt: XmlSchemaParserCtxtPtr,
     elem_decl: XmlSchemaElementPtr,
@@ -22359,15 +21146,9 @@ unsafe extern "C" fn xml_schema_check_elem_subst_group(
     }
 }
 
-/**
- * xmlSchemaCheckElementDeclComponent
- * @item:  an schema element declaration/particle
- * @ctxt:  a schema parser context
- * @name:  the name of the attribute
- *
- * Validates the value constraints of an element declaration.
- * Adds substitution group members.
- */
+/// Validates the value constraints of an element declaration.
+/// Adds substitution group members.
+#[doc(alias = "xmlSchemaCheckElementDeclComponent")]
 unsafe extern "C" fn xml_schema_check_element_decl_component(
     elem_decl: XmlSchemaElementPtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -22387,11 +21168,8 @@ unsafe extern "C" fn xml_schema_check_element_decl_component(
     }
 }
 
-/**
- * xmlSchemaBuildContentModelForSubstGroup:
- *
- * Returns 1 if nillable, 0 otherwise
- */
+/// Returns 1 if nillable, 0 otherwise
+#[doc(alias = "xmlSchemaBuildContentModelForSubstGroup")]
 unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
@@ -22545,11 +21323,8 @@ unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
     ret
 }
 
-/**
- * xmlSchemaBuildContentModelForElement:
- *
- * Returns 1 if nillable, 0 otherwise
- */
+/// Returns 1 if nillable, 0 otherwise
+#[doc(alias = "xmlSchemaBuildContentModelForElement")]
 unsafe extern "C" fn xml_schema_build_content_model_for_element(
     ctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
@@ -22633,16 +21408,10 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
     ret
 }
 
-/**
- * xmlSchemaBuildAContentModel:
- * @ctxt:  the schema parser context
- * @particle:  the particle component
- * @name:  the complex type's name whose content is being built
- *
- * Create the automaton for the {content type} of a complex type.
- *
- * Returns 1 if the content is nillable, 0 otherwise
- */
+/// Create the automaton for the {content type} of a complex type.
+///
+/// Returns 1 if the content is nillable, 0 otherwise
+#[doc(alias = "xmlSchemaBuildAContentModel")]
 unsafe extern "C" fn xml_schema_build_acontent_model(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
@@ -23099,14 +21868,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
     ret
 }
 
-/**
- * xmlSchemaBuildContentModel:
- * @ctxt:  the schema parser context
- * @type:  the complex type definition
- * @name:  the element name
- *
- * Builds the content model of the complex type.
- */
+/// Builds the content model of the complex type.
+#[doc(alias = "xmlSchemaBuildContentModel")]
 unsafe extern "C" fn xml_schema_build_content_model(
     typ: XmlSchemaTypePtr,
     ctxt: XmlSchemaParserCtxtPtr,
@@ -23632,16 +22395,11 @@ unsafe extern "C" fn xml_schema_fixup_components(
     ret
 }
 
-/**
- * xmlSchemaParse:
- * @ctxt:  a schema validation context
- *
- * parse a schema definition resource and build an internal
- * XML Schema structure which can be used to validate instances.
- *
- * Returns the internal XML Schema structure built from the resource or
- *         NULL in case of error
- */
+/// parse a schema definition resource and build an internal
+/// XML Schema structure which can be used to validate instances.
+///
+/// Returns the internal XML Schema structure built from the resource or NULL in case of error
+#[doc(alias = "xmlSchemaParse")]
 pub unsafe extern "C" fn xml_schema_parse(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
     let mut main_schema: XmlSchemaPtr;
     let mut bucket: XmlSchemaBucketPtr = null_mut();
@@ -23796,12 +22554,8 @@ extern "C" fn xml_schema_bucket_free_entry(bucket: *mut c_void, _name: *const Xm
     }
 }
 
-/**
- * xmlSchemaFree:
- * @schema:  a schema structure
- *
- * Deallocate a Schema structure.
- */
+/// Deallocate a Schema structure.
+#[doc(alias = "xmlSchemaFree")]
 pub unsafe extern "C" fn xml_schema_free(schema: XmlSchemaPtr) {
     if schema.is_null() {
         return;
@@ -23860,13 +22614,8 @@ pub unsafe extern "C" fn xml_schema_free(schema: XmlSchemaPtr) {
     xml_free(schema as _);
 }
 
-/**
- * xmlSchemaAttrUsesDump:
- * @uses:  attribute uses list
- * @output:  the file output
- *
- * Dumps a list of attribute use components.
- */
+/// Dumps a list of attribute use components.
+#[doc(alias = "xmlSchemaAttrUsesDump")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_schema_attr_uses_dump(uses: XmlSchemaItemListPtr, output: *mut FILE) {
     let mut using: XmlSchemaAttributeUsePtr;
@@ -23907,13 +22656,8 @@ unsafe extern "C" fn xml_schema_attr_uses_dump(uses: XmlSchemaItemListPtr, outpu
     }
 }
 
-/**
- * xmlSchemaAnnotDump:
- * @output:  the file output
- * @annot:  a annotation
- *
- * Dump the annotation
- */
+/// Dump the annotation
+#[doc(alias = "xmlSchemaAnnotDump")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_schema_annot_dump(output: *mut FILE, annot: XmlSchemaAnnotPtr) {
     if annot.is_null() {
@@ -23929,14 +22673,8 @@ unsafe extern "C" fn xml_schema_annot_dump(output: *mut FILE, annot: XmlSchemaAn
     }
 }
 
-/**
- * xmlSchemaContentModelDump:
- * @particle: the schema particle
- * @output: the file output
- * @depth: the depth used for indentation
- *
- * Dump a SchemaType structure
- */
+/// Dump a SchemaType structure
+#[doc(alias = "xmlSchemaContentModelDump")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_schema_content_model_dump(
     particle: XmlSchemaParticlePtr,
@@ -24020,13 +22758,8 @@ unsafe extern "C" fn xml_schema_content_model_dump(
     }
 }
 
-/**
- * xmlSchemaTypeDump:
- * @output:  the file output
- * @type:  a type structure
- *
- * Dump a SchemaType structure
- */
+/// Dump a SchemaType structure
+#[doc(alias = "xmlSchemaTypeDump")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_schema_type_dump(typ: XmlSchemaTypePtr, output: *mut FILE) {
     if typ.is_null() {
@@ -24132,13 +22865,8 @@ extern "C" fn xml_schema_type_dump_entry(
     }
 }
 
-/**
- * xmlSchemaElementDump:
- * @elem:  an element
- * @output:  the file output
- *
- * Dump the element
- */
+/// Dump the element
+#[doc(alias = "xmlSchemaElementDump")]
 #[cfg(feature = "output")]
 extern "C" fn xml_schema_element_dump(
     payload: *mut c_void,
@@ -24226,13 +22954,8 @@ extern "C" fn xml_schema_element_dump(
     }
 }
 
-/**
- * xmlSchemaDump:
- * @output:  the file output
- * @schema:  a schema structure
- *
- * Dump a Schema structure.
- */
+/// Dump a Schema structure.
+#[doc(alias = "xmlSchemaDump")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_schema_dump(output: *mut FILE, schema: XmlSchemaPtr) {
     use libc::fprintf;
@@ -24273,18 +22996,8 @@ pub unsafe extern "C" fn xml_schema_dump(output: *mut FILE, schema: XmlSchemaPtr
     );
 }
 
-/*
- * Interfaces for validating
- */
-/**
- * xmlSchemaSetValidErrors:
- * @ctxt:  a schema validation context
- * @err:  the error function
- * @warn: the warning function
- * @ctx: the functions context
- *
- * Set the error and warning callback information
- */
+/// Set the error and warning callback information
+#[doc(alias = "xmlSchemaSetValidErrors")]
 pub unsafe fn xml_schema_set_valid_errors(
     ctxt: XmlSchemaValidCtxtPtr,
     err: Option<GenericError>,
@@ -24302,14 +23015,8 @@ pub unsafe fn xml_schema_set_valid_errors(
     }
 }
 
-/**
- * xmlSchemaSetValidStructuredErrors:
- * @ctxt:  a schema validation context
- * @serror:  the structured error function
- * @ctx: the functions context
- *
- * Set the structured error callback
- */
+/// Set the structured error callback
+#[doc(alias = "xmlSchemaSetValidStructuredErrors")]
 pub unsafe fn xml_schema_set_valid_structured_errors(
     ctxt: XmlSchemaValidCtxtPtr,
     serror: Option<StructuredError>,
@@ -24327,17 +23034,10 @@ pub unsafe fn xml_schema_set_valid_structured_errors(
     }
 }
 
-/**
- * xmlSchemaGetValidErrors:
- * @ctxt: a XML-Schema validation context
- * @err: the error function result
- * @warn: the warning function result
- * @ctx: the functions context result
- *
- * Get the error and warning callback information
- *
- * Returns -1 in case of error and 0 otherwise
- */
+/// Get the error and warning callback information
+///
+/// Returns -1 in case of error and 0 otherwise
+#[doc(alias = "xmlSchemaGetValidErrors")]
 pub unsafe extern "C" fn xml_schema_get_valid_errors(
     ctxt: XmlSchemaValidCtxtPtr,
     err: *mut Option<GenericError>,
@@ -24359,16 +23059,10 @@ pub unsafe extern "C" fn xml_schema_get_valid_errors(
     0
 }
 
-/**
- * xmlSchemaSetValidOptions:
- * @ctxt:    a schema validation context
- * @options: a combination of xmlSchemaValidOption
- *
- * Sets the options to be used during the validation.
- *
- * Returns 0 in case of success, -1 in case of an
- * API error.
- */
+/// Sets the options to be used during the validation.
+///
+/// Returns 0 in case of success, -1 in case of an API error.
+#[doc(alias = "xmlSchemaSetValidOptions")]
 pub unsafe extern "C" fn xml_schema_set_valid_options(
     ctxt: XmlSchemaValidCtxtPtr,
     options: i32,
@@ -24391,14 +23085,9 @@ pub unsafe extern "C" fn xml_schema_set_valid_options(
     0
 }
 
-/**
- * xmlSchemaValidateSetFilename:
- * @vctxt: the schema validation context
- * @filename: the file name
- *
- * Workaround to provide file error reporting information when this is
- * not provided by current APIs
- */
+/// Workaround to provide file error reporting information when this is
+/// not provided by current APIs
+#[doc(alias = "xmlSchemaValidateSetFilename")]
 pub unsafe extern "C" fn xml_schema_validate_set_filename(
     vctxt: XmlSchemaValidCtxtPtr,
     filename: *const c_char,
@@ -24416,14 +23105,10 @@ pub unsafe extern "C" fn xml_schema_validate_set_filename(
     }
 }
 
-/**
- * xmlSchemaValidCtxtGetOptions:
- * @ctxt: a schema validation context
- *
- * Get the validation context options.
- *
- * Returns the option combination or -1 on error.
- */
+/// Get the validation context options.
+///
+/// Returns the option combination or -1 on error.
+#[doc(alias = "xmlSchemaValidCtxtGetOptions")]
 pub unsafe extern "C" fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
     if ctxt.is_null() {
         -1
@@ -24432,13 +23117,8 @@ pub unsafe extern "C" fn xml_schema_valid_ctxt_get_options(ctxt: XmlSchemaValidC
     }
 }
 
-/**
- * xmlSchemaVTypeErrMemory:
- * @node: a context node
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchemaVTypeErrMemory")]
 unsafe extern "C" fn xml_schema_verr_memory(
     ctxt: XmlSchemaValidCtxtPtr,
     extra: *const c_char,
@@ -24457,14 +23137,10 @@ unsafe extern "C" fn xml_schema_verr_memory(
     );
 }
 
-/**
- * xmlSchemaNewValidCtxt:
- * @schema:  a precompiled XML Schemas
- *
- * Create an XML Schemas validation context based on the given schema.
- *
- * Returns the validation context or NULL in case of error
- */
+/// Create an XML Schemas validation context based on the given schema.
+///
+/// Returns the validation context or NULL in case of error
+#[doc(alias = "xmlSchemaNewValidCtxt")]
 pub unsafe extern "C" fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlSchemaValidCtxtPtr {
     let ret: XmlSchemaValidCtxtPtr =
         xml_malloc(size_of::<XmlSchemaValidCtxt>()) as XmlSchemaValidCtxtPtr;
@@ -24484,12 +23160,8 @@ pub unsafe extern "C" fn xml_schema_new_valid_ctxt(schema: XmlSchemaPtr) -> XmlS
     ret
 }
 
-/**
- * xmlSchemaIDCFreeKey:
- * @key: the IDC key
- *
- * Frees an IDC key together with its compiled value.
- */
+/// Frees an IDC key together with its compiled value.
+#[doc(alias = "xmlSchemaIDCFreeKey")]
 unsafe extern "C" fn xml_schema_idc_free_key(key: XmlSchemaPSVIIDCKeyPtr) {
     if !(*key).val.is_null() {
         xml_schema_free_value((*key).val);
@@ -24512,9 +23184,7 @@ unsafe extern "C" fn xml_schema_free_idc_state_obj_list(mut sto: XmlSchemaIDCSta
     }
 }
 
-/*
-* Cleanup currently used attribute infos.
-*/
+// Cleanup currently used attribute infos.
 unsafe extern "C" fn xml_schema_clear_attr_infos(vctxt: XmlSchemaValidCtxtPtr) {
     let mut attr: XmlSchemaAttrInfoPtr;
 
@@ -24555,13 +23225,8 @@ extern "C" fn xml_free_idc_hash_entry(payload: *mut c_void, _name: *const XmlCha
     }
 }
 
-/**
- * xmlSchemaIDCReleaseMatcherList:
- * @vctxt: the WXS validation context
- * @matcher: the first IDC matcher in the list
- *
- * Caches a list of IDC matchers for reuse.
- */
+/// Caches a list of IDC matchers for reuse.
+#[doc(alias = "xmlSchemaIDCReleaseMatcherList")]
 unsafe extern "C" fn xml_schema_idc_release_matcher_list(
     vctxt: XmlSchemaValidCtxtPtr,
     mut matcher: XmlSchemaIDCMatcherPtr,
@@ -24616,12 +23281,8 @@ unsafe extern "C" fn xml_schema_idc_release_matcher_list(
     }
 }
 
-/**
- * xmlSchemaIDCFreeBinding:
- *
- * Frees an IDC binding. Note that the node table-items
- * are not freed.
- */
+/// Frees an IDC binding. Note that the node table-items are not freed.
+#[doc(alias = "xmlSchemaIDCFreeBinding")]
 unsafe extern "C" fn xml_schema_idc_free_binding(bind: XmlSchemaPSVIIDCBindingPtr) {
     if !(*bind).node_table.is_null() {
         xml_free((*bind).node_table as _);
@@ -24632,12 +23293,8 @@ unsafe extern "C" fn xml_schema_idc_free_binding(bind: XmlSchemaPSVIIDCBindingPt
     xml_free(bind as _);
 }
 
-/**
- * xmlSchemaIDCFreeIDCTable:
- * @bind: the first IDC binding in the list
- *
- * Frees an IDC table, i.e. all the IDC bindings in the list.
- */
+/// Frees an IDC table, i.e. all the IDC bindings in the list.
+#[doc(alias = "xmlSchemaIDCFreeIDCTable")]
 unsafe extern "C" fn xml_schema_idcfree_idc_table(mut bind: XmlSchemaPSVIIDCBindingPtr) {
     let mut prev: XmlSchemaPSVIIDCBindingPtr;
 
@@ -24648,11 +23305,7 @@ unsafe extern "C" fn xml_schema_idcfree_idc_table(mut bind: XmlSchemaPSVIIDCBind
     }
 }
 
-/**
- * xmlSchemaClearElemInfo:
- * @vctxt: the WXS validation context
- * @ielem: the element information item
- */
+#[doc(alias = "xmlSchemaClearElemInfo")]
 unsafe extern "C" fn xml_schema_clear_elem_info(
     vctxt: XmlSchemaValidCtxtPtr,
     ielem: XmlSchemaNodeInfoPtr,
@@ -24709,12 +23362,8 @@ unsafe extern "C" fn xml_schema_clear_elem_info(
     }
 }
 
-/**
- * xmlSchemaFreeValidCtxt:
- * @ctxt:  the schema validation context
- *
- * Free the resources associated to the schema validation context
- */
+/// Free the resources associated to the schema validation context
+#[doc(alias = "xmlSchemaFreeValidCtxt")]
 pub unsafe extern "C" fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -24802,14 +23451,10 @@ pub unsafe extern "C" fn xml_schema_free_valid_ctxt(ctxt: XmlSchemaValidCtxtPtr)
     xml_free(ctxt as _);
 }
 
-/**
- * xmlSchemaAugmentIDC:
- * @idcDef: the IDC definition
- *
- * Creates an augmented IDC definition item.
- *
- * Returns the item, or NULL on internal errors.
- */
+/// Creates an augmented IDC definition item.
+///
+/// Returns the item, or NULL on internal errors.
+#[doc(alias = "xmlSchemaAugmentIDC")]
 extern "C" fn xml_schema_augment_idc(
     payload: *mut c_void,
     data: *mut c_void,
@@ -24848,12 +23493,8 @@ extern "C" fn xml_schema_augment_idc(
     }
 }
 
-/**
- * xmlSchemaAugmentImportedIDC:
- * @imported: the imported schema
- *
- * Creates an augmented IDC definition for the imported schema.
- */
+/// Creates an augmented IDC definition for the imported schema.
+#[doc(alias = "xmlSchemaAugmentImportedIDC")]
 extern "C" fn xml_schema_augment_imported_idc(
     payload: *mut c_void,
     data: *mut c_void,
@@ -24967,15 +23608,11 @@ unsafe extern "C" fn xml_schema_pre_run(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     0
 }
 
-/**
- * xmlSchemaGetFreshElemInfo:
- * @vctxt: the schema validation context
- *
- * Creates/reuses and initializes the element info item for
- * the current tree depth.
- *
- * Returns the element info item or NULL on API or internal errors.
- */
+/// Creates/reuses and initializes the element info item for
+/// the current tree depth.
+///
+/// Returns the element info item or NULL on API or internal errors.
+#[doc(alias = "xmlSchemaGetFreshElemInfo")]
 unsafe extern "C" fn xml_schema_get_fresh_elem_info(
     vctxt: XmlSchemaValidCtxtPtr,
 ) -> XmlSchemaNodeInfoPtr {
@@ -25221,20 +23858,11 @@ unsafe extern "C" fn xml_schema_get_meta_attr_info(
     null_mut()
 }
 
-/**
- * xmlSchemaAssembleByLocation:
- * @pctxt:  a schema parser context
- * @vctxt:  a schema validation context
- * @schema: the existing schema
- * @node: the node that fired the assembling
- * @nsName: the namespace name of the new schema
- * @location: the location of the schema
- *
- * Expands an existing schema by an additional schema.
- *
- * Returns 0 if the new schema is correct, a positive error code
- * number otherwise and -1 in case of an internal or API error.
- */
+/// Expands an existing schema by an additional schema.
+///
+/// Returns 0 if the new schema is correct, a positive error code
+/// number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaAssembleByLocation")]
 unsafe extern "C" fn xml_schema_assemble_by_location(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
@@ -25368,18 +23996,14 @@ unsafe extern "C" fn xml_schema_assemble_by_location(
     //     return -1;
 }
 
-/**
- * xmlSchemaAssembleByXSI:
- * @vctxt:  a schema validation context
- *
- * Expands an existing schema by an additional schema using
- * the xsi:schemaLocation or xsi:noNamespaceSchemaLocation attribute
- * of an instance. If xsi:noNamespaceSchemaLocation is used, @noNamespace
- * must be set to 1.
- *
- * Returns 0 if the new schema is correct, a positive error code
- * number otherwise and -1 in case of an internal or API error.
- */
+/// Expands an existing schema by an additional schema using
+/// the xsi:schemaLocation or xsi:noNamespaceSchemaLocation attribute
+/// of an instance. If xsi:noNamespaceSchemaLocation is used, @noNamespace
+/// must be set to 1.
+///
+/// Returns 0 if the new schema is correct, a positive error code
+/// number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaAssembleByXSI")]
 unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut cur: *const XmlChar;
     let mut end: *const XmlChar;
@@ -25803,10 +24427,8 @@ unsafe extern "C" fn xml_schema_complex_type_err(
     xml_free(msg as _);
 }
 
-/*
-* 3.4.4 Complex Type Definition Validation Rules
-* Validation Rule: Element Locally Valid (Complex Type) (cvc-complex-type)
-*/
+// 3.4.4 Complex Type Definition Validation Rules
+// Validation Rule: Element Locally Valid (Complex Type) (cvc-complex-type)
 unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
 
@@ -26153,20 +24775,12 @@ unsafe extern "C" fn xml_schema_validate_elem_wildcard(
     0
 }
 
-/**
- * xmlSchemaIDCAddStateObject:
- * @vctxt: the WXS validation context
- * @matcher: the IDC matcher
- * @sel: the XPath information
- * @parent: the parent "selector" state object if any
- * @type: "selector" or "field"
- *
- * Creates/reuses and activates state objects for the given
- * XPath information; if the XPath expression consists of unions,
- * multiple state objects are created for every unioned expression.
- *
- * Returns 0 on success and -1 on internal errors.
- */
+/// Creates/reuses and activates state objects for the given
+/// XPath information; if the XPath expression consists of unions,
+/// multiple state objects are created for every unioned expression.
+///
+/// Returns 0 on success and -1 on internal errors.
+#[doc(alias = "xmlSchemaIDCAddStateObject")]
 unsafe extern "C" fn xml_schema_idc_add_state_object(
     vctxt: XmlSchemaValidCtxtPtr,
     matcher: XmlSchemaIDCMatcherPtr,
@@ -26234,16 +24848,10 @@ unsafe extern "C" fn xml_schema_idc_add_state_object(
     0
 }
 
-/**
- * xmlSchemaIDCRegisterMatchers:
- * @vctxt: the WXS validation context
- * @elemDecl: the element declaration
- *
- * Creates helper objects to evaluate IDC selectors/fields
- * successively.
- *
- * Returns 0 if OK and -1 on internal errors.
- */
+/// Creates helper objects to evaluate IDC selectors/fields successively.
+///
+/// Returns 0 if OK and -1 on internal errors.
+#[doc(alias = "xmlSchemaIDCRegisterMatchers")]
 unsafe extern "C" fn xml_schema_idc_register_matchers(
     vctxt: XmlSchemaValidCtxtPtr,
     elem_decl: XmlSchemaElementPtr,
@@ -26524,16 +25132,11 @@ unsafe extern "C" fn xml_schema_validate_elem_decl(vctxt: XmlSchemaValidCtxtPtr)
     0
 }
 
-/**
- * xmlSchemaXPathEvaluate:
- * @vctxt: the WXS validation context
- * @nodeType: the nodeType of the current node
- *
- * Evaluates all active XPath state objects.
- *
- * Returns the number of IC "field" state objects which resolved to
- * this node, 0 if none resolved and -1 on internal errors.
- */
+/// Evaluates all active XPath state objects.
+///
+/// Returns the number of IC "field" state objects which resolved to
+/// this node, 0 if none resolved and -1 on internal errors.
+#[doc(alias = "xmlSchemaXPathEvaluate")]
 unsafe extern "C" fn xml_schema_xpath_evaluate(
     vctxt: XmlSchemaValidCtxtPtr,
     node_type: XmlElementType,
@@ -26672,15 +25275,10 @@ unsafe extern "C" fn xml_schema_get_idc_designation(
     xml_schema_get_component_designation(buf, idc as _)
 }
 
-/**
- * xmlSchemaIDCStoreKey:
- * @vctxt: the WXS validation context
- * @item: the IDC key
- *
- * The validation context is used to store an IDC key.
- *
- * Returns 0 if succeeded, -1 on internal errors.
- */
+/// The validation context is used to store an IDC key.
+///
+/// Returns 0 if succeeded, -1 on internal errors.
+#[doc(alias = "xmlSchemaIDCStoreKey")]
 unsafe extern "C" fn xml_schema_idc_store_key(
     vctxt: XmlSchemaValidCtxtPtr,
     key: XmlSchemaPSVIIDCKeyPtr,
@@ -26809,17 +25407,12 @@ unsafe extern "C" fn xml_schema_format_idc_key_sequence(
     xml_schema_format_idc_key_sequence_1(vctxt, buf, seq, count, 0)
 }
 
-/**
- * xmlSchemaIDCStoreNodeTableItem:
- * @vctxt: the WXS validation context
- * @item: the IDC node table item
- *
- * The validation context is used to store IDC node table items.
- * They are stored to avoid copying them if IDC node-tables are merged
- * with corresponding parent IDC node-tables (bubbling).
- *
- * Returns 0 if succeeded, -1 on internal errors.
- */
+/// The validation context is used to store IDC node table items.
+/// They are stored to avoid copying them if IDC node-tables are merged
+/// with corresponding parent IDC node-tables (bubbling).
+///
+/// Returns 0 if succeeded, -1 on internal errors.
+#[doc(alias = "xmlSchemaIDCStoreNodeTableItem")]
 unsafe extern "C" fn xml_schema_idc_store_node_table_item(
     vctxt: XmlSchemaValidCtxtPtr,
     item: XmlSchemaPSVIIDCNodePtr,
@@ -26890,17 +25483,11 @@ unsafe extern "C" fn xml_schema_vadd_node_qname(
     i
 }
 
-/**
- * xmlSchemaXPathProcessHistory:
- * @vctxt: the WXS validation context
- * @type: the simple/complex type of the current node if any at all
- * @val: the precompiled value
- *
- * Processes and pops the history items of the IDC state objects.
- * IDC key-sequences are validated/created on IDC bindings.
- *
- * Returns 0 on success and -1 on internal errors.
- */
+/// Processes and pops the history items of the IDC state objects.
+/// IDC key-sequences are validated/created on IDC bindings.
+///
+/// Returns 0 on success and -1 on internal errors.
+#[doc(alias = "xmlSchemaXPathProcessHistory")]
 unsafe extern "C" fn xml_schema_xpath_process_history(
     vctxt: XmlSchemaValidCtxtPtr,
     depth: i32,
@@ -27224,7 +25811,7 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
                          * duplicate key-sequences.
                          */
                         // #if 0
-                        //         bind = xmlSchemaIDCAcquireBinding(vctxt, matcher);
+                        // bind = xmlSchemaIDCAcquireBinding(vctxt, matcher);
                         // #endif
                         targets = xml_schema_idc_acquire_target_list(vctxt, matcher);
                         if (*idc).typ != XmlSchemaTypeType::XmlSchemaTypeIDCKeyref
@@ -27466,14 +26053,10 @@ unsafe extern "C" fn xml_schema_xpath_process_history(
     0
 }
 
-/**
- * xmlSchemaXPathPop:
- * @vctxt: the WXS validation context
- *
- * Pops all XPath states.
- *
- * Returns 0 on success and -1 on internal errors.
- */
+/// Pops all XPath states.
+///
+/// Returns 0 on success and -1 on internal errors.
+#[doc(alias = "xmlSchemaXPathPop")]
 unsafe extern "C" fn xml_schema_xpath_pop(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut sto: XmlSchemaIDCStateObjPtr;
     let mut res: i32;
@@ -27533,16 +26116,14 @@ unsafe extern "C" fn xml_schema_illegal_attr_err(
     FREE_AND_NULL!(msg)
 }
 
-/*
-* 3.4.4 Complex Type Definition Validation Rules
-*   Element Locally Valid (Complex Type) (cvc-complex-type)
-* 3.2.4 Attribute Declaration Validation Rules
-*   Validation Rule: Attribute Locally Valid (cvc-attribute)
-*   Attribute Locally Valid (Use) (cvc-au)
-*
-* Only "assessed" attribute information items will be visible to
-* IDCs. I.e. not "lax" (without declaration) and "skip" wild attributes.
-*/
+// 3.4.4 Complex Type Definition Validation Rules
+//   Element Locally Valid (Complex Type) (cvc-complex-type)
+// 3.2.4 Attribute Declaration Validation Rules
+//   Validation Rule: Attribute Locally Valid (cvc-attribute)
+//   Attribute Locally Valid (Use) (cvc-au)
+//
+// Only "assessed" attribute information items will be visible to
+// IDCs. I.e. not "lax" (without declaration) and "skip" wild attributes.
 unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let typ: XmlSchemaTypePtr = (*(*vctxt).inode).type_def;
     let mut attr_use: XmlSchemaAttributeUsePtr;
@@ -28689,12 +27270,8 @@ unsafe extern "C" fn xml_schema_vcheck_inode_data_type(
     }
 }
 
-/*
-* xmlSchemaCheckCOSValidDefault:
-*
-* This will be called if: not nilled, no content and a default/fixed
-* value is provided.
-*/
+// This will be called if: not nilled, no content and a default/fixed value is provided.
+#[doc(alias = "xmlSchemaCheckCOSValidDefault")]
 unsafe extern "C" fn xml_schema_check_cos_valid_default(
     vctxt: XmlSchemaValidCtxtPtr,
     value: *const XmlChar,
@@ -28772,14 +27349,10 @@ unsafe extern "C" fn xml_schema_check_cos_valid_default(
     ret
 }
 
-/**
- * xmlSchemaIDCNewBinding:
- * @idcDef: the IDC definition of this binding
- *
- * Creates a new IDC binding.
- *
- * Returns the new IDC binding, NULL on internal errors.
- */
+/// Creates a new IDC binding.
+///
+/// Returns the new IDC binding, NULL on internal errors.
+#[doc(alias = "xmlSchemaIDCNewBinding")]
 unsafe extern "C" fn xml_schema_idc_new_binding(
     idc_def: XmlSchemaIDCPtr,
 ) -> XmlSchemaPSVIIDCBindingPtr {
@@ -28798,17 +27371,12 @@ unsafe extern "C" fn xml_schema_idc_new_binding(
     ret
 }
 
-/**
- * xmlSchemaIDCAcquireBinding:
- * @vctxt: the WXS validation context
- * @matcher: the IDC matcher
- *
- * Looks up an PSVI IDC binding, for the IDC definition and
- * of the given matcher. If none found, a new one is created
- * and added to the IDC table.
- *
- * Returns an IDC binding or NULL on internal errors.
- */
+/// Looks up an PSVI IDC binding, for the IDC definition and
+/// of the given matcher. If none found, a new one is created
+/// and added to the IDC table.
+///
+/// Returns an IDC binding or NULL on internal errors.
+#[doc(alias = "xmlSchemaIDCAcquireBinding")]
 unsafe extern "C" fn xml_schema_idc_acquire_binding(
     vctxt: XmlSchemaValidCtxtPtr,
     matcher: XmlSchemaIDCMatcherPtr,
@@ -28843,15 +27411,10 @@ unsafe extern "C" fn xml_schema_idc_acquire_binding(
     null_mut()
 }
 
-/**
- * xmlSchemaIDCAppendNodeTableItem:
- * @bind: the IDC binding
- * @ntItem: the node-table item
- *
- * Appends the IDC node-table item to the binding.
- *
- * Returns 0 on success and -1 on internal errors.
- */
+/// Appends the IDC node-table item to the binding.
+///
+/// Returns 0 on success and -1 on internal errors.
+#[doc(alias = "xmlSchemaIDCAppendNodeTableItem")]
 unsafe extern "C" fn xml_schema_idc_append_node_table_item(
     bind: XmlSchemaPSVIIDCBindingPtr,
     nt_item: XmlSchemaPSVIIDCNodePtr,
@@ -29156,13 +27719,8 @@ unsafe extern "C" fn xml_schema_keyref_err(
     FREE_AND_NULL!(msg);
 }
 
-/**
- * xmlSchemaCheckCVCIDCKeyRef:
- * @vctxt: the WXS validation context
- * @elemDecl: the element declaration
- *
- * Check the cvc-idc-keyref constraints.
- */
+/// Check the cvc-idc-keyref constraints.
+#[doc(alias = "xmlSchemaCheckCVCIDCKeyRef")]
 unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut matcher: XmlSchemaIDCMatcherPtr;
     let mut bind: XmlSchemaPSVIIDCBindingPtr;
@@ -29337,17 +27895,13 @@ unsafe extern "C" fn xml_schema_check_cvc_idc_key_ref(vctxt: XmlSchemaValidCtxtP
     0
 }
 
-/**
- * xmlSchemaBubbleIDCNodeTables:
- * @depth: the current tree depth
- *
- * Merges IDC bindings of an element at @depth into the corresponding IDC
- * bindings of its parent element. If a duplicate note-table entry is found,
- * both, the parent node-table entry and child entry are discarded from the
- * node-table of the parent.
- *
- * Returns 0 if OK and -1 on internal errors.
- */
+/// Merges IDC bindings of an element at @depth into the corresponding IDC
+/// bindings of its parent element. If a duplicate note-table entry is found,
+/// both, the parent node-table entry and child entry are discarded from the
+/// node-table of the parent.
+///
+/// Returns 0 if OK and -1 on internal errors.
+#[doc(alias = "xmlSchemaBubbleIDCNodeTables")]
 unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut bind: XmlSchemaPSVIIDCBindingPtr; /* IDC bindings of the current node. */
     let mut par_bind: XmlSchemaPSVIIDCBindingPtr = null_mut(); /* parent IDC bindings. */
@@ -29689,9 +28243,7 @@ unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxt
     //     return -1;
 }
 
-/*
-* Process END of element.
-*/
+// Process END of element.
 unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
     let inode: XmlSchemaNodeInfoPtr = (*vctxt).inode;
@@ -30441,12 +28993,8 @@ unsafe extern "C" fn xml_schema_item_list_clear(list: XmlSchemaItemListPtr) {
     (*list).size_items = 0;
 }
 
-/**
- * xmlSchemaIDCFreeMatcherList:
- * @matcher: the first IDC matcher in the list
- *
- * Frees a list of IDC matchers.
- */
+/// Frees a list of IDC matchers.
+#[doc(alias = "xmlSchemaIDCFreeMatcherList")]
 unsafe extern "C" fn xml_schema_idc_free_matcher_list(mut matcher: XmlSchemaIDCMatcherPtr) {
     let mut next: XmlSchemaIDCMatcherPtr;
 
@@ -30485,13 +29033,9 @@ unsafe extern "C" fn xml_schema_idc_free_matcher_list(mut matcher: XmlSchemaIDCM
     }
 }
 
-/**
- * xmlSchemaClearValidCtxt:
- * @vctxt: the schema validation context
- *
- * Free the resources associated to the schema validation context;
- * leaves some fields alive intended for reuse of the context.
- */
+/// Free the resources associated to the schema validation context;
+/// leaves some fields alive intended for reuse of the context.
+#[doc(alias = "xmlSchemaClearValidCtxt")]
 unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
     if vctxt.is_null() {
         return;
@@ -30664,16 +29208,11 @@ unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     ret
 }
 
-/**
- * xmlSchemaValidateDoc:
- * @ctxt:  a schema validation context
- * @doc:  a parsed document tree
- *
- * Validate a document tree in memory.
- *
- * Returns 0 if the document is schemas valid, a positive error code
- *     number otherwise and -1 in case of internal or API error.
- */
+/// Validate a document tree in memory.
+///
+/// Returns 0 if the document is schemas valid, a positive error code
+/// number otherwise and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateDoc")]
 pub unsafe extern "C" fn xml_schema_validate_doc(
     ctxt: XmlSchemaValidCtxtPtr,
     doc: XmlDocPtr,
@@ -30700,16 +29239,11 @@ pub unsafe extern "C" fn xml_schema_validate_doc(
     xml_schema_vstart(ctxt)
 }
 
-/**
- * xmlSchemaValidateOneElement:
- * @ctxt:  a schema validation context
- * @elem:  an element node
- *
- * Validate a branch of a tree, starting with the given @elem.
- *
- * Returns 0 if the element and its subtree is valid, a positive error
- * code number otherwise and -1 in case of an internal or API error.
- */
+/// Validate a branch of a tree, starting with the given @elem.
+///
+/// Returns 0 if the element and its subtree is valid, a positive error
+/// code number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaValidateOneElement")]
 pub unsafe extern "C" fn xml_schema_validate_one_element(
     ctxt: XmlSchemaValidCtxtPtr,
     elem: XmlNodePtr,
@@ -30728,17 +29262,10 @@ pub unsafe extern "C" fn xml_schema_validate_one_element(
     xml_schema_vstart(ctxt)
 }
 
-/**
- * xmlSchemaValidateStreamLocator:
- * @ctx: the xmlTextReaderPtr used
- * @file: returned file information
- * @line: returned line information
- *
- * Internal locator function for the readers
- *
- * Returns 0 in case the Schema validation could be (de)activated and
- *         -1 in case of error.
- */
+/// Internal locator function for the readers
+///
+/// Returns 0 in case the Schema validation could be (de)activated and -1 in case of error.
+#[doc(alias = "xmlSchemaValidateStreamLocator")]
 unsafe extern "C" fn xml_schema_validate_stream_locator(
     ctx: *mut c_void,
     file: *mut Option<String>,
@@ -30768,21 +29295,13 @@ unsafe extern "C" fn xml_schema_validate_stream_locator(
     -1
 }
 
-/**
- * xmlSchemaValidateStream:
- * @ctxt:  a schema validation context
- * @input:  the input to use for reading the data
- * @enc:  an optional encoding information
- * @sax:  a SAX handler for the resulting events
- * @user_data:  the context to provide to the SAX handler.
- *
- * Validate an input based on a flow of SAX event from the parser
- * and forward the events to the @sax handler with the provided @user_data
- * the user provided @sax handler must be a SAX2 one.
- *
- * Returns 0 if the document is schemas valid, a positive error code
- *     number otherwise and -1 in case of internal or API error.
- */
+/// Validate an input based on a flow of SAX event from the parser
+/// and forward the events to the @sax handler with the provided @user_data
+/// the user provided @sax handler must be a SAX2 one.
+///
+/// Returns 0 if the document is schemas valid, a positive error code
+/// number otherwise and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateStream")]
 pub unsafe fn xml_schema_validate_stream(
     ctxt: XmlSchemaValidCtxtPtr,
     input: XmlParserInputBuffer,
@@ -30872,18 +29391,12 @@ pub unsafe fn xml_schema_validate_stream(
     ret
 }
 
-/**
- * xmlSchemaValidateFile:
- * @ctxt: a schema validation context
- * @filename: the URI of the instance
- * @options: a future set of options, currently unused
- *
- * Do a schemas validation of the given resource, it will use the
- * SAX streamable validation internally.
- *
- * Returns 0 if the document is valid, a positive error code
- *     number otherwise and -1 in case of an internal or API error.
- */
+/// Do a schemas validation of the given resource, it will use the
+/// SAX streamable validation internally.
+///
+/// Returns 0 if the document is valid, a positive error code
+/// number otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaValidateFile")]
 pub unsafe extern "C" fn xml_schema_validate_file(
     ctxt: XmlSchemaValidCtxtPtr,
     filename: *const c_char,
@@ -30903,15 +29416,10 @@ pub unsafe extern "C" fn xml_schema_validate_file(
     ret
 }
 
-/**
- * xmlSchemaValidCtxtGetParserCtxt:
- * @ctxt: a schema validation context
- *
- * allow access to the parser context of the schema validation context
- *
- * Returns the parser context of the schema validation context or NULL
- *         in case of error.
- */
+/// Allow access to the parser context of the schema validation context
+///
+/// Returns the parser context of the schema validation context or NULL in case of error.
+#[doc(alias = "xmlSchemaValidCtxtGetParserCtxt")]
 pub unsafe extern "C" fn xml_schema_valid_ctxt_get_parser_ctxt(
     ctxt: XmlSchemaValidCtxtPtr,
 ) -> XmlParserCtxtPtr {
@@ -30921,9 +29429,7 @@ pub unsafe extern "C" fn xml_schema_valid_ctxt_get_parser_ctxt(
     (*ctxt).parser_ctxt
 }
 
-/*
- * Interface to insert Schemas SAX validation in a SAX stream
- */
+// Interface to insert Schemas SAX validation in a SAX stream
 pub type XmlSchemaSplitSAXDataPtr = *mut XmlSchemaSplitSAXData;
 #[repr(C)]
 pub struct XmlSchemaSplitSAXData {
@@ -31217,9 +29723,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
     //     return;
 }
 
-/*
-* Process text content.
-*/
+// Process text content.
 unsafe fn xml_schema_sax_handle_text(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
@@ -31257,9 +29761,7 @@ unsafe fn xml_schema_sax_handle_text(
     }
 }
 
-/*
-* Process CDATA content.
-*/
+// Process CDATA content.
 unsafe fn xml_schema_sax_handle_cdata_section(
     ctx: Option<GenericErrorContext>,
     ch: *const XmlChar,
@@ -31312,7 +29814,7 @@ unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _nam
     // TODO
 }
 
-/* All those functions just bounces to the user provided SAX handlers */
+// All those functions just bounces to the user provided SAX handlers
 unsafe fn internal_subset_split(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -31616,9 +30118,7 @@ unsafe fn comment_split(ctx: Option<GenericErrorContext>, value: *const XmlChar)
     }
 }
 
-/*
- * Varargs error callbacks to the user application, harder ...
- */
+// Varargs error callbacks to the user application, harder ...
 
 fn warning_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // let ctxt: XmlSchemaSAXPlugPtr = ctx as XmlSchemaSAXPlugPtr;
@@ -31639,10 +30139,7 @@ fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // }
 }
 
-/*
- * Those are function where both the user handler and the schemas handler
- * need to be called.
- */
+// Those are function where both the user handler and the schemas handler need to be called.
 unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -31787,19 +30284,13 @@ unsafe fn end_element_ns_split(
     }
 }
 
-/**
- * xmlSchemaSAXPlug:
- * @ctxt:  a schema validation context
- * @sax:  a pointer to the original xmlSAXHandlerPtr
- * @user_data:  a pointer to the original SAX user data pointer
- *
- * Plug a SAX based validation layer in a SAX parsing event flow.
- * The original @saxptr and @dataptr data are replaced by new pointers
- * but the calls to the original will be maintained.
- *
- * Returns a pointer to a data structure needed to unplug the validation layer
- *         or NULL in case of errors.
- */
+/// Plug a SAX based validation layer in a SAX parsing event flow.
+/// The original @saxptr and @dataptr data are replaced by new pointers
+/// but the calls to the original will be maintained.
+///
+/// Returns a pointer to a data structure needed to unplug the validation layer
+/// or NULL in case of errors.
+#[doc(alias = "xmlSchemaSAXPlug")]
 pub unsafe extern "C" fn xml_schema_sax_plug(
     ctxt: XmlSchemaValidCtxtPtr,
     sax: *mut XmlSAXHandlerPtr,
@@ -31960,15 +30451,11 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
     ret
 }
 
-/**
- * xmlSchemaSAXUnplug:
- * @plug:  a data structure returned by xmlSchemaSAXPlug
- *
- * Unplug a SAX based validation layer in a SAX parsing event flow.
- * The original pointers used in the call are restored.
- *
- * Returns 0 in case of success and -1 in case of failure.
- */
+/// Unplug a SAX based validation layer in a SAX parsing event flow.
+/// The original pointers used in the call are restored.
+///
+/// Returns 0 in case of success and -1 in case of failure.
+#[doc(alias = "xmlSchemaSAXUnplug")]
 pub unsafe extern "C" fn xml_schema_sax_unplug(plug: XmlSchemaSAXPlugPtr) -> i32 {
     let user_data: *mut Option<GenericErrorContext>;
 
@@ -31991,17 +30478,11 @@ pub unsafe extern "C" fn xml_schema_sax_unplug(plug: XmlSchemaSAXPlugPtr) -> i32
     0
 }
 
-/**
- * xmlSchemaValidateSetLocator:
- * @vctxt: a schema validation context
- * @f: the locator function pointer
- * @ctxt: the locator context
- *
- * Allows to set a locator function to the validation context,
- * which will be used to provide file and line information since
- * those are not provided as part of the SAX validation flow
- * Setting @f to NULL disable the locator.
- */
+/// Allows to set a locator function to the validation context,
+/// which will be used to provide file and line information since
+/// those are not provided as part of the SAX validation flow
+/// Setting @f to NULL disable the locator.
+#[doc(alias = "xmlSchemaValidateSetLocator")]
 pub unsafe extern "C" fn xml_schema_validate_set_locator(
     vctxt: XmlSchemaValidCtxtPtr,
     f: Option<XmlSchemaValidityLocatorFunc>,

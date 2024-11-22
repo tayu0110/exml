@@ -49,12 +49,9 @@ use crate::{
 
 const MAX_INDENT: usize = 60;
 
-/**
- * xmlSaveOption:
- *
- * This is the set of XML save options that can be passed down
- * to the xmlSaveToFd() and similar calls.
- */
+/// This is the set of XML save options that can be passed down
+/// to the xmlSaveToFd() and similar calls.
+#[doc(alias = "xmlSaveOption")]
 #[repr(C)]
 pub enum XmlSaveOption {
     XmlSaveFormat = 1 << 0,   /* format save output */
@@ -109,14 +106,8 @@ impl Default for XmlSaveCtxt {
     }
 }
 
-/**
- * xmlSaveErr:
- * @code:  the error number
- * @node:  the location of the error.
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSaveErr")]
 pub(crate) unsafe extern "C" fn xml_save_err(
     code: XmlParserErrors,
     node: XmlNodePtr,
@@ -132,12 +123,8 @@ pub(crate) unsafe extern "C" fn xml_save_err(
     __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, msg, extra);
 }
 
-/**
- * xmlSaveErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSaveErrMemory")]
 pub(crate) unsafe extern "C" fn xml_save_err_memory(extra: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromOutput,
@@ -172,21 +159,14 @@ pub(crate) fn xml_serialize_hex_char_ref(out: &mut [u8], mut val: u32) -> &[u8] 
     &out[..=3 + len]
 }
 
-/**
- * xmlEscapeEntities:
- * @out:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @out
- * @in:  a pointer to an array of unescaped UTF-8 bytes
- * @inlen:  the length of @in
- *
- * Take a block of UTF-8 chars in and escape them. Used when there is no
- * encoding specified.
- *
- * Returns 0 if success, or -1 otherwise
- * The value of @inlen after return is the number of octets consumed
- *     if the return value is positive, else unpredictable.
- * The value of @outlen after return is the number of octets consumed.
- */
+/// Take a block of UTF-8 chars in and escape them. Used when there is no
+/// encoding specified.
+///
+/// Returns 0 if success, or -1 otherwise
+/// The value of @inlen after return is the number of octets consumed
+/// if the return value is positive, else unpredictable.
+/// The value of @outlen after return is the number of octets consumed.
+#[doc(alias = "xmlEscapeEntities")]
 fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
     let mut out = [0; 13];
     for c in src.chars() {
@@ -209,12 +189,8 @@ fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
     0
 }
 
-/**
- * xmlSaveCtxtInit:
- * @ctxt: the saving context
- *
- * Initialize a saving context
- */
+/// Initialize a saving context
+#[doc(alias = "xmlSaveCtxtInit")]
 pub(crate) fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
     if ctxt.encoding.is_none() && ctxt.escape.is_none() {
         ctxt.escape = Some(xml_escape_entities);
@@ -265,13 +241,8 @@ unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i3
     0
 }
 
-/**
- * xmlOutputBufferWriteWSNonSig:
- * @ctxt:  The save context
- * @extra: Number of extra indents to apply to (*ctxt).level
- *
- * Write out formatting for non-significant whitespace output.
- */
+/// Write out formatting for non-significant whitespace output.
+#[doc(alias = "xmlOutputBufferWriteWSNonSig")]
 unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: i32) {
     if ctxt.buf.is_null() {
         return;
@@ -288,16 +259,10 @@ unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, 
     }
 }
 
-/**
- * xmlNsDumpOutput:
- * @buf:  the XML buffer output
- * @cur:  a namespace
- * @ctxt: the output save context. Optional.
- *
- * Dump a local Namespace definition.
- * Should be called in the context of attributes dumps.
- * If @ctxt is supplied, @buf should be its buffer.
- */
+/// Dump a local Namespace definition.
+/// Should be called in the context of attributes dumps.
+/// If @ctxt is supplied, @buf should be its buffer.
+#[doc(alias = "xmlNsDumpOutput")]
 pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     buf: XmlOutputBufferPtr,
     cur: XmlNsPtr,
@@ -335,64 +300,37 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     }
 }
 
-/**
- * xmlBufDumpNotationTable:
- * @buf:  an xmlBufPtr output
- * @table:  A notation table
- *
- * This will dump the content of the notation table as an XML DTD definition
- */
+/// This will dump the content of the notation table as an XML DTD definition
+#[doc(alias = "xmlBufDumpNotationTable")]
 unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_notation_table(buf, table);
 }
 
-/**
- * xmlBufDumpElementDecl:
- * @buf:  an xmlBufPtr output
- * @elem:  An element table
- *
- * This will dump the content of the element declaration as an XML
- * DTD definition
- */
+/// This will dump the content of the element declaration as an XML DTD definition
+#[doc(alias = "xmlBufDumpElementDecl")]
 unsafe extern "C" fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_element_decl(buf, elem);
 }
 
-/**
- * xmlBufDumpAttributeDecl:
- * @buf:  an xmlBufPtr output
- * @attr:  An attribute declaration
- *
- * This will dump the content of the attribute declaration as an XML
- * DTD definition
- */
+/// This will dump the content of the attribute declaration as an XML DTD definition
+#[doc(alias = "xmlBufDumpAttributeDecl")]
 unsafe extern "C" fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_attribute_decl(buf, attr);
 }
 
-/**
- * xmlBufDumpEntityDecl:
- * @buf:  an xmlBufPtr output
- * @ent:  An entity table
- *
- * This will dump the content of the entity table as an XML DTD definition
- */
+/// This will dump the content of the entity table as an XML DTD definition
+#[doc(alias = "xmlBufDumpEntityDecl")]
 unsafe extern "C" fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_entity_decl(buf, ent);
 }
 
-/**
- * xmlNsListDumpOutputCtxt
- * @ctxt: the save context
- * @cur:  the first namespace
- *
- * Dump a list of local namespace definitions to a save context.
- * Should be called in the context of attribute dumps.
- */
+/// Dump a list of local namespace definitions to a save context.
+/// Should be called in the context of attribute dumps.
+#[doc(alias = "xmlNsListDumpOutputCtxt")]
 unsafe extern "C" fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlNsPtr) {
     while !cur.is_null() {
         xml_ns_dump_output((*ctxt).buf, cur, ctxt);
@@ -400,14 +338,8 @@ unsafe extern "C" fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur:
     }
 }
 
-/**
- * xmlAttrSerializeContent:
- * @buf:  the XML buffer output
- * @doc:  the document
- * @attr:  the attribute pointer
- *
- * Serialize the attribute in the buffer
- */
+/// Serialize the attribute in the buffer
+#[doc(alias = "xmlAttrSerializeContent")]
 unsafe extern "C" fn xml_attr_serialize_content(buf: XmlOutputBufferPtr, attr: XmlAttrPtr) {
     let mut children = (*attr).children;
     while let Some(now) = children {
@@ -433,13 +365,8 @@ unsafe extern "C" fn xml_attr_serialize_content(buf: XmlOutputBufferPtr, attr: X
     }
 }
 
-/**
- * xmlAttrDumpOutput:
- * @buf:  the XML buffer output
- * @cur:  the attribute pointer
- *
- * Dump an XML attribute
- */
+/// Dump an XML attribute
+#[doc(alias = "xmlAttrDumpOutput")]
 unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
     if cur.is_null() {
         return;
@@ -468,12 +395,8 @@ unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr)
     (*buf).write_bytes(b"\"");
 }
 
-/**
- * xmlNodeDumpOutputInternal:
- * @cur:  the current node
- *
- * Dump an XML node, recursive behaviour, children are printed too.
- */
+/// Dump an XML node, recursive behaviour, children are printed too.
+#[doc(alias = "xmlNodeDumpOutputInternal")]
 pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     ctxt: XmlSaveCtxtPtr,
     mut cur: XmlNodePtr,
@@ -810,13 +733,8 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     }
 }
 
-/**
- * xmlDtdDumpOutput:
- * @buf:  the XML buffer output
- * @dtd:  the pointer to the DTD
- *
- * Dump the XML document DTD, if any.
- */
+/// Dump the XML document DTD, if any.
+#[doc(alias = "xmlDtdDumpOutput")]
 unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     let mut cur: XmlNodePtr;
 
@@ -882,24 +800,15 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     (*buf).write_bytes(b"]>");
 }
 
-/**
- * xmlNsDumpOutputCtxt
- * @ctxt: the save context
- * @cur:  a namespace
- *
- * Dump a local Namespace definition to a save context.
- * Should be called in the context of attribute dumps.
- */
+/// Dump a local Namespace definition to a save context.
+/// Should be called in the context of attribute dumps.
+#[doc(alias = "xmlNsDumpOutputCtxt")]
 unsafe extern "C" fn xml_ns_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
     xml_ns_dump_output((*ctxt).buf, cur, ctxt);
 }
 
-/**
- * xhtmlAttrListDumpOutput:
- * @cur:  the first attribute pointer
- *
- * Dump a list of XML attributes
- */
+/// Dump a list of XML attributes
+#[doc(alias = "xhtmlAttrListDumpOutput")]
 #[cfg(feature = "html")]
 unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
     use crate::tree::{xml_free_node, xml_new_doc_text, XmlNode};
@@ -984,14 +893,10 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
 
 const XHTML_NS_NAME: &str = "http://www.w3.org/1999/xhtml";
 
-/**
- * xhtmlIsEmpty:
- * @node:  the node
- *
- * Check if a node is an empty xhtml node
- *
- * Returns 1 if the node is an empty node, 0 if not and -1 in case of error
- */
+/// Check if a node is an empty xhtml node
+///
+/// Returns 1 if the node is an empty node, 0 if not and -1 in case of error
+#[doc(alias = "xhtmlIsEmpty")]
 #[cfg(feature = "html")]
 unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
     if node.is_null() {
@@ -1081,17 +986,8 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
     0
 }
 
-/**
- * xhtmlNodeDumpOutput:
- * @buf:  the XML buffer output
- * @doc:  the XHTML document
- * @cur:  the current node
- * @level: the imbrication level for indenting
- * @format: is formatting allowed
- * @encoding:  an optional encoding string
- *
- * Dump an XHTML node, recursive behaviour, children are printed too.
- */
+/// Dump an XHTML node, recursive behaviour, children are printed too.
+#[doc(alias = "xhtmlNodeDumpOutput")]
 #[cfg(feature = "html")]
 pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
     use crate::{
@@ -1495,12 +1391,8 @@ unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> i32 {
     0
 }
 
-/**
- * xmlDocContentDumpOutput:
- * @cur:  the document
- *
- * Dump an XML document.
- */
+/// Dump an XML document.
+#[doc(alias = "xmlDocContentDumpOutput")]
 pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     ctxt: XmlSaveCtxtPtr,
     cur: XmlDocPtr,
@@ -1695,11 +1587,8 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     0
 }
 
-/**
- * xmlFreeSaveCtxt:
- *
- * Free a saving context, destroying the output in any remaining buffer
- */
+/// Free a saving context, destroying the output in any remaining buffer
+#[doc(alias = "xmlFreeSaveCtxt")]
 unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -1711,13 +1600,10 @@ unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
     xml_free(ctxt as _);
 }
 
-/**
- * xmlNewSaveCtxt:
- *
- * Create a new saving context
- *
- * Returns the new structure or NULL in case of error
- */
+/// Create a new saving context
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlNewSaveCtxt")]
 unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_malloc(size_of::<XmlSaveCtxt>()) as _;
     if ret.is_null() {
@@ -1765,18 +1651,11 @@ unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSave
     ret
 }
 
-/**
- * xmlSaveToFilename:
- * @filename:  a file name or an URL
- * @encoding:  the encoding name to use or NULL
- * @options:  a set of xmlSaveOptions
- *
- * Create a document saving context serializing to a filename or possibly
- * to an URL (but this is less reliable) with the encoding and the options
- * given.
- *
- * Returns a new serialization context or NULL in case of error.
- */
+/// Create a document saving context serializing to a filename or possibly
+/// to an URL (but this is less reliable) with the encoding and the options given.
+///
+/// Returns a new serialization context or NULL in case of error.
+#[doc(alias = "xmlSaveToFilename")]
 pub unsafe fn xml_save_to_filename(
     filename: *const c_char,
     encoding: Option<&str>,
@@ -1796,19 +1675,11 @@ pub unsafe fn xml_save_to_filename(
     ret
 }
 
-/**
- * xmlSaveToIO:
- * @iowrite:  an I/O write function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @encoding:  the encoding name to use or NULL
- * @options:  a set of xmlSaveOptions
- *
- * Create a document saving context serializing to a file descriptor
- * with the encoding and the options given
- *
- * Returns a new serialization context or NULL in case of error.
- */
+/// Create a document saving context serializing to a file descriptor
+/// with the encoding and the options given
+///
+/// Returns a new serialization context or NULL in case of error.
+#[doc(alias = "xmlSaveToIO")]
 pub unsafe fn xml_save_to_io(
     iowrite: Option<XmlOutputWriteCallback>,
     ioclose: Option<XmlOutputCloseCallback>,
@@ -1828,17 +1699,12 @@ pub unsafe fn xml_save_to_io(
     ret
 }
 
-/**
- * xmlSaveDoc:
- * @ctxt:  a document saving context
- * @doc:  a document
- *
- * Save a full document to a saving context
- * TODO: The function is not fully implemented yet as it does not return the
- * byte count but 0 instead
- *
- * Returns the number of byte written or -1 in case of error
- */
+/// Save a full document to a saving context
+/// TODO: The function is not fully implemented yet as it does not return the
+/// byte count but 0 instead
+///
+/// Returns the number of byte written or -1 in case of error
+#[doc(alias = "xmlSaveDoc")]
 pub unsafe extern "C" fn xml_save_doc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> i64 {
     let ret: i64 = 0;
 
@@ -1851,12 +1717,8 @@ pub unsafe extern "C" fn xml_save_doc(ctxt: XmlSaveCtxtPtr, doc: XmlDocPtr) -> i
     ret
 }
 
-/**
- * htmlNodeDumpOutputInternal:
- * @cur:  the current node
- *
- * Dump an HTML node, recursive behaviour, children are printed too.
- */
+/// Dump an HTML node, recursive behaviour, children are printed too.
+#[doc(alias = "htmlNodeDumpOutputInternal")]
 #[cfg(feature = "html")]
 unsafe extern "C" fn html_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, cur: XmlNodePtr) -> i32 {
     use super::htmltree::html_node_dump_format_output;
@@ -1916,17 +1778,12 @@ unsafe extern "C" fn html_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, cur: X
     0
 }
 
-/**
- * xmlSaveTree:
- * @ctxt:  a document saving context
- * @node:  the top node of the subtree to save
- *
- * Save a subtree starting at the node parameter to a saving context
- * TODO: The function is not fully implemented yet as it does not return the
- * byte count but 0 instead
- *
- * Returns the number of byte written or -1 in case of error
- */
+/// Save a subtree starting at the node parameter to a saving context
+/// TODO: The function is not fully implemented yet as it does not return the
+/// byte count but 0 instead
+///
+/// Returns the number of byte written or -1 in case of error
+#[doc(alias = "xmlSaveTree")]
 pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -> i64 {
     let ret: i64 = 0;
 
@@ -1953,15 +1810,10 @@ pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -
     ret
 }
 
-/**
- * xmlSaveFlush:
- * @ctxt:  a document saving context
- *
- * Flush a document saving context, i.e. make sure that all bytes have
- * been output.
- *
- * Returns the number of byte written or -1 in case of error.
- */
+/// Flush a document saving context, i.e. make sure that all bytes have been output.
+///
+/// Returns the number of byte written or -1 in case of error.
+#[doc(alias = "xmlSaveFlush")]
 pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
@@ -1972,15 +1824,11 @@ pub unsafe extern "C" fn xml_save_flush(ctxt: XmlSaveCtxtPtr) -> i32 {
     (*(*ctxt).buf).flush()
 }
 
-/**
- * xmlSaveClose:
- * @ctxt:  a document saving context
- *
- * Close a document saving context, i.e. make sure that all bytes have
- * been output and free the associated data.
- *
- * Returns the number of byte written or -1 in case of error.
- */
+/// Close a document saving context, i.e. make sure that all bytes have
+/// been output and free the associated data.
+///
+/// Returns the number of byte written or -1 in case of error.
+#[doc(alias = "xmlSaveClose")]
 pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
@@ -1990,15 +1838,10 @@ pub unsafe extern "C" fn xml_save_close(ctxt: XmlSaveCtxtPtr) -> i32 {
     ret
 }
 
-/**
- * xmlSaveSetEscape:
- * @ctxt:  a document saving context
- * @escape:  the escaping function
- *
- * Set a custom escaping function to be used for text in element content
- *
- * Returns 0 if successful or -1 in case of error.
- */
+/// Set a custom escaping function to be used for text in element content
+///
+/// Returns 0 if successful or -1 in case of error.
+#[doc(alias = "xmlSaveSetEscape")]
 pub unsafe fn xml_save_set_escape(
     ctxt: XmlSaveCtxtPtr,
     escape: Option<fn(&str, &mut String) -> i32>,
@@ -2010,15 +1853,10 @@ pub unsafe fn xml_save_set_escape(
     0
 }
 
-/**
- * xmlSaveSetAttrEscape:
- * @ctxt:  a document saving context
- * @escape:  the escaping function
- *
- * Set a custom escaping function to be used for text in attribute content
- *
- * Returns 0 if successful or -1 in case of error.
- */
+/// Set a custom escaping function to be used for text in attribute content
+///
+/// Returns 0 if successful or -1 in case of error.
+#[doc(alias = "xmlSaveSetAttrEscape")]
 pub unsafe fn xml_save_set_attr_escape(
     ctxt: XmlSaveCtxtPtr,
     escape: Option<fn(&str, &mut String) -> i32>,

@@ -399,19 +399,11 @@ macro_rules! CUR_SCHAR {
     };
 }
 
-/*
- * Some helper functions
- */
-/**
- * xmlValidateNCName:
- * @value: the value to check
- * @space: allow spaces in front and end of the string
- *
- * Check that a value conforms to the lexical space of NCName
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of NCName
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlValidateNCName")]
 #[cfg(any(
     feature = "tree",
     feature = "xpath",
@@ -509,16 +501,11 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) 
     0
 }
 
-/**
- * xmlValidateQName:
- * @value: the value to check
- * @space: allow spaces in front and end of the string
- *
- * Check that a value conforms to the lexical space of QName
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of QName
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlValidateQName")]
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
@@ -644,16 +631,11 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -
     0
 }
 
-/**
- * xmlValidateName:
- * @value: the value to check
- * @space: allow spaces in front and end of the string
- *
- * Check that a value conforms to the lexical space of Name
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of Name
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlValidateName")]
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
@@ -745,16 +727,11 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) ->
     0
 }
 
-/**
- * xmlValidateNMToken:
- * @value: the value to check
- * @space: allow spaces in front and end of the string
- *
- * Check that a value conforms to the lexical space of NMToken
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of NMToken
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlValidateNMToken")]
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
@@ -857,12 +834,8 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32)
     0
 }
 
-/**
- * xmlTreeErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlTreeErrMemory")]
 unsafe extern "C" fn xml_tree_err_memory(extra: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromTree,
@@ -873,20 +846,13 @@ unsafe extern "C" fn xml_tree_err_memory(extra: *const c_char) {
     );
 }
 
-/**
- * xmlBuildQName:
- * @ncname:  the Name
- * @prefix:  the prefix
- * @memory:  preallocated memory
- * @len:  preallocated memory length
- *
- * Builds the QName @prefix:@ncname in @memory if there is enough space
- * and prefix is not NULL nor empty, otherwise allocate a new string.
- * If prefix is NULL or empty it returns ncname.
- *
- * Returns the new string which must be freed by the caller if different from
- *         @memory and @ncname or NULL in case of error
- */
+/// Builds the QName @prefix:@ncname in @memory if there is enough space
+/// and prefix is not NULL nor empty, otherwise allocate a new string.
+/// If prefix is NULL or empty it returns ncname.
+///
+/// Returns the new string which must be freed by the caller if different from
+/// @memory and @ncname or NULL in case of error
+#[doc(alias = "xmlBuildQName")]
 pub unsafe extern "C" fn xml_build_qname(
     ncname: *const XmlChar,
     prefix: *const XmlChar,
@@ -921,23 +887,20 @@ pub unsafe extern "C" fn xml_build_qname(
     ret as _
 }
 
-/**
- * xmlSplitQName2:
- * @name:  the full QName
- * @prefix:  a XmlChar **
- *
- * parse an XML qualified name string
- *
- * [NS 5] QName ::= (Prefix ':')? LocalPart
- *
- * [NS 6] Prefix ::= NCName
- *
- * [NS 7] LocalPart ::= NCName
- *
- * Returns NULL if the name doesn't have a prefix. Otherwise, returns the
- * local part, and prefix is updated to get the Prefix. Both the return value
- * and the prefix must be freed by the caller.
- */
+/// Parse an XML qualified name string
+///
+/// ```ignore
+/// [NS 5] QName ::= (Prefix ':')? LocalPart
+///
+/// [NS 6] Prefix ::= NCName
+///
+/// [NS 7] LocalPart ::= NCName
+/// ```
+///
+/// Returns NULL if the name doesn't have a prefix. Otherwise, returns the
+/// local part, and prefix is updated to get the Prefix. Both the return value
+/// and the prefix must be freed by the caller.
+#[doc(alias = "xmlSplitQName2")]
 pub unsafe extern "C" fn xml_split_qname2(
     name: *const XmlChar,
     prefix: *mut *mut XmlChar,
@@ -987,17 +950,12 @@ pub unsafe extern "C" fn xml_split_qname2(
     ret
 }
 
-/**
- * xmlSplitQName3:
- * @name:  the full QName
- * @len: an int *
- *
- * parse an XML qualified name string,i
- *
- * returns NULL if it is not a Qualified Name, otherwise, update len
- *         with the length in byte of the prefix and return a pointer
- *         to the start of the name without the prefix
- */
+/// Rarse an XML qualified name string,i
+///
+/// Returns NULL if it is not a Qualified Name, otherwise, update len
+/// with the length in byte of the prefix and return a pointer
+/// to the start of the name without the prefix
+#[doc(alias = "xmlSplitQName3")]
 pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const XmlChar {
     let mut l: i32 = 0;
 
@@ -1030,17 +988,8 @@ pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -
     name.add(l as usize + 1)
 }
 
-/*
- * Creating/freeing new structures.
- */
-
-/**
- * DICT_FREE:
- * @str:  a string
- *
- * Free a string if it is not owned by the "dict" dictionary in the
- * current scope
- */
+/// Free a string if it is not owned by the "dict" dictionary in the
+/// current scope
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
         if !$str.is_null()
@@ -1051,12 +1000,8 @@ macro_rules! DICT_FREE {
     };
 }
 
-/**
- * xmlFreeDtd:
- * @cur:  the DTD structure to free up
- *
- * Free a DTD structure.
- */
+/// Free a DTD structure.
+#[doc(alias = "xmlFreeDtd")]
 pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
@@ -1118,12 +1063,8 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     xml_free(cur as _);
 }
 
-/**
- * xmlFreeDoc:
- * @cur:  pointer to the document
- *
- * Free up all the structures used by a document, tree included.
- */
+/// Free up all the structures used by a document, tree included.
+#[doc(alias = "xmlFreeDoc")]
 pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
     let mut ext_subset: XmlDtdPtr;
     let mut dict: XmlDictPtr = null_mut();
@@ -1284,12 +1225,8 @@ unsafe fn xml_new_prop_internal(
     cur
 }
 
-/**
- * xmlFreePropList:
- * @cur:  the first property in the list
- *
- * Free a property and all its siblings, all the children are freed too.
- */
+/// Free a property and all its siblings, all the children are freed too.
+#[doc(alias = "xmlFreePropList")]
 pub unsafe extern "C" fn xml_free_prop_list(mut cur: XmlAttrPtr) {
     let mut next: XmlAttrPtr;
     if cur.is_null() {
@@ -1302,12 +1239,8 @@ pub unsafe extern "C" fn xml_free_prop_list(mut cur: XmlAttrPtr) {
     }
 }
 
-/**
- * xmlFreeProp:
- * @cur:  an attribute
- *
- * Free one attribute, all the content is freed too
- */
+/// Free one attribute, all the content is freed too
+#[doc(alias = "xmlFreeProp")]
 pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
     let mut dict: XmlDictPtr = null_mut();
     if cur.is_null() {
@@ -1335,19 +1268,13 @@ pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
     xml_free(cur as _);
 }
 
-/**
- * xmlNewReconciledNs:
- * @doc:  the document
- * @tree:  a node expected to hold the new namespace
- * @ns:  the original namespace
- *
- * This function tries to locate a namespace definition in a tree
- * ancestors, or create a new namespace definition node similar to
- * @ns trying to reuse the same prefix. However if the given prefix is
- * null (default namespace) or reused within the subtree defined by
- * @tree or on one of its ancestors then a new prefix is generated.
- * Returns the (new) namespace definition or null_mut() in case of error
- */
+/// This function tries to locate a namespace definition in a tree
+/// ancestors, or create a new namespace definition node similar to
+/// @ns trying to reuse the same prefix. However if the given prefix is
+/// null (default namespace) or reused within the subtree defined by
+/// @tree or on one of its ancestors then a new prefix is generated.
+/// Returns the (new) namespace definition or null_mut() in case of error
+#[doc(alias = "xmlNewReconciledNs")]
 unsafe extern "C" fn xml_new_reconciled_ns(
     doc: XmlDocPtr,
     tree: XmlNodePtr,
@@ -1412,24 +1339,22 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     def
 }
 
-/*
- * NOTE about the CopyNode operations !
- *
- * They are split into external and internal parts for one
- * tricky reason: namespaces. Doing a direct copy of a node
- * say RPM:Copyright without changing the namespace pointer to
- * something else can produce stale links. One way to do it is
- * to keep a reference counter but this doesn't work as soon
- * as one moves the element or the subtree out of the scope of
- * the existing namespace. The actual solution seems to be to add
- * a copy of the namespace at the top of the copied tree if
- * not available in the subtree.
- * Hence two functions, the public front-end call the inner ones
- * The argument "recursive" normally indicates a recursive copy
- * of the node with values 0 (no) and 1 (yes).  For XInclude,
- * however, we allow a value of 2 to indicate copy properties and
- * namespace info, but don't recurse on children.
- */
+// NOTE about the CopyNode operations !
+//
+// They are split into external and internal parts for one
+// tricky reason: namespaces. Doing a direct copy of a node
+// say RPM:Copyright without changing the namespace pointer to
+// something else can produce stale links. One way to do it is
+// to keep a reference counter but this doesn't work as soon
+// as one moves the element or the subtree out of the scope of
+// the existing namespace. The actual solution seems to be to add
+// a copy of the namespace at the top of the copied tree if
+// not available in the subtree.
+// Hence two functions, the public front-end call the inner ones
+// The argument "recursive" normally indicates a recursive copy
+// of the node with values 0 (no) and 1 (yes).  For XInclude,
+// however, we allow a value of 2 to indicate copy properties and
+// namespace info, but don't recurse on children.
 pub(crate) unsafe extern "C" fn xml_static_copy_node(
     node: XmlNodePtr,
     doc: XmlDocPtr,
@@ -1843,28 +1768,18 @@ unsafe extern "C" fn xml_copy_prop_internal(
     ret
 }
 
-/**
- * xmlCopyProp:
- * @target:  the element where the attribute will be grafted
- * @cur:  the attribute
- *
- * Do a copy of the attribute.
- *
- * Returns: a new #xmlAttrPtr, or null_mut() in case of error.
- */
+/// Do a copy of the attribute.
+///
+/// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyProp")]
 pub unsafe extern "C" fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> XmlAttrPtr {
     xml_copy_prop_internal(null_mut(), target, cur)
 }
 
-/**
- * xmlCopyPropList:
- * @target:  the element where the attributes will be grafted
- * @cur:  the first attribute
- *
- * Do a copy of an attribute list.
- *
- * Returns: a new #xmlAttrPtr, or null_mut() in case of error.
- */
+/// Do a copy of an attribute list.
+///
+/// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyPropList")]
 pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> XmlAttrPtr {
     let mut ret: XmlAttrPtr = null_mut();
     let mut p: XmlAttrPtr = null_mut();
@@ -1892,14 +1807,10 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
     ret
 }
 
-/**
- * xmlCopyDtd:
- * @dtd:  the dtd
- *
- * Do a copy of the dtd.
- *
- * Returns: a new #xmlDtdPtr, or null_mut() in case of error.
- */
+/// Do a copy of the dtd.
+///
+/// Returns: a new #xmlDtdPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     use std::ffi::CString;
@@ -2012,16 +1923,11 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     ret
 }
 
-/**
- * xmlCopyDoc:
- * @doc:  the document
- * @recursive:  if not zero do a recursive copy.
- *
- * Do a copy of the document info. If recursive, the content tree will
- * be copied too as well as DTD, namespaces and entities.
- *
- * Returns: a new #xmlDocPtr, or null_mut() in case of error.
- */
+/// Do a copy of the document info. If recursive, the content tree will
+/// be copied too as well as DTD, namespaces and entities.
+///
+/// Returns: a new #xmlDocPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyDoc")]
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocPtr {
     use crate::libxml::globals::xml_mem_strdup;
@@ -2097,25 +2003,15 @@ macro_rules! UPDATE_LAST_CHILD_AND_PARENT {
     };
 }
 
-/*
- * Creating new nodes.
- */
-/**
- * xmlNewDocNode:
- * @doc:  the document
- * @ns:  namespace if any
- * @name:  the node name
- * @content:  the XML text content if any
- *
- * Creation of a new node element within a document. @ns and @content
- * are optional (null_mut()).
- * NOTE: @content is supposed to be a piece of XML CDATA, so it allow entities
- *       references, but XML special chars need to be escaped first by using
- *       xmlEncodeEntitiesReentrant(). Use xmlNewDocRawNode() if you don't
- *       need entities support.
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a new node element within a document. @ns and @content
+/// are optional (null_mut()).
+/// NOTE: @content is supposed to be a piece of XML CDATA, so it allow entities
+///       references, but XML special chars need to be escaped first by using
+///       xmlEncodeEntitiesReentrant(). Use xmlNewDocRawNode() if you don't
+///       need entities support.
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocNode")]
 pub unsafe extern "C" fn xml_new_doc_node(
     doc: XmlDocPtr,
     ns: XmlNsPtr,
@@ -2140,22 +2036,15 @@ pub unsafe extern "C" fn xml_new_doc_node(
     cur
 }
 
-/**
- * xmlNewDocNodeEatName:
- * @doc:  the document
- * @ns:  namespace if any
- * @name:  the node name
- * @content:  the XML text content if any
- *
- * Creation of a new node element within a document. @ns and @content
- * are optional (null_mut()).
- * NOTE: @content is supposed to be a piece of XML CDATA, so it allow entities
- *       references, but XML special chars need to be escaped first by using
- *       xmlEncodeEntitiesReentrant(). Use xmlNewDocRawNode() if you don't
- *       need entities support.
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a new node element within a document. @ns and @content
+/// are optional (null_mut()).
+/// NOTE: @content is supposed to be a piece of XML CDATA, so it allow entities
+///       references, but XML special chars need to be escaped first by using
+///       xmlEncodeEntitiesReentrant(). Use xmlNewDocRawNode() if you don't
+///       need entities support.
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocNodeEatName")]
 pub unsafe extern "C" fn xml_new_doc_node_eat_name(
     doc: XmlDocPtr,
     ns: XmlNsPtr,
@@ -2182,18 +2071,12 @@ pub unsafe extern "C" fn xml_new_doc_node_eat_name(
     cur
 }
 
-/**
- * xmlNewNode:
- * @ns:  namespace if any
- * @name:  the node name
- *
- * Creation of a new node element. @ns is optional (null_mut()).
- *
- * Use of this function is DISCOURAGED in favor of xmlNewDocNode.
- *
- * Returns a pointer to the new node object. Uses xml_strdup() to make
- * copy of @name.
- */
+/// Creation of a new node element. @ns is optional (null_mut()).
+///
+/// Use of this function is DISCOURAGED in favor of xmlNewDocNode.
+///
+/// Returns a pointer to the new node object. Uses xml_strdup() to make copy of @name.
+#[doc(alias = "xmlNewNode")]
 pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> XmlNodePtr {
     if name.is_null() {
         return null_mut();
@@ -2221,19 +2104,14 @@ pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> Xml
     cur
 }
 
-/**
- * xmlNewNodeEatName:
- * @ns:  namespace if any
- * @name:  the node name
- *
- * Creation of a new node element. @ns is optional (null_mut()).
- *
- * Use of this function is DISCOURAGED in favor of xmlNewDocNodeEatName.
- *
- * Returns a pointer to the new node object, with pointer @name as
- * new node's name. Use xmlNewNode() if a copy of @name string is
- * is needed as new node's name.
- */
+/// Creation of a new node element. @ns is optional (null_mut()).
+///
+/// Use of this function is DISCOURAGED in favor of xmlNewDocNodeEatName.
+///
+/// Returns a pointer to the new node object, with pointer @name as
+/// new node's name. Use xmlNewNode() if a copy of @name string is
+/// is needed as new node's name.
+#[doc(alias = "xmlNewNodeEatName")]
 pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar) -> XmlNodePtr {
     if name.is_null() {
         return null_mut();
@@ -2262,23 +2140,16 @@ pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar)
     cur
 }
 
-/**
- * xmlNewChild:
- * @parent:  the parent node
- * @ns:  a namespace if any
- * @name:  the name of the child
- * @content:  the XML content of the child if any.
- *
- * Creation of a new child element, added at the end of @parent children list.
- * @ns and @content parameters are optional (null_mut()). If @ns is null_mut(), the newly
- * created element inherits the namespace of @parent. If @content is non null_mut(),
- * a child list containing the TEXTs and ENTITY_REFs node will be created.
- * NOTE: @content is supposed to be a piece of XML CDATA, so it allows entity
- *       references. XML special chars must be escaped first by using
- *       xmlEncodeEntitiesReentrant(), or xmlNewTextChild() should be used.
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a new child element, added at the end of @parent children list.
+/// @ns and @content parameters are optional (null_mut()). If @ns is null_mut(), the newly
+/// created element inherits the namespace of @parent. If @content is non null_mut(),
+/// a child list containing the TEXTs and ENTITY_REFs node will be created.
+/// NOTE: @content is supposed to be a piece of XML CDATA, so it allows entity
+///       references. XML special chars must be escaped first by using
+///       xmlEncodeEntitiesReentrant(), or xmlNewTextChild() should be used.
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewChild")]
 #[cfg(any(feature = "tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_new_child(
     parent: XmlNodePtr,
@@ -2342,14 +2213,9 @@ pub unsafe extern "C" fn xml_new_child(
     cur
 }
 
-/**
- * xmlNewDocText:
- * @doc: the document
- * @content:  the text content
- *
- * Creation of a new text node within a document.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new text node within a document.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocText")]
 pub unsafe extern "C" fn xml_new_doc_text(
     doc: *const XmlDoc,
     content: *const XmlChar,
@@ -2361,16 +2227,12 @@ pub unsafe extern "C" fn xml_new_doc_text(
     cur
 }
 
-/**
- * xmlNewText:
- * @content:  the text content
- *
- * Creation of a new text node.
- *
- * Use of this function is DISCOURAGED in favor of xmlNewDocText.
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a new text node.
+///
+/// Use of this function is DISCOURAGED in favor of xmlNewDocText.
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewText")]
 pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
     /*
      * Allocate a new node and fill the fields.
@@ -2396,15 +2258,9 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
     cur
 }
 
-/**
- * xmlNewDocPI:
- * @doc:  the target document
- * @name:  the processing instruction name
- * @content:  the PI content
- *
- * Creation of a processing instruction element.
- * Returns a pointer to the new node object.
- */
+/// Creation of a processing instruction element.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocPI")]
 pub unsafe extern "C" fn xml_new_doc_pi(
     doc: XmlDocPtr,
     name: *const XmlChar,
@@ -2443,31 +2299,20 @@ pub unsafe extern "C" fn xml_new_doc_pi(
     cur
 }
 
-/**
- * xmlNewPI:
- * @name:  the processing instruction name
- * @content:  the PI content
- *
- * Creation of a processing instruction element.
- *
- * Use of this function is DISCOURAGED in favor of xmlNewDocPI.
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a processing instruction element.
+///
+/// Use of this function is DISCOURAGED in favor of xmlNewDocPI.
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewPI")]
 pub unsafe extern "C" fn xml_new_pi(name: *const XmlChar, content: *const XmlChar) -> XmlNodePtr {
     xml_new_doc_pi(null_mut(), name, content)
 }
 
-/**
- * xmlNewDocTextLen:
- * @doc: the document
- * @content:  the text content
- * @len:  the text len.
- *
- * Creation of a new text node with an extra content length parameter. The
- * text node pertain to a given document.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new text node with an extra content length parameter. The
+/// text node pertain to a given document.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocTextLen")]
 pub unsafe extern "C" fn xml_new_doc_text_len(
     doc: XmlDocPtr,
     content: *const XmlChar,
@@ -2480,16 +2325,11 @@ pub unsafe extern "C" fn xml_new_doc_text_len(
     cur
 }
 
-/**
- * xmlNewTextLen:
- * @content:  the text content
- * @len:  the text len.
- *
- * Use of this function is DISCOURAGED in favor of xmlNewDocTextLen.
- *
- * Creation of a new text node with an extra parameter for the content's length
- * Returns a pointer to the new node object.
- */
+/// Use of this function is DISCOURAGED in favor of xmlNewDocTextLen.
+///
+/// Creation of a new text node with an extra parameter for the content's length
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewTextLen")]
 pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> XmlNodePtr {
     /*
      * Allocate a new node and fill the fields.
@@ -2515,14 +2355,9 @@ pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> 
     cur
 }
 
-/**
- * xmlNewDocComment:
- * @doc:  the document
- * @content:  the comment content
- *
- * Creation of a new node containing a comment within a document.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new node containing a comment within a document.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocComment")]
 pub unsafe extern "C" fn xml_new_doc_comment(
     doc: XmlDocPtr,
     content: *const XmlChar,
@@ -2534,15 +2369,11 @@ pub unsafe extern "C" fn xml_new_doc_comment(
     cur
 }
 
-/**
- * xmlNewComment:
- * @content:  the comment content
- *
- * Use of this function is DISCOURAGED in favor of xmlNewDocComment.
- *
- * Creation of a new node containing a comment.
- * Returns a pointer to the new node object.
- */
+/// Use of this function is DISCOURAGED in favor of xmlNewDocComment.
+///
+/// Creation of a new node containing a comment.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewComment")]
 pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr {
     /*
      * Allocate a new node and fill the fields.
@@ -2568,15 +2399,9 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
     cur
 }
 
-/**
- * xmlNewCDataBlock:
- * @doc:  the document
- * @content:  the CDATA block content content
- * @len:  the length of the block
- *
- * Creation of a new node containing a CDATA block.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new node containing a CDATA block.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewCDataBlock")]
 pub unsafe extern "C" fn xml_new_cdata_block(
     doc: XmlDocPtr,
     content: *const XmlChar,
@@ -2606,14 +2431,9 @@ pub unsafe extern "C" fn xml_new_cdata_block(
     cur
 }
 
-/**
- * xmlNewCharRef:
- * @doc: the document
- * @name:  the c_char ref string, starting with # or "&# ... ;"
- *
- * Creation of a new character reference node.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new character reference node.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewCharRef")]
 pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlChar) -> XmlNodePtr {
     if name.is_null() {
         return null_mut();
@@ -2651,14 +2471,9 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
     cur
 }
 
-/**
- * xmlNewReference:
- * @doc: the document
- * @name:  the reference name, or the reference string with & and ;
- *
- * Creation of a new reference node.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new reference node.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewReference")]
 pub unsafe extern "C" fn xml_new_reference(
     doc: *const XmlDoc,
     mut name: *const XmlChar,
@@ -2711,34 +2526,19 @@ pub unsafe extern "C" fn xml_new_reference(
     cur
 }
 
-/**
- * xmlCopyNode:
- * @node:  the node
- * @extended:   if 1 do a recursive copy (properties, namespaces and children
- *            when applicable)
- *        if 2 copy properties and namespaces (when applicable)
- *
- * Do a copy of the node.
- *
- * Returns: a new #XmlNodePtr, or null_mut() in case of error.
- */
+/// Do a copy of the node.
+///
+/// Returns: a new #XmlNodePtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyNode")]
 pub unsafe extern "C" fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node(node, null_mut(), null_mut(), extended);
     ret
 }
 
-/**
- * xmlDocCopyNode:
- * @node:  the node
- * @doc:  the document
- * @extended:   if 1 do a recursive copy (properties, namespaces and children
- *            when applicable)
- *        if 2 copy properties and namespaces (when applicable)
- *
- * Do a copy of the node to a given document.
- *
- * Returns: a new #XmlNodePtr, or null_mut() in case of error.
- */
+/// Do a copy of the node to a given document.
+///
+/// Returns: a new #XmlNodePtr, or null_mut() in case of error.
+#[doc(alias = "xmlDocCopyNode")]
 pub unsafe extern "C" fn xml_doc_copy_node(
     node: XmlNodePtr,
     doc: XmlDocPtr,
@@ -2748,53 +2548,37 @@ pub unsafe extern "C" fn xml_doc_copy_node(
     ret
 }
 
-/**
- * xmlDocCopyNodeList:
- * @doc: the target document
- * @node:  the first node in the list.
- *
- * Do a recursive copy of the node list.
- *
- * Returns: a new #XmlNodePtr, or null_mut() in case of error.
- */
+/// Do a recursive copy of the node list.
+///
+/// Returns: a new #XmlNodePtr, or null_mut() in case of error.
+#[doc(alias = "xmlDocCopyNodeList")]
 pub unsafe extern "C" fn xml_doc_copy_node_list(doc: XmlDocPtr, node: XmlNodePtr) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node_list(node, doc, null_mut());
     ret
 }
 
-/**
- * xmlCopyNodeList:
- * @node:  the first node in the list.
- *
- * Do a recursive copy of the node list.
- * Use xmlDocCopyNodeList() if possible to ensure string interning.
- *
- * Returns: a new #XmlNodePtr, or null_mut() in case of error.
- */
+/// Do a recursive copy of the node list.
+/// Use xmlDocCopyNodeList() if possible to ensure string interning.
+///
+/// Returns: a new #XmlNodePtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyNodeList")]
 pub unsafe extern "C" fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node_list(node, null_mut(), null_mut());
     ret
 }
 
-/**
- * xmlNewTextChild:
- * @parent:  the parent node
- * @ns:  a namespace if any
- * @name:  the name of the child
- * @content:  the text content of the child if any.
- *
- * Creation of a new child element, added at the end of @parent children list.
- * @ns and @content parameters are optional (null_mut()). If @ns is null_mut(), the newly
- * created element inherits the namespace of @parent. If @content is non null_mut(),
- * a child TEXT node will be created containing the string @content.
- * NOTE: Use xmlNewChild() if @content will contain entities that need to be
- * preserved. Use this function, xmlNewTextChild(), if you need to ensure that
- * reserved XML chars that might appear in @content, such as the ampersand,
- * greater-than or less-than signs, are automatically replaced by their XML
- * escaped entity representations.
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a new child element, added at the end of @parent children list.
+/// @ns and @content parameters are optional (null_mut()). If @ns is null_mut(), the newly
+/// created element inherits the namespace of @parent. If @content is non null_mut(),
+/// a child TEXT node will be created containing the string @content.
+/// NOTE: Use xmlNewChild() if @content will contain entities that need to be
+/// preserved. Use this function, xmlNewTextChild(), if you need to ensure that
+/// reserved XML chars that might appear in @content, such as the ampersand,
+/// greater-than or less-than signs, are automatically replaced by their XML
+/// escaped entity representations.
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewTextChild")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_new_text_child(
     parent: XmlNodePtr,
@@ -2858,18 +2642,11 @@ pub unsafe extern "C" fn xml_new_text_child(
     cur
 }
 
-/**
- * xmlNewDocRawNode:
- * @doc:  the document
- * @ns:  namespace if any
- * @name:  the node name
- * @content:  the text content if any
- *
- * Creation of a new node element within a document. @ns and @content
- * are optional (null_mut()).
- *
- * Returns a pointer to the new node object.
- */
+/// Creation of a new node element within a document. @ns and @content
+/// are optional (null_mut()).
+///
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocRawNode")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_new_doc_raw_node(
     doc: XmlDocPtr,
@@ -2888,13 +2665,9 @@ pub unsafe extern "C" fn xml_new_doc_raw_node(
     cur
 }
 
-/**
- * xmlNewDocFragment:
- * @doc:  the document owning the fragment
- *
- * Creation of a new Fragment node.
- * Returns a pointer to the new node object.
- */
+/// Creation of a new Fragment node.
+/// Returns a pointer to the new node object.
+#[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
     /*
@@ -2918,23 +2691,14 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
     cur
 }
 
-/*
- * Changing the structure.
- */
-
-/**
- * xmlReplaceNode:
- * @old:  the old node
- * @cur:  the node
- *
- * Unlink the old node from its current context, prune the new one
- * at the same place. If @cur was already inserted in a document it is
- * first unlinked from its existing context.
- *
- * See the note regarding namespaces in xmlAddChild.
- *
- * Returns the @old node
- */
+/// Unlink the old node from its current context, prune the new one
+/// at the same place. If @cur was already inserted in a document it is
+/// first unlinked from its existing context.
+///
+/// See the note regarding namespaces in xmlAddChild.
+///
+/// Returns the @old node
+#[doc(alias = "xmlReplaceNode")]
 #[cfg(any(feature = "tree", feature = "writer"))]
 pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
     if old == cur {
@@ -2994,14 +2758,9 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
     old
 }
 
-/**
- * xmlTextMerge:
- * @first:  the first text node
- * @second:  the second text node being merged
- *
- * Merge two text nodes into one
- * Returns the first text node augmented
- */
+/// Merge two text nodes into one
+/// Returns the first text node augmented
+#[doc(alias = "xmlTextMerge")]
 pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -> XmlNodePtr {
     if first.is_null() {
         return second;
@@ -3024,16 +2783,10 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
     first
 }
 
-/**
- * xmlTextConcat:
- * @node:  the node
- * @content:  the content
- * @len:  @content length
- *
- * Concat the given string at the end of the existing node content
- *
- * Returns -1 in case of error, 0 otherwise
- */
+/// Concat the given string at the end of the existing node content
+///
+/// Returns -1 in case of error, 0 otherwise
+#[doc(alias = "xmlTextConcat")]
 pub unsafe extern "C" fn xml_text_concat(
     node: XmlNodePtr,
     content: *const XmlChar,
@@ -3067,13 +2820,9 @@ pub unsafe extern "C" fn xml_text_concat(
     0
 }
 
-/**
- * xmlFreeNodeList:
- * @cur:  the first node in the list
- *
- * Free a node and all its siblings, this is a recursive behaviour, all
- * the children are freed too.
- */
+/// Free a node and all its siblings, this is a recursive behaviour, all
+/// the children are freed too.
+#[doc(alias = "xmlFreeNodeList")]
 pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
     let mut parent: XmlNodePtr;
     let mut dict: XmlDictPtr = null_mut();
@@ -3165,13 +2914,9 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
     }
 }
 
-/**
- * xmlFreeNode:
- * @cur:  the node
- *
- * Free a node, this is a recursive behaviour, all the children are freed too.
- * This doesn't unlink the child from the list, use xmlUnlinkNode() first.
- */
+/// Free a node, this is a recursive behaviour, all the children are freed too.
+/// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
+#[doc(alias = "xmlFreeNode")]
 pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     let mut dict: XmlDictPtr = null_mut();
 
@@ -3271,21 +3016,10 @@ unsafe extern "C" fn copy_string_for_new_dict_if_needed(
     new_value
 }
 
-/*
- * Namespaces.
- */
-/**
- * xmlNsInScope:
- * @doc:  the document
- * @node:  the current node
- * @ancestor:  the ancestor carrying the namespace
- * @prefix:  the namespace prefix
- *
- * Verify that the given namespace held on @ancestor is still in scope
- * on node.
- *
- * Returns 1 if true, 0 if false and -1 in case of error.
- */
+/// Verify that the given namespace held on @ancestor is still in scope on node.
+///
+/// Returns 1 if true, 0 if false and -1 in case of error.
+#[doc(alias = "xmlNsInScope")]
 unsafe extern "C" fn xml_ns_in_scope(
     _doc: XmlDocPtr,
     mut node: XmlNodePtr,
@@ -3326,14 +3060,10 @@ unsafe extern "C" fn xml_ns_in_scope(
     1
 }
 
-/**
- * xmlCopyNamespace:
- * @cur:  the namespace
- *
- * Do a copy of the namespace.
- *
- * Returns: a new #xmlNsPtr, or null_mut() in case of error.
- */
+/// Do a copy of the namespace.
+///
+/// Returns: a new #xmlNsPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyNamespace")]
 pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
     if cur.is_null() {
         return null_mut();
@@ -3345,14 +3075,10 @@ pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
     }
 }
 
-/**
- * xmlCopyNamespaceList:
- * @cur:  the first namespace
- *
- * Do a copy of an namespace list.
- *
- * Returns: a new #xmlNsPtr, or null_mut() in case of error.
- */
+/// Do a copy of an namespace list.
+///
+/// Returns: a new #xmlNsPtr, or null_mut() in case of error.
+#[doc(alias = "xmlCopyNamespaceList")]
 pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr {
     let mut ret: XmlNsPtr = null_mut();
     let mut p: XmlNsPtr = null_mut();
@@ -3376,19 +3102,10 @@ pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr 
     ret
 }
 
-/*
- * Changing the content.
- */
-
 static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 
-/**
- * xmlTreeErr:
- * @code:  the error number
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlTreeErr")]
 unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
     let msg = match code {
         XmlParserErrors::XmlTreeInvalidHex => {
@@ -3445,16 +3162,10 @@ pub fn set_compress_mode(mode: i32) {
     }
 }
 
-/*
-* DOM-wrapper helper functions.
-*/
-/*
-* xmlDOMWrapNewCtxt:
-*
-* Allocates and initializes a new DOM-wrapper context.
-*
-* Returns the xmlDOMWrapCtxtPtr or null_mut() in case of an internal error.
-*/
+/// Allocates and initializes a new DOM-wrapper context.
+///
+/// Returns the xmlDOMWrapCtxtPtr or null_mut() in case of an internal error.
+#[doc(alias = "xmlDOMWrapNewCtxt")]
 pub unsafe extern "C" fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
     let ret: XmlDOMWrapCtxtPtr = xml_malloc(size_of::<XmlDOMWrapCtxt>()) as _;
     if ret.is_null() {
@@ -3465,12 +3176,8 @@ pub unsafe extern "C" fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
     ret
 }
 
-/*
-* xmlDOMWrapNsMapFree:
-* @map: the ns-map
-*
-* Frees the ns-map
-*/
+/// Frees the ns-map
+#[doc(alias = "xmlDOMWrapNsMapFree")]
 unsafe extern "C" fn xml_dom_wrap_ns_map_free(nsmap: XmlNsMapPtr) {
     let mut cur: XmlNsMapItemPtr;
     let mut tmp: XmlNsMapItemPtr;
@@ -3493,12 +3200,8 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_free(nsmap: XmlNsMapPtr) {
     xml_free(nsmap as _);
 }
 
-/*
-* xmlDOMWrapFreeCtxt:
-* @ctxt: the DOM-wrapper context
-*
-* Frees the DOM-wrapper context.
-*/
+/// Frees the DOM-wrapper context.
+#[doc(alias = "xmlDOMWrapFreeCtxt")]
 pub unsafe extern "C" fn xml_dom_wrap_free_ctxt(ctxt: XmlDOMWrapCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -3554,10 +3257,8 @@ macro_rules! XML_NSMAP_POP {
     };
 }
 
-/*
-* XML_TREE_ADOPT_STR: If we have a dest-dict, put @str in the dict;
-* otherwise copy it, when it was in the source-dict.
-*/
+// XML_TREE_ADOPT_STR: If we have a dest-dict, put @str in the dict;
+// otherwise copy it, when it was in the source-dict.
 macro_rules! XML_TREE_ADOPT_STR {
     ($str:expr, $adoptStr:expr, $sourceDoc:expr, $destDoc:expr) => {
         if $adoptStr != 0 && !$str.is_null() {
@@ -3580,10 +3281,8 @@ macro_rules! XML_TREE_ADOPT_STR {
     };
 }
 
-/*
-* XML_TREE_ADOPT_STR_2: If @str was in the source-dict, then
-* put it in dest-dict or copy it.
-*/
+// XML_TREE_ADOPT_STR_2: If @str was in the source-dict, then
+// put it in dest-dict or copy it.
 macro_rules! XML_TREE_ADOPT_STR_2 {
     ($str:expr, $adoptStr:expr, $sourceDoc:expr, $destDoc:expr, $cur:expr) => {
         if $adoptStr != 0
@@ -3606,15 +3305,8 @@ const XML_TREE_NSMAP_XML: i32 = -2;
 const XML_TREE_NSMAP_DOC: i32 = -3;
 const XML_TREE_NSMAP_CUSTOM: i32 = -4;
 
-/*
-* xmlDOMWrapNsMapAddItem:
-* @map: the ns-map
-* @oldNs: the old ns-struct
-* @newNs: the new ns-struct
-* @depth: depth and ns-kind information
-*
-* Adds an ns-mapping item.
-*/
+/// Adds an ns-mapping item.
+#[doc(alias = "xmlDOMWrapNsMapAddItem")]
 unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
     nsmap: *mut XmlNsMapPtr,
     position: i32,
@@ -3694,16 +3386,10 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
     ret
 }
 
-/*
-*
-* xmlDOMWrapNSNormGatherInScopeNs:
-* @map: the namespace map
-* @node: the node to start with
-*
-* Puts in-scope namespaces into the ns-map.
-*
-* Returns 0 on success, -1 on API or internal errors.
-*/
+/// Puts in-scope namespaces into the ns-map.
+///
+/// Returns 0 on success, -1 on API or internal errors.
+#[doc(alias = "xmlDOMWrapNSNormGatherInScopeNs")]
 unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
     map: *mut XmlNsMapPtr,
     node: XmlNodePtr,
@@ -3763,13 +3449,10 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
     0
 }
 
-/*
-* xmlDOMWrapNSNormAddNsMapItem2:
-*
-* For internal use. Adds a ns-decl mapping.
-*
-* Returns 0 on success, -1 on internal errors.
-*/
+/// For internal use. Adds a ns-decl mapping.
+///
+/// Returns 0 on success, -1 on internal errors.
+#[doc(alias = "xmlDOMWrapNSNormAddNsMapItem2")]
 unsafe extern "C" fn xml_dom_wrap_ns_norm_add_ns_map_item2(
     list: *mut *mut XmlNsPtr,
     size: *mut i32,
@@ -3809,18 +3492,11 @@ macro_rules! IS_STR_XML {
     };
 }
 
-/*
-* xmlDOMWrapStoreNs:
-* @doc: the doc
-* @nsName: the namespace name
-* @prefix: the prefix
-*
-* Creates or reuses an xmlNs struct on (*doc).oldNs with
-* the given prefix and namespace name.
-*
-* Returns the acquired ns struct or null_mut() in case of an API
-*         or internal error.
-*/
+/// Creates or reuses an xmlNs struct on (*doc).oldNs with
+/// the given prefix and namespace name.
+///
+/// Returns the acquired ns struct or null_mut() in case of an API or internal error.
+#[doc(alias = "xmlDOMWrapStoreNs")]
 unsafe extern "C" fn xml_dom_wrap_store_ns(
     doc: XmlDocPtr,
     ns_name: *const XmlChar,
@@ -3858,16 +3534,10 @@ unsafe extern "C" fn xml_dom_wrap_store_ns(
     null_mut()
 }
 
-/*
-* xmlTreeLookupNsListByPrefix:
-* @nsList: a list of ns-structs
-* @prefix: the searched prefix
-*
-* Searches for a ns-decl with the given prefix in @nsList.
-*
-* Returns the ns-decl if found, null_mut() if not found and on
-*         API errors.
-*/
+/// Searches for a ns-decl with the given prefix in @nsList.
+///
+/// Returns the ns-decl if found, null_mut() if not found and on API errors.
+#[doc(alias = "xmlTreeLookupNsListByPrefix")]
 unsafe extern "C" fn xml_tree_nslist_lookup_by_prefix(
     ns_list: XmlNsPtr,
     prefix: *const XmlChar,
@@ -3892,19 +3562,11 @@ unsafe extern "C" fn xml_tree_nslist_lookup_by_prefix(
     null_mut()
 }
 
-/*
-* xmlSearchNsByPrefixStrict:
-* @doc: the document
-* @node: the start node
-* @prefix: the searched namespace prefix
-* @retNs: the resulting ns-decl
-*
-* Dynamically searches for a ns-declaration which matches
-* the given @nsName in the ancestor-or-self axis of @node.
-*
-* Returns 1 if a ns-decl was found, 0 if not and -1 on API
-*         and internal errors.
-*/
+/// Dynamically searches for a ns-declaration which matches
+/// the given @nsName in the ancestor-or-self axis of @node.
+///
+/// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
+#[doc(alias = "xmlSearchNsByPrefixStrict")]
 unsafe extern "C" fn xml_search_ns_by_prefix_strict(
     doc: XmlDocPtr,
     node: XmlNodePtr,
@@ -3969,21 +3631,12 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
     0
 }
 
-/*
-* xmlDOMWrapNSNormDeclareNsForced:
-* @doc: the doc
-* @elem: the element-node to declare on
-* @nsName: the namespace-name of the ns-decl
-* @prefix: the preferred prefix of the ns-decl
-* @checkShadow: ensure that the new ns-decl doesn't shadow ancestor ns-decls
-*
-* Declares a new namespace on @elem. It tries to use the
-* given @prefix; if a ns-decl with the given prefix is already existent
-* on @elem, it will generate an other prefix.
-*
-* Returns 1 if a ns-decl was found, 0 if not and -1 on API
-*         and internal errors.
-*/
+/// Declares a new namespace on @elem. It tries to use the
+/// given @prefix; if a ns-decl with the given prefix is already existent
+/// on @elem, it will generate an other prefix.
+///
+/// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
+#[doc(alias = "xmlDOMWrapNSNormDeclareNsForced")]
 unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -4068,25 +3721,14 @@ unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
     }
 }
 
-/*
-* xmlDOMWrapNSNormAcquireNormalizedNs:
-* @doc: the doc
-* @elem: the element-node to declare namespaces on
-* @ns: the ns-struct to use for the search
-* @retNs: the found/created ns-struct
-* @nsMap: the ns-map
-* @depth: the current tree depth
-* @ancestorsOnly: search in ancestor ns-decls only
-* @prefixed: if the searched ns-decl must have a prefix (for attributes)
-*
-* Searches for a matching ns-name in the ns-decls of @nsMap, if not
-* found it will either declare it on @elem, or store it in (*doc).oldNs.
-* If a new ns-decl needs to be declared on @elem, it tries to use the
-* @(*ns).prefix for it, if this prefix is already in use on @elem, it will
-* change the prefix or the new ns-decl.
-*
-* Returns 0 if succeeded, -1 otherwise and on API/internal errors.
-*/
+/// Searches for a matching ns-name in the ns-decls of @nsMap, if not
+/// found it will either declare it on @elem, or store it in (*doc).oldNs.
+/// If a new ns-decl needs to be declared on @elem, it tries to use the
+/// @(*ns).prefix for it, if this prefix is already in use on @elem, it will
+/// change the prefix or the new ns-decl.
+///
+/// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
+#[doc(alias = "xmlDOMWrapNSNormAcquireNormalizedNs")]
 unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -4205,22 +3847,16 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     0
 }
 
-/*
-* xmlDOMWrapReconcileNamespaces:
-* @ctxt: DOM wrapper context, unused at the moment
-* @elem: the element-node
-* @options: option flags
-*
-* Ensures that ns-references point to ns-decls hold on element-nodes.
-* Ensures that the tree is namespace wellformed by creating additional
-* ns-decls where needed. Note that, since prefixes of already existent
-* ns-decls can be shadowed by this process, it could break QNames in
-* attribute values or element content.
-*
-* NOTE: This function was not intensively tested.
-*
-* Returns 0 if succeeded, -1 otherwise and on API/internal errors.
-*/
+/// Ensures that ns-references point to ns-decls hold on element-nodes.
+/// Ensures that the tree is namespace wellformed by creating additional
+/// ns-decls where needed. Note that, since prefixes of already existent
+/// ns-decls can be shadowed by this process, it could break QNames in
+/// attribute values or element content.
+///
+/// NOTE: This function was not intensively tested.
+///
+/// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
+#[doc(alias = "xmlDOMWrapReconcileNamespaces")]
 pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
     _ctxt: XmlDOMWrapCtxtPtr,
     elem: XmlNodePtr,
@@ -4626,28 +4262,19 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
     ret
 }
 
-/*
-* xmlDOMWrapAdoptBranch:
-* @ctxt: the optional context for custom processing
-* @sourceDoc: the optional sourceDoc
-* @node: the element-node to start with
-* @destDoc: the destination doc for adoption
-* @destParent: the optional new parent of @node in @destDoc
-* @options: option flags
-*
-* Ensures that ns-references point to @destDoc: either to
-* elements->nsDef entries if @destParent is given, or to
-* @(*destDoc).oldNs otherwise.
-* If @destParent is given, it ensures that the tree is namespace
-* wellformed by creating additional ns-decls where needed.
-* Note that, since prefixes of already existent ns-decls can be
-* shadowed by this process, it could break QNames in attribute
-* values or element content.
-*
-* NOTE: This function was not intensively tested.
-*
-* Returns 0 if succeeded, -1 otherwise and on API/internal errors.
-*/
+/// Ensures that ns-references point to @destDoc: either to
+/// elements->nsDef entries if @destParent is given, or to
+/// @(*destDoc).oldNs otherwise.
+/// If @destParent is given, it ensures that the tree is namespace
+/// wellformed by creating additional ns-decls where needed.
+/// Note that, since prefixes of already existent ns-decls can be
+/// shadowed by this process, it could break QNames in attribute
+/// values or element content.
+///
+/// NOTE: This function was not intensively tested.
+///
+/// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
+#[doc(alias = "xmlDOMWrapAdoptBranch")]
 unsafe extern "C" fn xml_dom_wrap_adopt_branch(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: XmlDocPtr,
@@ -5084,20 +4711,11 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
     ret
 }
 
-/*
-* xmlSearchNsByNamespaceStrict:
-* @doc: the document
-* @node: the start node
-* @nsName: the searched namespace name
-* @retNs: the resulting ns-decl
-* @prefixed: if the found ns-decl must have a prefix (for attributes)
-*
-* Dynamically searches for a ns-declaration which matches
-* the given @nsName in the ancestor-or-self axis of @node.
-*
-* Returns 1 if a ns-decl was found, 0 if not and -1 on API
-*         and internal errors.
-*/
+/// Dynamically searches for a ns-declaration which matches
+/// the given @nsName in the ancestor-or-self axis of @node.
+///
+/// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
+#[doc(alias = "xmlSearchNsByNamespaceStrict")]
 unsafe extern "C" fn xml_search_ns_by_namespace_strict(
     doc: XmlDocPtr,
     node: XmlNodePtr,
@@ -5211,22 +4829,13 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
     0
 }
 
-/*
-* xmlDOMWrapAdoptAttr:
-* @ctxt: the optional context for custom processing
-* @sourceDoc: the optional source document of attr
-* @attr: the attribute-node to be adopted
-* @destDoc: the destination doc for adoption
-* @destParent: the optional new parent of @attr in @destDoc
-* @options: option flags
-*
-* @attr is adopted by @destDoc.
-* Ensures that ns-references point to @destDoc: either to
-* elements->nsDef entries if @destParent is given, or to
-* @(*destDoc).oldNs otherwise.
-*
-* Returns 0 if succeeded, -1 otherwise and on API/internal errors.
-*/
+/// @attr is adopted by @destDoc.
+/// Ensures that ns-references point to @destDoc: either to
+/// elements->nsDef entries if @destParent is given, or to
+/// @(*destDoc).oldNs otherwise.
+///
+/// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
+#[doc(alias = "xmlDOMWrapAdoptAttr")]
 unsafe extern "C" fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: XmlDocPtr,
@@ -5353,33 +4962,24 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
     //     return -1;
 }
 
-/*
-* xmlDOMWrapAdoptNode:
-* @ctxt: the optional context for custom processing
-* @sourceDoc: the optional sourceDoc
-* @node: the node to start with
-* @destDoc: the destination doc
-* @destParent: the optional new parent of @node in @destDoc
-* @options: option flags
-*
-* References of out-of scope ns-decls are remapped to point to @destDoc:
-* 1) If @destParent is given, then nsDef entries on element-nodes are used
-* 2) If *no* @destParent is given, then @(*destDoc).oldNs entries are used
-*    This is the case when you have an unlinked node and just want to move it
-*    to the context of
-*
-* If @destParent is given, it ensures that the tree is namespace
-* wellformed by creating additional ns-decls where needed.
-* Note that, since prefixes of already existent ns-decls can be
-* shadowed by this process, it could break QNames in attribute
-* values or element content.
-* NOTE: This function was not intensively tested.
-*
-* Returns 0 if the operation succeeded,
-*         1 if a node of unsupported type was given,
-*         2 if a node of not yet supported type was given and
-*         -1 on API/internal errors.
-*/
+/// References of out-of scope ns-decls are remapped to point to @destDoc:
+/// 1) If @destParent is given, then nsDef entries on element-nodes are used
+/// 2) If *no* @destParent is given, then @(*destDoc).oldNs entries are used
+///    This is the case when you have an unlinked node and just want to move it
+///    to the context of
+///
+/// If @destParent is given, it ensures that the tree is namespace
+/// wellformed by creating additional ns-decls where needed.
+/// Note that, since prefixes of already existent ns-decls can be
+/// shadowed by this process, it could break QNames in attribute
+/// values or element content.
+/// NOTE: This function was not intensively tested.
+///
+/// Returns 0 if the operation succeeded,
+///         1 if a node of unsupported type was given,
+///         2 if a node of not yet supported type was given and
+///         -1 on API/internal errors.
+#[doc(alias = "xmlDOMWrapAdoptNode")]
 pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
     ctxt: XmlDOMWrapCtxtPtr,
     mut source_doc: XmlDocPtr,
@@ -5493,23 +5093,16 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
     0
 }
 
-/*
-* xmlDOMWrapRemoveNode:
-* @ctxt: a DOM wrapper context
-* @doc: the doc
-* @node: the node to be removed.
-* @options: set of options, unused at the moment
-*
-* Unlinks the given node from its owner.
-* This will substitute ns-references to (*node).nsDef for
-* ns-references to (*doc).oldNs, thus ensuring the removed
-* branch to be autark wrt ns-references.
-*
-* NOTE: This function was not intensively tested.
-*
-* Returns 0 on success, 1 if the node is not supported,
-*         -1 on API and internal errors.
-*/
+/// Unlinks the given node from its owner.
+/// This will substitute ns-references to (*node).nsDef for
+/// ns-references to (*doc).oldNs, thus ensuring the removed
+/// branch to be autark wrt ns-references.
+///
+/// NOTE: This function was not intensively tested.
+///
+/// Returns 0 on success, 1 if the node is not supported,
+///         -1 on API and internal errors.
+#[doc(alias = "xmlDOMWrapRemoveNode")]
 pub unsafe extern "C" fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
     doc: XmlDocPtr,
@@ -5718,13 +5311,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
     // return -1;
 }
 
-/**
- * DICT_COPY:
- * @str:  a string
- *
- * Copy a string using a "dict" dictionary in the current scope,
- * if available.
- */
+/// Copy a string using a "dict" dictionary in the current scope, if available.
 macro_rules! DICT_COPY {
     ($dict:expr, $str:expr, $cpy:expr) => {
         if !$str.is_null() {
@@ -5741,13 +5328,7 @@ macro_rules! DICT_COPY {
     };
 }
 
-/**
- * DICT_CONST_COPY:
- * @str:  a string
- *
- * Copy a string using a "dict" dictionary in the current scope,
- * if available.
- */
+/// Copy a string using a "dict" dictionary in the current scope, if available.
 macro_rules! DICT_CONST_COPY {
     ($dict:expr, $str:expr, $cpy:expr) => {
         if !$str.is_null() {
@@ -5764,35 +5345,24 @@ macro_rules! DICT_CONST_COPY {
     };
 }
 
-/*
-* xmlDOMWrapCloneNode:
-* @ctxt: the optional context for custom processing
-* @sourceDoc: the optional sourceDoc
-* @node: the node to start with
-* @resNode: the clone of the given @node
-* @destDoc: the destination doc
-* @destParent: the optional new parent of @node in @destDoc
-* @deep: descend into child if set
-* @options: option flags
-*
-* References of out-of scope ns-decls are remapped to point to @destDoc:
-* 1) If @destParent is given, then nsDef entries on element-nodes are used
-* 2) If *no* @destParent is given, then @(*destDoc).oldNs entries are used.
-*    This is the case when you don't know already where the cloned branch
-*    will be added to.
-*
-* If @destParent is given, it ensures that the tree is namespace
-* wellformed by creating additional ns-decls where needed.
-* Note that, since prefixes of already existent ns-decls can be
-* shadowed by this process, it could break QNames in attribute
-* values or element content.
-* TODO:
-*   1) What to do with XInclude? Currently this returns an error for XInclude.
-*
-* Returns 0 if the operation succeeded,
-*         1 if a node of unsupported (or not yet supported) type was given,
-*         -1 on API/internal errors.
-*/
+/// References of out-of scope ns-decls are remapped to point to @destDoc:
+/// 1) If @destParent is given, then nsDef entries on element-nodes are used
+/// 2) If *no* @destParent is given, then @(*destDoc).oldNs entries are used.
+///    This is the case when you don't know already where the cloned branch
+///    will be added to.
+///
+/// If @destParent is given, it ensures that the tree is namespace
+/// wellformed by creating additional ns-decls where needed.
+/// Note that, since prefixes of already existent ns-decls can be
+/// shadowed by this process, it could break QNames in attribute
+/// values or element content.
+/// TODO:
+///   1) What to do with XInclude? Currently this returns an error for XInclude.
+///
+/// Returns 0 if the operation succeeded,
+///         1 if a node of unsupported (or not yet supported) type was given,
+///         -1 on API/internal errors.
+#[doc(alias = "xmlDOMWrapCloneNode")]
 pub unsafe extern "C" fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
     mut source_doc: XmlDocPtr,

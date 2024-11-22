@@ -8317,1553 +8317,907 @@ const XML_UNICODE_CAT_TBL: XmlUnicodeNameTable = XmlUnicodeNameTable {
     numentries: 36,
 };
 
-/**
- * xml_ucs_isAegeanNumbers:
- * @code: UCS code point
- *
- * Check whether the character is part of AegeanNumbers UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of AegeanNumbers UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_aegean_numbers(code: i32) -> i32 {
     (0x10100..=0x1013F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isAlphabeticPresentationForms:
- * @code: UCS code point
- *
- * Check whether the character is part of AlphabeticPresentationForms UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of AlphabeticPresentationForms UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_alphabetic_presentation_forms(code: i32) -> i32 {
     (0xFB00..=0xFB4F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isArabic:
- * @code: UCS code point
- *
- * Check whether the character is part of Arabic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Arabic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_arabic(code: i32) -> i32 {
     (0x0600..=0x06FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isArabicPresentationFormsA:
- * @code: UCS code point
- *
- * Check whether the character is part of ArabicPresentationForms-A UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of ArabicPresentationForms-A UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_a(code: i32) -> i32 {
     (0xFB50..=0xFDFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isArabicPresentationFormsB:
- * @code: UCS code point
- *
- * Check whether the character is part of ArabicPresentationForms-B UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of ArabicPresentationForms-B UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_b(code: i32) -> i32 {
     (0xFE70..=0xFEFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isArmenian:
- * @code: UCS code point
- *
- * Check whether the character is part of Armenian UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Armenian UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_armenian(code: i32) -> i32 {
     (0x0530..=0x058F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isArrows:
- * @code: UCS code point
- *
- * Check whether the character is part of Arrows UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Arrows UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_arrows(code: i32) -> i32 {
     (0x2190..=0x21FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBasicLatin:
- * @code: UCS code point
- *
- * Check whether the character is part of BasicLatin UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of BasicLatin UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_basic_latin(code: i32) -> i32 {
     (0x0000..=0x007F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBengali:
- * @code: UCS code point
- *
- * Check whether the character is part of Bengali UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Bengali UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_bengali(code: i32) -> i32 {
     (0x0980..=0x09FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBlockElements:
- * @code: UCS code point
- *
- * Check whether the character is part of BlockElements UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of BlockElements UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_block_elements(code: i32) -> i32 {
     (0x2580..=0x259F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBopomofo:
- * @code: UCS code point
- *
- * Check whether the character is part of Bopomofo UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Bopomofo UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_bopomofo(code: i32) -> i32 {
     (0x3100..=0x312F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBopomofoExtended:
- * @code: UCS code point
- *
- * Check whether the character is part of BopomofoExtended UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of BopomofoExtended UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_bopomofo_extended(code: i32) -> i32 {
     (0x31A0..=0x31BF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBoxDrawing:
- * @code: UCS code point
- *
- * Check whether the character is part of BoxDrawing UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of BoxDrawing UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_box_drawing(code: i32) -> i32 {
     (0x2500..=0x257F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBraillePatterns:
- * @code: UCS code point
- *
- * Check whether the character is part of BraillePatterns UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of BraillePatterns UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_braille_patterns(code: i32) -> i32 {
     (0x2800..=0x28FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBuhid:
- * @code: UCS code point
- *
- * Check whether the character is part of Buhid UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Buhid UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_buhid(code: i32) -> i32 {
     (0x1740..=0x175F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isByzantineMusicalSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of ByzantineMusicalSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of ByzantineMusicalSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_byzantine_musical_symbols(code: i32) -> i32 {
     (0x1D000..=0x1D0FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKCompatibility:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKCompatibility UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKCompatibility UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility(code: i32) -> i32 {
     (0x3300..=0x33FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKCompatibilityForms:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKCompatibilityForms UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKCompatibilityForms UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_forms(code: i32) -> i32 {
     (0xFE30..=0xFE4F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKCompatibilityIdeographs:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKCompatibilityIdeographs UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKCompatibilityIdeographs UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs(code: i32) -> i32 {
     (0xF900..=0xFAFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKCompatibilityIdeographsSupplement:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKCompatibilityIdeographsSupplement UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKCompatibilityIdeographsSupplement UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code: i32) -> i32 {
     (0x2F800..=0x2FA1F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKRadicalsSupplement:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKRadicalsSupplement UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKRadicalsSupplement UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_radicals_supplement(code: i32) -> i32 {
     (0x2E80..=0x2EFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKSymbolsandPunctuation:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKSymbolsandPunctuation UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKSymbolsandPunctuation UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_symbolsand_punctuation(code: i32) -> i32 {
     (0x3000..=0x303F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKUnifiedIdeographs:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKUnifiedIdeographs UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKUnifiedIdeographs UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs(code: i32) -> i32 {
     (0x4E00..=0x9FFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKUnifiedIdeographsExtensionA:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKUnifiedIdeographsExtensionA UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKUnifiedIdeographsExtensionA UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: i32) -> i32 {
     (0x3400..=0x4DBF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCJKUnifiedIdeographsExtensionB:
- * @code: UCS code point
- *
- * Check whether the character is part of CJKUnifiedIdeographsExtensionB UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CJKUnifiedIdeographsExtensionB UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: i32) -> i32 {
     (0x20000..=0x2A6DF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCherokee:
- * @code: UCS code point
- *
- * Check whether the character is part of Cherokee UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Cherokee UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cherokee(code: i32) -> i32 {
     (0x13A0..=0x13FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCombiningDiacriticalMarks:
- * @code: UCS code point
- *
- * Check whether the character is part of CombiningDiacriticalMarks UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CombiningDiacriticalMarks UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marks(code: i32) -> i32 {
     (0x0300..=0x036F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCombiningDiacriticalMarksforSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of CombiningDiacriticalMarksforSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CombiningDiacriticalMarksforSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marksfor_symbols(code: i32) -> i32 {
     (0x20D0..=0x20FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCombiningHalfMarks:
- * @code: UCS code point
- *
- * Check whether the character is part of CombiningHalfMarks UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CombiningHalfMarks UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_combining_half_marks(code: i32) -> i32 {
     (0xFE20..=0xFE2F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCombiningMarksforSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of CombiningMarksforSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CombiningMarksforSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_combining_marksfor_symbols(code: i32) -> i32 {
     (0x20D0..=0x20FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isControlPictures:
- * @code: UCS code point
- *
- * Check whether the character is part of ControlPictures UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of ControlPictures UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_control_pictures(code: i32) -> i32 {
     (0x2400..=0x243F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCurrencySymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of CurrencySymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CurrencySymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_currency_symbols(code: i32) -> i32 {
     (0x20A0..=0x20CF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCypriotSyllabary:
- * @code: UCS code point
- *
- * Check whether the character is part of CypriotSyllabary UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CypriotSyllabary UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cypriot_syllabary(code: i32) -> i32 {
     (0x10800..=0x1083F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCyrillic:
- * @code: UCS code point
- *
- * Check whether the character is part of Cyrillic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Cyrillic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cyrillic(code: i32) -> i32 {
     (0x0400..=0x04FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isCyrillicSupplement:
- * @code: UCS code point
- *
- * Check whether the character is part of CyrillicSupplement UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of CyrillicSupplement UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cyrillic_supplement(code: i32) -> i32 {
     (0x0500..=0x052F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isDeseret:
- * @code: UCS code point
- *
- * Check whether the character is part of Deseret UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Deseret UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_deseret(code: i32) -> i32 {
     (0x10400..=0x1044F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isDevanagari:
- * @code: UCS code point
- *
- * Check whether the character is part of Devanagari UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Devanagari UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_devanagari(code: i32) -> i32 {
     (0x0900..=0x097F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isDingbats:
- * @code: UCS code point
- *
- * Check whether the character is part of Dingbats UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Dingbats UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_dingbats(code: i32) -> i32 {
     (0x2700..=0x27BF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isEnclosedAlphanumerics:
- * @code: UCS code point
- *
- * Check whether the character is part of EnclosedAlphanumerics UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of EnclosedAlphanumerics UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_enclosed_alphanumerics(code: i32) -> i32 {
     (0x2460..=0x24FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isEnclosedCJKLettersandMonths:
- * @code: UCS code point
- *
- * Check whether the character is part of EnclosedCJKLettersandMonths UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of EnclosedCJKLettersandMonths UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_enclosed_cjk_lettersand_months(code: i32) -> i32 {
     (0x3200..=0x32FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isEthiopic:
- * @code: UCS code point
- *
- * Check whether the character is part of Ethiopic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Ethiopic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_ethiopic(code: i32) -> i32 {
     (0x1200..=0x137F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGeneralPunctuation:
- * @code: UCS code point
- *
- * Check whether the character is part of GeneralPunctuation UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of GeneralPunctuation UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_general_punctuation(code: i32) -> i32 {
     (0x2000..=0x206F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGeometricShapes:
- * @code: UCS code point
- *
- * Check whether the character is part of GeometricShapes UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of GeometricShapes UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_geometric_shapes(code: i32) -> i32 {
     (0x25A0..=0x25FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGeorgian:
- * @code: UCS code point
- *
- * Check whether the character is part of Georgian UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Georgian UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_georgian(code: i32) -> i32 {
     (0x10A0..=0x10FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGothic:
- * @code: UCS code point
- *
- * Check whether the character is part of Gothic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Gothic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_gothic(code: i32) -> i32 {
     (0x10330..=0x1034F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGreek:
- * @code: UCS code point
- *
- * Check whether the character is part of Greek UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Greek UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_greek(code: i32) -> i32 {
     (0x0370..=0x03FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGreekExtended:
- * @code: UCS code point
- *
- * Check whether the character is part of GreekExtended UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of GreekExtended UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_greek_extended(code: i32) -> i32 {
     (0x1F00..=0x1FFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGreekandCoptic:
- * @code: UCS code point
- *
- * Check whether the character is part of GreekandCoptic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of GreekandCoptic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_greekand_coptic(code: i32) -> i32 {
     (0x0370..=0x03FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGujarati:
- * @code: UCS code point
- *
- * Check whether the character is part of Gujarati UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Gujarati UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_gujarati(code: i32) -> i32 {
     (0x0A80..=0x0AFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isGurmukhi:
- * @code: UCS code point
- *
- * Check whether the character is part of Gurmukhi UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Gurmukhi UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_gurmukhi(code: i32) -> i32 {
     (0x0A00..=0x0A7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHalfwidthandFullwidthForms:
- * @code: UCS code point
- *
- * Check whether the character is part of HalfwidthandFullwidthForms UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of HalfwidthandFullwidthForms UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_halfwidthand_fullwidth_forms(code: i32) -> i32 {
     (0xFF00..=0xFFEF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHangulCompatibilityJamo:
- * @code: UCS code point
- *
- * Check whether the character is part of HangulCompatibilityJamo UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of HangulCompatibilityJamo UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_hangul_compatibility_jamo(code: i32) -> i32 {
     (0x3130..=0x318F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHangulJamo:
- * @code: UCS code point
- *
- * Check whether the character is part of HangulJamo UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of HangulJamo UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_hangul_jamo(code: i32) -> i32 {
     (0x1100..=0x11FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHangulSyllables:
- * @code: UCS code point
- *
- * Check whether the character is part of HangulSyllables UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of HangulSyllables UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_hangul_syllables(code: i32) -> i32 {
     (0xAC00..=0xD7AF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHanunoo:
- * @code: UCS code point
- *
- * Check whether the character is part of Hanunoo UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Hanunoo UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_hanunoo(code: i32) -> i32 {
     (0x1720..=0x173F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHebrew:
- * @code: UCS code point
- *
- * Check whether the character is part of Hebrew UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Hebrew UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_hebrew(code: i32) -> i32 {
     (0x0590..=0x05FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHighPrivateUseSurrogates:
- * @code: UCS code point
- *
- * Check whether the character is part of HighPrivateUseSurrogates UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of HighPrivateUseSurrogates UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_high_private_use_surrogates(code: i32) -> i32 {
     (0xDB80..=0xDBFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHighSurrogates:
- * @code: UCS code point
- *
- * Check whether the character is part of HighSurrogates UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of HighSurrogates UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_high_surrogates(code: i32) -> i32 {
     (0xD800..=0xDB7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isHiragana:
- * @code: UCS code point
- *
- * Check whether the character is part of Hiragana UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Hiragana UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_hiragana(code: i32) -> i32 {
     (0x3040..=0x309F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isIPAExtensions:
- * @code: UCS code point
- *
- * Check whether the character is part of IPAExtensions UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of IPAExtensions UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_ipa_extensions(code: i32) -> i32 {
     (0x0250..=0x02AF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isIdeographicDescriptionCharacters:
- * @code: UCS code point
- *
- * Check whether the character is part of IdeographicDescriptionCharacters UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of IdeographicDescriptionCharacters UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_ideographic_description_characters(code: i32) -> i32 {
     (0x2FF0..=0x2FFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKanbun:
- * @code: UCS code point
- *
- * Check whether the character is part of Kanbun UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Kanbun UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_kanbun(code: i32) -> i32 {
     (0x3190..=0x319F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKangxiRadicals:
- * @code: UCS code point
- *
- * Check whether the character is part of KangxiRadicals UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of KangxiRadicals UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_kangxi_radicals(code: i32) -> i32 {
     (0x2F00..=0x2FDF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKannada:
- * @code: UCS code point
- *
- * Check whether the character is part of Kannada UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Kannada UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_kannada(code: i32) -> i32 {
     (0x0C80..=0x0CFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKatakana:
- * @code: UCS code point
- *
- * Check whether the character is part of Katakana UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Katakana UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_katakana(code: i32) -> i32 {
     (0x30A0..=0x30FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKatakanaPhoneticExtensions:
- * @code: UCS code point
- *
- * Check whether the character is part of KatakanaPhoneticExtensions UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of KatakanaPhoneticExtensions UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_katakana_phonetic_extensions(code: i32) -> i32 {
     (0x31F0..=0x31FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKhmer:
- * @code: UCS code point
- *
- * Check whether the character is part of Khmer UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Khmer UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_khmer(code: i32) -> i32 {
     (0x1780..=0x17FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isKhmerSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of KhmerSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of KhmerSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_khmer_symbols(code: i32) -> i32 {
     (0x19E0..=0x19FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLao:
- * @code: UCS code point
- *
- * Check whether the character is part of Lao UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Lao UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_lao(code: i32) -> i32 {
     (0x0E80..=0x0EFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLatin1Supplement:
- * @code: UCS code point
- *
- * Check whether the character is part of Latin-1Supplement UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Latin-1Supplement UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_latin1_supplement(code: i32) -> i32 {
     (0x0080..=0x00FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLatinExtendedA:
- * @code: UCS code point
- *
- * Check whether the character is part of LatinExtended-A UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LatinExtended-A UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_latin_extended_a(code: i32) -> i32 {
     (0x0100..=0x017F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLatinExtendedB:
- * @code: UCS code point
- *
- * Check whether the character is part of LatinExtended-B UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LatinExtended-B UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_latin_extended_b(code: i32) -> i32 {
     (0x0180..=0x024F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLatinExtendedAdditional:
- * @code: UCS code point
- *
- * Check whether the character is part of LatinExtendedAdditional UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LatinExtendedAdditional UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_latin_extended_additional(code: i32) -> i32 {
     (0x1E00..=0x1EFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLetterlikeSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of LetterlikeSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LetterlikeSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_letterlike_symbols(code: i32) -> i32 {
     (0x2100..=0x214F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLimbu:
- * @code: UCS code point
- *
- * Check whether the character is part of Limbu UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Limbu UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_limbu(code: i32) -> i32 {
     (0x1900..=0x194F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLinearBIdeograms:
- * @code: UCS code point
- *
- * Check whether the character is part of LinearBIdeograms UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LinearBIdeograms UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_linear_bideograms(code: i32) -> i32 {
     (0x10080..=0x100FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLinearBSyllabary:
- * @code: UCS code point
- *
- * Check whether the character is part of LinearBSyllabary UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LinearBSyllabary UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_linear_bsyllabary(code: i32) -> i32 {
     (0x10000..=0x1007F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isLowSurrogates:
- * @code: UCS code point
- *
- * Check whether the character is part of LowSurrogates UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of LowSurrogates UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_low_surrogates(code: i32) -> i32 {
     (0xDC00..=0xDFFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMalayalam:
- * @code: UCS code point
- *
- * Check whether the character is part of Malayalam UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Malayalam UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_malayalam(code: i32) -> i32 {
     (0x0D00..=0x0D7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMathematicalAlphanumericSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of MathematicalAlphanumericSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MathematicalAlphanumericSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_mathematical_alphanumeric_symbols(code: i32) -> i32 {
     (0x1D400..=0x1D7FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMathematicalOperators:
- * @code: UCS code point
- *
- * Check whether the character is part of MathematicalOperators UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MathematicalOperators UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_mathematical_operators(code: i32) -> i32 {
     (0x2200..=0x22FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMiscellaneousMathematicalSymbolsA:
- * @code: UCS code point
- *
- * Check whether the character is part of MiscellaneousMathematicalSymbols-A UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MiscellaneousMathematicalSymbols-A UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: i32) -> i32 {
     (0x27C0..=0x27EF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMiscellaneousMathematicalSymbolsB:
- * @code: UCS code point
- *
- * Check whether the character is part of MiscellaneousMathematicalSymbols-B UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MiscellaneousMathematicalSymbols-B UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: i32) -> i32 {
     (0x2980..=0x29FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMiscellaneousSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of MiscellaneousSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MiscellaneousSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbols(code: i32) -> i32 {
     (0x2600..=0x26FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMiscellaneousSymbolsandArrows:
- * @code: UCS code point
- *
- * Check whether the character is part of MiscellaneousSymbolsandArrows UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MiscellaneousSymbolsandArrows UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: i32) -> i32 {
     (0x2B00..=0x2BFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMiscellaneousTechnical:
- * @code: UCS code point
- *
- * Check whether the character is part of MiscellaneousTechnical UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MiscellaneousTechnical UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_miscellaneous_technical(code: i32) -> i32 {
     (0x2300..=0x23FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMongolian:
- * @code: UCS code point
- *
- * Check whether the character is part of Mongolian UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Mongolian UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_mongolian(code: i32) -> i32 {
     (0x1800..=0x18AF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMusicalSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of MusicalSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of MusicalSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_musical_symbols(code: i32) -> i32 {
     (0x1D100..=0x1D1FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isMyanmar:
- * @code: UCS code point
- *
- * Check whether the character is part of Myanmar UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Myanmar UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_myanmar(code: i32) -> i32 {
     (0x1000..=0x109F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isNumberForms:
- * @code: UCS code point
- *
- * Check whether the character is part of NumberForms UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of NumberForms UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_number_forms(code: i32) -> i32 {
     (0x2150..=0x218F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isOgham:
- * @code: UCS code point
- *
- * Check whether the character is part of Ogham UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Ogham UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_ogham(code: i32) -> i32 {
     (0x1680..=0x169F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isOldItalic:
- * @code: UCS code point
- *
- * Check whether the character is part of OldItalic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of OldItalic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_old_italic(code: i32) -> i32 {
     (0x10300..=0x1032F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isOpticalCharacterRecognition:
- * @code: UCS code point
- *
- * Check whether the character is part of OpticalCharacterRecognition UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of OpticalCharacterRecognition UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_optical_character_recognition(code: i32) -> i32 {
     (0x2440..=0x245F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isOriya:
- * @code: UCS code point
- *
- * Check whether the character is part of Oriya UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Oriya UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_oriya(code: i32) -> i32 {
     (0x0B00..=0x0B7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isOsmanya:
- * @code: UCS code point
- *
- * Check whether the character is part of Osmanya UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Osmanya UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_osmanya(code: i32) -> i32 {
     (0x10480..=0x104AF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isPhoneticExtensions:
- * @code: UCS code point
- *
- * Check whether the character is part of PhoneticExtensions UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of PhoneticExtensions UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_phonetic_extensions(code: i32) -> i32 {
     (0x1D00..=0x1D7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isPrivateUse:
- * @code: UCS code point
- *
- * Check whether the character is part of PrivateUse UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of PrivateUse UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_private_use(code: i32) -> i32 {
     ((0xE000..=0xF8FF).contains(&code)
         || (0xF0000..=0xFFFFF).contains(&code)
         || (0x100000..=0x10FFFF).contains(&code)) as i32
 }
 
-/**
- * xml_ucs_isPrivateUseArea:
- * @code: UCS code point
- *
- * Check whether the character is part of PrivateUseArea UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of PrivateUseArea UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_private_use_area(code: i32) -> i32 {
     (0xE000..=0xF8FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isRunic:
- * @code: UCS code point
- *
- * Check whether the character is part of Runic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Runic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_runic(code: i32) -> i32 {
     (0x16A0..=0x16FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isShavian:
- * @code: UCS code point
- *
- * Check whether the character is part of Shavian UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Shavian UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_shavian(code: i32) -> i32 {
     (0x10450..=0x1047F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSinhala:
- * @code: UCS code point
- *
- * Check whether the character is part of Sinhala UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Sinhala UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_sinhala(code: i32) -> i32 {
     (0x0D80..=0x0DFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSmallFormVariants:
- * @code: UCS code point
- *
- * Check whether the character is part of SmallFormVariants UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SmallFormVariants UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_small_form_variants(code: i32) -> i32 {
     (0xFE50..=0xFE6F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSpacingModifierLetters:
- * @code: UCS code point
- *
- * Check whether the character is part of SpacingModifierLetters UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SpacingModifierLetters UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_spacing_modifier_letters(code: i32) -> i32 {
     (0x02B0..=0x02FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSpecials:
- * @code: UCS code point
- *
- * Check whether the character is part of Specials UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Specials UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_specials(code: i32) -> i32 {
     (0xFFF0..=0xFFFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSuperscriptsandSubscripts:
- * @code: UCS code point
- *
- * Check whether the character is part of SuperscriptsandSubscripts UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SuperscriptsandSubscripts UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_superscriptsand_subscripts(code: i32) -> i32 {
     (0x2070..=0x209F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSupplementalArrowsA:
- * @code: UCS code point
- *
- * Check whether the character is part of SupplementalArrows-A UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SupplementalArrows-A UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_a(code: i32) -> i32 {
     (0x27F0..=0x27FF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSupplementalArrowsB:
- * @code: UCS code point
- *
- * Check whether the character is part of SupplementalArrows-B UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SupplementalArrows-B UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_b(code: i32) -> i32 {
     (0x2900..=0x297F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSupplementalMathematicalOperators:
- * @code: UCS code point
- *
- * Check whether the character is part of SupplementalMathematicalOperators UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SupplementalMathematicalOperators UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_supplemental_mathematical_operators(code: i32) -> i32 {
     (0x2A00..=0x2AFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSupplementaryPrivateUseAreaA:
- * @code: UCS code point
- *
- * Check whether the character is part of SupplementaryPrivateUseArea-A UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SupplementaryPrivateUseArea-A UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_a(code: i32) -> i32 {
     (0xF0000..=0xFFFFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSupplementaryPrivateUseAreaB:
- * @code: UCS code point
- *
- * Check whether the character is part of SupplementaryPrivateUseArea-B UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of SupplementaryPrivateUseArea-B UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_b(code: i32) -> i32 {
     (0x100000..=0x10FFFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isSyriac:
- * @code: UCS code point
- *
- * Check whether the character is part of Syriac UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Syriac UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_syriac(code: i32) -> i32 {
     (0x0700..=0x074F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTagalog:
- * @code: UCS code point
- *
- * Check whether the character is part of Tagalog UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Tagalog UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tagalog(code: i32) -> i32 {
     (0x1700..=0x171F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTagbanwa:
- * @code: UCS code point
- *
- * Check whether the character is part of Tagbanwa UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Tagbanwa UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tagbanwa(code: i32) -> i32 {
     (0x1760..=0x177F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTags:
- * @code: UCS code point
- *
- * Check whether the character is part of Tags UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Tags UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tags(code: i32) -> i32 {
     (0xE0000..=0xE007F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTaiLe:
- * @code: UCS code point
- *
- * Check whether the character is part of TaiLe UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of TaiLe UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tai_le(code: i32) -> i32 {
     (0x1950..=0x197F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTaiXuanJingSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of TaiXuanJingSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of TaiXuanJingSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tai_xuan_jing_symbols(code: i32) -> i32 {
     (0x1D300..=0x1D35F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTamil:
- * @code: UCS code point
- *
- * Check whether the character is part of Tamil UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Tamil UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tamil(code: i32) -> i32 {
     (0x0B80..=0x0BFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTelugu:
- * @code: UCS code point
- *
- * Check whether the character is part of Telugu UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Telugu UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_telugu(code: i32) -> i32 {
     (0x0C00..=0x0C7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isThaana:
- * @code: UCS code point
- *
- * Check whether the character is part of Thaana UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Thaana UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_thaana(code: i32) -> i32 {
     (0x0780..=0x07BF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isThai:
- * @code: UCS code point
- *
- * Check whether the character is part of Thai UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Thai UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_thai(code: i32) -> i32 {
     (0x0E00..=0x0E7F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isTibetan:
- * @code: UCS code point
- *
- * Check whether the character is part of Tibetan UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Tibetan UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_tibetan(code: i32) -> i32 {
     (0x0F00..=0x0FFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isUgaritic:
- * @code: UCS code point
- *
- * Check whether the character is part of Ugaritic UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Ugaritic UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_ugaritic(code: i32) -> i32 {
     (0x10380..=0x1039F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isUnifiedCanadianAboriginalSyllabics:
- * @code: UCS code point
- *
- * Check whether the character is part of UnifiedCanadianAboriginalSyllabics UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of UnifiedCanadianAboriginalSyllabics UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: i32) -> i32 {
     (0x1400..=0x167F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isVariationSelectors:
- * @code: UCS code point
- *
- * Check whether the character is part of VariationSelectors UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of VariationSelectors UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_variation_selectors(code: i32) -> i32 {
     (0xFE00..=0xFE0F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isVariationSelectorsSupplement:
- * @code: UCS code point
- *
- * Check whether the character is part of VariationSelectorsSupplement UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of VariationSelectorsSupplement UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_variation_selectors_supplement(code: i32) -> i32 {
     (0xE0100..=0xE01EF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isYiRadicals:
- * @code: UCS code point
- *
- * Check whether the character is part of YiRadicals UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of YiRadicals UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_yi_radicals(code: i32) -> i32 {
     (0xA490..=0xA4CF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isYiSyllables:
- * @code: UCS code point
- *
- * Check whether the character is part of YiSyllables UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of YiSyllables UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_yi_syllables(code: i32) -> i32 {
     (0xA000..=0xA48F).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isYijingHexagramSymbols:
- * @code: UCS code point
- *
- * Check whether the character is part of YijingHexagramSymbols UCS Block
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of YijingHexagramSymbols UCS Block
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_yijing_hexagram_symbols(code: i32) -> i32 {
     (0x4DC0..=0x4DFF).contains(&code) as i32
 }
 
-/**
- * xml_ucs_isBlock:
- * @code: UCS code point
- * @block: UCS block name
- *
- * Check whether the character is part of the UCS Block
- *
- * Returns 1 if true, 0 if false and -1 on unknown block
- */
+/// Check whether the character is part of the UCS Block
+///
+/// Returns 1 if true, 0 if false and -1 on unknown block
 pub unsafe extern "C" fn xml_ucs_is_block(code: i32, block: *const c_char) -> i32 {
     if let Some(func) = xml_unicode_lookup(&XML_UNICODE_BLOCK_TBL, block) {
         func(code)
@@ -9872,50 +9226,30 @@ pub unsafe extern "C" fn xml_ucs_is_block(code: i32, block: *const c_char) -> i3
     }
 }
 
-/**
- * xml_ucs_isCatC:
- * @code: UCS code point
- *
- * Check whether the character is part of C UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of C UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_c(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_CG) as i32
 }
 
-/**
- * xml_ucs_isCatCc:
- * @code: UCS code point
- *
- * Check whether the character is part of Cc UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Cc UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_cc(code: i32) -> i32 {
     ((0x0..=0x1f).contains(&code) || (0x7f..=0x9f).contains(&code)) as i32
 }
 
-/**
- * xml_ucs_isCatCf:
- * @code: UCS code point
- *
- * Check whether the character is part of Cf UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Cf UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_cf(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_CF_G) as i32
 }
 
-/**
- * xml_ucs_isCatCo:
- * @code: UCS code point
- *
- * Check whether the character is part of Co UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Co UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_co(code: i32) -> i32 {
     ((code == 0xe000)
         || (code == 0xf8ff)
@@ -9925,14 +9259,9 @@ pub unsafe extern "C" fn xml_ucs_is_cat_co(code: i32) -> i32 {
         || (code == 0x10fffd)) as i32
 }
 
-/**
- * xml_ucs_isCatCs:
- * @code: UCS code point
- *
- * Check whether the character is part of Cs UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Cs UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: i32) -> i32 {
     ((code == 0xd800)
         || (0xdb7f..=0xdb80).contains(&code)
@@ -9940,110 +9269,65 @@ pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: i32) -> i32 {
         || (code == 0xdfff)) as i32
 }
 
-/**
- * xml_ucs_isCatL:
- * @code: UCS code point
- *
- * Check whether the character is part of L UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of L UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_l(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_LG) as i32
 }
 
-/**
- * xml_ucs_isCatLl:
- * @code: UCS code point
- *
- * Check whether the character is part of Ll UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Ll UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_LL_G) as i32
 }
 
-/**
- * xml_ucs_isCatLm:
- * @code: UCS code point
- *
- * Check whether the character is part of Lm UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Lm UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_LM_G) as i32
 }
 
-/**
- * xml_ucs_isCatLo:
- * @code: UCS code point
- *
- * Check whether the character is part of Lo UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Lo UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_LO_G) as i32
 }
 
-/**
- * xml_ucs_isCatLt:
- * @code: UCS code point
- *
- * Check whether the character is part of Lt UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Lt UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_LT_G) as i32
 }
 
-/**
- * xml_ucs_isCatLu:
- * @code: UCS code point
- *
- * Check whether the character is part of Lu UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Lu UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_LU_G) as i32
 }
 
-/**
- * xml_ucs_isCatM:
- * @code: UCS code point
- *
- * Check whether the character is part of M UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of M UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_m(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_MG) as i32
 }
 
-/**
- * xml_ucs_isCatMc:
- * @code: UCS code point
- *
- * Check whether the character is part of Mc UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Mc UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_MC_G) as i32
 }
 
-/**
- * xml_ucs_isCatMe:
- * @code: UCS code point
- *
- * Check whether the character is part of Me UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Me UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_me(code: i32) -> i32 {
     ((0x488..=0x489).contains(&code)
         || (code == 0x6de)
@@ -10051,50 +9335,30 @@ pub unsafe extern "C" fn xml_ucs_is_cat_me(code: i32) -> i32 {
         || (0x20e2..=0x20e4).contains(&code)) as i32
 }
 
-/**
- * xml_ucs_isCatMn:
- * @code: UCS code point
- *
- * Check whether the character is part of Mn UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Mn UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_MN_G) as i32
 }
 
-/**
- * xml_ucs_isCatN:
- * @code: UCS code point
- *
- * Check whether the character is part of N UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of N UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_n(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_NG) as i32
 }
 
-/**
- * xml_ucs_isCatNd:
- * @code: UCS code point
- *
- * Check whether the character is part of Nd UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Nd UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_ND_G) as i32
 }
 
-/**
- * xml_ucs_isCatNl:
- * @code: UCS code point
- *
- * Check whether the character is part of Nl UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Nl UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: i32) -> i32 {
     ((0x16ee..=0x16f0).contains(&code)
         || (0x2160..=0x2183).contains(&code)
@@ -10104,38 +9368,23 @@ pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: i32) -> i32 {
         || (code == 0x1034a)) as i32
 }
 
-/**
- * xml_ucs_isCatNo:
- * @code: UCS code point
- *
- * Check whether the character is part of No UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of No UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_no(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_NO_G) as i32
 }
 
-/**
- * xml_ucs_isCatP:
- * @code: UCS code point
- *
- * Check whether the character is part of P UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of P UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_p(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_PG) as i32
 }
 
-/**
- * xml_ucs_isCatPc:
- * @code: UCS code point
- *
- * Check whether the character is part of Pc UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Pc UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: i32) -> i32 {
     ((code == 0x5f)
         || (0x203f..=0x2040).contains(&code)
@@ -10147,50 +9396,30 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: i32) -> i32 {
         || (code == 0xff65)) as i32
 }
 
-/**
- * xml_ucs_isCatPd:
- * @code: UCS code point
- *
- * Check whether the character is part of Pd UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Pd UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_PD_G) as i32
 }
 
-/**
- * xml_ucs_isCatPe:
- * @code: UCS code point
- *
- * Check whether the character is part of Pe UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Pe UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_PE_G) as i32
 }
 
-/**
- * xml_ucs_isCatPf:
- * @code: UCS code point
- *
- * Check whether the character is part of Pf UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Pf UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_pf(code: i32) -> i32 {
     ((code == 0xbb) || (code == 0x2019) || (code == 0x201d) || (code == 0x203a)) as i32
 }
 
-/**
- * xml_ucs_isCatPi:
- * @code: UCS code point
- *
- * Check whether the character is part of Pi UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Pi UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: i32) -> i32 {
     ((code == 0xab)
         || (code == 0x2018)
@@ -10199,134 +9428,79 @@ pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: i32) -> i32 {
         || (code == 0x2039)) as i32
 }
 
-/**
- * xml_ucs_isCatPo:
- * @code: UCS code point
- *
- * Check whether the character is part of Po UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Po UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_po(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_PO_G) as i32
 }
 
-/**
- * xml_ucs_isCatPs:
- * @code: UCS code point
- *
- * Check whether the character is part of Ps UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Ps UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_PS_G) as i32
 }
 
-/**
- * xml_ucs_isCatS:
- * @code: UCS code point
- *
- * Check whether the character is part of S UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of S UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_s(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_SG) as i32
 }
 
-/**
- * xml_ucs_isCatSc:
- * @code: UCS code point
- *
- * Check whether the character is part of Sc UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Sc UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_SC_G) as i32
 }
 
-/**
- * xml_ucs_isCatSk:
- * @code: UCS code point
- *
- * Check whether the character is part of Sk UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Sk UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_SK_G) as i32
 }
 
-/**
- * xml_ucs_isCatSm:
- * @code: UCS code point
- *
- * Check whether the character is part of Sm UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Sm UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_SM_G) as i32
 }
 
-/**
- * xml_ucs_isCatSo:
- * @code: UCS code point
- *
- * Check whether the character is part of So UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of So UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_so(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_SO_G) as i32
 }
 
-/**
- * xml_ucs_isCatZ:
- * @code: UCS code point
- *
- * Check whether the character is part of Z UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Z UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_z(code: i32) -> i32 {
     xml_char_in_range(code as u32, &XML_ZG) as i32
 }
 
-/**
- * xml_ucs_isCatZl:
- * @code: UCS code point
- *
- * Check whether the character is part of Zl UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Zl UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_zl(code: i32) -> i32 {
     (code == 0x2028) as i32
 }
 
-/**
- * xml_ucs_isCatZp:
- * @code: UCS code point
- *
- * Check whether the character is part of Zp UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Zp UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_zp(code: i32) -> i32 {
     (code == 0x2029) as i32
 }
 
-/**
- * xml_ucs_isCatZs:
- * @code: UCS code point
- *
- * Check whether the character is part of Zs UCS Category
- *
- * Returns 1 if true 0 otherwise
- */
+/// Check whether the character is part of Zs UCS Category
+///
+/// Returns 1 if true 0 otherwise
 pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: i32) -> i32 {
     ((code == 0x20)
         || (code == 0xa0)
@@ -10338,15 +9512,9 @@ pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: i32) -> i32 {
         || (code == 0x3000)) as i32
 }
 
-/**
- * xml_ucs_isCat:
- * @code: UCS code point
- * @cat: UCS Category name
- *
- * Check whether the character is part of the UCS Category
- *
- * Returns 1 if true, 0 if false and -1 on unknown category
- */
+/// Check whether the character is part of the UCS Category
+///
+/// Returns 1 if true, 0 if false and -1 on unknown category
 pub unsafe extern "C" fn xml_ucs_is_cat(code: i32, cat: *const c_char) -> i32 {
     if let Some(func) = xml_unicode_lookup(&XML_UNICODE_CAT_TBL, cat) {
         func(code)
@@ -10355,15 +9523,10 @@ pub unsafe extern "C" fn xml_ucs_is_cat(code: i32, cat: *const c_char) -> i32 {
     }
 }
 
-/**
- * xmlUnicodeLookup:
- * @tptr: pointer to the name table
- * @name: name to be found
- *
- * binary table lookup for user-supplied name
- *
- * Returns pointer to range function if found, otherwise NULL
- */
+/// Binary table lookup for user-supplied name
+///
+/// Returns pointer to range function if found, otherwise NULL
+#[doc(alias = "xmlUnicodeLookup")]
 unsafe extern "C" fn xml_unicode_lookup(
     tptr: *const XmlUnicodeNameTable,
     tname: *const c_char,

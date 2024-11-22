@@ -3,15 +3,6 @@
 //!
 //! Please refer to original libxml2 documents also.
 
-/**
- * Summary: library of generic URI related routines
- * Description: library of generic URI related routines
- *              Implements RFC 2396
- *
- * Copy: See Copyright for the status of this software.
- *
- * Author: Daniel Veillard
- */
 use std::{
     ffi::c_char,
     mem::{size_of, size_of_val, zeroed},
@@ -30,17 +21,15 @@ use super::{
     },
 };
 
-/**
- * xmlURI:
- *
- * A parsed URI reference. This is a struct containing the various fields
- * as described in RFC 2396 but separated for further processing.
- *
- * Note: query is a deprecated field which is incorrectly unescaped.
- * query_raw takes precedence over query if the former is set.
- * See: http://mail.gnome.org/archives/xml/2007-April/thread.html#00127
- */
 pub type XmlURIPtr = *mut XmlURI;
+/// A parsed URI reference. This is a struct containing the various fields
+/// as described in RFC 2396 but separated for further processing.
+///
+/// # Note
+/// Query is a deprecated field which is incorrectly unescaped.
+/// query_raw takes precedence over query if the former is set.
+/// See: http://mail.gnome.org/archives/xml/2007-April/thread.html#00127
+#[doc(alias = "xmlURI")]
 #[repr(C)]
 pub struct XmlURI {
     pub(crate) scheme: *mut c_char,    /* the URI scheme */
@@ -102,18 +91,10 @@ unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
     }
 }
 
-/*
- * This function is in tree.h:
- * XmlChar *	xmlNodeGetBase	(xmlDocPtr doc,
- *                               xmlNodePtr cur);
- */
-/**
- * xmlCreateURI:
- *
- * Simply creates an empty xmlURI
- *
- * Returns the new structure or NULL in case of error
- */
+/// Simply creates an empty xmlURI
+///
+/// Returns the new structure or NULL in case of error
+#[doc(alias = "xmlCreateURI")]
 pub unsafe extern "C" fn xml_create_uri() -> XmlURIPtr {
     let ret: XmlURIPtr = xml_malloc(size_of::<XmlURI>()) as XmlURIPtr;
     if ret.is_null() {
@@ -125,21 +106,15 @@ pub unsafe extern "C" fn xml_create_uri() -> XmlURIPtr {
     ret
 }
 
-/**
- * xmlBuildURI:
- * @URI:  the URI instance found in the document
- * @base:  the base value
- *
- * Computes he final URI of the reference done by checking that
- * the given URI is valid, and building the final URI using the
- * base URI. This is processed according to section 5.2 of the
- * RFC 2396
- *
- * 5.2. Resolving Relative References to Absolute Form
- *
- * Returns a new URI string (to be freed by the caller) or NULL in case
- *         of error.
- */
+/// Computes he final URI of the reference done by checking that
+/// the given URI is valid, and building the final URI using the
+/// base URI. This is processed according to section 5.2 of the
+/// RFC 2396
+///
+/// 5.2. Resolving Relative References to Absolute Form
+///
+/// Returns a new URI string (to be freed by the caller) or NULL in case of error.
+#[doc(alias = "xmlBuildURI")]
 pub unsafe extern "C" fn xml_build_uri(uri: *const XmlChar, base: *const XmlChar) -> *mut XmlChar {
     let mut val: *mut XmlChar = null_mut();
     let mut ret: i32;
@@ -434,39 +409,35 @@ pub unsafe extern "C" fn xml_build_uri(uri: *const XmlChar, base: *const XmlChar
     val
 }
 
-/*
- * xmlBuildRelativeURI:
- * @URI:  the URI reference under consideration
- * @base:  the base value
- *
- * Expresses the URI of the reference in terms relative to the
- * base.  Some examples of this operation include:
- *    base = "http://site1.com/docs/book1.html"
- *    URI input                        URI returned
- *    docs/pic1.gif                    pic1.gif
- *    docs/img/pic1.gif                img/pic1.gif
- *    img/pic1.gif                     ../img/pic1.gif
- *    http://site1.com/docs/pic1.gif   pic1.gif
- *    http://site2.com/docs/pic1.gif   http://site2.com/docs/pic1.gif
- *
- *    base = "docs/book1.html"
- *
- *    URI input                        URI returned
- *    docs/pic1.gif                    pic1.gif
- *    docs/img/pic1.gif                img/pic1.gif
- *    img/pic1.gif                     ../img/pic1.gif
- *    http://site1.com/docs/pic1.gif   http://site1.com/docs/pic1.gif
- *
- *
- * Note: if the URI reference is really weird or complicated, it may be
- *      worthwhile to first convert it into a "nice" one by calling
- *      xmlBuildURI (using 'base') before calling this routine,
- *      since this routine (for reasonable efficiency) assumes URI has
- *      already been through some validation.
- *
- * Returns a new URI string (to be freed by the caller) or NULL in case
- * error.
- */
+/// Expresses the URI of the reference in terms relative to the base.  
+/// Some examples of this operation include:
+/// ```ignore
+///    base = "http://site1.com/docs/book1.html"
+///    URI input                        URI returned
+///    docs/pic1.gif                    pic1.gif
+///    docs/img/pic1.gif                img/pic1.gif
+///    img/pic1.gif                     ../img/pic1.gif
+///    http://site1.com/docs/pic1.gif   pic1.gif
+///    http://site2.com/docs/pic1.gif   http://site2.com/docs/pic1.gif
+///
+///    base = "docs/book1.html"
+///
+///    URI input                        URI returned
+///    docs/pic1.gif                    pic1.gif
+///    docs/img/pic1.gif                img/pic1.gif
+///    img/pic1.gif                     ../img/pic1.gif
+///    http://site1.com/docs/pic1.gif   http://site1.com/docs/pic1.gif
+/// ```
+///
+/// # Note
+/// if the URI reference is really weird or complicated, it may be
+/// worthwhile to first convert it into a "nice" one by calling
+/// xmlBuildURI (using 'base') before calling this routine,
+/// since this routine (for reasonable efficiency) assumes URI has
+/// already been through some validation.
+///
+/// Returns a new URI string (to be freed by the caller) or NULL in case error.
+#[doc(alias = "xmlBuildRelativeURI")]
 pub unsafe extern "C" fn xml_build_relative_uri(
     uri: *const XmlChar,
     base: *const XmlChar,
@@ -693,12 +664,8 @@ pub unsafe extern "C" fn xml_build_relative_uri(
     val
 }
 
-/**
- * xmlCleanURI:
- * @uri:  pointer to an xmlURI
- *
- * Make sure the xmlURI struct is free of content
- */
+/// Make sure the xmlURI struct is free of content
+#[doc(alias = "xmlCleanURI")]
 unsafe extern "C" fn xml_clean_uri(uri: XmlURIPtr) {
     if uri.is_null() {
         return;
@@ -760,17 +727,12 @@ macro_rules! STRNDUP {
     };
 }
 
-/**
- * xmlParse3986Scheme:
- * @uri:  pointer to an URI structure
- * @str:  pointer to the string to analyze
- *
- * Parse an URI scheme
- *
- * ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
- *
- * Returns 0 or the error code
- */
+/// Parse an URI scheme
+///
+/// ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Scheme")]
 unsafe extern "C" fn xml_parse3986_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
@@ -872,18 +834,13 @@ macro_rules! NEXT {
     };
 }
 
-/**
- * xmlParse3986Userinfo:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an user information part and fills in the appropriate fields
- * of the @uri structure
- *
- * userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
- *
- * Returns 0 or the error code
- */
+/// Parse an user information part and fills in the appropriate fields
+/// of the @uri structure
+///
+/// userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Userinfo")]
 unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
@@ -909,20 +866,18 @@ unsafe extern "C" fn xml_parse3986_userinfo(uri: XmlURIPtr, str: *mut *const c_c
     1
 }
 
-/**
- * xmlParse3986DecOctet:
- * @str:  the string to analyze
- *
- *    dec-octet     = DIGIT                 ; 0-9
- *                  / %x31-39 DIGIT         ; 10-99
- *                  / "1" 2DIGIT            ; 100-199
- *                  / "2" %x30-34 DIGIT     ; 200-249
- *                  / "25" %x30-35          ; 250-255
- *
- * Skip a dec-octet.
- *
- * Returns 0 if found and skipped, 1 otherwise
- */
+///```ignore
+/// dec-octet     = DIGIT                 ; 0-9
+///              / %x31-39 DIGIT         ; 10-99
+///              / "1" 2DIGIT            ; 100-199
+///              / "2" %x30-34 DIGIT     ; 200-249
+///              / "25" %x30-35          ; 250-255
+/// ```
+///
+/// Skip a dec-octet.
+///
+/// Returns 0 if found and skipped, 1 otherwise
+#[doc(alias = "xmlParse3986DecOctet")]
 unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char = *str;
 
@@ -951,21 +906,18 @@ unsafe extern "C" fn xml_parse3986_dec_octet(str: *mut *const c_char) -> i32 {
     0
 }
 
-/**
- * xmlParse3986Host:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an host part and fills in the appropriate fields
- * of the @uri structure
- *
- * host          = IP-literal / IPv4address / reg-name
- * IP-literal    = "[" ( IPv6address / IPvFuture  ) "]"
- * IPv4address   = dec-octet "." dec-octet "." dec-octet "." dec-octet
- * reg-name      = *( unreserved / pct-encoded / sub-delims )
- *
- * Returns 0 or the error code
- */
+/// Parse an host part and fills in the appropriate fields
+/// of the @uri structure
+///
+/// ```ignore
+/// host          = IP-literal / IPv4address / reg-name
+/// IP-literal    = "[" ( IPv6address / IPvFuture  ) "]"
+/// IPv4address   = dec-octet "." dec-octet "." dec-octet "." dec-octet
+/// reg-name      = *( unreserved / pct-encoded / sub-delims )
+/// ```
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Host")]
 unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char = *str;
 
@@ -1048,18 +1000,12 @@ unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char)
     0
 }
 
-/**
- * xmlParse3986Port:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse a port part and fills in the appropriate fields
- * of the @uri structure
- *
- * port          = *DIGIT
- *
- * Returns 0 or the error code
- */
+/// Parse a port part and fills in the appropriate fields of the @uri structure
+///
+/// `port          = *DIGIT`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Port")]
 unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char = *str;
     let mut port: i32 = 0;
@@ -1088,18 +1034,13 @@ unsafe extern "C" fn xml_parse3986_port(uri: XmlURIPtr, str: *mut *const c_char)
     1
 }
 
-/**
- * xmlParse3986Authority:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an authority part and fills in the appropriate fields
- * of the @uri structure
- *
- * authority     = [ userinfo "@" ] host [ ":" port ]
- *
- * Returns 0 or the error code
- */
+/// Parse an authority part and fills in the appropriate fields
+/// of the @uri structure
+///
+/// `authority     = [ userinfo "@" ] host [ ":" port ]`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Authority")]
 unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
     let mut ret: i32;
@@ -1129,22 +1070,18 @@ unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_
     0
 }
 
-/**
- * xmlParse3986Segment:
- * @str:  the string to analyze
- * @forbid: an optional forbidden character
- * @empty: allow an empty segment
- *
- * Parse a segment and fills in the appropriate fields
- * of the @uri structure
- *
- * segment       = *pchar
- * segment-nz    = 1*pchar
- * segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
- *               ; non-zero-length segment without any colon ":"
- *
- * Returns 0 or the error code
- */
+/// Parse a segment and fills in the appropriate fields
+/// of the @uri structure
+///
+/// ```ignore
+/// segment       = *pchar
+/// segment-nz    = 1*pchar
+/// segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
+///               ; non-zero-length segment without any colon ":"
+/// ```
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Segment")]
 unsafe extern "C" fn xml_parse3986_segment(
     str: *mut *const c_char,
     forbid: c_char,
@@ -1166,18 +1103,12 @@ unsafe extern "C" fn xml_parse3986_segment(
     0
 }
 
-/**
- * xmlParse3986PathAbEmpty:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an path absolute or empty and fills in the appropriate fields
- * of the @uri structure
- *
- * path-abempty  = *( "/" segment )
- *
- * Returns 0 or the error code
- */
+/// Parse an path absolute or empty and fills in the appropriate fields of the @uri structure
+///
+/// `path-abempty  = *( "/" segment )`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986PathAbEmpty")]
 unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
     let mut ret: i32;
@@ -1209,18 +1140,12 @@ unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *cons
     0
 }
 
-/**
- * xmlParse3986PathAbsolute:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an path absolute and fills in the appropriate fields
- * of the @uri structure
- *
- * path-absolute = "/" [ segment-nz *( "/" segment ) ]
- *
- * Returns 0 or the error code
- */
+/// Parse an path absolute and fills in the appropriate fields of the @uri structure
+///
+/// `path-absolute = "/" [ segment-nz *( "/" segment ) ]`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986PathAbsolute")]
 unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
     let mut ret: i32;
@@ -1259,18 +1184,13 @@ unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *cons
     0
 }
 
-/**
- * xmlParse3986PathRootless:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an path without root and fills in the appropriate fields
- * of the @uri structure
- *
- * path-rootless = segment-nz *( "/" segment )
- *
- * Returns 0 or the error code
- */
+/// Parse an path without root and fills in the appropriate fields
+/// of the @uri structure
+///
+/// `path-rootless = segment-nz *( "/" segment )`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986PathRootless")]
 unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
     let mut ret: i32;
@@ -1306,21 +1226,18 @@ unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *cons
     0
 }
 
-/**
- * xmlParse3986HierPart:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an hierarchical part and fills in the appropriate fields
- * of the @uri structure
- *
- * hier-part     = "//" authority path-abempty
- *                / path-absolute
- *                / path-rootless
- *                / path-empty
- *
- * Returns 0 or the error code
- */
+/// Parse an hierarchical part and fills in the appropriate fields
+/// of the @uri structure
+///
+/// ```ignore
+/// hier-part     = "//" authority path-abempty
+///                / path-absolute
+///                / path-rootless
+///                / path-empty
+/// ```
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986HierPart")]
 unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
     let mut ret: i32;
@@ -1371,7 +1288,6 @@ unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_
 /*
  * unwise = "{" | "}" | "|" | "\" | "^" | "`"
  */
-
 macro_rules! IS_UNWISE {
     ($p:expr) => {
         *$p == b'{' as i8
@@ -1385,17 +1301,12 @@ macro_rules! IS_UNWISE {
     };
 }
 
-/**
- * xmlParse3986Query:
- * @uri:  pointer to an URI structure
- * @str:  pointer to the string to analyze
- *
- * Parse the query part of an URI
- *
- * query = *uric
- *
- * Returns 0 or the error code
- */
+/// Parse the query part of an URI
+///
+/// `query = *uric`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Query")]
 unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
@@ -1434,21 +1345,18 @@ unsafe extern "C" fn xml_parse3986_query(uri: XmlURIPtr, str: *mut *const c_char
     0
 }
 
-/**
- * xmlParse3986Fragment:
- * @uri:  pointer to an URI structure
- * @str:  pointer to the string to analyze
- *
- * Parse the query part of an URI
- *
- * fragment      = *( pchar / "/" / "?" )
- * NOTE: the strict syntax as defined by 3986 does not allow '[' and ']'
- *       in the fragment identifier but this is used very broadly for
- *       xpointer scheme selection, so we are allowing it here to not break
- *       for example all the DocBook processing chains.
- *
- * Returns 0 or the error code
- */
+/// Parse the query part of an URI
+///
+/// `fragment      = *( pchar / "/" / "?" )`
+///
+/// # Note
+/// The strict syntax as defined by 3986 does not allow '[' and ']'
+/// in the fragment identifier but this is used very broadly for
+/// xpointer scheme selection, so we are allowing it here to not break
+/// for example all the DocBook processing chains.
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986Fragment")]
 unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
 
@@ -1481,18 +1389,12 @@ unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_c
     0
 }
 
-/**
- * xmlParse3986URI:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an URI string and fills in the appropriate fields
- * of the @uri structure
- *
- * scheme ":" hier-part [ "?" query ] [ "#" fragment ]
- *
- * Returns 0 or the error code
- */
+/// Parse an URI string and fills in the appropriate fields of the @uri structure
+///
+/// `scheme ":" hier-part [ "?" query ] [ "#" fragment ]`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986URI")]
 unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
     let mut ret: i32;
 
@@ -1529,18 +1431,12 @@ unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -
     0
 }
 
-/**
- * xmlParse3986PathNoScheme:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an path which is not a scheme and fills in the appropriate fields
- * of the @uri structure
- *
- * path-noscheme = segment-nz-nc *( "/" segment )
- *
- * Returns 0 or the error code
- */
+/// Parse an path which is not a scheme and fills in the appropriate fields of the @uri structure
+///
+/// `path-noscheme = segment-nz-nc *( "/" segment )`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986PathNoScheme")]
 unsafe extern "C" fn xml_parse3986_path_no_scheme(uri: XmlURIPtr, str: *mut *const c_char) -> i32 {
     let mut cur: *const c_char;
     let mut ret: i32;
@@ -1576,22 +1472,19 @@ unsafe extern "C" fn xml_parse3986_path_no_scheme(uri: XmlURIPtr, str: *mut *con
     0
 }
 
-/**
- * xmlParse3986RelativeRef:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an URI string and fills in the appropriate fields
- * of the @uri structure
- *
- * relative-refe  = relative-part [ "?" query ] [ "#" fragment ]
- * relative-part = "//" authority path-abempty
- *               / path-absolute
- *               / path-noscheme
- *               / path-empty
- *
- * Returns 0 or the error code
- */
+/// Parse an URI string and fills in the appropriate fields
+/// of the @uri structure
+///
+/// ```ignore
+/// relative-refe  = relative-part [ "?" query ] [ "#" fragment ]
+/// relative-part = "//" authority path-abempty
+///               / path-absolute
+///               / path-noscheme
+///               / path-empty
+/// ```
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986RelativeRef")]
 unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
     let mut ret: i32;
 
@@ -1646,18 +1539,12 @@ unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const 
     0
 }
 
-/**
- * xmlParse3986URIReference:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an URI reference string and fills in the appropriate fields
- * of the @uri structure
- *
- * URI-reference = URI / relative-refe
- *
- * Returns 0 or the error code
- */
+/// Parse an URI reference string and fills in the appropriate fields of the @uri structure
+///
+/// `URI-reference = URI / relative-refe`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParse3986URIReference")]
 unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_char) -> i32 {
     let mut ret: i32;
 
@@ -1682,16 +1569,12 @@ unsafe extern "C" fn xml_parse3986_uri_reference(uri: XmlURIPtr, str: *const c_c
     0
 }
 
-/**
- * xmlParseURI:
- * @str:  the URI string to analyze
- *
- * Parse an URI based on RFC 3986
- *
- * URI-reference = [ absoluteURI | relativeURI ] [ "#" fragment ]
- *
- * Returns a newly built xmlURIPtr or NULL in case of error
- */
+/// Parse an URI based on RFC 3986
+///
+/// `URI-reference = [ absoluteURI | relativeURI ] [ "#" fragment ]`
+///
+/// Returns a newly built xmlURIPtr or NULL in case of error
+#[doc(alias = "xmlParseURI")]
 pub unsafe extern "C" fn xml_parse_uri(str: *const c_char) -> XmlURIPtr {
     let ret: i32;
 
@@ -1709,17 +1592,12 @@ pub unsafe extern "C" fn xml_parse_uri(str: *const c_char) -> XmlURIPtr {
     uri
 }
 
-/**
- * xmlParseURIRaw:
- * @str:  the URI string to analyze
- * @raw:  if 1 unescaping of URI pieces are disabled
- *
- * Parse an URI but allows to keep intact the original fragments.
- *
- * URI-reference = URI / relative-refe
- *
- * Returns a newly built xmlURIPtr or NULL in case of error
- */
+/// Parse an URI but allows to keep intact the original fragments.
+///
+/// `URI-reference = URI / relative-refe`
+///
+/// Returns a newly built xmlURIPtr or NULL in case of error
+#[doc(alias = "xmlParseURIRaw")]
 pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: i32) -> XmlURIPtr {
     let ret: i32;
 
@@ -1740,18 +1618,13 @@ pub unsafe extern "C" fn xml_parse_uri_raw(str: *const c_char, raw: i32) -> XmlU
     uri
 }
 
-/**
- * xmlParseURIReference:
- * @uri:  pointer to an URI structure
- * @str:  the string to analyze
- *
- * Parse an URI reference string based on RFC 3986 and fills in the
- * appropriate fields of the @uri structure
- *
- * URI-reference = URI / relative-refe
- *
- * Returns 0 or the error code
- */
+/// Parse an URI reference string based on RFC 3986 and fills in the
+/// appropriate fields of the @uri structure
+///
+/// `URI-reference = URI / relative-refe`
+///
+/// Returns 0 or the error code
+#[doc(alias = "xmlParseURIReference")]
 pub unsafe extern "C" fn xml_parse_uri_reference(uri: XmlURIPtr, str: *const c_char) -> i32 {
     xml_parse3986_uri_reference(uri, str)
 }
@@ -1844,26 +1717,19 @@ macro_rules! IS_UNRESERVED {
     };
 }
 
-/**
- * MAX_URI_LENGTH:
- *
- * The definition of the URI regexp in the above RFC has no size limit
- * In practice they are usually relatively short except for the
- * data URI scheme as defined in RFC 2397. Even for data URI the usual
- * maximum size before hitting random practical limits is around 64 KB
- * and 4KB is usually a maximum admitted limit for proper operations.
- * The value below is more a security limit than anything else and
- * really should never be hit by 'normal' operations
- * Set to 1 MByte in 2012, this is only enforced on output
- */
+/// The definition of the URI regexp in the above RFC has no size limit
+/// In practice they are usually relatively short except for the
+/// data URI scheme as defined in RFC 2397. Even for data URI the usual
+/// maximum size before hitting random practical limits is around 64 KB
+/// and 4KB is usually a maximum admitted limit for proper operations.
+/// The value below is more a security limit than anything else and
+/// really should never be hit by 'normal' operations
+/// Set to 1 MByte in 2012, this is only enforced on output
 const MAX_URI_LENGTH: usize = 1024 * 1024;
 
-/**
- * xmlSaveUriRealloc:
- *
- * Function to handle properly a reallocation when saving an URI
- * Also imposes some limit on the length of an URI string output
- */
+/// Function to handle properly a reallocation when saving an URI
+/// Also imposes some limit on the length of an URI string output
+#[doc(alias = "xmlSaveUriRealloc")]
 unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut i32) -> *mut XmlChar {
     if *max > MAX_URI_LENGTH as i32 {
         xml_uri_err_memory(c"reaching arbitrary MAX_URI_LENGTH limit\n".as_ptr() as _);
@@ -1879,14 +1745,10 @@ unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut i32) -> *
     temp
 }
 
-/**
- * xmlSaveUri:
- * @uri:  pointer to an xmlURI
- *
- * Save the URI as an escaped string
- *
- * Returns a new string (to be deallocated by caller)
- */
+/// Save the URI as an escaped string
+///
+/// Returns a new string (to be deallocated by caller)
+#[doc(alias = "xmlSaveUri")]
 pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
     let mut temp: *mut XmlChar;
@@ -2282,13 +2144,8 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
     null_mut()
 }
 
-/**
- * xmlPrintURI:
- * @stream:  a FILE* for the output
- * @uri:  pointer to an xmlURI
- *
- * Prints the URI in the stream @stream.
- */
+/// Prints the URI in the stream @stream.
+#[doc(alias = "xmlPrintURI")]
 pub unsafe extern "C" fn xml_print_uri(stream: *mut FILE, uri: XmlURIPtr) {
     let out: *mut XmlChar = xml_save_uri(uri);
     if !out.is_null() {
@@ -2297,16 +2154,11 @@ pub unsafe extern "C" fn xml_print_uri(stream: *mut FILE, uri: XmlURIPtr) {
     }
 }
 
-/**
- * xmlURIEscapeStr:
- * @str:  string to escape
- * @list: exception list string of chars not to escape
- *
- * This routine escapes a string to hex, ignoring reserved characters
- * (a-z, A-Z, 0-9, "@-_.!~*'()") and the characters in the exception list.
- *
- * Returns a new escaped string or NULL in case of error.
- */
+/// This routine escapes a string to hex, ignoring reserved characters
+/// (a-z, A-Z, 0-9, "@-_.!~*'()") and the characters in the exception list.
+///
+/// Returns a new escaped string or NULL in case of error.
+#[doc(alias = "xmlURIEscapeStr")]
 pub unsafe extern "C" fn xml_uri_escape_str(
     str: *const XmlChar,
     list: *const XmlChar,
@@ -2391,20 +2243,13 @@ unsafe extern "C" fn is_hex(c: c_char) -> i32 {
     0
 }
 
-/**
- * xmlURIUnescapeString:
- * @str:  the string to unescape
- * @len:   the length in bytes to unescape (or <= 0 to indicate full string)
- * @target:  optional destination buffer
- *
- * Unescaping routine, but does not check that the string is an URI. The
- * output is a direct unsigned char translation of %XX values (no encoding)
- * Note that the length of the result can only be smaller or same size as
- * the input string.
- *
- * Returns a copy of the string, but unescaped, will return NULL only in case
- * of error
- */
+/// Unescaping routine, but does not check that the string is an URI. The
+/// output is a direct unsigned char translation of %XX values (no encoding)
+/// Note that the length of the result can only be smaller or same size as
+/// the input string.
+///
+/// Returns a copy of the string, but unescaped, will return NULL only in case of error
+#[doc(alias = "xmlURIUnescapeString")]
 pub unsafe extern "C" fn xml_uri_unescape_string(
     str: *const c_char,
     mut len: i32,
@@ -2474,17 +2319,13 @@ pub unsafe extern "C" fn xml_uri_unescape_string(
     ret
 }
 
-/**
- * xmlNormalizeURIPath:
- * @path:  pointer to the path string
- *
- * Applies the 5 normalization steps to a path string--that is, RFC 2396
- * Section 5.2, steps 6.c through 6.g.
- *
- * Normalization occurs directly on the string, no new allocation is done
- *
- * Returns 0 or an error code
- */
+/// Applies the 5 normalization steps to a path string--that is, RFC 2396
+/// Section 5.2, steps 6.c through 6.g.
+///
+/// Normalization occurs directly on the string, no new allocation is done
+///
+/// Returns 0 or an error code
+#[doc(alias = "xmlNormalizeURIPath")]
 pub unsafe extern "C" fn xml_normalize_uri_path(path: *mut c_char) -> i32 {
     let mut cur: *mut c_char;
     let mut out: *mut c_char;
@@ -2710,21 +2551,12 @@ macro_rules! NULLCHK {
     };
 }
 
-/**
- * xmlURIEscape:
- * @str:  the string of the URI to escape
- *
- * Escaping routine, does not do validity checks !
- * It will try to escape the chars needing this, but this is heuristic
- * based it's impossible to be sure.
- *
- * Returns an copy of the string, but escaped
- *
- * 25 May 2001
- * Uses xmlParseURI and xmlURIEscapeStr to try to escape correctly
- * according to RFC2396.
- *   - Carl Douglas
- */
+/// Escaping routine, does not do validity checks !
+/// It will try to escape the chars needing this, but this is heuristic
+/// based it's impossible to be sure.
+///
+/// Returns an copy of the string, but escaped
+#[doc(alias = "xmlURIEscape")]
 pub unsafe extern "C" fn xml_uri_escape(str: *const XmlChar) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
     let mut segment: *mut XmlChar;
@@ -2835,12 +2667,8 @@ pub unsafe extern "C" fn xml_uri_escape(str: *const XmlChar) -> *mut XmlChar {
     ret
 }
 
-/**
- * xmlFreeURI:
- * @uri:  pointer to an xmlURI
- *
- * Free up the xmlURI struct
- */
+/// Free up the xmlURI struct
+#[doc(alias = "xmlFreeURI")]
 pub unsafe extern "C" fn xml_free_uri(uri: XmlURIPtr) {
     if uri.is_null() {
         return;
@@ -2887,17 +2715,11 @@ macro_rules! IS_WINDOWS_PATH {
     };
 }
 
-/**
- * xmlCanonicPath:
- * @path:  the resource locator in a filesystem notation
- *
- * Constructs a canonic path from the specified path.
- *
- * Returns a new canonic path, or a duplicate of the path parameter if the
- * construction fails. The caller is responsible for freeing the memory occupied
- * by the returned string. If there is insufficient memory available, or the
- * argument is NULL, the function returns NULL.
- */
+/// Returns a new canonic path, or a duplicate of the path parameter if the
+/// construction fails. The caller is responsible for freeing the memory occupied
+/// by the returned string. If there is insufficient memory available, or the
+/// argument is NULL, the function returns NULL.
+#[doc(alias = "xmlCanonicPath")]
 pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlChar {
     /*
      * For Windows implementations, additional work needs to be done to
@@ -3042,17 +2864,13 @@ pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlC
     ret
 }
 
-/**
- * xmlPathToURI:
- * @path:  the resource locator in a filesystem notation
- *
- * Constructs an URI expressing the existing path
- *
- * Returns a new URI, or a duplicate of the path parameter if the
- * construction fails. The caller is responsible for freeing the memory
- * occupied by the returned string. If there is insufficient memory available,
- * or the argument is NULL, the function returns NULL.
- */
+/// Constructs an URI expressing the existing path
+///
+/// Returns a new URI, or a duplicate of the path parameter if the
+/// construction fails. The caller is responsible for freeing the memory
+/// occupied by the returned string. If there is insufficient memory available,
+/// or the argument is NULL, the function returns NULL.
+#[doc(alias = "xmlPathToURI")]
 pub unsafe extern "C" fn xml_path_to_uri(path: *const XmlChar) -> *mut XmlChar {
     let mut temp: XmlURI = unsafe { zeroed() };
 

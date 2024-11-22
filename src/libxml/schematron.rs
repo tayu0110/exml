@@ -52,25 +52,13 @@ pub enum XmlSchematronValidOptions {
     XmlSchematronOutIo = 1 << 10,    /* output to I/O mechanism */
 }
 
-/**
- * xmlSchematronValidityErrorFunc:
- * @ctx: the validation context
- * @msg: the message
- * @...: extra arguments
- *
- * Signature of an error callback from a Schematron validation
- */
+/// Signature of an error callback from a Schematron validation
+#[doc(alias = "xmlSchematronValidityErrorFunc")]
 pub type XmlSchematronValidityErrorFunc =
     unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/**
- * xmlSchematronValidityWarningFunc:
- * @ctx: the validation context
- * @msg: the message
- * @...: extra arguments
- *
- * Signature of a warning callback from a Schematron validation
- */
+/// Signature of a warning callback from a Schematron validation
+#[doc(alias = "xmlSchematronValidityWarningFunc")]
 pub type XmlSchematronValidityWarningFunc =
     unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
@@ -81,12 +69,9 @@ enum XmlSchematronTestType {
     XmlSchematronReport = 2,
 }
 
-/**
- * xmlSchematronLet:
- *
- * A Schematron let variable
- */
 pub type XmlSchematronLetPtr = *mut XmlSchematronLet;
+/// A Schematron let variable
+#[doc(alias = "xmlSchematronLet")]
 #[repr(C)]
 pub struct XmlSchematronLet {
     next: XmlSchematronLetPtr, /* the next let variable in the list */
@@ -94,12 +79,9 @@ pub struct XmlSchematronLet {
     comp: XmlXPathCompExprPtr, /* the compiled expression */
 }
 
-/**
- * xmlSchematronTest:
- *
- * A Schematrons test, either an assert or a report
- */
 pub type XmlSchematronTestPtr = *mut XmlSchematronTest;
+/// A Schematrons test, either an assert or a report
+#[doc(alias = "xmlSchematronTest")]
 #[repr(C)]
 pub struct XmlSchematronTest {
     next: XmlSchematronTestPtr, /* the next test in the list */
@@ -110,12 +92,9 @@ pub struct XmlSchematronTest {
     report: *mut XmlChar,       /* the message to report */
 }
 
-/**
- * xmlSchematronRule:
- *
- * A Schematrons rule
- */
 pub type XmlSchematronRulePtr = *mut XmlSchematronRule;
+/// A Schematrons rule
+#[doc(alias = "xmlSchematronRule")]
 #[repr(C)]
 pub struct XmlSchematronRule {
     next: XmlSchematronRulePtr,    /* the next rule in the list */
@@ -128,12 +107,9 @@ pub struct XmlSchematronRule {
     lets: XmlSchematronLetPtr,     /* the list of let variables */
 }
 
-/**
- * xmlSchematronPattern:
- *
- * A Schematrons pattern
- */
 pub type XmlSchematronPatternPtr = *mut XmlSchematronPattern;
+/// A Schematrons pattern
+#[doc(alias = "xmlSchematronPattern")]
 #[repr(C)]
 pub struct XmlSchematronPattern {
     next: XmlSchematronPatternPtr, /* the next pattern in the list */
@@ -141,16 +117,10 @@ pub struct XmlSchematronPattern {
     name: *mut XmlChar,            /* the name of the pattern */
 }
 
-/**
- * The schemas related types are kept internal
- */
 pub type XmlSchematronPtr = *mut XmlSchematron;
 
-/**
- * xmlSchematron:
- *
- * A Schematrons definition
- */
+/// A Schematrons definition
+#[doc(alias = "xmlSchematron")]
 #[repr(C)]
 pub struct XmlSchematron {
     name: *const XmlChar, /* schema name */
@@ -173,13 +143,9 @@ pub struct XmlSchematron {
     namespaces: *mut *const XmlChar,   /* the array of namespaces */
 }
 
-/**
- * xmlSchematronValidCtxt:
- *
- * A Schematrons validation context
- */
 pub type XmlSchematronValidCtxtPtr = *mut XmlSchematronValidCtxt;
-
+/// A Schematrons validation context
+#[doc(alias = "xmlSchematronValidCtxt")]
 #[repr(C)]
 pub struct XmlSchematronValidCtxt {
     typ: i32,
@@ -207,11 +173,8 @@ pub struct XmlSchematronValidCtxt {
     serror: Option<StructuredError>,        /* the structured function */
 }
 
-/**
- * A schemas validation context
- */
 pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
-
+/// A schemas validation context
 #[repr(C)]
 pub struct XmlSchematronParserCtxt {
     typ: i32,
@@ -254,13 +217,8 @@ const XML_SCHEMATRON_NS: &CStr = c"http://purl.oclc.org/dsdl/schematron";
 
 const XML_OLD_SCHEMATRON_NS: &CStr = SCT_OLD_NS;
 
-/**
- * xmlSchematronPErrMemory:
- * @node: a context node
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchematronPErrMemory")]
 unsafe extern "C" fn xml_schematron_perr_memory(
     ctxt: XmlSchematronParserCtxtPtr,
     extra: *const c_char,
@@ -278,18 +236,11 @@ unsafe extern "C" fn xml_schematron_perr_memory(
     );
 }
 
-/*
- * Interfaces for parsing.
- */
-/**
- * xmlSchematronNewParserCtxt:
- * @URL:  the location of the schema
- *
- * Create an XML Schematrons parse context for that file/resource expected
- * to contain an XML Schematrons file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schematrons parse context for that file/resource expected
+/// to contain an XML Schematrons file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchematronNewParserCtxt")]
 pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
     url: *const c_char,
 ) -> XmlSchematronParserCtxtPtr {
@@ -326,16 +277,11 @@ pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
     ret
 }
 
-/**
- * xmlSchematronNewMemParserCtxt:
- * @buffer:  a pointer to a c_char array containing the schemas
- * @size:  the size of the array
- *
- * Create an XML Schematrons parse context for that memory buffer expected
- * to contain an XML Schematrons file.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schematrons parse context for that memory buffer expected
+/// to contain an XML Schematrons file.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchematronNewMemParserCtxt")]
 pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: i32,
@@ -371,15 +317,11 @@ pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
     ret
 }
 
-/**
- * xmlSchematronNewDocParserCtxt:
- * @doc:  a preparsed document tree
- *
- * Create an XML Schematrons parse context for that document.
- * NB. The document may be modified during the parsing process.
- *
- * Returns the parser context or NULL in case of error
- */
+/// Create an XML Schematrons parse context for that document.
+/// NB. The document may be modified during the parsing process.
+///
+/// Returns the parser context or NULL in case of error
+#[doc(alias = "xmlSchematronNewDocParserCtxt")]
 pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
     doc: XmlDocPtr,
 ) -> XmlSchematronParserCtxtPtr {
@@ -416,12 +358,8 @@ pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
     ret
 }
 
-/**
- * xmlSchematronFreeParserCtxt:
- * @ctxt:  the schema parser context
- *
- * Free the resources associated to the schema parser context
- */
+/// Free the resources associated to the schema parser context
+#[doc(alias = "xmlSchematronFreeParserCtxt")]
 pub unsafe extern "C" fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -438,18 +376,6 @@ pub unsafe extern "C" fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronPars
     xml_dict_free((*ctxt).dict);
     xml_free(ctxt as _);
 }
-
-/*****
-pub unsafe extern "C" fn xmlSchematronSetParserErrors(ctxt: xmlSchematronParserCtxtPtr, xmlSchematronValidityErrorFunc err, xmlSchematronValidityWarningFunc warn,
-                     ctx: *mut c_void);
-pub unsafe extern "C" fn i32
-        xmlSchematronGetParserErrors(ctxt: xmlSchematronParserCtxtPtr,
-                    xmlSchematronValidityErrorFunc * err,
-                    xmlSchematronValidityWarningFunc * warn,
-                    c_void **ctx);
-pub unsafe extern "C" fn i32
-        xmlSchematronIsValid	(ctxt: xmlSchematronValidCtxtPtr);
- *****/
 
 macro_rules! IS_SCHEMATRON {
     ($node:expr, $elem:expr) => {
@@ -477,17 +403,8 @@ macro_rules! NEXT_SCHEMATRON {
     };
 }
 
-/**
- * xmlSchematronPErr:
- * @ctxt: the parsing context
- * @node: the context node
- * @error: the error code
- * @msg: the error message
- * @str1: extra data
- * @str2: extra data
- *
- * Handle a parser error
- */
+/// Handle a parser error
+#[doc(alias = "xmlSchematronPErr")]
 unsafe extern "C" fn xml_schematron_perr(
     ctxt: XmlSchematronParserCtxtPtr,
     node: XmlNodePtr,
@@ -534,14 +451,10 @@ unsafe extern "C" fn xml_schematron_perr(
     );
 }
 
-/**
- * xmlSchematronNewSchematron:
- * @ctxt:  a schema validation context
- *
- * Allocate a new Schematron structure.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new Schematron structure.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlSchematronNewSchematron")]
 unsafe extern "C" fn xml_schematron_new_schematron(
     ctxt: XmlSchematronParserCtxtPtr,
 ) -> XmlSchematronPtr {
@@ -557,14 +470,8 @@ unsafe extern "C" fn xml_schematron_new_schematron(
     ret
 }
 
-/**
- * xmlSchematronAddNamespace:
- * @ctxt:  the schema parser context
- * @prefix:  the namespace prefix
- * @ns:  the namespace name
- *
- * Add a namespace definition in the context
- */
+/// Add a namespace definition in the context
+#[doc(alias = "xmlSchematronAddNamespace")]
 unsafe extern "C" fn xml_schematron_add_namespace(
     ctxt: XmlSchematronParserCtxtPtr,
     prefix: *const XmlChar,
@@ -611,17 +518,10 @@ unsafe extern "C" fn xml_schematron_add_namespace(
         .add(2 * (*ctxt).nb_namespaces as usize + 1) = null_mut();
 }
 
-/**
- * xmlSchematronAddPattern:
- * @ctxt: the schema parsing context
- * @schema:  a schema structure
- * @node:  the node hosting the pattern
- * @id: the id or name of the pattern
- *
- * Add a pattern to a schematron
- *
- * Returns the new pointer or NULL in case of error
- */
+/// Add a pattern to a schematron
+///
+/// Returns the new pointer or NULL in case of error
+#[doc(alias = "xmlSchematronAddPattern")]
 unsafe extern "C" fn xml_schematron_add_pattern(
     ctxt: XmlSchematronParserCtxtPtr,
     schema: XmlSchematronPtr,
@@ -654,18 +554,10 @@ unsafe extern "C" fn xml_schematron_add_pattern(
     ret
 }
 
-/**
- * xmlSchematronAddRule:
- * @ctxt: the schema parsing context
- * @schema:  a schema structure
- * @node:  the node hosting the rule
- * @context: the associated context string
- * @report: the associated report string
- *
- * Add a rule to a schematron
- *
- * Returns the new pointer or NULL in case of error
- */
+/// Add a rule to a schematron
+///
+/// Returns the new pointer or NULL in case of error
+#[doc(alias = "xmlSchematronAddRule")]
 unsafe extern "C" fn xml_schematron_add_rule(
     ctxt: XmlSchematronParserCtxtPtr,
     schema: XmlSchematronPtr,
@@ -735,13 +627,8 @@ unsafe extern "C" fn xml_schematron_add_rule(
     ret
 }
 
-/**
- * xmlSchematronParseTestReportMsg:
- * @ctxt:  the schema parser context
- * @con:  the assert or report node
- *
- * Format the message content of the assert or report test
- */
+/// Format the message content of the assert or report test
+#[doc(alias = "xmlSchematronParseTestReportMsg")]
 unsafe extern "C" fn xml_schematron_parse_test_report_msg(
     ctxt: XmlSchematronParserCtxtPtr,
     con: XmlNodePtr,
@@ -792,19 +679,10 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
     }
 }
 
-/**
- * xmlSchematronAddTest:
- * @ctxt: the schema parsing context
- * @type:  the type of test
- * @rule:  the parent rule
- * @node:  the node hosting the test
- * @test: the associated test
- * @report: the associated report string
- *
- * Add a test to a schematron
- *
- * Returns the new pointer or NULL in case of error
- */
+/// Add a test to a schematron
+///
+/// Returns the new pointer or NULL in case of error
+#[doc(alias = "xmlSchematronAddTest")]
 unsafe extern "C" fn xml_schematron_add_test(
     ctxt: XmlSchematronParserCtxtPtr,
     typ: XmlSchematronTestType,
@@ -859,13 +737,8 @@ unsafe extern "C" fn xml_schematron_add_test(
     ret
 }
 
-/**
- * xmlSchematronParseRule:
- * @ctxt:  a schema validation context
- * @rule:  the rule node
- *
- * parse a rule element
- */
+/// Parse a rule element
+#[doc(alias = "xmlSchematronParseRule")]
 unsafe extern "C" fn xml_schematron_parse_rule(
     ctxt: XmlSchematronParserCtxtPtr,
     pattern: XmlSchematronPatternPtr,
@@ -1091,13 +964,8 @@ unsafe extern "C" fn xml_schematron_parse_rule(
     }
 }
 
-/**
- * xmlSchematronParsePattern:
- * @ctxt:  a schema validation context
- * @pat:  the pattern node
- *
- * parse a pattern element
- */
+/// Parse a pattern element
+#[doc(alias = "xmlSchematronParsePattern")]
 unsafe extern "C" fn xml_schematron_parse_pattern(
     ctxt: XmlSchematronParserCtxtPtr,
     pat: XmlNodePtr,
@@ -1152,16 +1020,11 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
     }
 }
 
-/**
- * xmlSchematronParse:
- * @ctxt:  a schema validation context
- *
- * parse a schema definition resource and build an internal
- * XML Schema structure which can be used to validate instances.
- *
- * Returns the internal XML Schematron structure built from the resource or
- *         NULL in case of error
- */
+/// Parse a schema definition resource and build an internal
+/// XML Schema structure which can be used to validate instances.
+///
+/// Returns the internal XML Schematron structure built from the resource or NULL in case of error
+#[doc(alias = "xmlSchematronParse")]
 pub unsafe extern "C" fn xml_schematron_parse(
     ctxt: XmlSchematronParserCtxtPtr,
 ) -> XmlSchematronPtr {
@@ -1372,12 +1235,8 @@ pub unsafe extern "C" fn xml_schematron_parse(
     ret
 }
 
-/**
- * xmlSchematronFreeTests:
- * @tests:  a list of tests
- *
- * Free a list of tests.
- */
+/// Free a list of tests.
+#[doc(alias = "xmlSchematronFreeTests")]
 unsafe extern "C" fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) {
     let mut next: XmlSchematronTestPtr;
 
@@ -1397,12 +1256,8 @@ unsafe extern "C" fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) 
     }
 }
 
-/**
- * xmlSchematronFreeLets:
- * @lets:  a list of let variables
- *
- * Free a list of let variables.
- */
+/// Free a list of let variables.
+#[doc(alias = "xmlSchematronFreeLets")]
 unsafe extern "C" fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
     let mut next: XmlSchematronLetPtr;
 
@@ -1419,12 +1274,8 @@ unsafe extern "C" fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
     }
 }
 
-/**
- * xmlSchematronFreeRules:
- * @rules:  a list of rules
- *
- * Free a list of rules.
- */
+/// Free a list of rules.
+#[doc(alias = "xmlSchematronFreeRules")]
 unsafe extern "C" fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) {
     let mut next: XmlSchematronRulePtr;
 
@@ -1450,12 +1301,8 @@ unsafe extern "C" fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) 
     }
 }
 
-/**
- * xmlSchematronFreePatterns:
- * @patterns:  a list of patterns
- *
- * Free a list of patterns.
- */
+/// Free a list of patterns.
+#[doc(alias = "xmlSchematronFreePatterns")]
 unsafe extern "C" fn xml_schematron_free_patterns(mut patterns: XmlSchematronPatternPtr) {
     let mut next: XmlSchematronPatternPtr;
 
@@ -1469,12 +1316,8 @@ unsafe extern "C" fn xml_schematron_free_patterns(mut patterns: XmlSchematronPat
     }
 }
 
-/**
- * xmlSchematronFree:
- * @schema:  a schema structure
- *
- * Deallocate a Schematron structure.
- */
+/// Deallocate a Schematron structure.
+#[doc(alias = "xmlSchematronFree")]
 pub unsafe extern "C" fn xml_schematron_free(schema: XmlSchematronPtr) {
     if schema.is_null() {
         return;
@@ -1494,17 +1337,8 @@ pub unsafe extern "C" fn xml_schematron_free(schema: XmlSchematronPtr) {
     xml_free(schema as _);
 }
 
-/*
- * Interfaces for validating
- */
-/**
- * xmlSchematronSetValidStructuredErrors:
- * @ctxt:  a Schematron validation context
- * @serror:  the structured error function
- * @ctx: the functions context
- *
- * Set the structured error callback
- */
+/// Set the structured error callback
+#[doc(alias = "xmlSchematronSetValidStructuredErrors")]
 pub unsafe fn xml_schematron_set_valid_structured_errors(
     ctxt: XmlSchematronValidCtxtPtr,
     serror: Option<StructuredError>,
@@ -1519,25 +1353,8 @@ pub unsafe fn xml_schematron_set_valid_structured_errors(
     (*ctxt).user_data = ctx;
 }
 
-/******
-pub unsafe extern "C" fn xmlSchematronSetValidErrors	(ctxt: xmlSchematronValidCtxtPtr, xmlSchematronValidityErrorFunc err, xmlSchematronValidityWarningFunc warn,
-                     ctx: *mut c_void);
-pub unsafe extern "C" fn i32 xmlSchematronGetValidErrors	(ctxt: xmlSchematronValidCtxtPtr, xmlSchematronValidityErrorFunc *err, xmlSchematronValidityWarningFunc *warn,
-                     c_void **ctx);
-pub unsafe extern "C" fn i32 xmlSchematronSetValidOptions(ctxt: xmlSchematronValidCtxtPtr, i32 options);
-pub unsafe extern "C" fn i32 xmlSchematronValidCtxtGetOptions(ctxt: xmlSchematronValidCtxtPtr);
-pub unsafe extern "C" fn i32
-            xmlSchematronValidateOneElement (ctxt: xmlSchematronValidCtxtPtr,
-                             xmlNodePtr elem);
- *******/
-
-/**
- * xmlSchematronVTypeErrMemory:
- * @node: a context node
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchematronVTypeErrMemory")]
 unsafe extern "C" fn xml_schematron_verr_memory(
     ctxt: XmlSchematronValidCtxtPtr,
     extra: *const c_char,
@@ -1556,15 +1373,10 @@ unsafe extern "C" fn xml_schematron_verr_memory(
     );
 }
 
-/**
- * xmlSchematronNewValidCtxt:
- * @schema:  a precompiled XML Schematrons
- * @options: a set of xmlSchematronValidOptions
- *
- * Create an XML Schematrons validation context based on the given schema.
- *
- * Returns the validation context or NULL in case of error
- */
+/// Create an XML Schematrons validation context based on the given schema.
+///
+/// Returns the validation context or NULL in case of error
+#[doc(alias = "xmlSchematronNewValidCtxt")]
 pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
     schema: XmlSchematronPtr,
     options: i32,
@@ -1608,12 +1420,8 @@ pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
     ret
 }
 
-/**
- * xmlSchematronFreeValidCtxt:
- * @ctxt:  the schema validation context
- *
- * Free the resources associated to the schema validation context
- */
+/// Free the resources associated to the schema validation context
+#[doc(alias = "xmlSchematronFreeValidCtxt")]
 pub unsafe extern "C" fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
     if ctxt.is_null() {
         return;
@@ -1627,17 +1435,10 @@ pub unsafe extern "C" fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValid
     xml_free(ctxt as _);
 }
 
-/**
- * xmlSchematronRegisterVariables:
- * @ctxt:  the schema validation context
- * @let:  the list of let variables
- * @instance:  the document instance tree
- * @cur:  the current node
- *
- * Registers a list of let variables to the current context of @cur
- *
- * Returns -1 in case of errors, otherwise 0
- */
+/// Registers a list of let variables to the current context of @cur
+///
+/// Returns -1 in case of errors, otherwise 0
+#[doc(alias = "xmlSchematronRegisterVariables")]
 unsafe extern "C" fn xml_schematron_register_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
@@ -1692,17 +1493,10 @@ unsafe extern "C" fn xml_schematron_get_node(
     node
 }
 
-/**
- * xmlSchematronFormatReport:
- * @ctxt:  the validation context
- * @test: the test node
- * @cur: the current node tested
- *
- * Build the string being reported to the user.
- *
- * Returns a report string or NULL in case of error. The string needs
- *         to be deallocated by the caller
- */
+/// Build the string being reported to the user.
+///
+/// Returns a report string or NULL in case of error. The string needs to be deallocated by the caller
+#[doc(alias = "xmlSchematronFormatReport")]
 unsafe extern "C" fn xml_schematron_format_report(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlNodePtr,
@@ -1823,14 +1617,8 @@ unsafe extern "C" fn xml_schematron_format_report(
     ret
 }
 
-/**
- * xmlSchematronReportOutput:
- * @ctxt: the validation context
- * @cur: the current node tested
- * @msg: the message output
- *
- * Output part of the report to whatever channel the user selected
- */
+/// Output part of the report to whatever channel the user selected
+#[doc(alias = "xmlSchematronReportOutput")]
 unsafe extern "C" fn xml_schematron_report_output(
     _ctxt: XmlSchematronValidCtxtPtr,
     _cur: XmlNodePtr,
@@ -1840,16 +1628,8 @@ unsafe extern "C" fn xml_schematron_report_output(
     eprintln!("{}", CStr::from_ptr(msg).to_string_lossy());
 }
 
-/**
- * xmlSchematronReportSuccess:
- * @ctxt:  the validation context
- * @test: the compiled test
- * @cur: the current node tested
- * @success: boolean value for the result
- *
- * called from the validation engine when an assert or report test have
- * been done.
- */
+/// Called from the validation engine when an assert or report test have been done.
+#[doc(alias = "xmlSchematronReportSuccess")]
 unsafe extern "C" fn xml_schematron_report_success(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
@@ -1968,17 +1748,10 @@ unsafe extern "C" fn xml_schematron_report_success(
     }
 }
 
-/**
- * xmlSchematronRunTest:
- * @ctxt:  the schema validation context
- * @test:  the current test
- * @instance:  the document instance tree
- * @cur:  the current node in the instance
- *
- * Validate a rule against a tree instance at a given position
- *
- * Returns 1 in case of success, 0 if error and -1 in case of internal error
- */
+/// Validate a rule against a tree instance at a given position
+///
+/// Returns 1 in case of success, 0 if error and -1 in case of internal error
+#[doc(alias = "xmlSchematronRunTest")]
 unsafe extern "C" fn xml_schematron_run_test(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
@@ -2037,15 +1810,10 @@ unsafe extern "C" fn xml_schematron_run_test(
     (failed == 0) as i32
 }
 
-/**
- * xmlSchematronUnregisterVariables:
- * @ctxt:  the schema validation context
- * @let:  the list of let variables
- *
- * Unregisters a list of let variables from the context
- *
- * Returns -1 in case of errors, otherwise 0
- */
+/// Unregisters a list of let variables from the context
+///
+/// Returns -1 in case of errors, otherwise 0
+#[doc(alias = "xmlSchematronUnregisterVariables")]
 unsafe extern "C" fn xml_schematron_unregister_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
@@ -2103,13 +1871,8 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
     cur
 }
 
-/**
- * xmlSchematronReportPattern:
- * @ctxt:  the validation context
- * @pattern: the current pattern
- *
- * called from the validation engine when starting to check a pattern
- */
+/// Called from the validation engine when starting to check a pattern
+#[doc(alias = "xmlSchematronReportPattern")]
 unsafe extern "C" fn xml_schematron_report_pattern(
     ctxt: XmlSchematronValidCtxtPtr,
     pattern: XmlSchematronPatternPtr,
@@ -2141,16 +1904,10 @@ unsafe extern "C" fn xml_schematron_report_pattern(
     }
 }
 
-/**
- * xmlSchematronValidateDoc:
- * @ctxt:  the schema validation context
- * @instance:  the document instance tree
- *
- * Validate a tree instance against the schematron
- *
- * Returns 0 in case of success, -1 in case of internal error
- *         and an error count otherwise.
- */
+/// Validate a tree instance against the schematron
+///
+/// Returns 0 in case of success, -1 in case of internal error and an error count otherwise.
+#[doc(alias = "xmlSchematronValidateDoc")]
 pub unsafe extern "C" fn xml_schematron_validate_doc(
     ctxt: XmlSchematronValidCtxtPtr,
     instance: XmlDocPtr,

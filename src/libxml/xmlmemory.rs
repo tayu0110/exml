@@ -73,14 +73,8 @@ macro_rules! HDR_2_CLIENT {
 static mut BLOCK: u32 = 0;
 static mut XML_MEM_STOP_AT_BLOCK: u32 = 0;
 static mut XML_MEM_TRACE_BLOCK_AT: *mut c_void = null_mut();
-// #[cfg(feature = "debug_memory_location")]
-// static mut memlist: *mut Memhdr = null_mut();
 
-/*
- * debugmem_tag_error:
- *
- * internal error function.
- */
+// internal error function.
 unsafe extern "C" fn debugmem_tag_error(addr: *mut c_void) {
     generic_error!("Memory tag error occurs :{:?} \n\t bye\n", addr);
 }
@@ -91,54 +85,29 @@ macro_rules! mem_tag_err {
     };
 }
 
-/*
- * The XML memory wrapper support 4 basic overloadable functions.
- */
-/**
- * xmlFreeFunc:
- * @mem: an already allocated block of memory
- *
- * Signature for a free() implementation.
- */
+/// Signature for a free() implementation.
+#[doc(alias = "xmlFreeFunc")]
 pub type XmlFreeFunc = unsafe extern "C" fn(mem: *mut c_void);
-/**
- * xmlMallocFunc:
- * @size:  the size requested in bytes
- *
- * Signature for a malloc() implementation.
- *
- * Returns a pointer to the newly allocated block or NULL in case of error.
- */
+/// Signature for a malloc() implementation.
+///
+/// Returns a pointer to the newly allocated block or NULL in case of error.
+#[doc(alias = "xmlMallocFunc")]
 pub type XmlMallocFunc = unsafe extern "C" fn(size: usize) -> *mut c_void;
-
-/**
- * xmlReallocFunc:
- * @mem: an already allocated block of memory
- * @size:  the new size requested in bytes
- *
- * Signature for a realloc() implementation.
- *
- * Returns a pointer to the newly reallocated block or NULL in case of error.
- */
+/// Signature for a realloc() implementation.
+///
+/// Returns a pointer to the newly reallocated block or NULL in case of error.
+#[doc(alias = "xmlReallocFunc")]
 pub type XmlReallocFunc = unsafe extern "C" fn(mem: *mut c_void, size: usize) -> *mut c_void;
-
-/**
- * xmlStrdupFunc:
- * @str: a zero terminated string
- *
- * Signature for an strdup() implementation.
- *
- * Returns the copy of the string or NULL in case of error.
- */
+/// Signature for an strdup() implementation.
+///
+/// Returns the copy of the string or NULL in case of error.
+#[doc(alias = "xmlStrdupFunc")]
 pub type XmlStrdupFunc = unsafe extern "C" fn(str: *const XmlChar) -> *mut XmlChar;
 
-/**
- * xmlMallocBreakpoint:
- *
- * Breakpoint to use in conjunction with xmlMemStopAtBlock. When the block
- * number reaches the specified value this function is called. One need to add a breakpoint
- * to it to get the context in which the given block is allocated.
- */
+/// Breakpoint to use in conjunction with xmlMemStopAtBlock. When the block
+/// number reaches the specified value this function is called. One need to add a breakpoint
+/// to it to get the context in which the given block is allocated.
+#[doc(alias = "xmlMallocBreakpoint")]
 pub unsafe extern "C" fn xml_malloc_breakpoint() {
     generic_error!(
         "xmlMallocBreakpoint reached on block {}\n",
@@ -146,31 +115,13 @@ pub unsafe extern "C" fn xml_malloc_breakpoint() {
     );
 }
 
-/****************************************************************
- *								*
- *		Initialization Routines				*
- *								*
- ****************************************************************/
-/*
- * The way to overload the existing functions.
- * The xmlGc function have an extra entry for atomic block
- * allocations useful for garbage collected memory allocators
- */
-/**
- * xmlMemSetup:
- * @freeFunc: the free() function to use
- * @mallocFunc: the malloc() function to use
- * @reallocFunc: the realloc() function to use
- * @strdupFunc: the strdup() function to use
- *
- * Override the default memory access functions with a new set
- * This has to be called before any other libxml routines !
- *
- * Should this be blocked if there was already some allocations
- * done ?
- *
- * Returns 0 on success
- */
+/// Override the default memory access functions with a new set
+/// This has to be called before any other libxml routines !
+///
+/// Should this be blocked if there was already some allocations done ?
+///
+/// Returns 0 on success
+#[doc(alias = "xmlMemSetup")]
 pub unsafe extern "C" fn xml_mem_setup(
     free_func: Option<XmlFreeFunc>,
     malloc_func: Option<XmlMallocFunc>,
@@ -197,17 +148,10 @@ pub unsafe extern "C" fn xml_mem_setup(
     0
 }
 
-/**
- * xmlMemGet:
- * @freeFunc: place to save the free() function in use
- * @mallocFunc: place to save the malloc() function in use
- * @reallocFunc: place to save the realloc() function in use
- * @strdupFunc: place to save the strdup() function in use
- *
- * Provides the memory access functions set currently in use
- *
- * Returns 0 on success
- */
+/// Provides the memory access functions set currently in use
+///
+/// Returns 0 on success
+#[doc(alias = "xmlMemGet")]
 pub unsafe extern "C" fn xml_mem_get(
     free_func: *mut XmlFreeFunc,
     malloc_func: *mut XmlMallocFunc,
@@ -229,24 +173,15 @@ pub unsafe extern "C" fn xml_mem_get(
     0
 }
 
-/**
- * xmlGcMemSetup:
- * @freeFunc: the free() function to use
- * @mallocFunc: the malloc() function to use
- * @mallocAtomicFunc: the malloc() function to use for atomic allocations
- * @reallocFunc: the realloc() function to use
- * @strdupFunc: the strdup() function to use
- *
- * Override the default memory access functions with a new set
- * This has to be called before any other libxml routines !
- * The mallocAtomicFunc is specialized for atomic block
- * allocations (i.e. of areas  useful for garbage collected memory allocators
- *
- * Should this be blocked if there was already some allocations
- * done ?
- *
- * Returns 0 on success
- */
+/// Override the default memory access functions with a new set
+/// This has to be called before any other libxml routines !
+/// The mallocAtomicFunc is specialized for atomic block
+/// allocations (i.e. of areas  useful for garbage collected memory allocators
+///
+/// Should this be blocked if there was already some allocations done ?
+///
+/// Returns 0 on success
+#[doc(alias = "xmlGcMemSetup")]
 pub unsafe extern "C" fn xml_gc_mem_setup(
     free_func: Option<XmlFreeFunc>,
     malloc_func: Option<XmlMallocFunc>,
@@ -277,20 +212,12 @@ pub unsafe extern "C" fn xml_gc_mem_setup(
     0
 }
 
-/**
- * xmlGcMemGet:
- * @freeFunc: place to save the free() function in use
- * @mallocFunc: place to save the malloc() function in use
- * @mallocAtomicFunc: place to save the atomic malloc() function in use
- * @reallocFunc: place to save the realloc() function in use
- * @strdupFunc: place to save the strdup() function in use
- *
- * Provides the memory access functions set currently in use
- * The mallocAtomicFunc is specialized for atomic block
- * allocations (i.e. of areas  useful for garbage collected memory allocators
- *
- * Returns 0 on success
- */
+/// Provides the memory access functions set currently in use
+/// The mallocAtomicFunc is specialized for atomic block
+/// allocations (i.e. of areas  useful for garbage collected memory allocators
+///
+/// Returns 0 on success
+#[doc(alias = "xmlGcMemGet")]
 pub unsafe extern "C" fn xml_gc_mem_get(
     free_func: *mut XmlFreeFunc,
     malloc_func: *mut XmlMallocFunc,
@@ -316,43 +243,22 @@ pub unsafe extern "C" fn xml_gc_mem_get(
     0
 }
 
-/*
- * Initialization of the memory layer.
- */
-/**
- * xmlInitMemory:
- *
- * DEPRECATED: Alias for xmlInitParser.
- */
-#[deprecated]
+#[doc(alias = "xmlInitMemory")]
+#[deprecated = "Alias for xmlInitParser"]
 pub unsafe extern "C" fn xml_init_memory() -> i32 {
     xml_init_parser();
     0
 }
 
-/*
- * Cleanup of the memory layer.
- */
-/**
- * xmlCleanupMemory:
- *
- * DEPRECATED: This function is a no-op. Call xmlCleanupParser
- * to free global state but see the warnings there. xmlCleanupParser
- * should be only called once at program exit. In most cases, you don't
- * have call cleanup functions at all.
- */
-#[deprecated]
+#[doc(alias = "xmlCleanupMemory")]
+#[deprecated = "This function is a no-op. Call xmlCleanupParser
+to free global state but see the warnings there. xmlCleanupParser
+should be only called once at program exit. In most cases, you don't
+have call cleanup functions at all"]
 pub unsafe extern "C" fn xml_cleanup_memory() {}
 
-/*
- * These are specific to the XML debug memory wrapper.
- */
-/**
- * xmlMemSize:
- * @ptr:  pointer to the memory allocation
- *
- * Returns the size of a memory allocation.
- */
+/// Returns the size of a memory allocation.
+#[doc(alias = "xmlMemSize")]
 pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> usize {
     if ptr.is_null() {
         return 0;
@@ -366,24 +272,18 @@ pub unsafe extern "C" fn xml_mem_size(ptr: *mut c_void) -> usize {
     (*p).mh_size
 }
 
-/**
- * xmlMemUsed:
- *
- * Provides the amount of memory currently allocated
- *
- * Returns an int representing the amount of memory allocated.
- */
+/// Provides the amount of memory currently allocated
+///
+/// Returns an int representing the amount of memory allocated.
+#[doc(alias = "xmlMemUsed")]
 pub unsafe extern "C" fn xml_mem_used() -> i32 {
     DEBUG_MEM_SIZE.get() as _
 }
 
-/**
- * xmlMemBlocks:
- *
- * Provides the number of memory areas currently allocated
- *
- * Returns an int representing the number of blocks
- */
+/// Provides the number of memory areas currently allocated
+///
+/// Returns an int representing the number of blocks
+#[doc(alias = "xmlMemBlocks")]
 pub unsafe extern "C" fn xml_mem_blocks() -> i32 {
     xml_mutex_lock(addr_of_mut!(XML_MEM_MUTEX));
     let res: i32 = DEBUG_MEM_BLOCKS.get() as _;
@@ -391,13 +291,8 @@ pub unsafe extern "C" fn xml_mem_blocks() -> i32 {
     res
 }
 
-/**
- * xmlMemDisplay:
- * @fp:  a FILE descriptor used as the output file, if NULL, the result is
- *       written to the file .memorylist
- *
- * show in-extenso the memory blocks allocated
- */
+/// show in-extenso the memory blocks allocated
+#[doc(alias = "xmlMemDisplay")]
 pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
     let old_fp: *mut FILE = fp;
 
@@ -417,15 +312,9 @@ pub unsafe extern "C" fn xml_mem_display(mut fp: *mut FILE) {
     }
 }
 
-/**
- * xmlMemDisplayLast:
- * @fp:  a FILE descriptor used as the output file, if NULL, the result is
- *       written to the file .memorylist
- * @nbBytes: the amount of memory to dump
- *
- * the last nbBytes of memory allocated and not freed, useful for dumping
- * the memory left allocated between two places at runtime.
- */
+/// The last nbBytes of memory allocated and not freed, useful for dumping
+/// the memory left allocated between two places at runtime.
+#[doc(alias = "xmlMemDisplayLast")]
 pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: i64) {
     let old_fp: *mut FILE = fp;
 
@@ -449,14 +338,9 @@ pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: i64) 
     }
 }
 
-/**
- * xmlMemShow:
- * @fp:  a FILE descriptor used as the output file
- * @nr:  number of entries to dump
- *
- * show a show display of the memory allocated, and dump
- * the @nr last allocated areas which were not freed
- */
+/// Show a show display of the memory allocated, and dump
+/// the @nr last allocated areas which were not freed
+#[doc(alias = "xmlMemShow")]
 pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: i32) {
     // #[cfg(feature = "debug_memory_location")]
     // let p: *mut Memhdr;
@@ -471,44 +355,28 @@ pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: i32) {
     }
 }
 
-/**
- * xmlMemoryDump:
- *
- * Dump in-extenso the memory blocks allocated to the file .memorylist
- */
+/// Dump in-extenso the memory blocks allocated to the file .memorylist
+#[doc(alias = "xmlMemoryDump")]
 pub unsafe extern "C" fn xml_memory_dump() {}
 
-/**
- * xmlMemMalloc:
- * @size:  an int specifying the size in byte to allocate.
- *
- * a malloc() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the allocated area or NULL in case of lack of memory.
- */
+/// A malloc() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the allocated area or NULL in case of lack of memory.
+#[doc(alias = "xmlMemMalloc")]
 pub unsafe extern "C" fn xml_mem_malloc(size: usize) -> *mut c_void {
     xml_malloc_loc(size, c"none".as_ptr() as _, 0)
 }
 
-/**
- * xmlMemRealloc:
- * @ptr:  the initial memory block pointer
- * @size:  an int specifying the size in byte to allocate.
- *
- * a realloc() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the allocated area or NULL in case of lack of memory.
- */
+/// A realloc() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the allocated area or NULL in case of lack of memory.
+#[doc(alias = "xmlMemRealloc")]
 pub unsafe extern "C" fn xml_mem_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     xml_realloc_loc(ptr, size, c"none".as_ptr() as _, 0)
 }
 
-/**
- * xmlMemFree:
- * @ptr:  the memory block pointer
- *
- * a free() equivalent, with error checking.
- */
+/// A free() equivalent, with error checking.
+#[doc(alias = "xmlMemFree")]
 pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
     if ptr.is_null() {
         return;
@@ -552,28 +420,18 @@ pub unsafe extern "C" fn xml_mem_free(ptr: *mut c_void) {
     xml_malloc_breakpoint();
 }
 
-/**
- * xmlMemoryStrdup:
- * @str:  the initial string pointer
- *
- * a strdup() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the new string or NULL if allocation error occurred.
- */
+/// A strdup() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the new string or NULL if allocation error occurred.
+#[doc(alias = "xmlMemoryStrdup")]
 pub unsafe extern "C" fn xml_memory_strdup(str: *const XmlChar) -> *mut XmlChar {
     xml_mem_strdup_loc(str as _, c"none".as_ptr() as _, 0) as _
 }
 
-/**
- * xmlMallocLoc:
- * @size:  an int specifying the size in byte to allocate.
- * @file:  the file name or NULL
- * @line:  the line number
- *
- * a malloc() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the allocated area or NULL in case of lack of memory.
- */
+/// A malloc() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the allocated area or NULL in case of lack of memory.
+#[doc(alias = "xmlMallocLoc")]
 pub unsafe extern "C" fn xml_malloc_loc(
     size: usize,
     file: *const c_char,
@@ -627,17 +485,10 @@ pub unsafe extern "C" fn xml_malloc_loc(
     ret
 }
 
-/**
- * xmlReallocLoc:
- * @ptr:  the initial memory block pointer
- * @size:  an int specifying the size in byte to allocate.
- * @file:  the file name or NULL
- * @line:  the line number
- *
- * a realloc() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the allocated area or NULL in case of lack of memory.
- */
+/// A realloc() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the allocated area or NULL in case of lack of memory.
+#[doc(alias = "xmlReallocLoc")]
 pub unsafe extern "C" fn xml_realloc_loc(
     ptr: *mut c_void,
     size: usize,
@@ -710,16 +561,10 @@ pub unsafe extern "C" fn xml_realloc_loc(
     // 	 return(null_mut());
 }
 
-/**
- * xmlMallocAtomicLoc:
- * @size:  an unsigned int specifying the size in byte to allocate.
- * @file:  the file name or NULL
- * @line:  the line number
- *
- * a malloc() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the allocated area or NULL in case of lack of memory.
- */
+/// A malloc() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the allocated area or NULL in case of lack of memory.
+#[doc(alias = "xmlMallocAtomicLoc")]
 pub unsafe extern "C" fn xml_malloc_atomic_loc(
     size: usize,
     file: *const c_char,
@@ -773,16 +618,10 @@ pub unsafe extern "C" fn xml_malloc_atomic_loc(
     ret
 }
 
-/**
- * xmlMemStrdupLoc:
- * @str:  the initial string pointer
- * @file:  the file name or NULL
- * @line:  the line number
- *
- * a strdup() equivalent, with logging of the allocation info.
- *
- * Returns a pointer to the new string or NULL if allocation error occurred.
- */
+/// A strdup() equivalent, with logging of the allocation info.
+///
+/// Returns a pointer to the new string or NULL if allocation error occurred.
+#[doc(alias = "xmlMemStrdupLoc")]
 pub unsafe extern "C" fn xml_mem_strdup_loc(
     str: *const c_char,
     file: *const c_char,
@@ -833,13 +672,10 @@ pub unsafe extern "C" fn xml_mem_strdup_loc(
     s
 }
 
-/**
- * xmlInitMemoryInternal:
- *
- * Initialize the memory layer.
- *
- * Returns 0 on success
- */
+/// Initialize the memory layer.
+///
+/// Returns 0 on success
+#[doc(alias = "xmlInitMemoryInternal")]
 pub(crate) unsafe extern "C" fn xml_init_memory_internal() {
     let mut breakpoint: *mut c_char;
     xml_init_mutex(addr_of_mut!(XML_MEM_MUTEX));
@@ -862,12 +698,9 @@ pub(crate) unsafe extern "C" fn xml_init_memory_internal() {
     }
 }
 
-/**
- * xmlCleanupMemoryInternal:
- *
- * Free up all the memory allocated by the library for its own
- * use. This should not be called by user level code.
- */
+/// Free up all the memory allocated by the library for its own use.  
+/// This should not be called by user level code.
+#[doc(alias = "xmlCleanupMemoryInternal")]
 pub(crate) unsafe extern "C" fn xml_cleanup_memory_internal() {
     xml_cleanup_mutex(addr_of_mut!(XML_MEM_MUTEX));
 }

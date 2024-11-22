@@ -67,17 +67,13 @@ use crate::{
 
 use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
 
-/*
- * Validation state added for non-determinist content model.
- */
+// Validation state added for non-determinist content model.
 pub type XmlValidStatePtr = *mut XmlValidState;
-/*
- * If regexp are enabled we can do continuous validation without the
- * need of a tree to validate the content model. this is done in each
- * callbacks.
- * Each xmlValidState represent the validation state associated to the
- * set of nodes currently open from the document root to the current element.
- */
+// If regexp are enabled we can do continuous validation without the
+// need of a tree to validate the content model. this is done in each
+// callbacks.
+// Each xmlValidState represent the validation state associated to the
+// set of nodes currently open from the document root to the current element.
 #[cfg(feature = "regexp")]
 #[repr(C)]
 pub struct XmlValidState {
@@ -95,37 +91,19 @@ pub struct XmlValidState {
     state: c_uchar,             /* ROLLBACK_XXX */
 }
 
-/**
- * xmlValidityErrorFunc:
- * @ctx:  usually an xmlValidCtxtPtr to a validity error context,
- *        but comes from ctxt->userData (which normally contains such
- *        a pointer); ctxt->userData can be changed by the user.
- * @msg:  the string to format *printf like vararg
- * @...:  remaining arguments to the format
- *
- * Callback called when a validity error is found. This is a message
- * oriented function similar to an *printf function.
- */
+/// Callback called when a validity error is found. This is a message
+/// oriented function similar to an *printf function.
+#[doc(alias = "xmlValidityErrorFunc")]
 pub type XmlValidityErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/**
- * xmlValidityWarningFunc:
- * @ctx:  usually an xmlValidCtxtPtr to a validity error context,
- *        but comes from ctxt->userData (which normally contains such
- *        a pointer); ctxt->userData can be changed by the user.
- * @msg:  the string to format *printf like vararg
- * @...:  remaining arguments to the format
- *
- * Callback called when a validity warning is found. This is a message
- * oriented function similar to an *printf function.
- */
+/// Callback called when a validity warning is found. This is a message
+/// oriented function similar to an *printf function.
+#[doc(alias = "xmlValidityWarningFunc")]
 pub type XmlValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
 
-/*
- * xmlValidCtxt:
- * An xmlValidCtxt is used for error reporting when validating.
- */
 pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
+/// An xmlValidCtxt is used for error reporting when validating.
+#[doc(alias = "xmlValidCtxt")]
 #[repr(C)]
 pub struct XmlValidCtxt {
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
@@ -181,54 +159,33 @@ impl Default for XmlValidCtxt {
     }
 }
 
-/*
- * ALL notation declarations are stored in a table.
- * There is one table per DTD.
- */
-
+// ALL notation declarations are stored in a table.
+// There is one table per DTD.
 pub type XmlNotationTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlNotationTablePtr = *mut XmlNotationTable;
 
-/*
- * ALL element declarations are stored in a table.
- * There is one table per DTD.
- */
-
+// ALL element declarations are stored in a table.
+// There is one table per DTD.
 pub type XmlElementTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlElementTablePtr = *mut XmlElementTable;
 
-/*
- * ALL attribute declarations are stored in a table.
- * There is one table per DTD.
- */
-
+// ALL attribute declarations are stored in a table.
+// There is one table per DTD.
 pub type XmlAttributeTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
 
-/*
- * ALL IDs attributes are stored in a table.
- * There is one table per document.
- */
-
+// ALL IDs attributes are stored in a table.
+// There is one table per document.
 pub type XmlIDTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlIDTablePtr = *mut XmlIDTable;
 
-/*
- * ALL Refs attributes are stored in a table.
- * There is one table per document.
- */
-
+// ALL Refs attributes are stored in a table.
+// There is one table per document.
 pub type XmlRefTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlRefTablePtr = *mut XmlRefTable;
 
-/**
- * xmlErrValid:
- * @ctxt:  an XML validation parser context
- * @error:  the error number
- * @extra:  extra information
- *
- * Handle a validation error
- */
+/// Handle a validation error
+#[doc(alias = "xmlErrValid")]
 unsafe extern "C" fn xml_err_valid(
     ctxt: XmlValidCtxtPtr,
     error: XmlParserErrors,
@@ -298,13 +255,8 @@ unsafe extern "C" fn xml_err_valid(
     }
 }
 
-/**
- * xmlVErrMemory:
- * @ctxt:  an XML validation parser context
- * @extra:  extra information
- *
- * Handle an out of memory error
- */
+/// Handle an out of memory error
+#[doc(alias = "xmlVErrMemory")]
 unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char) {
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
@@ -368,12 +320,8 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
     }
 }
 
-/**
- * xmlFreeNotation:
- * @not:  A notation
- *
- * Deallocate the memory used by an notation definition
- */
+/// Deallocate the memory used by an notation definition
+#[doc(alias = "xmlFreeNotation")]
 unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
     if nota.is_null() {
         return;
@@ -384,19 +332,10 @@ unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
     xml_free(nota as _);
 }
 
-/* Notation */
-/**
- * xmlAddNotationDecl:
- * @dtd:  pointer to the DTD
- * @ctxt:  the validation context
- * @name:  the entity name
- * @PublicID:  the public identifier or null_mut()
- * @SystemID:  the system identifier or null_mut()
- *
- * Register a new notation declaration
- *
- * Returns null_mut() if not, otherwise the entity
- */
+/// Register a new notation declaration
+///
+/// Returns null_mut() if not, otherwise the entity
+#[doc(alias = "xmlAddNotationDecl")]
 pub unsafe extern "C" fn xml_add_notation_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
@@ -488,14 +427,10 @@ pub unsafe extern "C" fn xml_add_notation_decl(
     ret
 }
 
-/**
- * xmlCopyNotation:
- * @nota:  A notation
- *
- * Build a copy of a notation.
- *
- * Returns the new xmlNotationPtr or null_mut() in case of error.
- */
+/// Build a copy of a notation.
+///
+/// Returns the new xmlNotationPtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyNotation")]
 #[cfg(feature = "tree")]
 extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let nota: XmlNotationPtr = payload as XmlNotationPtr;
@@ -514,14 +449,10 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
     }
 }
 
-/**
- * xmlCopyNotationTable:
- * @table:  A notation table
- *
- * Build a copy of a notation table.
- *
- * Returns the new xmlNotationTablePtr or null_mut() in case of error.
- */
+/// Build a copy of a notation table.
+///
+/// Returns the new xmlNotationTablePtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyNotationTable")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_notation_table(
     table: XmlNotationTablePtr,
@@ -535,23 +466,14 @@ extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const Xml
     }
 }
 
-/**
- * xmlFreeNotationTable:
- * @table:  An notation table
- *
- * Deallocate the memory used by an entities hash table.
- */
+/// Deallocate the memory used by an entities hash table.
+#[doc(alias = "xmlFreeNotationTable")]
 pub unsafe extern "C" fn xml_free_notation_table(table: XmlNotationTablePtr) {
     xml_hash_free(table, Some(xml_free_notation_table_entry));
 }
 
-/**
- * xmlDumpNotationDecl:
- * @buf:  the XML buffer output
- * @nota:  A notation declaration
- *
- * This will dump the content the notation declaration as an XML DTD definition
- */
+/// This will dump the content the notation declaration as an XML DTD definition
+#[doc(alias = "xmlDumpNotationDecl")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotationPtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_write_quoted_string};
@@ -579,13 +501,8 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotatio
     xml_buf_cat(buf, c" >\n".as_ptr() as _);
 }
 
-/**
- * xmlDumpNotationDeclScan:
- * @nota:  A notation declaration
- * @buf:  the XML buffer output
- *
- * This is called with the hash scan function, and just reverses args
- */
+/// This is called with the hash scan function, and just reverses args
+#[doc(alias = "xmlDumpNotationDeclScan")]
 #[cfg(feature = "output")]
 extern "C" fn xml_dump_notation_decl_scan(
     nota: *mut c_void,
@@ -597,13 +514,8 @@ extern "C" fn xml_dump_notation_decl_scan(
     }
 }
 
-/**
- * xmlDumpNotationTable:
- * @buf:  the XML buffer output
- * @table:  A notation table
- *
- * This will dump the content of the notation table as an XML DTD definition
- */
+/// This will dump the content of the notation table as an XML DTD definition
+#[doc(alias = "xmlDumpNotationTable")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
     if buf.is_null() || table.is_null() {
@@ -612,18 +524,11 @@ pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotat
     xml_hash_scan(table, Some(xml_dump_notation_decl_scan), buf as _);
 }
 
-/* Element Content */
-/* the non Doc version are being deprecated */
-/**
- * xmlNewElementContent:
- * @name:  the subelement name or null_mut()
- * @type:  the type of element content decl
- *
- * Allocate an element content structure.
- * Deprecated in favor of xmlNewDocElementContent
- *
- * Returns null_mut() if not, otherwise the new element content structure
- */
+/// Allocate an element content structure.
+/// Deprecated in favor of xmlNewDocElementContent
+///
+/// Returns null_mut() if not, otherwise the new element content structure
+#[doc(alias = "xmlNewElementContent")]
 pub unsafe extern "C" fn xml_new_element_content(
     name: *const XmlChar,
     typ: XmlElementContentType,
@@ -631,43 +536,28 @@ pub unsafe extern "C" fn xml_new_element_content(
     xml_new_doc_element_content(null_mut(), name, typ)
 }
 
-/**
- * xmlCopyElementContent:
- * @cur:  An element content pointer.
- *
- * Build a copy of an element content description.
- * Deprecated, use xmlCopyDocElementContent instead
- *
- * Returns the new xmlElementContentPtr or null_mut() in case of error.
- */
+/// Build a copy of an element content description.
+/// Deprecated, use xmlCopyDocElementContent instead
+///
+/// Returns the new xmlElementContentPtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyElementContent")]
 pub unsafe extern "C" fn xml_copy_element_content(
     content: XmlElementContentPtr,
 ) -> XmlElementContentPtr {
     xml_copy_doc_element_content(null_mut(), content)
 }
 
-/**
- * xmlFreeElementContent:
- * @cur:  the element content tree to free
- *
- * Free an element content structure. The whole subtree is removed.
- * Deprecated, use xmlFreeDocElementContent instead
- */
+/// Free an element content structure. The whole subtree is removed.
+/// Deprecated, use xmlFreeDocElementContent instead
+#[doc(alias = "xmlFreeElementContent")]
 pub unsafe extern "C" fn xml_free_element_content(cur: XmlElementContentPtr) {
     xml_free_doc_element_content(null_mut(), cur);
 }
 
-/* the new versions with doc argument */
-/**
- * xmlNewDocElementContent:
- * @doc:  the document
- * @name:  the subelement name or null_mut()
- * @type:  the type of element content decl
- *
- * Allocate an element content structure for the document.
- *
- * Returns null_mut() if not, otherwise the new element content structure
- */
+/// Allocate an element content structure for the document.
+///
+/// Returns null_mut() if not, otherwise the new element content structure
+#[doc(alias = "xmlNewDocElementContent")]
 pub unsafe extern "C" fn xml_new_doc_element_content(
     doc: XmlDocPtr,
     name: *const XmlChar,
@@ -741,15 +631,10 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
     ret
 }
 
-/**
- * xmlCopyDocElementContent:
- * @doc:  the document owning the element declaration
- * @cur:  An element content pointer.
- *
- * Build a copy of an element content description.
- *
- * Returns the new xmlElementContentPtr or null_mut() in case of error.
- */
+/// Build a copy of an element content description.
+///
+/// Returns the new xmlElementContentPtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyDocElementContent")]
 pub unsafe extern "C" fn xml_copy_doc_element_content(
     doc: XmlDocPtr,
     mut cur: XmlElementContentPtr,
@@ -838,13 +723,8 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
     ret
 }
 
-/**
- * xmlFreeDocElementContent:
- * @doc: the document owning the element declaration
- * @cur:  the element content tree to free
- *
- * Free an element content structure. The whole subtree is removed.
- */
+/// Free an element content structure. The whole subtree is removed.
+#[doc(alias = "xmlFreeDocElementContent")]
 pub unsafe extern "C" fn xml_free_doc_element_content(
     doc: XmlDocPtr,
     mut cur: XmlElementContentPtr,
@@ -919,16 +799,9 @@ pub unsafe extern "C" fn xml_free_doc_element_content(
     }
 }
 
-/**
- * xmlSnprintfElementContent:
- * @buf:  an output buffer
- * @size:  the buffer size
- * @content:  An element table
- * @englob: 1 if one must print the englobing parenthesis, 0 otherwise
- *
- * This will dump the content of the element content definition
- * Intended just for the debug routine
- */
+/// This will dump the content of the element content definition
+/// Intended just for the debug routine
+#[doc(alias = "xmlSnprintfElementContent")]
 pub unsafe extern "C" fn xml_snprintf_element_content(
     buf: *mut c_char,
     size: i32,
@@ -1059,16 +932,8 @@ pub unsafe extern "C" fn xml_snprintf_element_content(
     }
 }
 
-/* DEPRECATED */
-/**
- * xmlSprintfElementContent:
- * @buf:  an output buffer
- * @content:  An element table
- * @englob: 1 if one must print the englobing parenthesis, 0 otherwise
- *
- * Deprecated, unsafe, use xmlSnprintfElementContent
- */
-#[deprecated]
+#[doc(alias = "xmlSprintfElementContent")]
+#[deprecated = "unsafe, use xmlSnprintfElementContent"]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_sprintf_element_content(
     _buf: *mut c_char,
@@ -1076,14 +941,9 @@ pub unsafe extern "C" fn xml_sprintf_element_content(
     _englob: i32,
 ) {
 }
-/* DEPRECATED */
 
-/**
- * xmlFreeElement:
- * @elem:  An element
- *
- * Deallocate the memory used by an element definition
- */
+/// Deallocate the memory used by an element definition
+#[doc(alias = "xmlFreeElement")]
 unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     if elem.is_null() {
         return;
@@ -1099,17 +959,8 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     xml_free(elem as _);
 }
 
-/**
- * xmlErrValidNode:
- * @ctxt:  an XML validation parser context
- * @node:  the node raising the error
- * @error:  the error number
- * @str1:  extra information
- * @str2:  extra information
- * @str3:  extra information
- *
- * Handle a validation error, provide contextual information
- */
+/// Handle a validation error, provide contextual information
+#[doc(alias = "xmlErrValidNode")]
 #[cfg(any(feature = "valid", feature = "schema"))]
 unsafe extern "C" fn xml_err_valid_node(
     ctxt: XmlValidCtxtPtr,
@@ -1175,19 +1026,10 @@ unsafe extern "C" fn xml_err_valid_node(
     );
 }
 
-/* Element */
-/**
- * xmlAddElementDecl:
- * @ctxt:  the validation context
- * @dtd:  pointer to the DTD
- * @name:  the entity name
- * @type:  the element type
- * @content:  the element content tree or null_mut()
- *
- * Register a new element declaration
- *
- * Returns null_mut() if not, otherwise the entity
- */
+/// Register a new element declaration
+///
+/// Returns null_mut() if not, otherwise the entity
+#[doc(alias = "xmlAddElementDecl")]
 pub unsafe extern "C" fn xml_add_element_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
@@ -1461,14 +1303,10 @@ pub unsafe extern "C" fn xml_add_element_decl(
     ret
 }
 
-/**
- * xmlCopyElement:
- * @elem:  An element
- *
- * Build a copy of an element.
- *
- * Returns the new xmlElementPtr or null_mut() in case of error.
- */
+/// Build a copy of an element.
+///
+/// Returns the new xmlElementPtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyElement")]
 #[cfg(feature = "tree")]
 extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let elem: XmlElementPtr = payload as XmlElementPtr;
@@ -1492,14 +1330,10 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
     }
 }
 
-/**
- * xmlCopyElementTable:
- * @table:  An element table
- *
- * Build a copy of an element table.
- *
- * Returns the new xmlElementTablePtr or null_mut() in case of error.
- */
+/// Build a copy of an element table.
+///
+/// Returns the new xmlElementTablePtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyElementTable")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
     xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
@@ -1511,24 +1345,15 @@ extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlC
     }
 }
 
-/**
- * xmlFreeElementTable:
- * @table:  An element table
- *
- * Deallocate the memory used by an element hash table.
- */
+/// Deallocate the memory used by an element hash table.
+#[doc(alias = "xmlFreeElementTable")]
 pub unsafe extern "C" fn xml_free_element_table(table: XmlElementTablePtr) {
     xml_hash_free(table, Some(xml_free_element_table_entry));
 }
 
-/**
- * xmlDumpElementDeclScan:
- * @elem:  An element table
- * @buf:  the XML buffer output
- *
- * This routine is used by the hash scan function.  It just reverses
- * the arguments.
- */
+/// This routine is used by the hash scan function.  
+/// It just reverses the arguments.
+#[doc(alias = "xmlDumpElementDeclScan")]
 #[cfg(feature = "output")]
 extern "C" fn xml_dump_element_decl_scan(
     elem: *mut c_void,
@@ -1540,13 +1365,8 @@ extern "C" fn xml_dump_element_decl_scan(
     }
 }
 
-/**
- * xmlDumpElementTable:
- * @buf:  the XML buffer output
- * @table:  An element table
- *
- * This will dump the content of the element table as an XML DTD definition
- */
+/// This will dump the content of the element table as an XML DTD definition
+#[doc(alias = "xmlDumpElementTable")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElementTablePtr) {
     if buf.is_null() || table.is_null() {
@@ -1555,13 +1375,8 @@ pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElemen
     xml_hash_scan(table, Some(xml_dump_element_decl_scan), buf as _);
 }
 
-/**
- * xmlDumpElementOccur:
- * @buf:  An XML buffer
- * @cur:  An element table
- *
- * Dump the occurrence operator of an element.
- */
+/// Dump the occurrence operator of an element.
+#[doc(alias = "xmlDumpElementOccur")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementContentPtr) {
     use crate::buf::libxml_api::xml_buf_ccat;
@@ -1580,13 +1395,8 @@ unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementConte
     }
 }
 
-/**
- * xmlDumpElementContent:
- * @buf:  An XML buffer
- * @content:  An element table
- *
- * This will dump the content of the element table as an XML DTD definition
- */
+/// This will dump the content of the element table as an XML DTD definition
+#[doc(alias = "xmlDumpElementContent")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
@@ -1680,14 +1490,8 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElemen
     xml_dump_element_occur(buf, content);
 }
 
-/**
- * xmlDumpElementDecl:
- * @buf:  the XML buffer output
- * @elem:  An element table
- *
- * This will dump the content of the element declaration as an XML
- * DTD definition
- */
+/// This will dump the content of the element declaration as an XML DTD definition
+#[doc(alias = "xmlDumpElementDecl")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
     use std::ffi::CString;
@@ -1769,16 +1573,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
     }
 }
 
-/* Enumeration */
-/**
- * xmlCreateEnumeration:
- * @name:  the enumeration name or null_mut()
- *
- * create and initialize an enumeration attribute node.
- *
- * Returns the xmlEnumerationPtr just created or null_mut() in case
- *                of error.
- */
+/// create and initialize an enumeration attribute node.
+///
+/// Returns the xmlEnumerationPtr just created or null_mut() in case of error.
+#[doc(alias = "xmlCreateEnumeration")]
 pub unsafe fn xml_create_enumeration(name: Option<&str>) -> XmlEnumerationPtr {
     let ret: XmlEnumerationPtr = xml_malloc(size_of::<XmlEnumeration>()) as XmlEnumerationPtr;
     if ret.is_null() {
@@ -1792,12 +1590,8 @@ pub unsafe fn xml_create_enumeration(name: Option<&str>) -> XmlEnumerationPtr {
     ret
 }
 
-/**
- * xmlFreeEnumeration:
- * @cur:  the tree to free.
- *
- * free an enumeration attribute node (recursive).
- */
+/// free an enumeration attribute node (recursive).
+#[doc(alias = "xmlFreeEnumeration")]
 pub unsafe extern "C" fn xml_free_enumeration(cur: XmlEnumerationPtr) {
     if cur.is_null() {
         return;
@@ -1811,15 +1605,10 @@ pub unsafe extern "C" fn xml_free_enumeration(cur: XmlEnumerationPtr) {
     xml_free(cur as _);
 }
 
-/**
- * xmlCopyEnumeration:
- * @cur:  the tree to copy.
- *
- * Copy an enumeration attribute node (recursive).
- *
- * Returns the xmlEnumerationPtr just created or null_mut() in case
- *                of error.
- */
+/// Copy an enumeration attribute node (recursive).
+///
+/// Returns the xmlEnumerationPtr just created or null_mut() in case of error.
+#[doc(alias = "xmlCopyEnumeration")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_enumeration(cur: XmlEnumerationPtr) -> XmlEnumerationPtr {
     if cur.is_null() {
@@ -1926,15 +1715,10 @@ unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: i32) -> i32 {
     0
 }
 
-/**
- * xmlValidateNamesValueInternal:
- * @doc:  pointer to the document or null_mut()
- * @value:  an Names value
- *
- * Validate that the given value match Names production
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given value match Names production
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNamesValueInternal")]
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_validate_names_value_internal(
     doc: XmlDocPtr,
@@ -2022,17 +1806,12 @@ unsafe extern "C" fn xml_validate_name_value_internal(
     1
 }
 
-/**
- * xmlValidateNmtokensValueInternal:
- * @doc:  pointer to the document or null_mut()
- * @value:  an Nmtokens value
- *
- * Validate that the given value match Nmtokens production
- *
- * [ VC: Name Token ]
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given value match Nmtokens production
+///
+/// `[ VC: Name Token ]`
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNmtokensValueInternal")]
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_validate_nmtokens_value_internal(
     doc: XmlDocPtr,
@@ -2095,17 +1874,12 @@ unsafe extern "C" fn xml_validate_nmtokens_value_internal(
     1
 }
 
-/**
- * xmlValidateNmtokenValueInternal:
- * @doc:  pointer to the document or null_mut()
- * @value:  an Nmtoken value
- *
- * Validate that the given value match Nmtoken production
- *
- * [ VC: Name Token ]
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given value match Nmtoken production
+///
+/// `[ VC: Name Token ]`
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNmtokenValueInternal")]
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_validate_nmtoken_value_internal(
     doc: XmlDocPtr,
@@ -2140,16 +1914,10 @@ unsafe extern "C" fn xml_validate_nmtoken_value_internal(
     1
 }
 
-/**
- * xmlValidateAttributeValueInternal:
- * @doc: the document
- * @type:  an attribute type
- * @value:  an attribute value
- *
- * Validate that the given attribute value match  the proper production
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given attribute value match  the proper production
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateAttributeValueInternal")]
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_validate_attribute_value_internal(
     doc: XmlDocPtr,
@@ -2177,17 +1945,8 @@ unsafe extern "C" fn xml_validate_attribute_value_internal(
     1
 }
 
-/**
- * xmlErrValidWarning:
- * @ctxt:  an XML validation parser context
- * @node:  the node raising the error
- * @error:  the error number
- * @str1:  extra information
- * @str2:  extra information
- * @str3:  extra information
- *
- * Handle a validation error, provide contextual information
- */
+/// Handle a validation error, provide contextual information
+#[doc(alias = "xmlErrValidWarning")]
 unsafe extern "C" fn xml_err_valid_warning(
     ctxt: XmlValidCtxtPtr,
     node: XmlNodePtr,
@@ -2250,12 +2009,8 @@ unsafe extern "C" fn xml_err_valid_warning(
     );
 }
 
-/**
- * xmlFreeAttribute:
- * @elem:  An attribute
- *
- * Deallocate the memory used by an attribute definition
- */
+/// Deallocate the memory used by an attribute definition
+#[doc(alias = "xmlFreeAttribute")]
 unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
     if attr.is_null() {
         return;
@@ -2291,16 +2046,10 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
     xml_free(attr as _);
 }
 
-/**
- * xmlGetDtdElementDesc2:
- * @dtd:  a pointer to the DtD to search
- * @name:  the element name
- * @create:  create an empty description if not found
- *
- * Search the DTD for the description of this element
- *
- * returns the xmlElementPtr if found or null_mut()
- */
+/// Search the DTD for the description of this element
+///
+/// returns the xmlElementPtr if found or null_mut()
+#[doc(alias = "xmlGetDtdElementDesc2")]
 unsafe extern "C" fn xml_get_dtd_element_desc2(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
@@ -2390,17 +2139,11 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
     cur
 }
 
-/**
- * xmlScanIDAttributeDecl:
- * @ctxt:  the validation context
- * @elem:  the element name
- * @err: whether to raise errors here
- *
- * Verify that the element don't have too many ID attributes
- * declared.
- *
- * Returns the number of ID attributes found.
- */
+/// Verify that the element don't have too many ID attributes
+/// declared.
+///
+/// Returns the number of ID attributes found.
+#[doc(alias = "xmlScanIDAttributeDecl")]
 #[cfg(feature = "valid")]
 unsafe extern "C" fn xml_scan_id_attribute_decl(
     ctxt: XmlValidCtxtPtr,
@@ -2438,24 +2181,11 @@ unsafe extern "C" fn xml_scan_id_attribute_decl(
     ret
 }
 
-/* Attribute */
-/**
- * xmlAddAttributeDecl:
- * @ctxt:  the validation context
- * @dtd:  pointer to the DTD
- * @elem:  the element name
- * @name:  the attribute name
- * @ns:  the attribute namespace prefix
- * @type:  the attribute type
- * @def:  the attribute default type
- * @defaultValue:  the attribute default value
- * @tree:  if it's an enumeration, the associated list
- *
- * Register a new attribute declaration
- * Note that @tree becomes the ownership of the DTD
- *
- * Returns null_mut() if not new, otherwise the attribute decl
- */
+/// Register a new attribute declaration
+/// Note that @tree becomes the ownership of the DTD
+///
+/// Returns null_mut() if not new, otherwise the attribute decl
+#[doc(alias = "xmlAddAttributeDecl")]
 pub unsafe extern "C" fn xml_add_attribute_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
@@ -2731,14 +2461,10 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
     ret
 }
 
-/**
- * xmlCopyAttribute:
- * @attr:  An attribute
- *
- * Build a copy of an attribute.
- *
- * Returns the new xmlAttributePtr or null_mut() in case of error.
- */
+/// Build a copy of an attribute.
+///
+/// Returns the new xmlAttributePtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyAttribute")]
 #[cfg(feature = "tree")]
 extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let attr: XmlAttributePtr = payload as XmlAttributePtr;
@@ -2767,14 +2493,10 @@ extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) ->
     }
 }
 
-/**
- * xmlCopyAttributeTable:
- * @table:  An attribute table
- *
- * Build a copy of an attribute table.
- *
- * Returns the new xmlAttributeTablePtr or null_mut() in case of error.
- */
+/// Build a copy of an attribute table.
+///
+/// Returns the new xmlAttributeTablePtr or null_mut() in case of error.
+#[doc(alias = "xmlCopyAttributeTable")]
 #[cfg(feature = "tree")]
 pub unsafe extern "C" fn xml_copy_attribute_table(
     table: XmlAttributeTablePtr,
@@ -2788,23 +2510,14 @@ extern "C" fn xml_free_attribute_table_entry(attr: *mut c_void, _name: *const Xm
     }
 }
 
-/**
- * xmlFreeAttributeTable:
- * @table:  An attribute table
- *
- * Deallocate the memory used by an entities hash table.
- */
+/// Deallocate the memory used by an entities hash table.
+#[doc(alias = "xmlFreeAttributeTable")]
 pub unsafe extern "C" fn xml_free_attribute_table(table: XmlAttributeTablePtr) {
     xml_hash_free(table, Some(xml_free_attribute_table_entry));
 }
 
-/**
- * xmlDumpAttributeDeclScan:
- * @attr:  An attribute declaration
- * @buf:  the XML buffer output
- *
- * This is used with the hash scan function - just reverses arguments
- */
+/// This is used with the hash scan function - just reverses arguments
+#[doc(alias = "xmlDumpAttributeDeclScan")]
 #[cfg(feature = "output")]
 extern "C" fn xml_dump_attribute_decl_scan(
     attr: *mut c_void,
@@ -2816,13 +2529,8 @@ extern "C" fn xml_dump_attribute_decl_scan(
     }
 }
 
-/**
- * xmlDumpAttributeTable:
- * @buf:  the XML buffer output
- * @table:  An attribute table
- *
- * This will dump the content of the attribute table as an XML DTD definition
- */
+/// This will dump the content of the attribute table as an XML DTD definition
+#[doc(alias = "xmlDumpAttributeTable")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttributeTablePtr) {
     if buf.is_null() || table.is_null() {
@@ -2831,13 +2539,8 @@ pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttr
     xml_hash_scan(table, Some(xml_dump_attribute_decl_scan), buf as _);
 }
 
-/**
- * xmlDumpEnumeration:
- * @buf:  the XML buffer output
- * @enum:  An enumeration
- *
- * This will dump the content of the enumeration
- */
+/// This will dump the content of the enumeration
+#[doc(alias = "xmlDumpEnumeration")]
 #[cfg(feature = "output")]
 unsafe extern "C" fn xml_dump_enumeration(buf: XmlBufPtr, cur: XmlEnumerationPtr) {
     use std::ffi::CString;
@@ -2862,14 +2565,8 @@ unsafe extern "C" fn xml_dump_enumeration(buf: XmlBufPtr, cur: XmlEnumerationPtr
     }
 }
 
-/**
- * xmlDumpAttributeDecl:
- * @buf:  the XML buffer output
- * @attr:  An attribute declaration
- *
- * This will dump the content of the attribute declaration as an XML
- * DTD definition
- */
+/// This will dump the content of the attribute declaration as an XML DTD definition
+#[doc(alias = "xmlDumpAttributeDecl")]
 #[cfg(feature = "output")]
 pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string};
@@ -2975,13 +2672,7 @@ unsafe extern "C" fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
     matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
 }
 
-/**
- * DICT_FREE:
- * @str:  a string
- *
- * Free a string if it is not owned by the "dict" dictionary in the
- * current scope
- */
+/// Free a string if it is not owned by the "dict" dictionary in the current scope
 macro_rules! DICT_FREE {
     ($str:expr, $dict:expr) => {
         if !$str.is_null() && ($dict.is_null() || xml_dict_owns($dict, $str as *const XmlChar) == 0)
@@ -2991,12 +2682,8 @@ macro_rules! DICT_FREE {
     };
 }
 
-/**
- * xmlFreeID:
- * @not:  A id
- *
- * Deallocate the memory used by an id definition
- */
+/// Deallocate the memory used by an id definition
+#[doc(alias = "xmlFreeID")]
 unsafe extern "C" fn xml_free_id(id: XmlIDPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
@@ -3017,18 +2704,10 @@ unsafe extern "C" fn xml_free_id(id: XmlIDPtr) {
     xml_free(id as _);
 }
 
-/* IDs */
-/**
- * xmlAddID:
- * @ctxt:  the validation context
- * @doc:  pointer to the document
- * @value:  the value name
- * @attr:  the attribute holding the ID
- *
- * Register a new id declaration
- *
- * Returns null_mut() if not, otherwise the new xmlIDPtr
- */
+/// Register a new id declaration
+///
+/// Returns null_mut() if not, otherwise the new xmlIDPtr
+#[doc(alias = "xmlAddID")]
 pub unsafe extern "C" fn xml_add_id(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -3118,25 +2797,16 @@ extern "C" fn xml_free_id_table_entry(id: *mut c_void, _name: *const XmlChar) {
     }
 }
 
-/**
- * xmlFreeIDTable:
- * @table:  An id table
- *
- * Deallocate the memory used by an ID hash table.
- */
+/// Deallocate the memory used by an ID hash table.
+#[doc(alias = "xmlFreeIDTable")]
 pub unsafe extern "C" fn xml_free_id_table(table: XmlIDTablePtr) {
     xml_hash_free(table, Some(xml_free_id_table_entry));
 }
 
-/**
- * xmlGetID:
- * @doc:  pointer to the document
- * @ID:  the ID value
- *
- * Search the attribute declaring the given ID
- *
- * Returns null_mut() if not found, otherwise the xmlAttrPtr defining the ID
- */
+/// Search the attribute declaring the given ID
+///
+/// Returns null_mut() if not found, otherwise the xmlAttrPtr defining the ID
+#[doc(alias = "xmlGetID")]
 pub unsafe extern "C" fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> XmlAttrPtr {
     if doc.is_null() {
         return null_mut();
@@ -3165,19 +2835,13 @@ pub unsafe extern "C" fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> XmlAt
     (*id_ptr).attr
 }
 
-/**
- * xmlIsID:
- * @doc:  the document
- * @elem:  the element carrying the attribute
- * @attr:  the attribute
- *
- * Determine whether an attribute is of type ID. In case we have DTD(s)
- * then this is done if DTD loading has been requested. In the case
- * of HTML documents parsed with the HTML parser, then ID detection is
- * done systematically.
- *
- * Returns 0 or 1 depending on the lookup result
- */
+/// Determine whether an attribute is of type ID. In case we have DTD(s)
+/// then this is done if DTD loading has been requested. In the case
+/// of HTML documents parsed with the HTML parser, then ID detection is
+/// done systematically.
+///
+/// Returns 0 or 1 depending on the lookup result
+#[doc(alias = "xmlIsID")]
 pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAttrPtr) -> i32 {
     if attr.is_null() || (*attr).name.is_null() {
         return 0;
@@ -3248,12 +2912,8 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
     0
 }
 
-/**
- * xmlValidNormalizeString:
- * @str: a string
- *
- * Normalize a string in-place.
- */
+/// Normalize a string in-place.
+#[doc(alias = "xmlValidNormalizeString")]
 unsafe extern "C" fn xml_valid_normalize_string(str: *mut XmlChar) {
     let mut dst: *mut XmlChar;
     let mut src: *const XmlChar;
@@ -3285,15 +2945,10 @@ unsafe extern "C" fn xml_valid_normalize_string(str: *mut XmlChar) {
     *dst = 0;
 }
 
-/**
- * xmlRemoveID:
- * @doc:  the document
- * @attr:  the attribute
- *
- * Remove the given attribute from the ID table maintained internally.
- *
- * Returns -1 if the lookup failed and 0 otherwise
- */
+/// Remove the given attribute from the ID table maintained internally.
+///
+/// Returns -1 if the lookup failed and 0 otherwise
+#[doc(alias = "xmlRemoveID")]
 pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     if doc.is_null() {
         return -1;
@@ -3327,12 +2982,8 @@ pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 
     0
 }
 
-/**
- * xmlFreeRef:
- * @lk:  A list link
- *
- * Deallocate the memory used by a ref definition
- */
+/// Deallocate the memory used by a ref definition
+#[doc(alias = "xmlFreeRef")]
 extern "C" fn xml_free_ref(data: *mut c_void) {
     let refe: XmlRefPtr = data as XmlRefPtr;
     if refe.is_null() {
@@ -3349,31 +3000,16 @@ extern "C" fn xml_free_ref(data: *mut c_void) {
     }
 }
 
-/**
- * xmlDummyCompare
- * @data0:  Value supplied by the user
- * @data1:  Value supplied by the user
- *
- * Do nothing, return 0. Used to create unordered lists.
- */
+/// Do nothing, return 0. Used to create unordered lists.
+#[doc(alias = "xmlDummyCompare")]
 extern "C" fn xml_dummy_compare(_data0: *const c_void, _data1: *const c_void) -> i32 {
     0
 }
 
-/* IDREFs */
-/**
- * xmlAddRef:
- * @ctxt:  the validation context
- * @doc:  pointer to the document
- * @value:  the value name
- * @attr:  the attribute holding the Ref
- *
- * DEPRECATED, do not use. This function will be removed from the public API.
- *
- * Register a new ref declaration
- *
- * Returns null_mut() if not, otherwise the new xmlRefPtr
- */
+/// Register a new ref declaration
+///
+/// Returns null_mut() if not, otherwise the new xmlRefPtr
+#[doc(alias = "xmlAddRef")]
 pub(crate) unsafe extern "C" fn xml_add_ref(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -3483,12 +3119,8 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
     null_mut()
 }
 
-/**
- * xmlFreeRefTableEntry:
- * @list_ref:  A list of references.
- *
- * Deallocate the memory used by a list of references
- */
+/// Deallocate the memory used by a list of references
+#[doc(alias = "xmlFreeRefTableEntry")]
 extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *const XmlChar) {
     let list_ref: XmlListPtr = payload as XmlListPtr;
     if list_ref.is_null() {
@@ -3497,32 +3129,17 @@ extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *const XmlCh
     xml_list_delete(list_ref);
 }
 
-/**
- * xmlFreeRefTable:
- * @table:  An ref table
- *
- * DEPRECATED, do not use. This function will be removed from the public API.
- *
- * Deallocate the memory used by an Ref hash table.
- */
+/// Deallocate the memory used by an Ref hash table.
+#[doc(alias = "xmlFreeRefTable")]
 pub(crate) unsafe extern "C" fn xml_free_ref_table(table: XmlRefTablePtr) {
     xml_hash_free(table, Some(xml_free_ref_table_entry));
 }
 
-/**
- * xmlIsRef:
- * @doc:  the document
- * @elem:  the element carrying the attribute
- * @attr:  the attribute
- *
- * DEPRECATED, do not use. This function will be removed from the public API.
- *
- * Determine whether an attribute is of type Ref. In case we have DTD(s)
- * then this is simple, otherwise we use an heuristic: name Ref (upper
- * or lowercase).
- *
- * Returns 0 or 1 depending on the lookup result
- */
+/// Determine whether an attribute is of type Ref. In case we have DTD(s)
+/// then this is simple, otherwise we use an heuristic: name Ref (upper or lowercase).
+///
+/// Returns 0 or 1 depending on the lookup result
+#[doc(alias = "xmlIsRef")]
 pub(crate) unsafe extern "C" fn xml_is_ref(
     mut doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -3573,13 +3190,8 @@ pub struct XmlRemoveMemo {
 }
 pub type XmlRemoveMemoPtr = *mut XmlRemoveMemo;
 
-/**
- * xmlWalkRemoveRef:
- * @data:  Contents of current link
- * @user:  Value supplied by the user
- *
- * Returns 0 to abort the walk or 1 to continue
- */
+/// Returns 0 to abort the walk or 1 to continue
+#[doc(alias = "xmlWalkRemoveRef")]
 extern "C" fn xml_walk_remove_ref(data: *const c_void, user: *mut c_void) -> i32 {
     unsafe {
         let attr0: XmlAttrPtr = (*(data as XmlRefPtr)).attr;
@@ -3595,17 +3207,10 @@ extern "C" fn xml_walk_remove_ref(data: *const c_void, user: *mut c_void) -> i32
     }
 }
 
-/**
- * xmlRemoveRef:
- * @doc:  the document
- * @attr:  the attribute
- *
- * DEPRECATED, do not use. This function will be removed from the public API.
- *
- * Remove the given attribute from the Ref table maintained internally.
- *
- * Returns -1 if the lookup failed and 0 otherwise
- */
+/// Remove the given attribute from the Ref table maintained internally.
+///
+/// Returns -1 if the lookup failed and 0 otherwise
+#[doc(alias = "xmlRemoveRef")]
 pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     let mut target: XmlRemoveMemo = unsafe { zeroed() };
 
@@ -3662,17 +3267,10 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
     0
 }
 
-/**
- * xmlGetRefs:
- * @doc:  pointer to the document
- * @ID:  the ID value
- *
- * DEPRECATED, do not use. This function will be removed from the public API.
- *
- * Find the set of references for the supplied ID.
- *
- * Returns null_mut() if not found, otherwise node set for the ID.
- */
+/// Find the set of references for the supplied ID.
+///
+/// Returns null_mut() if not found, otherwise node set for the ID.
+#[doc(alias = "xmlGetRefs")]
 pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar) -> XmlListPtr {
     if doc.is_null() {
         return null_mut();
@@ -3690,17 +3288,10 @@ pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar)
     xml_hash_lookup(table, id) as _
 }
 
-/**
- * The public function calls related to validity checking.
- */
-/* Allocate/Release Validation Contexts */
-/**
- * xmlNewValidCtxt:
- *
- * Allocate a validation context structure.
- *
- * Returns null_mut() if not, otherwise the new validation context structure
- */
+/// Allocate a validation context structure.
+///
+/// Returns null_mut() if not, otherwise the new validation context structure
+#[doc(alias = "xmlNewValidCtxt")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
     let ret: XmlValidCtxtPtr = xml_malloc(size_of::<XmlValidCtxt>()) as _;
@@ -3714,12 +3305,8 @@ pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
     ret
 }
 
-/**
- * xmlFreeValidCtxt:
- * @cur:  the validation context to free
- *
- * Free a validation context structure.
- */
+/// Free a validation context structure.
+#[doc(alias = "xmlFreeValidCtxt")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
     if cur.is_null() {
@@ -3734,19 +3321,14 @@ pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
     xml_free(cur as _);
 }
 
-/**
- * xmlValidateRoot:
- * @ctxt:  the validation context
- * @doc:  a document instance
- *
- * Try to validate a the root element
- * basically it does the following check as described by the
- * XML-1.0 recommendation:
- *  - [ VC: Root Element Type ]
- *    it doesn't try to recurse or apply other check to the element
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a the root element
+/// basically it does the following check as described by the
+/// XML-1.0 recommendation:
+///  - [ VC: Root Element Type ]
+///    it doesn't try to recurse or apply other check to the element
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateRoot")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let ret: i32;
@@ -3830,21 +3412,15 @@ macro_rules! CHECK_DTD {
     };
 }
 
-/**
- * xmlValidateElementDecl:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element definition
- *
- * Try to validate a single element definition
- * basically it does the following checks as described by the
- * XML-1.0 recommendation:
- *  - [ VC: One ID per Element Type ]
- *  - [ VC: No Duplicate Types ]
- *  - [ VC: Unique Element Type Declaration ]
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a single element definition
+/// basically it does the following checks as described by the
+/// XML-1.0 recommendation:
+///  - [ VC: One ID per Element Type ]
+///  - [ VC: No Duplicate Types ]
+///  - [ VC: Unique Element Type Declaration ]
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateElementDecl")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_element_decl(
     ctxt: XmlValidCtxtPtr,
@@ -4039,24 +3615,16 @@ pub unsafe extern "C" fn xml_validate_element_decl(
     ret
 }
 
-/**
- * xmlValidNormalizeAttributeValue:
- * @doc:  the document
- * @elem:  the parent
- * @name:  the attribute name
- * @value:  the attribute value
- *
- * Does the validation related extra step of the normalization of attribute
- * values:
- *
- * If the declared value is not CDATA, then the XML processor must further
- * process the normalized attribute value by discarding any leading and
- * trailing space (#x20) characters, and by replacing sequences of space
- * (#x20) characters by single space (#x20) character.
- *
- * Returns a new normalized string if normalization is needed, null_mut() otherwise
- *      the caller must free the returned value.
- */
+/// Does the validation related extra step of the normalization of attribute values:
+///
+/// If the declared value is not CDATA, then the XML processor must further
+/// process the normalized attribute value by discarding any leading and
+/// trailing space (#x20) characters, and by replacing sequences of space
+/// (#x20) characters by single space (#x20) character.
+///
+/// Returns a new normalized string if normalization is needed, null_mut() otherwise
+/// the caller must free the returned value.
+#[doc(alias = "xmlValidNormalizeAttributeValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
     doc: XmlDocPtr,
@@ -4115,29 +3683,19 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
     ret
 }
 
-/**
- * xmlValidCtxtNormalizeAttributeValue:
- * @ctxt: the validation context
- * @doc:  the document
- * @elem:  the parent
- * @name:  the attribute name
- * @value:  the attribute value
- * @ctxt:  the validation context or null_mut()
- *
- * Does the validation related extra step of the normalization of attribute
- * values:
- *
- * If the declared value is not CDATA, then the XML processor must further
- * process the normalized attribute value by discarding any leading and
- * trailing space (#x20) characters, and by replacing sequences of space
- * (#x20) characters by single space (#x20) character.
- *
- * Also  check VC: Standalone Document Declaration in P32, and update
- *  (*ctxt).valid accordingly
- *
- * returns a new normalized string if normalization is needed, null_mut() otherwise
- *      the caller must free the returned value.
- */
+/// Does the validation related extra step of the normalization of attribute values:
+///
+/// If the declared value is not CDATA, then the XML processor must further
+/// process the normalized attribute value by discarding any leading and
+/// trailing space (#x20) characters, and by replacing sequences of space
+/// (#x20) characters by single space (#x20) character.
+///
+/// Also  check VC: Standalone Document Declaration in P32, and update
+///  (*ctxt).valid accordingly
+///
+/// Returns a new normalized string if normalization is needed, null_mut() otherwise
+/// the caller must free the returned value.
+#[doc(alias = "xmlValidCtxtNormalizeAttributeValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
     ctxt: XmlValidCtxtPtr,
@@ -4230,17 +3788,8 @@ extern "C" fn xml_validate_attribute_id_callback(
     }
 }
 
-/**
- * xmlErrValidNodeNr:
- * @ctxt:  an XML validation parser context
- * @node:  the node raising the error
- * @error:  the error number
- * @str1:  extra information
- * @int2:  extra information
- * @str3:  extra information
- *
- * Handle a validation error, provide contextual information
- */
+/// Handle a validation error, provide contextual information
+#[doc(alias = "xmlErrValidNodeNr")]
 unsafe extern "C" fn xml_err_valid_node_nr(
     ctxt: XmlValidCtxtPtr,
     node: XmlNodePtr,
@@ -4300,23 +3849,17 @@ unsafe extern "C" fn xml_err_valid_node_nr(
     );
 }
 
-/**
- * xmlValidateAttributeDecl:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @attr:  an attribute definition
- *
- * Try to validate a single attribute definition
- * basically it does the following checks as described by the
- * XML-1.0 recommendation:
- *  - [ VC: Attribute Default Legal ]
- *  - [ VC: Enumeration ]
- *  - [ VC: ID Attribute Default ]
- *
- * The ID/IDREF uniqueness and matching are done separately
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a single attribute definition
+/// basically it does the following checks as described by the
+/// XML-1.0 recommendation:
+///  - [ VC: Attribute Default Legal ]
+///  - [ VC: Enumeration ]
+///  - [ VC: ID Attribute Default ]
+///
+/// The ID/IDREF uniqueness and matching are done separately
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateAttributeDecl")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_attribute_decl(
     ctxt: XmlValidCtxtPtr,
@@ -4485,30 +4028,25 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
     ret
 }
 
-/**
- * xmlValidateAttributeValue:
- * @type:  an attribute type
- * @value:  an attribute value
- *
- * Validate that the given attribute value match  the proper production
- *
- * [ VC: ID ]
- * Values of type ID must match the Name production....
- *
- * [ VC: IDREF ]
- * Values of type IDREF must match the Name production, and values
- * of type IDREFS must match Names ...
- *
- * [ VC: Entity Name ]
- * Values of type ENTITY must match the Name production, values
- * of type ENTITIES must match Names ...
- *
- * [ VC: Name Token ]
- * Values of type NMTOKEN must match the Nmtoken production; values
- * of type NMTOKENS must match Nmtokens.
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given attribute value match  the proper production
+///
+/// `[ VC: ID ]`  
+/// Values of type ID must match the Name production....
+///
+/// `[ VC: IDREF ]`  
+/// Values of type IDREF must match the Name production, and values
+/// of type IDREFS must match Names ...
+///
+/// `[ VC: Entity Name ]`  
+/// Values of type ENTITY must match the Name production, values
+/// of type ENTITIES must match Names ...
+///
+/// `[ VC: Name Token ]`
+/// Values of type NMTOKEN must match the Nmtoken production; values
+/// of type NMTOKENS must match Nmtokens.
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateAttributeValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_attribute_value(
     typ: XmlAttributeType,
@@ -4517,20 +4055,14 @@ pub unsafe extern "C" fn xml_validate_attribute_value(
     xml_validate_attribute_value_internal(null_mut(), typ, value)
 }
 
-/**
- * xmlValidateNotationDecl:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @nota:  a notation definition
- *
- * Try to validate a single notation definition
- * basically it does the following checks as described by the
- * XML-1.0 recommendation:
- *  - it seems that no validity constraint exists on notation declarations
- *    But this function get called anyway ...
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a single notation definition
+/// basically it does the following checks as described by the
+/// XML-1.0 recommendation:
+///  - it seems that no validity constraint exists on notation declarations
+///    But this function get called anyway ...
+///
+/// Returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNotationDecl")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_notation_decl(
     _ctxt: XmlValidCtxtPtr,
@@ -4542,21 +4074,14 @@ pub unsafe extern "C" fn xml_validate_notation_decl(
     ret
 }
 
-/**
- * xmlValidateDtd:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @dtd:  a dtd instance
- *
- * Try to validate the document against the dtd instance
- *
- * Basically it does check all the definitions in the DtD.
- * Note the the internal subset (if present) is de-coupled
- * (i.e. not used), which could give problems if ID or IDREF
- * is present.
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate the document against the dtd instance
+///
+/// Basically it does check all the definitions in the DtD.
+/// Note the the internal subset (if present) is de-coupled
+/// (i.e. not used), which could give problems if ID or IDREF is present.
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateDtd")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_dtd(
     ctxt: XmlValidCtxtPtr,
@@ -4597,34 +4122,24 @@ pub unsafe extern "C" fn xml_validate_dtd(
     ret
 }
 
-/**
- * xmlValidateAttributeValue2:
- * @ctxt:  the validation context
- * @doc:  the document
- * @name:  the attribute name (used for error reporting only)
- * @type:  the attribute type
- * @value:  the attribute value
- *
- * Validate that the given attribute value match a given type.
- * This typically cannot be done before having finished parsing
- * the subsets.
- *
- * [ VC: IDREF ]
- * Values of type IDREF must match one of the declared IDs
- * Values of type IDREFS must match a sequence of the declared IDs
- * each Name must match the value of an ID attribute on some element
- * in the XML document; i.e. IDREF values must match the value of
- * some ID attribute
- *
- * [ VC: Entity Name ]
- * Values of type ENTITY must match one declared entity
- * Values of type ENTITIES must match a sequence of declared entities
- *
- * [ VC: Notation Attributes ]
- * all notation names in the declaration must be declared.
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given attribute value match a given type.
+/// This typically cannot be done before having finished parsing the subsets.
+///
+/// `[ VC: IDREF ]`  
+/// Values of type IDREF must match one of the declared IDs
+/// Values of type IDREFS must match a sequence of the declared IDs
+/// each Name must match the value of an ID attribute on some element
+/// in the XML document; i.e. IDREF values must match the value of some ID attribute
+///
+/// `[ VC: Entity Name ]`  
+/// Values of type ENTITY must match one declared entity
+/// Values of type ENTITIES must match a sequence of declared entities
+///
+/// `[ VC: Notation Attributes ]`  
+/// All notation names in the declaration must be declared.
+///
+/// Returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateAttributeValue2")]
 unsafe extern "C" fn xml_validate_attribute_value2(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -4902,22 +4417,16 @@ extern "C" fn xml_validate_notation_callback(
     }
 }
 
-/**
- * xmlValidateDtdFinal:
- * @ctxt:  the validation context
- * @doc:  a document instance
- *
- * Does the final step for the dtds validation once all the
- * subsets have been parsed
- *
- * basically it does the following checks described by the XML Rec
- * - check that ENTITY and ENTITIES type attributes default or
- *   possible values matches one of the defined entities.
- * - check that NOTATION type attributes default or
- *   possible values matches one of the defined notations.
- *
- * returns 1 if valid or 0 if invalid and -1 if not well-formed
- */
+/// Does the final step for the dtds validation once all the subsets have been parsed
+///
+/// basically it does the following checks described by the XML Rec
+/// - check that ENTITY and ENTITIES type attributes default or
+///   possible values matches one of the defined entities.
+/// - check that NOTATION type attributes default or
+///   possible values matches one of the defined notations.
+///
+/// Returns 1 if valid or 0 if invalid and -1 if not well-formed
+#[doc(alias = "xmlValidateDtdFinal")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let mut dtd: XmlDtdPtr;
@@ -4953,19 +4462,14 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
     (*ctxt).valid
 }
 
-/**
- * xmlValidateDocument:
- * @ctxt:  the validation context
- * @doc:  a document instance
- *
- * Try to validate the document instance
- *
- * basically it does the all the checks described by the XML Rec
- * i.e. validates the internal and external subset (if present)
- * and validate the document tree.
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate the document instance
+///
+/// basically it does the all the checks described by the XML Rec
+/// i.e. validates the internal and external subset (if present)
+/// and validate the document tree.
+///
+/// Returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateDocument")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     use std::ffi::CString;
@@ -5065,16 +4569,10 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
     ret
 }
 
-/**
- * xmlValidateElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- *
- * Try to validate the subtree under an element
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate the subtree under an element
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateElement")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_element(
     ctxt: XmlValidCtxtPtr,
@@ -5150,18 +4648,10 @@ pub unsafe extern "C" fn xml_validate_element(
     // return ret;
 }
 
-/**
- * xmlValidGetElemDecl:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- * @extsubset:  pointer, (out) indicate if the declaration was found
- *              in the external subset.
- *
- * Finds a declaration associated to an element in the document.
- *
- * returns the pointer to the declaration or null_mut() if not found.
- */
+/// Finds a declaration associated to an element in the document.
+///
+/// returns the pointer to the declaration or null_mut() if not found.
+#[doc(alias = "xmlValidGetElemDecl")]
 unsafe extern "C" fn xml_valid_get_elem_decl(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -5269,16 +4759,10 @@ unsafe extern "C" fn node_vpop(ctxt: XmlValidCtxtPtr) -> XmlNodePtr {
     ret
 }
 
-/**
- * xmlValidateCdataElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- *
- * Check that an element follows #CDATA
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Check that an element follows #CDATA
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateCdataElement")]
 unsafe extern "C" fn xml_validate_one_cdata_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -5350,16 +4834,9 @@ macro_rules! DEBUG_VALID_MSG {
     };
 }
 
-/**
- * xmlSnprintfElements:
- * @buf:  an output buffer
- * @size:  the size of the buffer
- * @content:  An element
- * @glob: 1 if one must print the englobing parenthesis, 0 otherwise
- *
- * This will dump the list of elements to the buffer
- * Intended just for the debug routine
- */
+/// This will dump the list of elements to the buffer
+/// Intended just for the debug routine
+#[doc(alias = "xmlSnprintfElements")]
 unsafe extern "C" fn xml_snprintf_elements(
     buf: *mut c_char,
     size: i32,
@@ -5453,16 +4930,12 @@ const ROLLBACK_OR: usize = 0;
 #[cfg(not(feature = "regexp"))]
 const ROLLBACK_PARENT: usize = 1;
 
-/**
- * xmlValidateElementType:
- * @ctxt:  the validation context
- *
- * Try to validate the content model of an element internal function
- *
- * returns 1 if valid or 0 ,-1 in case of error, -2 if an entity
- *           reference is found and -3 if the validation succeeded but
- *           the content model is not determinist.
- */
+/// Try to validate the content model of an element internal function
+///
+/// returns 1 if valid or 0 ,-1 in case of error, -2 if an entity
+/// reference is found and -3 if the validation succeeded but
+/// the content model is not determinist.
+#[doc(alias = "xmlValidateElementType")]
 #[cfg(not(feature = "regexp"))]
 unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
     let mut ret: i32 = -1;
@@ -5974,19 +5447,10 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
     determinist
 }
 
-/**
- * xmlValidateElementContent:
- * @ctxt:  the validation context
- * @child:  the child list
- * @elemDecl:  pointer to the element declaration
- * @warn:  emit the error message
- * @parent: the parent element (for error reporting)
- *
- * Try to validate the content model of an element
- *
- * returns 1 if valid or 0 if not and -1 in case of error
- */
-
+/// Try to validate the content model of an element
+///
+/// returns 1 if valid or 0 if not and -1 in case of error
+#[doc(alias = "xmlValidateElementContent")]
 unsafe extern "C" fn xml_validate_element_content(
     ctxt: XmlValidCtxtPtr,
     child: XmlNodePtr,
@@ -6342,23 +5806,17 @@ unsafe extern "C" fn xml_validate_element_content(
     ret
 }
 
-/**
- * xmlValidateOneElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- *
- * Try to validate a single element and it's attributes,
- * basically it does the following checks as described by the
- * XML-1.0 recommendation:
- *  - [ VC: Element Valid ]
- *  - [ VC: Required Attribute ]
- *    Then call xmlValidateOneAttribute() for each attribute present.
- *
- * The ID/IDREF checkings are done separately
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a single element and it's attributes,
+/// basically it does the following checks as described by the
+/// XML-1.0 recommendation:
+///  - [ VC: Element Valid ]
+///  - [ VC: Required Attribute ]
+///    Then call xmlValidateOneAttribute() for each attribute present.
+///
+/// The ID/IDREF checkings are done separately
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateOneElement")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
@@ -6896,30 +6354,22 @@ pub unsafe extern "C" fn xml_validate_one_element(
     ret
 }
 
-/**
- * xmlValidateOneAttribute:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- * @attr:  an attribute instance
- * @value:  the attribute value (without entities processing)
- *
- * Try to validate a single attribute for an element
- * basically it does the following checks as described by the
- * XML-1.0 recommendation:
- *  - [ VC: Attribute Value Type ]
- *  - [ VC: Fixed Attribute Default ]
- *  - [ VC: Entity Name ]
- *  - [ VC: Name Token ]
- *  - [ VC: ID ]
- *  - [ VC: IDREF ]
- *  - [ VC: Entity Name ]
- *  - [ VC: Notation Attributes ]
- *
- * The ID/IDREF uniqueness and matching are done separately
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a single attribute for an element
+/// basically it does the following checks as described by the
+/// XML-1.0 recommendation:
+///  - [ VC: Attribute Value Type ]
+///  - [ VC: Fixed Attribute Default ]
+///  - [ VC: Entity Name ]
+///  - [ VC: Name Token ]
+///  - [ VC: ID ]
+///  - [ VC: IDREF ]
+///  - [ VC: Entity Name ]
+///  - [ VC: Notation Attributes ]
+///
+/// The ID/IDREF uniqueness and matching are done separately
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateOneAttribute")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
@@ -7159,31 +6609,22 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
     ret
 }
 
-/**
- * xmlValidateOneNamespace:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- * @prefix:  the namespace prefix
- * @ns:  an namespace declaration instance
- * @value:  the attribute value (without entities processing)
- *
- * Try to validate a single namespace declaration for an element
- * basically it does the following checks as described by the
- * XML-1.0 recommendation:
- *  - [ VC: Attribute Value Type ]
- *  - [ VC: Fixed Attribute Default ]
- *  - [ VC: Entity Name ]
- *  - [ VC: Name Token ]
- *  - [ VC: ID ]
- *  - [ VC: IDREF ]
- *  - [ VC: Entity Name ]
- *  - [ VC: Notation Attributes ]
- *
- * The ID/IDREF uniqueness and matching are done separately
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Try to validate a single namespace declaration for an element
+/// basically it does the following checks as described by the
+/// XML-1.0 recommendation:
+///  - [ VC: Attribute Value Type ]
+///  - [ VC: Fixed Attribute Default ]
+///  - [ VC: Entity Name ]
+///  - [ VC: Name Token ]
+///  - [ VC: ID ]
+///  - [ VC: IDREF ]
+///  - [ VC: Entity Name ]
+///  - [ VC: Notation Attributes ]
+///
+/// The ID/IDREF uniqueness and matching are done separately
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateOneNamespace")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_one_namespace(
     ctxt: XmlValidCtxtPtr,
@@ -7352,17 +6793,15 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
      * no practical sense to use ID types anyway.
      */
     // #if 0
-    //     /* Validity Constraint: ID uniqueness */
-    //     if ((*attrDecl).atype == XML_ATTRIBUTE_ID) {
-    //         if (xmlAddID(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
-    // 	    ret = 0;
-    //     }
-
-    //     if (((*attrDecl).atype == XML_ATTRIBUTE_IDREF) ||
-    // 	((*attrDecl).atype == XML_ATTRIBUTE_IDREFS)) {
-    //         if (xmlAddRef(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
-    // 	    ret = 0;
-    //     }
+    // /* Validity Constraint: ID uniqueness */
+    // if ((*attrDecl).atype == XML_ATTRIBUTE_ID) {
+    //     if (xmlAddID(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
+    //         ret = 0;
+    // }
+    // if (((*attrDecl).atype == XML_ATTRIBUTE_IDREF) || ((*attrDecl).atype == XML_ATTRIBUTE_IDREFS)) {
+    //     if (xmlAddRef(ctxt, doc, value, (xmlAttrPtr) ns).is_null())
+    // 	       ret = 0;
+    // }
     // #endif
 
     /* Validity Constraint: Notation Attributes */
@@ -7515,13 +6954,7 @@ pub struct XmlValidateMemo {
     name: *const XmlChar,
 }
 
-/**
- * xmlValidateRef:
- * @ref:   A reference to be validated
- * @ctxt:  Validation context
- * @name:  Name of ID we are searching for
- *
- */
+#[doc(alias = "xmlValidateRef")]
 unsafe extern "C" fn xml_validate_ref(
     refe: XmlRefPtr,
     ctxt: XmlValidCtxtPtr,
@@ -7634,13 +7067,8 @@ unsafe extern "C" fn xml_validate_ref(
     }
 }
 
-/**
- * xmlWalkValidateList:
- * @data:  Contents of current link
- * @user:  Value supplied by the user
- *
- * Returns 0 to abort the walk or 1 to continue
- */
+/// Returns 0 to abort the walk or 1 to continue
+#[doc(alias = "xmlWalkValidateList")]
 extern "C" fn xml_walk_validate_list(data: *const c_void, user: *mut c_void) -> i32 {
     unsafe {
         let memo: XmlValidateMemoPtr = user as XmlValidateMemoPtr;
@@ -7649,13 +7077,7 @@ extern "C" fn xml_walk_validate_list(data: *const c_void, user: *mut c_void) -> 
     1
 }
 
-/**
- * xmlValidateCheckRefCallback:
- * @ref_list:  List of references
- * @ctxt:  Validation context
- * @name:  Name of ID we are searching for
- *
- */
+#[doc(alias = "xmlValidateCheckRefCallback")]
 extern "C" fn xml_validate_check_ref_callback(
     payload: *mut c_void,
     data: *mut c_void,
@@ -7678,20 +7100,15 @@ extern "C" fn xml_validate_check_ref_callback(
     );
 }
 
-/**
- * xmlValidateDocumentFinal:
- * @ctxt:  the validation context
- * @doc:  a document instance
- *
- * Does the final step for the document validation once all the
- * incremental validation steps have been completed
- *
- * basically it does the following checks described by the XML Rec
- *
- * Check all the IDREF/IDREFS attributes definition for validity
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Does the final step for the document validation once all the
+/// incremental validation steps have been completed
+///
+/// basically it does the following checks described by the XML Rec
+///
+/// Check all the IDREF/IDREFS attributes definition for validity
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateDocumentFinal")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     if ctxt.is_null() {
@@ -7729,17 +7146,11 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
     (*ctxt).valid
 }
 
-/**
- * xmlValidateNotationUse:
- * @ctxt:  the validation context
- * @doc:  the document
- * @notationName:  the notation name to check
- *
- * Validate that the given name match a notation declaration.
- * - [ VC: Notation Declared ]
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given name match a notation declaration.
+/// - [ VC: Notation Declared ]
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNotationUse")]
 #[cfg(any(feature = "valid", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_notation_use(
     ctxt: XmlValidCtxtPtr,
@@ -7771,16 +7182,11 @@ pub unsafe extern "C" fn xml_validate_notation_use(
     1
 }
 
-/**
- * xmlIsMixedElement:
- * @doc:  the document
- * @name:  the element name
- *
- * Search in the DtDs whether an element accept Mixed content (or ANY)
- * basically if it is supposed to accept text childs
- *
- * returns 0 if no, 1 if yes, and -1 if no element description is available
- */
+/// Search in the DtDs whether an element accept Mixed content (or ANY)
+/// basically if it is supposed to accept text childs
+///
+/// returns 0 if no, 1 if yes, and -1 if no element description is available
+#[doc(alias = "xmlIsMixedElement")]
 pub unsafe extern "C" fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlChar) -> i32 {
     let mut elem_decl: XmlElementPtr;
 
@@ -7814,17 +7220,10 @@ pub unsafe extern "C" fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlCh
     }
 }
 
-/**
- * xmlGetDtdAttrDesc:
- * @dtd:  a pointer to the DtD to search
- * @elem:  the element name
- * @name:  the attribute name
- *
- * Search the DTD for the description of this attribute on
- * this element.
- *
- * returns the xmlAttributePtr if found or null_mut()
- */
+/// Search the DTD for the description of this attribute on this element.
+///
+/// returns the xmlAttributePtr if found or null_mut()
+#[doc(alias = "xmlGetDtdAttrDesc")]
 pub unsafe extern "C" fn xml_get_dtd_attr_desc(
     dtd: XmlDtdPtr,
     elem: *const XmlChar,
@@ -7862,18 +7261,10 @@ pub unsafe extern "C" fn xml_get_dtd_attr_desc(
     cur
 }
 
-/**
- * xmlGetDtdQAttrDesc:
- * @dtd:  a pointer to the DtD to search
- * @elem:  the element name
- * @name:  the attribute name
- * @prefix:  the attribute namespace prefix
- *
- * Search the DTD for the description of this qualified attribute on
- * this element.
- *
- * returns the xmlAttributePtr if found or null_mut()
- */
+/// Search the DTD for the description of this qualified attribute on this element.
+///
+/// returns the xmlAttributePtr if found or null_mut()
+#[doc(alias = "xmlGetDtdQAttrDesc")]
 pub unsafe extern "C" fn xml_get_dtd_qattr_desc(
     dtd: XmlDtdPtr,
     elem: *const XmlChar,
@@ -7891,15 +7282,10 @@ pub unsafe extern "C" fn xml_get_dtd_qattr_desc(
     xml_hash_lookup3(table, name, prefix, elem) as _
 }
 
-/**
- * xmlGetDtdNotationDesc:
- * @dtd:  a pointer to the DtD to search
- * @name:  the notation name
- *
- * Search the DTD for the description of this notation
- *
- * returns the xmlNotationPtr if found or null_mut()
- */
+/// Search the DTD for the description of this notation
+///
+/// returns the xmlNotationPtr if found or null_mut()
+#[doc(alias = "xmlGetDtdNotationDesc")]
 pub unsafe extern "C" fn xml_get_dtd_notation_desc(
     dtd: XmlDtdPtr,
     name: *const XmlChar,
@@ -7915,16 +7301,10 @@ pub unsafe extern "C" fn xml_get_dtd_notation_desc(
     xml_hash_lookup(table, name) as _
 }
 
-/**
- * xmlGetDtdQElementDesc:
- * @dtd:  a pointer to the DtD to search
- * @name:  the element name
- * @prefix:  the element namespace prefix
- *
- * Search the DTD for the description of this element
- *
- * returns the xmlElementPtr if found or null_mut()
- */
+/// Search the DTD for the description of this element
+///
+/// returns the xmlElementPtr if found or null_mut()
+#[doc(alias = "xmlGetDtdQElementDesc")]
 pub unsafe extern "C" fn xml_get_dtd_qelement_desc(
     dtd: XmlDtdPtr,
     name: *const XmlChar,
@@ -7941,15 +7321,10 @@ pub unsafe extern "C" fn xml_get_dtd_qelement_desc(
     xml_hash_lookup2(table, name, prefix) as _
 }
 
-/**
- * xmlGetDtdElementDesc:
- * @dtd:  a pointer to the DtD to search
- * @name:  the element name
- *
- * Search the DTD for the description of this element
- *
- * returns the xmlElementPtr if found or null_mut()
- */
+/// Search the DTD for the description of this element
+///
+/// returns the xmlElementPtr if found or null_mut()
+#[doc(alias = "xmlGetDtdElementDesc")]
 pub unsafe extern "C" fn xml_get_dtd_element_desc(
     dtd: XmlDtdPtr,
     mut name: *const XmlChar,
@@ -7978,17 +7353,10 @@ pub unsafe extern "C" fn xml_get_dtd_element_desc(
     cur
 }
 
-/**
- * xmlValidGetPotentialChildren:
- * @ctree:  an element content tree
- * @names:  an array to store the list of child names
- * @len:  a pointer to the number of element in the list
- * @max:  the size of the array
- *
- * Build/extend a list of  potential children allowed by the content tree
- *
- * returns the number of element in the list, or -1 in case of error.
- */
+/// Build/extend a list of  potential children allowed by the content tree
+///
+/// Returns the number of element in the list, or -1 in case of error.
+#[doc(alias = "xmlValidGetPotentialChildren")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_valid_get_potential_children(
     ctree: *mut XmlElementContent,
@@ -8035,35 +7403,26 @@ pub unsafe extern "C" fn xml_valid_get_potential_children(
     *len
 }
 
-/*
- * Dummy function to suppress messages while we try out valid elements
- */
+// Dummy function to suppress messages while we try out valid elements
 fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
-/**
- * xmlValidGetValidElements:
- * @prev:  an element to insert after
- * @next:  an element to insert next
- * @names:  an array to store the list of child names
- * @max:  the size of the array
- *
- * This function returns the list of authorized children to insert
- * within an existing tree while respecting the validity constraints
- * forced by the Dtd. The insertion point is defined using @prev and
- * @next in the following ways:
- *  to insert before 'node': xmlValidGetValidElements((*node).prev, node, ...
- *  to insert next 'node': xmlValidGetValidElements(node, (*node).next, ...
- *  to replace 'node': xmlValidGetValidElements((*node).prev, (*node).next, ...
- *  to prepend a child to 'node': xmlValidGetValidElements(null_mut(), (*node).childs,
- *  to append a child to 'node': xmlValidGetValidElements((*node).last, null_mut(), ...
- *
- * pointers to the element names are inserted at the beginning of the array
- * and do not need to be freed.
- *
- * returns the number of element in the list, or -1 in case of error. If
- *    the function returns the value @max the caller is invited to grow the
- *    receiving array and retry.
- */
+/// This function returns the list of authorized children to insert
+/// within an existing tree while respecting the validity constraints
+/// forced by the Dtd. The insertion point is defined using @prev and
+/// @next in the following ways:
+///  to insert before 'node': xmlValidGetValidElements((*node).prev, node, ...
+///  to insert next 'node': xmlValidGetValidElements(node, (*node).next, ...
+///  to replace 'node': xmlValidGetValidElements((*node).prev, (*node).next, ...
+///  to prepend a child to 'node': xmlValidGetValidElements(null_mut(), (*node).childs,
+///  to append a child to 'node': xmlValidGetValidElements((*node).last, null_mut(), ...
+///
+/// pointers to the element names are inserted at the beginning of the array
+/// and do not need to be freed.
+///
+/// returns the number of element in the list, or -1 in case of error. If
+/// the function returns the value @max the caller is invited to grow the
+/// receiving array and retry.
+#[doc(alias = "xmlValidGetValidElements")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_valid_get_valid_elements(
     prev: *mut XmlNode,
@@ -8198,81 +7557,50 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     nb_valid_elements
 }
 
-/**
- * xmlValidateNameValue:
- * @doc:  pointer to the document or null_mut()
- * @value:  an Name value
- *
- * Validate that the given value match Name production
- *
- * returns 1 if valid or 0 otherwise
- */
-
-/**
- * xmlValidateNameValue:
- * @value:  an Name value
- *
- * Validate that the given value match Name production
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given value match Name production
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNameValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_name_value(value: *const XmlChar) -> i32 {
     xml_validate_name_value_internal(null_mut(), value)
 }
-/**
- * xmlValidateNamesValue:
- * @value:  an Names value
- *
- * Validate that the given value match Names production
- *
- * returns 1 if valid or 0 otherwise
- */
+
+/// Validate that the given value match Names production
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNamesValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_names_value(value: *const XmlChar) -> i32 {
     xml_validate_names_value_internal(null_mut(), value)
 }
 
-/**
- * xmlValidateNmtokenValue:
- * @value:  an Nmtoken value
- *
- * Validate that the given value match Nmtoken production
- *
- * [ VC: Name Token ]
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given value match Nmtoken production
+///
+/// `[ VC: Name Token ]`
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNmtokenValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_nmtoken_value(value: *const XmlChar) -> i32 {
     xml_validate_nmtoken_value_internal(null_mut(), value)
 }
 
-/**
- * xmlValidateNmtokensValue:
- * @value:  an Nmtokens value
- *
- * Validate that the given value match Nmtokens production
- *
- * [ VC: Name Token ]
- *
- * returns 1 if valid or 0 otherwise
- */
+/// Validate that the given value match Nmtokens production
+///
+/// `[ VC: Name Token ]`
+///
+/// returns 1 if valid or 0 otherwise
+#[doc(alias = "xmlValidateNmtokensValue")]
 #[cfg(feature = "valid")]
 pub unsafe extern "C" fn xml_validate_nmtokens_value(value: *const XmlChar) -> i32 {
     xml_validate_nmtokens_value_internal(null_mut(), value)
 }
 
-/**
- * xmlValidBuildAContentModel:
- * @content:  the content model
- * @ctxt:  the schema parser context
- * @name:  the element name whose content is being built
- *
- * Generate the automata sequence needed for that type
- *
- * Returns 1 if successful or 0 in case of error.
- */
+/// Generate the automata sequence needed for that type
+///
+/// Returns 1 if successful or 0 in case of error.
+#[doc(alias = "xmlValidBuildAContentModel")]
 unsafe extern "C" fn xml_valid_build_acontent_model(
     mut content: XmlElementContentPtr,
     ctxt: XmlValidCtxtPtr,
@@ -8464,19 +7792,10 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
     1
 }
 
-/*
- * Validation based on the regexp support
- */
-/**
- * xmlValidBuildContentModel:
- * @ctxt:  a validation context
- * @elem:  an element declaration node
- *
- * (Re)Build the automata associated to the content model of this
- * element
- *
- * Returns 1 in case of success, 0 in case of error
- */
+/// (Re)Build the automata associated to the content model of this element
+///
+/// Returns 1 in case of success, 0 in case of error
+#[doc(alias = "xmlValidBuildContentModel")]
 #[cfg(all(feature = "valid", feature = "regexp"))]
 pub unsafe extern "C" fn xml_valid_build_content_model(
     ctxt: XmlValidCtxtPtr,
@@ -8549,16 +7868,11 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
     (*ctxt).am = null_mut();
     1
 }
-/**
- * xmlValidateCheckMixed:
- * @ctxt:  the validation context
- * @cont:  the mixed content model
- * @qname:  the qualified name as appearing in the serialization
- *
- * Check if the given node is part of the content model.
- *
- * Returns 1 if yes, 0 if no, -1 in case of error
- */
+
+/// Check if the given node is part of the content model.
+///
+/// Returns 1 if yes, 0 if no, -1 in case of error
+#[doc(alias = "xmlValidateCheckMixed")]
 #[cfg(feature = "regexp")]
 unsafe extern "C" fn xml_validate_check_mixed(
     ctxt: XmlValidCtxtPtr,
@@ -8708,7 +8022,7 @@ unsafe extern "C" fn vstate_vpush(
 const MAX_RECURSE: usize = 25000;
 
 #[cfg(not(feature = "regexp"))]
-unsafe extern "C" fn vstateVPush(
+unsafe extern "C" fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
     cont: XmlElementContentPtr,
     node: XmlNodePtr,
@@ -8769,17 +8083,10 @@ unsafe extern "C" fn vstateVPush(
     res
 }
 
-/**
- * xmlValidatePushElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- * @qname:  the qualified name as appearing in the serialization
- *
- * Push a new element start on the validation stack.
- *
- * returns 1 if no validation problem was found or 0 otherwise
- */
+/// Push a new element start on the validation stack.
+///
+/// returns 1 if no validation problem was found or 0 otherwise
+#[doc(alias = "xmlValidatePushElement")]
 #[cfg(all(feature = "valid", feature = "regexp"))]
 pub unsafe extern "C" fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
@@ -8890,16 +8197,10 @@ pub unsafe extern "C" fn xml_validate_push_element(
     ret
 }
 
-/**
- * xmlValidatePushCData:
- * @ctxt:  the validation context
- * @data:  some character data read
- * @len:  the length of the data
- *
- * check the CData parsed for validation in the current stack
- *
- * returns 1 if no validation problem was found or 0 otherwise
- */
+/// Check the CData parsed for validation in the current stack
+///
+/// Returns 1 if no validation problem was found or 0 otherwise
+#[doc(alias = "xmlValidatePushCData")]
 #[cfg(all(feature = "valid", feature = "regexp"))]
 pub unsafe extern "C" fn xml_validate_push_cdata(
     ctxt: XmlValidCtxtPtr,
@@ -9013,17 +8314,10 @@ unsafe extern "C" fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
     return (*ctxt).vstateNr;
 }
 
-/**
- * xmlValidatePopElement:
- * @ctxt:  the validation context
- * @doc:  a document instance
- * @elem:  an element instance
- * @qname:  the qualified name as appearing in the serialization
- *
- * Pop the element end from the validation stack.
- *
- * returns 1 if no validation problem was found or 0 otherwise
- */
+/// Pop the element end from the validation stack.
+///
+/// Returns 1 if no validation problem was found or 0 otherwise
+#[doc(alias = "xmlValidatePopElement")]
 #[cfg(all(feature = "valid", feature = "regexp"))]
 pub unsafe extern "C" fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
@@ -9077,15 +8371,10 @@ pub unsafe extern "C" fn xml_validate_pop_element(
     ret
 }
 
-/**
- * xmlValidateSkipIgnorable:
- * @ctxt:  the validation context
- * @child:  the child list
- *
- * Skip ignorable elements w.r.t. the validation process
- *
- * returns the first element to consider for validation of the content model
- */
+/// Skip ignorable elements w.r.t. the validation process
+///
+/// Returns the first element to consider for validation of the content model
+#[doc(alias = "xmlValidateSkipIgnorable")]
 #[cfg(not(feature = "regexp"))]
 unsafe extern "C" fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
     while !child.is_null() {

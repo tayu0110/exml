@@ -46,37 +46,26 @@ use crate::{
     tree::{xml_free_node_list, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
 };
 
-/*
- * XPATH_MAX_STEPS:
- * when compiling an XPath expression we arbitrary limit the maximum
- * number of step operation in the compiled expression. 1000000 is
- * an insanely large value which should never be reached under normal
- * circumstances
- */
+// when compiling an XPath expression we arbitrary limit the maximum
+// number of step operation in the compiled expression. 1000000 is
+// an insanely large value which should never be reached under normal
+// circumstances
 pub(crate) const XPATH_MAX_STEPS: usize = 1000000;
 
-/*
- * XPATH_MAX_STACK_DEPTH:
- * when evaluating an XPath expression we arbitrary limit the maximum
- * number of object allowed to be pushed on the stack. 1000000 is
- * an insanely large value which should never be reached under normal
- * circumstances
- */
+// when evaluating an XPath expression we arbitrary limit the maximum
+// number of object allowed to be pushed on the stack. 1000000 is
+// an insanely large value which should never be reached under normal
+// circumstances
 pub(crate) const XPATH_MAX_STACK_DEPTH: usize = 1000000;
 
-/*
- * XPATH_MAX_NODESET_LENGTH:
- * when evaluating an XPath expression nodesets are created and we
- * arbitrary limit the maximum length of those node set. 10000000 is
- * an insanely large value which should never be reached under normal
- * circumstances, one would first need to construct an in memory tree
- * with more than 10 millions nodes.
- */
+// when evaluating an XPath expression nodesets are created and we
+// arbitrary limit the maximum length of those node set. 10000000 is
+// an insanely large value which should never be reached under normal
+// circumstances, one would first need to construct an in memory tree
+// with more than 10 millions nodes.
 pub(crate) const XPATH_MAX_NODESET_LENGTH: usize = 10000000;
 
-/**
- * The set of XPath error codes.
- */
+/// The set of XPath error codes.
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub enum XmlXPathError {
@@ -109,9 +98,7 @@ pub enum XmlXPathError {
     XpathRecursionLimitExceeded,
 }
 
-/*
- * A node-set (an unordered collection of nodes without duplicates).
- */
+// A node-set (an unordered collection of nodes without duplicates).
 #[cfg(feature = "xpath")]
 pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[cfg(feature = "xpath")]
@@ -123,16 +110,14 @@ pub struct XmlNodeSet {
                        /* @@ with_ns to check whether namespace nodes should be looked at @@ */
 }
 
-/*
- * An expression is evaluated to yield an object, which
- * has one of the following four basic types:
- *   - node-set
- *   - boolean
- *   - number
- *   - string
- *
- * @@ XPointer will add more types !
- */
+// An expression is evaluated to yield an object, which
+// has one of the following four basic types:
+//   - node-set
+//   - boolean
+//   - number
+//   - string
+//
+// @@ XPointer will add more types !
 #[cfg(feature = "xpath")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -218,23 +203,15 @@ pub struct XmlXPathObject {
     pub(crate) index2: i32,
 }
 
-/**
- * xmlXPathConvertFunc:
- * @obj:  an XPath object
- * @type:  the number of the target type
- *
- * A conversion function is associated to a type and used to cast
- * the new type to primitive values.
- *
- * Returns -1 in case of error, 0 otherwise
- */
+/// A conversion function is associated to a type and used to cast
+/// the new type to primitive values.
+///
+/// Returns -1 in case of error, 0 otherwise
+#[doc(alias = "xmlXPathConvertFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathConvertFunc = unsafe extern "C" fn(obj: XmlXPathObjectPtr, typ: i32) -> i32;
 
-/*
- * Extra type: a name and a conversion function.
- */
-
+// Extra type: a name and a conversion function.
 #[cfg(feature = "xpath")]
 pub type XmlXPathTypePtr = *mut XmlXPathType;
 #[cfg(feature = "xpath")]
@@ -244,10 +221,7 @@ pub struct XmlXPathType {
     func: XmlXPathConvertFunc, /* the conversion function */
 }
 
-/*
- * Extra variable: a name and a value.
- */
-
+// Extra variable: a name and a value.
 #[cfg(feature = "xpath")]
 pub type XmlXPathVariablePtr = *mut XmlXPathVariable;
 #[cfg(feature = "xpath")]
@@ -257,21 +231,12 @@ pub struct XmlXPathVariable {
     value: XmlXPathObjectPtr, /* the value */
 }
 
-/**
- * xmlXPathEvalFunc:
- * @ctxt: an XPath parser context
- * @nargs: the number of arguments passed to the function
- *
- * An XPath evaluation function, the parameters are on the XPath context stack.
- */
-
+/// An XPath evaluation function, the parameters are on the XPath context stack.
+#[doc(alias = "xmlXPathEvalFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathEvalFunc = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
 
-/*
- * Extra function: a name and a evaluation function.
- */
-
+// Extra function: a name and a evaluation function.
 #[cfg(feature = "xpath")]
 pub type XmlXPathFuncPtr = *mut XmlXPathFunct;
 #[cfg(feature = "xpath")]
@@ -281,28 +246,19 @@ pub struct XmlXPathFunct {
     func: XmlXPathEvalFunc, /* the evaluation function */
 }
 
-/**
- * xmlXPathAxisFunc:
- * @ctxt:  the XPath interpreter context
- * @cur:  the previous node being explored on that axis
- *
- * An axis traversal function. To traverse an axis, the engine calls
- * the first time with cur == NULL and repeat until the function returns
- * NULL indicating the end of the axis traversal.
- *
- * Returns the next node in that axis or NULL if at the end of the axis.
- */
-
+/// An axis traversal function. To traverse an axis, the engine calls
+/// the first time with cur == NULL and repeat until the function returns
+/// NULL indicating the end of the axis traversal.
+///
+/// Returns the next node in that axis or NULL if at the end of the axis.
+#[doc(alias = "xmlXPathAxisFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathAxisFunc = unsafe extern "C" fn(
     ctxt: XmlXPathParserContextPtr,
     cur: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr;
 
-/*
- * Extra axis: a name and an axis function.
- */
-
+// Extra axis: a name and an axis function.
 #[cfg(feature = "xpath")]
 pub type XmlXPathAxisPtr = *mut XmlXPathAxis;
 #[cfg(feature = "xpath")]
@@ -312,34 +268,17 @@ pub struct XmlXPathAxis {
     func: XmlXPathAxisFunc, /* the search function */
 }
 
-/**
- * xmlXPathFunction:
- * @ctxt:  the XPath interprestation context
- * @nargs:  the number of arguments
- *
- * An XPath function.
- * The arguments (if any) are popped out from the context stack
- * and the result is pushed on the stack.
- */
-
+/// An XPath function.
+/// The arguments (if any) are popped out from the context stack
+/// and the result is pushed on the stack.
+#[doc(alias = "xmlXPathFunction")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathFunction = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
 
-/*
- * Function and Variable Lookup.
- */
-
-/**
- * xmlXPathVariableLookupFunc:
- * @ctxt:  an XPath context
- * @name:  name of the variable
- * @ns_uri:  the namespace name hosting this variable
- *
- * Prototype for callbacks used to plug variable lookup in the XPath
- * engine.
- *
- * Returns the XPath object value or NULL if not found.
- */
+/// Prototype for callbacks used to plug variable lookup in the XPath engine.
+///
+/// Returns the XPath object value or NULL if not found.
+#[doc(alias = "xmlXPathVariableLookupFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathVariableLookupFunc = unsafe extern "C" fn(
     ctxt: *mut c_void,
@@ -347,17 +286,10 @@ pub type XmlXPathVariableLookupFunc = unsafe extern "C" fn(
     ns_uri: *const XmlChar,
 ) -> XmlXPathObjectPtr;
 
-/**
- * xmlXPathFuncLookupFunc:
- * @ctxt:  an XPath context
- * @name:  name of the function
- * @ns_uri:  the namespace name hosting this function
- *
- * Prototype for callbacks used to plug function lookup in the XPath
- * engine.
- *
- * Returns the XPath function or NULL if not found.
- */
+/// Prototype for callbacks used to plug function lookup in the XPath engine.
+///
+/// Returns the XPath function or NULL if not found.
+#[doc(alias = "xmlXPathFuncLookupFunc")]
 #[cfg(feature = "xpath")]
 pub type XmlXPathFuncLookupFunc = unsafe extern "C" fn(
     ctxt: *mut c_void,
@@ -365,44 +297,28 @@ pub type XmlXPathFuncLookupFunc = unsafe extern "C" fn(
     ns_uri: *const XmlChar,
 ) -> Option<XmlXPathFunction>;
 
-/**
- * xmlXPathFlags:
- * Flags for XPath engine compilation and runtime
- */
-/**
- * XML_XPATH_CHECKNS:
- *
- * check namespaces at compilation
- */
+/// check namespaces at compilation
 #[cfg(feature = "xpath")]
 pub(crate) const XML_XPATH_CHECKNS: usize = 1 << 0;
-/**
- * XML_XPATH_NOVAR:
- *
- * forbid variables in expression
- */
+/// forbid variables in expression
 #[cfg(feature = "xpath")]
 pub(crate) const XML_XPATH_NOVAR: usize = 1 << 1;
 
-/**
- * xmlXPathContext:
- *
- * Expression evaluation occurs with respect to a context.
- * he context consists of:
- *    - a node (the context node)
- *    - a node list (the context node list)
- *    - a set of variable bindings
- *    - a function library
- *    - the set of namespace declarations in scope for the expression
- *      Following the switch to hash tables, this need to be trimmed up at
- *      the next binary incompatible release.
- *      The node may be modified when the context is passed to libxml2
- *      for an XPath evaluation so you may need to initialize it again
- *      before the next call.
- */
-
 #[cfg(feature = "xpath")]
 pub type XmlXPathContextPtr = *mut XmlXPathContext;
+/// Expression evaluation occurs with respect to a context.
+/// he context consists of:
+///    - a node (the context node)
+///    - a node list (the context node list)
+///    - a set of variable bindings
+///    - a function library
+///    - the set of namespace declarations in scope for the expression
+///      Following the switch to hash tables, this need to be trimmed up at
+///      the next binary incompatible release.
+///      The node may be modified when the context is passed to libxml2
+///      for an XPath evaluation so you may need to initialize it again
+///      before the next call.
+#[doc(alias = "xmlXPathContext")]
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathContext {
@@ -479,10 +395,6 @@ pub struct XmlXPathContext {
     pub(crate) depth: i32,
 }
 
-/*
- * Types are private:
- */
-
 #[cfg(feature = "xpath")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -526,10 +438,7 @@ pub struct XmlXPathStepOp {
     pub(crate) cache_uri: *mut c_void,
 }
 
-/*
- * The structure of a compiled expression form is not public.
- */
-
+// The structure of a compiled expression form is not public.
 #[cfg(feature = "xpath")]
 pub type XmlXPathCompExprPtr = *mut XmlXPathCompExpr;
 #[cfg(feature = "xpath")]
@@ -545,14 +454,11 @@ pub struct XmlXPathCompExpr {
     pub(crate) stream: XmlPatternPtr,
 }
 
-/**
- * xmlXPathParserContext:
- *
- * An XPath parser context. It contains pure parsing information,
- * an xmlXPathContext, and the stack of objects.
- */
 #[cfg(feature = "xpath")]
 pub type XmlXPathParserContextPtr = *mut XmlXPathParserContext;
+/// An XPath parser context. It contains pure parsing information,
+/// an xmlXPathContext, and the stack of objects.
+#[doc(alias = "xmlXPathParserContext")]
 #[cfg(feature = "xpath")]
 #[repr(C)]
 pub struct XmlXPathParserContext {
@@ -574,16 +480,6 @@ pub struct XmlXPathParserContext {
     pub(crate) value_frame: i32, /* unused */
 }
 
-/************************************************************************
- *									*
- *			Public API					*
- *									*
- ************************************************************************/
-
-/**
- * Objects and Nodesets handling
- */
-
 #[cfg(feature = "xpath")]
 pub static mut XML_XPATH_NAN: f64 = 0.0;
 #[cfg(feature = "xpath")]
@@ -591,18 +487,13 @@ pub static mut XML_XPATH_PINF: f64 = 0.0;
 #[cfg(feature = "xpath")]
 pub static mut XML_XPATH_NINF: f64 = 0.0;
 
-/* These macros may later turn into functions */
-/**
- * xmlXPathNodeSetGetLength:
- * @ns:  a node-set
- *
- * Implement a functionality similar to the DOM NodeList.length.
- *
- * Returns the number of nodes in the node-set.
- */
+/// Implement a functionality similar to the DOM NodeList.length.
+///
+/// Returns the number of nodes in the node-set.
+#[doc(alias = "xmlXPathNodeSetGetLength")]
 #[cfg(feature = "xpath")]
 #[macro_export]
-macro_rules! xmlXPathNodeSetGetLength {
+macro_rules! xml_xpath_node_set_get_length {
     ($ns:expr) => {
         if !$ns.is_null() {
             (*$ns).node_nr
@@ -611,19 +502,15 @@ macro_rules! xmlXPathNodeSetGetLength {
         }
     };
 }
-/**
- * xmlXPathNodeSetItem:
- * @ns:  a node-set
- * @index:  index of a node in the set
- *
- * Implements a functionality similar to the DOM NodeList.item().
- *
- * Returns the xmlNodePtr at the given @index in @ns or NULL if
- *         @index is out of range (0 to length-1)
- */
+
+/// Implements a functionality similar to the DOM NodeList.item().
+///
+/// Returns the xmlNodePtr at the given @index in @ns or NULL if
+/// @index is out of range (0 to length-1)
+#[doc(alias = "xmlXPathNodeSetItem")]
 #[cfg(feature = "xpath")]
 #[macro_export]
-macro_rules! xmlXPathNodeSetItem {
+macro_rules! xml_xpath_node_set_item {
     ($ns:expr, $index:expr) => {
         if !$ns.is_null() && $index >= 0 && ($index) < (*$ns).node_nr {
             *(*$ns).node_tab.add($index as usize)
@@ -632,29 +519,21 @@ macro_rules! xmlXPathNodeSetItem {
         }
     };
 }
-/**
- * xmlXPathNodeSetIsEmpty:
- * @ns: a node-set
- *
- * Checks whether @ns is empty or not.
- *
- * Returns %TRUE if @ns is an empty node-set.
- */
+
+/// Checks whether @ns is empty or not.
+///
+/// Returns %TRUE if @ns is an empty node-set.
+#[doc(alias = "xmlXPathNodeSetIsEmpty")]
 #[cfg(feature = "xpath")]
 #[macro_export]
-macro_rules! xmlXPathNodeSetIsEmpty {
+macro_rules! xml_xpath_node_set_is_empty {
     ($ns:expr) => {
         $ns.is_null() || (*$ns).node_nr == 0 || (*$ns).node_tab.is_null()
     };
 }
 
-/**
- * xmlXPathFreeValueTree:
- * @obj:  the xmlNodeSetPtr to free
- *
- * Free the NodeSet compound and the actual tree, this is different
- * from xmlXPathFreeNodeSet()
- */
+/// Free the NodeSet compound and the actual tree, this is different from xmlXPathFreeNodeSet()
+#[doc(alias = "xmlXPathFreeValueTree")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
     if obj.is_null() {
@@ -679,12 +558,8 @@ pub unsafe extern "C" fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
     xml_free(obj as _);
 }
 
-/**
- * xmlXPathFreeObject:
- * @obj:  the object to free
- *
- * Free up an object: xmlXPathObjectPtr.
- */
+/// Free up an object: xmlXPathObjectPtr.
+#[doc(alias = "xmlXPathFreeObject")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
     if obj.is_null() {
@@ -713,14 +588,10 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
     xml_free(obj as _);
 }
 
-/**
- * xmlXPathNodeSetCreate:
- * @val:  an initial xmlNodePtr, or NULL
- *
- * Create a new xmlNodeSetPtr of type f64 and of value @val
- *
- * Returns the newly created object.
- */
+/// Create a new xmlNodeSetPtr of type f64 and of value @val
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathNodeSetCreate")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSetPtr {
     let ret: XmlNodeSetPtr = xml_malloc(size_of::<XmlNodeSet>()) as XmlNodeSetPtr;
@@ -761,13 +632,9 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
     ret
 }
 
-/**
- * xmlXPathFreeNodeSetList:
- * @obj:  an existing NodeSetList object
- *
- * Free up the xmlXPathObjectPtr @obj but don't deallocate the objects in
- * the list contrary to xmlXPathFreeObject().
- */
+/// Free up the xmlXPathObjectPtr @obj but don't deallocate the objects in
+/// the list contrary to xmlXPathFreeObject().
+#[doc(alias = "xmlXPathFreeNodeSetList")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
     if obj.is_null() {
@@ -776,12 +643,8 @@ pub unsafe extern "C" fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
     xml_free(obj as _);
 }
 
-/**
- * xmlXPathFreeNodeSet:
- * @obj:  the xmlNodeSetPtr to free
- *
- * Free the NodeSet compound (not the actual nodes !).
- */
+/// Free the NodeSet compound (not the actual nodes !).
+#[doc(alias = "xmlXPathFreeNodeSet")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
     if obj.is_null() {
@@ -804,14 +667,10 @@ pub unsafe extern "C" fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
     xml_free(obj as _);
 }
 
-/**
- * xmlXPathObjectCopy:
- * @val:  the original object
- *
- * allocate a new copy of a given object
- *
- * Returns the newly created object.
- */
+/// Allocate a new copy of a given object
+///
+/// Returns the newly created object.
+#[doc(alias = "xmlXPathObjectCopy")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     use crate::generic_error;
@@ -861,16 +720,11 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
     ret
 }
 
-/**
- * xmlXPathCmpNodes:
- * @node1:  the first node
- * @node2:  the second node
- *
- * Compare two nodes w.r.t document order
- *
- * Returns -2 in case of error 1 if first point < second point, 0 if
- *         it's the same node, -1 otherwise
- */
+/// Compare two nodes w.r.t document order
+///
+/// Returns -2 in case of error 1 if first point < second point, 0 if
+/// it's the same node, -1 otherwise
+#[doc(alias = "xmlXPathCmpNodes")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
     use crate::tree::NodePtr;
@@ -1040,17 +894,10 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     -1 /* assume there is no sibling list corruption */
 }
 
-/**
- * Conversion functions to basic types.
- */
-/**
- * xmlXPathCastNumberToBoolean:
- * @val:  a number
- *
- * Converts a number to its boolean value
- *
- * Returns the boolean value
- */
+/// Converts a number to its boolean value
+///
+/// Returns the boolean value
+#[doc(alias = "xmlXPathCastNumberToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> i32 {
     if xml_xpath_is_nan(val) != 0 || val == 0.0 {
@@ -1059,14 +906,10 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> i32 {
     1
 }
 
-/**
- * xmlXPathCastStringToBoolean:
- * @val:  a string
- *
- * Converts a string to its boolean value
- *
- * Returns the boolean value
- */
+/// Converts a string to its boolean value
+///
+/// Returns the boolean value
+#[doc(alias = "xmlXPathCastStringToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -> i32 {
     if val.is_null() || xml_strlen(val) == 0 {
@@ -1075,14 +918,10 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -
     1
 }
 
-/**
- * xmlXPathCastNodeSetToBoolean:
- * @ns:  a node-set
- *
- * Converts a node-set to its boolean value
- *
- * Returns the boolean value
- */
+/// Converts a node-set to its boolean value
+///
+/// Returns the boolean value
+#[doc(alias = "xmlXPathCastNodeSetToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> i32 {
     if ns.is_null() || (*ns).node_nr == 0 {
@@ -1091,14 +930,10 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -
     1
 }
 
-/**
- * xmlXPathCastToBoolean:
- * @val:  an XPath object
- *
- * Converts an XPath object to its boolean value
- *
- * Returns the boolean value
- */
+/// Converts an XPath object to its boolean value
+///
+/// Returns the boolean value
+#[doc(alias = "xmlXPathCastToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i32 {
     if val.is_null() {
@@ -1126,14 +961,10 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i3
     }
 }
 
-/**
- * xmlXPathCastBooleanToNumber:
- * @val:  a boolean
- *
- * Converts a boolean to its number value
- *
- * Returns the number value
- */
+/// Converts a boolean to its number value
+///
+/// Returns the number value
+#[doc(alias = "xmlXPathCastBooleanToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_boolean_to_number(val: i32) -> f64 {
     if val != 0 {
@@ -1142,27 +973,19 @@ pub unsafe extern "C" fn xml_xpath_cast_boolean_to_number(val: i32) -> f64 {
     0.0
 }
 
-/**
- * xmlXPathCastStringToNumber:
- * @val:  a string
- *
- * Converts a string to its number value
- *
- * Returns the number value
- */
+/// Converts a string to its number value
+///
+/// Returns the number value
+#[doc(alias = "xmlXPathCastStringToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_string_to_number(val: *const XmlChar) -> f64 {
     xml_xpath_string_eval_number(val)
 }
 
-/**
- * xmlXPathCastNodeToNumber:
- * @node:  a node
- *
- * Converts a node to its number value
- *
- * Returns the number value
- */
+/// Converts a node to its number value
+///
+/// Returns the number value
+#[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: XmlNodePtr) -> f64 {
     if node.is_null() {
@@ -1178,14 +1001,10 @@ pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: XmlNodePtr) -> f64 
     ret
 }
 
-/**
- * xmlXPathCastNodeSetToNumber:
- * @ns:  a node-set
- *
- * Converts a node-set to its number value
- *
- * Returns the number value
- */
+/// Converts a node-set to its number value
+///
+/// Returns the number value
+#[doc(alias = "xmlXPathCastNodeSetToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_set_to_number(ns: XmlNodeSetPtr) -> f64 {
     if ns.is_null() {
@@ -1197,14 +1016,10 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_number(ns: XmlNodeSetPtr) ->
     ret
 }
 
-/**
- * xmlXPathCastToNumber:
- * @val:  an XPath object
- *
- * Converts an XPath object to its number value
- *
- * Returns the number value
- */
+/// Converts an XPath object to its number value
+///
+/// Returns the number value
+#[doc(alias = "xmlXPathCastToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
     if val.is_null() {
@@ -1232,14 +1047,10 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
     }
 }
 
-/**
- * xmlXPathCastBooleanToString:
- * @val:  a boolean
- *
- * Converts a boolean to its string value.
- *
- * Returns a newly allocated string.
- */
+/// Converts a boolean to its string value.
+///
+/// Returns a newly allocated string.
+#[doc(alias = "xmlXPathCastBooleanToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_boolean_to_string(val: i32) -> *mut XmlChar {
     if val != 0 {
@@ -1255,14 +1066,8 @@ const LOWER_DOUBLE_EXP: usize = 5;
 const UPPER_DOUBLE: f64 = 1E9;
 const LOWER_DOUBLE: f64 = 1E-5;
 
-/**
- * xmlXPathFormatNumber:
- * @number:     number to format
- * @buffer:     output buffer
- * @buffersize: size of output buffer
- *
- * Convert the number into a string representation.
- */
+/// Convert the number into a string representation.
+#[doc(alias = "xmlXPathFormatNumber")]
 unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, buffersize: i32) {
     match xml_xpath_is_inf(number) {
         1 => {
@@ -1414,14 +1219,10 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
     }
 }
 
-/**
- * xmlXPathCastNumberToString:
- * @val:  a number
- *
- * Converts a number to its string value.
- *
- * Returns a newly allocated string.
- */
+/// Converts a number to its string value.
+///
+/// Returns a newly allocated string.
+#[doc(alias = "xmlXPathCastNumberToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlChar {
     let ret: *mut XmlChar;
@@ -1450,14 +1251,10 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
     ret
 }
 
-/**
- * xmlXPathCastNodeToString:
- * @node:  a node
- *
- * Converts a node to its string value.
- *
- * Returns a newly allocated string.
- */
+/// Converts a node to its string value.
+///
+/// Returns a newly allocated string.
+#[doc(alias = "xmlXPathCastNodeToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> *mut XmlChar {
     let mut ret: *mut XmlChar = if node.is_null() {
@@ -1471,14 +1268,10 @@ pub unsafe extern "C" fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> *mut
     ret
 }
 
-/**
- * xmlXPathCastNodeSetToString:
- * @ns:  a node-set
- *
- * Converts a node-set to its string value.
- *
- * Returns a newly allocated string.
- */
+/// Converts a node-set to its string value.
+///
+/// Returns a newly allocated string.
+#[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> *mut XmlChar {
     if ns.is_null() || (*ns).node_nr == 0 || (*ns).node_tab.is_null() {
@@ -1491,15 +1284,11 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) ->
     xml_xpath_cast_node_to_string(*(*ns).node_tab.add(0))
 }
 
-/**
- * xmlXPathCastToString:
- * @val:  an XPath object
- *
- * Converts an existing object to its string() equivalent
- *
- * Returns the allocated string value of the object, NULL in case of error.
- *         It's up to the caller to free the string memory with xmlFree( as _).
- */
+/// Converts an existing object to its string() equivalent
+///
+/// Returns the allocated string value of the object, NULL in case of error.
+/// It's up to the caller to free the string memory with xmlFree( as _).
+#[doc(alias = "xmlXPathCastToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mut XmlChar {
     if val.is_null() {
@@ -1527,15 +1316,10 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
     }
 }
 
-/**
- * xmlXPathConvertBoolean:
- * @val:  an XPath object
- *
- * Converts an existing object to its boolean() equivalent
- *
- * Returns the new object, the old one is freed (or the operation
- *         is done directly on @val)
- */
+/// Converts an existing object to its boolean() equivalent
+///
+/// Returns the new object, the old one is freed (or the operation is done directly on @val)
+#[doc(alias = "xmlXPathConvertBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     if val.is_null() {
@@ -1549,15 +1333,10 @@ pub unsafe extern "C" fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> Xm
     ret
 }
 
-/**
- * xmlXPathConvertNumber:
- * @val:  an XPath object
- *
- * Converts an existing object to its number() equivalent
- *
- * Returns the new object, the old one is freed (or the operation
- *         is done directly on @val)
- */
+/// Converts an existing object to its number() equivalent
+///
+/// Returns the new object, the old one is freed (or the operation is done directly on @val)
+#[doc(alias = "xmlXPathConvertNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     if val.is_null() {
@@ -1571,15 +1350,10 @@ pub unsafe extern "C" fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> Xml
     ret
 }
 
-/**
- * xmlXPathConvertString:
- * @val:  an XPath object
- *
- * Converts an existing object to its string() equivalent
- *
- * Returns the new object, the old one is freed (or the operation
- *         is done directly on @val)
- */
+/// Converts an existing object to its string() equivalent
+///
+/// Returns the new object, the old one is freed (or the operation is done directly on @val)
+#[doc(alias = "xmlXPathConvertString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     let mut res: *mut XmlChar = null_mut();
@@ -1619,17 +1393,10 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
     xml_xpath_wrap_string(res)
 }
 
-/**
- * Context handling.
- */
-/**
- * xmlXPathNewContext:
- * @doc:  the XML document
- *
- * Create a new xmlXPathContext
- *
- * Returns the xmlXPathContext just allocated. The caller will need to free it.
- */
+/// Create a new xmlXPathContext
+///
+/// Returns the xmlXPathContext just allocated. The caller will need to free it.
+#[doc(alias = "xmlXPathNewContext")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContextPtr {
     let ret: XmlXPathContextPtr = xml_malloc(size_of::<XmlXPathContext>()) as XmlXPathContextPtr;
@@ -1671,12 +1438,8 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
     ret
 }
 
-/**
- * xsltPointerListFree:
- *
- * Frees the xsltPointerList structure. This does not free
- * the content of the list.
- */
+/// Frees the xsltPointerList structure. This does not free the content of the list.
+#[doc(alias = "xsltPointerListFree")]
 unsafe extern "C" fn xml_pointer_list_free(list: XmlPointerListPtr) {
     if list.is_null() {
         return;
@@ -1733,12 +1496,8 @@ unsafe extern "C" fn xml_xpath_free_cache(cache: XmlXpathContextCachePtr) {
     xml_free(cache as _);
 }
 
-/**
- * xmlXPathFreeContext:
- * @ctxt:  the context to free
- *
- * Free up an xmlXPathContext
- */
+/// Free up an xmlXPathContext
+#[doc(alias = "xmlXPathFreeContext")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
     if ctxt.is_null() {
@@ -1755,13 +1514,10 @@ pub unsafe extern "C" fn xml_xpath_free_context(ctxt: XmlXPathContextPtr) {
     xml_free(ctxt as _);
 }
 
-/**
- * xmlXPathNewCache:
- *
- * Create a new object cache
- *
- * Returns the xmlXPathCache just allocated.
- */
+/// Create a new object cache
+///
+/// Returns the xmlXPathCache just allocated.
+#[doc(alias = "xmlXPathNewCache")]
 unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
     let ret: XmlXpathContextCachePtr =
         xml_malloc(size_of::<XmlXpathContextCache>()) as XmlXpathContextCachePtr;
@@ -1778,28 +1534,19 @@ unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
     ret
 }
 
-/**
- * xmlXPathContextSetCache:
- *
- * @ctxt:  the XPath context
- * @active: enables/disables (creates/frees) the cache
- * @value: a value with semantics dependent on @options
- * @options: options (currently only the value 0 is used)
- *
- * Creates/frees an object cache on the XPath context.
- * If activates XPath objects (xmlXPathObject) will be cached internally
- * to be reused.
- * @options:
- *   0: This will set the XPath object caching:
- *      @value:
- *        This will set the maximum number of XPath objects
- *        to be cached per slot
- *        There are 5 slots for: node-set, string, number, boolean, and
- *        misc objects. Use <0 for the default number (100).
- *   Other values for @options have currently no effect.
- *
- * Returns 0 if the setting succeeded, and -1 on API or internal errors.
- */
+/// Creates/frees an object cache on the XPath context.
+/// If activates XPath objects (xmlXPathObject) will be cached internally to be reused.
+/// @options:
+///   0: This will set the XPath object caching:
+///      @value:
+///        This will set the maximum number of XPath objects
+///        to be cached per slot
+///        There are 5 slots for: node-set, string, number, boolean, and
+///        misc objects. Use <0 for the default number (100).
+///   Other values for @options have currently no effect.
+///
+/// Returns 0 if the setting succeeded, and -1 on API or internal errors.
+#[doc(alias = "xmlXPathContextSetCache")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_context_set_cache(
     ctxt: XmlXPathContextPtr,
@@ -1835,22 +1582,14 @@ pub unsafe extern "C" fn xml_xpath_context_set_cache(
     0
 }
 
-/**
- * Evaluation functions.
- */
-/**
- * xmlXPathOrderDocElems:
- * @doc:  an input document
- *
- * Call this routine to speed up XPath computation on static documents.
- * This stamps all the element nodes with the document order
- * Like for line information, the order is kept in the element->content
- * field, the value stored is actually - the node number (starting at -1)
- * to be able to differentiate from line numbers.
- *
- * Returns the number of elements found in the document or -1 in case
- *    of error.
- */
+/// Call this routine to speed up XPath computation on static documents.
+/// This stamps all the element nodes with the document order
+/// Like for line information, the order is kept in the element->content
+/// field, the value stored is actually - the node number (starting at -1)
+/// to be able to differentiate from line numbers.
+///
+/// Returns the number of elements found in the document or -1 in case of error.
+#[doc(alias = "xmlXPathOrderDocElems")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     let mut count: isize = 0;
@@ -1894,16 +1633,11 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     count as _
 }
 
-/**
- * xmlXPathSetContextNode:
- * @node: the node to to use as the context node
- * @ctx:  the XPath context
- *
- * Sets 'node' as the context node. The node must be in the same
- * document as that associated with the context.
- *
- * Returns -1 in case of error or 0 if successful
- */
+/// Sets 'node' as the context node. The node must be in the same
+/// document as that associated with the context.
+///
+/// Returns -1 in case of error or 0 if successful
+#[doc(alias = "xmlXPathSetContextNode")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_set_context_node(
     node: XmlNodePtr,
@@ -1920,18 +1654,12 @@ pub unsafe extern "C" fn xml_xpath_set_context_node(
     -1
 }
 
-/**
- * xmlXPathNodeEval:
- * @node: the node to to use as the context node
- * @str:  the XPath expression
- * @ctx:  the XPath context
- *
- * Evaluate the XPath Location Path in the given context. The node 'node'
- * is set as the context node. The context node is not restored.
- *
- * Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
- *         the caller has to free the object.
- */
+/// Evaluate the XPath Location Path in the given context. The node 'node'
+/// is set as the context node. The context node is not restored.
+///
+/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathNodeEval")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_node_eval(
     node: XmlNodePtr,
@@ -1973,16 +1701,11 @@ macro_rules! CHECK_CTXT {
     };
 }
 
-/**
- * xmlXPathEval:
- * @str:  the XPath expression
- * @ctx:  the XPath context
- *
- * Evaluate the XPath Location Path in the given context.
- *
- * Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
- *         the caller has to free the object.
- */
+/// Evaluate the XPath Location Path in the given context.
+///
+/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathEval")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_eval(
     str: *const XmlChar,
@@ -2020,16 +1743,11 @@ pub unsafe extern "C" fn xml_xpath_eval(
     res
 }
 
-/**
- * xmlXPathEvalExpression:
- * @str:  the XPath expression
- * @ctxt:  the XPath context
- *
- * Alias for xmlXPathEval().
- *
- * Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
- *         the caller has to free the object.
- */
+/// Alias for xmlXPathEval().
+///
+/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathEvalExpression")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_eval_expression(
     str: *const XmlChar,
@@ -2038,22 +1756,17 @@ pub unsafe extern "C" fn xml_xpath_eval_expression(
     xml_xpath_eval(str, ctxt)
 }
 
-/**
- * xmlXPathEvalPredicate:
- * @ctxt:  the XPath context
- * @res:  the Predicate Expression evaluation result
- *
- * Evaluate a predicate result for the current node.
- * A PredicateExpr is evaluated by evaluating the Expr and converting
- * the result to a boolean. If the result is a number, the result will
- * be converted to true if the number is equal to the position of the
- * context node in the context node list (as returned by the position
- * function) and will be converted to false otherwise; if the result
- * is not a number, then the result will be converted as if by a call
- * to the boolean function.
- *
- * Returns 1 if predicate is true, 0 otherwise
- */
+/// Evaluate a predicate result for the current node.
+/// A PredicateExpr is evaluated by evaluating the Expr and converting
+/// the result to a boolean. If the result is a number, the result will
+/// be converted to true if the number is equal to the position of the
+/// context node in the context node list (as returned by the position
+/// function) and will be converted to false otherwise; if the result
+/// is not a number, then the result will be converted as if by a call
+/// to the boolean function.
+///
+/// Returns 1 if predicate is true, 0 otherwise
+#[doc(alias = "xmlXPathEvalPredicate")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_eval_predicate(
     ctxt: XmlXPathContextPtr,
@@ -2087,33 +1800,21 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
     0
 }
 
-/**
- * Separate compilation/evaluation entry points.
- */
-/**
- * xmlXPathCompile:
- * @str:  the XPath expression
- *
- * Compile an XPath expression
- *
- * Returns the xmlXPathCompExprPtr resulting from the compilation or NULL.
- *         the caller has to free the object.
- */
+/// Compile an XPath expression
+///
+/// Returns the xmlXPathCompExprPtr resulting from the compilation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathCompile")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_compile(str: *const XmlChar) -> XmlXPathCompExprPtr {
     xml_xpath_ctxt_compile(null_mut(), str)
 }
 
-/**
- * xmlXPathCtxtCompile:
- * @ctxt: an XPath context
- * @str:  the XPath expression
- *
- * Compile an XPath expression
- *
- * Returns the xmlXPathCompExprPtr resulting from the compilation or NULL.
- *         the caller has to free the object.
- */
+/// Compile an XPath expression
+///
+/// Returns the xmlXPathCompExprPtr resulting from the compilation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathCtxtCompile")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_ctxt_compile(
     ctxt: XmlXPathContextPtr,
@@ -2214,15 +1915,10 @@ macro_rules! CHECK_CTXT_NEG {
     };
 }
 
-/**
- * xmlXPathCompParserContext:
- * @comp:  the XPath compiled expression
- * @ctxt:  the XPath context
- *
- * Create a new xmlXPathParserContext when processing a compiled expression
- *
- * Returns the xmlXPathParserContext just allocated.
- */
+/// Create a new xmlXPathParserContext when processing a compiled expression
+///
+/// Returns the xmlXPathParserContext just allocated.
+#[doc(alias = "xmlXPathCompParserContext")]
 unsafe extern "C" fn xml_xpath_comp_parser_context(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
@@ -2252,19 +1948,12 @@ unsafe extern "C" fn xml_xpath_comp_parser_context(
     ret
 }
 
-/**
- * xmlXPathCompiledEvalInternal:
- * @comp:  the compiled XPath expression
- * @ctxt:  the XPath context
- * @resObj: the resulting XPath object or NULL
- * @toBool: 1 if only a boolean result is requested
- *
- * Evaluate the Precompiled XPath expression in the given context.
- * The caller has to free @resObj.
- *
- * Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
- *         the caller has to free the object.
- */
+/// Evaluate the Precompiled XPath expression in the given context.
+/// The caller has to free @resObj.
+///
+/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathCompiledEvalInternal")]
 unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
@@ -2328,16 +2017,11 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     res
 }
 
-/**
- * xmlXPathCompiledEval:
- * @comp:  the compiled XPath expression
- * @ctx:  the XPath context
- *
- * Evaluate the Precompiled XPath expression in the given context.
- *
- * Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
- *         the caller has to free the object.
- */
+/// Evaluate the Precompiled XPath expression in the given context.
+///
+/// Returns the let resulting: xmlXPathObjectPtr from the evaluation or NULL.
+/// The caller has to free the object.
+#[doc(alias = "xmlXPathCompiledEval")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_compiled_eval(
     comp: XmlXPathCompExprPtr,
@@ -2349,17 +2033,12 @@ pub unsafe extern "C" fn xml_xpath_compiled_eval(
     res
 }
 
-/**
- * xmlXPathCompiledEvalToBoolean:
- * @comp:  the compiled XPath expression
- * @ctxt:  the XPath context
- *
- * Applies the XPath boolean() function on the result of the given
- * compiled expression.
- *
- * Returns 1 if the expression evaluated to true, 0 if to false and
- *         -1 in API and internal errors.
- */
+/// Applies the XPath boolean() function on the result of the given
+/// compiled expression.
+///
+/// Returns 1 if the expression evaluated to true, 0 if to false and
+/// -1 in API and internal errors.
+#[doc(alias = "xmlXPathCompiledEvalToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_compiled_eval_to_boolean(
     comp: XmlXPathCompExprPtr,
@@ -2368,12 +2047,8 @@ pub unsafe extern "C" fn xml_xpath_compiled_eval_to_boolean(
     xml_xpath_compiled_eval_internal(comp, ctxt, null_mut(), 1)
 }
 
-/**
- * xmlXPathFreeCompExpr:
- * @comp:  an XPATH comp
- *
- * Free up the memory allocated by @comp
- */
+/// Free up the memory allocated by @comp
+#[doc(alias = "xmlXPathFreeCompExpr")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
     let mut op: XmlXPathStepOpPtr;
@@ -2420,34 +2095,22 @@ pub unsafe extern "C" fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
     xml_free(comp as _);
 }
 
-/**
-* xmlXPathInit:
-*
-* DEPRECATED: Alias for xmlInitParser.
-*/
+#[doc(alias = "xmlXPathInit")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
-#[deprecated]
+#[deprecated = "Alias for xmlInitParser"]
 pub unsafe extern "C" fn xml_xpath_init() {
     xml_init_parser();
 }
 
-/**
-* xmlXPathIsNaN:
-* @val:  a let value: f64
-*
-* Returns 1 if the value is a NaN, 0 otherwise
-*/
+/// Returns 1 if the value is a NaN, 0 otherwise
+#[doc(alias = "xmlXPathIsNaN")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
 pub unsafe extern "C" fn xml_xpath_is_nan(val: f64) -> i32 {
     val.is_nan() as i32
 }
 
-/**
- * xmlXPathIsInf:
- * @val:  a let value: f64
- *
- * Returns 1 if the value is +Infinite, -1 if -Infinite, 0 otherwise
- */
+/// Returns 1 if the value is +Infinite, -1 if -Infinite, 0 otherwise
+#[doc(alias = "xmlXPathIsInf")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
 pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> i32 {
     if val.is_infinite() {
@@ -2461,11 +2124,8 @@ pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> i32 {
     }
 }
 
-/**
- * xmlInitXPathInternal:
- *
- * Initialize the XPath environment
- */
+/// Initialize the XPath environment
+#[doc(alias = "xmlInitXPathInternal")]
 pub(crate) unsafe extern "C" fn xml_init_xpath_internal() {
     XML_XPATH_NAN = f64::NAN;
     XML_XPATH_PINF = f64::INFINITY;

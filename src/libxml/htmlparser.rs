@@ -58,9 +58,7 @@ use super::{
     parser_internals::xml_is_letter,
 };
 
-/*
- * Most of the back-end structures from XML and HTML are shared.
- */
+// Most of the back-end structures from XML and HTML are shared.
 pub type HtmlParserCtxt = XmlParserCtxt;
 pub type HtmlParserCtxtPtr = XmlParserCtxtPtr;
 pub type HtmlParserNodeInfo = XmlParserNodeInfo;
@@ -71,11 +69,9 @@ pub type HtmlParserInputPtr = XmlParserInputPtr;
 pub type HtmlDocPtr = XmlDocPtr;
 pub type HtmlNodePtr = XmlNodePtr;
 
-/*
- * Internal description of an HTML element, representing HTML 4.01
- * and XHTML 1.0 (which share the same structure).
- */
 pub type HtmlElemDescPtr = *mut HtmlElemDesc;
+// Internal description of an HTML element, representing HTML 4.01
+// and XHTML 1.0 (which share the same structure).
 #[repr(C)]
 pub struct HtmlElemDesc {
     pub(crate) name: *const c_char,  /* The tag name */
@@ -106,10 +102,8 @@ pub struct HtmlElemDesc {
     pub(crate) attrs_req: *mut *const c_char, /* Required attributes */
 }
 
-/*
- * Internal description of an HTML entity.
- */
 pub type HtmlEntityDescPtr = *mut HtmlEntityDesc;
+/// Internal description of an HTML entity.
 pub struct HtmlEntityDesc {
     value: u32,          /* the UNICODE value for the character */
     name: *const c_char, /* The entity name */
@@ -226,7 +220,7 @@ const HTML_INLINE: &[*const c_char] = &[
     null(),
 ];
 
-/* placeholders: elts with content but no subelements */
+// placeholders: elts with content but no subelements
 const HTML_PCDATA: &[*const c_char] = &[null()];
 const HTML_CDATA: &[*const c_char] = HTML_PCDATA;
 
@@ -266,7 +260,7 @@ const CORE_ATTRS: &[*const c_char] = &[
 ];
 const I18N_ATTRS: &[*const c_char] = &["lang".as_ptr() as _, c"dir".as_ptr() as _, null()];
 
-/* Other declarations that should go inline ... */
+// Other declarations that should go inline ...
 const A_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
     c"class".as_ptr() as _,
@@ -4328,15 +4322,8 @@ const HTML40_ENTITIES_TABLE: &[HtmlEntityDesc] = &[
     },
 ];
 
-/*
- * There is only few public functions.
- */
-/**
- * htmlInitAutoClose:
- *
- * DEPRECATED: This is a no-op.
- */
-#[deprecated]
+#[doc(alias = "htmlInitAutoClose")]
+#[deprecated = "This is a no-op"]
 pub unsafe extern "C" fn html_init_auto_close() {}
 
 unsafe extern "C" fn html_compare_tags(key: *const c_void, member: *const c_void) -> i32 {
@@ -4346,14 +4333,10 @@ unsafe extern "C" fn html_compare_tags(key: *const c_void, member: *const c_void
     xml_strcasecmp(tag, (*desc).name as _)
 }
 
-/**
- * htmlTagLookup:
- * @tag:  The tag name in lowercase
- *
- * Lookup the HTML tag in the ElementTable
- *
- * Returns the related htmlElemDescPtr or null_mut() if not found.
- */
+/// Lookup the HTML tag in the ElementTable
+///
+/// Returns the related htmlElemDescPtr or null_mut() if not found.
+#[doc(alias = "htmlTagLookup")]
 pub unsafe extern "C" fn html_tag_lookup(tag: *const XmlChar) -> *const HtmlElemDesc {
     if tag.is_null() {
         return null();
@@ -4368,16 +4351,12 @@ pub unsafe extern "C" fn html_tag_lookup(tag: *const XmlChar) -> *const HtmlElem
     ) as _
 }
 
-/**
- * htmlEntityLookup:
- * @name: the entity name
- *
- * Lookup the given entity in EntitiesTable
- *
- * TODO: the linear scan is really ugly, an hash table is really needed.
- *
- * Returns the associated htmlEntityDescPtr if found, NULL otherwise.
- */
+/// Lookup the given entity in EntitiesTable
+///
+/// TODO: the linear scan is really ugly, an hash table is really needed.
+///
+/// Returns the associated htmlEntityDescPtr if found, NULL otherwise.
+#[doc(alias = "htmlEntityLookup")]
 pub unsafe extern "C" fn html_entity_lookup(name: *const XmlChar) -> *const HtmlEntityDesc {
     for entry in HTML40_ENTITIES_TABLE {
         if xml_str_equal(name, entry.name as _) {
@@ -4387,16 +4366,12 @@ pub unsafe extern "C" fn html_entity_lookup(name: *const XmlChar) -> *const Html
     null_mut()
 }
 
-/**
- * htmlEntityValueLookup:
- * @value: the entity's unicode value
- *
- * Lookup the given entity in EntitiesTable
- *
- * TODO: the linear scan is really ugly, an hash table is really needed.
- *
- * Returns the associated htmlEntityDescPtr if found, NULL otherwise.
- */
+/// Lookup the given entity in EntitiesTable
+///
+/// TODO: the linear scan is really ugly, an hash table is really needed.
+///
+/// Returns the associated htmlEntityDescPtr if found, NULL otherwise.
+#[doc(alias = "htmlEntityValueLookup")]
 pub unsafe extern "C" fn html_entity_value_lookup(value: u32) -> *const HtmlEntityDesc {
     for entry in HTML40_ENTITIES_TABLE {
         if entry.value >= value {
@@ -4409,17 +4384,12 @@ pub unsafe extern "C" fn html_entity_value_lookup(value: u32) -> *const HtmlEnti
     null_mut()
 }
 
-/**
- * htmlIsAutoClosed:
- * @doc:  the HTML document
- * @elem:  the HTML element
- *
- * The HTML DTD allows a tag to implicitly close other tags.
- * The list is kept in htmlStartClose array. This function checks
- * if a tag is autoclosed by one of it's child
- *
- * Returns 1 if autoclosed, 0 otherwise
- */
+/// The HTML DTD allows a tag to implicitly close other tags.
+/// The list is kept in htmlStartClose array. This function checks
+/// if a tag is autoclosed by one of it's child
+///
+/// Returns 1 if autoclosed, 0 otherwise
+#[doc(alias = "htmlIsAutoClosed")]
 pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr) -> i32 {
     if elem.is_null() {
         return 1;
@@ -4440,9 +4410,7 @@ pub struct HtmlStartCloseEntry {
     new_tag: *const c_char,
 }
 
-/*
- * start tags that imply the end of current element
- */
+// start tags that imply the end of current element
 const HTML_START_CLOSE: &[HtmlStartCloseEntry] = &[
     HtmlStartCloseEntry {
         old_tag: c"a".as_ptr() as _,
@@ -5455,16 +5423,10 @@ unsafe extern "C" fn html_compare_start_close(vkey: *const c_void, member: *cons
     ret
 }
 
-/**
- * htmlCheckAutoClose:
- * @newtag:  The new tag name
- * @oldtag:  The old tag name
- *
- * Checks whether the new tag is one of the registered valid tags for
- * closing old.
- *
- * Returns 0 if no, 1 if yes.
- */
+/// Checks whether the new tag is one of the registered valid tags for closing old.
+///
+/// Returns 0 if no, 1 if yes.
+#[doc(alias = "htmlCheckAutoClose")]
 unsafe extern "C" fn html_check_auto_close(newtag: *const XmlChar, oldtag: *const XmlChar) -> i32 {
     let mut key: HtmlStartCloseEntry = unsafe { zeroed() };
 
@@ -5480,19 +5442,12 @@ unsafe extern "C" fn html_check_auto_close(newtag: *const XmlChar, oldtag: *cons
     !res.is_null() as i32
 }
 
-/**
- * htmlAutoCloseTag:
- * @doc:  the HTML document
- * @name:  The tag name
- * @elem:  the HTML element
- *
- * The HTML DTD allows a tag to implicitly close other tags.
- * The list is kept in htmlStartClose array. This function checks
- * if the element or one of it's children would autoclose the
- * given tag.
- *
- * Returns 1 if autoclose, 0 otherwise
- */
+/// The HTML DTD allows a tag to implicitly close other tags.
+/// The list is kept in htmlStartClose array. This function checks
+/// if the element or one of it's children would autoclose the given tag.
+///
+/// Returns 1 if autoclose, 0 otherwise
+#[doc(alias = "htmlAutoCloseTag")]
 pub unsafe extern "C" fn html_auto_close_tag(
     _doc: HtmlDocPtr,
     name: *const XmlChar,
@@ -5603,11 +5558,6 @@ macro_rules! CUR_CHAR {
         html_current_char($ctxt, addr_of_mut!($l))
     };
 }
-// macro_rules! CUR_SCHAR {
-//     ($ctxt:expr, $s:expr, $l:expr) => {
-//         xmlStringCurrentChar($ctxt, $s, addr_of_mut!($l))
-//     };
-// }
 macro_rules! COPY_BUF {
     ($ctxt:expr, $l:expr, $b:expr, $i:expr, $v:expr) => {
         if $l == 1 {
@@ -5623,28 +5573,19 @@ macro_rules! COPY_BUF {
     };
 }
 
-/**
- * htmlParseContent:
- * @ctxt:  an HTML parser context
- *
- * Parse a content: comment, sub-element, reference or text.
- * This is the entry point when called from parser.c
- */
+/// Parse a content: comment, sub-element, reference or text.
+/// This is the entry point when called from parser.c
+#[doc(alias = "htmlParseContent")]
 pub(crate) unsafe extern "C" fn __html_parse_content(ctxt: *mut c_void) {
     if !ctxt.is_null() {
         html_parse_content_internal(ctxt as HtmlParserCtxtPtr);
     }
 }
 
-/**
- * html_skip_blank_chars:
- * @ctxt:  the HTML parser context
- *
- * skip all blanks character found at that point in the input streams.
- *
- * Returns the number of space chars skipped
- */
-
+/// skip all blanks character found at that point in the input streams.
+///
+/// Returns the number of space chars skipped
+#[doc(alias = "htmlSkipBlankChars")]
 unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut res: i32 = 0;
 
@@ -5664,15 +5605,8 @@ unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
     res
 }
 
-/**
- * htmlParseErrInt:
- * @ctxt:  an HTML parser context
- * @error:  the error number
- * @msg:  the error message
- * @val:  integer info
- *
- * Handle a fatal parser error, i.e. violating Well-Formedness constraints
- */
+/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[doc(alias = "htmlParseErrInt")]
 unsafe extern "C" fn html_parse_err_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -5712,20 +5646,15 @@ unsafe extern "C" fn html_parse_err_int(
     }
 }
 
-/**
- * htmlFindEncoding:
- * @the HTML parser context
- *
- * Ty to find and encoding in the current data available in the input
- * buffer this is needed to try to match to the proper encoding when
- * one face a character error.
- * That's an heuristic, since it's operating outside of parsing it could
- * try to use a meta which had been commented out, that's the reason it
- * should only be used in case of error, not as a default.
- *
- * Returns an encoding string or NULL if not found, the string need to
- *   be freed
- */
+/// Ty to find and encoding in the current data available in the input
+/// buffer this is needed to try to match to the proper encoding when
+/// one face a character error.
+/// That's an heuristic, since it's operating outside of parsing it could
+/// try to use a meta which had been commented out, that's the reason it
+/// should only be used in case of error, not as a default.
+///
+/// Returns an encoding string or NULL if not found, the string need to be freed
+#[doc(alias = "htmlFindEncoding")]
 unsafe extern "C" fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut start: *const XmlChar;
     let mut cur: *const XmlChar;
@@ -5785,16 +5714,8 @@ unsafe extern "C" fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar 
     xml_strndup(start, cur.offset_from(start) as _)
 }
 
-/**
- * htmlParseErr:
- * @ctxt:  an HTML parser context
- * @error:  the error number
- * @msg:  the error message
- * @str1:  string infor
- * @str2:  string infor
- *
- * Handle a fatal parser error, i.e. violating Well-Formedness constraints
- */
+/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[doc(alias = "htmlParseErr")]
 unsafe extern "C" fn html_parse_err(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
@@ -5842,19 +5763,14 @@ unsafe extern "C" fn html_parse_err(
     }
 }
 
-/**
- * html_current_char:
- * @ctxt:  the HTML parser context
- * @len:  pointer to the length of the c_char read
- *
- * The current c_char value, if using UTF-8 this may actually span multiple
- * bytes in the input buffer. Implement the end of line normalization:
- * 2.11 End-of-Line Handling
- * If the encoding is unspecified, in the case we find an ISO-Latin-1
- * c_char, then the encoding converter is plugged in automatically.
- *
- * Returns the current c_char value and its length
- */
+/// The current char value, if using UTF-8 this may actually span multiple
+/// bytes in the input buffer. Implement the end of line normalization:
+/// 2.11 End-of-Line Handling
+/// If the encoding is unspecified, in the case we find an ISO-Latin-1
+/// char, then the encoding converter is plugged in automatically.
+///
+/// Returns the current char value and its length
+#[doc(alias = "htmlCurrentChar")]
 unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
     let mut val: u32;
 
@@ -6074,6 +5990,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
     *(*(*ctxt).input).cur as _
 }
 
+#[doc(alias = "htmlParseNameComplex")]
 unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut len: i32 = 0;
     let mut l: i32 = 0;
@@ -6149,14 +6066,10 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
     xml_dict_lookup((*ctxt).dict, (*(*ctxt).input).cur.sub(len as usize), len)
 }
 
-/**
- * htmlParseName:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML name, this routine is case sensitive.
- *
- * Returns the Name parsed or NULL
- */
+/// Parse an HTML name, this routine is case sensitive.
+///
+/// Returns the Name parsed or NULL
+#[doc(alias = "htmlParseName")]
 unsafe extern "C" fn html_parse_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
     let mut input: *const XmlChar;
     let ret: *const XmlChar;
@@ -6200,20 +6113,13 @@ unsafe extern "C" fn html_parse_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar 
     html_parse_name_complex(ctxt)
 }
 
-/**
- * htmlParseEntityRef:
- * @ctxt:  an HTML parser context
- * @str:  location to store the entity name
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an HTML ENTITY references
- *
- * [68] EntityRef ::= b'&' Name ';'
- *
- * Returns the associated htmlEntityDescPtr if found, or NULL otherwise,
- *         if non-NULL *str will have to be freed by the caller.
- */
+/// Parse an HTML ENTITY references
+///
+/// [68] EntityRef ::= b'&' Name ';'
+///
+/// Returns the associated htmlEntityDescPtr if found, or NULL otherwise,
+///         if non-NULL *str will have to be freed by the caller.
+#[doc(alias = "htmlParseEntityRef")]
 pub(crate) unsafe extern "C" fn html_parse_entity_ref(
     ctxt: HtmlParserCtxtPtr,
     str: *mut *const XmlChar,
@@ -6271,19 +6177,12 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
     ent
 }
 
-/**
- * htmlParseCharRef:
- * @ctxt:  an HTML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse Reference declarations
- *
- * [66] CharRef ::= b'&#' [0-9]+ ';' |
- *                  '&#x' [0-9a-fA-F]+ ';'
- *
- * Returns the value parsed (as an int)
- */
+/// Parse Reference declarations
+///
+/// `[66] CharRef ::= b'&#' [0-9]+ ';' | '&#x' [0-9a-fA-F]+ ';'`
+///
+/// Returns the value parsed (as an int)
+#[doc(alias = "htmlParseCharRef")]
 pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut val: i32 = 0;
 
@@ -6391,13 +6290,8 @@ const HTML_MAX_NAMELEN: usize = 1000;
 const HTML_PARSER_BIG_BUFFER_SIZE: usize = 1000;
 const HTML_PARSER_BUFFER_SIZE: usize = 100;
 
-/**
- * html_err_memory:
- * @ctxt:  an HTML parser context
- * @extra:  extra information
- *
- * Handle a redefinition of attribute error
- */
+/// Handle a redefinition of attribute error
+#[doc(alias = "htmlErrMemory")]
 pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *const c_char) {
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
@@ -6452,15 +6346,11 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
     }
 }
 
-/**
- * htmlParseHTMLName:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML tag or attribute name, note that we convert it to lowercase
- * since HTML names are not case-sensitive.
- *
- * Returns the Tag Name parsed or NULL
- */
+/// Parse an HTML tag or attribute name, note that we convert it to lowercase
+/// since HTML names are not case-sensitive.
+///
+/// Returns the Tag Name parsed or NULL
+#[doc(alias = "htmlParseHTMLName")]
 unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
     let mut i: usize = 0;
     let mut loc: [XmlChar; HTML_PARSER_BUFFER_SIZE] = [0; HTML_PARSER_BUFFER_SIZE];
@@ -6499,26 +6389,18 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
     ret
 }
 
-/**
- * htmlnamePop:
- * @ctxt: an HTML parser context
- *
- * Pops the top element name from the name stack
- *
- * Returns the name just removed
- */
+/// Pops the top element name from the name stack
+///
+/// Returns the name just removed
+#[doc(alias = "htmlnamePop")]
 unsafe fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
     let res = (*ctxt).name_tab.pop().unwrap_or(null());
     (*ctxt).name = *(*ctxt).name_tab.last().unwrap_or(&null());
     res
 }
 
-/**
- * htmlAutoCloseOnEnd:
- * @ctxt:  an HTML parser context
- *
- * Close all remaining tags at the end of the stream
- */
+/// Close all remaining tags at the end of the stream
+#[doc(alias = "htmlAutoCloseOnEnd")]
 unsafe extern "C" fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).name_tab.is_empty() {
         return;
@@ -6531,18 +6413,13 @@ unsafe extern "C" fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlAutoClose:
- * @ctxt:  an HTML parser context
- * @newtag:  The new tag name or NULL
- *
- * The HTML DTD allows a tag to implicitly close other tags.
- * The list is kept in htmlStartClose array. This function is
- * called when a new tag has been detected and generates the
- * appropriates closes if possible/needed.
- * If newtag is NULL this mean we are at the end of the resource
- * and we should check
- */
+/// The HTML DTD allows a tag to implicitly close other tags.
+/// The list is kept in htmlStartClose array.
+/// This function is called when a new tag has been detected and generates the
+/// appropriates closes if possible/needed.
+/// If newtag is NULL this mean we are at the end of the resource
+/// and we should check
+#[doc(alias = "htmlAutoClose")]
 unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     while !newtag.is_null()
         && !(*ctxt).name.is_null()
@@ -6572,15 +6449,10 @@ unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const Xml
 
 static HTML_OMITTED_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
 
-/**
- * htmlnamePush:
- * @ctxt:  an HTML parser context
- * @value:  the element name
- *
- * Pushes a new element name on top of the name stack
- *
- * Returns -1 in case of error, the index in the stack otherwise
- */
+/// Pushes a new element name on top of the name stack
+///
+/// Returns -1 in case of error, the index in the stack otherwise
+#[doc(alias = "htmlnamePush")]
 unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> i32 {
     if (*ctxt).html < 3 && xml_str_equal(value, c"head".as_ptr() as _) {
         (*ctxt).html = 3;
@@ -6593,15 +6465,10 @@ unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlCh
     (*ctxt).name_tab.len() as i32 - 1
 }
 
-/**
- * htmlCheckImplied:
- * @ctxt:  an HTML parser context
- * @newtag:  The new tag name
- *
- * The HTML DTD allows a tag to exists only implicitly
- * called when a new tag has been detected and generates the
- * appropriates implicit tags if missing
- */
+/// The HTML DTD allows a tag to exists only implicitly
+/// called when a new tag has been detected and generates the
+/// appropriates implicit tags if missing
+#[doc(alias = "htmlCheckImplied")]
 unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     if (*ctxt).options & HtmlParserOption::HtmlParseNoimplied as i32 != 0 {
         return;
@@ -6678,9 +6545,7 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
     }
 }
 
-/*
- * Macro used to grow the current buffer.
- */
+// Macro used to grow the current buffer.
 macro_rules! grow_buffer {
     ($ctxt:expr, $buffer:expr, $buffer_size:expr) => {
         $buffer_size *= 2;
@@ -6694,16 +6559,11 @@ macro_rules! grow_buffer {
     };
 }
 
-/**
- * htmlParseHTMLAttribute:
- * @ctxt:  an HTML parser context
- * @stop:  a c_char stop value
- *
- * parse an HTML attribute value till the stop (quote), if
- * stop is 0 then it stops at the first space
- *
- * Returns the attribute parsed or NULL
- */
+/// Parse an HTML attribute value till the stop (quote),
+/// if stop is 0 then it stops at the first space
+///
+/// Returns the attribute parsed or NULL
+#[doc(alias = "htmlParseHTMLAttribute")]
 unsafe extern "C" fn html_parse_html_attribute(
     ctxt: HtmlParserCtxtPtr,
     stop: XmlChar,
@@ -6893,17 +6753,15 @@ unsafe extern "C" fn html_parse_html_attribute(
     buffer
 }
 
-/**
- * htmlParseAttValue:
- * @ctxt:  an HTML parser context
- *
- * parse a value for an attribute
- * Note: the parser won't do substitution of entities here, this
- * will be handled later in xmlStringGetNodeList, unless it was
- * asked for (*ctxt).replaceEntities != 0
- *
- * Returns the AttValue parsed or NULL.
- */
+/// parse a value for an attribute
+///
+/// # Note
+/// The parser won't do substitution of entities here, this
+/// will be handled later in xmlStringGetNodeList, unless it was
+/// asked for (*ctxt).replaceEntities != 0
+///
+/// Returns the AttValue parsed or NULL.
+#[doc(alias = "htmlParseAttValue")]
 unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
     let ret: *mut XmlChar;
 
@@ -6953,27 +6811,20 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
     ret
 }
 
-/**
- * htmlParseAttribute:
- * @ctxt:  an HTML parser context
- * @value:  a XmlChar ** used to store the value of the attribute
- *
- * parse an attribute
- *
- * [41] Attribute ::= Name Eq AttValue
- *
- * [25] Eq ::= S? '=' S?
- *
- * With namespace:
- *
- * [NS 11] Attribute ::= QName Eq AttValue
- *
- * Also the case QName == xmlns:??? is handled independently as a namespace
- * definition.
- *
- * Returns the attribute name, and the value in *value.
- */
-
+/// Parse an attribute
+///
+/// `[41] Attribute ::= Name Eq AttValue`
+///
+/// `[25] Eq ::= S? '=' S?`
+///
+/// With namespace:
+///
+/// `[NS 11] Attribute ::= QName Eq AttValue`
+///
+/// Also the case QName == xmlns:??? is handled independently as a namespace definition.
+///
+/// Returns the attribute name, and the value in *value.
+#[doc(alias = "htmlParseAttribute")]
 unsafe extern "C" fn html_parse_attribute(
     ctxt: HtmlParserCtxtPtr,
     value: *mut *mut XmlChar,
@@ -7007,16 +6858,9 @@ unsafe extern "C" fn html_parse_attribute(
     name
 }
 
-/**
- * htmlCheckEncodingDirect:
- * @ctxt:  an HTML parser context
- * @attvalue: the attribute value
- *
- * Checks an attribute value to detect
- * the encoding
- * If a new encoding is detected the parser is switched to decode
- * it and pass UTF8
- */
+/// Checks an attribute value to detect the encoding
+/// If a new encoding is detected the parser is switched to decode it and pass UTF8
+#[doc(alias = "htmlCheckEncodingDirect")]
 unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&str>) {
     if ctxt.is_null()
         || encoding.is_none()
@@ -7141,16 +6985,9 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
     }
 }
 
-/**
- * htmlCheckEncoding:
- * @ctxt:  an HTML parser context
- * @attvalue: the attribute value
- *
- * Checks an http-equiv attribute from a Meta tag to detect
- * the encoding
- * If a new encoding is detected the parser is switched to decode
- * it and pass UTF8
- */
+/// Checks an http-equiv attribute from a Meta tag to detect the encoding
+/// If a new encoding is detected the parser is switched to decode it and pass UTF8
+#[doc(alias = "htmlCheckEncoding")]
 unsafe extern "C" fn html_check_encoding(ctxt: HtmlParserCtxtPtr, attvalue: *const XmlChar) {
     let mut encoding: *const XmlChar;
 
@@ -7181,13 +7018,8 @@ unsafe extern "C" fn html_check_encoding(ctxt: HtmlParserCtxtPtr, attvalue: *con
     }
 }
 
-/**
- * htmlCheckMeta:
- * @ctxt:  an HTML parser context
- * @atts:  the attributes values
- *
- * Checks an attributes from a Meta tag
- */
+/// Checks an attributes from a Meta tag
+#[doc(alias = "htmlCheckMeta")]
 unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const XmlChar) {
     let mut i: usize;
     let mut att: *const XmlChar;
@@ -7230,25 +7062,21 @@ unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const 
     }
 }
 
-/**
- * htmlParseStartTag:
- * @ctxt:  an HTML parser context
- *
- * parse a start of tag either for rule element or
- * EmptyElement. In both case we don't parse the tag closing chars.
- *
- * [40] STag ::= b'<' Name (S Attribute)* S? '>'
- *
- * [44] EmptyElemTag ::= b'<' Name (S Attribute)* S? '/>'
- *
- * With namespace:
- *
- * [NS 8] STag ::= b'<' QName (S Attribute)* S? '>'
- *
- * [NS 10] EmptyElement ::= b'<' QName (S Attribute)* S? '/>'
- *
- * Returns 0 in case of success, -1 in case of error and 1 if discarded
- */
+/// Parse a start of tag either for rule element or EmptyElement.  
+/// In both case we don't parse the tag closing chars.
+///
+/// `[40] STag ::= b'<' Name (S Attribute)* S? '>'`
+///
+/// `[44] EmptyElemTag ::= b'<' Name (S Attribute)* S? '/>'`
+///
+/// With namespace:
+///
+/// `[NS 8] STag ::= b'<' QName (S Attribute)* S? '>'`
+///
+/// `[NS 10] EmptyElement ::= b'<' QName (S Attribute)* S? '/>'`
+///
+/// Returns 0 in case of success, -1 in case of error and 1 if discarded
+#[doc(alias = "htmlParseStartTag")]
 unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut attname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
@@ -7485,13 +7313,10 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     discardtag
 }
 
-/*
- * This table is used by the htmlparser to know what to do with
- * broken html pages. By assigning different priorities to different
- * elements the parser can decide how to handle extra endtags.
- * Endtags are only allowed to close elements with lower or equal
- * priority.
- */
+/// This table is used by the htmlparser to know what to do with broken html pages.  
+/// By assigning different priorities to different elements
+/// the parser can decide how to handle extra endtags.  
+/// Endtags are only allowed to close elements with lower or equal priority.
 #[repr(C)]
 pub struct ElementPriority {
     name: *const c_char,
@@ -7549,12 +7374,8 @@ const HTML_END_PRIORITY: &[ElementPriority] = &[
     }, /* Default priority */
 ];
 
-/**
- * htmlGetEndPriority:
- * @name: The name of the element to look up the priority for.
- *
- * Return value: The "endtag" priority.
- **/
+/// Return value: The "endtag" priority.
+#[doc(alias = "htmlGetEndPriority")]
 unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> i32 {
     let mut i: usize = 0;
 
@@ -7567,14 +7388,8 @@ unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> i32 {
     HTML_END_PRIORITY[i].priority
 }
 
-/**
- * htmlAutoCloseOnClose:
- * @ctxt:  an HTML parser context
- * @newtag:  The new tag name
- * @force:  force the tag closure
- *
- * The HTML DTD allows an ending tag to implicitly close other tags.
- */
+/// The HTML DTD allows an ending tag to implicitly close other tags.
+#[doc(alias = "htmlAutoCloseOnClose")]
 unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     let mut info: *const HtmlElemDesc;
 
@@ -7613,14 +7428,10 @@ unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *
     }
 }
 
-/**
- * htmlNodeInfoPop:
- * @ctxt:  an HTML parser context
- *
- * Pops the top element name from the node info stack
- *
- * Returns 0 in case of error, the pointer to NodeInfo otherwise
- */
+/// Pops the top element name from the node info stack
+///
+/// Returns 0 in case of error, the pointer to NodeInfo otherwise
+#[doc(alias = "htmlNodeInfoPop")]
 unsafe extern "C" fn html_node_info_pop(ctxt: HtmlParserCtxtPtr) -> *mut HtmlParserNodeInfo {
     if (*ctxt).node_info_nr <= 0 {
         return null_mut();
@@ -7637,20 +7448,16 @@ unsafe extern "C" fn html_node_info_pop(ctxt: HtmlParserCtxtPtr) -> *mut HtmlPar
     (*ctxt).node_info_tab.add((*ctxt).node_info_nr as usize)
 }
 
-/**
- * htmlParseEndTag:
- * @ctxt:  an HTML parser context
- *
- * parse an end of tag
- *
- * [42] ETag ::= b'</' Name S? '>'
- *
- * With namespace
- *
- * [NS 9] ETag ::= b'</' QName S? '>'
- *
- * Returns 1 if the current level should be closed.
- */
+/// Parse an end of tag
+///
+/// `[42] ETag ::= b'</' Name S? '>'`
+///
+/// With namespace
+///
+/// `[NS 9] ETag ::= b'</' QName S? '>'`
+///
+/// Returns 1 if the current level should be closed.
+#[doc(alias = "htmlParseEndTag")]
 unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let oldname: *const XmlChar;
 
@@ -7762,17 +7569,12 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     0
 }
 
-/**
- * htmlParseHTMLName_nonInvasive:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML tag or attribute name, note that we convert it to lowercase
- * since HTML names are not case-sensitive, this doesn't consume the data
- * from the stream, it's a look-ahead
- *
- * Returns the Tag Name parsed or NULL
- */
-
+/// Parse an HTML tag or attribute name, note that we convert it to lowercase
+/// since HTML names are not case-sensitive, this doesn't consume the data
+/// from the stream, it's a look-ahead
+///
+/// Returns the Tag Name parsed or NULL
+#[doc(alias = "htmlParseHTMLName_nonInvasive")]
 unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
     let mut i: usize = 0;
     let mut loc: [XmlChar; HTML_PARSER_BUFFER_SIZE] = [0; HTML_PARSER_BUFFER_SIZE];
@@ -7799,27 +7601,24 @@ unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) 
     xml_dict_lookup((*ctxt).dict, loc.as_ptr(), i as _)
 }
 
-/**
- * htmlParseScript:
- * @ctxt:  an HTML parser context
- *
- * parse the content of an HTML SCRIPT or STYLE element
- * http://www.w3.org/TR/html4/sgml/dtd.html#Script
- * http://www.w3.org/TR/html4/sgml/dtd.html#StyleSheet
- * http://www.w3.org/TR/html4/types.html#type-script
- * http://www.w3.org/TR/html4/types.html#h-6.15
- * http://www.w3.org/TR/html4/appendix/notes.html#h-B.3.2.1
- *
- * Script data ( %Script; in the DTD) can be the content of the SCRIPT
- * element and the value of intrinsic event attributes. User agents must
- * not evaluate script data as HTML markup but instead must pass it on as
- * data to a script engine.
- * NOTES:
- * - The content is passed like CDATA
- * - the attributes for style and scripting "onXXX" are also described
- *   as CDATA but SGML allows entities references in attributes so their
- *   processing is identical as other attributes
- */
+/// Parse the content of an HTML SCRIPT or STYLE element
+/// http://www.w3.org/TR/html4/sgml/dtd.html#Script
+/// http://www.w3.org/TR/html4/sgml/dtd.html#StyleSheet
+/// http://www.w3.org/TR/html4/types.html#type-script
+/// http://www.w3.org/TR/html4/types.html#h-6.15
+/// http://www.w3.org/TR/html4/appendix/notes.html#h-B.3.2.1
+///
+/// Script data ( %Script; in the DTD) can be the content of the SCRIPT
+/// element and the value of intrinsic event attributes. User agents must
+/// not evaluate script data as HTML markup but instead must pass it on as
+/// data to a script engine.
+///
+/// # Note
+/// - The content is passed like CDATA
+/// - the attributes for style and scripting "onXXX" are also described
+///   as CDATA but SGML allows entities references in attributes so their
+///   processing is identical as other attributes
+#[doc(alias = "htmlParseScript")]
 unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
     let mut buf: [XmlChar; HTML_PARSER_BIG_BUFFER_SIZE + 5] = [0; HTML_PARSER_BIG_BUFFER_SIZE + 5];
     let mut nbchar: i32 = 0;
@@ -7907,16 +7706,12 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlParseSystemLiteral:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML Literal
- *
- * [11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'".as_ptr() as _)
- *
- * Returns the SystemLiteral parsed or NULL
- */
+/// Parse an HTML Literal
+///
+/// `[11] SystemLiteral ::= ('"' [^"]* '"') | ("'" [^']* "'")`
+///
+/// Returns the SystemLiteral parsed or NULL
+#[doc(alias = "htmlParseSystemLiteral")]
 unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
     let mut len: size_t = 0;
     let mut err: i32 = 0;
@@ -7974,16 +7769,12 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
     ret
 }
 
-/**
- * htmlParsePubidLiteral:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML public literal
- *
- * [12] PubidLiteral ::= b'"' PubidChar* '"' | "'" (PubidChar - "'".as_ptr() as _)* "'"
- *
- * Returns the PubidLiteral parsed or NULL.
- */
+/// Parse an HTML public literal
+///
+/// `[12] PubidLiteral ::= '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"`
+///
+/// Returns the PubidLiteral parsed or NULL.
+#[doc(alias = "htmlParsePubidLiteral")]
 unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut XmlChar {
     let mut len: size_t = 0;
     let mut err: i32 = 0;
@@ -8044,22 +7835,16 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
     ret
 }
 
-/**
- * htmlParseExternalID:
- * @ctxt:  an HTML parser context
- * @publicID:  a XmlChar** receiving PubidLiteral
- *
- * Parse an External ID or a Public ID
- *
- * [75] ExternalID ::= b'SYSTEM' S SystemLiteral
- *                   | 'PUBLIC' S PubidLiteral S SystemLiteral
- *
- * [83] PublicID ::= b'PUBLIC' S PubidLiteral
- *
- * Returns the function returns SystemLiteral and in the second
- *                case publicID receives PubidLiteral, is strict is off
- *                it is possible to return NULL and have publicID set.
- */
+/// Parse an External ID or a Public ID
+///
+/// `[75] ExternalID ::= b'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral S SystemLiteral`
+///
+/// `[83] PublicID ::= b'PUBLIC' S PubidLiteral`
+///
+/// Returns the function returns SystemLiteral and in the second
+/// case publicID receives PubidLiteral, is strict is off
+/// it is possible to return NULL and have publicID set.
+#[doc(alias = "htmlParseExternalID")]
 unsafe extern "C" fn html_parse_external_id(
     ctxt: HtmlParserCtxtPtr,
     public_id: *mut *mut XmlChar,
@@ -8130,15 +7915,10 @@ unsafe extern "C" fn html_parse_external_id(
     uri
 }
 
-/**
- * htmlParseDocTypeDecl:
- * @ctxt:  an HTML parser context
- *
- * parse a DOCTYPE declaration
- *
- * [28] doctypedecl ::= b'<!DOCTYPE' S Name (S ExternalID)? S?
- *                      ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
- */
+/// Parse a DOCTYPE declaration
+///
+/// `[28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'`
+#[doc(alias = "htmlParseDocTypeDecl")]
 unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
     let mut external_id: *mut XmlChar = null_mut();
 
@@ -8224,14 +8004,10 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlParseComment:
- * @ctxt:  an HTML parser context
- *
- * Parse an XML (SGML) comment <!-- .... -->
- *
- * [15] Comment ::= b'<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
- */
+/// Parse an XML (SGML) comment <!-- .... -->
+///
+/// `[15] Comment ::= b'<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'`
+#[doc(alias = "htmlParseComment")]
 unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
     let mut len: i32;
@@ -8425,14 +8201,10 @@ unsafe extern "C" fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
     } {}
 }
 
-/**
- * xmlParsePI:
- * @ctxt:  an XML parser context
- *
- * parse an XML Processing Instruction.
- *
- * [16] PI ::= b'<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'
- */
+/// Parse an XML Processing Instruction.
+///
+/// `[16] PI ::= b'<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'`
+#[doc(alias = "xmlParsePI")]
 unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
     let mut len: i32 = 0;
@@ -8579,25 +8351,17 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/*
- * The list of HTML elements which are supposed not to have
- * CDATA content and where a p element will be implied
- *
- * TODO: extend that list by reading the HTML SGML DTD on
- *       implied paragraph
- */
+// The list of HTML elements which are supposed not to have
+// CDATA content and where a p element will be implied
+//
+// TODO: extend that list by reading the HTML SGML DTD on implied paragraph
 const HTML_NO_CONTENT_ELEMENTS: &[*const c_char] = &[c"html".as_ptr(), c"head".as_ptr()];
 
-/**
- * htmlCheckParagraph
- * @ctxt:  an HTML parser context
- *
- * Check whether a p element need to be implied before inserting
- * characters in the current element.
- *
- * Returns 1 if a paragraph has been inserted, 0 if not and -1
- *         in case of error.
- */
+/// Check whether a p element need to be implied before inserting
+/// characters in the current element.
+///
+/// Returns 1 if a paragraph has been inserted, 0 if not and -1 in case of error.
+#[doc(alias = "htmlCheckParagraph")]
 unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
@@ -8637,14 +8401,9 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
     0
 }
 
-/**
- * htmlParseReference:
- * @ctxt:  an HTML parser context
- *
- * parse and handle entity references in content,
- * this will end-up in a call to character() since this is either a
- * CharRef, or a predefined entity.
- */
+/// Parse and handle entity references in content,
+/// this will end-up in a call to character() since this is either a CharRef, or a predefined entity.
+#[doc(alias = "htmlParseReference")]
 unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
     let ent: *const HtmlEntityDesc;
     let mut out: [XmlChar; 6] = [0; 6];
@@ -8757,12 +8516,11 @@ unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/*
- * all tags allowing pc data from the html 4.01 loose dtd
- * NOTE: it might be more appropriate to integrate this information
- * into the html40ElementTable array but I don't want to risk any
- * binary incompatibility
- */
+// all tags allowing pc data from the html 4.01 loose dtd
+//
+// NOTE: it might be more appropriate to integrate this information
+// into the html40ElementTable array but I don't want to risk any
+// binary incompatibility
 const ALLOW_PCDATA: &[*const c_char] = &[
     c"a".as_ptr() as _,
     c"abbr".as_ptr() as _,
@@ -8819,16 +8577,10 @@ const ALLOW_PCDATA: &[*const c_char] = &[
     c"var".as_ptr() as _,
 ];
 
-/**
- * areBlanks:
- * @ctxt:  an HTML parser context
- * @str:  a XmlChar *
- * @len:  the size of @str
- *
- * Is this a sequence of blank chars that one can ignore ?
- *
- * Returns 1 if ignorable 0 otherwise.
- */
+/// Is this a sequence of blank chars that one can ignore ?
+///
+/// Returns 1 if ignorable 0 otherwise.
+#[doc(alias = "areBlanks")]
 unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, len: i32) -> i32 {
     let mut last_child: XmlNodePtr;
     let dtd: XmlDtdPtr;
@@ -8906,16 +8658,11 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     1
 }
 
-/**
- * htmlParseCharDataInternal:
- * @ctxt:  an HTML parser context
- * @readahead: optional read ahead character in ascii range
- *
- * parse a CharData section.
- * if we are within a CDATA section ']]>' marks an end of section.
- *
- * [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
- */
+/// Parse a CharData section.
+/// if we are within a CDATA section ']]>' marks an end of section.
+///
+/// `[14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)`
+#[doc(alias = "htmlParseCharDataInternal")]
 unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, readahead: i32) {
     let mut buf: [XmlChar; HTML_PARSER_BIG_BUFFER_SIZE + 6] = [0; HTML_PARSER_BIG_BUFFER_SIZE + 6];
     let mut nbchar: i32 = 0;
@@ -8998,26 +8745,18 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
     }
 }
 
-/**
- * htmlParseCharData:
- * @ctxt:  an HTML parser context
- *
- * parse a CharData section.
- * if we are within a CDATA section ']]>' marks an end of section.
- *
- * [14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)
- */
+/// Parse a CharData section.
+/// if we are within a CDATA section ']]>' marks an end of section.
+///
+/// `[14] CharData ::= [^<&]* - ([^<&]* ']]>' [^<&]*)`
+#[doc(alias = "htmlParseCharData")]
 unsafe extern "C" fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
     html_parse_char_data_internal(ctxt, 0);
 }
 
-/**
- * htmlParseContent:
- * @ctxt:  an HTML parser context
- *
- * Parse a content: comment, sub-element, reference or text.
- * Kept for compatibility with old code
- */
+/// Parse a content: comment, sub-element, reference or text.
+/// Kept for compatibility with old code
+#[doc(alias = "htmlParseContent")]
 unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
     let mut name: *const XmlChar;
 
@@ -9180,19 +8919,13 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlParseElement:
- * @ctxt:  an HTML parser context
- *
- * DEPRECATED: Internal function, don't use.
- *
- * parse an HTML element, this is highly recursive
- * this is kept for compatibility with previous code versions
- *
- * [39] element ::= EmptyElemTag | STag content ETag
- *
- * [41] Attribute ::= Name Eq AttValue
- */
+/// Parse an HTML element, this is highly recursive
+/// this is kept for compatibility with previous code versions
+///
+/// `[39] element ::= EmptyElemTag | STag content ETag`
+///
+/// `[41] Attribute ::= Name Eq AttValue`
+#[doc(alias = "htmlParseElement")]
 pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     let mut node_info: HtmlParserNodeInfo = unsafe { zeroed() };
     let mut oldptr: *const XmlChar;
@@ -9333,27 +9066,18 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlNewParserCtxt:
- *
- * Allocate and initialize a new parser context.
- *
- * Returns the htmlParserCtxtPtr or NULL in case of allocation error
- */
+/// Allocate and initialize a new parser context.
+///
+/// Returns the `htmlParserCtxtPtr` or NULL in case of allocation error
+#[doc(alias = "htmlNewParserCtxt")]
 pub unsafe extern "C" fn html_new_parser_ctxt() -> HtmlParserCtxtPtr {
     html_new_sax_parser_ctxt(null(), None)
 }
 
-/**
- * htmlInitParserCtxt:
- * @ctxt:  an HTML parser context
- * @sax:  SAX handler
- * @userData:  user data
- *
- * Initialize a parser context
- *
- * Returns 0 in case of success and -1 in case of error
- */
+/// Initialize a parser context
+///
+/// Returns 0 in case of success and -1 in case of error
+#[doc(alias = "htmlInitParserCtxt")]
 unsafe fn html_init_parser_ctxt(
     ctxt: HtmlParserCtxtPtr,
     sax: *const HtmlSaxhandler,
@@ -9434,16 +9158,11 @@ unsafe fn html_init_parser_ctxt(
     0
 }
 
-/**
- * htmlNewSAXParserCtxt:
- * @sax:  SAX handler
- * @userData:  user data
- *
- * Allocate and initialize a new SAX parser context. If userData is NULL,
- * the parser context will be passed as user data.
- *
- * Returns the htmlParserCtxtPtr or NULL in case of allocation error
- */
+/// Allocate and initialize a new SAX parser context.
+/// If userData is NULL, the parser context will be passed as user data.
+///
+/// Returns the `htmlParserCtxtPtr` or NULL in case of allocation error
+#[doc(alias = "htmlNewSAXParserCtxt")]
 pub unsafe fn html_new_sax_parser_ctxt(
     sax: *const HtmlSaxhandler,
     user_data: Option<GenericErrorContext>,
@@ -9462,15 +9181,10 @@ pub unsafe fn html_new_sax_parser_ctxt(
     ctxt
 }
 
-/**
- * htmlCreateMemoryParserCtxt:
- * @buffer:  a pointer to a c_char array
- * @size:  the size of the array
- *
- * Create a parser context for an HTML in-memory document.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for an HTML in-memory document.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "htmlCreateMemoryParserCtxt")]
 pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtPtr {
     if buffer.is_empty() {
         return null_mut();
@@ -9500,6 +9214,7 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
     ctxt
 }
 
+#[doc(alias = "htmlParserFinishElementParsing")]
 unsafe extern "C" fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr) {
     /*
      * Capture end position and add node
@@ -9517,15 +9232,10 @@ unsafe extern "C" fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr)
     }
 }
 
-/**
- * htmlNodeInfoPush:
- * @ctxt:  an HTML parser context
- * @value:  the node info
- *
- * Pushes a new element name on top of the node info stack
- *
- * Returns 0 in case of error, the index in the stack otherwise
- */
+/// Pushes a new element name on top of the node info stack
+///
+/// Returns 0 in case of error, the index in the stack otherwise
+#[doc(alias = "htmlNodeInfoPush")]
 unsafe extern "C" fn html_node_info_push(
     ctxt: HtmlParserCtxtPtr,
     value: *mut HtmlParserNodeInfo,
@@ -9551,16 +9261,12 @@ unsafe extern "C" fn html_node_info_push(
     res
 }
 
-/**
- * htmlParseElementInternal:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML element, new version, non recursive
- *
- * [39] element ::= EmptyElemTag | STag content ETag
- *
- * [41] Attribute ::= Name Eq AttValue
- */
+/// Parse an HTML element, new version, non recursive
+///
+/// `[39] element ::= EmptyElemTag | STag content ETag`
+///
+/// `[41] Attribute ::= Name Eq AttValue`
+#[doc(alias = "htmlParseElementInternal")]
 unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     let mut node_info: HtmlParserNodeInfo = HtmlParserNodeInfo {
         node: null_mut(),
@@ -9669,13 +9375,9 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlParseContentInternal:
- * @ctxt:  an HTML parser context
- *
- * Parse a content: comment, sub-element, reference or text.
- * New version for non recursive htmlParseElementInternal
- */
+/// Parse a content: comment, sub-element, reference or text.
+/// New version for non recursive htmlParseElementInternal
+#[doc(alias = "htmlParseContentInternal")]
 unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
     let mut current_node: *mut XmlChar;
     let mut name: *const XmlChar;
@@ -9883,16 +9585,10 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlParseDocument:
- * @ctxt:  an HTML parser context
- *
- * parse an HTML document (and build a tree if using the standard SAX
- * interface).
- *
- * Returns 0, -1 in case of error. the parser context is augmented
- *                as a result of the parsing.
- */
+/// Parse an HTML document (and build a tree if using the standard SAX interface).
+///
+/// Returns 0, -1 in case of error. the parser context is augmented as a result of the parsing.
+#[doc(alias = "htmlParseDocument")]
 pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut start: [XmlChar; 4] = [0; 4];
     let dtd: XmlDtdPtr;
@@ -10039,17 +9735,12 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
     0
 }
 
-/**
- * htmlCreateDocParserCtxt:
- * @cur:  a pointer to an array of XmlChar
- * @encoding:  a free form C string describing the HTML document encoding, or NULL
- *
- * Create a parser context for an HTML document.
- *
- * TODO: check the need to add encoding handling there
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for an HTML document.
+///
+/// TODO: check the need to add encoding handling there
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "htmlCreateDocParserCtxt")]
 unsafe fn html_create_doc_parser_ctxt(
     cur: *const XmlChar,
     encoding: Option<&str>,
@@ -10103,23 +9794,13 @@ unsafe fn html_create_doc_parser_ctxt(
     ctxt
 }
 
-/**
- * htmlSAXParseDoc:
- * @cur:  a pointer to an array of XmlChar
- * @encoding:  a free form C string describing the HTML document encoding, or NULL
- * @sax:  the SAX handler block
- * @userData: if using SAX, this pointer will be provided on callbacks.
- *
- * DEPRECATED: Use htmlNewSAXParserCtxt and htmlCtxtReadDoc.
- *
- * Parse an HTML in-memory document. If sax is not NULL, use the SAX callbacks
- * to handle parse events. If sax is NULL, fallback to the default DOM
- * behavior and return a tree.
- *
- * Returns the resulting document tree unless SAX is NULL or the document is
- *     not well formed.
- */
-#[deprecated]
+/// Parse an HTML in-memory document.  
+/// If sax is not NULL, use the SAX callbacks to handle parse events.  
+/// If sax is NULL, fallback to the default DOM behavior and return a tree.
+///
+/// Returns the resulting document tree unless SAX is NULL or the document is not well formed.
+#[doc(alias = "htmlSAXParseDoc")]
+#[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadDoc"]
 pub unsafe fn html_sax_parse_doc(
     cur: *const XmlChar,
     encoding: Option<&str>,
@@ -10155,30 +9836,22 @@ pub unsafe fn html_sax_parse_doc(
     ret
 }
 
-/**
- * htmlParseDoc:
- * @cur:  a pointer to an array of XmlChar
- * @encoding:  a free form C string describing the HTML document encoding, or NULL
- *
- * parse an HTML in-memory document and build a tree.
- *
- * Returns the resulting document tree
- */
+/// Parse an HTML in-memory document and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlParseDoc")]
 pub unsafe fn html_parse_doc(cur: *const XmlChar, encoding: Option<&str>) -> HtmlDocPtr {
     html_sax_parse_doc(cur, encoding, null_mut(), None)
 }
 
-/**
- * htmlCreateFileParserCtxt:
- * @filename:  the filename
- * @encoding:  a free form C string describing the HTML document encoding, or NULL
- *
- * Create a parser context for a file content.
- * Automatic support for ZLIB/Compress compressed document is provided
- * by default if found at compile-time.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for a file content.
+///
+/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
+/// by default if found at compile-time.  
+/// However, this crate does not provide currently.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "htmlCreateFileParserCtxt")]
 pub unsafe fn html_create_file_parser_ctxt(
     filename: *const c_char,
     encoding: Option<&str>,
@@ -10230,24 +9903,14 @@ pub unsafe fn html_create_file_parser_ctxt(
     ctxt
 }
 
-/**
- * htmlSAXParseFile:
- * @filename:  the filename
- * @encoding:  a free form C string describing the HTML document encoding, or NULL
- * @sax:  the SAX handler block
- * @userData: if using SAX, this pointer will be provided on callbacks.
- *
- * DEPRECATED: Use htmlNewSAXParserCtxt and htmlCtxtReadFile.
- *
- * parse an HTML file and build a tree. Automatic support for ZLIB/Compress
- * compressed document is provided by default if found at compile-time.
- * It use the given SAX function block to handle the parsing callback.
- * If sax is NULL, fallback to the default DOM tree building routines.
- *
- * Returns the resulting document tree unless SAX is NULL or the document is
- *     not well formed.
- */
-#[deprecated]
+/// Parse an HTML file and build a tree. Automatic support for ZLIB/Compress
+/// compressed document is provided by default if found at compile-time.
+/// It use the given SAX function block to handle the parsing callback.
+/// If sax is NULL, fallback to the default DOM tree building routines.
+///
+/// Returns the resulting document tree unless SAX is NULL or the document is not well formed.
+#[doc(alias = "htmlSAXParseFile")]
+#[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadFile"]
 pub unsafe fn html_sax_parse_file(
     filename: *const c_char,
     encoding: Option<&str>,
@@ -10280,35 +9943,26 @@ pub unsafe fn html_sax_parse_file(
     ret
 }
 
-/**
- * htmlParseFile:
- * @filename:  the filename
- * @encoding:  a free form C string describing the HTML document encoding, or NULL
- *
- * parse an HTML file and build a tree. Automatic support for ZLIB/Compress
- * compressed document is provided by default if found at compile-time.
- *
- * Returns the resulting document tree
- */
+/// Parse an HTML file and build a tree.
+///
+/// In original libxml2, automatic support for ZLIB/Compress
+/// compressed document is provided by default if found at compile-time.  
+/// However, this crate does not support currently.
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlParseFile")]
 pub unsafe fn html_parse_file(filename: *const c_char, encoding: Option<&str>) -> HtmlDocPtr {
     html_sax_parse_file(filename, encoding, null_mut(), None)
 }
 
-/**
- * UTF8ToHtml:
- * @out:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @out
- * @in:  a pointer to an array of UTF-8 chars
- * @inlen:  the length of @in
- *
- * Take a block of UTF-8 chars in and try to convert it to an ASCII
- * plus HTML entities block of chars out.
- *
- * Returns 0 if success, -2 if the transcoding fails, or -1 otherwise
- * The value of @inlen after return is the number of octets consumed
- *     as the return value is positive, else unpredictable.
- * The value of @outlen after return is the number of octets consumed.
- */
+/// Take a block of UTF-8 chars in and try to convert it to an ASCII
+/// plus HTML entities block of chars out.
+///
+/// Returns 0 if success, -2 if the transcoding fails, or -1 otherwise.  
+/// The value of @inlen after return is the number of octets consumed
+/// as the return value is positive, else unpredictable.  
+/// The value of @outlen after return is the number of octets consumed.
+#[doc(alias = "UTF8ToHtml")]
 pub unsafe extern "C" fn utf8_to_html(
     mut out: *mut u8,
     outlen: *mut i32,
@@ -10418,22 +10072,14 @@ pub unsafe extern "C" fn utf8_to_html(
     0
 }
 
-/**
- * htmlEncodeEntities:
- * @out:  a pointer to an array of bytes to store the result
- * @outlen:  the length of @out
- * @in:  a pointer to an array of UTF-8 chars
- * @inlen:  the length of @in
- * @quoteChar: the quote character to escape (' or ") or zero.
- *
- * Take a block of UTF-8 chars in and try to convert it to an ASCII
- * plus HTML entities block of chars out.
- *
- * Returns 0 if success, -2 if the transcoding fails, or -1 otherwise
- * The value of @inlen after return is the number of octets consumed
- *     as the return value is positive, else unpredictable.
- * The value of @outlen after return is the number of octets consumed.
- */
+/// Take a block of UTF-8 chars in and try to convert it to an ASCII
+/// plus HTML entities block of chars out.
+///
+/// Returns 0 if success, -2 if the transcoding fails, or -1 otherwise.  
+/// The value of @inlen after return is the number of octets consumed
+/// as the return value is positive, else unpredictable.  
+/// The value of @outlen after return is the number of octets consumed.  
+#[doc(alias = "htmlEncodeEntities")]
 pub unsafe extern "C" fn html_encode_entities(
     mut out: *mut u8,
     outlen: *mut i32,
@@ -10540,11 +10186,10 @@ pub unsafe extern "C" fn html_encode_entities(
     0
 }
 
-/*
- * The list of HTML attributes which are of content %Script;
- * NOTE: when adding ones, check htmlIsScriptAttribute() since
- *       it assumes the name starts with 'on'
- */
+// The list of HTML attributes which are of content %Script;
+// # Note
+// when adding ones, check htmlIsScriptAttribute() since
+// it assumes the name starts with 'on'
 const HTML_SCRIPT_ATTRIBUTES: &[*const c_char] = &[
     c"onclick".as_ptr() as _,
     c"ondblclick".as_ptr() as _,
@@ -10566,14 +10211,10 @@ const HTML_SCRIPT_ATTRIBUTES: &[*const c_char] = &[
     c"onselect".as_ptr() as _,
 ];
 
-/**
- * htmlIsScriptAttribute:
- * @name:  an attribute name
- *
- * Check if an attribute is of content type Script
- *
- * Returns 1 is the attribute is a script 0 otherwise
- */
+/// Check if an attribute is of content type Script
+///
+/// Returns 1 is the attribute is a script 0 otherwise
+#[doc(alias = "htmlIsScriptAttribute")]
 pub unsafe extern "C" fn html_is_script_attribute(name: *const XmlChar) -> i32 {
     if name.is_null() {
         return 0;
@@ -10593,14 +10234,10 @@ pub unsafe extern "C" fn html_is_script_attribute(name: *const XmlChar) -> i32 {
     0
 }
 
-/**
- * htmlHandleOmittedElem:
- * @val:  int 0 or 1
- *
- * Set and return the previous value for handling HTML omitted tags.
- *
- * Returns the last value for 0 for no handling, 1 for auto insertion.
- */
+/// Set and return the previous value for handling HTML omitted tags.
+///
+/// Returns the last value for 0 for no handling, 1 for auto insertion.
+#[doc(alias = "htmlHandleOmittedElem")]
 pub unsafe extern "C" fn html_handle_omitted_elem(val: i32) -> i32 {
     let old: i32 = HTML_OMITTED_DEFAULT_VALUE.load(Ordering::Acquire);
 
@@ -10608,13 +10245,9 @@ pub unsafe extern "C" fn html_handle_omitted_elem(val: i32) -> i32 {
     old
 }
 
-/**
- * htmlNewInputStream:
- * @ctxt:  an HTML parser context
- *
- * Create a new input stream structure
- * Returns the new input stream or NULL
- */
+/// Create a new input stream structure
+/// Returns the new input stream or NULL
+#[doc(alias = "htmlNewInputStream")]
 #[cfg(feature = "push")]
 unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParserInputPtr {
     let input: HtmlParserInputPtr = xml_malloc(size_of::<HtmlParserInput>()) as XmlParserInputPtr;
@@ -10642,24 +10275,12 @@ unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParse
     input
 }
 
-/**
- * Interfaces for the Push mode.
- */
-/**
- * htmlCreatePushParserCtxt:
- * @sax:  a SAX handler
- * @user_data:  The user data returned on SAX callbacks
- * @chunk:  a pointer to an array of chars
- * @size:  number of chars in the array
- * @filename:  an optional file name or URI
- * @enc:  an optional encoding
- *
- * Create a parser context for using the HTML parser in push mode
- * The value of @filename is used for fetching external entities
- * and error/warning reports.
- *
- * Returns the new parser context or NULL
- */
+/// Create a parser context for using the HTML parser in push mode
+/// The value of `filename` is used for fetching external entities
+/// and error/warning reports.
+///
+/// Returns the new parser context or NULL
+#[doc(alias = "htmlCreatePushParserCtxt")]
 #[cfg(feature = "push")]
 pub unsafe fn html_create_push_parser_ctxt(
     sax: HtmlSaxhandlerPtr,
@@ -10744,24 +10365,15 @@ pub unsafe fn html_create_push_parser_ctxt(
     ctxt
 }
 
-/**
- * htmlParseLookupSequence:
- * @ctxt:  an HTML parser context
- * @first:  the first c_char to lookup
- * @next:  the next c_char to lookup or zero
- * @third:  the next c_char to lookup or zero
- * @ignoreattrval: skip over attribute values
- *
- * Try to find if a sequence (first, next, third) or  just (first next) or
- * (first) is available in the input stream.
- * This function has a side effect of (possibly) incrementing (*ctxt).checkIndex
- * to avoid rescanning sequences of bytes, it DOES change the state of the
- * parser, do not use liberally.
- * This is basically similar to xmlParseLookupSequence()
- *
- * Returns the index to the current parsing point if the full sequence
- *      is available, -1 otherwise.
- */
+/// Try to find if a sequence (first, next, third) or just (first next) or
+/// (first) is available in the input stream.
+/// This function has a side effect of (possibly) incrementing (*ctxt).checkIndex
+/// to avoid rescanning sequences of bytes, it DOES change the state of the
+/// parser, do not use liberally.
+/// This is basically similar to xmlParseLookupSequence()
+///
+/// Returns the index to the current parsing point if the full sequence is available, -1 otherwise.
+#[doc(alias = "htmlParseLookupSequence")]
 #[cfg(feature = "push")]
 unsafe extern "C" fn html_parse_lookup_sequence(
     ctxt: HtmlParserCtxtPtr,
@@ -10823,38 +10435,19 @@ unsafe extern "C" fn html_parse_lookup_sequence(
     }
     (*ctxt).check_index = base.max(len) as _;
     (*ctxt).end_check_state = quote;
-    // #ifdef DEBUG_PUSH
-    //     if (next == 0) {
-    //         xmlGenericError(xmlGenericErrorContext,
-    //                         c"HPP: lookup '%c' failed\n".as_ptr() as _, first);
-    //     }
-    //     else if (third == 0) {
-    //         xmlGenericError(xmlGenericErrorContext,
-    //                         c"HPP: lookup '%c%c' failed\n".as_ptr() as _, first, next);
-    //     }
-    //     else {
-    //         xmlGenericError(xmlGenericErrorContext,
-    //                         c"HPP: lookup '%c%c%c' failed\n".as_ptr() as _, first, next,
-    //                         third);
-    //     }
-    // #endif
     -1
 }
 
-/**
- * htmlParseLookupCommentEnd:
- * @ctxt: an HTML parser context
- *
- * Try to find a comment end tag in the input stream
- * The search includes "-->" as well as WHATWG-recommended incorrectly-closed tags.
- * (See https://html.spec.whatwg.org/multipage/parsing.html#parse-error-incorrectly-closed-comment)
- * This function has a side effect of (possibly) incrementing (*ctxt).checkIndex
- * to avoid rescanning sequences of bytes, it DOES change the state of the
- * parser, do not use liberally.
- * This wraps to htmlParseLookupSequence()
- *
- * Returns the index to the current parsing point if the full sequence is available, -1 otherwise.
- */
+/// Try to find a comment end tag in the input stream
+/// The search includes "-->" as well as WHATWG-recommended incorrectly-closed tags.
+/// (See https://html.spec.whatwg.org/multipage/parsing.html#parse-error-incorrectly-closed-comment)
+/// This function has a side effect of (possibly) incrementing (*ctxt).checkIndex
+/// to avoid rescanning sequences of bytes,
+/// it DOES change the state of the parser, do not use liberally.  
+/// This wraps to htmlParseLookupSequence()
+///
+/// Returns the index to the current parsing point if the full sequence is available, -1 otherwise.
+#[doc(alias = "htmlParseLookupCommentEnd")]
 #[cfg(feature = "push")]
 unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut mark: i32;
@@ -10881,15 +10474,10 @@ unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i
     mark
 }
 
-/**
- * htmlParseTryOrFinish:
- * @ctxt:  an HTML parser context
- * @terminate:  last chunk indicator
- *
- * Try to progress on parsing
- *
- * Returns zero if no parsing was possible
- */
+/// Try to progress on parsing
+///
+/// Returns zero if no parsing was possible
+#[doc(alias = "htmlParseTryOrFinish")]
 #[cfg(feature = "push")]
 unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i32 {
     let ret: i32 = 0;
@@ -11257,10 +10845,6 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 }
 
                 (*ctxt).instate = XmlParserInputState::XmlParserContent;
-                // #ifdef DEBUG_PUSH
-                // 		xmlGenericError(xmlGenericErrorContext,
-                // 			c"HPP: entering CONTENT\n".as_ptr() as _);
-                // #endif
             }
             XmlParserInputState::XmlParserContent => 'to_break: {
                 let mut chr: [XmlChar; 2] = [0, 0];
@@ -11612,17 +11196,10 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
     ret
 }
 
-/**
- * htmlParseChunk:
- * @ctxt:  an HTML parser context
- * @chunk:  an c_char array
- * @size:  the size in byte of the chunk
- * @terminate:  last chunk indicator
- *
- * Parse a Chunk of memory
- *
- * Returns zero if no error, the xmlParserErrors otherwise.
- */
+/// Parse a Chunk of memory
+///
+/// Returns zero if no error, the xmlParserErrors otherwise.
+#[doc(alias = "htmlParseChunk")]
 #[cfg(feature = "push")]
 pub unsafe extern "C" fn html_parse_chunk(
     ctxt: HtmlParserCtxtPtr,
@@ -11708,26 +11285,16 @@ pub unsafe extern "C" fn html_parse_chunk(
     (*ctxt).err_no
 }
 
-/**
- * htmlFreeParserCtxt:
- * @ctxt:  an HTML parser context
- *
- * Free all the memory used by a parser context. However the parsed
- * document in (*ctxt).myDoc is not freed.
- */
+/// Free all the memory used by a parser context.   
+/// However the parsed document in (*ctxt).myDoc is not freed.
+#[doc(alias = "htmlFreeParserCtxt")]
 pub unsafe extern "C" fn html_free_parser_ctxt(ctxt: HtmlParserCtxtPtr) {
     xml_free_parser_ctxt(ctxt);
 }
 
-/*
- * New set of simpler/more flexible APIs
- */
-/**
- * xmlParserOption:
- *
- * This is the set of XML parser options that can be passed down
- * to the xmlReadDoc() and similar calls.
- */
+/// This is the set of XML parser options that can be passed down
+/// to the xmlReadDoc() and similar calls.
+#[doc(alias = "xmlParserOption")]
 #[repr(C)]
 pub enum HtmlParserOption {
     HtmlParseRecover = 1 << 0,    /* Relaxed parsing */
@@ -11742,13 +11309,7 @@ pub enum HtmlParserOption {
     HtmlParseIgnoreEnc = 1 << 21, /* ignore internal document encoding hint */
 }
 
-/**
- * DICT_FREE:
- * @str:  a string
- *
- * Free a string if it is not owned by the "dict" dictionary in the
- * current scope
- */
+/// Free a string if it is not owned by the "dict" dictionary in the current scope
 macro_rules! DICT_FREE {
     ($dict:expr, $str:expr) => {
         if !$str.is_null()
@@ -11759,12 +11320,8 @@ macro_rules! DICT_FREE {
     };
 }
 
-/**
- * htmlCtxtReset:
- * @ctxt: an HTML parser context
- *
- * Reset a parser context
- */
+/// Reset a parser context
+#[doc(alias = "htmlCtxtReset")]
 pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     let mut input: XmlParserInputPtr;
 
@@ -11849,16 +11406,10 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     }
 }
 
-/**
- * htmlCtxtUseOptions:
- * @ctxt: an HTML parser context
- * @options:  a combination of htmlParserOption(s)
- *
- * Applies the options to the parser context
- *
- * Returns 0 in case of success, the set of unknown or unimplemented options
- *         in case of error.
- */
+/// Applies the options to the parser context
+///
+/// Returns 0 in case of success, the set of unknown or unimplemented options in case of error.
+#[doc(alias = "htmlCtxtUseOptions")]
 pub unsafe extern "C" fn html_ctxt_use_options(ctxt: HtmlParserCtxtPtr, mut options: i32) -> i32 {
     if ctxt.is_null() {
         return -1;
@@ -11923,18 +11474,10 @@ pub unsafe extern "C" fn html_ctxt_use_options(ctxt: HtmlParserCtxtPtr, mut opti
     options
 }
 
-/**
- * htmlDoRead:
- * @ctxt:  an HTML parser context
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- * @reuse:  keep the context for reuse
- *
- * Common front-end for the htmlRead functions
- *
- * Returns the resulting document tree or NULL
- */
+/// Common front-end for the htmlRead functions
+///
+/// Returns the resulting document tree or NULL
+#[doc(alias = "htmlDoRead")]
 unsafe fn html_do_read(
     ctxt: HtmlParserCtxtPtr,
     url: Option<&str>,
@@ -11965,17 +11508,10 @@ unsafe fn html_do_read(
     ret
 }
 
-/**
- * htmlReadDoc:
- * @cur:  a pointer to a zero terminated string
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an XML in-memory document and build a tree.
- *
- * Returns the resulting document tree
- */
+/// Parse an XML in-memory document and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlReadDoc")]
 pub unsafe fn html_read_doc(
     cur: *const XmlChar,
     url: Option<&str>,
@@ -11994,16 +11530,10 @@ pub unsafe fn html_read_doc(
     html_do_read(ctxt, url, encoding, options, 0)
 }
 
-/**
- * htmlReadFile:
- * @filename:  a file or URL
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an XML file from the filesystem or the network.
- *
- * Returns the resulting document tree
- */
+/// Parse an XML file from the filesystem or the network.
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlReadFile")]
 pub unsafe fn html_read_file(
     filename: *const c_char,
     encoding: Option<&str>,
@@ -12017,18 +11547,10 @@ pub unsafe fn html_read_file(
     html_do_read(ctxt, None, None, options, 0)
 }
 
-/**
- * htmlReadMemory:
- * @buffer:  a pointer to a c_char array
- * @size:  the size of the array
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an XML in-memory document and build a tree.
- *
- * Returns the resulting document tree
- */
+/// Parse an XML in-memory document and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlReadMemory")]
 pub unsafe fn html_read_memory(
     buffer: Vec<u8>,
     url: Option<&str>,
@@ -12043,19 +11565,10 @@ pub unsafe fn html_read_memory(
     html_do_read(ctxt, url, encoding, options, 0)
 }
 
-/**
- * htmlReadIO:
- * @ioread:  an I/O read function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an HTML document from I/O functions and source and build a tree.
- *
- * Returns the resulting document tree
- */
+/// Parse an HTML document from I/O functions and source and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlReadIO")]
 pub unsafe fn html_read_io(
     ioctx: impl Read + 'static,
     url: Option<&str>,
@@ -12079,19 +11592,11 @@ pub unsafe fn html_read_io(
     html_do_read(ctxt, url, encoding, options, 0)
 }
 
-/**
- * htmlCtxtReadDoc:
- * @ctxt:  an HTML parser context
- * @cur:  a pointer to a zero terminated string
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an XML in-memory document and build a tree.
- * This reuses the existing @ctxt parser context
- *
- * Returns the resulting document tree
- */
+/// Parse an XML in-memory document and build a tree.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlCtxtReadDoc")]
 pub unsafe fn html_ctxt_read_doc(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
@@ -12111,18 +11616,11 @@ pub unsafe fn html_ctxt_read_doc(
     )
 }
 
-/**
- * htmlCtxtReadFile:
- * @ctxt:  an HTML parser context
- * @filename:  a file or URL
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an XML file from the filesystem or the network.
- * This reuses the existing @ctxt parser context
- *
- * Returns the resulting document tree
- */
+/// Parse an XML file from the filesystem or the network.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlCtxtReadFile")]
 pub unsafe fn html_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
@@ -12147,20 +11645,11 @@ pub unsafe fn html_ctxt_read_file(
     html_do_read(ctxt, None, encoding, options, 1)
 }
 
-/**
- * htmlCtxtReadMemory:
- * @ctxt:  an HTML parser context
- * @buffer:  a pointer to a c_char array
- * @size:  the size of the array
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an XML in-memory document and build a tree.
- * This reuses the existing @ctxt parser context
- *
- * Returns the resulting document tree
- */
+/// Parse an XML in-memory document and build a tree.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlCtxtReadMemory")]
 pub unsafe fn html_ctxt_read_memory(
     ctxt: XmlParserCtxtPtr,
     buffer: Vec<u8>,
@@ -12189,21 +11678,11 @@ pub unsafe fn html_ctxt_read_memory(
     html_do_read(ctxt, url, encoding, options, 1)
 }
 
-/**
- * htmlCtxtReadIO:
- * @ctxt:  an HTML parser context
- * @ioread:  an I/O read function
- * @ioclose:  an I/O close function
- * @ioctx:  an I/O handler
- * @URL:  the base URL to use for the document
- * @encoding:  the document encoding, or NULL
- * @options:  a combination of htmlParserOption(s)
- *
- * parse an HTML document from I/O functions and source and build a tree.
- * This reuses the existing @ctxt parser context
- *
- * Returns the resulting document tree
- */
+/// Parse an HTML document from I/O functions and source and build a tree.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "htmlCtxtReadIO")]
 pub unsafe fn html_ctxt_read_io(
     ctxt: XmlParserCtxtPtr,
     ioctx: impl Read + 'static,
@@ -12228,8 +11707,7 @@ pub unsafe fn html_ctxt_read_io(
     html_do_read(ctxt, url, encoding, options, 1)
 }
 
-/* NRK/Jan2003: further knowledge of HTML structure
- */
+// NRK/Jan2003: further knowledge of HTML structure
 #[repr(C)]
 pub enum HtmlStatus {
     HtmlNa = 0, /* something we don't check at all */
@@ -12239,20 +11717,11 @@ pub enum HtmlStatus {
     HtmlRequired = 0xc, /* VALID bit set so ( & HTML_VALID ) is TRUE */
 }
 
-/* Using htmlElemDesc rather than name here, to emphasise the fact
-   that otherwise there's a lookup overhead
-*/
-/**
- * htmlAttrAllowed:
- * @elt: HTML element
- * @attr: HTML attribute
- * @legacy: whether to allow deprecated attributes
- *
- * Checks whether an attribute is valid for an element
- * Has full knowledge of Required and Deprecated attributes
- *
- * Returns one of HTML_REQUIRED, HTML_VALID, HTML_DEPRECATED, HTML_INVALID
- */
+/// Checks whether an attribute is valid for an element
+/// Has full knowledge of Required and Deprecated attributes
+///
+/// Returns one of HTML_REQUIRED, HTML_VALID, HTML_DEPRECATED, HTML_INVALID
+#[doc(alias = "htmlAttrAllowed")]
 pub unsafe extern "C" fn html_attr_allowed(
     elt: *const HtmlElemDesc,
     attr: *const XmlChar,
@@ -12297,16 +11766,13 @@ pub unsafe extern "C" fn html_attr_allowed(
     HtmlStatus::HtmlInvalid
 }
 
-/**
- * htmlElementAllowedHere:
- * @parent: HTML parent element
- * @elt: HTML element
- *
- * Checks whether an HTML element may be a direct child of a parent element.
- * Note - doesn't check for deprecated elements
- *
- * Returns 1 if allowed; 0 otherwise.
- */
+/// Checks whether an HTML element may be a direct child of a parent element.
+///
+/// # Note
+/// - doesn't check for deprecated elements
+///
+/// Returns 1 if allowed; 0 otherwise.
+#[doc(alias = "htmlElementAllowedHere")]
 pub unsafe extern "C" fn html_element_allowed_here(
     parent: *const HtmlElemDesc,
     elt: *const XmlChar,
@@ -12328,16 +11794,11 @@ pub unsafe extern "C" fn html_element_allowed_here(
     0
 }
 
-/**
- * htmlElementStatusHere:
- * @parent: HTML parent element
- * @elt: HTML element
- *
- * Checks whether an HTML element may be a direct child of a parent element.
- * and if so whether it is valid or deprecated.
- *
- * Returns one of htmlStatus::HTML_VALID, htmlStatus::HTML_DEPRECATED, htmlStatus::HTML_INVALID
- */
+/// Checks whether an HTML element may be a direct child of a parent element.
+/// and if so whether it is valid or deprecated.
+///
+/// Returns one of htmlStatus::HTML_VALID, htmlStatus::HTML_DEPRECATED, htmlStatus::HTML_INVALID
+#[doc(alias = "htmlElementStatusHere")]
 pub unsafe extern "C" fn html_element_status_here(
     parent: *const HtmlElemDesc,
     elt: *const HtmlElemDesc,
@@ -12356,20 +11817,14 @@ pub unsafe extern "C" fn html_element_status_here(
     }
 }
 
-/**
- * htmlNodeStatus:
- * @node: an htmlNodePtr in a tree
- * @legacy: whether to allow deprecated elements (YES is faster here
- *    for Element nodes)
- *
- * Checks whether the tree node is valid.  Experimental (the author
- *     only uses the HTML enhancements in a SAX parser)
- *
- * Return: for Element nodes, a return from htmlElementAllowedHere (if
- *    legacy allowed) or htmlElementStatusHere (otherwise).
- *    for Attribute nodes, a return from htmlAttrAllowed
- *    for other nodes, htmlStatus::HTML_NA (no checks performed)
- */
+/// Checks whether the tree node is valid.  
+/// Experimental (the author only uses the HTML enhancements in a SAX parser)
+///
+/// Return: for Element nodes, a return from htmlElementAllowedHere (if legacy allowed)
+/// or htmlElementStatusHere (otherwise).  
+/// - For Attribute nodes, a return from htmlAttrAllowed
+/// - For other nodes, htmlStatus::HTML_NA (no checks performed)
+#[doc(alias = "htmlNodeStatus")]
 pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
     if node.is_null() {
         return HtmlStatus::HtmlInvalid;
@@ -12402,44 +11857,6 @@ pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> Htm
         _ => HtmlStatus::HtmlNa,
     }
 }
-
-// /**
-//  * htmlDefaultSubelement:
-//  * @elt: HTML element
-//  *
-//  * Returns the default subelement for this element
-//  */
-// macro_rules! htmlDefaultSubelement {
-//     ($elt:expr) => {
-//         (*$elt).defaultsubelt
-//     };
-// }
-// /**
-//  * htmlElementAllowedHereDesc:
-//  * @parent: HTML parent element
-//  * @elt: HTML element
-//  *
-//  * Checks whether an HTML element description may be a
-//  * direct child of the specified element.
-//  *
-//  * Returns 1 if allowed; 0 otherwise.
-//  */
-// macro_rules! htmlElementAllowedHereDesc {
-//     ($parent:expr, $elt:expr) => {
-//         htmlElementAllowedHere($parent, (*$elt).name)
-//     };
-// }
-// /**
-//  * htmlRequiredAttrs:
-//  * @elt: HTML element
-//  *
-//  * Returns the attributes required for the specified element.
-//  */
-// macro_rules! htmlRequiredAttrs {
-//     ($elt:expr) => {
-//         (*$elt).attrs_req
-//     };
-// }
 
 #[cfg(test)]
 mod tests {

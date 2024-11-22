@@ -19,11 +19,8 @@ use super::{
     xmlstring::xml_strdup,
 };
 
-/**
- * xmlModulePtr:
- *
- * A handle to a dynamically loaded module
- */
+/// A handle to a dynamically loaded module
+#[doc(alias = "xmlModulePtr")]
 pub type XmlModulePtr = *mut XmlModule;
 #[repr(C)]
 pub struct XmlModule {
@@ -31,11 +28,8 @@ pub struct XmlModule {
     handle: *mut c_void,
 }
 
-/**
- * xmlModuleOption:
- *
- * enumeration of options that can be passed down to xmlModuleOpen()
- */
+/// Enumeration of options that can be passed down to xmlModuleOpen()
+#[doc(alias = "xmlModuleOption")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlModuleOption {
@@ -43,12 +37,8 @@ pub enum XmlModuleOption {
     XmlModuleLocal = 2, /* local binding */
 }
 
-/**
- * xmlModuleErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlModuleErrMemory")]
 unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c_char) {
     let mut name: *const c_char = null();
 
@@ -77,41 +67,30 @@ unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c
     );
 }
 
-/**
- * xmlModulePlatformOpen:
- * @name: path to the module
- *
- * returns a handle on success, and zero on error.
- */
+/// Returns a handle on success, and zero on error.
+#[doc(alias = "xmlModulePlatformOpen")]
 #[cfg(not(target_os = "windows"))]
 unsafe extern "C" fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
     dlopen(name, RTLD_GLOBAL | RTLD_NOW)
 }
 
-/*
- * xmlModulePlatformOpen:
- * returns a handle on success, and zero on error.
- */
+// returns a handle on success, and zero on error.
+#[doc(alias = "xmlModulePlatformOpen")]
 #[cfg(target_os = "windows")]
-unsafe extern "C" fn xmlModulePlatformOpen(name: *const c_char) -> *mut c_void {
+unsafe extern "C" fn xml_module_platform_open(name: *const c_char) -> *mut c_void {
     todo!("replace to libloading");
     LoadLibraryA(name)
 }
 
-/**
- * xmlModuleOpen:
- * @name: the module name
- * @options: a set of xmlModuleOption
- *
- * Opens a module/shared library given its name or path
- * NOTE: that due to portability issues, behaviour can only be
- * guaranteed with @name using ASCII. We cannot guarantee that
- * an UTF-8 string would work, which is why name is a const char *
- * and not a const xmlChar * .
- * TODO: options are not yet implemented.
- *
- * Returns a handle for the module or NULL in case of error
- */
+/// Opens a module/shared library given its name or path
+/// NOTE: that due to portability issues, behaviour can only be
+/// guaranteed with @name using ASCII. We cannot guarantee that
+/// an UTF-8 string would work, which is why name is a const char *
+/// and not a const xmlChar * .
+/// TODO: options are not yet implemented.
+///
+/// Returns a handle for the module or NULL in case of error
+#[doc(alias = "xmlModuleOpen")]
 pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: i32) -> XmlModulePtr {
     let module: XmlModulePtr = xml_malloc(size_of::<XmlModule>()) as XmlModulePtr;
     if module.is_null() {
@@ -151,11 +130,9 @@ pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: i32) -> 
     module
 }
 
-/*
- * xmlModulePlatformSymbol:
- * http://www.opengroup.org/onlinepubs/009695399/functions/dlsym.html
- * returns 0 on success and the loaded symbol in result, and -1 on error.
- */
+// http://www.opengroup.org/onlinepubs/009695399/functions/dlsym.html
+// returns 0 on success and the loaded symbol in result, and -1 on error.
+#[doc(alias = "xmlModulePlatformSymbol")]
 #[cfg(not(target_os = "windows"))]
 unsafe extern "C" fn xml_module_platform_symbol(
     handle: *mut c_void,
@@ -169,13 +146,11 @@ unsafe extern "C" fn xml_module_platform_symbol(
     0
 }
 
-/*
- * xmlModulePlatformSymbol:
- * http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dllproc/base/getprocaddress.asp
- * returns 0 on success and the loaded symbol in result, and -1 on error.
- */
+// http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dllproc/base/getprocaddress.asp
+// returns 0 on success and the loaded symbol in result, and -1 on error.
+#[doc(alias = "xmlModulePlatformSymbol")]
 #[cfg(target_os = "windows")]
-unsafe extern "C" fn xmlModulePlatformSymbol(
+unsafe extern "C" fn xml_module_platform_symbol(
     handle: *mut c_void,
     name: *const c_char,
     symbol: *mut *mut c_void,
@@ -185,20 +160,14 @@ unsafe extern "C" fn xmlModulePlatformSymbol(
     -((*symbol).is_null() as i32)
 }
 
-/**
- * xmlModuleSymbol:
- * @module: the module
- * @name: the name of the symbol
- * @symbol: the resulting symbol address
- *
- * Lookup for a symbol address in the given module
- * NOTE: that due to portability issues, behaviour can only be
- * guaranteed with @name using ASCII. We cannot guarantee that
- * an UTF-8 string would work, which is why name is a const c_char *
- * and not a const xmlChar * .
- *
- * Returns 0 if the symbol was found, or -1 in case of error
- */
+/// Lookup for a symbol address in the given module
+/// NOTE: that due to portability issues, behaviour can only be
+/// guaranteed with @name using ASCII. We cannot guarantee that
+/// an UTF-8 string would work, which is why name is a const c_char *
+/// and not a const xmlChar * .
+///
+/// Returns 0 if the symbol was found, or -1 in case of error
+#[doc(alias = "xmlModuleSymbol")]
 pub unsafe extern "C" fn xml_module_symbol(
     module: XmlModulePtr,
     name: *const c_char,
@@ -260,23 +229,17 @@ pub unsafe extern "C" fn xml_module_symbol(
     rc
 }
 
-/*
- * xmlModulePlatformClose:
- * @handle: handle to the module
- *
- * returns 0 on success, and non-zero on error.
- */
+/// Returns 0 on success, and non-zero on error.
+#[doc(alias = "xmlModulePlatformClose")]
 #[cfg(not(target_os = "windows"))]
 unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> i32 {
     dlclose(handle)
 }
 
-/*
- * xmlModulePlatformClose:
- * returns 0 on success, and non-zero on error.
- */
+/// Returns 0 on success, and non-zero on error.
+#[doc(alias = "xmlModulePlatformClose")]
 #[cfg(target_os = "windows")]
-unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> i32 {
+unsafe extern "C" fn xml_module_platform_close(handle: *mut c_void) -> i32 {
     let rc: i32;
 
     todo!("replace to libloading");
@@ -284,16 +247,12 @@ unsafe extern "C" fn xmlModulePlatformClose(handle: *mut c_void) -> i32 {
     (0 == rc) as i32
 }
 
-/**
- * xmlModuleClose:
- * @module: the module handle
- *
- * The close operations unload the associated module and free the
- * data associated to the module.
- *
- * Returns 0 in case of success, -1 in case of argument error and -2
- *         if the module could not be closed/unloaded.
- */
+/// The close operations unload the associated module and free the
+/// data associated to the module.
+///
+/// Returns 0 in case of success, -1 in case of argument error and -2
+/// if the module could not be closed/unloaded.
+#[doc(alias = "xmlModuleClose")]
 pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
     if module.is_null() {
         __xml_raise_error!(
@@ -348,16 +307,11 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
     xml_module_free(module)
 }
 
-/**
- * xmlModuleFree:
- * @module: the module handle
- *
- * The free operations free the data associated to the module
- * but does not unload the associated shared library which may still
- * be in use.
- *
- * Returns 0 in case of success, -1 in case of argument error
- */
+/// The free operations free the data associated to the module
+/// but does not unload the associated shared library which may still be in use.
+///
+/// Returns 0 in case of success, -1 in case of argument error
+#[doc(alias = "xmlModuleFree")]
 pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> i32 {
     if module.is_null() {
         __xml_raise_error!(

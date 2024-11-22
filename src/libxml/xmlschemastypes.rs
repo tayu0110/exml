@@ -87,7 +87,7 @@ macro_rules! IS_WSP_BLANK_CH {
     };
 }
 
-/* Date value */
+// Date value
 pub type XmlSchemaValDatePtr = *mut XmlSchemaValDate;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -109,7 +109,7 @@ pub struct XmlSchemaValDate {
     tzo: i32,
 }
 
-/* Duration value */
+// Duration value
 pub type XmlSchemaValDurationPtr = *mut XmlSchemaValDuration;
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -358,12 +358,10 @@ macro_rules! DAY_IN_YEAR {
 	}
 }
 
-/*
-* WARNING: Those type reside normally in xmlschemas.c but are
-* redefined here locally in oder of being able to use them for xs:anyType-
-* TODO: Remove those definition if we move the types to a header file.
-* TODO: Always keep those structs up-to-date with the originals.
-*/
+// WARNING: Those type reside normally in xmlschemas.c but are
+// redefined here locally in oder of being able to use them for xs:anyType-
+// TODO: Remove those definition if we move the types to a header file.
+// TODO: Always keep those structs up-to-date with the originals.
 const UNBOUNDED: i32 = 1 << 30;
 
 extern "C" fn xml_schema_free_type_entry(typ: *mut c_void, _name: *const XmlChar) {
@@ -372,11 +370,8 @@ extern "C" fn xml_schema_free_type_entry(typ: *mut c_void, _name: *const XmlChar
     }
 }
 
-/**
- * xmlSchemaCleanupTypesInternal:
- *
- * Cleanup the default XML Schemas type library
- */
+/// Cleanup the default XML Schemas type library
+#[doc(alias = "xmlSchemaCleanupTypesInternal")]
 unsafe extern "C" fn xml_schema_cleanup_types_internal() {
     let particle: XmlSchemaParticlePtr;
 
@@ -409,12 +404,8 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
     /* Note that the xmlSchemaType*Def pointers aren't set to NULL. */
 }
 
-/**
- * xmlSchemaTypeErrMemory:
- * @extra:  extra information
- *
- * Handle an out of memory condition
- */
+/// Handle an out of memory condition
+#[doc(alias = "xmlSchemaTypeErrMemory")]
 unsafe extern "C" fn xml_schema_type_err_memory(node: XmlNodePtr, extra: *const c_char) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromDatatype,
@@ -425,14 +416,10 @@ unsafe extern "C" fn xml_schema_type_err_memory(node: XmlNodePtr, extra: *const 
     );
 }
 
-/**
- * xmlSchemaNewValue:
- * @type:  the value type
- *
- * Allocate a new simple type value
- *
- * Returns a pointer to the new value or NULL in case of error
- */
+/// Allocate a new simple type value
+///
+/// Returns a pointer to the new value or NULL in case of error
+#[doc(alias = "xmlSchemaNewValue")]
 unsafe extern "C" fn xml_schema_new_value(typ: XmlSchemaValType) -> XmlSchemaValPtr {
     let value: XmlSchemaValPtr = xml_malloc(size_of::<XmlSchemaVal>()) as XmlSchemaValPtr;
     if value.is_null() {
@@ -458,13 +445,8 @@ unsafe extern "C" fn xml_schema_new_min_length_facet(value: i32) -> XmlSchemaFac
     ret
 }
 
-/*
- * xmlSchemaInitBasicType:
- * @name:  the type name
- * @type:  the value type associated
- *
- * Initialize one primitive built-in type
- */
+/// Initialize one primitive built-in type
+#[doc(alias = "xmlSchemaInitBasicType")]
 unsafe extern "C" fn xml_schema_init_basic_type(
     name: *const c_char,
     typ: XmlSchemaValType,
@@ -551,13 +533,10 @@ unsafe extern "C" fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
     ret
 }
 
-/*
- * xmlSchemaInitTypes:
- *
- * Initialize the default XML Schemas type library
- *
- * Returns 0 on success, -1 on error.
- */
+/// Initialize the default XML Schemas type library
+///
+/// Returns 0 on success, -1 on error.
+#[doc(alias = "xmlSchemaInitTypes")]
 pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
     if XML_SCHEMA_TYPES_INITIALIZED.get() {
         return 0;
@@ -1034,16 +1013,13 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
     -1
 }
 
-/**
- * xmlSchemaCleanupTypes:
- *
- * DEPRECATED: This function will be made private. Call xmlCleanupParser
- * to free global state but see the warnings there. xmlCleanupParser
- * should be only called once at program exit. In most cases, you don't
- * have to call cleanup functions at all.
- *
- * Cleanup the default XML Schemas type library
- */
+/// DEPRECATED: This function will be made private. Call xmlCleanupParser
+/// to free global state but see the warnings there. xmlCleanupParser
+/// should be only called once at program exit. In most cases, you don't
+/// have to call cleanup functions at all.
+///
+/// Cleanup the default XML Schemas type library
+#[doc(alias = "xmlSchemaCleanupTypes")]
 pub(crate) unsafe extern "C" fn xml_schema_cleanup_types() {
     if XML_SCHEMA_TYPES_INITIALIZED.get() {
         xml_schema_cleanup_types_internal();
@@ -1051,15 +1027,10 @@ pub(crate) unsafe extern "C" fn xml_schema_cleanup_types() {
     }
 }
 
-/**
- * xmlSchemaGetPredefinedType:
- * @name: the type name
- * @ns:  the URI of the namespace usually "http://www.w3.org/2001/XMLSchema"
- *
- * Lookup a type in the default XML Schemas type library
- *
- * Returns the type if found, NULL otherwise
- */
+/// Lookup a type in the default XML Schemas type library
+///
+/// Returns the type if found, NULL otherwise
+#[doc(alias = "xmlSchemaGetPredefinedType")]
 pub unsafe extern "C" fn xml_schema_get_predefined_type(
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -1073,18 +1044,12 @@ pub unsafe extern "C" fn xml_schema_get_predefined_type(
     xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.get(), name, ns) as XmlSchemaTypePtr
 }
 
-/**
- * xmlSchemaValidatePredefinedType:
- * @type: the predefined type
- * @value: the value to check
- * @val:  the return computed value
- *
- * Check that a value conforms to the lexical space of the predefined type.
- * if true a value is computed and returned in @val.
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of the predefined type.
+/// if true a value is computed and returned in @val.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidatePredefinedType")]
 pub unsafe extern "C" fn xml_schema_validate_predefined_type(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
@@ -1093,18 +1058,11 @@ pub unsafe extern "C" fn xml_schema_validate_predefined_type(
     xml_schema_val_predef_type_node(typ, value, val, null_mut())
 }
 
-/**
- * xmlSchemaParseUInt:
- * @str: pointer to the string R/W
- * @llo: pointer to the low result
- * @lmi: pointer to the mid result
- * @lhi: pointer to the high result
- *
- * Parse an u64 into 3 fields.
- *
- * Returns the number of significant digits in the number or
- * -1 if overflow of the capacity and -2 if it's not a number.
- */
+/// Parse an u64 into 3 fields.
+///
+/// Returns the number of significant digits in the number or
+/// -1 if overflow of the capacity and -2 if it's not a number.
+#[doc(alias = "xmlSchemaParseUInt")]
 unsafe extern "C" fn xml_schema_parse_uint(
     str: *mut *const XmlChar,
     llo: *mut u64,
@@ -1160,17 +1118,10 @@ unsafe extern "C" fn xml_schema_parse_uint(
     ret
 }
 
-/**
- * PARSE_2_DIGITS:
- * @num:  the integer to fill in
- * @cur:  an #xmlChar *
- * @invalid: an integer
- *
- * Parses a 2-digits integer and updates @num with the value. @cur is
- * updated to point just after the integer.
- * In case of error, @invalid is set to %TRUE, values of @num and
- * @cur are undefined.
- */
+/// Parses a 2-digits integer and updates @num with the value. @cur is
+/// updated to point just after the integer.
+/// In case of error, @invalid is set to %TRUE, values of @num and
+/// @cur are undefined.
 macro_rules! PARSE_2_DIGITS {
     ($num:expr, $cur:expr, $invalid:expr) => {
         if *$cur.add(0) < b'0' || *$cur.add(0) > b'9' || *$cur.add(1) < b'0' || *$cur.add(1) > b'9'
@@ -1183,18 +1134,11 @@ macro_rules! PARSE_2_DIGITS {
     };
 }
 
-/**
- * PARSE_FLOAT:
- * @num:  the double to fill in
- * @cur:  an #xmlChar *
- * @invalid: an integer
- *
- * Parses a float and updates @num with the value. @cur is
- * updated to point just after the float. The float must have a
- * 2-digits integer part and may or may not have a decimal part.
- * In case of error, @invalid is set to %TRUE, values of @num and
- * @cur are undefined.
- */
+/// Parses a float and updates @num with the value. @cur is
+/// updated to point just after the float. The float must have a
+/// 2-digits integer part and may or may not have a decimal part.
+/// In case of error, @invalid is set to %TRUE, values of @num and
+/// @cur are undefined.
 macro_rules! PARSE_FLOAT {
     ($num:expr, $cur:expr, $invalid:expr) => {
         PARSE_2_DIGITS!($num, $cur, $invalid);
@@ -1213,17 +1157,11 @@ macro_rules! PARSE_FLOAT {
     };
 }
 
-/**
- * _xmlSchemaParseTimeZone:
- * @dt:  pointer to a date structure
- * @str: pointer to the string to analyze
- *
- * Parses a time zone without time zone and fills in the appropriate
- * field of the @dt structure. @str is updated to point just after the
- * time zone.
- *
- * Returns 0 or the error code
- */
+/// Parses a time zone without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the time zone.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseTimeZone")]
 unsafe extern "C" fn _xml_schema_parse_time_zone(
     dt: XmlSchemaValDatePtr,
     str: *mut *const XmlChar,
@@ -1326,17 +1264,11 @@ macro_rules! RETURN_TYPE_IF_VALID {
     };
 }
 
-/**
- * _xmlSchemaParseGDay:
- * @dt:  pointer to a date structure
- * @str: pointer to the string to analyze
- *
- * Parses a xs:gDay without time zone and fills in the appropriate
- * field of the @dt structure. @str is updated to point just after the
- * xs:gDay.
- *
- * Returns 0 or the error code
- */
+/// Parses a xs:gDay without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the xs:gDay.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseGDay")]
 unsafe extern "C" fn _xml_schema_parse_gday(
     dt: XmlSchemaValDatePtr,
     str: *mut *const XmlChar,
@@ -1359,17 +1291,11 @@ unsafe extern "C" fn _xml_schema_parse_gday(
     0
 }
 
-/**
- * _xmlSchemaParseGMonth:
- * @dt:  pointer to a date structure
- * @str: pointer to the string to analyze
- *
- * Parses a xs:gMonth without time zone and fills in the appropriate
- * field of the @dt structure. @str is updated to point just after the
- * xs:gMonth.
- *
- * Returns 0 or the error code
- */
+/// Parses a xs:gMonth without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the xs:gMonth.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseGMonth")]
 unsafe extern "C" fn _xml_schema_parse_gmonth(
     dt: XmlSchemaValDatePtr,
     str: *mut *const XmlChar,
@@ -1393,18 +1319,12 @@ unsafe extern "C" fn _xml_schema_parse_gmonth(
     0
 }
 
-/**
- * _xmlSchemaParseTime:
- * @dt:  pointer to a date structure
- * @str: pointer to the string to analyze
- *
- * Parses a xs:time without time zone and fills in the appropriate
- * fields of the @dt structure. @str is updated to point just after the
- * xs:time.
- * In case of error, values of @dt fields are undefined.
- *
- * Returns 0 or the error code
- */
+/// Parses a xs:time without time zone and fills in the appropriate
+/// fields of the @dt structure. @str is updated to point just after the xs:time.
+/// In case of error, values of @dt fields are undefined.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseTime")]
 unsafe extern "C" fn _xml_schema_parse_time(
     dt: XmlSchemaValDatePtr,
     str: *mut *const XmlChar,
@@ -1457,18 +1377,12 @@ unsafe extern "C" fn _xml_schema_parse_time(
     0
 }
 
-/**
- * _xmlSchemaParseGYear:
- * @dt:  pointer to a date structure
- * @str: pointer to the string to analyze
- *
- * Parses a xs:gYear without time zone and fills in the appropriate
- * field of the @dt structure. @str is updated to point just after the
- * xs:gYear. It is supposed that @(*dt).year is big enough to contain
- * the year.
- *
- * Returns 0 or the error code
- */
+/// Parses a xs:gYear without time zone and fills in the appropriate
+/// field of the @dt structure. @str is updated to point just after the
+/// xs:gYear. It is supposed that @(*dt).year is big enough to contain the year.
+///
+/// Returns 0 or the error code
+#[doc(alias = "_xmlSchemaParseGYear")]
 unsafe extern "C" fn _xml_schema_parse_gyear(
     dt: XmlSchemaValDatePtr,
     str: *mut *const XmlChar,
@@ -1521,18 +1435,12 @@ unsafe extern "C" fn _xml_schema_parse_gyear(
     0
 }
 
-/**
- * xmlSchemaValidateDates:
- * @type: the expected type or XmlSchemaValType::XmlSchemasUnknown
- * @dateTime:  string to analyze
- * @val:  the return computed value
- *
- * Check that @dateTime conforms to the lexical space of one of the date types.
- * if true a value is computed and returned in @val.
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that @dateTime conforms to the lexical space of one of the date types.
+/// if true a value is computed and returned in @val.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateDates")]
 unsafe extern "C" fn xml_schema_validate_dates(
     typ: XmlSchemaValType,
     date_time: *const XmlChar,
@@ -1769,18 +1677,12 @@ unsafe extern "C" fn xml_schema_validate_dates(
     1
 }
 
-/**
- * xmlSchemaValidateDuration:
- * @type: the predefined type
- * @duration:  string to analyze
- * @val:  the return computed value
- *
- * Check that @duration conforms to the lexical space of the duration type.
- * if true a value is computed and returned in @val.
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that @duration conforms to the lexical space of the duration type.
+/// if true a value is computed and returned in @val.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateDuration")]
 unsafe extern "C" fn xml_schema_validate_duration(
     _typ: XmlSchemaTypePtr,
     duration: *const XmlChar,
@@ -1972,15 +1874,11 @@ unsafe extern "C" fn xml_schema_validate_duration(
     1
 }
 
-/*
- * xmlSchemaCheckLanguageType
- * @value: the value to check
- *
- * Check that a value conforms to the lexical space of the language datatype.
- * Must conform to [a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*
- *
- * Returns 1 if this validates, 0 otherwise.
- */
+/// Check that a value conforms to the lexical space of the language datatype.
+/// Must conform to [a-zA-Z]{1,8}(-[a-zA-Z0-9]{1,8})*
+///
+/// Returns 1 if this validates, 0 otherwise.
+#[doc(alias = "xmlSchemaCheckLanguageType")]
 unsafe extern "C" fn xml_schema_check_language_type(value: *const XmlChar) -> i32 {
     let mut first: i32 = 1;
     let mut len: i32 = 0;
@@ -2016,19 +1914,11 @@ unsafe extern "C" fn xml_schema_check_language_type(value: *const XmlChar) -> i3
     1
 }
 
-/**
- * xmlSchemaValAtomicListNode:
- * @type: the predefined atomic type for a token in the list
- * @value: the list value to check
- * @ret:  the return computed value
- * @node:  the node containing the value
- *
- * Check that a value conforms to the lexical space of the predefined
- * list type. if true a value is computed and returned in @ret.
- *
- * Returns the number of items if this validates, a negative error code
- *         number otherwise
- */
+/// Check that a value conforms to the lexical space of the predefined
+/// list type. if true a value is computed and returned in @ret.
+///
+/// Returns the number of items if this validates, a negative error code number otherwise
+#[doc(alias = "xmlSchemaValAtomicListNode")]
 unsafe extern "C" fn xml_schema_val_atomic_list_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
@@ -2105,14 +1995,10 @@ unsafe extern "C" fn xml_schema_val_atomic_list_node(
     -1
 }
 
-/**
- * xmlSchemaStrip:
- * @value: a value
- *
- * Removes the leading and ending spaces of a string
- *
- * Returns the new string or NULL if no change was required.
- */
+/// Removes the leading and ending spaces of a string
+///
+/// Returns the new string or NULL if no change was required.
+#[doc(alias = "xmlSchemaStrip")]
 unsafe extern "C" fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
     let mut start: *const XmlChar = value;
     let mut end: *const XmlChar;
@@ -2139,14 +2025,10 @@ unsafe extern "C" fn xml_schema_strip(value: *const XmlChar) -> *mut XmlChar {
     xml_strndup(start, end.offset_from(start) as _)
 }
 
-/**
- * _xmlSchemaBase64Decode:
- * @ch: a character
- *
- * Converts a base64 encoded character to its base 64 value.
- *
- * Returns 0-63 (value), 64 (pad), or -1 (not recognized)
- */
+/// Converts a base64 encoded character to its base 64 value.
+///
+/// Returns 0-63 (value), 64 (pad), or -1 (not recognized)
+#[doc(alias = "_xmlSchemaBase64Decode")]
 unsafe extern "C" fn _xml_schema_base64_decode(ch: XmlChar) -> i32 {
     if ch.is_ascii_uppercase() {
         (ch - b'A') as i32
@@ -2165,21 +2047,13 @@ unsafe extern "C" fn _xml_schema_base64_decode(ch: XmlChar) -> i32 {
     }
 }
 
-/**
- * xmlSchemaValAtomicType:
- * @type: the predefined type
- * @value: the value to check
- * @val:  the return computed value
- * @node:  the node containing the value
- * flags:  flags to control the validation
- *
- * Check that a value conforms to the lexical space of the atomic type.
- * if true a value is computed and returned in @val.
- * This checks the value space for list types as well (IDREFS, NMTOKENS).
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of the atomic type.
+/// if true a value is computed and returned in @val.
+/// This checks the value space for list types as well (IDREFS, NMTOKENS).
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValAtomicType")]
 unsafe extern "C" fn xml_schema_val_atomic_type(
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
@@ -3801,19 +3675,12 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
     -1
 }
 
-/**
- * xmlSchemaValPredefTypeNode:
- * @type: the predefined type
- * @value: the value to check
- * @val:  the return computed value
- * @node:  the node containing the value
- *
- * Check that a value conforms to the lexical space of the predefined type.
- * if true a value is computed and returned in @val.
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of the predefined type.
+/// if true a value is computed and returned in @val.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValPredefTypeNode")]
 pub unsafe extern "C" fn xml_schema_val_predef_type_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
@@ -3833,15 +3700,10 @@ pub unsafe extern "C" fn xml_schema_val_predef_type_node(
     )
 }
 
-/**
- * xmlSchemaCompareDecimals:
- * @x:  a first decimal value
- * @y:  a second decimal value
- *
- * Compare 2 decimals
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y and -2 in case of error
- */
+/// Compare 2 decimals
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y and -2 in case of error
+#[doc(alias = "xmlSchemaCompareDecimals")]
 unsafe extern "C" fn xml_schema_compare_decimals(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
     let swp: XmlSchemaValPtr;
     let mut order: i32 = 1;
@@ -3982,16 +3844,10 @@ unsafe extern "C" fn xml_schema_compare_decimals(x: XmlSchemaValPtr, y: XmlSchem
     -order
 }
 
-/**
- * xmlSchemaCompareDurations:
- * @x:  a first duration value
- * @y:  a second duration value
- *
- * Compare 2 durations
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
- * case of error
- */
+/// Compare 2 durations
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareDurations")]
 unsafe extern "C" fn xml_schema_compare_durations(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
     let mut sec: f64;
     let mut invert: i32 = 1;
@@ -4089,15 +3945,10 @@ unsafe extern "C" fn xml_schema_compare_durations(x: XmlSchemaValPtr, y: XmlSche
     2
 }
 
-/**
- * xmlSchemaDupVal:
- * @v: the #value: xmlSchemaValPtr to duplicate
- *
- * Makes a copy of @v. The calling program is responsible for freeing
- * the returned value.
- *
- * returns a pointer to a duplicated #xmlSchemaValPtr or NULL if error.
- */
+/// Makes a copy of @v. The calling program is responsible for freeing the returned value.
+///
+/// returns a pointer to a duplicated #xmlSchemaValPtr or NULL if error.
+#[doc(alias = "xmlSchemaDupVal")]
 unsafe extern "C" fn xml_schema_dup_val(v: XmlSchemaValPtr) -> XmlSchemaValPtr {
     let ret: XmlSchemaValPtr = xml_schema_new_value((*v).typ);
     if ret.is_null() {
@@ -4133,18 +3984,13 @@ macro_rules! MODULO_RANGE {
     };
 }
 
-/**
- * _xmlSchemaDateAdd:
- * @dt: an #xmlSchemaValPtr
- * @dur: an #xmlSchemaValPtr of type #XS_DURATION
- *
- * Compute a new date/time from @dt and @dur. This function assumes @dt
- * is either #XmlSchemaValType::XML_SCHEMAS_DATETIME, #XmlSchemaValType::XML_SCHEMAS_DATE, #XmlSchemaValType::XML_SCHEMAS_GYEARMONTH,
- * or #XmlSchemaValType::XML_SCHEMAS_GYEAR. The returned #xmlSchemaVal is the same type as
- * @dt. The calling program is responsible for freeing the returned value.
- *
- * Returns a pointer to a new #xmlSchemaVal or NULL if error.
- */
+/// Compute a new date/time from @dt and @dur. This function assumes @dt
+/// is either #XmlSchemaValType::XML_SCHEMAS_DATETIME, #XmlSchemaValType::XML_SCHEMAS_DATE, #XmlSchemaValType::XML_SCHEMAS_GYEARMONTH,
+/// or #XmlSchemaValType::XML_SCHEMAS_GYEAR. The returned #xmlSchemaVal is the same type as
+/// @dt. The calling program is responsible for freeing the returned value.
+///
+/// Returns a pointer to a new #xmlSchemaVal or NULL if error.
+#[doc(alias = "_xmlSchemaDateAdd")]
 unsafe extern "C" fn _xml_schema_date_add(
     dt: XmlSchemaValPtr,
     dur: XmlSchemaValPtr,
@@ -4299,16 +4145,11 @@ unsafe extern "C" fn _xml_schema_date_add(
     ret
 }
 
-/**
- * xmlSchemaDateNormalize:
- * @dt: an #xmlSchemaValPtr of a date/time type value.
- * @offset: number of seconds to adjust @dt by.
- *
- * Normalize @dt to GMT time. The @offset parameter is subtracted from
- * the return value is a time-zone offset is present on @dt.
- *
- * Returns a normalized copy of @dt or NULL if error.
- */
+/// Normalize @dt to GMT time. The @offset parameter is subtracted from
+/// the return value is a time-zone offset is present on @dt.
+///
+/// Returns a normalized copy of @dt or NULL if error.
+#[doc(alias = "xmlSchemaDateNormalize")]
 unsafe extern "C" fn xml_schema_date_normalize(
     dt: XmlSchemaValPtr,
     offset: f64,
@@ -4345,17 +4186,13 @@ unsafe extern "C" fn xml_schema_date_normalize(
     ret
 }
 
-/**
- * _xmlSchemaDateCastYMToDays:
- * @dt: an #xmlSchemaValPtr
- *
- * Convert mon and year of @dt to total number of days. Take the
- * number of years since (or before) 1 AD and add the number of leap
- * years. This is a function  because negative
- * years must be handled a little differently and there is no zero year.
- *
- * Returns number of days.
- */
+/// Convert mon and year of @dt to total number of days. Take the
+/// number of years since (or before) 1 AD and add the number of leap
+/// years. This is a function  because negative
+/// years must be handled a little differently and there is no zero year.
+///
+/// Returns number of days.
+#[doc(alias = "_xmlSchemaDateCastYMToDays")]
 unsafe extern "C" fn _xml_schema_date_cast_ymto_days(dt: XmlSchemaValPtr) -> i64 {
     let mut mon: i32;
 
@@ -4377,14 +4214,9 @@ unsafe extern "C" fn _xml_schema_date_cast_ymto_days(dt: XmlSchemaValPtr) -> i64
     }
 }
 
-/**
- * TIME_TO_NUMBER:
- * @dt:  an #xmlSchemaValPtr
- *
- * Calculates the number of seconds in the time portion of @dt.
- *
- * Returns seconds.
- */
+/// Calculates the number of seconds in the time portion of @dt.
+///
+/// Returns seconds.
 macro_rules! TIME_TO_NUMBER {
     ($dt:expr) => {
         (((*$dt).value.date.hour as i32 * SECS_PER_HOUR)
@@ -4394,16 +4226,10 @@ macro_rules! TIME_TO_NUMBER {
     };
 }
 
-/**
- * xmlSchemaCompareDates:
- * @x:  a first date/time value
- * @y:  a second date/time value
- *
- * Compare 2 date/times
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
- * case of error
- */
+/// Compare 2 date/times
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareDates")]
 unsafe extern "C" fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
     let mut p1: XmlSchemaValPtr;
     let p2: XmlSchemaValPtr;
@@ -4696,20 +4522,14 @@ unsafe extern "C" fn xml_schema_compare_dates(x: XmlSchemaValPtr, y: XmlSchemaVa
     0
 }
 
-/**
- * xmlSchemaComparePreserveReplaceStrings:
- * @x:  a first string value
- * @y:  a second string value
- * @invert: inverts the result if x < y or x > y.
- *
- * Compare 2 string for their normalized values.
- * @x is a string with whitespace of "preserve", @y is
- * a string with a whitespace of "replace". I.e. @x could
- * be an "xsd:string" and @y an "xsd:normalizedString".
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
- * case of error
- */
+/// Compare 2 string for their normalized values.
+/// @x is a string with whitespace of "preserve", @y is
+/// a string with a whitespace of "replace". I.e. @x could
+/// be an "xsd:string" and @y an "xsd:normalizedString".
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
+/// case of error
+#[doc(alias = "xmlSchemaComparePreserveReplaceStrings")]
 unsafe extern "C" fn xml_schema_compare_preserve_replace_strings(
     mut x: *const XmlChar,
     mut y: *const XmlChar,
@@ -4769,19 +4589,14 @@ unsafe extern "C" fn xml_schema_compare_preserve_replace_strings(
     0
 }
 
-/**
- * xmlSchemaComparePreserveCollapseStrings:
- * @x:  a first string value
- * @y:  a second string value
- *
- * Compare 2 string for their normalized values.
- * @x is a string with whitespace of "preserve", @y is
- * a string with a whitespace of "collapse". I.e. @x could
- * be an "xsd:string" and @y an "xsd:normalizedString".
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
- * case of error
- */
+/// Compare 2 string for their normalized values.
+/// @x is a string with whitespace of "preserve", @y is
+/// a string with a whitespace of "collapse". I.e. @x could
+/// be an "xsd:string" and @y an "xsd:normalizedString".
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
+/// case of error
+#[doc(alias = "xmlSchemaComparePreserveCollapseStrings")]
 unsafe extern "C" fn xml_schema_compare_replace_collapse_strings(
     mut x: *const XmlChar,
     mut y: *const XmlChar,
@@ -4875,19 +4690,13 @@ unsafe extern "C" fn xml_schema_compare_replace_collapse_strings(
     0
 }
 
-/**
- * xmlSchemaComparePreserveCollapseStrings:
- * @x:  a first string value
- * @y:  a second string value
- *
- * Compare 2 string for their normalized values.
- * @x is a string with whitespace of "preserve", @y is
- * a string with a whitespace of "collapse". I.e. @x could
- * be an "xsd:string" and @y an "xsd:normalizedString".
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
- * case of error
- */
+/// Compare 2 string for their normalized values.
+/// @x is a string with whitespace of "preserve", @y is
+/// a string with a whitespace of "collapse". I.e. @x could
+/// be an "xsd:string" and @y an "xsd:normalizedString".
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in case of error
+#[doc(alias = "xmlSchemaComparePreserveCollapseStrings")]
 unsafe extern "C" fn xml_schema_compare_preserve_collapse_strings(
     mut x: *const XmlChar,
     mut y: *const XmlChar,
@@ -4973,16 +4782,10 @@ unsafe extern "C" fn xml_schema_compare_preserve_collapse_strings(
     0
 }
 
-/**
- * xmlSchemaCompareReplacedStrings:
- * @x:  a first string value
- * @y:  a second string value
- *
- * Compare 2 string for their normalized values.
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
- * case of error
- */
+/// Compare 2 string for their normalized values.
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareReplacedStrings")]
 unsafe extern "C" fn xml_schema_compare_replaced_strings(
     mut x: *const XmlChar,
     mut y: *const XmlChar,
@@ -5026,16 +4829,10 @@ unsafe extern "C" fn xml_schema_compare_replaced_strings(
     0
 }
 
-/**
- * xmlSchemaCompareNormStrings:
- * @x:  a first string value
- * @y:  a second string value
- *
- * Compare 2 string for their normalized values.
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in
- * case of error
- */
+/// Compare 2 string for their normalized values.
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareNormStrings")]
 unsafe extern "C" fn xml_schema_compare_norm_strings(
     mut x: *const XmlChar,
     mut y: *const XmlChar,
@@ -5091,16 +4888,10 @@ unsafe extern "C" fn xml_schema_compare_norm_strings(
     0
 }
 
-/**
- * xmlSchemaCompareFloats:
- * @x:  a first float or double value
- * @y:  a second float or double value
- *
- * Compare 2 values
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
- * case of error
- */
+/// Compare 2 values
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareFloats")]
 unsafe extern "C" fn xml_schema_compare_floats(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
     let d1: f64;
     let d2: f64;
@@ -5176,20 +4967,11 @@ unsafe extern "C" fn xml_schema_compare_floats(x: XmlSchemaValPtr, y: XmlSchemaV
     2
 }
 
-/**
- * xmlSchemaCompareValues:
- * @x:  a first value
- * @xvalue: the first value as a string (optional)
- * @xwtsp: the whitespace type
- * @y:  a second value
- * @xvalue: the second value as a string (optional)
- * @ywtsp: the whitespace type
- *
- * Compare 2 values
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, 3 if not
- * comparable and -2 in case of error
- */
+/// Compare 2 values
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, 3 if not
+/// comparable and -2 in case of error
+#[doc(alias = "xmlSchemaCompareValues")]
 unsafe extern "C" fn xml_schema_compare_values_internal(
     xtype: XmlSchemaValType,
     x: XmlSchemaValPtr,
@@ -5473,18 +5255,11 @@ unsafe extern "C" fn xml_schema_compare_values_internal(
     -2
 }
 
-/**
- * xmlSchemaCompareValuesWhtspExt:
- * @x:  a first value
- * @xws: the whitespace value of x
- * @y:  a second value
- * @yws: the whitespace value of y
- *
- * Compare 2 values
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
- * case of error
- */
+/// Compare 2 values
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
+/// case of error
+#[doc(alias = "xmlSchemaCompareValuesWhtspExt")]
 unsafe extern "C" fn xml_schema_compare_values_whtsp_ext(
     xtype: XmlSchemaValType,
     x: XmlSchemaValPtr,
@@ -5498,14 +5273,10 @@ unsafe extern "C" fn xml_schema_compare_values_whtsp_ext(
     xml_schema_compare_values_internal(xtype, x, xvalue, xws, ytype, y, yvalue, yws)
 }
 
-/**
- * xmlSchemaNormLen:
- * @value:  a string
- *
- * Computes the UTF8 length of the normalized value of the string
- *
- * Returns the length or -1 in case of error.
- */
+/// Computes the UTF8 length of the normalized value of the string
+///
+/// Returns the length or -1 in case of error.
+#[doc(alias = "xmlSchemaNormLen")]
 unsafe extern "C" fn xml_schema_norm_len(value: *const XmlChar) -> i32 {
     let mut utf: *const XmlChar;
     let mut ret: i32 = 0;
@@ -5552,20 +5323,11 @@ unsafe extern "C" fn xml_schema_norm_len(value: *const XmlChar) -> i32 {
     ret
 }
 
-/**
- * xmlSchemaValidateFacetInternal:
- * @facet:  the facet to check
- * @fws: the whitespace type of the facet's value
- * @valType: the built-in type of the value
- * @value:  the lexical repr of the value to validate
- * @val:  the precomputed value
- * @ws: the whitespace type of the value
- *
- * Check a value against a facet condition
- *
- * Returns 0 if the element is schemas valid, a positive error code
- *     number otherwise and -1 in case of internal or API error.
- */
+/// Check a value against a facet condition
+///
+/// Returns 0 if the element is schemas valid, a positive error code
+/// number otherwise and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateFacetInternal")]
 unsafe extern "C" fn xml_schema_validate_facet_internal(
     facet: XmlSchemaFacetPtr,
     fws: XmlSchemaWhitespaceValueType,
@@ -5837,18 +5599,11 @@ unsafe extern "C" fn xml_schema_validate_facet_internal(
     0
 }
 
-/**
- * xmlSchemaValidateFacet:
- * @base:  the base type
- * @facet:  the facet to check
- * @value:  the lexical repr of the value to validate
- * @val:  the precomputed value
- *
- * Check a value against a facet condition
- *
- * Returns 0 if the element is schemas valid, a positive error code
- *     number otherwise and -1 in case of internal or API error.
- */
+/// Check a value against a facet condition
+///
+/// Returns 0 if the element is schemas valid, a positive error code
+/// number otherwise and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateFacet")]
 pub unsafe extern "C" fn xml_schema_validate_facet(
     base: XmlSchemaTypePtr,
     facet: XmlSchemaFacetPtr,
@@ -5882,23 +5637,14 @@ pub unsafe extern "C" fn xml_schema_validate_facet(
     -1
 }
 
-/**
- * xmlSchemaValidateFacetWhtsp:
- * @facet:  the facet to check
- * @fws: the whitespace type of the facet's value
- * @valType: the built-in type of the value
- * @value:  the lexical (or normalized for pattern) repr of the value to validate
- * @val:  the precomputed value
- * @ws: the whitespace type of the value
- *
- * Check a value against a facet condition. This takes value normalization
- * according to the specified whitespace types into account.
- * Note that @value needs to be the *normalized* value if the facet
- * is of type "pattern".
- *
- * Returns 0 if the element is schemas valid, a positive error code
- *     number otherwise and -1 in case of internal or API error.
- */
+/// Check a value against a facet condition. This takes value normalization
+/// according to the specified whitespace types into account.
+/// Note that @value needs to be the *normalized* value if the facet
+/// is of type "pattern".
+///
+/// Returns 0 if the element is schemas valid, a positive error code
+///     number otherwise and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValidateFacetWhtsp")]
 pub unsafe extern "C" fn xml_schema_validate_facet_whtsp(
     facet: XmlSchemaFacetPtr,
     fws: XmlSchemaWhitespaceValueType,
@@ -5910,12 +5656,8 @@ pub unsafe extern "C" fn xml_schema_validate_facet_whtsp(
     xml_schema_validate_facet_internal(facet, fws, val_type, value, val, ws)
 }
 
-/**
- * xmlSchemaFreeValue:
- * @value:  the value to free
- *
- * Cleanup the default XML Schemas type library
- */
+/// Cleanup the default XML Schemas type library
+#[doc(alias = "xmlSchemaFreeValue")]
 pub unsafe extern "C" fn xml_schema_free_value(mut value: XmlSchemaValPtr) {
     let mut prev: XmlSchemaValPtr;
 
@@ -5966,13 +5708,10 @@ pub unsafe extern "C" fn xml_schema_free_value(mut value: XmlSchemaValPtr) {
     }
 }
 
-/**
- * xmlSchemaNewFacet:
- *
- * Allocate a new Facet structure.
- *
- * Returns the newly allocated structure or NULL in case or error
- */
+/// Allocate a new Facet structure.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlSchemaNewFacet")]
 pub unsafe extern "C" fn xml_schema_new_facet() -> XmlSchemaFacetPtr {
     let ret: XmlSchemaFacetPtr = xml_malloc(size_of::<XmlSchemaFacet>()) as _;
     if ret.is_null() {
@@ -6044,18 +5783,11 @@ macro_rules! FREE_AND_NULL {
     };
 }
 
-/**
- * xmlSchemaCheckFacet:
- * @facet:  the facet
- * @typeDecl:  the schema type definition
- * @pctxt:  the schema parser context or NULL
- * @name: the optional name of the type
- *
- * Checks and computes the values of facets.
- *
- * Returns 0 if valid, a positive error code if not valid and
- *         -1 in case of an internal or API error.
- */
+/// Checks and computes the values of facets.
+///
+/// Returns 0 if valid, a positive error code if not valid and
+/// -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaCheckFacet")]
 pub unsafe extern "C" fn xml_schema_check_facet(
     facet: XmlSchemaFacetPtr,
     type_decl: XmlSchemaTypePtr,
@@ -6302,12 +6034,8 @@ pub unsafe extern "C" fn xml_schema_check_facet(
     //     return -1;
 }
 
-/**
- * xmlSchemaFreeFacet:
- * @facet:  a schema facet structure
- *
- * Deallocate a Schema Facet structure.
- */
+/// Deallocate a Schema Facet structure.
+#[doc(alias = "xmlSchemaFreeFacet")]
 pub unsafe extern "C" fn xml_schema_free_facet(facet: XmlSchemaFacetPtr) {
     if facet.is_null() {
         return;
@@ -6324,16 +6052,10 @@ pub unsafe extern "C" fn xml_schema_free_facet(facet: XmlSchemaFacetPtr) {
     xml_free(facet as _);
 }
 
-/**
- * xmlSchemaCompareValues:
- * @x:  a first value
- * @y:  a second value
- *
- * Compare 2 values
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
- * case of error
- */
+/// Compare 2 values
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareValues")]
 pub unsafe extern "C" fn xml_schema_compare_values(x: XmlSchemaValPtr, y: XmlSchemaValPtr) -> i32 {
     if x.is_null() || y.is_null() {
         return -2;
@@ -6357,15 +6079,11 @@ pub unsafe extern "C" fn xml_schema_compare_values(x: XmlSchemaValPtr, y: XmlSch
     xml_schema_compare_values_internal((*x).typ, x, null_mut(), xws, (*y).typ, y, null_mut(), yws)
 }
 
-/**
- * xmlSchemaGetBuiltInListSimpleTypeItemType:
- * @type: the built-in simple type.
- *
- * Lookup function
- *
- * Returns the item type of @type as defined by the built-in datatype
- * hierarchy of XML Schema Part 2: Datatypes, or NULL in case of an error.
- */
+/// Lookup function
+///
+/// Returns the item type of @type as defined by the built-in datatype
+/// hierarchy of XML Schema Part 2: Datatypes, or NULL in case of an error.
+#[doc(alias = "xmlSchemaGetBuiltInListSimpleTypeItemType")]
 pub unsafe extern "C" fn xml_schema_get_built_in_list_simple_type_item_type(
     typ: XmlSchemaTypePtr,
 ) -> XmlSchemaTypePtr {
@@ -6380,18 +6098,11 @@ pub unsafe extern "C" fn xml_schema_get_built_in_list_simple_type_item_type(
     }
 }
 
-/**
- * xmlSchemaValidateListSimpleTypeFacet:
- * @facet:  the facet to check
- * @value:  the lexical repr of the value to validate
- * @actualLen:  the number of list items
- * @expectedLen: the resulting expected number of list items
- *
- * Checks the value of a list simple type against a facet.
- *
- * Returns 0 if the value is valid, a positive error code
- * number otherwise and -1 in case of an internal error.
- */
+/// Checks the value of a list simple type against a facet.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// number otherwise and -1 in case of an internal error.
+#[doc(alias = "xmlSchemaValidateListSimpleTypeFacet")]
 pub unsafe extern "C" fn xml_schema_validate_list_simple_type_facet(
     facet: XmlSchemaFacetPtr,
     value: *const XmlChar,
@@ -6437,15 +6148,11 @@ pub unsafe extern "C" fn xml_schema_validate_list_simple_type_facet(
     0
 }
 
-/**
- * xmlSchemaGetBuiltInType:
- * @type:  the type of the built in type
- *
- * Gives you the type struct for a built-in
- * type by its type id.
- *
- * Returns the type if found, NULL otherwise.
- */
+/// Gives you the type struct for a built-in
+/// type by its type id.
+///
+/// Returns the type if found, NULL otherwise.
+#[doc(alias = "xmlSchemaGetBuiltInType")]
 pub unsafe extern "C" fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> XmlSchemaTypePtr {
     if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
         return null_mut();
@@ -6501,17 +6208,12 @@ pub unsafe extern "C" fn xml_schema_get_built_in_type(typ: XmlSchemaValType) -> 
     }
 }
 
-/**
- * xmlSchemaIsBuiltInTypeFacet:
- * @type: the built-in type
- * @facetType:  the facet type
- *
- * Evaluates if a specific facet can be
- * used in conjunction with a type.
- *
- * Returns 1 if the facet can be used with the given built-in type,
- * 0 otherwise and -1 in case the type is not a built-in type.
- */
+/// Evaluates if a specific facet can be
+/// used in conjunction with a type.
+///
+/// Returns 1 if the facet can be used with the given built-in type,
+/// 0 otherwise and -1 in case the type is not a built-in type.
+#[doc(alias = "xmlSchemaIsBuiltInTypeFacet")]
 pub unsafe extern "C" fn xml_schema_is_built_in_type_facet(
     typ: XmlSchemaTypePtr,
     facet_type: i32,
@@ -6595,14 +6297,10 @@ pub unsafe extern "C" fn xml_schema_is_built_in_type_facet(
     0
 }
 
-/**
- * xmlSchemaCollapseString:
- * @value: a value
- *
- * Removes and normalize white spaces in the string
- *
- * Returns the new string or NULL if no change was required.
- */
+/// Removes and normalize white spaces in the string
+///
+/// Returns the new string or NULL if no change was required.
+#[doc(alias = "xmlSchemaCollapseString")]
 pub unsafe extern "C" fn xml_schema_collapse_string(value: *const XmlChar) -> *mut XmlChar {
     let mut start: *const XmlChar = value;
     let mut end: *const XmlChar;
@@ -6664,14 +6362,10 @@ pub unsafe extern "C" fn xml_schema_collapse_string(value: *const XmlChar) -> *m
     start as _
 }
 
-/**
- * xmlSchemaWhiteSpaceReplace:
- * @value: a value
- *
- * Replaces 0xd, 0x9 and 0xa with a space.
- *
- * Returns the new string or NULL if no change was required.
- */
+/// Replaces 0xd, 0x9 and 0xa with a space.
+///
+/// Returns the new string or NULL if no change was required.
+#[doc(alias = "xmlSchemaWhiteSpaceReplace")]
 pub unsafe extern "C" fn xml_schema_white_space_replace(value: *const XmlChar) -> *mut XmlChar {
     let mut cur: *const XmlChar = value;
     let mut mcur: *mut XmlChar;
@@ -6699,14 +6393,10 @@ pub unsafe extern "C" fn xml_schema_white_space_replace(value: *const XmlChar) -
     ret
 }
 
-/**
- * xmlSchemaGetFacetValueAsULong:
- * @facet: an schemas type facet
- *
- * Extract the value of a facet
- *
- * Returns the value as a long
- */
+/// Extract the value of a facet
+///
+/// Returns the value as a long
+#[doc(alias = "xmlSchemaGetFacetValueAsULong")]
 pub unsafe extern "C" fn xml_schema_get_facet_value_as_ulong(facet: XmlSchemaFacetPtr) -> u64 {
     /*
      * TODO: Check if this is a decimal.
@@ -6717,21 +6407,12 @@ pub unsafe extern "C" fn xml_schema_get_facet_value_as_ulong(facet: XmlSchemaFac
     (*(*facet).val).value.decimal.lo
 }
 
-/**
- * xmlSchemaValidateLengthFacet:
- * @type:  the built-in type
- * @facet:  the facet to check
- * @value:  the lexical repr. of the value to be validated
- * @val:  the precomputed value
- * @ws: the whitespace type of the value
- * @length: the actual length of the value
- *
- * Checka a value against a "length", "minLength" and "maxLength"
- * facet; sets @length to the computed length of @value.
- *
- * Returns 0 if the value is valid, a positive error code
- * otherwise and -1 in case of an internal or API error.
- */
+/// Checka a value against a "length", "minLength" and "maxLength"
+/// facet; sets @length to the computed length of @value.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaValidateLengthFacet")]
 unsafe extern "C" fn xml_schema_validate_length_facet_internal(
     facet: XmlSchemaFacetPtr,
     val_type: XmlSchemaValType,
@@ -6845,20 +6526,12 @@ unsafe extern "C" fn xml_schema_validate_length_facet_internal(
     0
 }
 
-/**
- * xmlSchemaValidateLengthFacet:
- * @type:  the built-in type
- * @facet:  the facet to check
- * @value:  the lexical repr. of the value to be validated
- * @val:  the precomputed value
- * @length: the actual length of the value
- *
- * Checka a value against a "length", "minLength" and "maxLength"
- * facet; sets @length to the computed length of @value.
- *
- * Returns 0 if the value is valid, a positive error code
- * otherwise and -1 in case of an internal or API error.
- */
+/// Checka a value against a "length", "minLength" and "maxLength"
+/// facet; sets @length to the computed length of @value.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaValidateLengthFacet")]
 pub unsafe extern "C" fn xml_schema_validate_length_facet(
     typ: XmlSchemaTypePtr,
     facet: XmlSchemaFacetPtr,
@@ -6879,21 +6552,12 @@ pub unsafe extern "C" fn xml_schema_validate_length_facet(
     )
 }
 
-/**
- * xmlSchemaValidateLengthFacetWhtsp:
- * @facet:  the facet to check
- * @valType:  the built-in type
- * @value:  the lexical repr. of the value to be validated
- * @val:  the precomputed value
- * @ws: the whitespace type of the value
- * @length: the actual length of the value
- *
- * Checka a value against a "length", "minLength" and "maxLength"
- * facet; sets @length to the computed length of @value.
- *
- * Returns 0 if the value is valid, a positive error code
- * otherwise and -1 in case of an internal or API error.
- */
+/// Checka a value against a "length", "minLength" and "maxLength"
+/// facet; sets @length to the computed length of @value.
+///
+/// Returns 0 if the value is valid, a positive error code
+/// otherwise and -1 in case of an internal or API error.
+#[doc(alias = "xmlSchemaValidateLengthFacetWhtsp")]
 pub unsafe extern "C" fn xml_schema_validate_length_facet_whtsp(
     facet: XmlSchemaFacetPtr,
     val_type: XmlSchemaValType,
@@ -6905,20 +6569,13 @@ pub unsafe extern "C" fn xml_schema_validate_length_facet_whtsp(
     xml_schema_validate_length_facet_internal(facet, val_type, value, val, length, ws)
 }
 
-/**
- * xmlSchemaValPredefTypeNodeNoNorm:
- * @type: the predefined type
- * @value: the value to check
- * @val:  the return computed value
- * @node:  the node containing the value
- *
- * Check that a value conforms to the lexical space of the predefined type.
- * if true a value is computed and returned in @val.
- * This one does apply any normalization to the value.
- *
- * Returns 0 if this validates, a positive error code number otherwise
- *         and -1 in case of internal or API error.
- */
+/// Check that a value conforms to the lexical space of the predefined type.
+/// if true a value is computed and returned in @val.
+/// This one does apply any normalization to the value.
+///
+/// Returns 0 if this validates, a positive error code number otherwise
+/// and -1 in case of internal or API error.
+#[doc(alias = "xmlSchemaValPredefTypeNodeNoNorm")]
 pub unsafe extern "C" fn xml_schema_val_predef_type_node_no_norm(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
@@ -6938,25 +6595,20 @@ pub unsafe extern "C" fn xml_schema_val_predef_type_node_no_norm(
     )
 }
 
-/**
- * xmlSchemaGetCanonValue:
- * @val: the precomputed value
- * @retValue: the returned value
- *
- * Get the canonical lexical representation of the value.
- * The caller has to FREE the returned retValue.
- *
- * WARNING: Some value types are not supported yet, resulting
- * in a @retValue of "???".
- *
- * TODO: XML Schema 1.0 does not define canonical representations
- * for: duration, gYearMonth, gYear, gMonthDay, gMonth, gDay,
- * anyURI, QName, NOTATION. This will be fixed in XML Schema 1.1.
- *
- *
- * Returns 0 if the value could be built, 1 if the value type is
- * not supported yet and -1 in case of API errors.
- */
+/// Get the canonical lexical representation of the value.
+/// The caller has to FREE the returned retValue.
+///
+/// WARNING: Some value types are not supported yet, resulting
+/// in a @retValue of "???".
+///
+/// TODO: XML Schema 1.0 does not define canonical representations
+/// for: duration, gYearMonth, gYear, gMonthDay, gMonth, gDay,
+/// anyURI, QName, NOTATION. This will be fixed in XML Schema 1.1.
+///
+///
+/// Returns 0 if the value could be built, 1 if the value type is
+/// not supported yet and -1 in case of API errors.
+#[doc(alias = "xmlSchemaGetCanonValue")]
 pub unsafe extern "C" fn xml_schema_get_canon_value(
     val: XmlSchemaValPtr,
     ret_value: *mut *const XmlChar,
@@ -7488,18 +7140,12 @@ pub unsafe extern "C" fn xml_schema_get_canon_value(
     0
 }
 
-/**
- * xmlSchemaGetCanonValueWhtsp:
- * @val: the precomputed value
- * @retValue: the returned value
- * @ws: the whitespace type of the value
- *
- * Get the canonical representation of the value.
- * The caller has to free the returned @retValue.
- *
- * Returns 0 if the value could be built, 1 if the value type is
- * not supported yet and -1 in case of API errors.
- */
+/// Get the canonical representation of the value.
+/// The caller has to free the returned @retValue.
+///
+/// Returns 0 if the value could be built, 1 if the value type is
+/// not supported yet and -1 in case of API errors.
+#[doc(alias = "xmlSchemaGetCanonValueWhtsp")]
 pub unsafe extern "C" fn xml_schema_get_canon_value_whtsp(
     val: XmlSchemaValPtr,
     ret_value: *mut *const XmlChar,
@@ -7549,15 +7195,10 @@ pub unsafe extern "C" fn xml_schema_get_canon_value_whtsp(
     0
 }
 
-/**
- * xmlSchemaValueAppend:
- * @prev: the value
- * @cur: the value to be appended
- *
- * Appends a next sibling to a list of computed values.
- *
- * Returns 0 if succeeded and -1 on API errors.
- */
+/// Appends a next sibling to a list of computed values.
+///
+/// Returns 0 if succeeded and -1 on API errors.
+#[doc(alias = "xmlSchemaValueAppend")]
 pub unsafe extern "C" fn xml_schema_value_append(
     prev: XmlSchemaValPtr,
     cur: XmlSchemaValPtr,
@@ -7569,15 +7210,10 @@ pub unsafe extern "C" fn xml_schema_value_append(
     0
 }
 
-/**
- * xmlSchemaValueGetNext:
- * @cur: the value
- *
- * Accessor for the next sibling of a list of computed values.
- *
- * Returns the next value or NULL if there was none, or on
- *         API errors.
- */
+/// Accessor for the next sibling of a list of computed values.
+///
+/// Returns the next value or NULL if there was none, or on API errors.
+#[doc(alias = "xmlSchemaValueGetNext")]
 pub unsafe extern "C" fn xml_schema_value_get_next(cur: XmlSchemaValPtr) -> XmlSchemaValPtr {
     if cur.is_null() {
         return null_mut();
@@ -7585,15 +7221,10 @@ pub unsafe extern "C" fn xml_schema_value_get_next(cur: XmlSchemaValPtr) -> XmlS
     (*cur).next
 }
 
-/**
- * xmlSchemaValueGetAsString:
- * @val: the value
- *
- * Accessor for the string value of a computed value.
- *
- * Returns the string value or NULL if there was none, or on
- *         API errors.
- */
+/// Accessor for the string value of a computed value.
+///
+/// Returns the string value or NULL if there was none, or on API errors.
+#[doc(alias = "xmlSchemaValueGetAsString")]
 pub unsafe extern "C" fn xml_schema_value_get_as_string(val: XmlSchemaValPtr) -> *const XmlChar {
     if val.is_null() {
         return null_mut();
@@ -7618,14 +7249,10 @@ pub unsafe extern "C" fn xml_schema_value_get_as_string(val: XmlSchemaValPtr) ->
     null_mut()
 }
 
-/**
- * xmlSchemaValueGetAsBoolean:
- * @val: the value
- *
- * Accessor for the boolean value of a computed value.
- *
- * Returns 1 if true and 0 if false, or in case of an error. Hmm.
- */
+/// Accessor for the boolean value of a computed value.
+///
+/// Returns 1 if true and 0 if false, or in case of an error. Hmm.
+#[doc(alias = "xmlSchemaValueGetAsBoolean")]
 pub unsafe extern "C" fn xml_schema_value_get_as_boolean(val: XmlSchemaValPtr) -> i32 {
     if val.is_null() || (*val).typ != XmlSchemaValType::XmlSchemasBoolean {
         return 0;
@@ -7633,19 +7260,14 @@ pub unsafe extern "C" fn xml_schema_value_get_as_boolean(val: XmlSchemaValPtr) -
     (*val).value.b
 }
 
-/**
- * xmlSchemaNewStringValue:
- * @type:  the value type
- * @value:  the value
- *
- * Allocate a new simple type value. The type can be
- * of XmlSchemaValType::XML_SCHEMAS_STRING.
- * WARNING: This one is intended to be expanded for other
- * string based types. We need this for anySimpleType as well.
- * The given value is consumed and freed with the struct.
- *
- * Returns a pointer to the new value or NULL in case of error
- */
+/// Allocate a new simple type value. The type can be
+/// of XmlSchemaValType::XML_SCHEMAS_STRING.
+/// WARNING: This one is intended to be expanded for other
+/// string based types. We need this for anySimpleType as well.
+/// The given value is consumed and freed with the struct.
+///
+/// Returns a pointer to the new value or NULL in case of error
+#[doc(alias = "xmlSchemaNewStringValue")]
 pub unsafe extern "C" fn xml_schema_new_string_value(
     typ: XmlSchemaValType,
     value: *const XmlChar,
@@ -7663,16 +7285,11 @@ pub unsafe extern "C" fn xml_schema_new_string_value(
     val
 }
 
-/**
- * xmlSchemaNewNOTATIONValue:
- * @name:  the notation name
- * @ns: the notation namespace name or NULL
- *
- * Allocate a new NOTATION value.
- * The given values are consumed and freed with the struct.
- *
- * Returns a pointer to the new value or NULL in case of error
- */
+/// Allocate a new NOTATION value.
+/// The given values are consumed and freed with the struct.
+///
+/// Returns a pointer to the new value or NULL in case of error
+#[doc(alias = "xmlSchemaNewNOTATIONValue")]
 pub unsafe extern "C" fn xml_schema_new_notation_value(
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -7689,16 +7306,11 @@ pub unsafe extern "C" fn xml_schema_new_notation_value(
     val
 }
 
-/**
- * xmlSchemaNewQNameValue:
- * @namespaceName: the namespace name
- * @localName: the local name
- *
- * Allocate a new QName value.
- * The given values are consumed and freed with the struct.
- *
- * Returns a pointer to the new value or NULL in case of an error.
- */
+/// Allocate a new QName value.
+/// The given values are consumed and freed with the struct.
+///
+/// Returns a pointer to the new value or NULL in case of an error.
+#[doc(alias = "xmlSchemaNewQNameValue")]
 pub unsafe extern "C" fn xml_schema_new_qname_value(
     namespace_name: *const XmlChar,
     local_name: *const XmlChar,
@@ -7713,18 +7325,10 @@ pub unsafe extern "C" fn xml_schema_new_qname_value(
     val
 }
 
-/**
- * xmlSchemaCompareValuesWhtsp:
- * @x:  a first value
- * @xws: the whitespace value of x
- * @y:  a second value
- * @yws: the whitespace value of y
- *
- * Compare 2 values
- *
- * Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in
- * case of error
- */
+/// Compare 2 values
+///
+/// Returns -1 if x < y, 0 if x == y, 1 if x > y, 2 if x <> y, and -2 in case of error
+#[doc(alias = "xmlSchemaCompareValuesWhtsp")]
 pub unsafe extern "C" fn xml_schema_compare_values_whtsp(
     x: XmlSchemaValPtr,
     xws: XmlSchemaWhitespaceValueType,
@@ -7737,14 +7341,10 @@ pub unsafe extern "C" fn xml_schema_compare_values_whtsp(
     xml_schema_compare_values_internal((*x).typ, x, null_mut(), xws, (*y).typ, y, null_mut(), yws)
 }
 
-/**
- * xmlSchemaCopyValue:
- * @val:  the precomputed value to be copied
- *
- * Copies the precomputed value. This duplicates any string within.
- *
- * Returns the copy or NULL if a copy for a data-type is not implemented.
- */
+/// Copies the precomputed value. This duplicates any string within.
+///
+/// Returns the copy or NULL if a copy for a data-type is not implemented.
+#[doc(alias = "xmlSchemaCopyValue")]
 pub unsafe extern "C" fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlSchemaValPtr {
     let mut ret: XmlSchemaValPtr = null_mut();
     let mut prev: XmlSchemaValPtr = null_mut();
@@ -7815,14 +7415,10 @@ pub unsafe extern "C" fn xml_schema_copy_value(mut val: XmlSchemaValPtr) -> XmlS
     ret
 }
 
-/**
- * xmlSchemaGetValType:
- * @val: a schemas value
- *
- * Accessor for the type of a value
- *
- * Returns the XmlSchemaValType of the value
- */
+/// Accessor for the type of a value
+///
+/// Returns the XmlSchemaValType of the value
+#[doc(alias = "xmlSchemaGetValType")]
 pub unsafe extern "C" fn xml_schema_get_val_type(val: XmlSchemaValPtr) -> XmlSchemaValType {
     if val.is_null() {
         return XmlSchemaValType::XmlSchemasUnknown;
