@@ -208,9 +208,20 @@ impl XmlOutputBuffer {
 
     /// Create a buffered parser output
     ///
+    /// Returns the new parser output or NULL
+    #[doc(alias = "xmlAllocOutputBuffer")]
+    #[cfg(feature = "output")]
+    pub fn new(encoder: Option<XmlCharEncodingHandler>) -> Option<XmlOutputBuffer> {
+        Self::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e))))
+    }
+
+    /// Create a buffered parser output
+    ///
     /// If successfully created, return it. Otherwise return `None`.
     #[doc(alias = "xmlAllocOutputBufferInternal")]
-    pub fn new(encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>) -> Option<Self> {
+    pub(crate) fn from_wrapped_encoder(
+        encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+    ) -> Option<Self> {
         let mut ret = Self::default();
         let mut buf = XmlBufRef::new()?;
         buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
@@ -813,7 +824,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 context = (callbacks[i].opencallback.unwrap())(unescaped.as_ptr());
                 if !context.is_null() {
                     // Allocate the Output buffer front-end.
-                    let mut ret = XmlOutputBuffer::new(encoder)?;
+                    let mut ret = XmlOutputBuffer::from_wrapped_encoder(encoder)?;
                     ret.context = context;
                     ret.writecallback = callbacks[i].writecallback;
                     ret.closecallback = callbacks[i].closecallback;
@@ -835,7 +846,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 context = (callbacks[i].opencallback.unwrap())(uri.as_ptr());
                 if !context.is_null() {
                     // Allocate the Output buffer front-end.
-                    let mut ret = XmlOutputBuffer::new(encoder)?;
+                    let mut ret = XmlOutputBuffer::from_wrapped_encoder(encoder)?;
                     ret.context = context;
                     ret.writecallback = callbacks[i].writecallback;
                     ret.closecallback = callbacks[i].closecallback;

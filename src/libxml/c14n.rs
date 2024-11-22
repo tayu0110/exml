@@ -286,7 +286,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     *doc_txt_ptr = null_mut();
 
     // create memory buffer with UTF8 (default) encoding
-    let Some(buf) = XmlOutputBuffer::new(None) else {
+    let Some(buf) = XmlOutputBuffer::from_wrapped_encoder(None) else {
         xml_c14n_err_memory(c"creating output buffer".as_ptr() as _);
         return -1;
     };

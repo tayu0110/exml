@@ -537,7 +537,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
         find_encoding_handler("ascii")
     };
 
-    let Some(mut buf) = XmlOutputBuffer::new(handler.map(|e| Rc::new(RefCell::new(e)))) else {
+    let Some(mut buf) = XmlOutputBuffer::from_wrapped_encoder(handler.map(|e| Rc::new(RefCell::new(e)))) else {
         *mem = null_mut();
         *size = 0;
         return;

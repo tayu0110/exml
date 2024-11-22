@@ -34,7 +34,6 @@ use url::Url;
 
 use crate::{
     __xml_raise_error,
-    buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error},
     globals::{GenericError, StructuredError},
@@ -59,7 +58,6 @@ use crate::{
     },
     nanohttp::XmlNanoHTTPCtxt,
     private::parser::__xml_err_encoding,
-    tree::XmlBufferAllocationScheme,
     xml_str_printf,
 };
 
@@ -583,32 +581,6 @@ unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
     xml_io_http_close_write(ctxt, c"PUT".as_ptr() as _)
 }
 
-/// Create a buffered parser output
-///
-/// Returns the new parser output or NULL
-#[doc(alias = "xmlAllocOutputBuffer")]
-#[cfg(feature = "output")]
-pub unsafe fn xml_alloc_output_buffer(
-    encoder: Option<XmlCharEncodingHandler>,
-) -> Option<XmlOutputBuffer> {
-    let mut ret = XmlOutputBuffer::default();
-    let mut buf = XmlBufRef::new()?;
-    buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    ret.buffer = Some(buf);
-
-    ret.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
-    if ret.encoder.is_some() {
-        ret.conv = Some(XmlBufRef::with_capacity(4000)?);
-        // This call is designed to initiate the encoder state
-        ret.encode(true);
-    }
-    ret.writecallback = None;
-    ret.closecallback = None;
-    ret.context = null_mut();
-    ret.written = 0;
-    Some(ret)
-}
-
 /// Create a buffered output for the progressive saving to a FILE *
 /// buffered C I/O
 ///
@@ -627,12 +599,14 @@ pub unsafe fn xml_output_buffer_create_file(
         return None;
     }
 
-    XmlOutputBuffer::new(encoder.map(|e| Rc::new(RefCell::new(e)))).map(|mut buf| {
-        buf.context = file as _;
-        buf.writecallback = Some(xml_file_write);
-        buf.closecallback = Some(xml_file_flush);
-        buf
-    })
+    XmlOutputBuffer::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e)))).map(
+        |mut buf| {
+            buf.context = file as _;
+            buf.writecallback = Some(xml_file_write);
+            buf.closecallback = Some(xml_file_flush);
+            buf
+        },
+    )
 }
 
 /// Write `len` bytes from `buffer` to the I/O channel.
@@ -669,7 +643,7 @@ pub unsafe fn xml_output_buffer_create_io(
 ) -> Option<XmlOutputBuffer> {
     iowrite?;
 
-    XmlOutputBuffer::new(encoder).map(|mut buf| {
+    XmlOutputBuffer::from_wrapped_encoder(encoder).map(|mut buf| {
         buf.context = ioctx;
         buf.writecallback = iowrite;
         buf.closecallback = ioclose;
@@ -1338,7 +1312,7 @@ pub unsafe extern "C" fn xml_io_http_open_w(
 
     // Any character conversions should have been done before this
 
-    let Some(buf) = XmlOutputBuffer::new(None) else {
+    let Some(buf) = XmlOutputBuffer::from_wrapped_encoder(None) else {
         xml_free_http_write_ctxt(ctxt);
         return null_mut();
     };

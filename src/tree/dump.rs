@@ -11,7 +11,7 @@ use crate::{
     buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
-    io::{xml_alloc_output_buffer, xml_output_buffer_create_file, XmlOutputBuffer},
+    io::{xml_output_buffer_create_file, XmlOutputBuffer},
     libxml::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
@@ -82,8 +82,7 @@ impl XmlDoc {
             None
         };
 
-        let Some(out_buff) =
-            xml_alloc_output_buffer(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
+        let Some(out_buff) = XmlOutputBuffer::new(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
         else {
             xml_save_err_memory(c"creating buffer".as_ptr() as _);
             return;
