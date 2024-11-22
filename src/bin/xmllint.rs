@@ -2257,6 +2257,8 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
  ************************************************************************/
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
+    use std::{cell::RefCell, rc::Rc};
+
     use exml::{
         io::{xml_output_buffer_close, xml_output_buffer_create_file, XmlOutputBufferPtr},
         libxml::xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
@@ -2278,18 +2280,18 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     extern "C" {
                         static stdout: *mut FILE;
                     }
-                    buf = xml_output_buffer_create_file(stdout, None);
-                    if buf.is_null() {
+                    let Some(buf) = xml_output_buffer_create_file(stdout, None) else {
                         eprintln!("Out of memory for XPath");
                         PROGRESULT = XmllintReturnCode::ErrMem;
                         return;
-                    }
+                    };
+                    let buf = Rc::new(RefCell::new(buf));
                     for i in 0..(*(*cur).nodesetval).node_nr {
                         node = *(*(*cur).nodesetval).node_tab.add(i as usize);
-                        (*node).dump_output(buf, null_mut(), 0, 0, None);
-                        (*buf).write_bytes(b"\n");
+                        (*node).dump_output(buf.clone(), null_mut(), 0, 0, None);
+                        buf.borrow_mut().write_bytes(b"\n");
                     }
-                    xml_output_buffer_close(buf);
+                    buf.borrow_mut().flush();
                 }
             }
             #[cfg(not(feature = "output"))]

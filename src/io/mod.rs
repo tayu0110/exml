@@ -619,42 +619,23 @@ unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
 #[cfg(feature = "output")]
 pub unsafe fn xml_alloc_output_buffer(
     encoder: Option<XmlCharEncodingHandler>,
-) -> XmlOutputBufferPtr {
-    let ret: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as XmlOutputBufferPtr;
-    if ret.is_null() {
-        xml_ioerr_memory(c"creating output buffer".as_ptr() as _);
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlOutputBuffer>());
-    let Some(mut buf) = XmlBufRef::new() else {
-        xml_free(ret as _);
-        return null_mut();
-    };
+) -> Option<XmlOutputBuffer> {
+    let mut ret = XmlOutputBuffer::default();
+    let mut buf = XmlBufRef::new()?;
     buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    (*ret).buffer = Some(buf);
+    ret.buffer = Some(buf);
 
-    (*ret).encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
-    if (*ret).encoder.is_some() {
-        (*ret).conv = XmlBufRef::with_capacity(4000);
-        if (*ret).conv.is_none() {
-            buf.free();
-            xml_free(ret as _);
-            return null_mut();
-        }
-
-        /*
-         * This call is designed to initiate the encoder state
-         */
-        (*ret).encode(true);
-    } else {
-        (*ret).conv = None;
+    ret.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
+    if ret.encoder.is_some() {
+        ret.conv = Some(XmlBufRef::with_capacity(4000)?);
+        // This call is designed to initiate the encoder state
+        ret.encode(true);
     }
-    (*ret).writecallback = None;
-    (*ret).closecallback = None;
-    (*ret).context = null_mut();
-    (*ret).written = 0;
-
-    ret
+    ret.writecallback = None;
+    ret.closecallback = None;
+    ret.context = null_mut();
+    ret.written = 0;
+    Some(ret)
 }
 
 /// Create a buffered  output for the progressive saving of a file
@@ -670,7 +651,7 @@ pub unsafe fn xml_output_buffer_create_filename(
     uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: i32,
-) -> XmlOutputBufferPtr {
+) -> Option<XmlOutputBuffer> {
     if let Some(f) = GLOBAL_STATE.with_borrow(|state| state.output_buffer_create_filename_value) {
         return f(uri, encoder, compression);
     }
@@ -686,24 +667,21 @@ pub unsafe fn xml_output_buffer_create_filename(
 pub unsafe fn xml_output_buffer_create_file(
     file: *mut FILE,
     encoder: Option<XmlCharEncodingHandler>,
-) -> XmlOutputBufferPtr {
+) -> Option<XmlOutputBuffer> {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         xml_register_default_output_callbacks();
     }
 
     if file.is_null() {
-        return null_mut();
+        return None;
     }
 
-    let ret: XmlOutputBufferPtr =
-        xml_alloc_output_buffer_internal(encoder.map(|e| Rc::new(RefCell::new(e))));
-    if !ret.is_null() {
-        (*ret).context = file as _;
-        (*ret).writecallback = Some(xml_file_write);
-        (*ret).closecallback = Some(xml_file_flush);
-    }
-
-    ret
+    XmlOutputBuffer::new(encoder.map(|e| Rc::new(RefCell::new(e)))).map(|mut buf| {
+        buf.context = file as _;
+        buf.writecallback = Some(xml_file_write);
+        buf.closecallback = Some(xml_file_flush);
+        buf
+    })
 }
 
 /// Write `len` bytes from `buffer` to the I/O channel.
@@ -737,19 +715,15 @@ pub unsafe fn xml_output_buffer_create_io(
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-) -> XmlOutputBufferPtr {
-    if iowrite.is_none() {
-        return null_mut();
-    }
+) -> Option<XmlOutputBuffer> {
+    iowrite?;
 
-    let ret: XmlOutputBufferPtr = xml_alloc_output_buffer_internal(encoder);
-    if !ret.is_null() {
-        (*ret).context = ioctx;
-        (*ret).writecallback = iowrite;
-        (*ret).closecallback = ioclose;
-    }
-
-    ret
+    XmlOutputBuffer::new(encoder).map(|mut buf| {
+        buf.context = ioctx;
+        buf.writecallback = iowrite;
+        buf.closecallback = ioclose;
+        buf
+    })
 }
 
 /// Take a block of UTF-8 chars in and escape them.

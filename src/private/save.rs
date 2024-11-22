@@ -7,7 +7,7 @@ use std::{ffi::c_int, ptr::null_mut};
 
 use crate::{
     error::XmlParserErrors,
-    io::XmlOutputBufferPtr,
+    io::XmlOutputBuffer,
     libxml::{
         chvalid::xml_is_char,
         xmlsave::{xml_ns_dump_output, xml_save_err, xml_serialize_hex_char_ref},
@@ -162,7 +162,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
  * Should be called in the context of attributes dumps.
  */
 pub(crate) unsafe extern "C" fn xml_ns_list_dump_output(
-    buf: XmlOutputBufferPtr,
+    buf: &mut XmlOutputBuffer,
     mut cur: XmlNsPtr,
 ) {
     while !cur.is_null() {

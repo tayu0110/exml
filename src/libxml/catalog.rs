@@ -3117,10 +3117,7 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
      * Rebuild a catalog
      */
 
-    use crate::{
-        io::{xml_output_buffer_create_file, XmlOutputBufferPtr},
-        tree::NodeCommon,
-    };
+    use crate::{io::xml_output_buffer_create_file, tree::NodeCommon};
     let doc: XmlDocPtr = xml_new_doc(None);
     if doc.is_null() {
         return -1;
@@ -3153,11 +3150,10 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
     /*
      * reserialize it
      */
-    let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(out, None);
-    if buf.is_null() {
+    let Some(buf) = xml_output_buffer_create_file(out, None) else {
         xml_free_doc(doc);
         return -1;
-    }
+    };
     let ret: i32 = (*doc).save_format_file_to(buf, None, 1);
 
     /*

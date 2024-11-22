@@ -5,18 +5,17 @@ use std::{
     rc::Rc,
 };
 
-use libc::{memset, FILE};
+use libc::FILE;
 
 use crate::{
     buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
     io::{
-        xml_alloc_output_buffer, xml_output_buffer_close, xml_output_buffer_create_file,
-        xml_output_buffer_create_filename, XmlOutputBuffer, XmlOutputBufferPtr,
+        xml_alloc_output_buffer, xml_output_buffer_create_file, xml_output_buffer_create_filename,
+        XmlOutputBuffer,
     },
     libxml::{
-        globals::{xml_free, xml_malloc},
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
         xmlsave::{
@@ -86,21 +85,22 @@ impl XmlDoc {
             None
         };
 
-        let out_buff: XmlOutputBufferPtr = xml_alloc_output_buffer(conv_hdlr);
-        if out_buff.is_null() {
+        let Some(out_buff) =
+            xml_alloc_output_buffer(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
+        else {
             xml_save_err_memory(c"creating buffer".as_ptr() as _);
             return;
-        }
+        };
 
-        ctxt.buf = out_buff;
+        ctxt.buf = out_buff.clone();
         ctxt.level = 0;
         ctxt.format = (format != 0) as i32;
         ctxt.encoding = encoding;
         xml_save_ctxt_init(&mut ctxt);
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt, self);
-        (*out_buff).flush();
-        if let Some(conv) = (*out_buff).conv {
+        out_buff.borrow_mut().flush();
+        if let Some(conv) = out_buff.borrow().conv {
             *doc_txt_len = conv.len() as i32;
             *doc_txt_ptr = xml_strndup(
                 if conv.is_ok() {
@@ -111,15 +111,15 @@ impl XmlDoc {
                 *doc_txt_len,
             );
         } else {
-            *doc_txt_len = (*out_buff).buffer.map_or(0, |buf| buf.len() as i32);
+            *doc_txt_len = out_buff.borrow().buffer.map_or(0, |buf| buf.len() as i32);
             *doc_txt_ptr = xml_strndup(
-                (*out_buff)
+                out_buff
+                    .borrow()
                     .buffer
                     .map_or(null(), |buf| buf.as_ref().as_ptr()),
                 *doc_txt_len,
             );
         }
-        xml_output_buffer_close(out_buff);
 
         if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
             *doc_txt_len = 0;
@@ -186,10 +186,11 @@ impl XmlDoc {
         } else {
             None
         };
-        let buf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, handler);
-        if buf.is_null() {
+        let Some(buf) =
+            xml_output_buffer_create_file(f, handler).map(|buf| Rc::new(RefCell::new(buf)))
+        else {
             return -1;
-        }
+        };
 
         let mut ctxt = XmlSaveCtxt {
             buf,
@@ -202,8 +203,16 @@ impl XmlDoc {
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
 
-        let ret: i32 = xml_output_buffer_close(buf);
-        ret
+        let mut buf = Rc::into_inner(ctxt.buf)
+            .expect("Internal Error")
+            .into_inner();
+
+        if buf.error.is_ok() {
+            buf.flush();
+            buf.written
+        } else {
+            -1
+        }
     }
 
     /// Dump an XML document to an open FILE.
@@ -241,14 +250,14 @@ impl XmlDoc {
         };
 
         // save the content to a temp buffer.
-        let buf: XmlOutputBufferPtr = xml_output_buffer_create_filename(
+        let Some(buf) = xml_output_buffer_create_filename(
             filename,
             handler.map(|e| Rc::new(RefCell::new(e))),
             self.compression,
-        );
-        if buf.is_null() {
+        )
+        .map(|buf| Rc::new(RefCell::new(buf))) else {
             return -1;
-        }
+        };
         let mut ctxt = XmlSaveCtxt {
             buf,
             level: 0,
@@ -261,8 +270,15 @@ impl XmlDoc {
 
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
 
-        let ret: i32 = xml_output_buffer_close(buf);
-        ret
+        let mut buf = Rc::into_inner(ctxt.buf)
+            .expect("Internal Error")
+            .into_inner();
+        if buf.error.is_ok() {
+            buf.flush();
+            buf.written
+        } else {
+            -1
+        }
     }
 
     /// Dump an XML document to a file. Will use compression if compiled in and enabled.  
@@ -305,22 +321,18 @@ impl XmlDoc {
     #[doc(alias = "xmlSaveFormatFileTo")]
     pub unsafe fn save_format_file_to(
         &mut self,
-        buf: XmlOutputBufferPtr,
+        buf: XmlOutputBuffer,
         encoding: Option<&str>,
         format: i32,
     ) -> i32 {
-        if buf.is_null() {
-            return -1;
-        }
         if !matches!(
             self.typ,
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         ) {
-            xml_output_buffer_close(buf);
             return -1;
         }
         let mut ctxt = XmlSaveCtxt {
-            buf,
+            buf: Rc::new(RefCell::new(buf)),
             level: 0,
             format: (format != 0) as i32,
             encoding: encoding.map(|e| e.to_owned()),
@@ -329,8 +341,15 @@ impl XmlDoc {
         xml_save_ctxt_init(&mut ctxt);
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
-        let ret: i32 = xml_output_buffer_close(buf);
-        ret
+        let mut buf = Rc::into_inner(ctxt.buf)
+            .expect("Internal Error")
+            .into_inner();
+        if buf.error.is_ok() {
+            buf.flush();
+            buf.written
+        } else {
+            -1
+        }
     }
 
     /// Dump an XML document to an I/O buffer.
@@ -340,10 +359,11 @@ impl XmlDoc {
     /// # Warning
     ///  This call xmlOutputBufferClose() on buf which is not available after this call.
     #[doc(alias = "xmlSaveFileTo")]
-    pub unsafe fn save_file_to(&mut self, buf: XmlOutputBufferPtr, encoding: Option<&str>) -> i32 {
-        if buf.is_null() {
-            return -1;
-        }
+    pub unsafe fn save_file_to(
+        &mut self,
+        buf: Rc<RefCell<XmlOutputBuffer>>,
+        encoding: Option<&str>,
+    ) -> i32 {
         let mut ctxt = XmlSaveCtxt {
             buf,
             level: 0,
@@ -354,8 +374,15 @@ impl XmlDoc {
         xml_save_ctxt_init(&mut ctxt);
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
-        let ret: i32 = xml_output_buffer_close(buf);
-        ret
+        let mut buf = Rc::into_inner(ctxt.buf)
+            .expect("Internal Error")
+            .into_inner();
+        if buf.error.is_ok() {
+            buf.flush();
+            buf.written
+        } else {
+            -1
+        }
     }
 }
 
@@ -367,17 +394,13 @@ impl XmlNode {
     #[doc(alias = "xmlNodeDumpOutput")]
     pub unsafe fn dump_output(
         &mut self,
-        buf: XmlOutputBufferPtr,
+        buf: Rc<RefCell<XmlOutputBuffer>>,
         doc: XmlDocPtr,
         level: i32,
         format: i32,
         mut encoding: Option<&str>,
     ) {
         xml_init_parser();
-
-        if buf.is_null() {
-            return;
-        }
 
         if encoding.is_none() {
             encoding = Some("UTF-8");
@@ -415,6 +438,7 @@ impl XmlNode {
         {
             xml_node_dump_output_internal(addr_of_mut!(ctxt) as _, cur);
         }
+        ctxt.buf.borrow_mut().flush();
     }
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
@@ -422,14 +446,13 @@ impl XmlNode {
     pub unsafe fn dump_file(&mut self, f: *mut FILE, doc: XmlDocPtr) {
         xml_init_parser();
 
-        let outbuf: XmlOutputBufferPtr = xml_output_buffer_create_file(f, None);
-        if outbuf.is_null() {
+        let Some(mut outbuf) = xml_output_buffer_create_file(f, None) else {
             return;
-        }
+        };
         if !doc.is_null() && matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
             #[cfg(feature = "html")]
             {
-                html_node_dump_output(outbuf, doc, self, null_mut());
+                html_node_dump_output(&mut outbuf, doc, self, null_mut());
             }
             #[cfg(not(feature = "html"))]
             {
@@ -439,10 +462,10 @@ impl XmlNode {
                     c"HTML support not compiled in\n".as_ptr() as _,
                 );
             }
+            outbuf.flush();
         } else {
-            self.dump_output(outbuf, doc, 0, 1, None);
+            self.dump_output(Rc::new(RefCell::new(outbuf)), doc, 0, 1, None);
         }
-        xml_output_buffer_close(outbuf);
     }
 
     /// Dump an XML node, recursive behaviour,children are printed too.
@@ -465,25 +488,22 @@ impl XmlNode {
         if buf.is_null() {
             return usize::MAX;
         }
-        let outbuf: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as _;
-        if outbuf.is_null() {
-            xml_save_err_memory(c"creating buffer".as_ptr() as _);
-            return usize::MAX;
-        }
-        memset(outbuf as _, 0, size_of::<XmlOutputBuffer>());
-        (*outbuf).buffer = XmlBufRef::from_raw(buf);
-        (*outbuf).encoder = None;
-        (*outbuf).writecallback = None;
-        (*outbuf).closecallback = None;
-        (*outbuf).context = null_mut();
-        (*outbuf).written = 0;
+        let mut outbuf = XmlOutputBuffer::default();
+        outbuf.buffer = XmlBufRef::from_raw(buf);
+        outbuf.encoder = None;
+        outbuf.writecallback = None;
+        outbuf.closecallback = None;
+        outbuf.context = null_mut();
+        outbuf.written = 0;
 
         let using: usize = xml_buf_use(buf);
         let oldalloc: i32 = xml_buf_get_allocation_scheme(buf);
         xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        self.dump_output(outbuf, doc, level, format, None);
+        let outbuf = Rc::new(RefCell::new(outbuf));
+        self.dump_output(outbuf.clone(), doc, level, format, None);
+        // The buffer should not be dropped because the caller may still use it.
+        let _ = outbuf.borrow_mut().buffer.take();
         xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
-        xml_free(outbuf as _);
         let ret: i32 = (xml_buf_use(buf) - using) as i32;
         ret as _
     }

@@ -17,11 +17,9 @@ use crate::{
     buf::XmlBufRef,
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
     error::XmlParserErrors,
-    io::{
-        xml_alloc_output_buffer_internal, xml_io_http_close_put, xml_io_http_dflt_open_w,
-        xml_io_http_match, xml_io_http_write,
-    },
+    io::{xml_io_http_close_put, xml_io_http_dflt_open_w, xml_io_http_match, xml_io_http_write},
     libxml::uri::unescape_url,
+    tree::XmlBufferAllocationScheme,
 };
 
 use super::{
@@ -205,6 +203,29 @@ impl XmlOutputBuffer {
         } else {
             ret
         }
+    }
+
+    /// Create a buffered parser output
+    ///
+    /// Returns the new parser output or NULL
+    #[doc(alias = "xmlAllocOutputBufferInternal")]
+    pub fn new(encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>) -> Option<Self> {
+        let mut ret = Self::default();
+        let mut buf = XmlBufRef::new()?;
+        buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        ret.buffer = Some(buf);
+        ret.encoder = encoder;
+        if ret.encoder.is_some() {
+            ret.conv = Some(XmlBufRef::with_capacity(4000)?);
+
+            // This call is designed to initiate the encoder state
+            ret.encode(true);
+        }
+        ret.writecallback = None;
+        ret.closecallback = None;
+        ret.context = null_mut();
+        ret.written = 0;
+        Some(ret)
     }
 
     /// Write the content of the array in the output I/O buffer.  
@@ -581,6 +602,38 @@ impl XmlOutputBuffer {
     }
 }
 
+impl Default for XmlOutputBuffer {
+    fn default() -> Self {
+        Self {
+            context: null_mut(),
+            writecallback: None,
+            closecallback: None,
+            encoder: None,
+            buffer: None,
+            conv: None,
+            written: 0,
+            error: XmlParserErrors::default(),
+        }
+    }
+}
+
+impl Drop for XmlOutputBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            self.flush();
+            if let Some(close) = self.closecallback {
+                close(self.context);
+            }
+            if let Some(buf) = self.buffer.take() {
+                buf.free();
+            }
+            if let Some(conv) = self.conv.take() {
+                conv.free();
+            }
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub(crate) struct XmlOutputCallback {
@@ -706,8 +759,7 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     _compression: i32,
-) -> XmlOutputBufferPtr {
-    let ret: XmlOutputBufferPtr;
+) -> Option<XmlOutputBuffer> {
     let mut context: *mut c_void = null_mut();
 
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
@@ -737,13 +789,11 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 context = (callbacks[i].opencallback.unwrap())(unescaped.as_ptr());
                 if !context.is_null() {
                     // Allocate the Output buffer front-end.
-                    ret = xml_alloc_output_buffer_internal(encoder);
-                    if !ret.is_null() {
-                        (*ret).context = context;
-                        (*ret).writecallback = callbacks[i].writecallback;
-                        (*ret).closecallback = callbacks[i].closecallback;
-                    }
-                    return ret;
+                    let mut ret = XmlOutputBuffer::new(encoder)?;
+                    ret.context = context;
+                    ret.writecallback = callbacks[i].writecallback;
+                    ret.closecallback = callbacks[i].closecallback;
+                    return Some(ret);
                 }
             }
         }
@@ -761,17 +811,15 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
                 context = (callbacks[i].opencallback.unwrap())(uri.as_ptr());
                 if !context.is_null() {
                     // Allocate the Output buffer front-end.
-                    ret = xml_alloc_output_buffer_internal(encoder);
-                    if !ret.is_null() {
-                        (*ret).context = context;
-                        (*ret).writecallback = callbacks[i].writecallback;
-                        (*ret).closecallback = callbacks[i].closecallback;
-                    }
-                    return ret;
+                    let mut ret = XmlOutputBuffer::new(encoder)?;
+                    ret.context = context;
+                    ret.writecallback = callbacks[i].writecallback;
+                    ret.closecallback = callbacks[i].closecallback;
+                    return Some(ret);
                 }
             }
         }
     }
 
-    null_mut()
+    None
 }

@@ -34,7 +34,7 @@ type OutputBufferCreateFilename = fn(
     uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     compression: i32,
-) -> *mut XmlOutputBuffer;
+) -> Option<XmlOutputBuffer>;
 
 pub struct GenericErrorContext {
     pub(crate) context: Rc<Mutex<dyn Any>>,

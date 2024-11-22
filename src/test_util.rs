@@ -10,7 +10,7 @@ use libc::{fclose, fopen, snprintf, FILE};
 
 use crate::{
     buf::XmlBuf,
-    io::XmlOutputBufferPtr,
+    io::{XmlOutputBuffer, XmlOutputBufferPtr},
     libxml::{
         catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
         debug_xml::XmlShellCtxtPtr,
@@ -1547,13 +1547,13 @@ pub(crate) fn gen_void_ptr(_no: i32, _nr: i32) -> *mut c_void {
 pub(crate) fn des_void_ptr(_no: i32, _val: *mut c_void, _nr: i32) {}
 
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn gen_xml_output_buffer_ptr(no: i32, _nr: i32) -> XmlOutputBufferPtr {
+pub(crate) unsafe fn gen_xml_output_buffer_ptr(no: i32, _nr: i32) -> Option<XmlOutputBuffer> {
     use crate::io::xml_output_buffer_create_filename;
 
     if no == 0 {
         return xml_output_buffer_create_filename("test.out", None, 0);
     }
-    null_mut()
+    None
 }
 
 #[cfg(feature = "output")]
