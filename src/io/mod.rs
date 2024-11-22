@@ -436,7 +436,7 @@ pub type XmlIOHTTPWriteCtxtPtr = *mut XmlIOHTTPWriteCtxt;
 pub struct XmlIOHTTPWriteCtxt {
     compression: c_int,
     uri: *mut c_char,
-    doc_buff: *mut c_void,
+    doc_buff: XmlOutputBuffer,
 }
 
 /// Collect data from memory buffer c_into a temporary file for later
@@ -452,18 +452,13 @@ unsafe extern "C" fn xml_io_http_write(
 ) -> c_int {
     let ctxt: XmlIOHTTPWriteCtxtPtr = context as _;
 
-    if ctxt.is_null() || (*ctxt).doc_buff.is_null() || buffer.is_null() {
+    if ctxt.is_null() || buffer.is_null() {
         return -1;
     }
 
     if len > 0 {
-        /*  Use gzwrite or fwrite as previously setup in the open call  */
-        //  #ifdef LIBXML_ZLIB_ENABLED
-        //  if ( (*ctxt).compression > 0 )
-        //      len = xmlZMemBuffAppend( (*ctxt).doc_buff, buffer, len );
-        //  else
-        //  #endif
-        len = (*((*ctxt).doc_buff as *mut XmlOutputBuffer))
+        len = (*ctxt)
+            .doc_buff
             .write_bytes(from_raw_parts(buffer as *const u8, len as usize));
 
         if len < 0 {
@@ -493,18 +488,7 @@ unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
         xml_free((*ctxt).uri as _);
     }
 
-    if !(*ctxt).doc_buff.is_null() {
-        // #ifdef LIBXML_ZLIB_ENABLED
-        // if ( (*ctxt).compression > 0 ) {
-        //     xmlFreeZMemBuff( (*ctxt).doc_buff );
-        // }
-        // else
-        // #endif
-        {
-            xml_output_buffer_close((*ctxt).doc_buff as _);
-        }
-    }
-
+    (*ctxt).doc_buff = XmlOutputBuffer::default();
     xml_free(ctxt as _);
 }
 
@@ -517,10 +501,7 @@ unsafe extern "C" fn xml_io_http_close_write(
 ) -> c_int {
     let mut close_rc: c_int = -1;
     let http_rtn: c_int;
-    let content_lgth: c_int;
     let ctxt: XmlIOHTTPWriteCtxtPtr = context as _;
-
-    let http_content: *mut c_char;
     let content_encoding: *mut c_char = null_mut();
     let mut content_type: *mut c_char = c"text/xml".as_ptr() as _;
     let http_ctxt: *mut c_void;
@@ -529,27 +510,17 @@ unsafe extern "C" fn xml_io_http_close_write(
         return -1;
     }
 
-    /*  Retrieve the content from the appropriate buffer  */
-    // #ifdef LIBXML_ZLIB_ENABLED
-    // if ( (*ctxt).compression > 0 ) {
-    // 	   content_lgth = xmlZMemBuffGetContent( (*ctxt).doc_buff, &http_content );
-    // 	   content_encoding = (c_char *) "Content-Encoding: gzip";
-    // }
-    // else
-    // #endif
-    {
-        /*  Pull the data out of the memory output buffer  */
+    // Pull the data out of the memory output buffer
 
-        let dctxt: XmlOutputBufferPtr = (*ctxt).doc_buff as _;
-        http_content = (*dctxt).buffer.map_or(null_mut(), |buf| {
-            if buf.is_ok() {
-                buf.as_ref().as_ptr() as *mut i8
-            } else {
-                null_mut()
-            }
-        });
-        content_lgth = (*dctxt).buffer.map_or(0, |buf| buf.len()) as i32;
-    }
+    let dctxt = &mut (*ctxt).doc_buff;
+    let http_content: *mut c_char = dctxt.buffer.map_or(null_mut(), |buf| {
+        if buf.is_ok() {
+            buf.as_ref().as_ptr() as *mut i8
+        } else {
+            null_mut()
+        }
+    });
+    let content_lgth: c_int = dctxt.buffer.map_or(0, |buf| buf.len()) as i32;
 
     if http_content.is_null() {
         let mut msg: [XmlChar; 500] = [0; 500];
@@ -763,55 +734,6 @@ pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_i
     } else {
         err_rc
     }
-}
-
-/// Create a buffered parser output
-///
-/// Returns the new parser output or NULL
-#[doc(alias = "xmlAllocOutputBufferInternal")]
-#[cfg(feature = "output")]
-pub(crate) unsafe fn xml_alloc_output_buffer_internal(
-    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-) -> XmlOutputBufferPtr {
-    let ret: XmlOutputBufferPtr = xml_malloc(size_of::<XmlOutputBuffer>()) as XmlOutputBufferPtr;
-    if ret.is_null() {
-        xml_ioerr_memory(c"creating output buffer".as_ptr() as _);
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlOutputBuffer>());
-    let Some(mut buf) = XmlBufRef::new() else {
-        xml_free(ret as _);
-        return null_mut();
-    };
-    (*ret).buffer = Some(buf);
-
-    /*
-     * For conversion buffers we use the special IO handling
-     */
-    buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocIo);
-
-    (*ret).encoder = encoder;
-    if (*ret).encoder.is_some() {
-        (*ret).conv = XmlBufRef::with_capacity(4000);
-        if (*ret).conv.is_none() {
-            buf.free();
-            xml_free(ret as _);
-            return null_mut();
-        }
-
-        /*
-         * This call is designed to initiate the encoder state
-         */
-        (*ret).encode(true);
-    } else {
-        (*ret).conv = None;
-    }
-    (*ret).writecallback = None;
-    (*ret).closecallback = None;
-    (*ret).context = null_mut();
-    (*ret).written = 0;
-
-    ret
 }
 
 /// Close the transmit HTTP I/O channel and actually send data using a POST HTTP method.
@@ -1395,13 +1317,11 @@ pub unsafe extern "C" fn xml_io_http_open_w(
     post_uri: *const c_char,
     _compression: c_int,
 ) -> *mut c_void {
-    let mut ctxt: XmlIOHTTPWriteCtxtPtr;
-
     if post_uri.is_null() {
         return null_mut();
     }
 
-    ctxt = xml_malloc(size_of::<XmlIOHTTPWriteCtxt>()) as _;
+    let ctxt = xml_malloc(size_of::<XmlIOHTTPWriteCtxt>()) as XmlIOHTTPWriteCtxtPtr;
     if ctxt.is_null() {
         xml_ioerr_memory(c"creating HTTP output context".as_ptr() as _);
         return null_mut();
@@ -1416,28 +1336,13 @@ pub unsafe extern "C" fn xml_io_http_open_w(
         return null_mut();
     }
 
-    /*
-     * **  Since the document length is required for an HTTP post,
-     * **  need to put the document c_into a buffer.  A memory buffer
-     * **  is being used to avoid pushing the data to disk and back.
-     */
-    // #ifdef LIBXML_ZLIB_ENABLED
-    // if ((compression > 0) && (compression <= 9)) {
-    //     (*ctxt).compression = compression;
-    //     (*ctxt).doc_buff = xmlCreateZMemBuff(compression);
-    // } else
-    // #endif
-    {
-        /*  Any character conversions should have been done before this  */
+    // Any character conversions should have been done before this
 
-        (*ctxt).doc_buff = xml_alloc_output_buffer_internal(None) as _;
-    }
-
-    if (*ctxt).doc_buff.is_null() {
+    let Some(buf) = XmlOutputBuffer::new(None) else {
         xml_free_http_write_ctxt(ctxt);
-        ctxt = null_mut();
-    }
-
+        return null_mut();
+    };
+    (*ctxt).doc_buff = buf;
     ctxt as _
 }
 

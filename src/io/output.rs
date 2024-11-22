@@ -208,7 +208,7 @@ impl XmlOutputBuffer {
 
     /// Create a buffered parser output
     ///
-    /// Returns the new parser output or NULL
+    /// If successfully created, return it. Otherwise return `None`.
     #[doc(alias = "xmlAllocOutputBufferInternal")]
     pub fn new(encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>) -> Option<Self> {
         let mut ret = Self::default();
