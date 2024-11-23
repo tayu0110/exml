@@ -416,59 +416,48 @@ impl<'a> XmlOutputBuffer<'a> {
         &mut self,
         str: &str,
         escaping: Option<fn(&str, &mut String) -> i32>,
-    ) -> i32 {
-        let ret; /* return from function call */
+    ) -> io::Result<usize> {
         let mut written = 0; /* number of c_char written to I/O so far */
-        let mut oldwritten; /* loop guard */
 
         if !self.error.is_ok() {
-            return -1;
+            return Err(io::Error::other("Buffer already has an error."));
         }
         let Some(mut buffer) = self.buffer else {
-            return -1;
+            return Err(io::Error::other("Internal buffer is not allocated."));
         };
 
         let escaping = escaping.unwrap_or(xml_escape_content);
 
         loop {
-            /*
-             * make sure we have enough room to save first, if this is
-             * not the case force a flush, but make sure we stay in the loop
-             */
+            // make sure we have enough room to save first, if this is
+            // not the case force a flush, but make sure we stay in the loop
             if buffer.avail() < 40 {
                 if buffer.grow(100).is_err() {
-                    return -1;
+                    return Err(io::Error::other("Failed to grow buffer."));
                 }
-                oldwritten = -1;
-                if str.is_empty() || oldwritten == written {
+                if str.is_empty() {
                     break;
                 }
                 continue;
             }
 
-            /*
-             * first handle encoding stuff.
-             */
+            // first handle encoding stuff.
             let nbchars = if self.encoder.is_some() {
-                /*
-                 * Store the data in the incoming raw buffer
-                 */
+                // Store the data in the incoming raw buffer
                 let conv = *self.conv.get_or_insert_with(|| XmlBufRef::new().unwrap());
                 let mut buf = String::new();
-                ret = escaping(str, &mut buf);
+                let ret = escaping(str, &mut buf);
                 buffer.push_bytes(buf.as_bytes()).ok();
                 if ret < 0 || buf.is_empty() {
-                    /* chunk==0 => nothing done */
-                    return -1;
+                    // chunk==0 => nothing done
+                    return Err(io::Error::other("Failed to escape content."));
                 }
                 if buffer.len() < MINLEN {
                     // goto done;
-                    return written;
+                    return Ok(written);
                 }
 
-                /*
-                 * convert as much as possible to the output buffer.
-                 */
+                // convert as much as possible to the output buffer.
                 let ret = match self.encode(false) {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
@@ -477,33 +466,33 @@ impl<'a> XmlOutputBuffer<'a> {
                             xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
                         }
                         self.error = XmlParserErrors::XmlIOEncoder;
-                        return -1;
+                        return Err(io::Error::other("Failed to encode content."));
                     }
                 };
                 if self.context.is_some() {
-                    conv.len() as i32
+                    conv.len()
                 } else {
-                    ret.unwrap_or(0) as i32
+                    ret.unwrap_or(0)
                 }
             } else {
                 let mut buf = String::new();
-                ret = escaping(str, &mut buf);
+                let ret = escaping(str, &mut buf);
                 buffer.push_bytes(buf.as_bytes()).ok();
                 if ret < 0 || buf.is_empty() {
-                    /* chunk==0 => nothing done */
-                    return -1;
+                    // chunk==0 => nothing done
+                    return Err(io::Error::other("Failed to escape content."));
                 }
                 if self.context.is_some() {
-                    buffer.len() as i32
+                    buffer.len()
                 } else {
-                    buf.len() as i32
+                    buf.len()
                 }
             };
 
             if let Some(context) = self.context.as_mut() {
-                if nbchars < MINLEN as i32 {
+                if nbchars < MINLEN {
                     // goto done;
-                    return written;
+                    return Ok(written);
                 }
 
                 let buffer = if self.encoder.is_some() {
@@ -512,17 +501,19 @@ impl<'a> XmlOutputBuffer<'a> {
                     self.buffer
                 };
                 // second write the stuff to the I/O channel
-                match buffer.map(|buf| context.write(&buf.as_ref()[..nbchars as usize])) {
+                match buffer.map(|buf| context.write(&buf.as_ref()[..nbchars])) {
                     Some(Ok(ret)) => {
                         buffer.unwrap().trim_head(ret);
                         self.written = self.written.saturating_add(ret as i32);
                     }
-                    _ => {
+                    e => {
                         unsafe {
                             xml_ioerr(XmlParserErrors::XmlIOWrite, null());
                         }
                         self.error = XmlParserErrors::XmlIOWrite;
-                        return -1;
+
+                        return e
+                            .unwrap_or(Err(io::Error::other("Internal Buffer is not allocated.")));
                     }
                 }
             } else if buffer.avail() < MINLEN {
@@ -534,7 +525,7 @@ impl<'a> XmlOutputBuffer<'a> {
         }
 
         // done:
-        written
+        Ok(written)
     }
 
     /// flushes the output I/O channel
@@ -545,13 +536,9 @@ impl<'a> XmlOutputBuffer<'a> {
         if !self.error.is_ok() {
             return -1;
         }
-        /*
-         * first handle encoding stuff.
-         */
+        // first handle encoding stuff.
         if self.conv.is_some() && self.encoder.is_some() {
-            /*
-             * convert as much as possible to the parser output buffer.
-             */
+            // convert as much as possible to the parser output buffer.
             while {
                 let Ok(nbchars) = self.encode(false) else {
                     unsafe {
