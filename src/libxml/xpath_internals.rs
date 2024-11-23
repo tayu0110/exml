@@ -5,13 +5,12 @@
 
 use std::{
     ffi::{c_char, CStr},
+    io::Write,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, addr_of_mut, null, null_mut, NonNull},
 };
 
-#[cfg(feature = "libxml_debug")]
-use libc::{fprintf, FILE};
 use libc::{memcpy, memset, INT_MAX, INT_MIN};
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -1027,29 +1026,26 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
 }
 
 #[cfg(feature = "libxml_debug")]
-unsafe extern "C" fn xml_xpath_debug_dump_node(output: *mut FILE, cur: XmlNodePtr, depth: i32) {
+unsafe extern "C" fn xml_xpath_debug_dump_node<'a>(
+    output: &mut (impl Write + 'a),
+    cur: XmlNodePtr,
+    depth: i32,
+) {
     use crate::libxml::debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node};
 
-    let mut shift: [c_char; 100] = [0; 100];
-
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
     if cur.is_null() {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c"Node is NULL !\n".as_ptr());
+        write!(output, "{}", shift);
+        writeln!(output, "Node is NULL !");
         return;
     }
 
     if (*cur).typ == XmlElementType::XmlDocumentNode
         || (*cur).typ == XmlElementType::XmlHTMLDocumentNode
     {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c" /\n".as_ptr());
+        write!(output, "{}", shift);
+        writeln!(output, " /");
     } else if (*cur).typ == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr(output, cur as XmlAttrPtr, depth);
     } else {
@@ -1058,26 +1054,19 @@ unsafe extern "C" fn xml_xpath_debug_dump_node(output: *mut FILE, cur: XmlNodePt
 }
 
 #[cfg(feature = "libxml_debug")]
-unsafe extern "C" fn xml_xpath_debug_dump_node_list(
-    output: *mut FILE,
+unsafe extern "C" fn xml_xpath_debug_dump_node_list<'a>(
+    output: &mut (impl Write + 'a),
     mut cur: XmlNodePtr,
     depth: i32,
 ) {
     use super::debug_xml::xml_debug_dump_one_node;
 
     let mut tmp: XmlNodePtr;
-    let mut shift: [c_char; 100] = [0; 100];
-
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
     if cur.is_null() {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c"Node is NULL !\n".as_ptr());
+        write!(output, "{}", shift);
+        writeln!(output, "Node is NULL !");
         return;
     }
 
@@ -1089,63 +1078,45 @@ unsafe extern "C" fn xml_xpath_debug_dump_node_list(
 }
 
 #[cfg(feature = "libxml_debug")]
-unsafe extern "C" fn xml_xpath_debug_dump_node_set(
-    output: *mut FILE,
+unsafe extern "C" fn xml_xpath_debug_dump_node_set<'a>(
+    output: &mut (impl Write + 'a),
     cur: XmlNodeSetPtr,
     depth: i32,
 ) {
-    let mut shift: [c_char; 100] = [0; 100];
-
-    if output.is_null() {
-        return;
-    }
-
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
     if cur.is_null() {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c"NodeSet is NULL !\n".as_ptr());
+        write!(output, "{}", shift);
+        writeln!(output, "NodeSet is NULL !");
         return;
     }
 
     if !cur.is_null() {
-        fprintf(output, c"Set contains %d nodes:\n".as_ptr(), (*cur).node_nr);
+        writeln!(output, "Set contains {} nodes:", (*cur).node_nr);
         for i in 0..(*cur).node_nr {
-            fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-            fprintf(output, c"%d".as_ptr(), i + 1);
+            write!(output, "{}", shift);
+            write!(output, "{}", i + 1);
             xml_xpath_debug_dump_node(output, *(*cur).node_tab.add(i as usize), depth + 1);
         }
     }
 }
 
 #[cfg(feature = "libxml_debug")]
-unsafe extern "C" fn xml_xpath_debug_dump_value_tree(
-    output: *mut FILE,
+unsafe extern "C" fn xml_xpath_debug_dump_value_tree<'a>(
+    output: &mut (impl Write + 'a),
     cur: XmlNodeSetPtr,
     depth: i32,
 ) {
-    let mut shift: [c_char; 100] = [0; 100];
-
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
     if cur.is_null() || (*cur).node_nr == 0 || (*(*cur).node_tab.add(0)).is_null() {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c"Value Tree is NULL !\n".as_ptr());
+        write!(output, "{}", shift);
+        writeln!(output, "Value Tree is NULL !");
         return;
     }
 
-    fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-    fprintf(output, c"%d".as_ptr(), depth.clamp(0, 25) + 1);
+    write!(output, "{}", shift);
+    write!(output, "{}", depth.clamp(0, 25) + 1);
     xml_xpath_debug_dump_node_list(
         output,
         (*(*(*cur).node_tab.add(0)))
@@ -1186,306 +1157,282 @@ unsafe extern "C" fn xml_xpath_debug_dump_location_set(
 /// Dump the content of the object for debugging purposes
 #[doc(alias = "xmlXPathDebugDumpObject")]
 #[cfg(feature = "libxml_debug")]
-pub unsafe extern "C" fn xml_xpath_debug_dump_object(
-    output: *mut FILE,
+pub unsafe extern "C" fn xml_xpath_debug_dump_object<'a>(
+    output: &mut (impl Write + 'a),
     cur: XmlXPathObjectPtr,
     depth: i32,
 ) {
     use super::debug_xml::xml_debug_dump_string;
 
-    let mut shift: [c_char; 100] = [0; 100];
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    if output.is_null() {
-        return;
-    }
-
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
-
-    fprintf(output, c"%s".as_ptr(), shift.as_ptr());
+    write!(output, "{}", shift);
 
     if cur.is_null() {
-        fprintf(output, c"Object is empty (NULL)\n".as_ptr());
+        writeln!(output, "Object is empty (NULL)");
         return;
     }
     match (*cur).typ {
         XmlXPathObjectType::XpathUndefined => {
-            fprintf(output, c"Object is uninitialized\n".as_ptr());
+            writeln!(output, "Object is uninitialized");
         }
         XmlXPathObjectType::XpathNodeset => {
-            fprintf(output, c"Object is a Node Set :\n".as_ptr());
+            writeln!(output, "Object is a Node Set :");
             xml_xpath_debug_dump_node_set(output, (*cur).nodesetval, depth);
         }
         XmlXPathObjectType::XpathXsltTree => {
-            fprintf(output, c"Object is an XSLT value tree :\n".as_ptr());
+            writeln!(output, "Object is an XSLT value tree :");
             xml_xpath_debug_dump_value_tree(output, (*cur).nodesetval, depth);
         }
         XmlXPathObjectType::XpathBoolean => {
-            fprintf(output, c"Object is a Boolean : ".as_ptr());
+            write!(output, "Object is a Boolean : ");
             if (*cur).boolval != 0 {
-                fprintf(output, c"true\n".as_ptr());
+                writeln!(output, "true");
             } else {
-                fprintf(output, c"false\n".as_ptr());
+                writeln!(output, "false");
             }
         }
         XmlXPathObjectType::XpathNumber => {
             match xml_xpath_is_inf((*cur).floatval) {
                 1 => {
-                    fprintf(output, c"Object is a number : Infinity\n".as_ptr());
+                    writeln!(output, "Object is a number : Infinity");
                 }
                 -1 => {
-                    fprintf(output, c"Object is a number : -Infinity\n".as_ptr());
+                    writeln!(output, "Object is a number : -Infinity");
                 }
                 _ => {
                     if xml_xpath_is_nan((*cur).floatval) != 0 {
-                        fprintf(output, c"Object is a number : NaN\n".as_ptr());
+                        writeln!(output, "Object is a number : NaN");
                     } else if (*cur).floatval == 0.0 {
                         /* Omit sign for negative zero. */
-                        fprintf(output, c"Object is a number : 0\n".as_ptr());
+                        writeln!(output, "Object is a number : 0");
                     } else {
-                        fprintf(
-                            output,
-                            c"Object is a number : %0g\n".as_ptr(),
-                            (*cur).floatval,
-                        );
+                        writeln!(output, "Object is a number : {}", (*cur).floatval);
                     }
                 }
             }
         }
         XmlXPathObjectType::XpathString => {
-            fprintf(output, c"Object is a string : ".as_ptr());
-            xml_debug_dump_string(output, (*cur).stringval);
-            fprintf(output, c"\n".as_ptr());
+            write!(output, "Object is a string : ");
+            xml_debug_dump_string(Some(output), (*cur).stringval);
+            writeln!(output);
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XpathPoint => {
-            fprintf(
-                output,
-                c"Object is a point : index %d in node".as_ptr(),
-                (*cur).index,
-            );
+            write!(output, "Object is a point : index {} in node", (*cur).index,);
             xml_xpath_debug_dump_node(output, (*cur).user as XmlNodePtr, depth + 1);
-            fprintf(output, c"\n".as_ptr());
+            write!(output, "\n");
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XpathRange => {
             if (*cur).user2.is_null()
                 || ((*cur).user2 == (*cur).user && (*cur).index == (*cur).index2)
             {
-                fprintf(output, c"Object is a collapsed range :\n".as_ptr());
-                fprintf(output, c"%s".as_ptr(), shift.as_ptr());
+                write!(output, "Object is a collapsed range :\n");
+                write!(output, "{}", shift);
                 if (*cur).index >= 0 {
-                    fprintf(output, c"index %d in ".as_ptr(), (*cur).index);
+                    write!(output, "index {} in ", (*cur).index);
                 }
-                fprintf(output, c"node\n".as_ptr());
+                write!(output, "node\n");
                 xml_xpath_debug_dump_node(output, (*cur).user as XmlNodePtr, depth + 1);
             } else {
-                fprintf(output, c"Object is a range :\n".as_ptr());
-                fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-                fprintf(output, c"From ".as_ptr());
+                write!(output, "Object is a range :\n");
+                write!(output, "{}", shift);
+                write!(output, "From ");
                 if (*cur).index >= 0 {
-                    fprintf(output, c"index %d in ".as_ptr(), (*cur).index);
+                    write!(output, "index {} in ", (*cur).index);
                 }
-                fprintf(output, c"node\n".as_ptr());
+                write!(output, "node\n");
                 xml_xpath_debug_dump_node(output, (*cur).user as XmlNodePtr, depth + 1);
-                fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-                fprintf(output, c"To ".as_ptr());
+                write!(output, "{}", shift);
+                write!(output, "To ");
                 if (*cur).index2 >= 0 {
-                    fprintf(output, c"index %d in ".as_ptr(), (*cur).index2);
+                    write!(output, "index {} in ", (*cur).index2);
                 }
-                fprintf(output, c"node\n".as_ptr());
+                write!(output, "node\n");
                 xml_xpath_debug_dump_node(output, (*cur).user2 as XmlNodePtr, depth + 1);
-                fprintf(output, c"\n".as_ptr());
+                write!(output, "\n");
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XpathLocationset => {
-            fprintf(output, c"Object is a Location Set:\n".as_ptr());
+            write!(output, "Object is a Location Set:\n");
             xml_xpath_debug_dump_location_set(output, (*cur).user as XmlLocationSetPtr, depth);
         }
         XmlXPathObjectType::XpathUsers => {
-            fprintf(output, c"Object is user defined\n".as_ptr());
+            writeln!(output, "Object is user defined");
         }
     }
 }
 
-unsafe extern "C" fn xml_xpath_debug_dump_step_op(
-    output: *mut FILE,
+unsafe extern "C" fn xml_xpath_debug_dump_step_op<'a>(
+    output: &mut (impl Write + 'a),
     comp: XmlXPathCompExprPtr,
     op: XmlXPathStepOpPtr,
     depth: i32,
 ) {
-    let mut shift: [c_char; 100] = [0; 100];
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
-
-    fprintf(output, c"%s".as_ptr(), shift.as_ptr());
+    write!(output, "{}", shift);
     if op.is_null() {
-        fprintf(output, c"Step is NULL\n".as_ptr());
+        writeln!(output, "Step is NULL");
         return;
     }
     match (*op).op {
         XmlXPathOp::XpathOpEnd => {
-            fprintf(output, c"END".as_ptr());
+            write!(output, "END");
         }
         XmlXPathOp::XpathOpAnd => {
-            fprintf(output, c"AND".as_ptr());
+            write!(output, "AND");
         }
         XmlXPathOp::XpathOpOr => {
-            fprintf(output, c"OR".as_ptr());
+            write!(output, "OR");
         }
         XmlXPathOp::XpathOpEqual => {
             if (*op).value != 0 {
-                fprintf(output, c"EQUAL =".as_ptr());
+                write!(output, "EQUAL =");
             } else {
-                fprintf(output, c"EQUAL !=".as_ptr());
+                write!(output, "EQUAL !=");
             }
         }
         XmlXPathOp::XpathOpCmp => {
             if (*op).value != 0 {
-                fprintf(output, c"CMP <".as_ptr());
+                write!(output, "CMP <");
             } else {
-                fprintf(output, c"CMP >".as_ptr());
+                write!(output, "CMP >");
             }
             if (*op).value2 == 0 {
-                fprintf(output, c"=".as_ptr());
+                write!(output, "=");
             }
         }
         XmlXPathOp::XpathOpPlus => {
             if (*op).value == 0 {
-                fprintf(output, c"PLUS -".as_ptr());
+                write!(output, "PLUS -");
             } else if (*op).value == 1 {
-                fprintf(output, c"PLUS +".as_ptr());
+                write!(output, "PLUS +");
             } else if (*op).value == 2 {
-                fprintf(output, c"PLUS unary -".as_ptr());
+                write!(output, "PLUS unary -");
             } else if (*op).value == 3 {
-                fprintf(output, c"PLUS unary - -".as_ptr());
+                write!(output, "PLUS unary - -");
             }
         }
         XmlXPathOp::XpathOpMult => {
             if (*op).value == 0 {
-                fprintf(output, c"MULT *".as_ptr());
+                write!(output, "MULT *");
             } else if (*op).value == 1 {
-                fprintf(output, c"MULT div".as_ptr());
+                write!(output, "MULT div");
             } else {
-                fprintf(output, c"MULT mod".as_ptr());
+                write!(output, "MULT mod");
             }
         }
         XmlXPathOp::XpathOpUnion => {
-            fprintf(output, c"UNION".as_ptr());
+            write!(output, "UNION");
         }
         XmlXPathOp::XpathOpRoot => {
-            fprintf(output, c"ROOT".as_ptr());
+            write!(output, "ROOT");
         }
         XmlXPathOp::XpathOpNode => {
-            fprintf(output, c"NODE".as_ptr());
+            write!(output, "NODE");
         }
         XmlXPathOp::XpathOpSort => {
-            fprintf(output, c"SORT".as_ptr());
+            write!(output, "SORT");
         }
         XmlXPathOp::XpathOpCollect => {
             let prefix: *const XmlChar = (*op).value4 as _;
             let name: *const XmlChar = (*op).value5 as _;
 
-            fprintf(output, c"COLLECT ".as_ptr());
+            write!(output, "COLLECT ");
             match XmlXPathAxisVal::try_from((*op).value) {
                 Ok(XmlXPathAxisVal::AxisAncestor) => {
-                    fprintf(output, c" 'ancestors' ".as_ptr());
+                    write!(output, " 'ancestors' ");
                 }
                 Ok(XmlXPathAxisVal::AxisAncestorOrSelf) => {
-                    fprintf(output, c" 'ancestors-or-self' ".as_ptr());
+                    write!(output, " 'ancestors-or-self' ");
                 }
                 Ok(XmlXPathAxisVal::AxisAttribute) => {
-                    fprintf(output, c" 'attributes' ".as_ptr());
+                    write!(output, " 'attributes' ");
                 }
                 Ok(XmlXPathAxisVal::AxisChild) => {
-                    fprintf(output, c" 'child' ".as_ptr());
+                    write!(output, " 'child' ");
                 }
                 Ok(XmlXPathAxisVal::AxisDescendant) => {
-                    fprintf(output, c" 'descendant' ".as_ptr());
+                    write!(output, " 'descendant' ");
                 }
                 Ok(XmlXPathAxisVal::AxisDescendantOrSelf) => {
-                    fprintf(output, c" 'descendant-or-self' ".as_ptr());
+                    write!(output, " 'descendant-or-self' ");
                 }
                 Ok(XmlXPathAxisVal::AxisFollowing) => {
-                    fprintf(output, c" 'following' ".as_ptr());
+                    write!(output, " 'following' ");
                 }
                 Ok(XmlXPathAxisVal::AxisFollowingSibling) => {
-                    fprintf(output, c" 'following-siblings' ".as_ptr());
+                    write!(output, " 'following-siblings' ");
                 }
                 Ok(XmlXPathAxisVal::AxisNamespace) => {
-                    fprintf(output, c" 'namespace' ".as_ptr());
+                    write!(output, " 'namespace' ");
                 }
                 Ok(XmlXPathAxisVal::AxisParent) => {
-                    fprintf(output, c" 'parent' ".as_ptr());
+                    write!(output, " 'parent' ");
                 }
                 Ok(XmlXPathAxisVal::AxisPreceding) => {
-                    fprintf(output, c" 'preceding' ".as_ptr());
+                    write!(output, " 'preceding' ");
                 }
                 Ok(XmlXPathAxisVal::AxisPrecedingSibling) => {
-                    fprintf(output, c" 'preceding-sibling' ".as_ptr());
+                    write!(output, " 'preceding-sibling' ");
                 }
                 Ok(XmlXPathAxisVal::AxisSelf) => {
-                    fprintf(output, c" 'self' ".as_ptr());
+                    write!(output, " 'self' ");
                 }
                 _ => unreachable!(),
             }
             match XmlXPathTestVal::try_from((*op).value2) {
                 Ok(XmlXPathTestVal::NodeTestNone) => {
-                    fprintf(output, c"'none' ".as_ptr());
+                    write!(output, "'none' ");
                 }
                 Ok(XmlXPathTestVal::NodeTestType) => {
-                    fprintf(output, c"'type' ".as_ptr());
+                    write!(output, "'type' ");
                 }
                 Ok(XmlXPathTestVal::NodeTestPI) => {
-                    fprintf(output, c"'PI' ".as_ptr());
+                    write!(output, "'PI' ");
                 }
                 Ok(XmlXPathTestVal::NodeTestAll) => {
-                    fprintf(output, c"'all' ".as_ptr());
+                    write!(output, "'all' ");
                 }
                 Ok(XmlXPathTestVal::NodeTestNs) => {
-                    fprintf(output, c"'namespace' ".as_ptr());
+                    write!(output, "'namespace' ");
                 }
                 Ok(XmlXPathTestVal::NodeTestName) => {
-                    fprintf(output, c"'name' ".as_ptr());
+                    write!(output, "'name' ");
                 }
                 _ => unreachable!(),
             }
             match XmlXPathTypeVal::try_from((*op).value3) {
                 Ok(XmlXPathTypeVal::NodeTypeNode) => {
-                    fprintf(output, c"'node' ".as_ptr());
+                    write!(output, "'node' ");
                 }
                 Ok(XmlXPathTypeVal::NodeTypeComment) => {
-                    fprintf(output, c"'comment' ".as_ptr());
+                    write!(output, "'comment' ");
                 }
                 Ok(XmlXPathTypeVal::NodeTypeText) => {
-                    fprintf(output, c"'text' ".as_ptr());
+                    write!(output, "'text' ");
                 }
                 Ok(XmlXPathTypeVal::NodeTypePI) => {
-                    fprintf(output, c"'PI' ".as_ptr());
+                    write!(output, "'PI' ");
                 }
                 _ => unreachable!(),
             }
             if !prefix.is_null() {
-                fprintf(output, c"%s:".as_ptr(), prefix);
+                let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                write!(output, "{}:", prefix);
             }
             if !name.is_null() {
-                fprintf(output, c"%s".as_ptr(), name as *const c_char);
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                write!(output, "{}", name);
             }
         }
         XmlXPathOp::XpathOpValue => {
             let object: XmlXPathObjectPtr = (*op).value4 as XmlXPathObjectPtr;
 
-            fprintf(output, c"ELEM ".as_ptr());
+            write!(output, "ELEM ");
             xml_xpath_debug_dump_object(output, object, 0);
             // goto finish;
             if (*op).ch1 >= 0 {
@@ -1509,48 +1456,46 @@ unsafe extern "C" fn xml_xpath_debug_dump_step_op(
         XmlXPathOp::XpathOpVariable => {
             let prefix: *const XmlChar = (*op).value5 as _;
             let name: *const XmlChar = (*op).value4 as _;
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
 
             if !prefix.is_null() {
-                fprintf(output, c"VARIABLE %s:%s".as_ptr(), prefix, name);
+                let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                write!(output, "VARIABLE {prefix}:{name}");
             } else {
-                fprintf(output, c"VARIABLE %s".as_ptr(), name);
+                write!(output, "VARIABLE {name}");
             }
         }
         XmlXPathOp::XpathOpFunction => {
             let nbargs: i32 = (*op).value;
             let prefix: *const XmlChar = (*op).value5 as _;
             let name: *const XmlChar = (*op).value4 as _;
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
 
             if !prefix.is_null() {
-                fprintf(
-                    output,
-                    c"FUNCTION %s:%s(%d args)".as_ptr(),
-                    prefix,
-                    name,
-                    nbargs,
-                );
+                let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                write!(output, "FUNCTION {prefix}:{name}({nbargs} args)");
             } else {
-                fprintf(output, c"FUNCTION %s(%d args)".as_ptr(), name, nbargs);
+                write!(output, "FUNCTION {name}({nbargs} args)");
             }
         }
         XmlXPathOp::XpathOpArg => {
-            fprintf(output, c"ARG".as_ptr());
+            write!(output, "ARG");
         }
         XmlXPathOp::XpathOpPredicate => {
-            fprintf(output, c"PREDICATE".as_ptr());
+            write!(output, "PREDICATE");
         }
         XmlXPathOp::XpathOpFilter => {
-            fprintf(output, c"FILTER".as_ptr());
+            write!(output, "FILTER");
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathOp::XpathOpRangeto => {
-            fprintf(output, c"RANGETO".as_ptr());
+            write!(output, "RANGETO");
         } // _ => {
-          //     fprintf(output, c"UNKNOWN %d\n".as_ptr(), (*op).op);
+          //     write!(output, "UNKNOWN %d\n", (*op).op);
           //     return;
           // }
     }
-    fprintf(output, c"\n".as_ptr());
+    writeln!(output);
     // finish:
     if (*op).ch1 >= 0 {
         xml_xpath_debug_dump_step_op(
@@ -1573,34 +1518,23 @@ unsafe extern "C" fn xml_xpath_debug_dump_step_op(
 /// Dumps the tree of the compiled XPath expression.
 #[doc(alias = "xmlXPathDebugDumpCompExpr")]
 #[cfg(feature = "libxml_debug")]
-pub unsafe extern "C" fn xml_xpath_debug_dump_comp_expr(
-    output: *mut FILE,
+pub unsafe extern "C" fn xml_xpath_debug_dump_comp_expr<'a>(
+    output: &mut (impl Write + 'a),
     comp: XmlXPathCompExprPtr,
     depth: i32,
 ) {
-    let mut shift: [c_char; 100] = [0; 100];
-
-    if output.is_null() || comp.is_null() {
+    if comp.is_null() {
         return;
     }
 
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    fprintf(output, c"%s".as_ptr(), shift.as_ptr());
+    write!(output, "{}", shift);
 
     if !(*comp).stream.is_null() {
-        fprintf(output, c"Streaming Expression\n".as_ptr());
+        writeln!(output, "Streaming Expression");
     } else {
-        fprintf(
-            output,
-            c"Compiled Expression : %d elements\n".as_ptr(),
-            (*comp).nb_step,
-        );
+        writeln!(output, "Compiled Expression : {} elements", (*comp).nb_step,);
         xml_xpath_debug_dump_step_op(
             output,
             comp,
@@ -13086,12 +13020,11 @@ mod tests {
                 for n_comp in 0..GEN_NB_XML_XPATH_COMP_EXPR_PTR {
                     for n_depth in 0..GEN_NB_INT {
                         let mem_base = xml_mem_blocks();
-                        let output = gen_file_ptr(n_output, 0);
+                        let mut output = gen_file_ptr(n_output, 0).unwrap();
                         let comp = gen_xml_xpath_comp_expr_ptr(n_comp, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xml_xpath_debug_dump_comp_expr(output, comp, depth);
-                        des_file_ptr(n_output, output, 0);
+                        xml_xpath_debug_dump_comp_expr(&mut output, comp, depth);
                         des_xml_xpath_comp_expr_ptr(n_comp, comp, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();
@@ -13125,12 +13058,11 @@ mod tests {
                 for n_cur in 0..GEN_NB_XML_XPATH_OBJECT_PTR {
                     for n_depth in 0..GEN_NB_INT {
                         let mem_base = xml_mem_blocks();
-                        let output = gen_file_ptr(n_output, 0);
+                        let mut output = gen_file_ptr(n_output, 0).unwrap();
                         let cur = gen_xml_xpath_object_ptr(n_cur, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xml_xpath_debug_dump_object(output, cur, depth);
-                        des_file_ptr(n_output, output, 0);
+                        xml_xpath_debug_dump_object(&mut output, cur, depth);
                         des_xml_xpath_object_ptr(n_cur, cur, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();

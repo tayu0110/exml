@@ -5,6 +5,7 @@
 
 use std::cell::Cell;
 use std::ffi::{c_char, c_void};
+use std::io::Write;
 use std::mem::{size_of, zeroed};
 use std::ptr::{addr_of_mut, null_mut};
 
@@ -341,18 +342,13 @@ pub unsafe extern "C" fn xml_mem_display_last(mut fp: *mut FILE, nb_bytes: i64) 
 /// Show a show display of the memory allocated, and dump
 /// the @nr last allocated areas which were not freed
 #[doc(alias = "xmlMemShow")]
-pub unsafe extern "C" fn xml_mem_show(fp: *mut FILE, _nr: i32) {
-    // #[cfg(feature = "debug_memory_location")]
-    // let p: *mut Memhdr;
-
-    if !fp.is_null() {
-        fprintf(
-            fp,
-            c"      MEMORY ALLOCATED : %lu, MAX was %lu\n".as_ptr() as _,
-            DEBUG_MEM_SIZE,
-            DEBUG_MAX_MEM_SIZE,
-        );
-    }
+pub unsafe extern "C" fn xml_mem_show<'a>(fp: &mut (impl Write + 'a), _nr: i32) {
+    writeln!(
+        fp,
+        "      MEMORY ALLOCATED : {}, MAX was {}",
+        DEBUG_MEM_SIZE.get(),
+        DEBUG_MAX_MEM_SIZE.get(),
+    );
 }
 
 /// Dump in-extenso the memory blocks allocated to the file .memorylist

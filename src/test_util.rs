@@ -1,16 +1,17 @@
 use std::{
     cell::{Cell, RefCell},
     ffi::{c_char, CStr},
+    fs::File,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::Mutex,
 };
 
-use libc::{fclose, fopen, snprintf, FILE};
+use libc::snprintf;
 
 use crate::{
     buf::XmlBuf,
-    io::{XmlOutputBuffer, XmlOutputBufferPtr},
+    io::XmlOutputBuffer,
     libxml::{
         catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
         debug_xml::XmlShellCtxtPtr,
@@ -94,7 +95,7 @@ pub(crate) const GEN_NB_XML_OUTPUT_BUFFER_PTR: i32 = 2;
 #[cfg(feature = "html")]
 pub(crate) const GEN_NB_CONST_HTML_NODE_PTR: i32 = 1;
 pub(crate) const GEN_NB_CONST_XML_CHAR_PTR_PTR: i32 = 1;
-pub(crate) const GEN_NB_FILE_PTR: i32 = 2;
+pub(crate) const GEN_NB_FILE_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_CHAR_PTR_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_BUFFER_PTR: i32 = 3;
 pub(crate) const GEN_NB_XML_NODE_PTR: i32 = 3;
@@ -230,7 +231,7 @@ pub(crate) const GEN_NB_DEBUG_FILE_PTR: i32 = 2;
 pub(crate) const GEN_NB_XML_SHELL_CTXT_PTR: i32 = 1;
 
 #[cfg(feature = "xpath")]
-pub(crate) fn gen_xml_shell_ctxt_ptr(_no: i32, _nr: i32) -> XmlShellCtxtPtr {
+pub(crate) fn gen_xml_shell_ctxt_ptr(_no: i32, _nr: i32) -> XmlShellCtxtPtr<'static> {
     null_mut()
 }
 
@@ -238,16 +239,17 @@ pub(crate) fn gen_xml_shell_ctxt_ptr(_no: i32, _nr: i32) -> XmlShellCtxtPtr {
 pub(crate) fn des_xml_shell_ctxt_ptr(_no: i32, _val: XmlShellCtxtPtr, _nr: i32) {}
 
 #[cfg(feature = "libxml_debug")]
-pub(crate) unsafe extern "C" fn gen_debug_file_ptr(_no: i32, _nr: i32) -> *mut FILE {
-    fopen(c"test.out".as_ptr() as _, c"a+".as_ptr() as _)
+pub(crate) fn gen_debug_file_ptr(_no: i32, _nr: i32) -> Option<File> {
+    return File::options()
+        .append(true)
+        .read(true)
+        .create(true)
+        .open("test.out")
+        .ok();
 }
 
 #[cfg(feature = "libxml_debug")]
-pub(crate) unsafe extern "C" fn des_debug_file_ptr(_no: i32, val: *mut FILE, _nr: i32) {
-    if !val.is_null() {
-        fclose(val);
-    }
-}
+pub(crate) unsafe fn des_debug_file_ptr(_no: i32, _val: File, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) fn gen_xml_xpath_parser_context_ptr(_no: i32, _nr: i32) -> XmlXPathParserContextPtr {
@@ -345,7 +347,10 @@ pub(crate) fn gen_xml_xpath_context_ptr(_no: i32, _nr: i32) -> XmlXPathContextPt
 pub(crate) fn des_xml_xpath_context_ptr(_no: i32, _val: XmlXPathContextPtr, _nr: i32) {}
 
 #[cfg(feature = "writer")]
-pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(no: i32, _nr: i32) -> XmlTextWriterPtr {
+pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(
+    no: i32,
+    _nr: i32,
+) -> XmlTextWriterPtr<'static> {
     use crate::libxml::xmlwriter::xml_new_text_writer_filename;
 
     if no == 0 {
@@ -496,7 +501,7 @@ pub(crate) fn gen_xml_schema_saxplug_ptr(_no: i32, _nr: i32) -> XmlSchemaSAXPlug
 pub(crate) fn des_xml_schema_saxplug_ptr(_no: i32, _val: XmlSchemaSAXPlugPtr, _nr: i32) {}
 
 #[cfg(feature = "output")]
-pub(crate) fn gen_xml_save_ctxt_ptr(_no: i32, _nr: i32) -> XmlSaveCtxtPtr {
+pub(crate) fn gen_xml_save_ctxt_ptr(_no: i32, _nr: i32) -> XmlSaveCtxtPtr<'static> {
     null_mut()
 }
 
@@ -1547,7 +1552,10 @@ pub(crate) fn gen_void_ptr(_no: i32, _nr: i32) -> *mut c_void {
 pub(crate) fn des_void_ptr(_no: i32, _val: *mut c_void, _nr: i32) {}
 
 #[cfg(feature = "output")]
-pub(crate) unsafe fn gen_xml_output_buffer_ptr(no: i32, _nr: i32) -> Option<XmlOutputBuffer> {
+pub(crate) unsafe fn gen_xml_output_buffer_ptr(
+    no: i32,
+    _nr: i32,
+) -> Option<XmlOutputBuffer<'static>> {
     if no == 0 {
         return XmlOutputBuffer::from_uri("test.out", None, 0);
     }
@@ -1555,17 +1563,7 @@ pub(crate) unsafe fn gen_xml_output_buffer_ptr(no: i32, _nr: i32) -> Option<XmlO
 }
 
 #[cfg(feature = "output")]
-pub(crate) unsafe extern "C" fn des_xml_output_buffer_ptr(
-    _no: i32,
-    val: XmlOutputBufferPtr,
-    _nr: i32,
-) {
-    use crate::io::xml_output_buffer_close;
-
-    if !val.is_null() {
-        xml_output_buffer_close(val);
-    }
-}
+pub(crate) fn des_xml_output_buffer_ptr(_no: i32, _val: XmlOutputBuffer, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr {
     if no == 0 {
@@ -1680,17 +1678,15 @@ pub(crate) fn des_unsigned_int(_no: i32, _val: u32, _nr: i32) {}
 
 pub(crate) fn des_const_xml_char_ptr_ptr(_no: i32, _val: *mut *const XmlChar, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn gen_file_ptr(no: i32, _nr: i32) -> *mut FILE {
-    if no == 0 {
-        return fopen(c"test.out".as_ptr() as _, c"a+".as_ptr() as _);
-    }
-    null_mut()
+pub(crate) fn gen_file_ptr(_no: i32, _nr: i32) -> Option<File> {
+    return File::options()
+        .append(true)
+        .read(true)
+        .create(true)
+        .open("test.out")
+        .ok();
 }
-pub(crate) unsafe extern "C" fn des_file_ptr(_no: i32, val: *mut FILE, _nr: i32) {
-    if !val.is_null() {
-        fclose(val);
-    }
-}
+pub(crate) fn des_file_ptr(_no: i32, _val: File, _nr: i32) {}
 
 pub(crate) fn gen_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlChar {
     null_mut()

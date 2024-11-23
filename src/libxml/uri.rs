@@ -5,13 +5,14 @@
 
 use std::{
     borrow::Cow,
-    ffi::c_char,
+    ffi::{c_char, CStr},
+    io::Write,
     mem::{size_of, size_of_val, zeroed},
     ptr::{addr_of_mut, null, null_mut},
     string::FromUtf8Error,
 };
 
-use libc::{fprintf, memcpy, memset, snprintf, strlen, FILE, INT_MAX};
+use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
 
 use crate::{__xml_raise_error, libxml::xmlstring::xml_strcat};
 
@@ -2148,10 +2149,11 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
 
 /// Prints the URI in the stream @stream.
 #[doc(alias = "xmlPrintURI")]
-pub unsafe extern "C" fn xml_print_uri(stream: *mut FILE, uri: XmlURIPtr) {
+pub unsafe extern "C" fn xml_print_uri<'a>(stream: &mut (impl Write + 'a), uri: XmlURIPtr) {
     let out: *mut XmlChar = xml_save_uri(uri);
     if !out.is_null() {
-        fprintf(stream, c"%s".as_ptr() as _, out as *mut c_char);
+        let o = CStr::from_ptr(out as *const i8).to_string_lossy();
+        write!(stream, "{o}");
         xml_free(out as _);
     }
 }
@@ -3194,11 +3196,10 @@ mod tests {
             for n_stream in 0..GEN_NB_FILE_PTR {
                 for n_uri in 0..GEN_NB_XML_URIPTR {
                     let mem_base = xml_mem_blocks();
-                    let stream = gen_file_ptr(n_stream, 0);
+                    let mut stream = gen_file_ptr(n_stream, 0).unwrap();
                     let uri = gen_xml_uriptr(n_uri, 1);
 
-                    xml_print_uri(stream, uri);
-                    des_file_ptr(n_stream, stream, 0);
+                    xml_print_uri(&mut stream, uri);
                     des_xml_uriptr(n_uri, uri, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {

@@ -6,6 +6,7 @@
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
+    io::Write,
     mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -21,10 +22,7 @@ use crate::{
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
-    io::{
-        xml_output_buffer_create_io, XmlOutputBuffer, XmlOutputCloseCallback,
-        XmlOutputWriteCallback,
-    },
+    io::XmlOutputBuffer,
     libxml::{
         entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{xml_free, xml_malloc},
@@ -64,16 +62,16 @@ pub enum XmlSaveOption {
     XmlSaveWsnonsig = 1 << 7, /* format with non-significant whitespace */
 }
 
-pub type XmlSaveCtxtPtr = *mut XmlSaveCtxt;
+pub type XmlSaveCtxtPtr<'a> = *mut XmlSaveCtxt<'a>;
 #[repr(C)]
-pub struct XmlSaveCtxt {
+pub struct XmlSaveCtxt<'a> {
     pub(crate) _private: *mut c_void,
     pub(crate) typ: i32,
     pub(crate) fd: i32,
     pub(crate) filename: *const XmlChar,
     pub(crate) encoding: Option<String>,
     pub(crate) handler: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    pub(crate) buf: Rc<RefCell<XmlOutputBuffer>>,
+    pub(crate) buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
     pub(crate) options: i32,
     pub(crate) level: i32,
     pub(crate) format: i32,
@@ -84,7 +82,7 @@ pub struct XmlSaveCtxt {
     pub(crate) escape_attr: Option<fn(&str, &mut String) -> i32>, /* used for attribute content */
 }
 
-impl Default for XmlSaveCtxt {
+impl Default for XmlSaveCtxt<'_> {
     fn default() -> Self {
         Self {
             _private: null_mut(),
@@ -1726,11 +1724,11 @@ unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSave
 ///
 /// Returns a new serialization context or NULL in case of error.
 #[doc(alias = "xmlSaveToFilename")]
-pub unsafe fn xml_save_to_filename(
-    filename: &str,
-    encoding: Option<&str>,
+pub unsafe fn xml_save_to_filename<'a, 'b: 'a>(
+    filename: &'b str,
+    encoding: Option<&'b str>,
     options: i32,
-) -> XmlSaveCtxtPtr {
+) -> XmlSaveCtxtPtr<'a> {
     let compression: i32 = 0; /* TODO handle compression option */
 
     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
@@ -1750,18 +1748,17 @@ pub unsafe fn xml_save_to_filename(
 ///
 /// Returns a new serialization context or NULL in case of error.
 #[doc(alias = "xmlSaveToIO")]
-pub unsafe fn xml_save_to_io(
-    iowrite: Option<XmlOutputWriteCallback>,
-    ioclose: Option<XmlOutputCloseCallback>,
-    ioctx: *mut c_void,
-    encoding: Option<&str>,
+pub unsafe fn xml_save_to_io<'a>(
+    ioctx: impl Write + 'a,
+    encoding: Option<&'a str>,
     options: i32,
 ) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
     if ret.is_null() {
         return null_mut();
     }
-    let Some(buf) = xml_output_buffer_create_io(iowrite, ioclose, ioctx, (*ret).handler.clone())
+    let Some(buf) =
+        XmlOutputBuffer::from_writer_with_wrapped_encoder(ioctx, (*ret).handler.clone())
     else {
         xml_free_save_ctxt(ret);
         return null_mut();

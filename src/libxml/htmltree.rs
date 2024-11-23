@@ -5,12 +5,13 @@
 
 use std::{
     ffi::{c_char, CStr, CString},
+    io::Write,
     mem::size_of,
     ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
 
-use libc::{memset, FILE};
+use libc::memset;
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -579,7 +580,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlDocDump")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
+pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
         libxml::parser::xml_init_parser,
@@ -587,7 +588,7 @@ pub unsafe extern "C" fn html_doc_dump(f: *mut FILE, cur: XmlDocPtr) -> i32 {
 
     xml_init_parser();
 
-    if cur.is_null() || f.is_null() {
+    if cur.is_null() {
         return -1;
     }
 
@@ -724,9 +725,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
     let mut outbuf = XmlOutputBuffer::default();
     outbuf.buffer = XmlBufRef::from_raw(buf);
     outbuf.encoder = None;
-    outbuf.writecallback = None;
-    outbuf.closecallback = None;
-    outbuf.context = null_mut();
+    outbuf.context = None;
     outbuf.written = 0;
 
     let using: usize = xml_buf_use(buf);
@@ -766,7 +765,11 @@ pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: Xml
 /// Dump an HTML node, recursive behaviour,children are printed too, and formatting returns are added.
 #[doc(alias = "htmlNodeDumpFile")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_node_dump_file(out: *mut FILE, doc: XmlDocPtr, cur: XmlNodePtr) {
+pub unsafe extern "C" fn html_node_dump_file<'a>(
+    out: &mut (impl Write + 'a),
+    doc: XmlDocPtr,
+    cur: XmlNodePtr,
+) {
     html_node_dump_file_format(out, doc, cur, null_mut(), 1);
 }
 
@@ -777,8 +780,8 @@ pub unsafe extern "C" fn html_node_dump_file(out: *mut FILE, doc: XmlDocPtr, cur
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlNodeDumpFileFormat")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn html_node_dump_file_format(
-    out: *mut FILE,
+pub unsafe extern "C" fn html_node_dump_file_format<'a>(
+    out: &mut (impl Write + 'a),
     doc: XmlDocPtr,
     cur: XmlNodePtr,
     encoding: *const c_char,
@@ -1440,12 +1443,11 @@ mod tests {
             for n_f in 0..GEN_NB_FILE_PTR {
                 for n_cur in 0..GEN_NB_XML_DOC_PTR {
                     let mem_base = xml_mem_blocks();
-                    let f = gen_file_ptr(n_f, 0);
+                    let mut f = gen_file_ptr(n_f, 0).unwrap();
                     let cur = gen_xml_doc_ptr(n_cur, 1);
 
-                    let ret_val = html_doc_dump(f, cur);
+                    let ret_val = html_doc_dump(&mut f, cur);
                     desret_int(ret_val);
-                    des_file_ptr(n_f, f, 0);
                     des_xml_doc_ptr(n_cur, cur, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -1681,12 +1683,11 @@ mod tests {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     for n_cur in 0..GEN_NB_XML_NODE_PTR {
                         let mem_base = xml_mem_blocks();
-                        let out = gen_file_ptr(n_out, 0);
+                        let mut out = gen_file_ptr(n_out, 0).unwrap();
                         let doc = gen_xml_doc_ptr(n_doc, 1);
                         let cur = gen_xml_node_ptr(n_cur, 2);
 
-                        html_node_dump_file(out, doc, cur);
-                        des_file_ptr(n_out, out, 0);
+                        html_node_dump_file(&mut out, doc, cur);
                         des_xml_doc_ptr(n_doc, doc, 1);
                         des_xml_node_ptr(n_cur, cur, 2);
                         reset_last_error();
@@ -1719,16 +1720,16 @@ mod tests {
                         for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
                             for n_format in 0..GEN_NB_INT {
                                 let mem_base = xml_mem_blocks();
-                                let out = gen_file_ptr(n_out, 0);
+                                let mut out = gen_file_ptr(n_out, 0).unwrap();
                                 let doc = gen_xml_doc_ptr(n_doc, 1);
                                 let cur = gen_xml_node_ptr(n_cur, 2);
                                 let encoding = gen_const_char_ptr(n_encoding, 3);
                                 let format = gen_int(n_format, 4);
 
-                                let ret_val =
-                                    html_node_dump_file_format(out, doc, cur, encoding, format);
+                                let ret_val = html_node_dump_file_format(
+                                    &mut out, doc, cur, encoding, format,
+                                );
                                 desret_int(ret_val);
-                                des_file_ptr(n_out, out, 0);
                                 des_xml_doc_ptr(n_doc, doc, 1);
                                 des_xml_node_ptr(n_cur, cur, 2);
                                 des_const_char_ptr(n_encoding, encoding, 3);

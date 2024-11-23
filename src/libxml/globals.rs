@@ -4,11 +4,9 @@
 //! Please refer to original libxml2 documents also.
 
 use std::{
-    cell::RefCell,
     ffi::{c_char, c_void},
     mem::{size_of, zeroed},
     ptr::{addr_of_mut, null_mut},
-    rc::Rc,
     sync::atomic::{AtomicI32, AtomicPtr, Ordering},
 };
 
@@ -17,10 +15,8 @@ use libc::{free, malloc, memset, realloc};
 #[cfg(feature = "legacy")]
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
-    encoding::XmlCharEncodingHandler,
     error::{parser_error, parser_warning, XmlError},
     globals::reset_last_error,
-    io::XmlOutputBufferPtr,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSAXLocator},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
@@ -61,33 +57,33 @@ pub unsafe extern "C" fn xml_init_globals() {
 #[deprecated = "This function is a no-op"]
 pub unsafe extern "C" fn xml_cleanup_globals() {}
 
-/// Signature for the function doing the lookup for a suitable output method
-/// corresponding to an URI.
-///
-/// Returns the new xmlOutputBufferPtr in case of success or NULL if no method was found.
-#[doc(alias = "xmlOutputBufferCreateFilenameFunc")]
-pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
-    URI: *const c_char,
-    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    compression: i32,
-) -> XmlOutputBufferPtr;
+// /// Signature for the function doing the lookup for a suitable output method
+// /// corresponding to an URI.
+// ///
+// /// Returns the new xmlOutputBufferPtr in case of success or NULL if no method was found.
+// #[doc(alias = "xmlOutputBufferCreateFilenameFunc")]
+// pub type XmlOutputBufferCreateFilenameFunc = unsafe fn(
+//     URI: *const c_char,
+//     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+//     compression: i32,
+// ) -> XmlOutputBufferPtr;
 
-/// Registers a callback for URI output file handling
-///
-/// Returns the old value of the registration function
-#[doc(alias = "xmlOutputBufferCreateFilenameDefault")]
-pub unsafe fn xml_output_buffer_create_filename_default(
-    func: Option<XmlOutputBufferCreateFilenameFunc>,
-) -> Option<XmlOutputBufferCreateFilenameFunc> {
-    let old = _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE;
-    // #ifdef LIBXML_OUTPUT_ENABLED
-    // if old.is_null() {
-    //     old = __xmlOutputBufferCreateFilename;
-    // }
-    // #endif
-    _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE = func;
-    old
-}
+// /// Registers a callback for URI output file handling
+// ///
+// /// Returns the old value of the registration function
+// #[doc(alias = "xmlOutputBufferCreateFilenameDefault")]
+// pub unsafe fn xml_output_buffer_create_filename_default(
+//     func: Option<XmlOutputBufferCreateFilenameFunc>,
+// ) -> Option<XmlOutputBufferCreateFilenameFunc> {
+//     let old = _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE;
+//     // #ifdef LIBXML_OUTPUT_ENABLED
+//     // if old.is_null() {
+//     //     old = __xmlOutputBufferCreateFilename;
+//     // }
+//     // #endif
+//     _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE = func;
+//     old
+// }
 
 /// Signature for the registration callback of a created node
 #[doc(alias = "xmlRegisterNodeFunc")]
@@ -132,8 +128,7 @@ pub struct XmlGlobalState {
     pub(crate) xml_malloc_atomic: Option<XmlMallocFunc>,
     pub(crate) xml_last_error: XmlError,
 
-    pub(crate) xml_output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
-
+    // pub(crate) xml_output_buffer_create_filename_value: Option<XmlOutputBufferCreateFilenameFunc>,
     pub(crate) xml_structured_error_context: AtomicPtr<c_void>,
 }
 
@@ -342,17 +337,17 @@ static mut XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlRegisterNodeFunc> 
 pub(crate) static mut _XML_DEREGISTER_NODE_DEFAULT_VALUE: Option<XmlDeregisterNodeFunc> = None;
 static mut XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlDeregisterNodeFunc> = None;
 
-/**
- * xmlOutputBufferCreateFilenameValue:
- *
- * DEPRECATED: Don't use
- */
-pub(crate) static mut _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE: Option<
-    XmlOutputBufferCreateFilenameFunc,
-> = None;
-pub(crate) static mut XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF: Option<
-    XmlOutputBufferCreateFilenameFunc,
-> = None;
+// /**
+//  * xmlOutputBufferCreateFilenameValue:
+//  *
+//  * DEPRECATED: Don't use
+//  */
+// pub(crate) static mut _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE: Option<
+//     XmlOutputBufferCreateFilenameFunc,
+// > = None;
+// pub(crate) static mut XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF: Option<
+//     XmlOutputBufferCreateFilenameFunc,
+// > = None;
 
 /// xmlInitializeGlobalState() initialize a global state with all the
 /// default values of the library.
@@ -398,7 +393,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    (*gs).xml_output_buffer_create_filename_value = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
+    // (*gs).xml_output_buffer_create_filename_value = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     memset(
         addr_of_mut!((*gs).xml_last_error) as _,
         0,
@@ -859,37 +854,37 @@ pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
     _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
 
-#[deprecated]
-pub unsafe fn __xml_output_buffer_create_filename_value(
-) -> Option<XmlOutputBufferCreateFilenameFunc> {
-    if IS_MAIN_THREAD!() != 0 {
-        _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE
-    } else {
-        (*xml_get_global_state()).xml_output_buffer_create_filename_value
-    }
-}
+// #[deprecated]
+// pub unsafe fn __xml_output_buffer_create_filename_value(
+// ) -> Option<XmlOutputBufferCreateFilenameFunc> {
+//     if IS_MAIN_THREAD!() != 0 {
+//         _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE
+//     } else {
+//         (*xml_get_global_state()).xml_output_buffer_create_filename_value
+//     }
+// }
 
-#[cfg(feature = "thread")]
-pub unsafe fn xml_output_buffer_create_filename_value(
-    uri: *const c_char,
-    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-    compression: i32,
-) -> XmlOutputBufferPtr {
-    if let Some(fvalue) = __xml_output_buffer_create_filename_value() {
-        fvalue(uri, encoder, compression)
-    } else {
-        null_mut()
-    }
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
-    uri: *const c_char,
-    encoder: Option<XmlCharEncodingHandler>,
-    compression: i32,
-) -> XmlOutputBufferPtr {
-    _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, encoder, compression)
-}
+// #[cfg(feature = "thread")]
+// pub unsafe fn xml_output_buffer_create_filename_value(
+//     uri: *const c_char,
+//     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+//     compression: i32,
+// ) -> XmlOutputBufferPtr {
+//     if let Some(fvalue) = __xml_output_buffer_create_filename_value() {
+//         fvalue(uri, encoder, compression)
+//     } else {
+//         null_mut()
+//     }
+// }
+// #[deprecated]
+// #[cfg(not(feature = "thread"))]
+// pub unsafe extern "C" fn xml_output_buffer_create_filename_value(
+//     uri: *const c_char,
+//     encoder: Option<XmlCharEncodingHandler>,
+//     compression: i32,
+// ) -> XmlOutputBufferPtr {
+//     _XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE.unwrap()(uri, encoder, compression)
+// }
 
 /**
  * xmlInitGlobalsInternal:

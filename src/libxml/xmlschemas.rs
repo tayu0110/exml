@@ -6,6 +6,7 @@
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
+    io::Write,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -13,7 +14,7 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::{fprintf, memcpy, memset, snprintf, strchr, FILE};
+use libc::{memcpy, memset, snprintf, strchr};
 
 use crate::{
     __xml_raise_error,
@@ -22617,7 +22618,10 @@ pub unsafe extern "C" fn xml_schema_free(schema: XmlSchemaPtr) {
 /// Dumps a list of attribute use components.
 #[doc(alias = "xmlSchemaAttrUsesDump")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_schema_attr_uses_dump(uses: XmlSchemaItemListPtr, output: *mut FILE) {
+unsafe extern "C" fn xml_schema_attr_uses_dump<'a>(
+    uses: XmlSchemaItemListPtr,
+    output: &mut (impl Write + 'a),
+) {
     let mut using: XmlSchemaAttributeUsePtr;
     let mut prohib: XmlSchemaAttributeUseProhibPtr;
     let mut refe: XmlSchemaQnameRefPtr;
@@ -22629,28 +22633,29 @@ unsafe extern "C" fn xml_schema_attr_uses_dump(uses: XmlSchemaItemListPtr, outpu
         return;
     }
 
-    fprintf(output, c"  attributes:\n".as_ptr() as _);
+    writeln!(output, "  attributes:");
     for i in 0..(*uses).nb_items {
         using = *(*uses).items.add(i as usize) as _;
         if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraAttrUseProhib {
-            fprintf(output, c"  [prohibition] ".as_ptr() as _);
+            write!(output, "  [prohibition] ");
             prohib = using as XmlSchemaAttributeUseProhibPtr;
             name = (*prohib).name;
             tns = (*prohib).target_namespace;
         } else if (*using).typ == XmlSchemaTypeType::XmlSchemaExtraQnameref {
-            fprintf(output, c"  [reference] ".as_ptr() as _);
+            write!(output, "  [reference] ");
             refe = using as XmlSchemaQnameRefPtr;
             name = (*refe).name;
             tns = (*refe).target_namespace;
         } else {
-            fprintf(output, c"  [use] ".as_ptr() as _);
+            write!(output, "  [use] ");
             name = WXS_ATTRUSE_DECL_NAME!(using);
             tns = WXS_ATTRUSE_DECL_TNS!(using);
         }
-        fprintf(
+        writeln!(
             output,
-            c"'%s'\n".as_ptr() as _,
-            xml_schema_format_qname(addr_of_mut!(str), tns, name),
+            "'{}'",
+            CStr::from_ptr(xml_schema_format_qname(addr_of_mut!(str), tns, name) as *const i8)
+                .to_string_lossy(),
         );
         FREE_AND_NULL!(str);
     }
@@ -22659,89 +22664,91 @@ unsafe extern "C" fn xml_schema_attr_uses_dump(uses: XmlSchemaItemListPtr, outpu
 /// Dump the annotation
 #[doc(alias = "xmlSchemaAnnotDump")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_schema_annot_dump(output: *mut FILE, annot: XmlSchemaAnnotPtr) {
+unsafe extern "C" fn xml_schema_annot_dump<'a>(
+    output: &mut (impl Write + 'a),
+    annot: XmlSchemaAnnotPtr,
+) {
     if annot.is_null() {
         return;
     }
 
     let content: *mut XmlChar = (*(*annot).content).get_content();
     if !content.is_null() {
-        fprintf(output, c"  Annot: %s\n".as_ptr() as _, content);
+        writeln!(
+            output,
+            "  Annot: {}",
+            CStr::from_ptr(content as *const i8).to_string_lossy()
+        );
         xml_free(content as _);
     } else {
-        fprintf(output, c"  Annot: empty\n".as_ptr() as _);
+        writeln!(output, "  Annot: empty");
     }
 }
 
 /// Dump a SchemaType structure
 #[doc(alias = "xmlSchemaContentModelDump")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_schema_content_model_dump(
+unsafe extern "C" fn xml_schema_content_model_dump<'a>(
     particle: XmlSchemaParticlePtr,
-    output: *mut FILE,
+    output: &mut (impl Write + 'a),
     depth: i32,
 ) {
     let mut str: *mut XmlChar = null_mut();
-    let mut shift: [u8; 100] = [0; 100];
 
     if particle.is_null() {
         return;
     }
-    for i in 0..depth.min(25) as usize {
-        shift[2 * i] = b' ';
-        shift[2 * i + 1] = b' ';
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
-    fprintf(output, c"%s".as_ptr() as _, shift.as_ptr());
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
+    write!(output, "{}", shift);
     if (*particle).children.is_null() {
-        fprintf(output, c"MISSING particle term\n".as_ptr() as _);
+        writeln!(output, "MISSING particle term");
         return;
     }
     let term: XmlSchemaTreeItemPtr = (*particle).children;
     if term.is_null() {
-        fprintf(output, c"(NULL)".as_ptr() as _);
+        write!(output, "(NULL)");
     } else {
         match (*term).typ {
             XmlSchemaTypeType::XmlSchemaTypeElement => {
-                fprintf(
+                write!(
                     output,
-                    c"ELEM '%s'".as_ptr() as _,
-                    xml_schema_format_qname(
+                    "ELEM '{}'",
+                    CStr::from_ptr(xml_schema_format_qname(
                         addr_of_mut!(str),
                         (*(term as XmlSchemaElementPtr)).target_namespace,
                         (*(term as XmlSchemaElementPtr)).name,
-                    ),
+                    ) as *const i8)
+                    .to_string_lossy(),
                 );
                 FREE_AND_NULL!(str);
             }
             XmlSchemaTypeType::XmlSchemaTypeSequence => {
-                fprintf(output, c"SEQUENCE".as_ptr() as _);
+                write!(output, "SEQUENCE");
             }
             XmlSchemaTypeType::XmlSchemaTypeChoice => {
-                fprintf(output, c"CHOICE".as_ptr() as _);
+                write!(output, "CHOICE");
             }
             XmlSchemaTypeType::XmlSchemaTypeAll => {
-                fprintf(output, c"ALL".as_ptr() as _);
+                write!(output, "ALL");
             }
             XmlSchemaTypeType::XmlSchemaTypeAny => {
-                fprintf(output, c"ANY".as_ptr() as _);
+                write!(output, "ANY");
             }
             _ => {
-                fprintf(output, c"UNKNOWN\n".as_ptr() as _);
+                writeln!(output, "UNKNOWN");
                 return;
             }
         }
     }
     if (*particle).min_occurs != 1 {
-        fprintf(output, c" min: %d".as_ptr() as _, (*particle).min_occurs);
+        write!(output, " min: {}", (*particle).min_occurs);
     }
     if (*particle).max_occurs >= UNBOUNDED as i32 {
-        fprintf(output, c" max: unbounded".as_ptr() as _);
+        write!(output, " max: unbounded");
     } else if (*particle).max_occurs != 1 {
-        fprintf(output, c" max: %d".as_ptr() as _, (*particle).max_occurs);
+        write!(output, " max: {}", (*particle).max_occurs);
     }
-    fprintf(output, c"\n".as_ptr() as _);
+    writeln!(output);
     if !term.is_null()
         && matches!(
             (*term).typ,
@@ -22761,84 +22768,103 @@ unsafe extern "C" fn xml_schema_content_model_dump(
 /// Dump a SchemaType structure
 #[doc(alias = "xmlSchemaTypeDump")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_schema_type_dump(typ: XmlSchemaTypePtr, output: *mut FILE) {
+unsafe extern "C" fn xml_schema_type_dump<'a>(
+    typ: XmlSchemaTypePtr,
+    output: &mut (impl Write + 'a),
+) {
     if typ.is_null() {
-        fprintf(output, c"Type: NULL\n".as_ptr() as _);
+        writeln!(output, "Type: NULL");
         return;
     }
-    fprintf(output, c"Type: ".as_ptr() as _);
+    write!(output, "Type: ");
     if !(*typ).name.is_null() {
-        fprintf(output, c"'%s' ".as_ptr() as _, (*typ).name);
+        write!(
+            output,
+            "'{}' ",
+            CStr::from_ptr((*typ).name as *const i8).to_string_lossy()
+        );
     } else {
-        fprintf(output, c"(no name) ".as_ptr() as _);
+        write!(output, "(no name) ");
     }
     if !(*typ).target_namespace.is_null() {
-        fprintf(output, c"ns '%s' ".as_ptr() as _, (*typ).target_namespace);
+        write!(
+            output,
+            "ns '{}' ",
+            CStr::from_ptr((*typ).target_namespace as *const i8).to_string_lossy()
+        );
     }
     match (*typ).typ {
         XmlSchemaTypeType::XmlSchemaTypeBasic => {
-            fprintf(output, c"[basic] ".as_ptr() as _);
+            write!(output, "[basic] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeSimple => {
-            fprintf(output, c"[simple] ".as_ptr() as _);
+            write!(output, "[simple] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeComplex => {
-            fprintf(output, c"[complex] ".as_ptr() as _);
+            write!(output, "[complex] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeSequence => {
-            fprintf(output, c"[sequence] ".as_ptr() as _);
+            write!(output, "[sequence] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeChoice => {
-            fprintf(output, c"[choice] ".as_ptr() as _);
+            write!(output, "[choice] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeAll => {
-            fprintf(output, c"[all] ".as_ptr() as _);
+            write!(output, "[all] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeUr => {
-            fprintf(output, c"[ur] ".as_ptr() as _);
+            write!(output, "[ur] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeRestriction => {
-            fprintf(output, c"[restriction] ".as_ptr() as _);
+            write!(output, "[restriction] ");
         }
         XmlSchemaTypeType::XmlSchemaTypeExtension => {
-            fprintf(output, c"[extension] ".as_ptr() as _);
+            write!(output, "[extension] ");
         }
         _ => {
-            fprintf(output, c"[unknown type %d] ".as_ptr() as _, (*typ).typ);
+            write!(output, "[unknown type {}] ", (*typ).typ as i32);
         }
     }
-    fprintf(output, c"content: ".as_ptr() as _);
+    write!(output, "content: ");
     match (*typ).content_type {
         XmlSchemaContentType::XmlSchemaContentUnknown => {
-            fprintf(output, c"[unknown] ".as_ptr() as _);
+            write!(output, "[unknown] ");
         }
         XmlSchemaContentType::XmlSchemaContentEmpty => {
-            fprintf(output, c"[empty] ".as_ptr() as _);
+            write!(output, "[empty] ");
         }
         XmlSchemaContentType::XmlSchemaContentElements => {
-            fprintf(output, c"[element] ".as_ptr() as _);
+            write!(output, "[element] ");
         }
         XmlSchemaContentType::XmlSchemaContentMixed => {
-            fprintf(output, c"[mixed] ".as_ptr() as _);
+            write!(output, "[mixed] ");
         }
         XmlSchemaContentType::XmlSchemaContentMixedOrElements => { /* not used. */ }
         XmlSchemaContentType::XmlSchemaContentBasic => {
-            fprintf(output, c"[basic] ".as_ptr() as _);
+            write!(output, "[basic] ");
         }
         XmlSchemaContentType::XmlSchemaContentSimple => {
-            fprintf(output, c"[simple] ".as_ptr() as _);
+            write!(output, "[simple] ");
         }
         XmlSchemaContentType::XmlSchemaContentAny => {
-            fprintf(output, c"[any] ".as_ptr() as _);
+            write!(output, "[any] ");
         }
     }
-    fprintf(output, c"\n".as_ptr() as _);
+    writeln!(output);
     if !(*typ).base.is_null() {
-        fprintf(output, c"  base type: '%s'".as_ptr() as _, (*typ).base);
+        write!(
+            output,
+            "  base type: '{}'",
+            CStr::from_ptr((*typ).base as *const i8).to_string_lossy()
+        );
         if !(*typ).base_ns.is_null() {
-            fprintf(output, c" ns '%s'\n".as_ptr() as _, (*typ).base_ns);
+            writeln!(
+                output,
+                " ns '{}'",
+                CStr::from_ptr((*typ).base_ns as *const i8).to_string_lossy()
+            );
         } else {
-            fprintf(output, c"\n".as_ptr() as _);
+            writeln!(output);
         }
     }
     if !(*typ).attr_uses.is_null() {
@@ -22855,42 +22881,43 @@ unsafe extern "C" fn xml_schema_type_dump(typ: XmlSchemaTypePtr, output: *mut FI
 }
 
 #[cfg(feature = "output")]
-extern "C" fn xml_schema_type_dump_entry(
-    typ: *mut c_void,
-    output: *mut c_void,
-    _name: *const XmlChar,
-) {
+extern "C" fn xml_schema_type_dump_entry<'a>(typ: *mut c_void, output: &mut (impl Write + 'a)) {
     unsafe {
-        xml_schema_type_dump(typ as XmlSchemaTypePtr, output as *mut FILE);
+        xml_schema_type_dump(typ as XmlSchemaTypePtr, output);
     }
 }
 
 /// Dump the element
 #[doc(alias = "xmlSchemaElementDump")]
 #[cfg(feature = "output")]
-extern "C" fn xml_schema_element_dump(
+extern "C" fn xml_schema_element_dump<'a>(
     payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
+    output: &mut (impl Write + 'a),
     namespace: *const XmlChar,
-    _context: *const XmlChar,
 ) {
     let elem: XmlSchemaElementPtr = payload as XmlSchemaElementPtr;
-    let output: *mut FILE = data as *mut FILE;
     if elem.is_null() {
         return;
     }
 
     unsafe {
-        fprintf(output, c"Element".as_ptr() as _);
+        write!(output, "Element");
         if (*elem).flags & XML_SCHEMAS_ELEM_GLOBAL != 0 {
-            fprintf(output, c" (global)".as_ptr() as _);
+            write!(output, " (global)");
         }
-        fprintf(output, c": '%s' ".as_ptr() as _, (*elem).name);
+        write!(
+            output,
+            ": '{}' ",
+            CStr::from_ptr((*elem).name as *const i8).to_string_lossy()
+        );
         if !namespace.is_null() {
-            fprintf(output, c"ns '%s'".as_ptr() as _, namespace);
+            write!(
+                output,
+                "ns '{}'",
+                CStr::from_ptr(namespace as *const i8).to_string_lossy()
+            );
         }
-        fprintf(output, c"\n".as_ptr() as _);
+        writeln!(output);
         /*
          * Misc other properties.
          */
@@ -22899,36 +22926,48 @@ extern "C" fn xml_schema_element_dump(
             || (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0
             || (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0
         {
-            fprintf(output, c"  props: ".as_ptr() as _);
+            write!(output, "  props: ");
             if (*elem).flags & XML_SCHEMAS_ELEM_FIXED != 0 {
-                fprintf(output, c"[fixed] ".as_ptr() as _);
+                write!(output, "[fixed] ");
             }
             if (*elem).flags & XML_SCHEMAS_ELEM_DEFAULT != 0 {
-                fprintf(output, c"[default] ".as_ptr() as _);
+                write!(output, "[default] ");
             }
             if (*elem).flags & XML_SCHEMAS_ELEM_ABSTRACT != 0 {
-                fprintf(output, c"[abstract] ".as_ptr() as _);
+                write!(output, "[abstract] ");
             }
             if (*elem).flags & XML_SCHEMAS_ELEM_NILLABLE != 0 {
-                fprintf(output, c"[nillable] ".as_ptr() as _);
+                write!(output, "[nillable] ");
             }
-            fprintf(output, c"\n".as_ptr() as _);
+            writeln!(output);
         }
         /*
          * Default/fixed value.
          */
         if !(*elem).value.is_null() {
-            fprintf(output, c"  value: '%s'\n".as_ptr() as _, (*elem).value);
+            writeln!(
+                output,
+                "  value: '{}'",
+                CStr::from_ptr((*elem).value as *const i8).to_string_lossy()
+            );
         }
         /*
          * Type.
          */
         if !(*elem).named_type.is_null() {
-            fprintf(output, c"  type: '%s' ".as_ptr() as _, (*elem).named_type);
+            write!(
+                output,
+                "  type: '{}' ",
+                CStr::from_ptr((*elem).named_type as *const i8).to_string_lossy()
+            );
             if !(*elem).named_type_ns.is_null() {
-                fprintf(output, c"ns '%s'\n".as_ptr() as _, (*elem).named_type_ns);
+                writeln!(
+                    output,
+                    "ns '{}'",
+                    CStr::from_ptr((*elem).named_type_ns as *const i8).to_string_lossy()
+                );
             } else {
-                fprintf(output, c"\n".as_ptr() as _);
+                writeln!(output);
             }
         } else if !(*elem).subtypes.is_null() {
             /*
@@ -22940,15 +22979,19 @@ extern "C" fn xml_schema_element_dump(
          * Substitution group.
          */
         if !(*elem).subst_group.is_null() {
-            fprintf(
+            write!(
                 output,
-                c"  substitutionGroup: '%s' ".as_ptr() as _,
-                (*elem).subst_group,
+                "  substitutionGroup: '{}' ",
+                CStr::from_ptr((*elem).subst_group as *const i8).to_string_lossy()
             );
             if !(*elem).subst_group_ns.is_null() {
-                fprintf(output, c"ns '%s'\n".as_ptr() as _, (*elem).subst_group_ns);
+                writeln!(
+                    output,
+                    "ns '{}'",
+                    CStr::from_ptr((*elem).subst_group_ns as *const i8).to_string_lossy()
+                );
             } else {
-                fprintf(output, c"\n".as_ptr() as _);
+                writeln!(output);
             }
         }
     }
@@ -22957,43 +23000,54 @@ extern "C" fn xml_schema_element_dump(
 /// Dump a Schema structure.
 #[doc(alias = "xmlSchemaDump")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_schema_dump(output: *mut FILE, schema: XmlSchemaPtr) {
-    use libc::fprintf;
+pub unsafe extern "C" fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSchemaPtr) {
+    use crate::hash::XmlHashTableRef;
 
-    use crate::libxml::hash::{xml_hash_scan, xml_hash_scan_full};
-
-    if output.is_null() {
-        return;
-    }
     if schema.is_null() {
-        fprintf(output, c"Schemas: NULL\n".as_ptr() as _);
+        writeln!(output, "Schemas: NULL");
         return;
     }
-    fprintf(output, c"Schemas: ".as_ptr() as _);
+    write!(output, "Schemas: ");
     if !(*schema).name.is_null() {
-        fprintf(output, c"%s, ".as_ptr() as _, (*schema).name);
+        write!(
+            output,
+            "{}, ",
+            CStr::from_ptr((*schema).name as *const i8).to_string_lossy()
+        );
     } else {
-        fprintf(output, c"no name, c".as_ptr() as _);
+        write!(output, "no name, c");
     }
     if !(*schema).target_namespace.is_null() {
-        fprintf(output, c"%s".as_ptr() as _, (*schema).target_namespace);
+        write!(
+            output,
+            "{}",
+            CStr::from_ptr((*schema).target_namespace as *const i8).to_string_lossy()
+        );
     } else {
-        fprintf(output, c"no target namespace".as_ptr() as _);
+        write!(output, "no target namespace");
     }
-    fprintf(output, c"\n".as_ptr() as _);
+    writeln!(output);
     if !(*schema).annot.is_null() {
         xml_schema_annot_dump(output, (*schema).annot);
     }
-    xml_hash_scan(
-        (*schema).type_decl,
-        Some(xml_schema_type_dump_entry),
-        output as _,
-    );
-    xml_hash_scan_full(
-        (*schema).elem_decl,
-        Some(xml_schema_element_dump),
-        output as _,
-    );
+    if let Some(type_decl) = XmlHashTableRef::from_raw((*schema).type_decl) {
+        type_decl.scan(|data, _, _, _| {
+            if !data.0.is_null() {
+                xml_schema_type_dump_entry(data.0, output);
+            }
+        });
+    }
+    if let Some(elem_decl) = XmlHashTableRef::from_raw((*schema).elem_decl) {
+        elem_decl.scan(|data, _, namespace, _| {
+            if !data.0.is_null() {
+                xml_schema_element_dump(
+                    data.0,
+                    output,
+                    namespace.map_or(null(), |ns| ns.as_ptr() as *const u8),
+                );
+            }
+        });
+    }
 }
 
 /// Set the error and warning callback information
@@ -30510,11 +30564,10 @@ mod tests {
             for n_output in 0..GEN_NB_FILE_PTR {
                 for n_schema in 0..GEN_NB_XML_SCHEMA_PTR {
                     let mem_base = xml_mem_blocks();
-                    let output = gen_file_ptr(n_output, 0);
+                    let mut output = gen_file_ptr(n_output, 0).unwrap();
                     let schema = gen_xml_schema_ptr(n_schema, 1);
 
-                    xml_schema_dump(output, schema);
-                    des_file_ptr(n_output, output, 0);
+                    xml_schema_dump(&mut output, schema);
                     des_xml_schema_ptr(n_schema, schema, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -30531,96 +30584,6 @@ mod tests {
             }
         }
     }
-
-    // #[test]
-    // fn test_xml_schema_get_parser_errors() {
-    //     #[cfg(feature = "schema")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_SCHEMA_PARSER_CTXT_PTR {
-    //             for n_err in 0..GEN_NB_XML_SCHEMA_VALIDITY_ERROR_FUNC_PTR {
-    //                 for n_warn in 0..GEN_NB_XML_SCHEMA_VALIDITY_WARNING_FUNC_PTR {
-    //                     for n_ctx in 0..GEN_NB_VOID_PTR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctxt = gen_xml_schema_parser_ctxt_ptr(n_ctxt, 0);
-    //                         let err = gen_xml_schema_validity_error_func_ptr(n_err, 1);
-    //                         let warn = gen_xml_schema_validity_warning_func_ptr(n_warn, 2);
-    //                         let ctx = gen_void_ptr_ptr(n_ctx, 3);
-
-    //                         let ret_val = xml_schema_get_parser_errors(ctxt, err, warn, ctx);
-    //                         desret_int(ret_val);
-    //                         des_xml_schema_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                         des_xml_schema_validity_error_func_ptr(n_err, err, 1);
-    //                         des_xml_schema_validity_warning_func_ptr(n_warn, warn, 2);
-    //                         des_void_ptr_ptr(n_ctx, ctx, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSchemaGetParserErrors",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             assert!(
-    //                                 leaks == 0,
-    //                                 "{leaks} Leaks are found in xmlSchemaGetParserErrors()"
-    //                             );
-    //                             eprint!(" {}", n_ctxt);
-    //                             eprint!(" {}", n_err);
-    //                             eprint!(" {}", n_warn);
-    //                             eprintln!(" {}", n_ctx);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_schema_get_valid_errors() {
-    //     #[cfg(feature = "schema")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-    //             for n_err in 0..GEN_NB_XML_SCHEMA_VALIDITY_ERROR_FUNC_PTR {
-    //                 for n_warn in 0..GEN_NB_XML_SCHEMA_VALIDITY_WARNING_FUNC_PTR {
-    //                     for n_ctx in 0..GEN_NB_VOID_PTR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-    //                         let err = gen_xml_schema_validity_error_func_ptr(n_err, 1);
-    //                         let warn = gen_xml_schema_validity_warning_func_ptr(n_warn, 2);
-    //                         let ctx = gen_void_ptr_ptr(n_ctx, 3);
-
-    //                         let ret_val = xml_schema_get_valid_errors(ctxt, err, warn, ctx);
-    //                         desret_int(ret_val);
-    //                         des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                         des_xml_schema_validity_error_func_ptr(n_err, err, 1);
-    //                         des_xml_schema_validity_warning_func_ptr(n_warn, warn, 2);
-    //                         des_void_ptr_ptr(n_ctx, ctx, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlSchemaGetValidErrors",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             assert!(
-    //                                 leaks == 0,
-    //                                 "{leaks} Leaks are found in xmlSchemaGetValidErrors()"
-    //                             );
-    //                             eprint!(" {}", n_ctxt);
-    //                             eprint!(" {}", n_err);
-    //                             eprint!(" {}", n_warn);
-    //                             eprintln!(" {}", n_ctx);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 
     #[test]
     fn test_xml_schema_is_valid() {
@@ -31057,61 +31020,4 @@ mod tests {
             }
         }
     }
-
-    #[test]
-    fn test_xml_schema_validate_set_locator() {
-
-        /* missing type support */
-    }
-
-    // #[test]
-    // fn test_xml_schema_validate_stream() {
-    //     #[cfg(feature = "schema")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_SCHEMA_VALID_CTXT_PTR {
-    //             for n_input in 0..GEN_NB_XML_PARSER_INPUT_BUFFER_PTR {
-    //                 for n_enc in 0..GEN_NB_XML_CHAR_ENCODING {
-    //                     for n_sax in 0..GEN_NB_XML_SAXHANDLER_PTR {
-    //                         for n_user_data in 0..GEN_NB_USERDATA {
-    //                             let mem_base = xml_mem_blocks();
-    //                             let ctxt = gen_xml_schema_valid_ctxt_ptr(n_ctxt, 0);
-    //                             let input = gen_xml_parser_input_buffer_ptr(n_input, 1);
-    //                             let enc = gen_xml_char_encoding(n_enc, 2);
-    //                             let sax = gen_xml_saxhandler_ptr(n_sax, 3);
-    //                             let user_data = gen_userdata(n_user_data, 4);
-
-    //                             let ret_val =
-    //                                 xml_schema_validate_stream(ctxt, input, enc, sax, user_data);
-    //                             desret_int(ret_val);
-    //                             des_xml_schema_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                             des_xml_parser_input_buffer_ptr(n_input, input, 1);
-    //                             des_xml_char_encoding(n_enc, enc, 2);
-    //                             des_xml_saxhandler_ptr(n_sax, sax, 3);
-    //                             des_userdata(n_user_data, user_data, 4);
-    //                             reset_last_error();
-    //                             if mem_base != xml_mem_blocks() {
-    //                                 leaks += 1;
-    //                                 eprint!(
-    //                                     "Leak of {} blocks found in xmlSchemaValidateStream",
-    //                                     xml_mem_blocks() - mem_base
-    //                                 );
-    //                                 assert!(
-    //                                     leaks == 0,
-    //                                     "{leaks} Leaks are found in xmlSchemaValidateStream()"
-    //                                 );
-    //                                 eprint!(" {}", n_ctxt);
-    //                                 eprint!(" {}", n_input);
-    //                                 eprint!(" {}", n_enc);
-    //                                 eprint!(" {}", n_sax);
-    //                                 eprintln!(" {}", n_user_data);
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }

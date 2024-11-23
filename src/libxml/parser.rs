@@ -38,9 +38,9 @@ use crate::{
     },
     hash::XmlHashTableRef,
     io::{
-        cleanup_input_callbacks, register_default_input_callbacks, xml_cleanup_output_callbacks,
-        xml_default_external_entity_loader, xml_ioerr_memory, xml_no_net_exists,
-        xml_parser_get_directory, xml_register_default_output_callbacks, XmlParserInputBuffer,
+        cleanup_input_callbacks, cleanup_output_callbacks, register_default_input_callbacks,
+        register_default_output_callbacks, xml_default_external_entity_loader, xml_ioerr_memory,
+        xml_no_net_exists, xml_parser_get_directory, XmlParserInputBuffer,
     },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -2569,7 +2569,7 @@ pub unsafe extern "C" fn xml_init_parser() {
         register_default_input_callbacks();
         #[cfg(feature = "output")]
         {
-            xml_register_default_output_callbacks();
+            register_default_output_callbacks();
         }
         #[cfg(any(feature = "xpath", feature = "schema"))]
         {
@@ -2616,7 +2616,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
     cleanup_input_callbacks();
     #[cfg(feature = "output")]
     {
-        xml_cleanup_output_callbacks();
+        cleanup_output_callbacks();
     }
     #[cfg(feature = "schema")]
     {

@@ -9,32 +9,27 @@ mod output;
 
 use std::{
     borrow::Cow,
-    cell::RefCell,
     ffi::{c_char, c_int, c_uint, c_void, CStr, CString},
     fs::{metadata, File},
-    io::{self, stdin, ErrorKind, Read},
-    mem::size_of,
+    io::{self, stdin, stdout, ErrorKind, Read, Write},
     path::Path,
-    ptr::{addr_of_mut, null, null_mut},
-    rc::Rc,
-    slice::from_raw_parts,
+    ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
 
 use libc::{
-    __errno_location, fclose, ferror, fflush, fopen, fread, fwrite, getcwd, memset, ptrdiff_t,
-    strcmp, strlen, strncpy, write, EACCES, EADDRINUSE, EAFNOSUPPORT, EAGAIN, EALREADY, EBADF,
-    EBADMSG, EBUSY, ECANCELED, ECHILD, ECONNREFUSED, EDEADLK, EDOM, EEXIST, EFAULT, EFBIG,
-    EINPROGRESS, EINTR, EINVAL, EIO, EISCONN, EISDIR, EMFILE, EMLINK, EMSGSIZE, ENAMETOOLONG,
-    ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC, ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK,
-    ENOTSUP, ENOTTY, ENXIO, EOF, EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH, ETIMEDOUT, EXDEV,
-    FILE,
+    __errno_location, fclose, ferror, fflush, fopen, fread, fwrite, getcwd, ptrdiff_t, strcmp,
+    strlen, strncpy, write, EACCES, EADDRINUSE, EAFNOSUPPORT, EAGAIN, EALREADY, EBADF, EBADMSG,
+    EBUSY, ECANCELED, ECHILD, ECONNREFUSED, EDEADLK, EDOM, EEXIST, EFAULT, EFBIG, EINPROGRESS,
+    EINTR, EINVAL, EIO, EISCONN, EISDIR, EMFILE, EMLINK, EMSGSIZE, ENAMETOOLONG, ENFILE, ENODEV,
+    ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC, ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK, ENOTSUP, ENOTTY,
+    ENXIO, EOF, EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH, ETIMEDOUT, EXDEV, FILE,
 };
 use url::Url;
 
 use crate::{
     __xml_raise_error,
-    encoding::{find_encoding_handler, XmlCharEncodingHandler},
+    encoding::find_encoding_handler,
     error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error},
     globals::{GenericError, StructuredError},
     libxml::{
@@ -42,12 +37,9 @@ use crate::{
             xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
             xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
         },
-        globals::{xml_free, xml_malloc, xml_mem_strdup},
+        globals::{xml_free, xml_mem_strdup},
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
-        nanohttp::{
-            xml_nanohttp_close, xml_nanohttp_method, xml_nanohttp_open, xml_nanohttp_read,
-            xml_nanohttp_return_code,
-        },
+        nanohttp::{xml_nanohttp_close, xml_nanohttp_open, xml_nanohttp_read},
         parser::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption,
             XML_SAX2_MAGIC,
@@ -58,7 +50,6 @@ use crate::{
     },
     nanohttp::XmlNanoHTTPCtxt,
     private::parser::__xml_err_encoding,
-    xml_str_printf,
 };
 
 pub use input::*;
@@ -416,170 +407,159 @@ pub unsafe extern "C" fn xml_file_write(
     items * len
 }
 
-/// Calls xmlIOHTTPOpenW with no compression to set up for a subsequent HTTP post command.  
-/// This function should generally not be used as
-/// the open callback is short circuited in xmlOutputBufferCreateFile.
-///
-/// Returns a poc_inter to the new IO context.
-#[doc(alias = "xmlIOHTTPDfltOpenW")]
-#[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xml_io_http_dflt_open_w(post_uri: *const c_char) -> *mut c_void {
-    xml_io_http_open_w(post_uri, 0)
-}
+// /// Calls xmlIOHTTPOpenW with no compression to set up for a subsequent HTTP post command.
+// /// This function should generally not be used as
+// /// the open callback is short circuited in xmlOutputBufferCreateFile.
+// ///
+// /// Returns a poc_inter to the new IO context.
+// #[doc(alias = "xmlIOHTTPDfltOpenW")]
+// #[cfg(all(feature = "output", feature = "http"))]
+// unsafe extern "C" fn xml_io_http_dflt_open_w(post_uri: *const c_char) -> *mut c_void {
+//     xml_io_http_open_w(post_uri, 0)
+// }
 
-#[cfg(all(feature = "output", feature = "http"))]
-pub type XmlIOHTTPWriteCtxtPtr = *mut XmlIOHTTPWriteCtxt;
-#[cfg(all(feature = "output", feature = "http"))]
-#[repr(C)]
-pub struct XmlIOHTTPWriteCtxt {
-    compression: c_int,
-    uri: *mut c_char,
-    doc_buff: XmlOutputBuffer,
-}
+// /// Collect data from memory buffer c_into a temporary file for later
+// /// processing.
+// ///
+// /// Returns number of bytes written.
+// #[doc(alias = "xmlIOHTTPWrite")]
+// #[cfg(all(feature = "output", feature = "http"))]
+// unsafe extern "C" fn xml_io_http_write(
+//     context: *mut c_void,
+//     buffer: *const c_char,
+//     mut len: c_int,
+// ) -> c_int {
+//     let ctxt: XmlIOHTTPWriteCtxtPtr = context as _;
 
-/// Collect data from memory buffer c_into a temporary file for later
-/// processing.
-///
-/// Returns number of bytes written.
-#[doc(alias = "xmlIOHTTPWrite")]
-#[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xml_io_http_write(
-    context: *mut c_void,
-    buffer: *const c_char,
-    mut len: c_int,
-) -> c_int {
-    let ctxt: XmlIOHTTPWriteCtxtPtr = context as _;
+//     if ctxt.is_null() || buffer.is_null() {
+//         return -1;
+//     }
 
-    if ctxt.is_null() || buffer.is_null() {
-        return -1;
-    }
+//     if len > 0 {
+//         len = (*ctxt)
+//             .doc_buff
+//             .write_bytes(from_raw_parts(buffer as *const u8, len as usize));
 
-    if len > 0 {
-        len = (*ctxt)
-            .doc_buff
-            .write_bytes(from_raw_parts(buffer as *const u8, len as usize));
+//         if len < 0 {
+//             let mut msg: [XmlChar; 500] = [0; 500];
+//             xml_str_printf!(
+//                 msg.as_mut_ptr(),
+//                 500,
+//                 c"xmlIOHTTPWrite:  %s\n%s '%s'.\n".as_ptr(),
+//                 c"Error appending to c_internal buffer.".as_ptr(),
+//                 c"Error sending document to URI".as_ptr(),
+//                 (*ctxt).uri
+//             );
+//             xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
+//         }
+//     }
 
-        if len < 0 {
-            let mut msg: [XmlChar; 500] = [0; 500];
-            xml_str_printf!(
-                msg.as_mut_ptr(),
-                500,
-                c"xmlIOHTTPWrite:  %s\n%s '%s'.\n".as_ptr(),
-                c"Error appending to c_internal buffer.".as_ptr(),
-                c"Error sending document to URI".as_ptr(),
-                (*ctxt).uri
-            );
-            xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
-        }
-    }
+//     len
+// }
 
-    len
-}
+// /// Free allocated memory and reclaim system resources.
+// ///
+// /// No return value.
+// #[doc(alias = "xmlFreeHTTPWriteCtxt")]
+// #[cfg(all(feature = "output", feature = "http"))]
+// unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
+//     if !(*ctxt).uri.is_null() {
+//         xml_free((*ctxt).uri as _);
+//     }
 
-/// Free allocated memory and reclaim system resources.
-///
-/// No return value.
-#[doc(alias = "xmlFreeHTTPWriteCtxt")]
-#[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xml_free_http_write_ctxt(ctxt: XmlIOHTTPWriteCtxtPtr) {
-    if !(*ctxt).uri.is_null() {
-        xml_free((*ctxt).uri as _);
-    }
+//     (*ctxt).doc_buff = XmlOutputBuffer::default();
+//     xml_free(ctxt as _);
+// }
 
-    (*ctxt).doc_buff = XmlOutputBuffer::default();
-    xml_free(ctxt as _);
-}
+// /// Close the transmit HTTP I/O channel and actually send the data.
+// #[doc(alias = "xmlIOHTTCloseWrite")]
+// #[cfg(all(feature = "output", feature = "http"))]
+// unsafe extern "C" fn xml_io_http_close_write(
+//     context: *mut c_void,
+//     http_mthd: *const c_char,
+// ) -> c_int {
+//     let mut close_rc: c_int = -1;
+//     let http_rtn: c_int;
+//     let ctxt: XmlIOHTTPWriteCtxtPtr = context as _;
+//     let content_encoding: *mut c_char = null_mut();
+//     let mut content_type: *mut c_char = c"text/xml".as_ptr() as _;
+//     let http_ctxt: *mut c_void;
 
-/// Close the transmit HTTP I/O channel and actually send the data.
-#[doc(alias = "xmlIOHTTCloseWrite")]
-#[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xml_io_http_close_write(
-    context: *mut c_void,
-    http_mthd: *const c_char,
-) -> c_int {
-    let mut close_rc: c_int = -1;
-    let http_rtn: c_int;
-    let ctxt: XmlIOHTTPWriteCtxtPtr = context as _;
-    let content_encoding: *mut c_char = null_mut();
-    let mut content_type: *mut c_char = c"text/xml".as_ptr() as _;
-    let http_ctxt: *mut c_void;
+//     if ctxt.is_null() || http_mthd.is_null() {
+//         return -1;
+//     }
 
-    if ctxt.is_null() || http_mthd.is_null() {
-        return -1;
-    }
+//     // Pull the data out of the memory output buffer
 
-    // Pull the data out of the memory output buffer
+//     let dctxt = &mut (*ctxt).doc_buff;
+//     let http_content: *mut c_char = dctxt.buffer.map_or(null_mut(), |buf| {
+//         if buf.is_ok() {
+//             buf.as_ref().as_ptr() as *mut i8
+//         } else {
+//             null_mut()
+//         }
+//     });
+//     let content_lgth: c_int = dctxt.buffer.map_or(0, |buf| buf.len()) as i32;
 
-    let dctxt = &mut (*ctxt).doc_buff;
-    let http_content: *mut c_char = dctxt.buffer.map_or(null_mut(), |buf| {
-        if buf.is_ok() {
-            buf.as_ref().as_ptr() as *mut i8
-        } else {
-            null_mut()
-        }
-    });
-    let content_lgth: c_int = dctxt.buffer.map_or(0, |buf| buf.len()) as i32;
+//     if http_content.is_null() {
+//         let mut msg: [XmlChar; 500] = [0; 500];
+//         xml_str_printf!(
+//             msg.as_mut_ptr(),
+//             500,
+//             c"xmlIOHTTPCloseWrite:  %s '%s' %s '%s'.\n".as_ptr(),
+//             c"Error retrieving content.\nUnable to".as_ptr(),
+//             http_mthd,
+//             "data to URI",
+//             (*ctxt).uri
+//         );
+//         xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
+//     } else {
+//         http_ctxt = xml_nanohttp_method(
+//             (*ctxt).uri,
+//             http_mthd,
+//             http_content,
+//             addr_of_mut!(content_type) as _,
+//             content_encoding,
+//             content_lgth,
+//         );
 
-    if http_content.is_null() {
-        let mut msg: [XmlChar; 500] = [0; 500];
-        xml_str_printf!(
-            msg.as_mut_ptr(),
-            500,
-            c"xmlIOHTTPCloseWrite:  %s '%s' %s '%s'.\n".as_ptr(),
-            c"Error retrieving content.\nUnable to".as_ptr(),
-            http_mthd,
-            "data to URI",
-            (*ctxt).uri
-        );
-        xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
-    } else {
-        http_ctxt = xml_nanohttp_method(
-            (*ctxt).uri,
-            http_mthd,
-            http_content,
-            addr_of_mut!(content_type) as _,
-            content_encoding,
-            content_lgth,
-        );
+//         if !http_ctxt.is_null() {
+//             http_rtn = xml_nanohttp_return_code(http_ctxt);
+//             if (200..300).contains(&http_rtn) {
+//                 close_rc = 0;
+//             } else {
+//                 let mut msg: [XmlChar; 500] = [0; 500];
+//                 xml_str_printf!(
+//                     msg.as_mut_ptr(),
+//                     500,
+//                     c"xmlIOHTTPCloseWrite: HTTP '%s' of %d %s\n'%s' %s %d\n".as_ptr(),
+//                     http_mthd,
+//                     content_lgth,
+//                     c"bytes to URI".as_ptr(),
+//                     (*ctxt).uri,
+//                     c"failed.  HTTP return code:".as_ptr(),
+//                     http_rtn
+//                 );
+//                 xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
+//             }
 
-        if !http_ctxt.is_null() {
-            http_rtn = xml_nanohttp_return_code(http_ctxt);
-            if (200..300).contains(&http_rtn) {
-                close_rc = 0;
-            } else {
-                let mut msg: [XmlChar; 500] = [0; 500];
-                xml_str_printf!(
-                    msg.as_mut_ptr(),
-                    500,
-                    c"xmlIOHTTPCloseWrite: HTTP '%s' of %d %s\n'%s' %s %d\n".as_ptr(),
-                    http_mthd,
-                    content_lgth,
-                    c"bytes to URI".as_ptr(),
-                    (*ctxt).uri,
-                    c"failed.  HTTP return code:".as_ptr(),
-                    http_rtn
-                );
-                xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
-            }
+//             xml_nanohttp_close(http_ctxt);
+//             xml_free(content_type as _);
+//         }
+//     }
 
-            xml_nanohttp_close(http_ctxt);
-            xml_free(content_type as _);
-        }
-    }
+//     /*  Final cleanups  */
+//     xml_free_http_write_ctxt(ctxt);
 
-    /*  Final cleanups  */
+//     close_rc
+// }
 
-    xml_free_http_write_ctxt(ctxt);
-
-    close_rc
-}
-
-/// Close the transmit HTTP I/O channel and actually send data using a PUT HTTP method.
-#[doc(alias = "xmlIOHTTPClosePut")]
-#[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
-    xml_io_http_close_write(ctxt, c"PUT".as_ptr() as _)
-}
+// /// Close the transmit HTTP I/O channel and actually send data using a PUT HTTP method.
+// #[doc(alias = "xmlIOHTTPClosePut")]
+// #[cfg(all(feature = "output", feature = "http"))]
+// unsafe extern "C" fn xml_io_http_close_put(ctxt: *mut c_void) -> c_int {
+//     xml_io_http_close_write(ctxt, c"PUT".as_ptr() as _)
+// }
 
 /// Write `len` bytes from `buffer` to the I/O channel.
 ///
@@ -602,26 +582,26 @@ unsafe extern "C" fn xml_fd_write(
     ret
 }
 
-/// Create a buffered output for the progressive saving to an I/O handler
-///
-/// Returns the new parser output or NULL
-#[doc(alias = "xmlOutputBufferCreateIO")]
-#[cfg(feature = "output")]
-pub unsafe fn xml_output_buffer_create_io(
-    iowrite: Option<XmlOutputWriteCallback>,
-    ioclose: Option<XmlOutputCloseCallback>,
-    ioctx: *mut c_void,
-    encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
-) -> Option<XmlOutputBuffer> {
-    iowrite?;
+// /// Create a buffered output for the progressive saving to an I/O handler
+// ///
+// /// Returns the new parser output or NULL
+// #[doc(alias = "xmlOutputBufferCreateIO")]
+// #[cfg(feature = "output")]
+// pub unsafe fn xml_output_buffer_create_io(
+//     iowrite: Option<XmlOutputWriteCallback>,
+//     ioclose: Option<XmlOutputCloseCallback>,
+//     ioctx: *mut c_void,
+//     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+// ) -> Option<XmlOutputBuffer> {
+//     iowrite?;
 
-    XmlOutputBuffer::from_wrapped_encoder(encoder).map(|mut buf| {
-        buf.context = ioctx;
-        buf.writecallback = iowrite;
-        buf.closecallback = ioclose;
-        buf
-    })
-}
+//     XmlOutputBuffer::from_wrapped_encoder(encoder).map(|mut buf| {
+//         buf.context = ioctx;
+//         buf.writecallback = iowrite;
+//         buf.closecallback = ioclose;
+//         buf
+//     })
+// }
 
 /// Take a block of UTF-8 chars in and escape them.
 /// Returns 0 if success, or -1 otherwise
@@ -644,50 +624,50 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
     0
 }
 
-/// flushes and close the output I/O channel
-/// and free up all the associated resources
-///
-/// Returns the number of byte written or -1 in case of error.
-#[doc(alias = "xmlOutputBufferClose")]
-#[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_int {
-    let mut err_rc: c_int = 0;
+// /// flushes and close the output I/O channel
+// /// and free up all the associated resources
+// ///
+// /// Returns the number of byte written or -1 in case of error.
+// #[doc(alias = "xmlOutputBufferClose")]
+// #[cfg(feature = "output")]
+// pub unsafe extern "C" fn xml_output_buffer_close(out: XmlOutputBufferPtr) -> c_int {
+//     let mut err_rc: c_int = 0;
 
-    if out.is_null() {
-        return -1;
-    }
-    if (*out).writecallback.is_some() {
-        (*out).flush();
-    }
-    if let Some(closecallback) = (*out).closecallback {
-        err_rc = closecallback((*out).context);
-    }
-    let written: c_int = (*out).written;
-    if let Some(conv) = (*out).conv.take() {
-        conv.free();
-    }
-    let _ = (*out).encoder.take();
-    if let Some(buf) = (*out).buffer.take() {
-        buf.free();
-    }
+//     if out.is_null() {
+//         return -1;
+//     }
+//     if (*out).writecallback.is_some() {
+//         (*out).flush();
+//     }
+//     if let Some(closecallback) = (*out).closecallback {
+//         err_rc = closecallback((*out).context);
+//     }
+//     let written: c_int = (*out).written;
+//     if let Some(conv) = (*out).conv.take() {
+//         conv.free();
+//     }
+//     let _ = (*out).encoder.take();
+//     if let Some(buf) = (*out).buffer.take() {
+//         buf.free();
+//     }
 
-    if !(*out).error.is_ok() {
-        err_rc = -1;
-    }
-    xml_free(out as _);
-    if err_rc == 0 {
-        written
-    } else {
-        err_rc
-    }
-}
+//     if !(*out).error.is_ok() {
+//         err_rc = -1;
+//     }
+//     xml_free(out as _);
+//     if err_rc == 0 {
+//         written
+//     } else {
+//         err_rc
+//     }
+// }
 
-/// Close the transmit HTTP I/O channel and actually send data using a POST HTTP method.
-#[doc(alias = "xmlIOHTTPClosePost")]
-#[cfg(all(feature = "output", feature = "http"))]
-unsafe extern "C" fn xml_io_http_close_post(ctxt: *mut c_void) -> c_int {
-    xml_io_http_close_write(ctxt, c"POST".as_ptr() as _)
-}
+// /// Close the transmit HTTP I/O channel and actually send data using a POST HTTP method.
+// #[doc(alias = "xmlIOHTTPClosePost")]
+// #[cfg(all(feature = "output", feature = "http"))]
+// unsafe extern "C" fn xml_io_http_close_post(ctxt: *mut c_void) -> c_int {
+//     xml_io_http_close_write(ctxt, c"POST".as_ptr() as _)
+// }
 
 /// By default, libxml submits HTTP output requests using the "PUT" method.
 /// Calling this method changes the HTTP output method to use the "POST"
@@ -698,15 +678,12 @@ pub unsafe extern "C" fn xml_register_http_post_callbacks() {
     /*  Register defaults if not done previously  */
 
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        xml_register_default_output_callbacks();
+        register_default_output_callbacks();
     }
 
-    xml_register_output_callbacks(
-        Some(xml_io_http_match),
-        Some(xml_io_http_dflt_open_w),
-        Some(xml_io_http_write),
-        Some(xml_io_http_close_post),
-    );
+    register_output_callbacks(DefaultHTTPIOCallbacks {
+        write_method: "POST",
+    });
 }
 
 /// Handle a resource access error
@@ -1253,44 +1230,44 @@ pub unsafe fn xml_io_http_open(filename: &str) -> *mut c_void {
     xml_nanohttp_open(filename.as_ptr(), null_mut())
 }
 
-/// Open a temporary buffer to collect the document for a subsequent HTTP POST request.  
-/// Non-static as is called from the output buffer creation routine.
-///
-/// Returns an I/O context or NULL in case of error.
-#[doc(alias = "xmlIOHTTPOpenW")]
-#[cfg(all(feature = "http", feature = "output"))]
-pub unsafe extern "C" fn xml_io_http_open_w(
-    post_uri: *const c_char,
-    _compression: c_int,
-) -> *mut c_void {
-    if post_uri.is_null() {
-        return null_mut();
-    }
+// /// Open a temporary buffer to collect the document for a subsequent HTTP POST request.
+// /// Non-static as is called from the output buffer creation routine.
+// ///
+// /// Returns an I/O context or NULL in case of error.
+// #[doc(alias = "xmlIOHTTPOpenW")]
+// #[cfg(all(feature = "http", feature = "output"))]
+// pub unsafe extern "C" fn xml_io_http_open_w(
+//     post_uri: *const c_char,
+//     _compression: c_int,
+// ) -> *mut c_void {
+//     if post_uri.is_null() {
+//         return null_mut();
+//     }
 
-    let ctxt = xml_malloc(size_of::<XmlIOHTTPWriteCtxt>()) as XmlIOHTTPWriteCtxtPtr;
-    if ctxt.is_null() {
-        xml_ioerr_memory(c"creating HTTP output context".as_ptr() as _);
-        return null_mut();
-    }
+//     let ctxt = xml_malloc(size_of::<XmlIOHTTPWriteCtxt>()) as XmlIOHTTPWriteCtxtPtr;
+//     if ctxt.is_null() {
+//         xml_ioerr_memory(c"creating HTTP output context".as_ptr() as _);
+//         return null_mut();
+//     }
 
-    memset(ctxt as _, 0, size_of::<XmlIOHTTPWriteCtxt>());
+//     memset(ctxt as _, 0, size_of::<XmlIOHTTPWriteCtxt>());
 
-    (*ctxt).uri = xml_strdup(post_uri as _) as _;
-    if (*ctxt).uri.is_null() {
-        xml_ioerr_memory(c"copying URI".as_ptr() as _);
-        xml_free_http_write_ctxt(ctxt);
-        return null_mut();
-    }
+//     (*ctxt).uri = xml_strdup(post_uri as _) as _;
+//     if (*ctxt).uri.is_null() {
+//         xml_ioerr_memory(c"copying URI".as_ptr() as _);
+//         xml_free_http_write_ctxt(ctxt);
+//         return null_mut();
+//     }
 
-    // Any character conversions should have been done before this
+//     // Any character conversions should have been done before this
 
-    let Some(buf) = XmlOutputBuffer::from_wrapped_encoder(None) else {
-        xml_free_http_write_ctxt(ctxt);
-        return null_mut();
-    };
-    (*ctxt).doc_buff = buf;
-    ctxt as _
-}
+//     let Some(buf) = XmlOutputBuffer::from_wrapped_encoder(None) else {
+//         xml_free_http_write_ctxt(ctxt);
+//         return null_mut();
+//     };
+//     (*ctxt).doc_buff = buf;
+//     ctxt as _
+// }
 
 /// Read `len` bytes to `buffer` from the I/O channel.
 ///
@@ -1397,9 +1374,42 @@ impl XmlInputCallback for DefaultFileIOCallbacks {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct DefaultHTTPIOCallbacks;
+impl XmlOutputCallback for DefaultFileIOCallbacks {
+    fn is_match(&self, _filename: &str) -> bool {
+        true
+    }
 
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn io::Write>> {
+        if filename == "-" {
+            return Ok(Box::new(stdout()));
+        }
+
+        let filename = if let Ok(Ok(name)) = Url::parse(filename).map(|url| url.to_file_path()) {
+            Cow::Owned(name)
+        } else {
+            Cow::Borrowed(Path::new(filename))
+        };
+
+        File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(filename.as_ref())
+            .inspect_err(|_| unsafe {
+                let path = CString::new(filename.to_string_lossy().as_ref()).unwrap();
+                xml_ioerr(XmlParserErrors::XmlErrOK, path.as_ptr())
+            })
+            .map(|file| Box::new(file) as Box<dyn Write>)
+    }
+}
+
+#[cfg(feature = "http")]
+#[derive(Debug, Clone, Copy)]
+pub struct DefaultHTTPIOCallbacks {
+    write_method: &'static str,
+}
+
+#[cfg(feature = "http")]
 impl XmlInputCallback for DefaultHTTPIOCallbacks {
     fn is_match(&self, filename: &str) -> bool {
         filename.starts_with("http://")
@@ -1477,7 +1487,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xml_cleanup_output_callbacks();
+            cleanup_output_callbacks();
             reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;
@@ -1754,31 +1764,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_pop_output_callbacks() {
-        #[cfg(feature = "output")]
-        unsafe {
-            let mut leaks = 0;
-
-            let mem_base = xml_mem_blocks();
-
-            let ret_val = xml_pop_output_callbacks();
-            desret_int(ret_val);
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlPopOutputCallbacks",
-                    xml_mem_blocks() - mem_base
-                );
-                assert!(
-                    leaks == 0,
-                    "{leaks} Leaks are found in xmlPopOutputCallbacks()"
-                );
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_register_default_input_callbacks() {
         unsafe {
             let mut leaks = 0;
@@ -1808,7 +1793,7 @@ mod tests {
 
             let mem_base = xml_mem_blocks();
 
-            xml_register_default_output_callbacks();
+            register_default_output_callbacks();
             reset_last_error();
             if mem_base != xml_mem_blocks() {
                 leaks += 1;

@@ -1,11 +1,10 @@
 use std::{
     cell::RefCell,
     ffi::CString,
+    io::Write,
     ptr::{null, null_mut},
     rc::Rc,
 };
-
-use libc::FILE;
 
 use crate::{
     buf::XmlBufRef,
@@ -168,7 +167,7 @@ impl XmlDoc {
     /// Note that `format = 1` provide node indenting only if `xmlIndentTreeOutput = 1`
     /// or `xmlKeepBlanksDefault(0)` was called
     #[doc(alias = "xmlDocFormatDump")]
-    pub unsafe fn dump_format_file(&mut self, f: *mut FILE, format: i32) -> i32 {
+    pub unsafe fn dump_format_file(&mut self, f: &mut impl Write, format: i32) -> i32 {
         let mut encoding = self.encoding.clone();
 
         let handler = if let Some(enc) = self.encoding.as_deref() {
@@ -215,7 +214,7 @@ impl XmlDoc {
     ///
     /// returns: the number of bytes written or -1 in case of failure.
     #[doc(alias = "xmlDocDump")]
-    pub unsafe fn dump_file(&mut self, f: *mut FILE) -> i32 {
+    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a)) -> i32 {
         self.dump_format_file(f, 0)
     }
 
@@ -439,7 +438,7 @@ impl XmlNode {
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
-    pub unsafe fn dump_file(&mut self, f: *mut FILE, doc: XmlDocPtr) {
+    pub unsafe fn dump_file<'a>(&mut self, f: impl Write + 'a, doc: XmlDocPtr) {
         xml_init_parser();
 
         let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
@@ -487,9 +486,7 @@ impl XmlNode {
         let mut outbuf = XmlOutputBuffer::default();
         outbuf.buffer = XmlBufRef::from_raw(buf);
         outbuf.encoder = None;
-        outbuf.writecallback = None;
-        outbuf.closecallback = None;
-        outbuf.context = null_mut();
+        outbuf.context = None;
         outbuf.written = 0;
 
         let using: usize = xml_buf_use(buf);

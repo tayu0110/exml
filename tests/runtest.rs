@@ -9,7 +9,7 @@ use std::{
     fs::{metadata, remove_file, File},
     io::{self, BufRead, BufReader, Read, Write},
     mem::zeroed,
-    os::{fd::AsRawFd, raw::c_void},
+    os::raw::c_void,
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
@@ -73,7 +73,7 @@ use exml::{
     },
     SYSCONFDIR,
 };
-use libc::{fdopen, fflush, free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
+use libc::{free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
@@ -1979,8 +1979,11 @@ unsafe fn push_parse_test(
     }
     xml_free(base as _);
     if let Some(err) = err {
-        res = TEST_ERRORS
-            .with_borrow(|errors| compare_file_mem(err, &errors[..TEST_ERRORS_SIZE.get()]));
+        let mut emsg = vec![];
+        TEST_ERRORS.with_borrow(|errors| {
+            emsg.extend_from_slice(&errors[..TEST_ERRORS_SIZE.get()]);
+        });
+        res = compare_file_mem(err, &emsg);
         if res != 0 {
             eprintln!("Error for {filename} failed",);
             return -1;
@@ -2929,13 +2932,11 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
             }
         }
     }
-    let fd = fdopen(
-        XPATH_OUTPUT.with_borrow_mut(|f| f.as_ref().unwrap().as_raw_fd()),
-        c"wb".as_ptr(),
-    );
-    assert!(!fd.is_null());
-    xml_xpath_debug_dump_object(fd, res, 0);
-    fflush(fd);
+    XPATH_OUTPUT.with_borrow_mut(|out| {
+        let out = out.as_mut().unwrap();
+        xml_xpath_debug_dump_object(out, res, 0);
+        out.flush().ok();
+    });
     xml_xpath_free_object(res);
     xml_xpath_free_context(ctxt);
 
@@ -3019,7 +3020,56 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
     if let Some(result) = result {
         ret = compare_files(temp.as_str(), result.as_str());
         if ret != 0 {
-            eprintln!("Result for {filename} failed in {}", result);
+            // Rust `format!` does not support the similar of `%g` of C lang.
+            // Therefore, the representation of the floating point number may be different
+            // from result files of the original libxml2.
+            let mut t = BufReader::new(File::open(temp.as_str()).unwrap());
+            let mut r = BufReader::new(File::open(result.as_str()).unwrap());
+            let (mut ts, mut rs) = (String::new(), String::new());
+            let mut ok = true;
+            let mut cache = String::new();
+            while t.read_line(&mut ts).ok().filter(|&len| len > 0).is_none() {
+                if r.read_line(&mut rs).ok().filter(|&len| len > 0).is_none() {
+                    ok = false;
+                    break;
+                }
+                if ts.starts_with("Expression") {
+                    if ts != rs {
+                        ok = false;
+                        break;
+                    }
+                    cache = ts.clone();
+                } else if ts.starts_with("Object is a number") {
+                    if ts == rs {
+                        ts.clear();
+                        rs.clear();
+                        continue;
+                    }
+                    let Some((_, expr)) = cache.split_once(' ') else {
+                        ok = false;
+                        break;
+                    };
+                    let Ok(float) = expr.trim().parse::<f64>() else {
+                        ok = false;
+                        break;
+                    };
+                    let s = format!("Object is a number : {float}\n");
+                    if ts != s {
+                        ok = false;
+                        break;
+                    }
+                } else if ts != rs {
+                    ok = false;
+                    break;
+                }
+                ts.clear();
+                rs.clear();
+            }
+            if ok {
+                ret = 0;
+            } else {
+                eprintln!("Result for {filename} failed in {}", result);
+            }
         }
     }
 
@@ -3311,10 +3361,7 @@ unsafe extern "C" fn handle_uri(str: *const c_char, base: *const c_char, o: &mut
             .ok();
         } else {
             xml_normalize_uri_path((*uri).path);
-            let fd = fdopen(o.as_raw_fd(), c"wb".as_ptr());
-            assert!(!fd.is_null());
-            xml_print_uri(fd, uri);
-            fflush(fd);
+            xml_print_uri(o, uri);
             writeln!(o).ok();
             o.flush().ok();
         }

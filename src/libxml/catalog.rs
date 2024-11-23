@@ -6,6 +6,7 @@
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr},
+    io::Write,
     mem::{size_of, transmute, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -14,7 +15,7 @@ use std::{
 };
 
 use const_format::concatcp;
-use libc::{close, fprintf, getenv, memset, open, read, snprintf, stat, FILE, O_RDONLY};
+use libc::{close, getenv, memset, open, read, snprintf, stat, O_RDONLY};
 
 use crate::{
     __xml_raise_error,
@@ -28,7 +29,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_create, xml_hash_free, xml_hash_lookup,
-            xml_hash_remove_entry, xml_hash_scan, xml_hash_size, XmlHashTable, XmlHashTablePtr,
+            xml_hash_remove_entry, xml_hash_size, XmlHashTable, XmlHashTablePtr,
         },
         parser::{
             xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
@@ -2861,53 +2862,48 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_uri(
 /// Serialize an SGML Catalog entry
 #[doc(alias = "xmlCatalogDumpEntry")]
 #[cfg(feature = "output")]
-extern "C" fn xml_catalog_dump_entry(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
-) {
+fn xml_catalog_dump_entry(payload: *mut c_void, out: &mut impl Write) {
     let entry: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
-    let out: *mut FILE = data as _;
-    if entry.is_null() || out.is_null() {
+    if entry.is_null() {
         return;
     }
     unsafe {
         match (*entry).typ {
             XmlCatalogEntryType::SgmlCataEntity => {
-                fprintf(out, c"ENTITY ".as_ptr() as _);
+                write!(out, "ENTITY ");
             }
             XmlCatalogEntryType::SgmlCataPentity => {
-                fprintf(out, c"ENTITY %%".as_ptr() as _);
+                write!(out, "ENTITY %%");
             }
             XmlCatalogEntryType::SgmlCataDoctype => {
-                fprintf(out, c"DOCTYPE ".as_ptr() as _);
+                write!(out, "DOCTYPE ");
             }
             XmlCatalogEntryType::SgmlCataLinktype => {
-                fprintf(out, c"LINKTYPE ".as_ptr() as _);
+                write!(out, "LINKTYPE ");
             }
             XmlCatalogEntryType::SgmlCataNotation => {
-                fprintf(out, c"NOTATION ".as_ptr() as _);
+                write!(out, "NOTATION ");
             }
             XmlCatalogEntryType::SgmlCataPublic => {
-                fprintf(out, c"PUBLIC ".as_ptr() as _);
+                write!(out, "PUBLIC ");
             }
             XmlCatalogEntryType::SgmlCataSystem => {
-                fprintf(out, c"SYSTEM ".as_ptr() as _);
+                write!(out, "SYSTEM ");
             }
             XmlCatalogEntryType::SgmlCataDelegate => {
-                fprintf(out, c"DELEGATE ".as_ptr() as _);
+                write!(out, "DELEGATE ");
             }
             XmlCatalogEntryType::SgmlCataBase => {
-                fprintf(out, c"BASE ".as_ptr() as _);
+                write!(out, "BASE ");
             }
             XmlCatalogEntryType::SgmlCataCatalog => {
-                fprintf(out, c"CATALOG ".as_ptr() as _);
+                write!(out, "CATALOG ");
             }
             XmlCatalogEntryType::SgmlCataDocument => {
-                fprintf(out, c"DOCUMENT ".as_ptr() as _);
+                write!(out, "DOCUMENT ");
             }
             XmlCatalogEntryType::SgmlCataSGMLDecl => {
-                fprintf(out, c"SGMLDECL ".as_ptr() as _);
+                write!(out, "SGMLDECL ");
             }
             _ => {
                 return;
@@ -2919,7 +2915,11 @@ extern "C" fn xml_catalog_dump_entry(
             | XmlCatalogEntryType::SgmlCataDoctype
             | XmlCatalogEntryType::SgmlCataLinktype
             | XmlCatalogEntryType::SgmlCataNotation => {
-                fprintf(out, c"%s".as_ptr() as _, (*entry).name);
+                write!(
+                    out,
+                    "{}",
+                    CStr::from_ptr((*entry).name as *const i8).to_string_lossy()
+                );
             }
             XmlCatalogEntryType::SgmlCataPublic
             | XmlCatalogEntryType::SgmlCataSystem
@@ -2928,7 +2928,11 @@ extern "C" fn xml_catalog_dump_entry(
             | XmlCatalogEntryType::SgmlCataCatalog
             | XmlCatalogEntryType::SgmlCataBase
             | XmlCatalogEntryType::SgmlCataDelegate => {
-                fprintf(out, c"\"%s\"".as_ptr() as _, (*entry).name);
+                write!(
+                    out,
+                    "\"{}\"",
+                    CStr::from_ptr((*entry).name as *const i8).to_string_lossy()
+                );
             }
             _ => {}
         }
@@ -2941,11 +2945,15 @@ extern "C" fn xml_catalog_dump_entry(
             | XmlCatalogEntryType::SgmlCataPublic
             | XmlCatalogEntryType::SgmlCataSystem
             | XmlCatalogEntryType::SgmlCataDelegate => {
-                fprintf(out, c" \"%s\"".as_ptr() as _, (*entry).value);
+                write!(
+                    out,
+                    " \"{}\"",
+                    CStr::from_ptr((*entry).value as *const i8).to_string_lossy()
+                );
             }
             _ => {}
         }
-        fprintf(out, c"\n".as_ptr() as _);
+        writeln!(out);
     }
 }
 
@@ -3112,10 +3120,8 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
 
 #[doc(alias = "xmlDumpXMLCatalog")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntryPtr) -> i32 {
-    /*
-     * Rebuild a catalog
-     */
+unsafe fn xml_dump_xml_catalog(out: impl Write + 'static, catal: XmlCatalogEntryPtr) -> i32 {
+    // Rebuild a catalog
 
     use crate::{io::XmlOutputBuffer, tree::NodeCommon};
     let doc: XmlDocPtr = xml_new_doc(None);
@@ -3167,15 +3173,19 @@ unsafe extern "C" fn xml_dump_xml_catalog(out: *mut FILE, catal: XmlCatalogEntry
 /// Dump the given catalog to the given file.
 #[doc(alias = "xmlACatalogDump")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_a_catalog_dump(catal: XmlCatalogPtr, out: *mut FILE) {
-    if out.is_null() || catal.is_null() {
+pub unsafe fn xml_a_catalog_dump(catal: XmlCatalogPtr, mut out: impl Write + 'static) {
+    if catal.is_null() {
         return;
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlXMLCatalogType) {
         xml_dump_xml_catalog(out, (*catal).xml);
-    } else {
-        xml_hash_scan((*catal).sgml, Some(xml_catalog_dump_entry), out as _);
+    } else if let Some(sgml) = XmlHashTableRef::from_raw((*catal).sgml) {
+        sgml.scan(|data, _, _, _| {
+            if !data.0.is_null() {
+                xml_catalog_dump_entry(data.0, &mut out);
+            }
+        });
     }
 }
 
@@ -3520,11 +3530,7 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
 /// Dump all the global catalog content to the given file.
 #[doc(alias = "xmlCatalogDump")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_catalog_dump(out: *mut FILE) {
-    if out.is_null() {
-        return;
-    }
-
+pub unsafe extern "C" fn xml_catalog_dump(out: impl Write + 'static) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -4137,11 +4143,10 @@ mod tests {
                 for n_out in 0..GEN_NB_FILE_PTR {
                     let mem_base = xml_mem_blocks();
                     let catal = gen_xml_catalog_ptr(n_catal, 0);
-                    let out = gen_file_ptr(n_out, 1);
+                    let out = gen_file_ptr(n_out, 1).unwrap();
 
                     xml_a_catalog_dump(catal, out);
                     des_xml_catalog_ptr(n_catal, catal, 0);
-                    des_file_ptr(n_out, out, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
                         leaks += 1;
@@ -4417,10 +4422,9 @@ mod tests {
 
             for n_out in 0..GEN_NB_FILE_PTR {
                 let mem_base = xml_mem_blocks();
-                let out = gen_file_ptr(n_out, 0);
+                let out = gen_file_ptr(n_out, 0).unwrap();
 
                 xml_catalog_dump(out);
-                des_file_ptr(n_out, out, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;

@@ -5,13 +5,15 @@
 
 use std::{
     ffi::{c_char, CStr, CString},
+    io::{stdout, Write},
     mem::zeroed,
     os::raw::c_void,
-    ptr::{addr_of, addr_of_mut, null_mut},
+    ptr::{addr_of_mut, null_mut},
+    str::from_utf8_unchecked,
     sync::atomic::Ordering,
 };
 
-use libc::{fprintf, fputc, strlen, FILE};
+use libc::strlen;
 
 use crate::{
     __xml_raise_error,
@@ -38,58 +40,73 @@ use super::{
     xpath::XmlXPathObjectType,
 };
 
-pub type XmlDebugCtxtPtr = *mut XmlDebugCtxt;
+pub type XmlDebugCtxtPtr<'a> = *mut XmlDebugCtxt<'a>;
 #[repr(C)]
-pub struct XmlDebugCtxt {
-    output: *mut FILE,    /* the output file */
-    shift: [c_char; 101], /* used for indenting */
-    depth: i32,           /* current depth */
-    doc: XmlDocPtr,       /* current document */
-    node: XmlNodePtr,     /* current node */
-    dict: XmlDictPtr,     /* the doc dictionary */
-    check: i32,           /* do just checkings */
-    errors: i32,          /* number of errors found */
-    nodict: i32,          /* if the document has no dictionary */
-    options: i32,         /* options */
+pub struct XmlDebugCtxt<'a> {
+    output: Box<dyn Write + 'a>, /* the output file */
+    shift: [u8; 100],            /* used for indenting */
+    depth: i32,                  /* current depth */
+    doc: XmlDocPtr,              /* current document */
+    node: XmlNodePtr,            /* current node */
+    dict: XmlDictPtr,            /* the doc dictionary */
+    check: i32,                  /* do just checkings */
+    errors: i32,                 /* number of errors found */
+    nodict: i32,                 /* if the document has no dictionary */
+    options: i32,                /* options */
+}
+
+impl Default for XmlDebugCtxt<'_> {
+    fn default() -> Self {
+        Self {
+            depth: 0,
+            check: 0,
+            errors: 0,
+            output: Box::new(stdout()),
+            doc: null_mut(),
+            node: null_mut(),
+            dict: null_mut(),
+            nodict: 0,
+            options: 0,
+            shift: [b' '; 100],
+        }
+    }
 }
 
 /// Dumps information about the string, shorten it if necessary
 #[doc(alias = "xmlDebugDumpString")]
-pub unsafe extern "C" fn xml_debug_dump_string(mut output: *mut FILE, str: *const XmlChar) {
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-    if output.is_null() {
-        output = stdout;
-    }
+pub unsafe extern "C" fn xml_debug_dump_string<'a>(
+    mut output: Option<&mut (impl Write + 'a)>,
+    str: *const XmlChar,
+) {
+    let mut stdout = stdout();
+    let output = output
+        .as_mut()
+        .map(|o| o as &mut dyn Write)
+        .unwrap_or(&mut stdout as &mut dyn Write);
     if str.is_null() {
-        fprintf(output, c"(NULL)".as_ptr());
+        write!(output, "(NULL)");
         return;
     }
     for i in 0..40 {
         if *str.add(i) == 0 {
             return;
         } else if xml_is_blank_char(*str.add(i) as u32) {
-            fputc(b' ' as i32, output);
+            write!(output, " ");
         } else if *str.add(i) >= 0x80 {
-            fprintf(output, c"#%X".as_ptr(), *str.add(i) as i32);
+            write!(output, "#{:X}", *str.add(i) as i32);
         } else {
-            fputc(*str.add(i) as i32, output);
+            write!(output, "{}", *str.add(i) as char);
         }
     }
-    fprintf(output, c"...".as_ptr());
+    write!(output, "...");
 }
 
 #[doc(alias = "xmlCtxtDumpInitCtxt")]
 unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
     (*ctxt).depth = 0;
     (*ctxt).check = 0;
     (*ctxt).errors = 0;
-    (*ctxt).output = stdout;
+    (*ctxt).output = Box::new(stdout());
     (*ctxt).doc = null_mut();
     (*ctxt).node = null_mut();
     (*ctxt).dict = null_mut();
@@ -98,7 +115,6 @@ unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
     for i in 0..100 {
         (*ctxt).shift[i] = b' ' as _;
     }
-    (*ctxt).shift[100] = 0;
 }
 
 #[doc(alias = "xmlCtxtDumpSpaces")]
@@ -106,15 +122,12 @@ unsafe extern "C" fn xml_ctxt_dump_spaces(ctxt: XmlDebugCtxtPtr) {
     if (*ctxt).check != 0 {
         return;
     }
-    if !(*ctxt).output.is_null() && (*ctxt).depth > 0 {
+    if (*ctxt).depth > 0 {
         if (*ctxt).depth < 50 {
-            fprintf(
-                (*ctxt).output,
-                c"%s".as_ptr(),
-                addr_of!((*ctxt).shift[100 - 2 * (*ctxt).depth as usize]),
-            );
+            let spaces = from_utf8_unchecked(&(*ctxt).shift[100 - 2 * (*ctxt).depth as usize..]);
+            write!((*ctxt).output, "{spaces}",);
         } else {
-            fprintf((*ctxt).output, c"%s".as_ptr(), (*ctxt).shift.as_ptr());
+            write!((*ctxt).output, "{}", from_utf8_unchecked(&(*ctxt).shift));
         }
     }
 }
@@ -126,7 +139,7 @@ unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const Xml
     }
     /* TODO: check UTF8 content of the string */
     if str.is_null() {
-        fprintf((*ctxt).output, c"(NULL)".as_ptr());
+        write!((*ctxt).output, "(NULL)");
         return;
     }
 
@@ -134,14 +147,14 @@ unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const Xml
         if *str.add(i) == 0 {
             return;
         } else if xml_is_blank_char(*str.add(i) as u32) {
-            fputc(b' ' as i32, (*ctxt).output);
+            write!((*ctxt).output, " ");
         } else if *str.add(i) >= 0x80 {
-            fprintf((*ctxt).output, c"#%X".as_ptr(), *str.add(i) as i32);
+            write!((*ctxt).output, "#{:0X}", *str.add(i) as i32);
         } else {
-            fputc(*str.add(i) as i32, (*ctxt).output);
+            write!((*ctxt).output, "{}", *str.add(i) as char);
         }
     }
-    fprintf((*ctxt).output, c"...".as_ptr());
+    write!((*ctxt).output, "...");
 }
 
 const DUMP_TEXT_TYPE: i32 = 1;
@@ -607,7 +620,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
 
     if dtd.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"DTD node is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "DTD node is NULL");
         }
         return;
     }
@@ -622,27 +635,18 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
     }
     if (*ctxt).check == 0 {
         if !(*dtd).name.is_null() {
-            fprintf(
-                (*ctxt).output,
-                c"DTD(%s)".as_ptr(),
-                (*dtd).name as *mut c_char,
-            );
+            let name = CStr::from_ptr((*dtd).name as *const i8).to_string_lossy();
+            write!((*ctxt).output, "DTD({})", name);
         } else {
-            fprintf((*ctxt).output, c"DTD".as_ptr());
+            write!((*ctxt).output, "DTD");
         }
         if let Some(external_id) = (*dtd).external_id.as_deref() {
-            let external_id = CString::new(external_id).unwrap();
-            fprintf(
-                (*ctxt).output,
-                c", PUBLIC %s".as_ptr(),
-                external_id.as_ptr(),
-            );
+            write!((*ctxt).output, ", PUBLIC {external_id}");
         }
         if let Some(system_id) = (*dtd).system_id.as_deref() {
-            let system_id = CString::new(system_id).unwrap();
-            fprintf((*ctxt).output, c", SYSTEM %s".as_ptr(), system_id.as_ptr());
+            write!((*ctxt).output, ", SYSTEM {system_id}");
         }
-        fprintf((*ctxt).output, c"\n".as_ptr());
+        writeln!((*ctxt).output);
     }
     /*
      * Do a bit of checking
@@ -655,7 +659,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
 unsafe extern "C" fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
     if dtd.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"DTD is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "DTD is NULL");
         }
         return;
     }
@@ -665,7 +669,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPtr) {
         xml_ctxt_dump_node_list(ctxt, children.as_ptr());
         (*ctxt).depth -= 1;
     } else {
-        fprintf((*ctxt).output, c"    DTD is empty\n".as_ptr());
+        writeln!((*ctxt).output, "    DTD is empty");
     }
 }
 
@@ -675,7 +679,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
 
     if elem.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Element declaration is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "Element declaration is NULL");
         }
         return;
     }
@@ -690,9 +694,9 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
     if let Some(name) = (*elem).name.as_deref() {
         if (*ctxt).check == 0 {
             let name = CString::new(name.as_str()).unwrap();
-            fprintf((*ctxt).output, c"ELEMDECL(".as_ptr());
+            write!((*ctxt).output, "ELEMDECL(");
             xml_ctxt_dump_string(ctxt, name.as_ptr() as *const u8);
-            fprintf((*ctxt).output, c")".as_ptr());
+            write!((*ctxt).output, ")");
         }
     } else {
         xml_debug_err(
@@ -704,19 +708,19 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
     if (*ctxt).check == 0 {
         match (*elem).etype {
             XmlElementTypeVal::XmlElementTypeUndefined => {
-                fprintf((*ctxt).output, c", UNDEFINED".as_ptr());
+                write!((*ctxt).output, ", UNDEFINED");
             }
             XmlElementTypeVal::XmlElementTypeEmpty => {
-                fprintf((*ctxt).output, c", EMPTY".as_ptr());
+                write!((*ctxt).output, ", EMPTY");
             }
             XmlElementTypeVal::XmlElementTypeAny => {
-                fprintf((*ctxt).output, c", ANY".as_ptr());
+                write!((*ctxt).output, ", ANY");
             }
             XmlElementTypeVal::XmlElementTypeMixed => {
-                fprintf((*ctxt).output, c", MIXED ".as_ptr());
+                write!((*ctxt).output, ", MIXED ");
             }
             XmlElementTypeVal::XmlElementTypeElement => {
-                fprintf((*ctxt).output, c", MIXED ".as_ptr());
+                write!((*ctxt).output, ", MIXED ");
             }
         }
         if (*elem).typ != XmlElementType::XmlElementNode && !(*elem).content.is_null() {
@@ -725,14 +729,13 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
             buf[0] = 0;
             xml_snprintf_element_content(buf.as_mut_ptr(), 5000, (*elem).content, 1);
             buf[5000] = 0;
-            fprintf((*ctxt).output, c"%s".as_ptr(), buf);
+            let elem = CStr::from_ptr(buf.as_ptr()).to_string_lossy();
+            write!((*ctxt).output, "{}", elem);
         }
-        fprintf((*ctxt).output, c"\n".as_ptr());
+        writeln!((*ctxt).output);
     }
 
-    /*
-     * Do a bit of checking
-     */
+    // Do a bit of checking
     xml_ctxt_generic_node_check(ctxt, elem as XmlNodePtr);
 }
 
@@ -742,7 +745,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
 
     if attr.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Attribute declaration is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "Attribute declaration is NULL");
         }
         return;
     }
@@ -756,11 +759,8 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     }
     if !(*attr).name.is_null() {
         if (*ctxt).check == 0 {
-            fprintf(
-                (*ctxt).output,
-                c"ATTRDECL(%s)".as_ptr(),
-                (*attr).name as *mut c_char,
-            );
+            let name = CStr::from_ptr((*attr).name as *const i8).to_string_lossy();
+            write!((*ctxt).output, "ATTRDECL({name})");
         }
     } else {
         xml_debug_err(
@@ -771,8 +771,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     }
     if let Some(elem) = (*attr).elem.as_deref() {
         if (*ctxt).check == 0 {
-            let elem = CString::new(elem).unwrap();
-            fprintf((*ctxt).output, c" for %s".as_ptr(), elem.as_ptr());
+            write!((*ctxt).output, " for {elem}");
         }
     } else {
         xml_debug_err(
@@ -784,45 +783,45 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
     if (*ctxt).check == 0 {
         match (*attr).atype {
             XmlAttributeType::XmlAttributeCDATA => {
-                fprintf((*ctxt).output, c" CDATA".as_ptr());
+                write!((*ctxt).output, " CDATA");
             }
             XmlAttributeType::XmlAttributeID => {
-                fprintf((*ctxt).output, c" ID".as_ptr());
+                write!((*ctxt).output, " ID");
             }
             XmlAttributeType::XmlAttributeIDREF => {
-                fprintf((*ctxt).output, c" IDREF".as_ptr());
+                write!((*ctxt).output, " IDREF");
             }
             XmlAttributeType::XmlAttributeIDREFS => {
-                fprintf((*ctxt).output, c" IDREFS".as_ptr());
+                write!((*ctxt).output, " IDREFS");
             }
             XmlAttributeType::XmlAttributeEntity => {
-                fprintf((*ctxt).output, c" ENTITY".as_ptr());
+                write!((*ctxt).output, " ENTITY");
             }
             XmlAttributeType::XmlAttributeEntities => {
-                fprintf((*ctxt).output, c" ENTITIES".as_ptr());
+                write!((*ctxt).output, " ENTITIES");
             }
             XmlAttributeType::XmlAttributeNmtoken => {
-                fprintf((*ctxt).output, c" NMTOKEN".as_ptr());
+                write!((*ctxt).output, " NMTOKEN");
             }
             XmlAttributeType::XmlAttributeNmtokens => {
-                fprintf((*ctxt).output, c" NMTOKENS".as_ptr());
+                write!((*ctxt).output, " NMTOKENS");
             }
             XmlAttributeType::XmlAttributeEnumeration => {
-                fprintf((*ctxt).output, c" ENUMERATION".as_ptr());
+                write!((*ctxt).output, " ENUMERATION");
             }
             XmlAttributeType::XmlAttributeNotation => {
-                fprintf((*ctxt).output, c" NOTATION ".as_ptr());
+                write!((*ctxt).output, " NOTATION ");
             }
         }
         if !(*attr).tree.is_null() {
             let mut cur: XmlEnumerationPtr = (*attr).tree;
 
             for indx in 0..5 {
-                let name = CString::new((*cur).name.as_deref().unwrap()).unwrap();
+                let name = (*cur).name.as_deref().unwrap();
                 if indx != 0 {
-                    fprintf((*ctxt).output, c"|%s".as_ptr(), name.as_ptr());
+                    write!((*ctxt).output, "|{name}");
                 } else {
-                    fprintf((*ctxt).output, c" (%s".as_ptr(), name.as_ptr());
+                    write!((*ctxt).output, " ({name}");
                 }
                 cur = (*cur).next;
                 if cur.is_null() {
@@ -830,29 +829,29 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
                 }
             }
             if cur.is_null() {
-                fprintf((*ctxt).output, c")".as_ptr());
+                write!((*ctxt).output, ")");
             } else {
-                fprintf((*ctxt).output, c"...)".as_ptr());
+                write!((*ctxt).output, "...)");
             }
         }
         match (*attr).def {
             XmlAttributeDefault::XmlAttributeNone => {}
             XmlAttributeDefault::XmlAttributeRequired => {
-                fprintf((*ctxt).output, c" REQUIRED".as_ptr());
+                write!((*ctxt).output, " REQUIRED");
             }
             XmlAttributeDefault::XmlAttributeImplied => {
-                fprintf((*ctxt).output, c" IMPLIED".as_ptr());
+                write!((*ctxt).output, " IMPLIED");
             }
             XmlAttributeDefault::XmlAttributeFixed => {
-                fprintf((*ctxt).output, c" FIXED".as_ptr());
+                write!((*ctxt).output, " FIXED");
             }
         }
         if !(*attr).default_value.is_null() {
-            fprintf((*ctxt).output, c"\"".as_ptr());
+            write!((*ctxt).output, "\"");
             xml_ctxt_dump_string(ctxt, (*attr).default_value);
-            fprintf((*ctxt).output, c"\"".as_ptr());
+            write!((*ctxt).output, "\"");
         }
-        fprintf((*ctxt).output, c"\n".as_ptr());
+        writeln!((*ctxt).output);
     }
 
     /*
@@ -867,7 +866,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
 
     if ent.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Entity declaration is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "Entity declaration is NULL");
         }
         return;
     }
@@ -881,9 +880,9 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
     }
     if !(*ent).name.load(Ordering::Relaxed).is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"ENTITYDECL(".as_ptr());
+            write!((*ctxt).output, "ENTITYDECL(");
             xml_ctxt_dump_string(ctxt, (*ent).name.load(Ordering::Relaxed));
-            fprintf((*ctxt).output, c")".as_ptr());
+            write!((*ctxt).output, ")");
         }
     } else {
         xml_debug_err(
@@ -895,54 +894,49 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
     if (*ctxt).check == 0 {
         match (*ent).etype {
             Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                fprintf((*ctxt).output, c", internal\n".as_ptr());
+                writeln!((*ctxt).output, ", internal");
             }
             Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                fprintf((*ctxt).output, c", external parsed\n".as_ptr());
+                writeln!((*ctxt).output, ", external parsed");
             }
             Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                fprintf((*ctxt).output, c", unparsed\n".as_ptr());
+                writeln!((*ctxt).output, ", unparsed");
             }
             Some(XmlEntityType::XmlInternalParameterEntity) => {
-                fprintf((*ctxt).output, c", parameter\n".as_ptr());
+                writeln!((*ctxt).output, ", parameter");
             }
             Some(XmlEntityType::XmlExternalParameterEntity) => {
-                fprintf((*ctxt).output, c", external parameter\n".as_ptr());
+                writeln!((*ctxt).output, ", external parameter");
             }
             Some(XmlEntityType::XmlInternalPredefinedEntity) => {
-                fprintf((*ctxt).output, c", predefined\n".as_ptr());
+                writeln!((*ctxt).output, ", predefined");
             }
             _ => unreachable!(),
         }
         if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf(
-                (*ctxt).output,
-                c" ExternalID=%s\n".as_ptr(),
-                (*ent).external_id.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let external_id =
+                CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+            writeln!((*ctxt).output, " ExternalID={external_id}");
         }
         if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf(
-                (*ctxt).output,
-                c" SystemID=%s\n".as_ptr(),
-                (*ent).system_id.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let system_id = CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as *const i8)
+                .to_string_lossy();
+            writeln!((*ctxt).output, " SystemID={system_id}");
         }
         if !(*ent).uri.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf(
-                (*ctxt).output,
-                c" URI=%s\n".as_ptr(),
-                (*ent).uri.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let uri =
+                CStr::from_ptr((*ent).uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+            writeln!((*ctxt).output, " URI={uri}");
         }
         if !(*ent).content.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf((*ctxt).output, c" content=".as_ptr());
+            write!((*ctxt).output, " content=");
             xml_ctxt_dump_string(ctxt, (*ent).content.load(Ordering::Relaxed));
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
     }
 
@@ -958,7 +952,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
 
     if ns.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"namespace node is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "namespace node is NULL");
         }
         return;
     }
@@ -987,17 +981,14 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         }
     } else if (*ctxt).check == 0 {
         if !(*ns).prefix.is_null() {
-            fprintf(
-                (*ctxt).output,
-                c"namespace %s href=".as_ptr(),
-                (*ns).prefix as *mut c_char,
-            );
+            let prefix = CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy();
+            write!((*ctxt).output, "namespace {prefix} href=");
         } else {
-            fprintf((*ctxt).output, c"default namespace href=".as_ptr());
+            write!((*ctxt).output, "default namespace href=");
         }
 
         xml_ctxt_dump_string(ctxt, (*ns).href);
-        fprintf((*ctxt).output, c"\n".as_ptr());
+        writeln!((*ctxt).output);
     }
 }
 
@@ -1015,69 +1006,59 @@ unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityP
 
     if ent.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Entity is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "Entity is NULL");
         }
         return;
     }
     if (*ctxt).check == 0 {
         match (*ent).etype {
             Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                fprintf((*ctxt).output, c"INTERNAL_GENERAL_ENTITY ".as_ptr());
+                write!((*ctxt).output, "INTERNAL_GENERAL_ENTITY ");
             }
             Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                fprintf((*ctxt).output, c"EXTERNAL_GENERAL_PARSED_ENTITY ".as_ptr());
+                write!((*ctxt).output, "EXTERNAL_GENERAL_PARSED_ENTITY ");
             }
             Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                fprintf(
-                    (*ctxt).output,
-                    c"EXTERNAL_GENERAL_UNPARSED_ENTITY ".as_ptr(),
-                );
+                write!((*ctxt).output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ");
             }
             Some(XmlEntityType::XmlInternalParameterEntity) => {
-                fprintf((*ctxt).output, c"INTERNAL_PARAMETER_ENTITY ".as_ptr());
+                write!((*ctxt).output, "INTERNAL_PARAMETER_ENTITY ");
             }
             Some(XmlEntityType::XmlExternalParameterEntity) => {
-                fprintf((*ctxt).output, c"EXTERNAL_PARAMETER_ENTITY ".as_ptr());
+                write!((*ctxt).output, "EXTERNAL_PARAMETER_ENTITY ");
             }
             Some(e) => {
-                fprintf((*ctxt).output, c"ENTITY_%d ! ".as_ptr(), e as i32);
+                write!((*ctxt).output, "ENTITY_{} ! ", e as i32);
             }
             _ => unreachable!(),
         }
-        fprintf(
-            (*ctxt).output,
-            c"%s\n".as_ptr(),
-            (*ent).name.load(Ordering::Relaxed),
-        );
+        let name =
+            CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+        writeln!((*ctxt).output, "{name}");
         if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf(
-                (*ctxt).output,
-                c"ExternalID=%s\n".as_ptr(),
-                (*ent).external_id.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let external_id =
+                CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+            writeln!((*ctxt).output, "ExternalID={external_id}");
         }
         if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf(
-                (*ctxt).output,
-                c"SystemID=%s\n".as_ptr(),
-                (*ent).system_id.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let system_id = CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as *const i8)
+                .to_string_lossy();
+            writeln!((*ctxt).output, "SystemID={system_id}");
         }
         if !(*ent).uri.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf(
-                (*ctxt).output,
-                c"URI=%s\n".as_ptr(),
-                (*ent).uri.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let uri =
+                CStr::from_ptr((*ent).uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+            writeln!((*ctxt).output, "URI={uri}");
         }
         if !(*ent).content.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf((*ctxt).output, c"content=".as_ptr());
+            write!((*ctxt).output, "content=");
             xml_ctxt_dump_string(ctxt, (*ent).content.load(Ordering::Relaxed));
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
     }
 }
@@ -1097,7 +1078,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
     if node.is_null() {
         if (*ctxt).check == 0 {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf((*ctxt).output, c"node is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "node is NULL");
         }
         return;
     }
@@ -1107,20 +1088,20 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
         XmlElementType::XmlElementNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"ELEMENT ".as_ptr());
+                write!((*ctxt).output, "ELEMENT ");
                 if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
                     xml_ctxt_dump_string(ctxt, (*(*node).ns).prefix);
-                    fprintf((*ctxt).output, c":".as_ptr());
+                    write!((*ctxt).output, ":");
                 }
                 xml_ctxt_dump_string(ctxt, (*node).name);
-                fprintf((*ctxt).output, c"\n".as_ptr());
+                writeln!((*ctxt).output);
             }
         }
         XmlElementType::XmlAttributeNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
             }
-            fprintf((*ctxt).output, c"Error, ATTRIBUTE found here\n".as_ptr());
+            writeln!((*ctxt).output, "Error, ATTRIBUTE found here");
             xml_ctxt_generic_node_check(ctxt, node);
             return;
         }
@@ -1128,85 +1109,79 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
                 if (*node).name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
-                    fprintf((*ctxt).output, c"TEXT no enc".as_ptr());
+                    write!((*ctxt).output, "TEXT no enc");
                 } else {
-                    fprintf((*ctxt).output, c"TEXT".as_ptr());
+                    write!((*ctxt).output, "TEXT");
                 }
                 if (*ctxt).options & DUMP_TEXT_TYPE != 0 {
                     if (*node).content == addr_of_mut!((*node).properties) as *mut XmlChar {
-                        fprintf((*ctxt).output, c" compact\n".as_ptr());
+                        writeln!((*ctxt).output, " compact");
                     } else if xml_dict_owns((*ctxt).dict, (*node).content) == 1 {
-                        fprintf((*ctxt).output, c" interned\n".as_ptr());
+                        writeln!((*ctxt).output, " interned");
                     } else {
-                        fprintf((*ctxt).output, c"\n".as_ptr());
+                        writeln!((*ctxt).output);
                     }
                 } else {
-                    fprintf((*ctxt).output, c"\n".as_ptr());
+                    writeln!((*ctxt).output);
                 }
             }
         }
         XmlElementType::XmlCDATASectionNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"CDATA_SECTION\n".as_ptr());
+                writeln!((*ctxt).output, "CDATA_SECTION");
             }
         }
         XmlElementType::XmlEntityRefNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf(
-                    (*ctxt).output,
-                    c"ENTITY_REF(%s)\n".as_ptr(),
-                    (*node).name as *mut c_char,
-                );
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                writeln!((*ctxt).output, "ENTITY_REF({name})");
             }
         }
         XmlElementType::XmlEntityNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"ENTITY\n".as_ptr());
+                writeln!((*ctxt).output, "ENTITY");
             }
         }
         XmlElementType::XmlPINode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf(
-                    (*ctxt).output,
-                    c"PI %s\n".as_ptr(),
-                    (*node).name as *mut c_char,
-                );
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                writeln!((*ctxt).output, "PI {name}");
             }
         }
         XmlElementType::XmlCommentNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"COMMENT\n".as_ptr());
+                writeln!((*ctxt).output, "COMMENT");
             }
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
             }
-            fprintf((*ctxt).output, c"Error, DOCUMENT found here\n".as_ptr());
+            writeln!((*ctxt).output, "Error, DOCUMENT found here");
             xml_ctxt_generic_node_check(ctxt, node);
             return;
         }
         XmlElementType::XmlDocumentTypeNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"DOCUMENT_TYPE\n".as_ptr());
+                writeln!((*ctxt).output, "DOCUMENT_TYPE");
             }
         }
         XmlElementType::XmlDocumentFragNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"DOCUMENT_FRAG\n".as_ptr());
+                writeln!((*ctxt).output, "DOCUMENT_FRAG");
             }
         }
         XmlElementType::XmlNotationNode => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"NOTATION\n".as_ptr());
+                writeln!((*ctxt).output, "NOTATION");
             }
         }
         XmlElementType::XmlDTDNode => {
@@ -1232,14 +1207,14 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
         XmlElementType::XmlXIncludeStart => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"INCLUDE START\n".as_ptr());
+                writeln!((*ctxt).output, "INCLUDE START");
             }
             return;
         }
         XmlElementType::XmlXIncludeEnd => {
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
-                fprintf((*ctxt).output, c"INCLUDE END\n".as_ptr());
+                writeln!((*ctxt).output, "INCLUDE END");
             }
             return;
         }
@@ -1260,7 +1235,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
         if (*ctxt).check == 0 {
             xml_ctxt_dump_spaces(ctxt);
         }
-        fprintf((*ctxt).output, c"PBM: doc.is_null() !!!\n".as_ptr());
+        writeln!((*ctxt).output, "PBM: doc.is_null() !!!");
     }
     (*ctxt).depth += 1;
     if (*node).typ == XmlElementType::XmlElementNode && !(*node).ns_def.is_null() {
@@ -1274,9 +1249,9 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             && (*ctxt).check == 0
         {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf((*ctxt).output, c"content=".as_ptr());
+            write!((*ctxt).output, "content=");
             xml_ctxt_dump_string(ctxt, (*node).content);
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
     } else {
         let ent: XmlEntityPtr = xml_get_doc_entity((*node).doc, (*node).name);
@@ -1298,7 +1273,7 @@ unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
     if node.is_null() {
         if (*ctxt).check == 0 {
             xml_ctxt_dump_spaces(ctxt);
-            fprintf((*ctxt).output, c"node is NULL\n".as_ptr());
+            writeln!((*ctxt).output, "node is NULL");
         }
         return;
     }
@@ -1329,14 +1304,14 @@ unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr)
 
     if attr.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Attr is NULL".as_ptr());
+            write!((*ctxt).output, "Attr is NULL");
         }
         return;
     }
     if (*ctxt).check == 0 {
-        fprintf((*ctxt).output, c"ATTRIBUTE ".as_ptr());
+        write!((*ctxt).output, "ATTRIBUTE ");
         xml_ctxt_dump_string(ctxt, (*attr).name);
-        fprintf((*ctxt).output, c"\n".as_ptr());
+        writeln!((*ctxt).output);
         if let Some(children) = (*attr).children {
             (*ctxt).depth += 1;
             xml_ctxt_dump_node_list(ctxt, children.as_ptr());
@@ -1364,14 +1339,15 @@ unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
 
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlDebugDumpAttr")]
-pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr, depth: i32) {
-    let mut ctxt: XmlDebugCtxt = zeroed();
+pub unsafe extern "C" fn xml_debug_dump_attr(
+    output: &mut impl Write,
+    attr: XmlAttrPtr,
+    depth: i32,
+) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    if output.is_null() {
-        return;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = Box::new(output);
     ctxt.depth = depth;
     xml_ctxt_dump_attr(addr_of_mut!(ctxt), attr);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
@@ -1379,14 +1355,15 @@ pub unsafe extern "C" fn xml_debug_dump_attr(output: *mut FILE, attr: XmlAttrPtr
 
 /// Dumps debug information for the attribute list
 #[doc(alias = "xmlDebugDumpAttrList")]
-pub unsafe extern "C" fn xml_debug_dump_attr_list(output: *mut FILE, attr: XmlAttrPtr, depth: i32) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
+    output: &mut (impl Write + 'a),
+    attr: XmlAttrPtr,
+    depth: i32,
+) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    if output.is_null() {
-        return;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = Box::new(output);
     ctxt.depth = depth;
     xml_ctxt_dump_attr_list(addr_of_mut!(ctxt), attr);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
@@ -1394,14 +1371,15 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list(output: *mut FILE, attr: XmlAt
 
 /// Dumps debug information for the element node, it is not recursive
 #[doc(alias = "xmlDebugDumpOneNode")]
-pub unsafe extern "C" fn xml_debug_dump_one_node(output: *mut FILE, node: XmlNodePtr, depth: i32) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe extern "C" fn xml_debug_dump_one_node(
+    output: &mut impl Write,
+    node: XmlNodePtr,
+    depth: i32,
+) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    if output.is_null() {
-        return;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = Box::new(output);
     ctxt.depth = depth;
     xml_ctxt_dump_one_node(addr_of_mut!(ctxt), node);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
@@ -1409,17 +1387,15 @@ pub unsafe extern "C" fn xml_debug_dump_one_node(output: *mut FILE, node: XmlNod
 
 /// Dumps debug information for the element node, it is recursive
 #[doc(alias = "xmlDebugDumpNode")]
-pub unsafe extern "C" fn xml_debug_dump_node(mut output: *mut FILE, node: XmlNodePtr, depth: i32) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_dump_node<'a>(
+    output: Option<impl Write + 'a>,
+    node: XmlNodePtr,
+    depth: i32,
+) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-    if output.is_null() {
-        output = stdout;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     ctxt.depth = depth;
     xml_ctxt_dump_node(addr_of_mut!(ctxt), node);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
@@ -1427,22 +1403,11 @@ pub unsafe extern "C" fn xml_debug_dump_node(mut output: *mut FILE, node: XmlNod
 
 /// Dumps debug information for the list of element node, it is recursive
 #[doc(alias = "xmlDebugDumpNodeList")]
-pub unsafe extern "C" fn xml_debug_dump_node_list(
-    mut output: *mut FILE,
-    node: XmlNodePtr,
-    depth: i32,
-) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_dump_node_list(output: Option<impl Write>, node: XmlNodePtr, depth: i32) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    if output.is_null() {
-        output = stdout;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     ctxt.depth = depth;
     xml_ctxt_dump_node_list(addr_of_mut!(ctxt), node);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
@@ -1452,7 +1417,7 @@ pub unsafe extern "C" fn xml_debug_dump_node_list(
 unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"DOCUMENT.is_null() !\n".as_ptr());
+            writeln!((*ctxt).output, "DOCUMENT.is_null() !");
         }
         return;
     }
@@ -1517,12 +1482,12 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         }
         XmlElementType::XmlDocumentNode => {
             if (*ctxt).check == 0 {
-                fprintf((*ctxt).output, c"DOCUMENT\n".as_ptr());
+                writeln!((*ctxt).output, "DOCUMENT");
             }
         }
         XmlElementType::XmlHTMLDocumentNode => {
             if (*ctxt).check == 0 {
-                fprintf((*ctxt).output, c"HTML DOCUMENT\n".as_ptr());
+                writeln!((*ctxt).output, "HTML DOCUMENT");
             }
         }
         XmlElementType::XmlDocumentTypeNode => {
@@ -1566,30 +1531,30 @@ unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Xml
     xml_ctxt_dump_doc_head(ctxt, doc);
     if (*ctxt).check == 0 {
         if !(*doc).name.is_null() {
-            fprintf((*ctxt).output, c"name=".as_ptr());
+            write!((*ctxt).output, "name=");
             xml_ctxt_dump_string(ctxt, (*doc).name as _);
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
         if let Some(version) = (*doc).version.as_deref() {
-            fprintf((*ctxt).output, c"version=".as_ptr());
+            write!((*ctxt).output, "version=");
             let version = CString::new(version).unwrap();
             xml_ctxt_dump_string(ctxt, version.as_ptr() as *const u8);
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
         if let Some(encoding) = (*doc).encoding.as_deref() {
-            fprintf((*ctxt).output, c"encoding=".as_ptr());
+            write!((*ctxt).output, "encoding=");
             let encoding = CString::new(encoding).unwrap();
             xml_ctxt_dump_string(ctxt, encoding.as_ptr() as *const u8);
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
         if let Some(url) = (*doc).url.as_deref() {
-            fprintf((*ctxt).output, c"URL=".as_ptr());
+            write!((*ctxt).output, "URL=");
             let url = CString::new(url).unwrap();
             xml_ctxt_dump_string(ctxt, url.as_ptr() as *const u8);
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
         if (*doc).standalone != 0 {
-            fprintf((*ctxt).output, c"standalone=true\n".as_ptr());
+            writeln!((*ctxt).output, "standalone=true");
         }
     }
     if !(*doc).old_ns.is_null() {
@@ -1599,19 +1564,12 @@ unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Xml
 
 /// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlDebugDumpDocumentHead")]
-pub unsafe extern "C" fn xml_debug_dump_document_head(mut output: *mut FILE, doc: XmlDocPtr) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: XmlDocPtr) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    if output.is_null() {
-        output = stdout;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
-    ctxt.output = output;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_document_head(addr_of_mut!(ctxt), doc);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1621,7 +1579,7 @@ pub unsafe extern "C" fn xml_debug_dump_document_head(mut output: *mut FILE, doc
 unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
     if doc.is_null() {
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"DOCUMENT.is_null() !\n".as_ptr());
+            writeln!((*ctxt).output, "DOCUMENT.is_null() !");
         }
         return;
     }
@@ -1640,38 +1598,24 @@ unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
 
 /// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlDebugDumpDocument")]
-pub unsafe extern "C" fn xml_debug_dump_document(mut output: *mut FILE, doc: XmlDocPtr) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: XmlDocPtr) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    if output.is_null() {
-        output = stdout;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
-    ctxt.output = output;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the DTD
 #[doc(alias = "xmlDebugDumpDTD")]
-pub unsafe extern "C" fn xml_debug_dump_dtd(mut output: *mut FILE, dtd: XmlDtdPtr) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: XmlDtdPtr) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    if output.is_null() {
-        output = stdout;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
-    ctxt.output = output;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_dtd(addr_of_mut!(ctxt), dtd);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1687,31 +1631,29 @@ extern "C" fn xml_ctxt_dump_entity_callback(
     unsafe {
         if cur.is_null() {
             if (*ctxt).check == 0 {
-                fprintf((*ctxt).output, c"Entity is NULL".as_ptr());
+                write!((*ctxt).output, "Entity is NULL");
             }
             return;
         }
         if (*ctxt).check == 0 {
-            fprintf(
-                (*ctxt).output,
-                c"%s : ".as_ptr(),
-                (*cur).name.load(Ordering::Relaxed) as *mut c_char,
-            );
+            let name =
+                CStr::from_ptr((*cur).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+            write!((*ctxt).output, "{name} : ");
             match (*cur).etype {
                 Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                    fprintf((*ctxt).output, c"INTERNAL GENERAL, ".as_ptr());
+                    write!((*ctxt).output, "INTERNAL GENERAL, ");
                 }
                 Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                    fprintf((*ctxt).output, c"EXTERNAL PARSED, ".as_ptr());
+                    write!((*ctxt).output, "EXTERNAL PARSED, ");
                 }
                 Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                    fprintf((*ctxt).output, c"EXTERNAL UNPARSED, ".as_ptr());
+                    write!((*ctxt).output, "EXTERNAL UNPARSED, ");
                 }
                 Some(XmlEntityType::XmlInternalParameterEntity) => {
-                    fprintf((*ctxt).output, c"INTERNAL PARAMETER, ".as_ptr());
+                    write!((*ctxt).output, "INTERNAL PARAMETER, ");
                 }
                 Some(XmlEntityType::XmlExternalParameterEntity) => {
-                    fprintf((*ctxt).output, c"EXTERNAL PARAMETER, ".as_ptr());
+                    write!((*ctxt).output, "EXTERNAL PARAMETER, ");
                 }
                 Some(e) => {
                     xml_debug_err2(
@@ -1724,36 +1666,30 @@ extern "C" fn xml_ctxt_dump_entity_callback(
                 _ => unreachable!(),
             }
             if !(*cur).external_id.load(Ordering::Relaxed).is_null() {
-                fprintf(
-                    (*ctxt).output,
-                    c"ID \"%s\"".as_ptr(),
-                    (*cur).external_id.load(Ordering::Relaxed) as *mut c_char,
-                );
+                let external_id =
+                    CStr::from_ptr((*cur).external_id.load(Ordering::Relaxed) as *const i8)
+                        .to_string_lossy();
+                write!((*ctxt).output, "ID \"{external_id}\"");
             }
             if !(*cur).system_id.load(Ordering::Relaxed).is_null() {
-                fprintf(
-                    (*ctxt).output,
-                    c"SYSTEM \"%s\"".as_ptr(),
-                    (*cur).system_id.load(Ordering::Relaxed) as *mut c_char,
-                );
+                let system_id =
+                    CStr::from_ptr((*cur).system_id.load(Ordering::Relaxed) as *const i8)
+                        .to_string_lossy();
+                write!((*ctxt).output, "SYSTEM \"{system_id}\"");
             }
             if !(*cur).orig.load(Ordering::Relaxed).is_null() {
-                fprintf(
-                    (*ctxt).output,
-                    c"\n orig \"%s\"".as_ptr(),
-                    (*cur).orig.load(Ordering::Relaxed) as *mut c_char,
-                );
+                let orig = CStr::from_ptr((*cur).orig.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                write!((*ctxt).output, "\n orig \"{orig}\"");
             }
             if (*cur).typ != XmlElementType::XmlElementNode
                 && !(*cur).content.load(Ordering::Relaxed).is_null()
             {
-                fprintf(
-                    (*ctxt).output,
-                    c"\n content \"%s\"".as_ptr(),
-                    (*cur).content.load(Ordering::Relaxed) as *mut c_char,
-                );
+                let content = CStr::from_ptr((*cur).content.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                write!((*ctxt).output, "\n content \"{content}\"");
             }
-            fprintf((*ctxt).output, c"\n".as_ptr());
+            writeln!((*ctxt).output);
         }
     }
 }
@@ -1769,34 +1705,31 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         let table: XmlEntitiesTablePtr = (*(*doc).int_subset).entities as XmlEntitiesTablePtr;
 
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Entities in internal subset\n".as_ptr());
+            writeln!((*ctxt).output, "Entities in internal subset");
         }
         xml_hash_scan(table, Some(xml_ctxt_dump_entity_callback), ctxt as _);
     } else {
-        fprintf((*ctxt).output, c"No entities in internal subset\n".as_ptr());
+        writeln!((*ctxt).output, "No entities in internal subset");
     }
     if !(*doc).ext_subset.is_null() && !(*(*doc).ext_subset).entities.is_null() {
         let table: XmlEntitiesTablePtr = (*(*doc).ext_subset).entities as XmlEntitiesTablePtr;
 
         if (*ctxt).check == 0 {
-            fprintf((*ctxt).output, c"Entities in external subset\n".as_ptr());
+            writeln!((*ctxt).output, "Entities in external subset");
         }
         xml_hash_scan(table, Some(xml_ctxt_dump_entity_callback), ctxt as _);
     } else if (*ctxt).check == 0 {
-        fprintf((*ctxt).output, c"No entities in external subset\n".as_ptr());
+        writeln!((*ctxt).output, "No entities in external subset");
     }
 }
 
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlDebugDumpEntities")]
-pub unsafe extern "C" fn xml_debug_dump_entities(output: *mut FILE, doc: XmlDocPtr) {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: XmlDocPtr) {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    if output.is_null() {
-        return;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = Box::new(output);
     xml_ctxt_dump_entities(addr_of_mut!(ctxt), doc);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1806,18 +1739,14 @@ pub unsafe extern "C" fn xml_debug_dump_entities(output: *mut FILE, doc: XmlDocP
 ///
 /// Returns the number of errors found
 #[doc(alias = "xmlDebugCheckDocument")]
-pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: XmlDocPtr) -> i32 {
-    let mut ctxt: XmlDebugCtxt = unsafe { zeroed() };
+pub unsafe fn xml_debug_check_document(
+    output: Option<impl Write + 'static>,
+    doc: XmlDocPtr,
+) -> i32 {
+    let mut ctxt = XmlDebugCtxt::default();
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    if output.is_null() {
-        output = stdout;
-    }
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output;
+    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     ctxt.check = 1;
     xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
@@ -1826,109 +1755,113 @@ pub unsafe extern "C" fn xml_debug_check_document(mut output: *mut FILE, doc: Xm
 
 /// Dump to `output` the type and name of @node.
 #[doc(alias = "xmlLsOneNode")]
-pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
-    if output.is_null() {
-        return;
-    }
+pub unsafe extern "C" fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodePtr) {
     if node.is_null() {
-        fprintf(output, c"NULL\n".as_ptr());
+        writeln!(output, "NULL");
         return;
     }
     match (*node).typ {
         XmlElementType::XmlElementNode => {
-            fprintf(output, c"-".as_ptr());
+            write!(output, "-");
         }
         XmlElementType::XmlAttributeNode => {
-            fprintf(output, c"a".as_ptr());
+            write!(output, "a");
         }
         XmlElementType::XmlTextNode => {
-            fprintf(output, c"t".as_ptr());
+            write!(output, "t");
         }
         XmlElementType::XmlCDATASectionNode => {
-            fprintf(output, c"C".as_ptr());
+            write!(output, "C");
         }
         XmlElementType::XmlEntityRefNode => {
-            fprintf(output, c"e".as_ptr());
+            write!(output, "e");
         }
         XmlElementType::XmlEntityNode => {
-            fprintf(output, c"E".as_ptr());
+            write!(output, "E");
         }
         XmlElementType::XmlPINode => {
-            fprintf(output, c"p".as_ptr());
+            write!(output, "p");
         }
         XmlElementType::XmlCommentNode => {
-            fprintf(output, c"c".as_ptr());
+            write!(output, "c");
         }
         XmlElementType::XmlDocumentNode => {
-            fprintf(output, c"d".as_ptr());
+            write!(output, "d");
         }
         XmlElementType::XmlHTMLDocumentNode => {
-            fprintf(output, c"h".as_ptr());
+            write!(output, "h");
         }
         XmlElementType::XmlDocumentTypeNode => {
-            fprintf(output, c"T".as_ptr());
+            write!(output, "T");
         }
         XmlElementType::XmlDocumentFragNode => {
-            fprintf(output, c"F".as_ptr());
+            write!(output, "F");
         }
         XmlElementType::XmlNotationNode => {
-            fprintf(output, c"N".as_ptr());
+            write!(output, "N");
         }
         XmlElementType::XmlNamespaceDecl => {
-            fprintf(output, c"n".as_ptr());
+            write!(output, "n");
         }
         _ => {
-            fprintf(output, c"?".as_ptr());
+            write!(output, "?");
         }
     }
     if (*node).typ != XmlElementType::XmlNamespaceDecl {
         if !(*node).properties.is_null() {
-            fprintf(output, c"a".as_ptr());
+            write!(output, "a");
         } else {
-            fprintf(output, c"-".as_ptr());
+            write!(output, "-");
         }
         if !(*node).ns_def.is_null() {
-            fprintf(output, c"n".as_ptr());
+            write!(output, "n");
         } else {
-            fprintf(output, c"-".as_ptr());
+            write!(output, "-");
         }
     }
 
-    fprintf(output, c" %8d ".as_ptr(), xml_ls_count_node(node));
+    write!(output, " {} ", xml_ls_count_node(node));
 
     match (*node).typ {
         XmlElementType::XmlElementNode => {
             if !(*node).name.is_null() {
                 if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-                    fprintf(output, c"%s:".as_ptr(), (*(*node).ns).prefix);
+                    let prefix =
+                        CStr::from_ptr((*(*node).ns).prefix as *const i8).to_string_lossy();
+                    write!(output, "{prefix}:");
                 }
-                fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                write!(output, "{name}");
             }
         }
         XmlElementType::XmlAttributeNode => {
             if !(*node).name.is_null() {
-                fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                write!(output, "{name}");
             }
         }
         XmlElementType::XmlTextNode => {
             if !(*node).content.is_null() {
-                xml_debug_dump_string(output, (*node).content);
+                xml_debug_dump_string(Some(output), (*node).content);
             }
         }
         XmlElementType::XmlCDATASectionNode => {}
         XmlElementType::XmlEntityRefNode => {
             if !(*node).name.is_null() {
-                fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                write!(output, "{name}");
             }
         }
         XmlElementType::XmlEntityNode => {
             if !(*node).name.is_null() {
-                fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                write!(output, "{name}");
             }
         }
         XmlElementType::XmlPINode => {
             if !(*node).name.is_null() {
-                fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                write!(output, "{name}");
             }
         }
         XmlElementType::XmlCommentNode => {}
@@ -1940,24 +1873,22 @@ pub unsafe extern "C" fn xml_ls_one_node(output: *mut FILE, node: XmlNodePtr) {
         XmlElementType::XmlNamespaceDecl => {
             let ns: XmlNsPtr = node as XmlNsPtr;
 
+            let href = CStr::from_ptr((*ns).href as *const i8).to_string_lossy();
             if (*ns).prefix.is_null() {
-                fprintf(output, c"default -> %s".as_ptr(), (*ns).href as *mut c_char);
+                write!(output, "default -> {href}");
             } else {
-                fprintf(
-                    output,
-                    c"%s -> %s".as_ptr(),
-                    (*ns).prefix as *mut c_char,
-                    (*ns).href as *mut c_char,
-                );
+                let prefix = CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy();
+                write!(output, "{prefix} -> {href}");
             }
         }
         _ => {
             if !(*node).name.is_null() {
-                fprintf(output, c"%s".as_ptr(), (*node).name as *const c_char);
+                let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+                write!(output, "{name}");
             }
         }
     }
-    fprintf(output, c"\n".as_ptr());
+    writeln!(output);
 }
 
 /// Count the children of @node.
@@ -2039,17 +1970,17 @@ pub type XmlShellReadlineFunc = unsafe extern "C" fn(prompt: *mut c_char) -> *mu
 /// A debugging shell context.  
 /// TODO: add the defined function tables.
 #[cfg(feature = "xpath")]
-pub type XmlShellCtxtPtr = *mut XmlShellCtxt;
+pub type XmlShellCtxtPtr<'a> = *mut XmlShellCtxt<'a>;
 #[doc(alias = "xmlShellCtxt")]
 #[cfg(feature = "xpath")]
 #[repr(C)]
-pub struct XmlShellCtxt {
+pub struct XmlShellCtxt<'a> {
     filename: *mut c_char,
     doc: XmlDocPtr,
     node: XmlNodePtr,
     pctxt: XmlXPathContextPtr,
     loaded: i32,
-    output: *mut FILE,
+    output: Box<dyn Write + 'a>,
     input: XmlShellReadlineFunc,
 }
 
@@ -2128,25 +2059,22 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
         return;
     }
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
+    let stdout = &mut stdout();
     let fp = if ctxt.is_null() {
-        stdout
+        stdout as &mut dyn Write
     } else {
-        (*ctxt).output
+        (*ctxt).output.as_mut()
     };
-
+    let mut boxed = Box::new(fp);
     if (*node).typ == XmlElementType::XmlDocumentNode {
-        (*(node as XmlDocPtr)).dump_file(fp);
+        (*(node as XmlDocPtr)).dump_file(&mut boxed);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr_list(fp, node as XmlAttrPtr, 0);
+        xml_debug_dump_attr_list(&mut boxed, node as XmlAttrPtr, 0);
     } else {
-        (*node).dump_file(fp, (*node).doc);
+        (*node).dump_file(&mut boxed, (*node).doc);
     }
 
-    fprintf(fp, c"\n".as_ptr());
+    writeln!(boxed);
 }
 
 /// Prints result to the output FILE
@@ -2224,7 +2152,7 @@ pub unsafe extern "C" fn xml_shell_list(
         return 0;
     }
     if node.is_null() {
-        fprintf((*ctxt).output, c"NULL\n".as_ptr());
+        writeln!((*ctxt).output, "NULL");
         return 0;
     }
     if (*node).typ == XmlElementType::XmlDocumentNode
@@ -2234,16 +2162,16 @@ pub unsafe extern "C" fn xml_shell_list(
             .children
             .map_or(null_mut(), |c| c.as_ptr());
     } else if (*node).typ == XmlElementType::XmlNamespaceDecl {
-        xml_ls_one_node((*ctxt).output, node);
+        xml_ls_one_node(&mut (*ctxt).output, node);
         return 0;
     } else if let Some(children) = (*node).children {
         cur = children.as_ptr();
     } else {
-        xml_ls_one_node((*ctxt).output, node);
+        xml_ls_one_node(&mut (*ctxt).output, node);
         return 0;
     }
     while !cur.is_null() {
-        xml_ls_one_node((*ctxt).output, cur);
+        xml_ls_one_node(&mut (*ctxt).output, cur);
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
     0
@@ -2267,16 +2195,17 @@ pub unsafe extern "C" fn xml_shell_base(
         return 0;
     }
     if node.is_null() {
-        fprintf((*ctxt).output, c"NULL\n".as_ptr());
+        writeln!((*ctxt).output, "NULL");
         return 0;
     }
 
     let base: *mut XmlChar = (*node).get_base((*node).doc);
 
     if base.is_null() {
-        fprintf((*ctxt).output, c" No base found !!!\n".as_ptr());
+        writeln!((*ctxt).output, " No base found !!!");
     } else {
-        fprintf((*ctxt).output, c"%s\n".as_ptr(), base);
+        let b = CStr::from_ptr(base as *const i8).to_string_lossy();
+        writeln!((*ctxt).output, "{b}");
         xml_free(base as _);
     }
     0
@@ -2298,17 +2227,17 @@ pub unsafe extern "C" fn xml_shell_dir(
         return 0;
     }
     if node.is_null() {
-        fprintf((*ctxt).output, c"NULL\n".as_ptr());
+        writeln!((*ctxt).output, "NULL");
         return 0;
     }
     if (*node).typ == XmlElementType::XmlDocumentNode
         || (*node).typ == XmlElementType::XmlHTMLDocumentNode
     {
-        xml_debug_dump_document_head((*ctxt).output, node as XmlDocPtr);
+        xml_debug_dump_document_head(Some(&mut (*ctxt).output), node as XmlDocPtr);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr((*ctxt).output, node as XmlAttrPtr, 0);
+        xml_debug_dump_attr(&mut (*ctxt).output, node as XmlAttrPtr, 0);
     } else {
-        xml_debug_dump_one_node((*ctxt).output, node, 0);
+        xml_debug_dump_one_node(&mut (*ctxt).output, node, 0);
     }
     0
 }
@@ -2352,7 +2281,7 @@ pub unsafe extern "C" fn xml_shell_load(
         }
         #[cfg(not(feature = "html"))]
         {
-            fprintf((*ctxt).output, c"HTML support not compiled in\n".as_ptr());
+            write!((*ctxt).output, "HTML support not compiled in\n".as_ptr());
             doc = null_mut();
         }
     } else {
@@ -2408,15 +2337,15 @@ pub unsafe extern "C" fn xml_shell_cat(
         return 0;
     }
     if node.is_null() {
-        fprintf((*ctxt).output, c"NULL\n".as_ptr());
+        writeln!((*ctxt).output, "NULL");
         return 0;
     }
     if (*(*ctxt).doc).typ == XmlElementType::XmlHTMLDocumentNode {
         #[cfg(feature = "html")]
         if (*node).typ == XmlElementType::XmlHTMLDocumentNode {
-            html_doc_dump((*ctxt).output, node as HtmlDocPtr);
+            html_doc_dump(&mut (*ctxt).output, node as HtmlDocPtr);
         } else {
-            html_node_dump_file((*ctxt).output, (*ctxt).doc, node);
+            html_node_dump_file(&mut (*ctxt).output, (*ctxt).doc, node);
         }
         #[cfg(not(feature = "html"))]
         if (*node).typ == XmlElementType::XmlDocumentNode {
@@ -2425,11 +2354,11 @@ pub unsafe extern "C" fn xml_shell_cat(
             xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
         }
     } else if (*node).typ == XmlElementType::XmlDocumentNode {
-        (*(node as XmlDocPtr)).dump_file((*ctxt).output);
+        (*(node as XmlDocPtr)).dump_file(&mut (*ctxt).output);
     } else {
-        (*node).dump_file((*ctxt).output, (*ctxt).doc);
+        (*node).dump_file(&mut (*ctxt).output, (*ctxt).doc);
     }
-    fprintf((*ctxt).output, c"\n".as_ptr());
+    writeln!((*ctxt).output);
     0
 }
 
@@ -2446,7 +2375,7 @@ pub unsafe fn xml_shell_write(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use libc::{fclose, fopen};
+    use std::fs::File;
 
     use crate::libxml::htmltree::html_save_file;
 
@@ -2480,13 +2409,20 @@ pub unsafe fn xml_shell_write(
             }
         }
         _ => {
-            let f: *mut FILE = fopen(cfilename.as_ptr(), c"w".as_ptr());
-            if f.is_null() {
-                generic_error!("Failed to write to {filename}\n");
-                return -1;
+            match File::options()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(filename)
+            {
+                Ok(mut f) => {
+                    (*node).dump_file(&mut f, (*ctxt).doc);
+                }
+                _ => {
+                    generic_error!("Failed to write to {filename}\n");
+                    return -1;
+                }
             }
-            (*node).dump_file(f, (*ctxt).doc);
-            fclose(f);
         }
     }
     0
@@ -2629,15 +2565,17 @@ pub unsafe extern "C" fn xml_shell_du(
         if (*node).typ == XmlElementType::XmlDocumentNode
             || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
-            fprintf((*ctxt).output, c"/\n".as_ptr());
+            writeln!((*ctxt).output, "/");
         } else if (*node).typ == XmlElementType::XmlElementNode {
             for _ in 0..indent {
-                fprintf((*ctxt).output, c"  ".as_ptr());
+                write!((*ctxt).output, "  ");
             }
             if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-                fprintf((*ctxt).output, c"%s:".as_ptr(), (*(*node).ns).prefix);
+                let prefix = CStr::from_ptr((*(*node).ns).prefix as *const i8).to_string_lossy();
+                write!((*ctxt).output, "{prefix}:");
             }
-            fprintf((*ctxt).output, c"%s\n".as_ptr(), (*node).name);
+            let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
+            writeln!((*ctxt).output, "{name}");
         }
 
         // Browse the full subtree, deep first
@@ -2821,17 +2759,16 @@ unsafe extern "C" fn xml_shell_grep(
     while !node.is_null() {
         if (*node).typ == XmlElementType::XmlCommentNode {
             if !xml_strstr((*node).content, arg as *mut XmlChar).is_null() {
-                fprintf((*ctxt).output, c"%s : ".as_ptr(), (*node).get_node_path());
+                let path = CStr::from_ptr((*node).get_node_path() as *const i8).to_string_lossy();
+                write!((*ctxt).output, "{path} : ");
                 xml_shell_list(ctxt, null_mut(), node, null_mut());
             }
         } else if (*node).typ == XmlElementType::XmlTextNode
             && !xml_strstr((*node).content, arg as *mut XmlChar).is_null()
         {
-            fprintf(
-                (*ctxt).output,
-                c"%s : ".as_ptr(),
-                (*node).parent.unwrap().get_node_path(),
-            );
+            let path = CStr::from_ptr((*node).parent.unwrap().get_node_path() as *const i8)
+                .to_string_lossy();
+            write!((*ctxt).output, "{path} : ");
             xml_shell_list(
                 ctxt,
                 null_mut(),
@@ -2893,11 +2830,11 @@ unsafe extern "C" fn xml_shell_set_content(
         return 0;
     }
     if node.is_null() {
-        fprintf((*ctxt).output, c"NULL\n".as_ptr());
+        writeln!((*ctxt).output, "NULL");
         return 0;
     }
     if value.is_null() {
-        fprintf((*ctxt).output, c"NULL\n".as_ptr());
+        writeln!((*ctxt).output, "NULL");
         return 0;
     }
 
@@ -2915,7 +2852,7 @@ unsafe extern "C" fn xml_shell_set_content(
         }
         (*node).add_child_list(results);
     } else {
-        fprintf((*ctxt).output, c"failed to parse content\n".as_ptr());
+        writeln!((*ctxt).output, "failed to parse content");
     }
     0
 }
@@ -2953,7 +2890,7 @@ unsafe extern "C" fn xml_shell_register_namespace(
         prefix = next;
         next = xml_strchr(next, b'=') as *mut XmlChar;
         if next.is_null() {
-            fprintf((*ctxt).output, c"setns: prefix=[nsuri] required\n".as_ptr());
+            writeln!((*ctxt).output, "setns: prefix=[nsuri] required");
             xml_free(ns_list_dup as _);
             return -1;
         }
@@ -2970,11 +2907,11 @@ unsafe extern "C" fn xml_shell_register_namespace(
 
         /* do register namespace */
         if xml_xpath_register_ns((*ctxt).pctxt, prefix, href) != 0 {
-            fprintf(
+            let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+            let href = CStr::from_ptr(href as *const i8).to_string_lossy();
+            writeln!(
                 (*ctxt).output,
-                c"Error: unable to register NS with prefix=\"%s\" and href=\"%s\"\n".as_ptr(),
-                prefix,
-                href,
+                "Error: unable to register NS with prefix=\"{prefix}\" and href=\"{href}\""
             );
             xml_free(ns_list_dup as _);
             return -1;
@@ -3051,11 +2988,11 @@ unsafe extern "C" fn xml_shell_set_base(
 /// using a environment similar to a UNIX commandline.
 #[doc(alias = "xmlShell")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell(
+pub unsafe fn xml_shell<'a>(
     doc: XmlDocPtr,
     filename: *mut c_char,
     input: Option<XmlShellReadlineFunc>,
-    mut output: *mut FILE,
+    output: Option<impl Write + 'a>,
 ) {
     use std::mem::size_of;
 
@@ -3094,13 +3031,6 @@ pub unsafe extern "C" fn xml_shell(
         return;
     }
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    if output.is_null() {
-        output = stdout;
-    }
     let ctxt: XmlShellCtxtPtr = xml_malloc(size_of::<XmlShellCtxt>()) as XmlShellCtxtPtr;
     if ctxt.is_null() {
         return;
@@ -3108,7 +3038,7 @@ pub unsafe extern "C" fn xml_shell(
     (*ctxt).loaded = 0;
     (*ctxt).doc = doc;
     (*ctxt).input = input.unwrap();
-    (*ctxt).output = output;
+    (*ctxt).output = output.map_or(Box::new(stdout()) as Box<dyn Write + 'a>, |o| Box::new(o));
     (*ctxt).filename = xml_strdup(filename as *mut XmlChar) as *mut c_char;
     (*ctxt).node = (*ctxt).doc as XmlNodePtr;
 
@@ -3215,96 +3145,94 @@ pub unsafe extern "C" fn xml_shell(
             break;
         }
         if strcmp(command.as_mut_ptr(), c"help".as_ptr()) == 0 {
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tbase         display XML base of the node\n".as_ptr(),
+                "\tbase         display XML base of the node",
             );
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tsetbase URI  change the XML base of the node\n".as_ptr(),
+                "\tsetbase URI  change the XML base of the node"
             );
-            fprintf((*ctxt).output, c"\tbye          leave shell\n".as_ptr());
-            fprintf(
+            writeln!((*ctxt).output, "\tbye          leave shell");
+            writeln!(
                 (*ctxt).output,
-                c"\tcat [node]   display node or current node\n".as_ptr(),
+                "\tcat [node]   display node or current node"
             );
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tcd [path]    change directory to path or to root\n".as_ptr(),
+                "\tcd [path]    change directory to path or to root"
             );
-            fprintf((*ctxt).output, c"\tdir [path]   dumps information about the node (namespace, attributes, content)\n".as_ptr());
-            fprintf((*ctxt).output, c"\tdu [path]    show the structure of the subtree under path or the current node\n".as_ptr());
-            fprintf((*ctxt).output, c"\texit         leave shell\n".as_ptr());
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\thelp         display this help\n".as_ptr(),
+                "\tdir [path]   dumps information about the node (namespace, attributes, content)"
             );
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tfree         display memory usage\n".as_ptr(),
+                "\tdu [path]    show the structure of the subtree under path or the current node"
             );
-            fprintf(
+            writeln!((*ctxt).output, "\texit         leave shell");
+            writeln!((*ctxt).output, "\thelp         display this help");
+            writeln!((*ctxt).output, "\tfree         display memory usage");
+            writeln!(
                 (*ctxt).output,
-                c"\tload [name]  load a new document with name\n".as_ptr(),
+                "\tload [name]  load a new document with name"
             );
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tls [path]    list contents of path or the current directory\n".as_ptr(),
+                "\tls [path]    list contents of path or the current directory"
             );
-            fprintf((*ctxt).output, c"\tset xml_fragment replace the current node content with the fragment parsed in context\n".as_ptr());
+            writeln!((*ctxt).output, "\tset xml_fragment replace the current node content with the fragment parsed in context");
             #[cfg(feature = "xpath")]
             {
-                fprintf((*ctxt).output, c"\txpath expr   evaluate the XPath expression in that context and print the result\n".as_ptr());
-                fprintf((*ctxt).output, c"\tsetns nsreg  register a namespace to a prefix in the XPath evaluation context\n".as_ptr());
-                fprintf((*ctxt).output, c"\t             format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)\n".as_ptr());
-                fprintf(
+                writeln!((*ctxt).output, "\txpath expr   evaluate the XPath expression in that context and print the result");
+                writeln!((*ctxt).output, "\tsetns nsreg  register a namespace to a prefix in the XPath evaluation context");
+                writeln!((*ctxt).output, "\t             format for nsreg is: prefix=[nsuri] (i.e. prefix= unsets a prefix)");
+                writeln!(
                     (*ctxt).output,
-                    c"\tsetrootns    register all namespace found on the root element\n".as_ptr(),
+                    "\tsetrootns    register all namespace found on the root element"
                 );
-                fprintf(
+                writeln!(
                     (*ctxt).output,
-                    c"\t             the default namespace if any uses 'defaultns' prefix\n"
-                        .as_ptr(),
+                    "\t             the default namespace if any uses 'defaultns' prefix"
                 );
             }
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tpwd          display current working directory\n".as_ptr(),
+                "\tpwd          display current working directory"
             );
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\twhereis      display absolute path of [path] or current working directory\n"
-                    .as_ptr(),
+                "\twhereis      display absolute path of [path] or current working directory"
             );
-            fprintf((*ctxt).output, c"\tquit         leave shell\n".as_ptr());
+            writeln!((*ctxt).output, "\tquit         leave shell");
             #[cfg(feature = "output")]
             {
-                fprintf(
+                writeln!(
                     (*ctxt).output,
-                    c"\tsave [name]  save this document to name or the original name\n".as_ptr(),
+                    "\tsave [name]  save this document to name or the original name"
                 );
-                fprintf(
+                writeln!(
                     (*ctxt).output,
-                    c"\twrite [name] write the current node to the filename\n".as_ptr(),
+                    "\twrite [name] write the current node to the filename"
                 );
             }
             #[cfg(feature = "valid")]
             {
-                fprintf(
+                writeln!(
                     (*ctxt).output,
-                    c"\tvalidate     check the document for errors\n".as_ptr(),
+                    "\tvalidate     check the document for errors"
                 );
             }
             #[cfg(feature = "schema")]
             {
-                fprintf(
+                writeln!(
                     (*ctxt).output,
-                    c"\trelaxng rng  validate the document against the Relax-NG schemas\n".as_ptr(),
+                    "\trelaxng rng  validate the document against the Relax-NG schemas"
                 );
             }
-            fprintf(
+            writeln!(
                 (*ctxt).output,
-                c"\tgrep string  search for a string in the subtree\n".as_ptr(),
+                "\tgrep string  search for a string in the subtree"
             );
         } else if {
             #[cfg(feature = "valid")]
@@ -3375,18 +3303,19 @@ pub unsafe extern "C" fn xml_shell(
             xml_shell_grep(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
         } else if strcmp(command.as_ptr(), c"free".as_ptr()) == 0 {
             if arg[0] == 0 {
-                xml_mem_show((*ctxt).output, 0);
+                xml_mem_show(&mut (*ctxt).output, 0);
             } else {
                 let mut len: i32 = 0;
 
                 sscanf(arg.as_mut_ptr(), c"%d".as_ptr(), addr_of_mut!(len));
-                xml_mem_show((*ctxt).output, len);
+                xml_mem_show(&mut (*ctxt).output, len);
             }
         } else if strcmp(command.as_ptr(), c"pwd".as_ptr()) == 0 {
             let mut dir: [c_char; 500] = [0; 500];
 
             if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, null_mut()) == 0 {
-                fprintf((*ctxt).output, c"%s\n".as_ptr(), dir);
+                let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                writeln!((*ctxt).output, "{dir}");
             }
         } else if strcmp(command.as_ptr(), c"du".as_ptr()) == 0 {
             if arg[0] == 0 {
@@ -3539,7 +3468,7 @@ pub unsafe extern "C" fn xml_shell(
             } else {
                 (*(*ctxt).pctxt).node = (*ctxt).node;
                 list = xml_xpath_eval(arg.as_mut_ptr() as *mut XmlChar, (*ctxt).pctxt);
-                xml_xpath_debug_dump_object((*ctxt).output, list, 0);
+                xml_xpath_debug_dump_object(&mut (*ctxt).output, list, 0);
                 xml_xpath_free_object(list);
             }
         } else if {
@@ -3678,7 +3607,8 @@ pub unsafe extern "C" fn xml_shell(
 
             if arg[0] == 0 {
                 if xml_shell_pwd(ctxt, dir.as_mut_ptr(), (*ctxt).node, null_mut()) == 0 {
-                    fprintf((*ctxt).output, c"%s\n".as_ptr(), dir);
+                    let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                    writeln!((*ctxt).output, "{dir}");
                 }
             } else {
                 (*(*ctxt).pctxt).node = (*ctxt).node;
@@ -3710,7 +3640,8 @@ pub unsafe extern "C" fn xml_shell(
                                         null_mut(),
                                     ) == 0
                                     {
-                                        fprintf((*ctxt).output, c"%s\n".as_ptr(), dir);
+                                        let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                                        writeln!((*ctxt).output, "{dir}");
                                     }
                                 }
                             }
@@ -3931,7 +3862,7 @@ pub unsafe extern "C" fn xml_shell(
                             } else {
                                 for indx in 0..(*(*list).nodesetval).node_nr {
                                     if i > 0 {
-                                        fprintf((*ctxt).output, c" -------\n".as_ptr());
+                                        writeln!((*ctxt).output, " -------");
                                     }
                                     xml_shell_cat(
                                         ctxt,
@@ -4078,7 +4009,6 @@ mod tests {
 
                     let ret_val = xml_debug_check_document(output, doc);
                     desret_int(ret_val);
-                    des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -4109,12 +4039,11 @@ mod tests {
                 for n_attr in 0..GEN_NB_XML_ATTR_PTR {
                     for n_depth in 0..GEN_NB_INT {
                         let mem_base = xml_mem_blocks();
-                        let output = gen_debug_file_ptr(n_output, 0);
+                        let mut output = gen_debug_file_ptr(n_output, 0).unwrap();
                         let attr = gen_xml_attr_ptr(n_attr, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xml_debug_dump_attr(output, attr, depth);
-                        des_debug_file_ptr(n_output, output, 0);
+                        xml_debug_dump_attr(&mut output, attr, depth);
                         des_xml_attr_ptr(n_attr, attr, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();
@@ -4145,12 +4074,11 @@ mod tests {
                 for n_attr in 0..GEN_NB_XML_ATTR_PTR {
                     for n_depth in 0..GEN_NB_INT {
                         let mem_base = xml_mem_blocks();
-                        let output = gen_debug_file_ptr(n_output, 0);
+                        let mut output = gen_debug_file_ptr(n_output, 0).unwrap();
                         let attr = gen_xml_attr_ptr(n_attr, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xml_debug_dump_attr_list(output, attr, depth);
-                        des_debug_file_ptr(n_output, output, 0);
+                        xml_debug_dump_attr_list(&mut output, attr, depth);
                         des_xml_attr_ptr(n_attr, attr, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();
@@ -4187,7 +4115,6 @@ mod tests {
                     let dtd = gen_xml_dtd_ptr(n_dtd, 1);
 
                     xml_debug_dump_dtd(output, dtd);
-                    des_debug_file_ptr(n_output, output, 0);
                     des_xml_dtd_ptr(n_dtd, dtd, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -4218,7 +4145,6 @@ mod tests {
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
                     xml_debug_dump_document(output, doc);
-                    des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -4252,7 +4178,6 @@ mod tests {
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
                     xml_debug_dump_document_head(output, doc);
-                    des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -4282,11 +4207,10 @@ mod tests {
             for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
                 for n_doc in 0..GEN_NB_XML_DOC_PTR {
                     let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0);
+                    let output = gen_debug_file_ptr(n_output, 0).unwrap();
                     let doc = gen_xml_doc_ptr(n_doc, 1);
 
                     xml_debug_dump_entities(output, doc);
-                    des_debug_file_ptr(n_output, output, 0);
                     des_xml_doc_ptr(n_doc, doc, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -4322,7 +4246,6 @@ mod tests {
                         let depth = gen_int(n_depth, 2);
 
                         xml_debug_dump_node(output, node, depth);
-                        des_debug_file_ptr(n_output, output, 0);
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();
@@ -4358,7 +4281,6 @@ mod tests {
                         let depth = gen_int(n_depth, 2);
 
                         xml_debug_dump_node_list(output, node, depth);
-                        des_debug_file_ptr(n_output, output, 0);
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();
@@ -4392,12 +4314,11 @@ mod tests {
                 for n_node in 0..GEN_NB_XML_NODE_PTR {
                     for n_depth in 0..GEN_NB_INT {
                         let mem_base = xml_mem_blocks();
-                        let output = gen_debug_file_ptr(n_output, 0);
+                        let mut output = gen_debug_file_ptr(n_output, 0).unwrap();
                         let node = gen_xml_node_ptr(n_node, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xml_debug_dump_one_node(output, node, depth);
-                        des_debug_file_ptr(n_output, output, 0);
+                        xml_debug_dump_one_node(&mut output, node, depth);
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();
@@ -4430,11 +4351,10 @@ mod tests {
             for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
                 for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0);
+                    let mut output = gen_debug_file_ptr(n_output, 0);
                     let str = gen_const_xml_char_ptr(n_str, 1);
 
-                    xml_debug_dump_string(output, str);
-                    des_debug_file_ptr(n_output, output, 0);
+                    xml_debug_dump_string(output.as_mut(), str);
                     des_const_xml_char_ptr(n_str, str, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -4491,11 +4411,10 @@ mod tests {
             for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
                 for n_node in 0..GEN_NB_XML_NODE_PTR {
                     let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0);
+                    let mut output = gen_debug_file_ptr(n_output, 0).unwrap();
                     let node = gen_xml_node_ptr(n_node, 1);
 
-                    xml_ls_one_node(output, node);
-                    des_debug_file_ptr(n_output, output, 0);
+                    xml_ls_one_node(&mut output, node);
                     des_xml_node_ptr(n_node, node, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {

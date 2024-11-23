@@ -2,16 +2,16 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     ffi::{c_void, CString},
-    ptr::{null, null_mut},
+    io::{self, Write},
+    ptr::null,
     rc::Rc,
     str::from_utf8,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, Ordering},
         Mutex,
     },
 };
 
-use libc::FILE;
 use url::Url;
 
 use crate::{
@@ -19,14 +19,13 @@ use crate::{
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
     error::XmlParserErrors,
     globals::GLOBAL_STATE,
-    io::{xml_io_http_close_put, xml_io_http_dflt_open_w, xml_io_http_match, xml_io_http_write},
     libxml::uri::unescape_url,
+    nanohttp::xml_nanohttp_method,
     tree::XmlBufferAllocationScheme,
 };
 
 use super::{
-    xml_escape_content, xml_file_close, xml_file_flush, xml_file_match, xml_file_open_w,
-    xml_file_write, xml_ioerr, MINLEN,
+    xml_escape_content, xml_ioerr, DefaultFileIOCallbacks, DefaultHTTPIOCallbacks, MINLEN,
 };
 
 /// Callback used in the I/O Output API to detect if the current handler
@@ -52,12 +51,10 @@ pub type XmlOutputWriteCallback =
 #[doc(alias = "xmlOutputCloseCallback")]
 pub type XmlOutputCloseCallback = unsafe extern "C" fn(context: *mut c_void) -> i32;
 
-pub type XmlOutputBufferPtr = *mut XmlOutputBuffer;
 #[repr(C)]
-pub struct XmlOutputBuffer {
-    pub(crate) context: *mut c_void,
-    pub(crate) writecallback: Option<XmlOutputWriteCallback>,
-    pub(crate) closecallback: Option<XmlOutputCloseCallback>,
+#[derive(Default)]
+pub struct XmlOutputBuffer<'a> {
+    pub(crate) context: Option<Box<dyn Write + 'a>>,
     pub(crate) encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>, /* I18N conversions to UTF-8 */
     pub(crate) buffer: Option<XmlBufRef>, /* Local buffer encoded in UTF-8 or ISOLatin */
     pub(crate) conv: Option<XmlBufRef>,   /* if encoder != NULL buffer for output */
@@ -65,7 +62,7 @@ pub struct XmlOutputBuffer {
     pub(crate) error: XmlParserErrors,
 }
 
-impl XmlOutputBuffer {
+impl<'a> XmlOutputBuffer<'a> {
     /// Generic front-end for the encoding handler on parser output.  
     ///
     /// On the first call, `init` should be set to `true`.  
@@ -212,7 +209,7 @@ impl XmlOutputBuffer {
     /// Returns the new parser output or NULL
     #[doc(alias = "xmlAllocOutputBuffer")]
     #[cfg(feature = "output")]
-    pub fn new(encoder: Option<XmlCharEncodingHandler>) -> Option<XmlOutputBuffer> {
+    pub fn new(encoder: Option<XmlCharEncodingHandler>) -> Option<XmlOutputBuffer<'a>> {
         Self::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e))))
     }
 
@@ -234,9 +231,7 @@ impl XmlOutputBuffer {
             // This call is designed to initiate the encoder state
             ret.encode(true);
         }
-        ret.writecallback = None;
-        ret.closecallback = None;
-        ret.context = null_mut();
+        ret.context = None;
         ret.written = 0;
         Some(ret)
     }
@@ -252,8 +247,8 @@ impl XmlOutputBuffer {
     /// If the resource indicated by `uri` is found, return the new output buffer.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlOutputBufferCreateFilename")]
-    pub unsafe fn from_uri(
-        uri: &str,
+    pub unsafe fn from_uri<'b: 'a>(
+        uri: &'b str,
         encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
         compression: i32,
     ) -> Option<Self> {
@@ -268,26 +263,25 @@ impl XmlOutputBuffer {
     ///
     /// Returns the new parser output or NULL
     #[doc(alias = "xmlOutputBufferCreateFile")]
-    pub unsafe fn from_writer(
-        file: *mut FILE,
+    pub fn from_writer(
+        writer: impl Write + 'a,
         encoder: Option<XmlCharEncodingHandler>,
-    ) -> Option<XmlOutputBuffer> {
+    ) -> Option<Self> {
+        Self::from_writer_with_wrapped_encoder(writer, encoder.map(|e| Rc::new(RefCell::new(e))))
+    }
+
+    pub(crate) fn from_writer_with_wrapped_encoder(
+        writer: impl Write + 'a,
+        encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
+    ) -> Option<Self> {
         if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-            xml_register_default_output_callbacks();
+            register_default_output_callbacks();
         }
 
-        if file.is_null() {
-            return None;
-        }
-
-        XmlOutputBuffer::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e)))).map(
-            |mut buf| {
-                buf.context = file as _;
-                buf.writecallback = Some(xml_file_write);
-                buf.closecallback = Some(xml_file_flush);
-                buf
-            },
-        )
+        XmlOutputBuffer::from_wrapped_encoder(encoder).map(|mut buf| {
+            buf.context = Some(Box::new(writer));
+            buf
+        })
     }
 
     /// Write the content of the array in the output I/O buffer.  
@@ -297,7 +291,6 @@ impl XmlOutputBuffer {
     /// Returns the number of chars immediately written, or -1 in case of error.
     #[doc(alias = "xmlOutputBufferWrite")]
     pub unsafe fn write_bytes(&mut self, buf: &[u8]) -> i32 {
-        let mut ret; /* return from function call */
         let mut written = 0; /* number of c_char written to I/O so far */
 
         if !self.error.is_ok() {
@@ -339,7 +332,7 @@ impl XmlOutputBuffer {
                         return -1;
                     }
                 };
-                if self.writecallback.is_some() {
+                if self.context.is_some() {
                     self.conv.map_or(0, |buf| buf.len())
                 } else {
                     res.unwrap_or(0)
@@ -351,7 +344,7 @@ impl XmlOutputBuffer {
                 {
                     return -1;
                 }
-                if self.writecallback.is_some() {
+                if self.context.is_some() {
                     self.buffer.map_or(0, |buf| buf.len())
                 } else {
                     buf.len()
@@ -359,45 +352,28 @@ impl XmlOutputBuffer {
             };
             len -= buf.len();
 
-            if let Some(writecallback) = self.writecallback {
+            if let Some(context) = self.context.as_mut() {
                 if nbchars < MINLEN && len == 0 {
                     break;
                 }
 
-                /*
-                 * second write the stuff to the I/O channel
-                 */
-                if self.encoder.is_some() {
-                    ret = writecallback(
-                        self.context,
-                        self.conv
-                            .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
-                        nbchars as i32,
-                    );
-                    if ret >= 0 {
-                        if let Some(mut conv) = self.conv {
-                            conv.trim_head(ret as usize);
-                        }
-                    }
+                // second write the stuff to the I/O channel
+                let buffer = if self.encoder.is_some() {
+                    self.conv
                 } else {
-                    ret = writecallback(
-                        self.context,
-                        self.buffer
-                            .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
-                        nbchars as i32,
-                    );
-                    if ret >= 0 {
-                        if let Some(mut buf) = self.buffer {
-                            buf.trim_head(ret as usize);
-                        }
+                    self.buffer
+                };
+                match buffer.map(|buf| context.write(&buf.as_ref()[..nbchars])) {
+                    Some(Ok(ret)) => {
+                        buffer.unwrap().trim_head(ret);
+                        self.written = self.written.saturating_add(ret as i32);
+                    }
+                    _ => {
+                        xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                        self.error = XmlParserErrors::XmlIOWrite;
+                        return -1;
                     }
                 }
-                if ret < 0 {
-                    xml_ioerr(XmlParserErrors::XmlIOWrite, null());
-                    self.error = XmlParserErrors::XmlIOWrite;
-                    return ret;
-                }
-                self.written = self.written.saturating_add(ret);
             }
             written += nbchars as i32;
         }
@@ -434,7 +410,7 @@ impl XmlOutputBuffer {
         str: &str,
         escaping: Option<fn(&str, &mut String) -> i32>,
     ) -> i32 {
-        let mut ret; /* return from function call */
+        let ret; /* return from function call */
         let mut written = 0; /* number of c_char written to I/O so far */
         let mut oldwritten; /* loop guard */
 
@@ -495,7 +471,7 @@ impl XmlOutputBuffer {
                         return -1;
                     }
                 };
-                if self.writecallback.is_some() {
+                if self.context.is_some() {
                     conv.len() as i32
                 } else {
                     ret.unwrap_or(0) as i32
@@ -508,59 +484,36 @@ impl XmlOutputBuffer {
                     /* chunk==0 => nothing done */
                     return -1;
                 }
-                if self.writecallback.is_some() {
+                if self.context.is_some() {
                     buffer.len() as i32
                 } else {
                     buf.len() as i32
                 }
             };
 
-            if let Some(writecallback) = self.writecallback {
+            if let Some(context) = self.context.as_mut() {
                 if nbchars < MINLEN as i32 {
                     // goto done;
                     return written;
                 }
 
-                /*
-                 * second write the stuff to the I/O channel
-                 */
-                if self.encoder.is_some() {
-                    ret = writecallback(
-                        self.context,
-                        self.conv.map_or(null(), |conv| {
-                            if conv.is_ok() {
-                                conv.as_ref().as_ptr()
-                            } else {
-                                null()
-                            }
-                        }) as *const i8,
-                        nbchars,
-                    );
-                    if ret >= 0 {
-                        if let Some(mut conv) = self.conv {
-                            conv.trim_head(ret as usize);
-                        }
-                    }
+                let buffer = if self.encoder.is_some() {
+                    self.conv
                 } else {
-                    ret = writecallback(
-                        self.context,
-                        if buffer.is_ok() {
-                            buffer.as_ref().as_ptr() as *const i8
-                        } else {
-                            null()
-                        },
-                        nbchars,
-                    );
-                    if ret >= 0 {
-                        buffer.trim_head(ret as usize);
+                    self.buffer
+                };
+                // second write the stuff to the I/O channel
+                match buffer.map(|buf| context.write(&buf.as_ref()[..nbchars as usize])) {
+                    Some(Ok(ret)) => {
+                        buffer.unwrap().trim_head(ret);
+                        self.written = self.written.saturating_add(ret as i32);
+                    }
+                    _ => {
+                        xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                        self.error = XmlParserErrors::XmlIOWrite;
+                        return -1;
                     }
                 }
-                if ret < 0 {
-                    xml_ioerr(XmlParserErrors::XmlIOWrite, null());
-                    self.error = XmlParserErrors::XmlIOWrite;
-                    return ret;
-                }
-                self.written = self.written.wrapping_add(ret);
             } else if buffer.avail() < MINLEN {
                 buffer.grow(MINLEN);
             }
@@ -578,8 +531,6 @@ impl XmlOutputBuffer {
     /// Returns the number of byte written or -1 in case of error.
     #[doc(alias = "xmlOutputBufferFlush")]
     pub unsafe extern "C" fn flush(&mut self) -> i32 {
-        let mut ret = 0;
-
         if !self.error.is_ok() {
             return -1;
         }
@@ -601,47 +552,28 @@ impl XmlOutputBuffer {
             } {}
         }
 
-        /*
-         * second flush the stuff to the I/O channel
-         */
-        if let Some(mut conv) = self
-            .conv
-            .filter(|_| self.encoder.is_some() && self.writecallback.is_some())
-        {
-            // if !(*out).conv.is_null() && !(*out).encoder.is_null() && (*out).writecallback.is_some() {
-            ret = (self.writecallback.unwrap())(
-                self.context,
-                if conv.is_ok() {
-                    conv.as_ref().as_ptr() as *const i8
-                } else {
-                    null()
-                },
-                conv.len() as i32,
-            );
-            if ret >= 0 {
-                conv.trim_head(ret as usize);
-            }
-        } else if self.writecallback.is_some() {
-            ret = (self.writecallback.unwrap())(
-                self.context,
-                self.buffer
-                    .map_or(null(), |buf| buf.as_ref().as_ptr() as *const i8),
-                self.buffer.map_or(0, |buf| buf.len() as i32),
-            );
-            if ret >= 0 {
-                if let Some(mut buf) = self.buffer {
-                    buf.trim_head(ret as usize);
-                }
-            }
-        }
-        if ret < 0 {
-            xml_ioerr(XmlParserErrors::XmlIOFlush, null());
-            self.error = XmlParserErrors::XmlIOFlush;
-            return ret;
-        }
-        self.written = self.written.saturating_add(ret);
+        let Some(context) = self.context.as_mut() else {
+            return 0;
+        };
 
-        ret
+        // second flush the stuff to the I/O channel
+        let buf = if self.encoder.is_some() {
+            self.conv
+        } else {
+            self.buffer
+        };
+        match buf.map(|buf| context.write(buf.as_ref())) {
+            Some(Ok(ret)) => {
+                buf.unwrap().trim_head(ret);
+                self.written = self.written.saturating_add(ret as i32);
+                ret as i32
+            }
+            _ => {
+                xml_ioerr(XmlParserErrors::XmlIOFlush, null());
+                self.error = XmlParserErrors::XmlIOFlush;
+                -1
+            }
+        }
     }
 
     /// Gives a pointer to the data currently held in the output buffer
@@ -664,28 +596,10 @@ impl XmlOutputBuffer {
     }
 }
 
-impl Default for XmlOutputBuffer {
-    fn default() -> Self {
-        Self {
-            context: null_mut(),
-            writecallback: None,
-            closecallback: None,
-            encoder: None,
-            buffer: None,
-            conv: None,
-            written: 0,
-            error: XmlParserErrors::default(),
-        }
-    }
-}
-
-impl Drop for XmlOutputBuffer {
+impl Drop for XmlOutputBuffer<'_> {
     fn drop(&mut self) {
         unsafe {
             self.flush();
-            if let Some(close) = self.closecallback {
-                close(self.context);
-            }
             if let Some(buf) = self.buffer.take() {
                 buf.free();
             }
@@ -696,98 +610,59 @@ impl Drop for XmlOutputBuffer {
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(crate) struct XmlOutputCallback {
-    pub(in crate::io) matchcallback: Option<XmlOutputMatchCallback>,
-    pub(in crate::io) opencallback: Option<XmlOutputOpenCallback>,
-    pub(in crate::io) writecallback: Option<XmlOutputWriteCallback>,
-    pub(in crate::io) closecallback: Option<XmlOutputCloseCallback>,
+pub trait XmlOutputCallback: Send {
+    fn is_match(&self, filename: &str) -> bool;
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn Write>>;
 }
 
 const MAX_OUTPUT_CALLBACK: usize = 15;
-pub(in crate::io) static XML_OUTPUT_CALLBACK_TABLE: Mutex<
-    [XmlOutputCallback; MAX_OUTPUT_CALLBACK],
-> = Mutex::new(
-    [XmlOutputCallback {
-        matchcallback: None,
-        opencallback: None,
-        writecallback: None,
-        closecallback: None,
-    }; MAX_OUTPUT_CALLBACK],
-);
-pub(in crate::io) static XML_OUTPUT_CALLBACK_NR: AtomicUsize = AtomicUsize::new(0);
+pub(in crate::io) static XML_OUTPUT_CALLBACK_TABLE: Mutex<Vec<Box<dyn XmlOutputCallback>>> =
+    Mutex::new(vec![]);
 pub(in crate::io) static XML_OUTPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// clears the entire output callback table. this includes the compiled-in I/O callbacks.
 #[doc(alias = "xmlCleanupOutputCallbacks")]
-pub fn xml_cleanup_output_callbacks() {
+pub fn cleanup_output_callbacks() {
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
         return;
     }
 
-    let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
     let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
-    callbacks[..num_callbacks].fill(XmlOutputCallback {
-        matchcallback: None,
-        opencallback: None,
-        writecallback: None,
-        closecallback: None,
-    });
+    callbacks.clear();
 
-    XML_OUTPUT_CALLBACK_NR.store(0, Ordering::Release);
     XML_OUTPUT_CALLBACK_INITIALIZED.store(false, Ordering::Release);
 }
 
 /// Remove the top output callbacks from the output stack.  
 /// This includes the compiled-in I/O.
 ///
-/// Returns the number of output callback registered or -1 in case of error.
+/// Even if no callbacks are registered, this function does not fail and return `0`.
 #[doc(alias = "xmlPopOutputCallbacks")]
-pub fn xml_pop_output_callbacks() -> i32 {
+pub fn pop_output_callbacks() -> usize {
     if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
-        return -1;
+        return 0;
     }
 
-    let mut num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
-    if num_callbacks == 0 {
-        return -1;
-    }
-
-    num_callbacks -= 1;
     let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
-    callbacks[num_callbacks].matchcallback = None;
-    callbacks[num_callbacks].opencallback = None;
-    callbacks[num_callbacks].writecallback = None;
-    callbacks[num_callbacks].closecallback = None;
-
-    XML_OUTPUT_CALLBACK_NR.store(num_callbacks, Ordering::Release);
-    num_callbacks as _
+    callbacks.pop();
+    callbacks.len()
 }
 
 /// Registers the default compiled-in I/O handlers.
 #[doc(alias = "xmlRegisterDefaultOutputCallbacks")]
-pub unsafe extern "C" fn xml_register_default_output_callbacks() {
+pub fn register_default_output_callbacks() {
     if XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
         return;
     }
 
-    xml_register_output_callbacks(
-        Some(xml_file_match),
-        Some(xml_file_open_w),
-        Some(xml_file_write),
-        Some(xml_file_close),
-    );
+    register_output_callbacks(DefaultFileIOCallbacks);
 
     #[cfg(feature = "http")]
     {
-        xml_register_output_callbacks(
-            Some(xml_io_http_match),
-            Some(xml_io_http_dflt_open_w),
-            Some(xml_io_http_write),
-            Some(xml_io_http_close_put),
-        );
+        register_output_callbacks(DefaultHTTPIOCallbacks {
+            write_method: "PUT",
+        });
     }
 
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
@@ -797,24 +672,14 @@ pub unsafe extern "C" fn xml_register_default_output_callbacks() {
 ///
 /// Returns the registered handler number or -1 in case of error
 #[doc(alias = "xmlRegisterOutputCallbacks")]
-pub fn xml_register_output_callbacks(
-    match_func: Option<XmlOutputMatchCallback>,
-    open_func: Option<XmlOutputOpenCallback>,
-    write_func: Option<XmlOutputWriteCallback>,
-    close_func: Option<XmlOutputCloseCallback>,
-) -> i32 {
-    let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
-    if num_callbacks >= MAX_OUTPUT_CALLBACK {
-        return -1;
-    }
+pub fn register_output_callbacks(callback: impl XmlOutputCallback + 'static) -> io::Result<usize> {
     let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
-    callbacks[num_callbacks].matchcallback = match_func;
-    callbacks[num_callbacks].opencallback = open_func;
-    callbacks[num_callbacks].writecallback = write_func;
-    callbacks[num_callbacks].closecallback = close_func;
+    if callbacks.len() == MAX_OUTPUT_CALLBACK {
+        return Err(io::Error::other("Too many input callbacks."));
+    }
+    callbacks.push(Box::new(callback));
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
-    XML_OUTPUT_CALLBACK_NR.store(num_callbacks + 1, Ordering::Release);
-    num_callbacks as _
+    Ok(callbacks.len())
 }
 
 pub(crate) unsafe fn __xml_output_buffer_create_filename(
@@ -822,11 +687,9 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     _compression: i32,
 ) -> Option<XmlOutputBuffer> {
-    let mut context: *mut c_void = null_mut();
-
     let is_initialized = XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire);
     if !is_initialized {
-        xml_register_default_output_callbacks();
+        register_default_output_callbacks();
     }
 
     let unescaped = Url::parse(uri)
@@ -834,27 +697,18 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
         .filter(|url| url.scheme() == "file")
         .and_then(|_| unescape_url(uri).ok());
 
-    let num_callbacks = XML_OUTPUT_CALLBACK_NR.load(Ordering::Acquire);
-    let callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
+    let mut callbacks = XML_OUTPUT_CALLBACK_TABLE.lock().unwrap();
 
     // Try to find one of the output accept method accepting that scheme
     // Go in reverse to give precedence to user defined handlers.
     // try with an unescaped version of the URI
     if let Some(Cow::Owned(unescaped)) = unescaped {
-        for i in (0..num_callbacks).rev() {
-            if callbacks[i]
-                .matchcallback
-                .filter(|callback| callback(&unescaped) != 0)
-                .is_some()
-            {
-                let unescaped = CString::new(unescaped.as_str()).unwrap();
-                context = (callbacks[i].opencallback.unwrap())(unescaped.as_ptr());
-                if !context.is_null() {
+        for callback in callbacks.iter_mut().rev() {
+            if callback.is_match(&unescaped) {
+                if let Ok(context) = callback.open(unescaped.as_str()) {
                     // Allocate the Output buffer front-end.
                     let mut ret = XmlOutputBuffer::from_wrapped_encoder(encoder)?;
-                    ret.context = context;
-                    ret.writecallback = callbacks[i].writecallback;
-                    ret.closecallback = callbacks[i].closecallback;
+                    ret.context = Some(context);
                     return Some(ret);
                 }
             }
@@ -862,26 +716,126 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     }
 
     // If this failed try with a non-escaped URI this may be a strange filename
-    if context.is_null() {
-        for i in (0..num_callbacks).rev() {
-            if callbacks[i]
-                .matchcallback
-                .filter(|callback| callback(uri) != 0)
-                .is_some()
-            {
-                let uri = CString::new(uri).unwrap();
-                context = (callbacks[i].opencallback.unwrap())(uri.as_ptr());
-                if !context.is_null() {
-                    // Allocate the Output buffer front-end.
-                    let mut ret = XmlOutputBuffer::from_wrapped_encoder(encoder)?;
-                    ret.context = context;
-                    ret.writecallback = callbacks[i].writecallback;
-                    ret.closecallback = callbacks[i].closecallback;
-                    return Some(ret);
-                }
+    for callback in callbacks.iter_mut().rev() {
+        if callback.is_match(uri) {
+            if let Ok(context) = callback.open(uri) {
+                // Allocate the Output buffer front-end.
+                let mut ret = XmlOutputBuffer::from_wrapped_encoder(encoder)?;
+                ret.context = Some(context);
+                return Some(ret);
             }
         }
     }
 
     None
+}
+
+#[cfg(feature = "http")]
+#[repr(C)]
+pub struct XmlIOHTTPWriteCtxt {
+    compression: i32,
+    uri: String,
+    doc_buff: XmlOutputBuffer<'static>,
+    method: &'static str,
+}
+
+#[cfg(feature = "http")]
+impl XmlOutputCallback for DefaultHTTPIOCallbacks {
+    fn is_match(&self, filename: &str) -> bool {
+        filename.starts_with("http://")
+    }
+
+    #[doc(alias = "xmlIOHTTPOpenW")]
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn Write>> {
+        let ctxt = XmlIOHTTPWriteCtxt {
+            compression: 0,
+            uri: filename.to_owned(),
+            doc_buff: XmlOutputBuffer::from_wrapped_encoder(None)
+                .ok_or(io::Error::other("Failed to create XmlOutputBuffer"))?,
+            method: self.write_method,
+        };
+        Ok(Box::new(ctxt))
+    }
+}
+
+#[cfg(feature = "http")]
+impl Write for XmlIOHTTPWriteCtxt {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if !buf.is_empty() {
+            let len = unsafe { self.doc_buff.write_bytes(buf) };
+            if len < 0 {
+                let error = io::Error::last_os_error();
+                let msg = format!(
+                    "xmlIOHTTPWrite:  {}\n{} '{}'.\n",
+                    "Error appending to internal buffer.",
+                    "Error sending document to URI",
+                    self.uri
+                );
+                let msg = CString::new(msg).unwrap();
+                unsafe {
+                    xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr());
+                }
+                return Err(error);
+            }
+            return Ok(len as usize);
+        }
+        Ok(0)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(feature = "http")]
+impl Drop for XmlIOHTTPWriteCtxt {
+    fn drop(&mut self) {
+        // Pull the data out of the memory output buffer
+
+        let dctxt = &mut self.doc_buff;
+        let http_content = dctxt.buffer.filter(|buf| buf.is_ok());
+        let content_lgth = dctxt.buffer.map_or(0, |buf| buf.len()) as i32;
+
+        if let Some(http_content) = http_content {
+            let mut content_type = Some(Cow::Borrowed("text/xml"));
+            let content_encoding = None;
+            let content = String::from_utf8_lossy(http_content.as_ref());
+            let http_ctxt = xml_nanohttp_method(
+                &self.uri,
+                Some(self.method),
+                Some(content.as_ref()),
+                &mut content_type,
+                content_encoding,
+            )
+            .ok();
+
+            if let Some(ctxt) = http_ctxt {
+                let return_code = ctxt.return_code();
+                if !(200..300).contains(&return_code) {
+                    let msg = format!(
+                        "xmlIOHTTPCloseWrite: HTTP '{}' of {} {}\n'{}' {} {}\n",
+                        self.method,
+                        content_lgth,
+                        "bytes to URI",
+                        self.uri,
+                        "failed.  HTTP return code:",
+                        return_code
+                    );
+                    let msg = CString::new(msg).unwrap();
+                    unsafe {
+                        xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
+                    }
+                }
+            }
+        } else {
+            let msg = format!(
+                "xmlIOHTTPCloseWrite:  {} '{}' {} '{}'.\n",
+                "Error retrieving content.\nUnable to", self.method, "data to URI", self.uri
+            );
+            let msg = CString::new(msg).unwrap();
+            unsafe {
+                xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr() as _);
+            }
+        }
+    }
 }

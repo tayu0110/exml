@@ -7,13 +7,14 @@ use std::{
     any::type_name,
     cell::Cell,
     ffi::{c_char, CStr},
+    io::Write,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     slice::from_raw_parts,
 };
 
-use libc::{fprintf, memcpy, memset, ptrdiff_t, snprintf, FILE};
+use libc::{memcpy, memset, ptrdiff_t, snprintf};
 
 use crate::{
     __xml_raise_error,
@@ -8323,7 +8324,10 @@ pub unsafe extern "C" fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpDefines")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_relaxng_dump_defines(output: *mut FILE, mut defines: XmlRelaxNGDefinePtr) {
+unsafe extern "C" fn xml_relaxng_dump_defines<'a>(
+    output: &mut (impl Write + 'a),
+    mut defines: XmlRelaxNGDefinePtr,
+) {
     while !defines.is_null() {
         xml_relaxng_dump_define(output, defines);
         defines = (*defines).next;
@@ -8333,104 +8337,112 @@ unsafe extern "C" fn xml_relaxng_dump_defines(output: *mut FILE, mut defines: Xm
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpDefine")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_relaxng_dump_define(output: *mut FILE, define: XmlRelaxNGDefinePtr) {
+unsafe extern "C" fn xml_relaxng_dump_define<'a>(
+    output: &mut (impl Write + 'a),
+    define: XmlRelaxNGDefinePtr,
+) {
     if define.is_null() {
         return;
     }
     match (*define).typ {
         XmlRelaxNGType::Empty => {
-            fprintf(output, c"<empty/>\n".as_ptr() as _);
+            writeln!(output, "<empty/>");
         }
         XmlRelaxNGType::NotAllowed => {
-            fprintf(output, c"<notAllowed/>\n".as_ptr() as _);
+            writeln!(output, "<notAllowed/>");
         }
         XmlRelaxNGType::Text => {
-            fprintf(output, c"<text/>\n".as_ptr() as _);
+            writeln!(output, "<text/>");
         }
         XmlRelaxNGType::Element => {
-            fprintf(output, c"<element>\n".as_ptr() as _);
+            writeln!(output, "<element>");
             if !(*define).name.is_null() {
-                fprintf(output, c"<name".as_ptr() as _);
+                write!(output, "<name");
                 if !(*define).ns.is_null() {
-                    fprintf(output, c" ns=\"%s\"".as_ptr() as _, (*define).ns);
+                    let ns = CStr::from_ptr((*define).ns as *const i8).to_string_lossy();
+                    write!(output, " ns=\"{ns}\"");
                 }
-                fprintf(output, c">%s</name>\n".as_ptr() as _, (*define).name);
+                let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
+                writeln!(output, ">{name}</name>");
             }
             xml_relaxng_dump_defines(output, (*define).attrs);
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</element>\n".as_ptr() as _);
+            writeln!(output, "</element>");
         }
         XmlRelaxNGType::List => {
-            fprintf(output, c"<list>\n".as_ptr() as _);
+            writeln!(output, "<list>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</list>\n".as_ptr() as _);
+            writeln!(output, "</list>");
         }
         XmlRelaxNGType::Oneormore => {
-            fprintf(output, c"<oneOrMore>\n".as_ptr() as _);
+            writeln!(output, "<oneOrMore>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</oneOrMore>\n".as_ptr() as _);
+            writeln!(output, "</oneOrMore>");
         }
         XmlRelaxNGType::Zeroormore => {
-            fprintf(output, c"<zeroOrMore>\n".as_ptr() as _);
+            writeln!(output, "<zeroOrMore>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</zeroOrMore>\n".as_ptr() as _);
+            writeln!(output, "</zeroOrMore>");
         }
         XmlRelaxNGType::Choice => {
-            fprintf(output, c"<choice>\n".as_ptr() as _);
+            writeln!(output, "<choice>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</choice>\n".as_ptr() as _);
+            writeln!(output, "</choice>");
         }
         XmlRelaxNGType::Group => {
-            fprintf(output, c"<group>\n".as_ptr() as _);
+            writeln!(output, "<group>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</group>\n".as_ptr() as _);
+            writeln!(output, "</group>");
         }
         XmlRelaxNGType::Interleave => {
-            fprintf(output, c"<interleave>\n".as_ptr() as _);
+            writeln!(output, "<interleave>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</interleave>\n".as_ptr() as _);
+            writeln!(output, "</interleave>");
         }
         XmlRelaxNGType::Optional => {
-            fprintf(output, c"<optional>\n".as_ptr() as _);
+            writeln!(output, "<optional>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</optional>\n".as_ptr() as _);
+            writeln!(output, "</optional>");
         }
         XmlRelaxNGType::Attribute => {
-            fprintf(output, c"<attribute>\n".as_ptr() as _);
+            writeln!(output, "<attribute>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</attribute>\n".as_ptr() as _);
+            writeln!(output, "</attribute>");
         }
         XmlRelaxNGType::Def => {
-            fprintf(output, c"<define".as_ptr() as _);
+            write!(output, "<define");
             if !(*define).name.is_null() {
-                fprintf(output, c" name=\"%s\"".as_ptr() as _, (*define).name);
+                let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
+                write!(output, " name=\"{name}\"");
             }
-            fprintf(output, c">\n".as_ptr() as _);
+            writeln!(output, ">");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</define>\n".as_ptr() as _);
+            writeln!(output, "</define>");
         }
         XmlRelaxNGType::Ref => {
-            fprintf(output, c"<ref".as_ptr() as _);
+            write!(output, "<ref");
             if !(*define).name.is_null() {
-                fprintf(output, c" name=\"%s\"".as_ptr() as _, (*define).name);
+                let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
+                write!(output, " name=\"{name}\"");
             }
-            fprintf(output, c">\n".as_ptr() as _);
+            writeln!(output, ">");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</ref>\n".as_ptr() as _);
+            writeln!(output, "</ref>");
         }
         XmlRelaxNGType::Parentref => {
-            fprintf(output, c"<parentRef".as_ptr() as _);
+            write!(output, "<parentRef");
             if !(*define).name.is_null() {
-                fprintf(output, c" name=\"%s\"".as_ptr() as _, (*define).name);
+                let name = CStr::from_ptr((*define).name as *const i8).to_string_lossy();
+                write!(output, " name=\"{name}\"");
             }
-            fprintf(output, c">\n".as_ptr() as _);
+            writeln!(output, ">");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</parentRef>\n".as_ptr() as _);
+            writeln!(output, "</parentRef>");
         }
         XmlRelaxNGType::Externalref => {
-            fprintf(output, c"<externalRef>".as_ptr() as _);
+            write!(output, "<externalRef>");
             xml_relaxng_dump_defines(output, (*define).content);
-            fprintf(output, c"</externalRef>\n".as_ptr() as _);
+            writeln!(output, "</externalRef>");
         }
         XmlRelaxNGType::Datatype | XmlRelaxNGType::Value => {
             // TODO
@@ -8447,8 +8459,8 @@ unsafe extern "C" fn xml_relaxng_dump_define(output: *mut FILE, define: XmlRelax
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpGrammar")]
 #[cfg(feature = "output")]
-unsafe extern "C" fn xml_relaxng_dump_grammar(
-    output: *mut FILE,
+unsafe extern "C" fn xml_relaxng_dump_grammar<'a>(
+    output: &mut (impl Write + 'a),
     grammar: XmlRelaxNGGrammarPtr,
     top: i32,
 ) {
@@ -8456,63 +8468,54 @@ unsafe extern "C" fn xml_relaxng_dump_grammar(
         return;
     }
 
-    fprintf(output, c"<grammar".as_ptr() as _);
+    write!(output, "<grammar");
     if top != 0 {
-        fprintf(
-            output,
-            c" xmlns=\"http://relaxng.org/ns/structure/1.0\"".as_ptr() as _,
-        );
+        write!(output, " xmlns=\"http://relaxng.org/ns/structure/1.0\"");
     }
     match (*grammar).combine {
         XmlRelaxNGCombine::Undefined => {}
         XmlRelaxNGCombine::Choice => {
-            fprintf(output, c" combine=\"choice\"".as_ptr() as _);
+            write!(output, " combine=\"choice\"");
         }
         XmlRelaxNGCombine::Interleave => {
-            fprintf(output, c" combine=\"interleave\"".as_ptr() as _);
+            write!(output, " combine=\"interleave\"");
         } // _ => {
-          //     fprintf(output, c" <!-- invalid combine value -->".as_ptr() as _);
+          //     write!(output, " <!-- invalid combine value -->");
           // }
     }
-    fprintf(output, c">\n".as_ptr() as _);
+    writeln!(output, ">");
     if (*grammar).start.is_null() {
-        fprintf(output, c" <!-- grammar had no start -->".as_ptr() as _);
+        write!(output, " <!-- grammar had no start -->");
     } else {
-        fprintf(output, c"<start>\n".as_ptr() as _);
+        writeln!(output, "<start>");
         xml_relaxng_dump_define(output, (*grammar).start);
-        fprintf(output, c"</start>\n".as_ptr() as _);
+        writeln!(output, "</start>");
     }
     /* TODO ? Dump the defines ? */
-    fprintf(output, c"</grammar>\n".as_ptr() as _);
+    writeln!(output, "</grammar>");
 }
 
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDump")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGPtr) {
-    use std::ffi::CString;
-
-    if output.is_null() {
-        return;
-    }
+pub unsafe extern "C" fn xml_relaxng_dump<'a>(
+    output: &mut (impl Write + 'a),
+    schema: XmlRelaxNGPtr,
+) {
     if schema.is_null() {
-        fprintf(
-            output,
-            c"RelaxNG empty or failed to compile\n".as_ptr() as _,
-        );
+        writeln!(output, "RelaxNG empty or failed to compile");
         return;
     }
-    fprintf(output, c"RelaxNG: ".as_ptr() as _);
+    write!(output, "RelaxNG: ");
     if (*schema).doc.is_null() {
-        fprintf(output, c"no document\n".as_ptr() as _);
+        writeln!(output, "no document");
     } else if let Some(url) = (*(*schema).doc).url.as_deref() {
-        let url = CString::new(url).unwrap();
-        fprintf(output, c"%s\n".as_ptr() as _, url.as_ptr());
+        writeln!(output, "{url}");
     } else {
-        fprintf(output, c"\n".as_ptr() as _);
+        writeln!(output);
     }
     if (*schema).topgrammar.is_null() {
-        fprintf(output, c"RelaxNG has no top grammar\n".as_ptr() as _);
+        writeln!(output, "RelaxNG has no top grammar");
         return;
     }
     xml_relaxng_dump_grammar(output, (*schema).topgrammar, 1);
@@ -8521,19 +8524,13 @@ pub unsafe extern "C" fn xml_relaxng_dump(output: *mut FILE, schema: XmlRelaxNGP
 /// Dump the transformed RelaxNG tree.
 #[doc(alias = "xmlRelaxNGDumpTree")]
 #[cfg(feature = "output")]
-pub unsafe extern "C" fn xml_relaxng_dump_tree(output: *mut FILE, schema: XmlRelaxNGPtr) {
-    if output.is_null() {
-        return;
-    }
+pub unsafe extern "C" fn xml_relaxng_dump_tree(output: &mut impl Write, schema: XmlRelaxNGPtr) {
     if schema.is_null() {
-        fprintf(
-            output,
-            c"RelaxNG empty or failed to compile\n".as_ptr() as _,
-        );
+        writeln!(output, "RelaxNG empty or failed to compile");
         return;
     }
     if (*schema).doc.is_null() {
-        fprintf(output, c"no document\n".as_ptr() as _);
+        writeln!(output, "no document");
     } else {
         (*(*schema).doc).dump_file(output);
     }
@@ -11855,11 +11852,10 @@ mod tests {
             for n_output in 0..GEN_NB_FILE_PTR {
                 for n_schema in 0..GEN_NB_XML_RELAXNG_PTR {
                     let mem_base = xml_mem_blocks();
-                    let output = gen_file_ptr(n_output, 0);
+                    let mut output = gen_file_ptr(n_output, 0).unwrap();
                     let schema = gen_xml_relaxng_ptr(n_schema, 1);
 
-                    xml_relaxng_dump(output, schema);
-                    des_file_ptr(n_output, output, 0);
+                    xml_relaxng_dump(&mut output, schema);
                     des_xml_relaxng_ptr(n_schema, schema, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -11886,11 +11882,10 @@ mod tests {
             for n_output in 0..GEN_NB_FILE_PTR {
                 for n_schema in 0..GEN_NB_XML_RELAXNG_PTR {
                     let mem_base = xml_mem_blocks();
-                    let output = gen_file_ptr(n_output, 0);
+                    let mut output = gen_file_ptr(n_output, 0).unwrap();
                     let schema = gen_xml_relaxng_ptr(n_schema, 1);
 
-                    xml_relaxng_dump_tree(output, schema);
-                    des_file_ptr(n_output, output, 0);
+                    xml_relaxng_dump_tree(&mut output, schema);
                     des_xml_relaxng_ptr(n_schema, schema, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -11910,96 +11905,6 @@ mod tests {
             }
         }
     }
-
-    // #[test]
-    // fn test_xml_relaxng_get_parser_errors() {
-    //     #[cfg(feature = "schema")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_RELAXNG_PARSER_CTXT_PTR {
-    //             for n_err in 0..GEN_NB_XML_RELAXNG_VALIDITY_ERROR_FUNC_PTR {
-    //                 for n_warn in 0..GEN_NB_XML_RELAXNG_VALIDITY_WARNING_FUNC_PTR {
-    //                     for n_ctx in 0..GEN_NB_VOID_PTR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctxt = gen_xml_relaxng_parser_ctxt_ptr(n_ctxt, 0);
-    //                         let err = gen_xml_relaxng_validity_error_func_ptr(n_err, 1);
-    //                         let warn = gen_xml_relaxng_validity_warning_func_ptr(n_warn, 2);
-    //                         let ctx = gen_void_ptr_ptr(n_ctx, 3);
-
-    //                         let ret_val = xml_relaxng_get_parser_errors(ctxt, err, warn, ctx);
-    //                         desret_int(ret_val);
-    //                         des_xml_relaxng_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                         des_xml_relaxng_validity_error_func_ptr(n_err, err, 1);
-    //                         des_xml_relaxng_validity_warning_func_ptr(n_warn, warn, 2);
-    //                         des_void_ptr_ptr(n_ctx, ctx, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlRelaxNGGetParserErrors",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             assert!(
-    //                                 leaks == 0,
-    //                                 "{leaks} Leaks are found in xmlRelaxNGGetParserErrors()"
-    //                             );
-    //                             eprint!(" {}", n_ctxt);
-    //                             eprint!(" {}", n_err);
-    //                             eprint!(" {}", n_warn);
-    //                             eprintln!(" {}", n_ctx);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-
-    // #[test]
-    // fn test_xml_relaxng_get_valid_errors() {
-    //     #[cfg(feature = "schema")]
-    //     unsafe {
-    //         let mut leaks = 0;
-
-    //         for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
-    //             for n_err in 0..GEN_NB_XML_RELAXNG_VALIDITY_ERROR_FUNC_PTR {
-    //                 for n_warn in 0..GEN_NB_XML_RELAXNG_VALIDITY_WARNING_FUNC_PTR {
-    //                     for n_ctx in 0..GEN_NB_VOID_PTR_PTR {
-    //                         let mem_base = xml_mem_blocks();
-    //                         let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
-    //                         let err = gen_xml_relaxng_validity_error_func_ptr(n_err, 1);
-    //                         let warn = gen_xml_relaxng_validity_warning_func_ptr(n_warn, 2);
-    //                         let ctx = gen_void_ptr_ptr(n_ctx, 3);
-
-    //                         let ret_val = xml_relaxng_get_valid_errors(ctxt, err, warn, ctx);
-    //                         desret_int(ret_val);
-    //                         des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-    //                         des_xml_relaxng_validity_error_func_ptr(n_err, err, 1);
-    //                         des_xml_relaxng_validity_warning_func_ptr(n_warn, warn, 2);
-    //                         des_void_ptr_ptr(n_ctx, ctx, 3);
-    //                         reset_last_error();
-    //                         if mem_base != xml_mem_blocks() {
-    //                             leaks += 1;
-    //                             eprint!(
-    //                                 "Leak of {} blocks found in xmlRelaxNGGetValidErrors",
-    //                                 xml_mem_blocks() - mem_base
-    //                             );
-    //                             assert!(
-    //                                 leaks == 0,
-    //                                 "{leaks} Leaks are found in xmlRelaxNGGetValidErrors()"
-    //                             );
-    //                             eprint!(" {}", n_ctxt);
-    //                             eprint!(" {}", n_err);
-    //                             eprint!(" {}", n_warn);
-    //                             eprintln!(" {}", n_ctx);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 
     #[test]
     fn test_xml_relaxng_init_types() {
@@ -12122,42 +12027,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_relaxng_new_valid_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_relaxng_parse() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_relaxng_set_parser_errors() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_relaxng_set_parser_structured_errors() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_relaxng_set_valid_errors() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_relaxng_set_valid_structured_errors() {
-
-        /* missing type support */
     }
 
     #[test]

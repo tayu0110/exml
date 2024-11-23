@@ -11,7 +11,7 @@ use std::{
     env::args,
     ffi::{c_char, c_int, c_long, c_void, CStr, CString},
     fs::File,
-    io::{stderr, stdin, Write},
+    io::{stderr, stdin, stdout, Write},
     mem::zeroed,
     num::IntErrorKind,
     process::exit,
@@ -2257,10 +2257,10 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
  ************************************************************************/
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
-    use std::{cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, io::stdout, rc::Rc};
 
     use exml::{
-        io::{xml_output_buffer_close, XmlOutputBuffer, XmlOutputBufferPtr},
+        io::XmlOutputBuffer,
         libxml::xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
         tree::XmlNodePtr,
     };
@@ -2270,17 +2270,12 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             let mut node: XmlNodePtr;
             #[cfg(feature = "output")]
             {
-                let buf: XmlOutputBufferPtr;
-
                 if (*cur).nodesetval.is_null() || (*(*cur).nodesetval).node_nr <= 0 {
                     if QUIET == 0 {
                         eprintln!("XPath set is empty");
                     }
                 } else {
-                    extern "C" {
-                        static stdout: *mut FILE;
-                    }
-                    let Some(buf) = XmlOutputBuffer::from_writer(stdout, None) else {
+                    let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                         eprintln!("Out of memory for XPath");
                         PROGRESULT = XmllintReturnCode::ErrMem;
                         return;
@@ -2689,13 +2684,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         do_xpath_query(doc, query.as_ptr());
     }
 
-    extern "C" {
-        static stdout: *mut FILE;
-    }
-
-    /*
-     * shell interaction
-     */
+    // shell interaction
     #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
     if SHELL != 0 {
         xml_xpath_order_doc_elems(doc);
@@ -2704,7 +2693,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             doc,
             fname.map_or(null_mut(), |f| f.as_ptr() as _),
             Some(xml_shell_readline),
-            stdout,
+            Some(stdout()),
         );
     }
 
@@ -2803,27 +2792,25 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         let o = OUTPUT.lock().unwrap();
                         let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
                         html_save_file_format(o.as_ref(), doc, None, 1);
-                    } else {
-                        let out: *mut FILE = OUTPUT
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
-                        if !out.is_null() {
-                            if html_doc_dump(out, doc) < 0 {
+                    } else if let Some(filename) = OUTPUT.lock().unwrap().as_deref() {
+                        let filename = filename.to_string_lossy();
+                        match File::options()
+                            .write(true)
+                            .truncate(true)
+                            .open(filename.as_ref())
+                        {
+                            Ok(mut f) => {
+                                if html_doc_dump(&mut f, doc) < 0 {
+                                    PROGRESULT = XmllintReturnCode::ErrOut;
+                                }
+                            }
+                            _ => {
+                                eprintln!("failed to open {filename}");
                                 PROGRESULT = XmllintReturnCode::ErrOut;
                             }
-
-                            if OUTPUT.lock().unwrap().is_some() {
-                                fclose(out);
-                            }
-                        } else {
-                            eprintln!(
-                                "failed to open {}",
-                                OUTPUT.lock().unwrap().as_ref().unwrap().to_string_lossy()
-                            );
-                            PROGRESULT = XmllintReturnCode::ErrOut;
                         }
+                    } else if html_doc_dump(&mut stdout(), doc) < 0 {
+                        PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                     if TIMING != 0 && REPEAT == 0 {
                         end_timer!("Saving");
@@ -2962,27 +2949,25 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         eprintln!("failed save to {}", o.to_string_lossy());
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
-                } else {
-                    let out: *mut FILE = OUTPUT
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
-                    if !out.is_null() {
-                        if doc.is_null() || (*doc).dump_file(out) < 0 {
+                } else if let Some(filename) = OUTPUT.lock().unwrap().as_deref() {
+                    let filename = filename.to_string_lossy();
+                    match File::options()
+                        .write(true)
+                        .truncate(true)
+                        .open(filename.as_ref())
+                    {
+                        Ok(mut f) => {
+                            if doc.is_null() || (*doc).dump_file(&mut f) < 0 {
+                                PROGRESULT = XmllintReturnCode::ErrOut;
+                            }
+                        }
+                        _ => {
+                            eprintln!("failed to open {filename}");
                             PROGRESULT = XmllintReturnCode::ErrOut;
                         }
-
-                        if OUTPUT.lock().unwrap().is_some() {
-                            fclose(out);
-                        }
-                    } else {
-                        eprintln!(
-                            "failed to open {}",
-                            OUTPUT.lock().unwrap().as_ref().unwrap().to_string_lossy()
-                        );
-                        PROGRESULT = XmllintReturnCode::ErrOut;
                     }
+                } else if doc.is_null() || (*doc).dump_file(&mut stdout()) < 0 {
+                    PROGRESULT = XmllintReturnCode::ErrOut;
                 }
             } else {
                 let ctxt: XmlSaveCtxtPtr;
@@ -2999,24 +2984,15 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
                 }
 
-                if let Some(o) = OUTPUT.lock().unwrap().as_ref() {
-                    ctxt = xml_save_to_filename(
-                        o.to_string_lossy().as_ref(),
-                        ENCODING.lock().unwrap().as_deref(),
-                        save_opts,
-                    );
+                let olock = OUTPUT.lock().unwrap();
+                let outname = olock.as_ref().map(|o| o.to_string_lossy());
+                let elock = ENCODING.lock().unwrap();
+                let encoding = elock.as_deref();
+                let ctxt = if let Some(o) = outname.as_deref() {
+                    xml_save_to_filename(o, encoding, save_opts)
                 } else {
-                    extern "C" {
-                        static stdout: *mut FILE;
-                    }
-                    ctxt = xml_save_to_io(
-                        Some(xml_file_write),
-                        Some(xml_file_flush),
-                        stdout as _,
-                        ENCODING.lock().unwrap().as_deref(),
-                        save_opts,
-                    );
-                }
+                    xml_save_to_io(stdout(), encoding, save_opts)
+                };
 
                 if !ctxt.is_null() {
                     if xml_save_doc(ctxt, doc) < 0 {
@@ -3036,23 +3012,23 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         } else {
             #[cfg(feature = "libxml_debug")]
             {
-                let out: *mut FILE = OUTPUT
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .map_or(stdout, |o| fopen(o.as_ptr(), c"wb".as_ptr()));
-                if !out.is_null() {
-                    xml_debug_dump_document(out, doc);
-
-                    if OUTPUT.lock().unwrap().is_some() {
-                        fclose(out);
+                if let Some(filename) = OUTPUT.lock().unwrap().as_deref() {
+                    let filename = filename.to_string_lossy();
+                    match File::options()
+                        .write(true)
+                        .truncate(true)
+                        .open(filename.as_ref())
+                    {
+                        Ok(f) => {
+                            xml_debug_dump_document(Some(f), doc);
+                        }
+                        _ => {
+                            eprintln!("failed to open {filename}");
+                            PROGRESULT = XmllintReturnCode::ErrOut;
+                        }
                     }
                 } else {
-                    eprintln!(
-                        "failed to open {}",
-                        OUTPUT.lock().unwrap().as_ref().unwrap().to_string_lossy()
-                    );
-                    PROGRESULT = XmllintReturnCode::ErrOut;
+                    xml_debug_dump_document(Some(stdout()), doc);
                 }
             }
         }
@@ -3289,13 +3265,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
     }
 
-    extern "C" {
-        static stderr: *mut FILE;
-    }
-
     #[cfg(all(feature = "libxml_debug", any(feature = "html", feature = "valid")))]
     if DEBUGENT != 0 && HTML == 0 {
-        xml_debug_dump_entities(stderr, doc);
+        xml_debug_dump_entities(stderr(), doc);
     }
 
     /*

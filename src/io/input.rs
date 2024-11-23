@@ -418,7 +418,7 @@ pub fn register_default_input_callbacks() {
     register_input_callbacks(DefaultFileIOCallbacks);
     #[cfg(feature = "http")]
     {
-        register_input_callbacks(DefaultHTTPIOCallbacks);
+        register_input_callbacks(DefaultHTTPIOCallbacks { write_method: "" });
     }
     #[cfg(feature = "ftp")]
     {

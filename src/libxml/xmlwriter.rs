@@ -12,6 +12,7 @@
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
+    io::{self, Write},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -27,7 +28,7 @@ use crate::{
     encoding::find_encoding_handler,
     error::XmlParserErrors,
     globals::GenericErrorContext,
-    io::{xml_output_buffer_create_io, XmlOutputBuffer},
+    io::XmlOutputBuffer,
     libxml::{
         entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
@@ -85,12 +86,12 @@ struct XmlTextWriterNsStackEntry {
     elem: XmlLinkPtr,
 }
 
-pub type XmlTextWriterPtr = *mut XmlTextWriter;
+pub type XmlTextWriterPtr<'a> = *mut XmlTextWriter<'a>;
 #[repr(C)]
-pub struct XmlTextWriter {
-    out: XmlOutputBuffer, /* output buffer */
-    nodes: XmlListPtr,    /* element name stack */
-    nsstack: XmlListPtr,  /* name spaces stack */
+pub struct XmlTextWriter<'a> {
+    out: XmlOutputBuffer<'a>, /* output buffer */
+    nodes: XmlListPtr,        /* element name stack */
+    nsstack: XmlListPtr,      /* name spaces stack */
     level: i32,
     indent: i32,         /* enable indent */
     doindent: i32,       /* internal indent flag */
@@ -101,7 +102,7 @@ pub struct XmlTextWriter {
     doc: XmlDocPtr,
 }
 
-impl Default for XmlTextWriter {
+impl Default for XmlTextWriter<'_> {
     fn default() -> Self {
         Self {
             out: XmlOutputBuffer::default(),
@@ -427,13 +428,9 @@ unsafe extern "C" fn xml_text_writer_write_doc_callback(
     len: i32,
 ) -> i32 {
     let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
-    let rc: i32;
 
-    let res = {
-        rc = xml_parse_chunk(ctxt, str, len, 0);
-        rc != 0
-    };
-    if res {
+    let rc = xml_parse_chunk(ctxt, str, len, 0);
+    if rc != 0 {
         xml_writer_err_msg_int(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
@@ -471,6 +468,34 @@ unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) ->
     0
 }
 
+struct TextWriterPushContext {
+    context: XmlParserCtxtPtr,
+}
+
+impl Write for TextWriterPushContext {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let ptr = buf.as_ptr() as *const i8;
+        let len = buf.len() as i32;
+        let res = unsafe { xml_text_writer_write_doc_callback(self.context as _, ptr, len) };
+        if res >= 0 {
+            Ok(res as usize)
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Drop for TextWriterPushContext {
+    fn drop(&mut self) {
+        unsafe {
+            xml_text_writer_close_doc_callback(self.context as _);
+        }
+    }
+}
+
 /// Create a new xmlNewTextWriter structure with @ctxt as output
 /// NOTE: the @ctxt context will be freed with the resulting writer
 ///       (if the call succeeds).
@@ -481,7 +506,7 @@ unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) ->
 pub unsafe extern "C" fn xml_new_text_writer_push_parser(
     ctxt: XmlParserCtxtPtr,
     _compression: i32,
-) -> XmlTextWriterPtr {
+) -> XmlTextWriterPtr<'static> {
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -491,12 +516,8 @@ pub unsafe extern "C" fn xml_new_text_writer_push_parser(
         return null_mut();
     }
 
-    let Some(out) = xml_output_buffer_create_io(
-        Some(xml_text_writer_write_doc_callback),
-        Some(xml_text_writer_close_doc_callback),
-        ctxt as _,
-        None,
-    ) else {
+    let Some(out) = XmlOutputBuffer::from_writer(TextWriterPushContext { context: ctxt }, None)
+    else {
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
@@ -613,7 +634,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
 pub unsafe extern "C" fn xml_new_text_writer_doc(
     doc: *mut XmlDocPtr,
     compression: i32,
-) -> XmlTextWriterPtr {
+) -> XmlTextWriterPtr<'static> {
     let mut sax_handler: XmlSAXHandler = unsafe { zeroed() };
 
     memset(
@@ -683,7 +704,7 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
     doc: XmlDocPtr,
     node: XmlNodePtr,
     compression: i32,
-) -> XmlTextWriterPtr {
+) -> XmlTextWriterPtr<'static> {
     let mut sax_handler: XmlSAXHandler = unsafe { zeroed() };
 
     if doc.is_null() {

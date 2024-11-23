@@ -84,13 +84,13 @@ pub struct XmlC14NVisibleNsStack {
 pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 
 #[repr(C)]
-pub struct XmlC14NCtx {
+pub struct XmlC14NCtx<'a> {
     /* input parameters */
     doc: XmlDocPtr,
     is_visible_callback: Option<XmlC14NIsVisibleCallback>,
     user_data: *mut c_void,
     with_comments: i32,
-    buf: Rc<RefCell<XmlOutputBuffer>>,
+    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 
     /* position in the XML document */
     pos: XmlC14NPosition,
@@ -107,7 +107,7 @@ pub struct XmlC14NCtx {
     error: i32,
 }
 
-impl Default for XmlC14NCtx {
+impl Default for XmlC14NCtx<'_> {
     fn default() -> Self {
         Self {
             doc: null_mut(),
@@ -125,7 +125,7 @@ impl Default for XmlC14NCtx {
     }
 }
 
-pub type XmlC14NCtxPtr = *mut XmlC14NCtx;
+pub type XmlC14NCtxPtr<'a> = *mut XmlC14NCtx<'a>;
 #[repr(C)]
 pub enum XmlC14NNormalizationMode {
     XmlC14NNormalizeAttr = 0,
