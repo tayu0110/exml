@@ -293,11 +293,11 @@ impl<'a> XmlOutputBuffer<'a> {
     ///
     /// Returns the number of chars immediately written, or -1 in case of error.
     #[doc(alias = "xmlOutputBufferWrite")]
-    pub fn write_bytes(&mut self, buf: &[u8]) -> i32 {
+    pub fn write_bytes(&mut self, buf: &[u8]) -> io::Result<usize> {
         let mut written = 0; /* number of c_char written to I/O so far */
 
         if !self.error.is_ok() {
-            return -1;
+            return Err(io::Error::other("Buffer already has an error."));
         }
 
         let mut len = buf.len();
@@ -316,7 +316,7 @@ impl<'a> XmlOutputBuffer<'a> {
                     .buffer
                     .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
                 {
-                    return -1;
+                    return Err(io::Error::other("Failed to push a string to the buffer."));
                 }
 
                 if self.buffer.map_or(0, |buf| buf.len()) < MINLEN && buf.len() == len {
@@ -334,7 +334,7 @@ impl<'a> XmlOutputBuffer<'a> {
                             xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
                         }
                         self.error = XmlParserErrors::XmlIOEncoder;
-                        return -1;
+                        return Err(io::Error::other("Failed to encode the content."));
                     }
                 };
                 if self.context.is_some() {
@@ -347,7 +347,7 @@ impl<'a> XmlOutputBuffer<'a> {
                     .buffer
                     .map_or(true, |mut buffer| buffer.push_bytes(buf).is_err())
                 {
-                    return -1;
+                    return Err(io::Error::other("Failed to push a string to the buffer."));
                 }
                 if self.context.is_some() {
                     self.buffer.map_or(0, |buf| buf.len())
@@ -373,19 +373,20 @@ impl<'a> XmlOutputBuffer<'a> {
                         buffer.unwrap().trim_head(ret);
                         self.written = self.written.saturating_add(ret as i32);
                     }
-                    _ => {
+                    e => {
                         unsafe {
                             xml_ioerr(XmlParserErrors::XmlIOWrite, null());
                         }
                         self.error = XmlParserErrors::XmlIOWrite;
-                        return -1;
+                        return e
+                            .unwrap_or(Err(io::Error::other("Internal buffer is not allocated.")));
                     }
                 }
             }
-            written += nbchars as i32;
+            written += nbchars;
         }
 
-        written
+        Ok(written)
     }
 
     /// Write the content of the string in the output I/O buffer.  
@@ -394,15 +395,8 @@ impl<'a> XmlOutputBuffer<'a> {
     ///
     /// Returns the number of chars immediately written, or -1 in case of error.
     #[doc(alias = "xmlOutputBufferWriteString")]
-    pub fn write_str(&mut self, s: &str) -> i32 {
-        if !self.error.is_ok() {
-            return -1;
-        }
-
-        if !s.is_empty() {
-            return self.write_bytes(s.as_bytes());
-        }
-        s.len() as i32
+    pub fn write_str(&mut self, s: &str) -> io::Result<usize> {
+        self.write_bytes(s.as_bytes())
     }
 
     /// Write the content of the string in the output I/O buffer.  
@@ -791,22 +785,24 @@ impl XmlOutputCallback for DefaultHTTPIOCallbacks {
 impl Write for XmlIOHTTPWriteCtxt {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !buf.is_empty() {
-            let len = self.doc_buff.write_bytes(buf);
-            if len < 0 {
-                let error = io::Error::last_os_error();
-                let msg = format!(
-                    "xmlIOHTTPWrite:  {}\n{} '{}'.\n",
-                    "Error appending to internal buffer.",
-                    "Error sending document to URI",
-                    self.uri
-                );
-                let msg = CString::new(msg).unwrap();
-                unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr());
+            match self.doc_buff.write_bytes(buf) {
+                Ok(len) => {
+                    return Ok(len);
                 }
-                return Err(error);
+                Err(e) => {
+                    let msg = format!(
+                        "xmlIOHTTPWrite:  {}\n{} '{}'.\n",
+                        "Error appending to internal buffer.",
+                        "Error sending document to URI",
+                        self.uri
+                    );
+                    let msg = CString::new(msg).unwrap();
+                    unsafe {
+                        xml_ioerr(XmlParserErrors::XmlIOWrite, msg.as_ptr());
+                    }
+                    return Err(e);
+                }
             }
-            return Ok(len as usize);
         }
         Ok(0)
     }
