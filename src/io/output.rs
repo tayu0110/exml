@@ -2,7 +2,9 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     ffi::{c_void, CString},
-    io::{self, Write},
+    fs::File,
+    io::{self, stdout, Write},
+    path::Path,
     ptr::null,
     rc::Rc,
     str::from_utf8,
@@ -98,7 +100,7 @@ impl<'a> XmlOutputBuffer<'a> {
                 let mut dst = vec![0; c_out];
                 return match encoder.encode("", &mut dst) {
                     Ok((_, write)) => {
-                        out.push_bytes(&dst[..write]);
+                        out.push_bytes(&dst[..write]).ok();
                         Ok(write)
                     }
                     Err(EncodingError::Unmappable {
@@ -106,7 +108,7 @@ impl<'a> XmlOutputBuffer<'a> {
                         write,
                         c: _,
                     }) => {
-                        out.push_bytes(&dst[..write]);
+                        out.push_bytes(&dst[..write]).ok();
                         Ok(write)
                     }
                     _ => Ok(0),
@@ -122,7 +124,7 @@ impl<'a> XmlOutputBuffer<'a> {
             }
             toconv = toconv.min(64 * 1024);
             if toconv * 4 >= written {
-                out.grow(toconv * 4);
+                out.grow(toconv * 4).ok();
                 written = out.avail();
             }
             written = written.min(256 * 1024);
@@ -133,7 +135,7 @@ impl<'a> XmlOutputBuffer<'a> {
             match encoder.encode(from_utf8(&bufin.as_ref()[..c_in]).unwrap(), &mut dst) {
                 Ok((read, write)) => {
                     bufin.trim_head(read);
-                    out.push_bytes(&dst[..write]);
+                    out.push_bytes(&dst[..write]).ok();
                     writtentot += write;
                     break Ok(0);
                 }
@@ -145,20 +147,20 @@ impl<'a> XmlOutputBuffer<'a> {
                     // Therefore, ommit it.
                     // ret = -2;
                     bufin.trim_head(read);
-                    out.push_bytes(&dst[..write]);
+                    out.push_bytes(&dst[..write]).ok();
                     writtentot += write;
 
                     let charref = format!("&#{};", c as u32);
                     let charref_len = charref.len();
 
-                    out.grow(charref_len * 4);
+                    out.grow(charref_len * 4).ok();
                     let c_out = out.avail();
                     let mut dst = vec![0; c_out];
                     let result = encoder.encode(&charref, &mut dst);
 
                     match result {
                         Ok((read, write)) if read == charref_len => {
-                            out.push_bytes(&dst[..write]);
+                            out.push_bytes(&dst[..write]).ok();
                             writtentot += write;
                         }
                         e => {
@@ -181,7 +183,7 @@ impl<'a> XmlOutputBuffer<'a> {
                                     &msg,
                                 );
                             }
-                            out.push_bytes(b" ");
+                            out.push_bytes(b" ").ok();
                             break e.map(|_| 0);
                         }
                     }
@@ -222,14 +224,15 @@ impl<'a> XmlOutputBuffer<'a> {
     ) -> Option<Self> {
         let mut ret = Self::default();
         let mut buf = XmlBufRef::new()?;
-        buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit)
+            .ok();
         ret.buffer = Some(buf);
         ret.encoder = encoder;
         if ret.encoder.is_some() {
             ret.conv = Some(XmlBufRef::with_capacity(4000)?);
 
             // This call is designed to initiate the encoder state
-            ret.encode(true);
+            ret.encode(true).ok();
         }
         ret.context = None;
         ret.written = 0;
@@ -449,7 +452,7 @@ impl<'a> XmlOutputBuffer<'a> {
                 let conv = *self.conv.get_or_insert_with(|| XmlBufRef::new().unwrap());
                 let mut buf = String::new();
                 ret = escaping(str, &mut buf);
-                buffer.push_bytes(buf.as_bytes());
+                buffer.push_bytes(buf.as_bytes()).ok();
                 if ret < 0 || buf.is_empty() {
                     /* chunk==0 => nothing done */
                     return -1;
@@ -479,7 +482,7 @@ impl<'a> XmlOutputBuffer<'a> {
             } else {
                 let mut buf = String::new();
                 ret = escaping(str, &mut buf);
-                buffer.push_bytes(buf.as_bytes());
+                buffer.push_bytes(buf.as_bytes()).ok();
                 if ret < 0 || buf.is_empty() {
                     /* chunk==0 => nothing done */
                     return -1;
@@ -515,7 +518,7 @@ impl<'a> XmlOutputBuffer<'a> {
                     }
                 }
             } else if buffer.avail() < MINLEN {
-                buffer.grow(MINLEN);
+                buffer.grow(MINLEN).ok();
             }
             written += nbchars;
 
@@ -656,13 +659,14 @@ pub fn register_default_output_callbacks() {
         return;
     }
 
-    register_output_callbacks(DefaultFileIOCallbacks);
+    register_output_callbacks(DefaultFileIOCallbacks).ok();
 
     #[cfg(feature = "http")]
     {
         register_output_callbacks(DefaultHTTPIOCallbacks {
             write_method: "PUT",
-        });
+        })
+        .ok();
     }
 
     XML_OUTPUT_CALLBACK_INITIALIZED.store(true, Ordering::Release);
@@ -728,6 +732,35 @@ pub(crate) unsafe fn __xml_output_buffer_create_filename(
     }
 
     None
+}
+
+impl XmlOutputCallback for DefaultFileIOCallbacks {
+    fn is_match(&self, _filename: &str) -> bool {
+        true
+    }
+
+    fn open(&mut self, filename: &str) -> io::Result<Box<dyn io::Write>> {
+        if filename == "-" {
+            return Ok(Box::new(stdout()));
+        }
+
+        let filename = if let Ok(Ok(name)) = Url::parse(filename).map(|url| url.to_file_path()) {
+            Cow::Owned(name)
+        } else {
+            Cow::Borrowed(Path::new(filename))
+        };
+
+        File::options()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(filename.as_ref())
+            .inspect_err(|_| unsafe {
+                let path = CString::new(filename.to_string_lossy().as_ref()).unwrap();
+                xml_ioerr(XmlParserErrors::XmlErrOK, path.as_ptr())
+            })
+            .map(|file| Box::new(file) as Box<dyn Write>)
+    }
 }
 
 #[cfg(feature = "http")]
@@ -838,4 +871,22 @@ impl Drop for XmlIOHTTPWriteCtxt {
             }
         }
     }
+}
+
+/// By default, libxml submits HTTP output requests using the "PUT" method.
+/// Calling this method changes the HTTP output method to use the "POST"
+/// method instead.
+#[doc(alias = "xmlRegisterHTTPPostCallbacks")]
+#[cfg(all(feature = "output", feature = "http"))]
+pub fn xml_register_http_post_callbacks() {
+    /*  Register defaults if not done previously  */
+
+    if !XML_OUTPUT_CALLBACK_INITIALIZED.load(Ordering::Acquire) {
+        register_default_output_callbacks();
+    }
+
+    register_output_callbacks(DefaultHTTPIOCallbacks {
+        write_method: "POST",
+    })
+    .ok();
 }

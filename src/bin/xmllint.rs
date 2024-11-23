@@ -1,10 +1,11 @@
-/*
- * xmllint.c : a small tester program for XML input.
- *
- * See Copyright for the status of this software.
- *
- * daniel@veillard.com
- */
+//! Rust implementation of `xmllint.c` in the original libxml2.  
+//! Copyright of the original code is the following.
+//! --------
+//! xmllint.c : a small tester program for XML input.
+//!
+//! See Copyright for the status of this software.
+//!
+//! daniel@veillard.com
 #![allow(unused)]
 
 use std::{
@@ -32,7 +33,7 @@ use exml::{
         get_load_ext_dtd_default_value, set_load_ext_dtd_default_value, set_parser_debug_entities,
         set_tree_indent_string, GenericError, GenericErrorContext,
     },
-    io::{xml_file_flush, xml_file_write, xml_no_net_external_entity_loader, XmlParserInputBuffer},
+    io::{xml_no_net_external_entity_loader, XmlParserInputBuffer},
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
@@ -50,10 +51,9 @@ use exml::{
             xml_ctxt_read_memory, xml_ctxt_use_options, xml_free_parser_ctxt,
             xml_get_external_entity_loader, xml_has_feature, xml_new_parser_ctxt,
             xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_file, xml_read_io,
-            xml_read_memory, xml_set_external_entity_loader, ErrorSAXFunc, WarningSAXFunc,
-            XmlExternalEntityLoader, XmlFeature, XmlParserCtxtPtr, XmlParserInputPtr,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS,
-            XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_read_memory, xml_set_external_entity_loader, XmlExternalEntityLoader, XmlFeature,
+            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
+            XmlSAXLocatorPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
@@ -79,8 +79,7 @@ use exml::{
         },
         xmlreader::XmlTextReaderPtr,
         xmlsave::{
-            xml_save_close, xml_save_doc, xml_save_to_filename, xml_save_to_io, XmlSaveCtxtPtr,
-            XmlSaveOption,
+            xml_save_close, xml_save_doc, xml_save_to_filename, xml_save_to_io, XmlSaveOption,
         },
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
@@ -2539,18 +2538,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     } else if TEST_IO != 0 {
         if filename == Some("-") {
             doc = xml_read_io(stdin(), None, None, OPTIONS);
-        } else {
-            let fname = filename.map(|s| CString::new(s).unwrap());
-            let f: *mut FILE = fopen(fname.map_or(null(), |f| f.as_ptr()), c"rb".as_ptr());
-            if let Some(Ok(f)) = filename.map(File::open) {
-                if rectxt.is_null() {
-                    doc = xml_read_io(f, filename, None, OPTIONS);
-                } else {
-                    doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS);
-                }
+        } else if let Some(Ok(f)) = filename.map(File::open) {
+            if rectxt.is_null() {
+                doc = xml_read_io(f, filename, None, OPTIONS);
             } else {
-                doc = null_mut();
+                doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS);
             }
+        } else {
+            doc = null_mut();
         }
     } else if HTMLOUT != 0 {
         let ctxt: XmlParserCtxtPtr;
@@ -2970,7 +2965,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     PROGRESULT = XmllintReturnCode::ErrOut;
                 }
             } else {
-                let ctxt: XmlSaveCtxtPtr;
                 let mut save_opts: c_int = 0;
 
                 if FORMAT == 1 {

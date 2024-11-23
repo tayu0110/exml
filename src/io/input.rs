@@ -52,7 +52,9 @@ impl XmlParserInputBuffer {
         let default_buffer_size = GLOBAL_STATE.with_borrow(|state| state.default_buffer_size);
         let mut new_buf = XmlBufRef::with_capacity(2 * default_buffer_size).unwrap();
         ret.buffer = Some(new_buf);
-        new_buf.set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        new_buf
+            .set_allocation_scheme(XmlBufferAllocationScheme::XmlBufferAllocDoubleit)
+            .ok();
         ret.encoder = get_encoding_handler(enc);
         ret.raw = if ret.encoder.is_some() {
             XmlBufRef::with_capacity(2 * default_buffer_size)
@@ -154,7 +156,7 @@ impl XmlParserInputBuffer {
         let ret = match self.encoder.as_mut().unwrap().decode(src, dst) {
             Ok((read, write)) => {
                 bufin.trim_head(read);
-                out.push_bytes(&outstr[..write]);
+                out.push_bytes(&outstr[..write]).ok();
                 // no-op
                 Ok(0)
             }
@@ -171,7 +173,7 @@ impl XmlParserInputBuffer {
                 },
             ) => {
                 bufin.trim_head(read - length - offset);
-                out.push_bytes(&outstr[..write]);
+                out.push_bytes(&outstr[..write]).ok();
                 let content = bufin.as_ref();
                 let buf = format!(
                     "0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
@@ -256,7 +258,7 @@ impl XmlParserInputBuffer {
             let Ok(len) = context.read(&mut buffer) else {
                 return -1;
             };
-            buf.as_mut().unwrap().push_bytes(&buffer[..len]);
+            buf.as_mut().unwrap().push_bytes(&buffer[..len]).ok();
             res = len as i32;
         }
 
@@ -415,10 +417,10 @@ pub fn register_default_input_callbacks() {
         return;
     }
 
-    register_input_callbacks(DefaultFileIOCallbacks);
+    register_input_callbacks(DefaultFileIOCallbacks).ok();
     #[cfg(feature = "http")]
     {
-        register_input_callbacks(DefaultHTTPIOCallbacks { write_method: "" });
+        register_input_callbacks(DefaultHTTPIOCallbacks { write_method: "" }).ok();
     }
     #[cfg(feature = "ftp")]
     {
