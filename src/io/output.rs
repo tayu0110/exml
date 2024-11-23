@@ -250,7 +250,7 @@ impl<'a> XmlOutputBuffer<'a> {
     /// If the resource indicated by `uri` is found, return the new output buffer.  
     /// Otherwise, return `None`.
     #[doc(alias = "xmlOutputBufferCreateFilename")]
-    pub unsafe fn from_uri<'b: 'a>(
+    pub fn from_uri<'b: 'a>(
         uri: &'b str,
         encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
         compression: i32,
@@ -293,7 +293,7 @@ impl<'a> XmlOutputBuffer<'a> {
     ///
     /// Returns the number of chars immediately written, or -1 in case of error.
     #[doc(alias = "xmlOutputBufferWrite")]
-    pub unsafe fn write_bytes(&mut self, buf: &[u8]) -> i32 {
+    pub fn write_bytes(&mut self, buf: &[u8]) -> i32 {
         let mut written = 0; /* number of c_char written to I/O so far */
 
         if !self.error.is_ok() {
@@ -330,7 +330,9 @@ impl<'a> XmlOutputBuffer<'a> {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
-                        xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                        unsafe {
+                            xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                        }
                         self.error = XmlParserErrors::XmlIOEncoder;
                         return -1;
                     }
@@ -372,7 +374,9 @@ impl<'a> XmlOutputBuffer<'a> {
                         self.written = self.written.saturating_add(ret as i32);
                     }
                     _ => {
-                        xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                        unsafe {
+                            xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                        }
                         self.error = XmlParserErrors::XmlIOWrite;
                         return -1;
                     }
@@ -390,7 +394,7 @@ impl<'a> XmlOutputBuffer<'a> {
     ///
     /// Returns the number of chars immediately written, or -1 in case of error.
     #[doc(alias = "xmlOutputBufferWriteString")]
-    pub unsafe fn write_str(&mut self, s: &str) -> i32 {
+    pub fn write_str(&mut self, s: &str) -> i32 {
         if !self.error.is_ok() {
             return -1;
         }
@@ -408,7 +412,7 @@ impl<'a> XmlOutputBuffer<'a> {
     /// Returns the number of chars immediately written, or -1 in case of error.
     ///
     #[doc(alias = "xmlOutputBufferWriteEscape")]
-    pub unsafe fn write_str_with_escape(
+    pub fn write_str_with_escape(
         &mut self,
         str: &str,
         escaping: Option<fn(&str, &mut String) -> i32>,
@@ -469,7 +473,9 @@ impl<'a> XmlOutputBuffer<'a> {
                     Ok(len) => Ok(len),
                     Err(EncodingError::BufferTooShort) => Err(EncodingError::BufferTooShort),
                     _ => {
-                        xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                        unsafe {
+                            xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                        }
                         self.error = XmlParserErrors::XmlIOEncoder;
                         return -1;
                     }
@@ -512,7 +518,9 @@ impl<'a> XmlOutputBuffer<'a> {
                         self.written = self.written.saturating_add(ret as i32);
                     }
                     _ => {
-                        xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                        unsafe {
+                            xml_ioerr(XmlParserErrors::XmlIOWrite, null());
+                        }
                         self.error = XmlParserErrors::XmlIOWrite;
                         return -1;
                     }
@@ -533,7 +541,7 @@ impl<'a> XmlOutputBuffer<'a> {
     ///
     /// Returns the number of byte written or -1 in case of error.
     #[doc(alias = "xmlOutputBufferFlush")]
-    pub unsafe extern "C" fn flush(&mut self) -> i32 {
+    pub fn flush(&mut self) -> i32 {
         if !self.error.is_ok() {
             return -1;
         }
@@ -546,7 +554,9 @@ impl<'a> XmlOutputBuffer<'a> {
              */
             while {
                 let Ok(nbchars) = self.encode(false) else {
-                    xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                    unsafe {
+                        xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                    }
                     self.error = XmlParserErrors::XmlIOEncoder;
                     return -1;
                 };
@@ -572,7 +582,9 @@ impl<'a> XmlOutputBuffer<'a> {
                 ret as i32
             }
             _ => {
-                xml_ioerr(XmlParserErrors::XmlIOFlush, null());
+                unsafe {
+                    xml_ioerr(XmlParserErrors::XmlIOFlush, null());
+                }
                 self.error = XmlParserErrors::XmlIOFlush;
                 -1
             }
@@ -601,14 +613,12 @@ impl<'a> XmlOutputBuffer<'a> {
 
 impl Drop for XmlOutputBuffer<'_> {
     fn drop(&mut self) {
-        unsafe {
-            self.flush();
-            if let Some(buf) = self.buffer.take() {
-                buf.free();
-            }
-            if let Some(conv) = self.conv.take() {
-                conv.free();
-            }
+        self.flush();
+        if let Some(buf) = self.buffer.take() {
+            buf.free();
+        }
+        if let Some(conv) = self.conv.take() {
+            conv.free();
         }
     }
 }
@@ -619,9 +629,8 @@ pub trait XmlOutputCallback: Send {
 }
 
 const MAX_OUTPUT_CALLBACK: usize = 15;
-pub(in crate::io) static XML_OUTPUT_CALLBACK_TABLE: Mutex<Vec<Box<dyn XmlOutputCallback>>> =
-    Mutex::new(vec![]);
-pub(in crate::io) static XML_OUTPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
+static XML_OUTPUT_CALLBACK_TABLE: Mutex<Vec<Box<dyn XmlOutputCallback>>> = Mutex::new(vec![]);
+static XML_OUTPUT_CALLBACK_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
 /// clears the entire output callback table. this includes the compiled-in I/O callbacks.
 #[doc(alias = "xmlCleanupOutputCallbacks")]
@@ -686,7 +695,7 @@ pub fn register_output_callbacks(callback: impl XmlOutputCallback + 'static) -> 
     Ok(callbacks.len())
 }
 
-pub(crate) unsafe fn __xml_output_buffer_create_filename(
+pub(crate) fn __xml_output_buffer_create_filename(
     uri: &str,
     encoder: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     _compression: i32,
@@ -795,7 +804,7 @@ impl XmlOutputCallback for DefaultHTTPIOCallbacks {
 impl Write for XmlIOHTTPWriteCtxt {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if !buf.is_empty() {
-            let len = unsafe { self.doc_buff.write_bytes(buf) };
+            let len = self.doc_buff.write_bytes(buf);
             if len < 0 {
                 let error = io::Error::last_os_error();
                 let msg = format!(
