@@ -1125,38 +1125,6 @@ pub(crate) fn gen_xml_node_ptr_ptr(_no: i32, _nr: i32) -> *mut XmlNodePtr {
 
 pub(crate) fn des_xml_node_ptr_ptr(_no: i32, _val: *mut XmlNodePtr, _nr: i32) {}
 
-#[cfg(feature = "http")]
-pub(crate) unsafe extern "C" fn desret_xml_nano_httpctxt_ptr(val: *mut c_void) {
-    use crate::libxml::nanohttp::xml_nanohttp_close;
-
-    xml_nanohttp_close(val);
-}
-
-#[cfg(feature = "http")]
-pub(crate) unsafe extern "C" fn gen_xml_nano_httpctxt_ptr(no: i32, _nr: i32) -> *mut c_void {
-    use crate::libxml::nanohttp::xml_nanohttp_open;
-
-    if no == 0 {
-        return xml_nanohttp_open(REMOTE1GOOD.as_ptr() as _, null_mut());
-    }
-    if no == 1 {
-        return xml_nanohttp_open(REMOTE2GOOD.as_ptr() as _, null_mut());
-    }
-    if no == 2 {
-        return xml_nanohttp_open(REMOTE1BAD.as_ptr() as _, null_mut());
-    }
-    null_mut()
-}
-
-#[cfg(feature = "http")]
-pub(crate) unsafe extern "C" fn des_xml_nano_httpctxt_ptr(_no: i32, val: *mut c_void, _nr: i32) {
-    use crate::libxml::nanohttp::xml_nanohttp_close;
-
-    if !val.is_null() {
-        xml_nanohttp_close(val);
-    }
-}
-
 pub(crate) fn gen_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut c_char {
     null_mut()
 }

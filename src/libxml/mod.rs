@@ -16,8 +16,6 @@ pub mod htmltree;
 pub mod list;
 #[cfg(feature = "ftp")]
 pub mod nanoftp;
-#[cfg(feature = "http")]
-pub mod nanohttp;
 pub mod parser;
 pub mod parser_internals;
 #[cfg(feature = "libxml_pattern")]

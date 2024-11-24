@@ -21,6 +21,7 @@ pub mod hash;
 pub mod io;
 pub mod libxml;
 pub mod list;
+#[cfg(feature = "http")]
 pub mod nanohttp;
 pub mod private;
 #[cfg(test)]
