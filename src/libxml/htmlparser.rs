@@ -54,7 +54,6 @@ use crate::{
             xml_strncasecmp, xml_strndup, XmlChar,
         },
     },
-    private::parser::XML_VCTXT_USE_PCTXT,
     tree::{xml_create_int_subset, xml_free_doc, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr},
 };
 
@@ -63,7 +62,7 @@ use super::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
     },
-    parser_internals::xml_is_letter,
+    parser_internals::{xml_is_letter, XML_VCTXT_USE_PCTXT},
 };
 
 // Most of the back-end structures from XML and HTML are shared.

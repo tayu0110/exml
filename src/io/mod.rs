@@ -42,12 +42,11 @@ use crate::{
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption,
             XML_SAX2_MAGIC,
         },
-        parser_internals::{xml_free_input_stream, xml_new_input_from_file},
+        parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
         uri::xml_canonic_path,
         xmlstring::{xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,
-    private::parser::__xml_err_encoding,
 };
 
 pub use input::*;

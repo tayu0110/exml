@@ -122,12 +122,9 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
         xpath::xml_init_xpath_internal,
     },
-    private::{
-        parser::{__xml_err_encoding, xml_err_memory, XML_VCTXT_USE_PCTXT},
-        threads::{
-            __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
-            xml_cleanup_threads_internal, xml_init_threads_internal,
-        },
+    private::threads::{
+        __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
+        xml_init_threads_internal,
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
@@ -148,7 +145,8 @@ use super::{
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
     parser_internals::{
-        xml_err_encoding_int, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
+        __xml_err_encoding, xml_err_encoding_int, xml_err_memory, xml_is_letter, LINE_LEN,
+        XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
     },
     sax2::{xml_sax2_end_element, xml_sax2_start_element},
 };

@@ -77,7 +77,6 @@ use crate::{
             xml_strndup, XmlChar,
         },
     },
-    private::parser::{__xml_err_encoding, xml_err_memory},
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_new_doc, xml_new_doc_node, xml_split_qname3, XmlAttributeDefault, XmlAttributeType,
@@ -222,6 +221,122 @@ pub(crate) unsafe extern "C" fn xml_err_internal(
         0,
         msg,
         str
+    );
+    if !ctxt.is_null() {
+        (*ctxt).well_formed = 0;
+        if (*ctxt).recovery == 0 {
+            (*ctxt).disable_sax = 1;
+        }
+    }
+}
+
+/// Set after xmlValidateDtdFinal was called.
+pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
+/// Set if the validation context is part of a parser context.
+pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
+
+/// Handle a redefinition of attribute error
+#[doc(alias = "xmlErrMemory")]
+pub(crate) unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *const char) {
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
+        (*ctxt).instate = XmlParserInputState::XmlParserEOF;
+        (*ctxt).disable_sax = 1;
+    }
+    if !extra.is_null() {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            null_mut(),
+            0,
+            (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
+                .to_string_lossy()
+                .into_owned()
+                .into()),
+            None,
+            None,
+            0,
+            0,
+            c"Memory allocation failed : %s\n".as_ptr(),
+            extra
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromParser,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            null_mut(),
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            c"Memory allocation failed\n".as_ptr(),
+        );
+    }
+}
+
+/// Handle an encoding error
+#[doc(alias = "__xmlErrEncoding")]
+pub(crate) unsafe extern "C" fn __xml_err_encoding(
+    ctxt: XmlParserCtxtPtr,
+    xmlerr: XmlParserErrors,
+    msg: *const char,
+    str1: *const XmlChar,
+    str2: *const XmlChar,
+) {
+    if (!ctxt.is_null())
+        && ((*ctxt).disable_sax != 0)
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    if !ctxt.is_null() {
+        (*ctxt).err_no = xmlerr as _;
+    }
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        ctxt as _,
+        null_mut(),
+        XmlErrorDomain::XmlFromParser,
+        xmlerr,
+        XmlErrorLevel::XmlErrFatal,
+        null(),
+        0,
+        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
+        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
+            .to_string_lossy()
+            .into_owned()
+            .into()),
+        None,
+        0,
+        0,
+        msg as _,
+        str1,
+        str2
     );
     if !ctxt.is_null() {
         (*ctxt).well_formed = 0;

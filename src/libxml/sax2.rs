@@ -35,7 +35,6 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    private::parser::{xml_err_memory, XML_VCTXT_DTD_VALIDATED},
     tree::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
@@ -61,9 +60,10 @@ use super::{
         XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS,
     },
     parser_internals::{
-        xml_free_input_stream, xml_parse_external_subset, xml_push_input, xml_split_qname,
-        xml_string_decode_entities, xml_string_len_decode_entities, xml_switch_encoding,
-        XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
+        xml_err_memory, xml_free_input_stream, xml_parse_external_subset, xml_push_input,
+        xml_split_qname, xml_string_decode_entities, xml_string_len_decode_entities,
+        xml_switch_encoding, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
+        XML_VCTXT_DTD_VALIDATED,
     },
     uri::{
         xml_build_uri, xml_canonic_path, xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr,
@@ -2116,6 +2116,8 @@ pub unsafe fn xml_sax2_start_element(
     fullname: *const XmlChar,
     atts: *mut *const XmlChar,
 ) {
+    use crate::libxml::parser_internals::XML_VCTXT_DTD_VALIDATED;
+
     let mut parent: XmlNodePtr;
     let mut ns: XmlNsPtr;
     let name: *mut XmlChar;
@@ -2680,10 +2682,8 @@ pub unsafe fn xml_sax2_start_element_ns(
 
     #[cfg(feature = "libxml_valid")]
     {
-        /*
-         * If it's the Document root, finish the DTD validation and
-         * check the document root element for validity
-         */
+        // If it's the Document root, finish the DTD validation and
+        // check the document root element for validity
         if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
             let chk: i32 = xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
             if chk <= 0 {

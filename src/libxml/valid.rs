@@ -62,7 +62,6 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
-    private::parser::XML_VCTXT_USE_PCTXT,
     tree::{
         xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2, xml_split_qname3,
         NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
@@ -73,7 +72,9 @@ use crate::{
     },
 };
 
-use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
+use super::{
+    chvalid::xml_is_blank_char, hash::CVoidWrapper, parser_internals::XML_VCTXT_USE_PCTXT,
+};
 
 // Validation state added for non-determinist content model.
 pub type XmlValidStatePtr = *mut XmlValidState;
@@ -273,8 +274,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
     if !ctxt.is_null() {
         channel = (*ctxt).error;
         data = (*ctxt).user_data.clone();
-        /* Look up flag to detect if it is part of a parsing
-        context */
+        // Look up flag to detect if it is part of a parsing context
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
             pctxt = (*ctxt)
                 .user_data
