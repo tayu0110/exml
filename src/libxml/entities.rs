@@ -1484,6 +1484,28 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
     }
 }
 
+// Entity flags
+//
+// XML_ENT_PARSED: The entity was parsed and `children` points to the content.
+// XML_ENT_CHECKED: The entity was checked for loops.
+pub(crate) const XML_ENT_PARSED: usize = 1 << 0;
+pub(crate) const XML_ENT_CHECKED: usize = 1 << 1;
+pub(crate) const XML_ENT_EXPANDING: usize = 1 << 2;
+pub(crate) const XML_ENT_CHECKED_LT: usize = 1 << 3;
+pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
+
+/// Do a global encoding of a string, replacing the predefined entities
+/// and non ASCII values with their entities and CharRef counterparts for attribute values.
+///
+/// Returns A newly allocated string with the substitution done.
+#[doc(alias = "xmlEncodeAttributeEntities")]
+pub(crate) unsafe extern "C" fn xml_encode_attribute_entities(
+    doc: XmlDocPtr,
+    input: *const XmlChar,
+) -> *mut XmlChar {
+    xml_encode_entities_internal(doc, input, 1)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};

@@ -77,13 +77,7 @@ use crate::{
             xml_strndup, XmlChar,
         },
     },
-    private::{
-        entities::{
-            XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-            XML_ENT_PARSED,
-        },
-        parser::{__xml_err_encoding, xml_err_memory},
-    },
+    private::parser::{__xml_err_encoding, xml_err_memory},
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_new_doc, xml_new_doc_node, xml_split_qname3, XmlAttributeDefault, XmlAttributeType,
@@ -91,6 +85,10 @@ use crate::{
         XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
         XML_XML_NAMESPACE,
     },
+};
+
+use super::entities::{
+    XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
 
 macro_rules! VALID_CTXT {

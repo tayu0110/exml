@@ -46,7 +46,6 @@ use crate::{
             XmlChar,
         },
     },
-    private::entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
 };
 
 pub use attribute::*;

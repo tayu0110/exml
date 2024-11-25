@@ -13,7 +13,10 @@ use crate::{
     dict::xml_dict_owns,
     hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
-        entities::{xml_encode_entities_reentrant, xml_get_doc_entity, XmlEntityPtr},
+        entities::{
+            xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_get_doc_entity,
+            XmlEntityPtr,
+        },
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
         valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc, xml_remove_id},
@@ -27,11 +30,10 @@ use crate::{
 
 use super::{
     copy_string_for_new_dict_if_needed, xml_buf_cat, xml_buf_create, xml_buf_create_size,
-    xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_encode_attribute_entities,
-    xml_free_node, xml_free_prop, xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope,
-    xml_text_merge, xml_tree_err_memory, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlBufPtr,
-    XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlDtd, XmlElementType, XmlNs, XmlNsPtr,
-    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop,
+    xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope, xml_text_merge, xml_tree_err_memory,
+    XmlAttr, XmlAttrPtr, XmlAttributeType, XmlBufPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr,
+    XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {

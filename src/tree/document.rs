@@ -7,7 +7,9 @@ use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     libxml::{
-        entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
+        entities::{
+            xml_get_doc_entity, XmlEntityPtr, XmlEntityType, XML_ENT_EXPANDING, XML_ENT_PARSED,
+        },
         globals::{xml_free, xml_malloc, xml_register_node_default_value},
         parser_internals::xml_copy_char_multi_byte,
         xmlstring::{xml_strdup, xml_strndup, XmlChar},
@@ -19,8 +21,7 @@ use super::{
     xml_buf_set_allocation_scheme, xml_free_node_list, xml_new_doc_text, xml_new_reference,
     xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr, XmlBufferAllocationScheme,
     XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
-    XML_ENT_EXPANDING, XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
-    __XML_REGISTER_CALLBACKS,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML document.

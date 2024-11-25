@@ -123,10 +123,6 @@ use crate::{
         xpath::xml_init_xpath_internal,
     },
     private::{
-        entities::{
-            XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
-            XML_ENT_PARSED,
-        },
         parser::{__xml_err_encoding, xml_err_memory, XML_VCTXT_USE_PCTXT},
         threads::{
             __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock,
@@ -147,6 +143,9 @@ use super::{
     chvalid::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
+    },
+    entities::{
+        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
     parser_internals::{
         xml_err_encoding_int, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
