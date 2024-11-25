@@ -54,9 +54,10 @@ use crate::{
         uri::xml_canonic_path,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
-    private::save::xml_buf_attr_serialize_txt_content,
     tree::{xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
 };
+
+use super::xmlsave::xml_buf_attr_serialize_txt_content;
 
 // Types are kept private
 #[repr(C)]

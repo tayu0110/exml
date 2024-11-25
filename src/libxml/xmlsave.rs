@@ -26,8 +26,7 @@ use std::{
 use libc::memset;
 
 use crate::{
-    buf::libxml_api::xml_buf_set_allocation_scheme,
-    buf::XmlBufRef,
+    buf::{libxml_api::xml_buf_set_allocation_scheme, XmlBufRef},
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
@@ -46,13 +45,14 @@ use crate::{
         },
         xmlstring::{xml_str_equal, XmlChar},
     },
-    private::save::xml_buf_attr_serialize_txt_content,
     tree::{
-        is_xhtml, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme,
-        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr,
-        XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_buf_add, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
+        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr,
+        XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
+
+use super::chvalid::xml_is_char;
 
 const MAX_INDENT: usize = 60;
 
@@ -1941,6 +1941,154 @@ pub unsafe fn xml_save_set_attr_escape(
     }
     (*ctxt).escape_attr = escape;
     0
+}
+
+/// Serialize text attribute values to an xmlBufPtr
+#[doc(alias = "xmlBufAttrSerializeTxtContent")]
+pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
+    buf: XmlBufPtr,
+    doc: XmlDocPtr,
+    attr: XmlAttrPtr,
+    string: *const XmlChar,
+) {
+    let mut base: *mut XmlChar;
+    let mut cur: *mut XmlChar;
+
+    if string.is_null() {
+        return;
+    }
+    base = string as _;
+    cur = base;
+    while *cur != 0 {
+        if *cur == b'\n' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&#10;".as_ptr() as _, 5);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur == b'\r' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&#13;".as_ptr() as _, 5);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur == b'\t' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&#9;".as_ptr() as _, 4);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur == b'"' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&quot;".as_ptr() as _, 6);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur == b'<' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&lt;".as_ptr() as _, 4);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur == b'>' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&gt;".as_ptr() as _, 4);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur == b'&' {
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            xml_buf_add(buf, c"&amp;".as_ptr() as _, 5);
+            cur = cur.add(1);
+            base = cur;
+        } else if *cur >= 0x80 && *cur.add(1) != 0 && (doc.is_null() || (*doc).encoding.is_none()) {
+            /*
+             * We assume we have UTF-8 content.
+             */
+            let mut tmp: [u8; 12] = [0; 12];
+            let mut val = 0;
+            let mut l = 1;
+
+            if base != cur {
+                xml_buf_add(buf, base, cur.offset_from(base) as _);
+            }
+            if *cur < 0xC0 {
+                xml_save_err(XmlParserErrors::XmlSaveNotUTF8 as _, attr as _, null_mut());
+                xml_serialize_hex_char_ref(&mut tmp, *cur as _);
+                xml_buf_add(buf, tmp.as_ptr() as _, -1);
+                cur = cur.add(1);
+                base = cur;
+                continue;
+            } else if *cur < 0xE0 {
+                val = *cur.add(0) as i32 & 0x1F;
+                val <<= 6;
+                val |= *cur.add(1) as i32 & 0x3F;
+                l = 2;
+            } else if *cur < 0xF0 && *cur.add(2) != 0 {
+                val = *cur.add(0) as i32 & 0x0F;
+                val <<= 6;
+                val |= *cur.add(1) as i32 & 0x3F;
+                val <<= 6;
+                val |= *cur.add(2) as i32 & 0x3F;
+                l = 3;
+            } else if *cur < 0xF8 && *cur.add(2) != 0 && *cur.add(3) != 0 {
+                val = *cur.add(0) as i32 & 0x07;
+                val <<= 6;
+                val |= *cur.add(1) as i32 & 0x3F;
+                val <<= 6;
+                val |= *cur.add(2) as i32 & 0x3F;
+                val <<= 6;
+                val |= *cur.add(3) as i32 & 0x3F;
+                l = 4;
+            }
+            if l == 1 || !xml_is_char(val as u32) {
+                xml_save_err(
+                    XmlParserErrors::XmlSaveCharInvalid as _,
+                    attr as _,
+                    null_mut(),
+                );
+                xml_serialize_hex_char_ref(&mut tmp, *cur as _);
+                xml_buf_add(buf, tmp.as_ptr() as _, -1);
+                cur = cur.add(1);
+                base = cur;
+                continue;
+            }
+            /*
+             * We could do multiple things here. Just save
+             * as a c_char ref
+             */
+            xml_serialize_hex_char_ref(&mut tmp, val as u32);
+            xml_buf_add(buf, tmp.as_ptr() as _, -1);
+            cur = cur.add(l as usize);
+            base = cur;
+        } else {
+            cur = cur.add(1);
+        }
+    }
+    if base != cur {
+        xml_buf_add(buf, base, cur.offset_from(base) as _);
+    }
+}
+
+/// Dump a list of local Namespace definitions.
+/// Should be called in the context of attributes dumps.
+#[doc(alias = "xmlNsListDumpOutput")]
+pub(crate) unsafe extern "C" fn xml_ns_list_dump_output(
+    buf: &mut XmlOutputBuffer,
+    mut cur: XmlNsPtr,
+) {
+    while !cur.is_null() {
+        xml_ns_dump_output(buf, cur, null_mut());
+        cur = (*cur).next;
+    }
 }
 
 #[cfg(test)]
