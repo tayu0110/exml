@@ -1951,7 +1951,7 @@ mod tests {
 
     #[test]
     fn test_xml_save_close() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -1978,7 +1978,7 @@ mod tests {
 
     #[test]
     fn test_xml_save_doc() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -2010,7 +2010,7 @@ mod tests {
 
     #[test]
     fn test_xml_save_flush() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -2067,7 +2067,7 @@ mod tests {
 
     #[test]
     fn test_xml_save_tree() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 

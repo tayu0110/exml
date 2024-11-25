@@ -11,10 +11,11 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
-    io::Write,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -22625,7 +22626,7 @@ pub unsafe extern "C" fn xml_schema_free(schema: XmlSchemaPtr) {
 
 /// Dumps a list of attribute use components.
 #[doc(alias = "xmlSchemaAttrUsesDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_schema_attr_uses_dump<'a>(
     uses: XmlSchemaItemListPtr,
     output: &mut (impl Write + 'a),
@@ -22671,7 +22672,7 @@ unsafe extern "C" fn xml_schema_attr_uses_dump<'a>(
 
 /// Dump the annotation
 #[doc(alias = "xmlSchemaAnnotDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_schema_annot_dump<'a>(
     output: &mut (impl Write + 'a),
     annot: XmlSchemaAnnotPtr,
@@ -22695,7 +22696,7 @@ unsafe extern "C" fn xml_schema_annot_dump<'a>(
 
 /// Dump a SchemaType structure
 #[doc(alias = "xmlSchemaContentModelDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_schema_content_model_dump<'a>(
     particle: XmlSchemaParticlePtr,
     output: &mut (impl Write + 'a),
@@ -22775,7 +22776,7 @@ unsafe extern "C" fn xml_schema_content_model_dump<'a>(
 
 /// Dump a SchemaType structure
 #[doc(alias = "xmlSchemaTypeDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_schema_type_dump<'a>(
     typ: XmlSchemaTypePtr,
     output: &mut (impl Write + 'a),
@@ -22888,7 +22889,7 @@ unsafe extern "C" fn xml_schema_type_dump<'a>(
     // #endif
 }
 
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 extern "C" fn xml_schema_type_dump_entry<'a>(typ: *mut c_void, output: &mut (impl Write + 'a)) {
     unsafe {
         xml_schema_type_dump(typ as XmlSchemaTypePtr, output);
@@ -22897,7 +22898,7 @@ extern "C" fn xml_schema_type_dump_entry<'a>(typ: *mut c_void, output: &mut (imp
 
 /// Dump the element
 #[doc(alias = "xmlSchemaElementDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 extern "C" fn xml_schema_element_dump<'a>(
     payload: *mut c_void,
     output: &mut (impl Write + 'a),
@@ -23007,7 +23008,7 @@ extern "C" fn xml_schema_element_dump<'a>(
 
 /// Dump a Schema structure.
 #[doc(alias = "xmlSchemaDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_schema_dump<'a>(output: &mut (impl Write + 'a), schema: XmlSchemaPtr) {
     use crate::hash::XmlHashTableRef;
 
@@ -30565,7 +30566,7 @@ mod tests {
 
     #[test]
     fn test_xml_schema_dump() {
-        #[cfg(all(feature = "schema", feature = "output"))]
+        #[cfg(all(feature = "schema", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 

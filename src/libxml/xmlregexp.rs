@@ -7653,7 +7653,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_ctxt_nb_cons() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7680,7 +7680,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_ctxt_nb_nodes() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7707,7 +7707,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_dump() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7744,7 +7744,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_get_language() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7798,7 +7798,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_get_start() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7845,7 +7845,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_is_nillable() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7872,7 +7872,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_max_token() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7935,7 +7935,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_ref() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -7967,7 +7967,7 @@ mod tests {
 
     #[test]
     fn test_xml_exp_subsume() {
-        #[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
         unsafe {
             let mut leaks = 0;
 
@@ -8004,7 +8004,7 @@ mod tests {
 
     #[test]
     fn test_xml_reg_exec_err_info() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 
@@ -8070,7 +8070,7 @@ mod tests {
 
     #[test]
     fn test_xml_reg_exec_next_values() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 
@@ -8121,7 +8121,7 @@ mod tests {
 
     #[test]
     fn test_xml_reg_exec_push_string() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 
@@ -8161,7 +8161,7 @@ mod tests {
 
     #[test]
     fn test_xml_reg_exec_push_string2() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 
@@ -8218,7 +8218,7 @@ mod tests {
 
     #[test]
     fn test_xml_regexp_exec() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 
@@ -8250,7 +8250,7 @@ mod tests {
 
     #[test]
     fn test_xml_regexp_is_determinist() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 
@@ -8280,7 +8280,7 @@ mod tests {
 
     #[test]
     fn test_xml_regexp_print() {
-        #[cfg(feature = "regexp")]
+        #[cfg(feature = "libxml_regexp")]
         unsafe {
             let mut leaks = 0;
 

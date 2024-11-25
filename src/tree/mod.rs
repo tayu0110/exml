@@ -7,7 +7,7 @@ mod attribute;
 mod document;
 mod dom_wrapper;
 mod dtd;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 mod dump;
 mod id;
 mod namespace;
@@ -404,7 +404,7 @@ macro_rules! CUR_SCHAR {
     feature = "schema",
     feature = "html",
     feature = "sax1",
-    feature = "writer",
+    feature = "libxml_writer",
     feature = "legacy"
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
@@ -2693,7 +2693,7 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
 ///
 /// Returns the @old node
 #[doc(alias = "xmlReplaceNode")]
-#[cfg(any(feature = "tree", feature = "writer"))]
+#[cfg(any(feature = "tree", feature = "libxml_writer"))]
 pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
     if old == cur {
         return null_mut();

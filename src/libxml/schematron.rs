@@ -168,9 +168,9 @@ pub struct XmlSchematronValidCtxt {
 
     output_file: *mut FILE,   /* if using XML_SCHEMATRON_OUT_FILE */
     output_buffer: XmlBufPtr, /* if using XML_SCHEMATRON_OUT_BUFFER */
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     iowrite: Option<XmlOutputWriteCallback>, /* if using XML_SCHEMATRON_OUT_IO */
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     ioclose: Option<XmlOutputCloseCallback>,
     ioctx: *mut c_void,
 

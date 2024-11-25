@@ -17,10 +17,11 @@
 //
 // Daniel.Veillard@imag.fr
 
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr},
-    io::Write,
     mem::{size_of, transmute, zeroed},
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -2875,7 +2876,7 @@ pub unsafe extern "C" fn xml_a_catalog_resolve_uri(
 
 /// Serialize an SGML Catalog entry
 #[doc(alias = "xmlCatalogDumpEntry")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 fn xml_catalog_dump_entry(payload: *mut c_void, out: &mut impl Write) {
     let entry: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     if entry.is_null() {
@@ -2973,7 +2974,7 @@ fn xml_catalog_dump_entry(payload: *mut c_void, out: &mut impl Write) {
 
 /// Serializes a Catalog entry, called by xmlDumpXMLCatalog and recursively for group entries
 #[doc(alias = "xmlDumpXMLCatalogNode")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_dump_xml_catalog_node(
     catal: XmlCatalogEntryPtr,
     catalog: XmlNodePtr,
@@ -3133,7 +3134,7 @@ unsafe extern "C" fn xml_dump_xml_catalog_node(
 }
 
 #[doc(alias = "xmlDumpXMLCatalog")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe fn xml_dump_xml_catalog(out: impl Write + 'static, catal: XmlCatalogEntryPtr) -> i32 {
     // Rebuild a catalog
 
@@ -3186,7 +3187,7 @@ unsafe fn xml_dump_xml_catalog(out: impl Write + 'static, catal: XmlCatalogEntry
 
 /// Dump the given catalog to the given file.
 #[doc(alias = "xmlACatalogDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe fn xml_a_catalog_dump(catal: XmlCatalogPtr, mut out: impl Write + 'static) {
     if catal.is_null() {
         return;
@@ -3543,7 +3544,7 @@ pub unsafe extern "C" fn xml_catalog_cleanup() {
 
 /// Dump all the global catalog content to the given file.
 #[doc(alias = "xmlCatalogDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_catalog_dump(out: impl Write + 'static) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
@@ -4149,7 +4150,7 @@ mod tests {
     #[test]
     fn test_xml_acatalog_dump() {
         let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(all(feature = "catalog", feature = "output"))]
+        #[cfg(all(feature = "catalog", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -4430,7 +4431,7 @@ mod tests {
     #[test]
     fn test_xml_catalog_dump() {
         let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(all(feature = "catalog", feature = "output"))]
+        #[cfg(all(feature = "catalog", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 

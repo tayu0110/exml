@@ -848,7 +848,7 @@ mod tests {
 
     #[test]
     fn test_xml_automata_is_determinist() {
-        #[cfg(all(feature = "regexp", feature = "libxml_automata"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
         unsafe {
             let mut leaks = 0;
 
@@ -902,7 +902,7 @@ mod tests {
 
     #[test]
     fn test_xml_automata_new_counter() {
-        #[cfg(all(feature = "regexp", feature = "libxml_automata"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
         unsafe {
             let mut leaks = 0;
 
@@ -990,7 +990,7 @@ mod tests {
 
     #[test]
     fn test_xml_automata_set_final_state() {
-        #[cfg(all(feature = "regexp", feature = "libxml_automata"))]
+        #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
         unsafe {
             let mut leaks = 0;
 

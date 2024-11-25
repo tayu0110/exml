@@ -1340,7 +1340,7 @@ pub unsafe extern "C" fn xml_free_entities_table(table: XmlEntitiesTablePtr) {
 
 /// When using the hash table scan function, arguments need to be reversed
 #[doc(alias = "xmlDumpEntityDeclScan")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _name: *const XmlChar) {
     unsafe {
         xml_dump_entity_decl(buf as XmlBufPtr, ent as XmlEntityPtr);
@@ -1349,7 +1349,7 @@ extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _nam
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntitiesTable")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr) {
     xml_hash_scan(table, Some(xml_dump_entity_decl_scan), buf as _);
 }
@@ -1357,7 +1357,7 @@ pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntit
 /// This will dump the quoted string value, taking care of the special
 /// treatment required by %
 #[doc(alias = "xmlDumpEntityContent")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
     if !xml_strchr(content, b'%').is_null() {
         let mut base: *const XmlChar;
@@ -1396,7 +1396,7 @@ unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const Xml
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntityDecl")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     if buf.is_null() || ent.is_null() {
         return;
@@ -1620,7 +1620,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_entities_table() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -1654,7 +1654,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_entity_decl() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 

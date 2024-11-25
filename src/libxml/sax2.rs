@@ -1346,7 +1346,7 @@ unsafe extern "C" fn xml_ns_warn_msg(
 #[cfg(any(
     feature = "sax1",
     feature = "html",
-    feature = "writer",
+    feature = "libxml_writer",
     feature = "legacy"
 ))]
 unsafe extern "C" fn xml_ns_err_msg(
@@ -1401,7 +1401,7 @@ unsafe extern "C" fn xml_ns_err_msg(
 #[cfg(any(
     feature = "sax1",
     feature = "html",
-    feature = "writer",
+    feature = "libxml_writer",
     feature = "legacy"
 ))]
 unsafe fn xml_sax2_attribute_internal(
@@ -1916,7 +1916,7 @@ unsafe fn xml_sax2_attribute_internal(
 #[cfg(any(
     feature = "sax1",
     feature = "html",
-    feature = "writer",
+    feature = "libxml_writer",
     feature = "legacy"
 ))]
 unsafe extern "C" fn xml_check_defaulted_attributes(
@@ -2108,7 +2108,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
 #[cfg(any(
     feature = "sax1",
     feature = "html",
-    feature = "writer",
+    feature = "libxml_writer",
     feature = "legacy"
 ))]
 pub unsafe fn xml_sax2_start_element(
@@ -2356,7 +2356,7 @@ pub unsafe fn xml_sax2_start_element(
 #[cfg(any(
     feature = "sax1",
     feature = "html",
-    feature = "writer",
+    feature = "libxml_writer",
     feature = "legacy"
 ))]
 pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
@@ -3084,7 +3084,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             #[cfg(any(
                 feature = "sax1",
                 feature = "html",
-                feature = "writer",
+                feature = "libxml_writer",
                 feature = "legacy"
             ))]
             {

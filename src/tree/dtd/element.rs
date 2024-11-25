@@ -33,9 +33,9 @@ pub struct XmlElement {
     pub(crate) content: XmlElementContentPtr, /* the allowed element content */
     pub(crate) attributes: XmlAttributePtr,   /* List of the declared attributes */
     pub(crate) prefix: Option<String>,        /* the namespace prefix if any */
-    #[cfg(feature = "regexp")]
+    #[cfg(feature = "libxml_regexp")]
     pub(crate) cont_model: XmlRegexpPtr, /* the validating regexp */
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     pub(crate) cont_model: *mut c_void,
 }
 

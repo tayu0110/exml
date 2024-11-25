@@ -1652,7 +1652,7 @@ unsafe extern "C" fn xml_text_reader_ent_push(
 
 /// Push the current node for validation
 #[doc(alias = "xmlTextReaderValidatePush")]
-#[cfg(all(feature = "libxml_reader", feature = "regexp"))]
+#[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
     let mut node: XmlNodePtr = reader.node;
 
@@ -1718,7 +1718,7 @@ unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
 
 /// Push some CData for validation
 #[doc(alias = "xmlTextReaderValidateCData")]
-#[cfg(all(feature = "libxml_reader", feature = "regexp"))]
+#[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_cdata(
     reader: &mut XmlTextReader,
     data: *const XmlChar,
@@ -1768,7 +1768,7 @@ unsafe extern "C" fn xml_text_reader_ent_pop(reader: &mut XmlTextReader) -> XmlN
 /// entity substitution is not activated. As a result the parser interface
 /// must walk through the entity and do the validation calls
 #[doc(alias = "xmlTextReaderValidateEntity")]
-#[cfg(all(feature = "libxml_reader", feature = "regexp"))]
+#[cfg(all(feature = "libxml_reader", feature = "libxml_regexp"))]
 unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader) {
     use crate::tree::{NodeCommon, NodePtr};
 
@@ -1802,7 +1802,7 @@ unsafe extern "C" fn xml_text_reader_validate_entity(reader: &mut XmlTextReader)
                         break 'skip_children;
                     }
                 } else {
-                    #[cfg(feature = "regexp")]
+                    #[cfg(feature = "libxml_regexp")]
                     if (*node).typ == XmlElementType::XmlElementNode {
                         reader.node = node;
                         xml_text_reader_validate_push(reader);
@@ -2038,7 +2038,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                         reader.state = XmlTextReaderState::End;
                         break 'goto_node_found;
                     }
-                    #[cfg(feature = "regexp")]
+                    #[cfg(feature = "libxml_regexp")]
                     if reader.validate as u32 != 0
                         && (*reader.node).typ == XmlElementType::XmlElementNode
                     {
@@ -2084,7 +2084,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                     reader.state = XmlTextReaderState::End;
                     break 'goto_node_found;
                 }
-                #[cfg(feature = "regexp")]
+                #[cfg(feature = "libxml_regexp")]
                 if reader.validate != XmlTextReaderValidate::NotValidate
                     && (*reader.node).typ == XmlElementType::XmlElementNode
                 {
@@ -2227,7 +2227,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
                 reader.node = children.children.map_or(null_mut(), |c| c.as_ptr());
             }
         } else {
-            #[cfg(feature = "regexp")]
+            #[cfg(feature = "libxml_regexp")]
             if !reader.node.is_null()
                 && (*reader.node).typ == XmlElementType::XmlEntityRefNode
                 && !reader.ctxt.is_null()
@@ -2249,7 +2249,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
 
         break;
     }
-    #[cfg(feature = "regexp")]
+    #[cfg(feature = "libxml_regexp")]
     if reader.validate != XmlTextReaderValidate::NotValidate && !reader.node.is_null() {
         let node: XmlNodePtr = reader.node;
 
@@ -2300,7 +2300,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
 /// is neither an element nor attribute, or has no child nodes. The
 /// string must be deallocated by the caller.
 #[doc(alias = "xmlTextReaderReadInnerXml")]
-#[cfg(all(feature = "libxml_reader", feature = "writer"))]
+#[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
 pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
     reader: &mut XmlTextReader,
 ) -> *mut XmlChar {
@@ -2349,7 +2349,7 @@ pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
 /// Returns a string containing the node and any XML content, or NULL if the
 /// current node cannot be serialized. The string must be deallocated by the caller.
 #[doc(alias = "xmlTextReaderReadOuterXml")]
-#[cfg(all(feature = "libxml_reader", feature = "writer"))]
+#[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
 pub unsafe extern "C" fn xml_text_reader_read_outer_xml(
     reader: &mut XmlTextReader,
 ) -> *mut XmlChar {
@@ -3428,7 +3428,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i3
     if !reader.ctxt.is_null() {
         #[cfg(feature = "valid")]
         if !(*reader.ctxt).vctxt.vstate_tab.is_null() && (*reader.ctxt).vctxt.vstate_max > 0 {
-            #[cfg(feature = "regexp")]
+            #[cfg(feature = "libxml_regexp")]
             while (*reader.ctxt).vctxt.vstate_nr > 0 {
                 xml_validate_pop_element(
                     addr_of_mut!((*reader.ctxt).vctxt),

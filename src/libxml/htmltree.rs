@@ -11,9 +11,10 @@
 //
 // daniel@veillard.com
 
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     ffi::{c_char, CStr, CString},
-    io::Write,
     mem::size_of,
     ptr::{null, null_mut},
     sync::atomic::Ordering,
@@ -23,14 +24,14 @@ use libc::memset;
 
 use crate::{
     encoding::XmlCharEncoding,
-    error::XmlParserErrors,
-    io::XmlOutputBuffer,
     tree::{
         xml_create_int_subset, xml_free_node, xml_new_doc_node, xml_new_prop, NodeCommon,
-        XmlAttrPtr, XmlBufPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
+        XmlAttrPtr, XmlDoc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr,
         __XML_REGISTER_CALLBACKS,
     },
 };
+#[cfg(feature = "libxml_output")]
+use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlBufPtr};
 
 use super::{
     globals::{xml_malloc, xml_register_node_default_value},
@@ -471,7 +472,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
 /// Dump an HTML document in memory and return the xmlChar * and it's size.  
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemory")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_doc_dump_memory(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
@@ -482,7 +483,7 @@ pub unsafe extern "C" fn html_doc_dump_memory(
 
 /// Handle an out of memory condition
 #[doc(alias = "htmlSaveErr")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
     use crate::error::{XmlErrorDomain, __xml_simple_error};
 
@@ -499,7 +500,7 @@ unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extr
 /// Dump an HTML document in memory and return the xmlChar * and it's size.  
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemoryFormat")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_doc_dump_memory_format(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
@@ -587,7 +588,7 @@ pub unsafe extern "C" fn html_doc_dump_memory_format(
 ///
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlDocDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i32 {
     use crate::{
         encoding::{find_encoding_handler, XmlCharEncoding},
@@ -639,7 +640,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
 ///
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFile")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     use std::{cell::RefCell, rc::Rc};
 
@@ -698,7 +699,7 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 
 /// Handle an out of memory condition
 #[doc(alias = "htmlSaveErrMemory")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
     use crate::error::{XmlErrorDomain, __xml_simple_error};
 
@@ -715,7 +716,7 @@ unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
 ///
 /// Returns the number of byte written or -1 in case of error
 #[doc(alias = "htmlBufNodeDumpFormat")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn html_buf_node_dump_format(
     buf: XmlBufPtr,
     doc: XmlDocPtr,
@@ -745,7 +746,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
 ///
 /// Returns the number of byte written or -1 in case of error
 #[doc(alias = "htmlNodeDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
     use crate::libxml::parser::xml_init_parser;
 
@@ -772,7 +773,7 @@ pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: Xml
 
 /// Dump an HTML node, recursive behaviour,children are printed too, and formatting returns are added.
 #[doc(alias = "htmlNodeDumpFile")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_node_dump_file<'a>(
     out: &mut (impl Write + 'a),
     doc: XmlDocPtr,
@@ -787,7 +788,7 @@ pub unsafe extern "C" fn html_node_dump_file<'a>(
 ///
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlNodeDumpFileFormat")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
     doc: XmlDocPtr,
@@ -847,7 +848,7 @@ pub unsafe extern "C" fn html_node_dump_file_format<'a>(
 ///
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFileEnc")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe fn html_save_file_enc(filename: &str, cur: XmlDocPtr, encoding: Option<&str>) -> i32 {
     html_save_file_format(filename, cur, encoding, 1)
 }
@@ -856,7 +857,7 @@ pub unsafe fn html_save_file_enc(filename: &str, cur: XmlDocPtr, encoding: Optio
 ///
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFileFormat")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe fn html_save_file_format(
     filename: &str,
     cur: XmlDocPtr,
@@ -924,7 +925,7 @@ pub unsafe fn html_save_file_format(
 ///
 /// Dump the HTML document DTD, if any.
 #[doc(alias = "htmlDtdDumpOutput")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn html_dtd_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: XmlDocPtr,
@@ -972,7 +973,7 @@ unsafe extern "C" fn html_dtd_dump_output(
 
 /// Dump an HTML attribute
 #[doc(alias = "htmlAttrDumpOutput")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn html_attr_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: XmlDocPtr,
@@ -1061,7 +1062,7 @@ unsafe extern "C" fn html_attr_dump_output(
 
 /// Dump an HTML node, recursive behaviour,children are printed too.
 #[doc(alias = "htmlNodeDumpFormatOutput")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe fn html_node_dump_format_output(
     buf: &mut XmlOutputBuffer,
     doc: XmlDocPtr,
@@ -1358,7 +1359,7 @@ pub unsafe fn html_node_dump_format_output(
 
 /// Dump an HTML document. Formatting return/spaces are added.
 #[doc(alias = "htmlDocContentDumpOutput")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_doc_content_dump_output(
     buf: &mut XmlOutputBuffer,
     cur: XmlDocPtr,
@@ -1369,7 +1370,7 @@ pub unsafe extern "C" fn html_doc_content_dump_output(
 
 /// Dump an HTML document.
 #[doc(alias = "htmlDocContentDumpFormatOutput")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe fn html_doc_content_dump_format_output(
     buf: &mut XmlOutputBuffer,
     cur: XmlDocPtr,
@@ -1390,7 +1391,7 @@ pub unsafe fn html_doc_content_dump_format_output(
 /// Dump an HTML node, recursive behaviour,children are printed too,
 /// and formatting returns/spaces are added.
 #[doc(alias = "htmlNodeDumpOutput")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: XmlDocPtr,
@@ -1444,7 +1445,7 @@ mod tests {
 
     #[test]
     fn test_html_doc_dump() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -1475,7 +1476,7 @@ mod tests {
 
     #[test]
     fn test_html_doc_dump_memory() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -1511,7 +1512,7 @@ mod tests {
 
     #[test]
     fn test_html_doc_dump_memory_format() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -1646,7 +1647,7 @@ mod tests {
 
     #[test]
     fn test_html_node_dump() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -1683,7 +1684,7 @@ mod tests {
 
     #[test]
     fn test_html_node_dump_file() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -1718,7 +1719,7 @@ mod tests {
 
     #[test]
     fn test_html_node_dump_file_format() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -1769,7 +1770,7 @@ mod tests {
 
     #[test]
     fn test_html_save_file() {
-        #[cfg(all(feature = "html", feature = "output"))]
+        #[cfg(all(feature = "html", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 

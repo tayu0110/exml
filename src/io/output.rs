@@ -210,7 +210,6 @@ impl<'a> XmlOutputBuffer<'a> {
     ///
     /// Returns the new parser output or NULL
     #[doc(alias = "xmlAllocOutputBuffer")]
-    #[cfg(feature = "output")]
     pub fn new(encoder: Option<XmlCharEncodingHandler>) -> Option<XmlOutputBuffer<'a>> {
         Self::from_wrapped_encoder(encoder.map(|e| Rc::new(RefCell::new(e))))
     }
@@ -869,7 +868,7 @@ impl Drop for XmlIOHTTPWriteCtxt {
 /// Calling this method changes the HTTP output method to use the "POST"
 /// method instead.
 #[doc(alias = "xmlRegisterHTTPPostCallbacks")]
-#[cfg(all(feature = "output", feature = "http"))]
+#[cfg(feature = "http")]
 pub fn xml_register_http_post_callbacks() {
     /*  Register defaults if not done previously  */
 

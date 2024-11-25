@@ -676,7 +676,7 @@ impl XmlDoc {
     ///
     /// Returns the old root element if any was found, NULL if root was NULL
     #[doc(alias = "xmlDocSetRootElement")]
-    #[cfg(any(feature = "tree", feature = "writer"))]
+    #[cfg(any(feature = "tree", feature = "libxml_writer"))]
     pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
         use crate::tree::{xml_replace_node, NodeCommon};
 

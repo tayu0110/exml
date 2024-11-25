@@ -11,11 +11,12 @@
 //
 // Daniel Veillard <veillard@redhat.com>
 
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     any::type_name,
     cell::Cell,
     ffi::{c_char, CStr},
-    io::Write,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -8331,7 +8332,7 @@ pub unsafe extern "C" fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
 
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpDefines")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_relaxng_dump_defines<'a>(
     output: &mut (impl Write + 'a),
     mut defines: XmlRelaxNGDefinePtr,
@@ -8344,7 +8345,7 @@ unsafe extern "C" fn xml_relaxng_dump_defines<'a>(
 
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpDefine")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_relaxng_dump_define<'a>(
     output: &mut (impl Write + 'a),
     define: XmlRelaxNGDefinePtr,
@@ -8466,7 +8467,7 @@ unsafe extern "C" fn xml_relaxng_dump_define<'a>(
 
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpGrammar")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_relaxng_dump_grammar<'a>(
     output: &mut (impl Write + 'a),
     grammar: XmlRelaxNGGrammarPtr,
@@ -8505,7 +8506,7 @@ unsafe extern "C" fn xml_relaxng_dump_grammar<'a>(
 
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDump")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_relaxng_dump<'a>(
     output: &mut (impl Write + 'a),
     schema: XmlRelaxNGPtr,
@@ -8531,7 +8532,7 @@ pub unsafe extern "C" fn xml_relaxng_dump<'a>(
 
 /// Dump the transformed RelaxNG tree.
 #[doc(alias = "xmlRelaxNGDumpTree")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_relaxng_dump_tree(output: &mut impl Write, schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         writeln!(output, "RelaxNG empty or failed to compile");
@@ -11853,7 +11854,7 @@ mod tests {
 
     #[test]
     fn test_xml_relaxng_dump() {
-        #[cfg(all(feature = "schema", feature = "output"))]
+        #[cfg(all(feature = "schema", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -11883,7 +11884,7 @@ mod tests {
 
     #[test]
     fn test_xml_relaxng_dump_tree() {
-        #[cfg(all(feature = "schema", feature = "output"))]
+        #[cfg(all(feature = "schema", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 

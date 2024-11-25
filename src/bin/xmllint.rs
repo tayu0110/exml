@@ -135,11 +135,11 @@ static mut NOBLANKS: c_int = 0;
 static mut NOOUT: c_int = 0;
 static mut NOWRAP: c_int = 0;
 static mut FORMAT: c_int = 0;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 static OUTPUT: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 static mut COMPRESS: c_int = 0;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 static mut OLDOUT: c_int = 0;
 #[cfg(feature = "valid")]
 static mut VALID: c_int = 0;
@@ -2268,7 +2268,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     match (*cur).typ {
         XmlXPathObjectType::XpathNodeset => {
             let mut node: XmlNodePtr;
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             {
                 if (*cur).nodesetval.is_null() || (*(*cur).nodesetval).node_nr <= 0 {
                     if QUIET == 0 {
@@ -2289,9 +2289,9 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     buf.borrow_mut().flush();
                 }
             }
-            #[cfg(not(feature = "output"))]
+            #[cfg(not(feature = "libxml_output"))]
             {
-                println!("xpath returned {} nodes", (*(*cur).nodesetval).nodeNr);
+                println!("xpath returned {} nodes", (*(*cur).nodesetval).node_nr);
             }
         }
         XmlXPathObjectType::XpathBoolean => {
@@ -2755,7 +2755,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             walk_doc(doc);
         }
     }
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     if NOOUT == 0 {
         let ret: c_int;
 
@@ -3393,7 +3393,7 @@ fn show_version(name: &str) {
 
 fn usage(f: &mut impl Write, name: &str) {
     writeln!(f, "Usage : {} [options] XMLfiles ...", name).ok();
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     {
         writeln!(
             f,
@@ -3401,7 +3401,7 @@ fn usage(f: &mut impl Write, name: &str) {
         )
         .ok();
     }
-    #[cfg(not(feature = "output"))]
+    #[cfg(not(feature = "libxml_output"))]
     {
         writeln!(f, "\tParse the XML files").ok();
     }
@@ -3491,7 +3491,7 @@ fn usage(f: &mut impl Write, name: &str) {
     writeln!(f, "\t--repeat : repeat 100 times, for timing or profiling",).ok();
     writeln!(f, "\t--insert : ad-hoc test for valid insertions").ok();
     // #ifdef LIBXML_ZLIB_ENABLED
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     {
         writeln!(f, "\t--compress : turn on gzip compression of output").ok();
     }
@@ -3528,7 +3528,7 @@ fn usage(f: &mut impl Write, name: &str) {
     .ok();
     writeln!(f, "\t--noblanks : drop (ignorable?) blanks spaces").ok();
     writeln!(f, "\t--nocdata : replace cdata section with text nodes").ok();
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     {
         writeln!(f, "\t--format : reformat/reindent the output").ok();
         writeln!(f, "\t--encode encoding : output in the given encoding").ok();
@@ -3753,7 +3753,7 @@ fn main() {
                 version = 1;
             } else if arg == "-noout" || arg == "--noout" {
                 NOOUT += 1;
-            } else if cfg!(feature = "output")
+            } else if cfg!(feature = "libxml_output")
                 && (arg == "-o" || arg == "-output" || arg == "--output")
             {
                 *OUTPUT.lock().unwrap() =
@@ -3833,7 +3833,7 @@ fn main() {
                 XINCLUDE += 1;
                 OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
                 OPTIONS |= XmlParserOption::XmlParseNobasefix as i32;
-            } else if cfg!(feature = "output")
+            } else if cfg!(feature = "libxml_output")
                 // && cfg!(feature = "libxml_zlib")
                 && (arg == "-compress" || arg == "--compress")
             {
@@ -3878,13 +3878,13 @@ fn main() {
             } else if arg == "-noblanks" || arg == "--noblanks" {
                 NOBLANKS = 1;
             } else if arg == "-format" || arg == "--format" {
-                #[cfg(feature = "output")]
+                #[cfg(feature = "libxml_output")]
                 {
                     FORMAT = 1;
                 }
             } else if arg == "-pretty" || arg == "--pretty" {
                 if let Some(next) = args.next() {
-                    #[cfg(feature = "output")]
+                    #[cfg(feature = "libxml_output")]
                     {
                         FORMAT = next.parse().expect("--pretty: Failed to parse integer");
                     }

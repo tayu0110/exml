@@ -21,20 +21,20 @@ use std::{
 
 use libc::{memset, strcat, strcmp, strlen};
 
-#[cfg(not(feature = "regexp"))]
-use crate::libxml::tree::xml_free_node_list;
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlautomata::{
     xml_automata_compile, xml_automata_get_init_state, xml_automata_set_final_state,
     xml_free_automata, xml_new_automata, XmlAutomataPtr,
 };
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlregexp::{
     xml_reg_exec_push_string, xml_reg_free_exec_ctxt, xml_reg_free_regexp, xml_reg_new_exec_ctxt,
     xml_regexp_is_determinist, XmlRegExecCtxtPtr,
 };
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 use crate::libxml::xmlstring::xml_strncmp;
+#[cfg(not(feature = "libxml_regexp"))]
+use crate::tree::xml_free_node_list;
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
@@ -82,14 +82,14 @@ pub type XmlValidStatePtr = *mut XmlValidState;
 // callbacks.
 // Each xmlValidState represent the validation state associated to the
 // set of nodes currently open from the document root to the current element.
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 #[repr(C)]
 pub struct XmlValidState {
     elem_decl: XmlElementPtr, /* pointer to the content model */
     node: XmlNodePtr,         /* pointer to the current node */
     exec: XmlRegExecCtxtPtr,  /* regexp runtime */
 }
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 #[repr(C)]
 pub struct XmlValidState {
     cont: XmlElementContentPtr, /* pointer to the content model subtree */
@@ -134,13 +134,13 @@ pub struct XmlValidCtxt {
     pub(crate) vstate_max: i32,            /* Max depth of the validation stack */
     pub(crate) vstate_tab: *mut XmlValidState, /* array of validation states */
 
-    #[cfg(feature = "regexp")]
+    #[cfg(feature = "libxml_regexp")]
     pub(crate) am: XmlAutomataPtr, /* the automata */
-    #[cfg(feature = "regexp")]
+    #[cfg(feature = "libxml_regexp")]
     pub(crate) state: XmlAutomataStatePtr, /* used to build the automata */
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     pub(crate) am: *mut c_void,
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     pub(crate) state: *mut c_void,
 }
 
@@ -482,7 +482,7 @@ pub unsafe extern "C" fn xml_free_notation_table(table: XmlNotationTablePtr) {
 
 /// This will dump the content the notation declaration as an XML DTD definition
 #[doc(alias = "xmlDumpNotationDecl")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotationPtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_write_quoted_string};
 
@@ -511,7 +511,7 @@ pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotatio
 
 /// This is called with the hash scan function, and just reverses args
 #[doc(alias = "xmlDumpNotationDeclScan")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 extern "C" fn xml_dump_notation_decl_scan(
     nota: *mut c_void,
     buf: *mut c_void,
@@ -524,7 +524,7 @@ extern "C" fn xml_dump_notation_decl_scan(
 
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlDumpNotationTable")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
     if buf.is_null() || table.is_null() {
         return;
@@ -942,7 +942,7 @@ pub unsafe extern "C" fn xml_snprintf_element_content(
 
 #[doc(alias = "xmlSprintfElementContent")]
 #[deprecated = "unsafe, use xmlSnprintfElementContent"]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_sprintf_element_content(
     _buf: *mut c_char,
     _content: XmlElementContentPtr,
@@ -960,7 +960,7 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
     xml_free_doc_element_content((*elem).doc, (*elem).content);
     (*elem).name = None;
     (*elem).prefix = None;
-    #[cfg(feature = "regexp")]
+    #[cfg(feature = "libxml_regexp")]
     if !(*elem).cont_model.is_null() {
         xml_reg_free_regexp((*elem).cont_model);
     }
@@ -1362,7 +1362,7 @@ pub unsafe extern "C" fn xml_free_element_table(table: XmlElementTablePtr) {
 /// This routine is used by the hash scan function.  
 /// It just reverses the arguments.
 #[doc(alias = "xmlDumpElementDeclScan")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 extern "C" fn xml_dump_element_decl_scan(
     elem: *mut c_void,
     buf: *mut c_void,
@@ -1375,7 +1375,7 @@ extern "C" fn xml_dump_element_decl_scan(
 
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementTable")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElementTablePtr) {
     if buf.is_null() || table.is_null() {
         return;
@@ -1385,7 +1385,7 @@ pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElemen
 
 /// Dump the occurrence operator of an element.
 #[doc(alias = "xmlDumpElementOccur")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementContentPtr) {
     use crate::buf::libxml_api::xml_buf_ccat;
 
@@ -1405,7 +1405,7 @@ unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementConte
 
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementContent")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
 
@@ -1500,7 +1500,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElemen
 
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlDumpElementDecl")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
     use std::ffi::CString;
 
@@ -2526,7 +2526,7 @@ pub unsafe extern "C" fn xml_free_attribute_table(table: XmlAttributeTablePtr) {
 
 /// This is used with the hash scan function - just reverses arguments
 #[doc(alias = "xmlDumpAttributeDeclScan")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 extern "C" fn xml_dump_attribute_decl_scan(
     attr: *mut c_void,
     buf: *mut c_void,
@@ -2539,7 +2539,7 @@ extern "C" fn xml_dump_attribute_decl_scan(
 
 /// This will dump the content of the attribute table as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeTable")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttributeTablePtr) {
     if buf.is_null() || table.is_null() {
         return;
@@ -2549,7 +2549,7 @@ pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttr
 
 /// This will dump the content of the enumeration
 #[doc(alias = "xmlDumpEnumeration")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_dump_enumeration(buf: XmlBufPtr, cur: XmlEnumerationPtr) {
     use std::ffi::CString;
 
@@ -2575,7 +2575,7 @@ unsafe extern "C" fn xml_dump_enumeration(buf: XmlBufPtr, cur: XmlEnumerationPtr
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeDecl")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string};
 
@@ -4835,7 +4835,7 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
     ret
 }
 
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 macro_rules! DEBUG_VALID_MSG {
     ($m:expr) => {
         $crate::generic_error!("{}\n", $m);
@@ -4933,9 +4933,9 @@ unsafe extern "C" fn xml_snprintf_elements(
     }
 }
 
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 const ROLLBACK_OR: usize = 0;
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 const ROLLBACK_PARENT: usize = 1;
 
 /// Try to validate the content model of an element internal function
@@ -4944,7 +4944,7 @@ const ROLLBACK_PARENT: usize = 1;
 /// reference is found and -3 if the validation succeeded but
 /// the content model is not determinist.
 #[doc(alias = "xmlValidateElementType")]
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
     let mut ret: i32 = -1;
     let mut determinist: i32 = 1;
@@ -5467,11 +5467,11 @@ unsafe extern "C" fn xml_validate_element_content(
     parent: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 1;
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     let mut repl: XmlNodePtr = null_mut();
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     let mut last: XmlNodePtr = null_mut();
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     let mut tmp: XmlNodePtr;
     let mut cur: XmlNodePtr;
 
@@ -5484,7 +5484,7 @@ unsafe extern "C" fn xml_validate_element_content(
         .as_ref()
         .map(|n| CString::new(n.as_str()).unwrap());
 
-    #[cfg(feature = "regexp")]
+    #[cfg(feature = "libxml_regexp")]
     {
         /* Build the regexp associated to the content model */
         if (*elem_decl).cont_model.is_null() {
@@ -5582,10 +5582,10 @@ unsafe extern "C" fn xml_validate_element_content(
         }
     }
 
-    #[cfg_attr(feature = "regexp", allow(unused_labels))]
+    #[cfg_attr(feature = "libxml_regexp", allow(unused_labels))]
     // label `'done` is used just only when 'regexp' is disabled.
     'done: {
-        #[cfg(not(feature = "regexp"))]
+        #[cfg(not(feature = "libxml_regexp"))]
         {
             /*
              * Allocate the stack
@@ -5724,7 +5724,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 expr[0] = 0;
                 xml_snprintf_element_content(expr.as_mut_ptr().add(0) as _, 5000, cont, 1);
                 list[0] = 0;
-                #[cfg(not(feature = "regexp"))]
+                #[cfg(not(feature = "libxml_regexp"))]
                 {
                     if !repl.is_null() {
                         xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, repl, 1);
@@ -5732,7 +5732,7 @@ unsafe extern "C" fn xml_validate_element_content(
                         xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                     }
                 }
-                #[cfg(feature = "regexp")]
+                #[cfg(feature = "libxml_regexp")]
                 {
                     xml_snprintf_elements(list.as_mut_ptr().add(0) as _, 5000, child, 1);
                 }
@@ -5788,7 +5788,7 @@ unsafe extern "C" fn xml_validate_element_content(
         }
     }
 
-    #[cfg(not(feature = "regexp"))]
+    #[cfg(not(feature = "libxml_regexp"))]
     {
         // done:
         /*
@@ -7804,7 +7804,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
 ///
 /// Returns 1 in case of success, 0 in case of error
 #[doc(alias = "xmlValidBuildContentModel")]
-#[cfg(all(feature = "valid", feature = "regexp"))]
+#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_valid_build_content_model(
     ctxt: XmlValidCtxtPtr,
     elem: XmlElementPtr,
@@ -7881,7 +7881,7 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
 ///
 /// Returns 1 if yes, 0 if no, -1 in case of error
 #[doc(alias = "xmlValidateCheckMixed")]
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 unsafe extern "C" fn xml_validate_check_mixed(
     ctxt: XmlValidCtxtPtr,
     mut cont: XmlElementContentPtr,
@@ -7966,7 +7966,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
     0
 }
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 unsafe extern "C" fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
     elem_decl: XmlElementPtr,
@@ -8026,10 +8026,10 @@ unsafe extern "C" fn vstate_vpush(
     res
 }
 
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 const MAX_RECURSE: usize = 25000;
 
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 unsafe extern "C" fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
     cont: XmlElementContentPtr,
@@ -8095,7 +8095,7 @@ unsafe extern "C" fn vstate_vpush(
 ///
 /// returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushElement")]
-#[cfg(all(feature = "valid", feature = "regexp"))]
+#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -8209,7 +8209,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
 ///
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushCData")]
-#[cfg(all(feature = "valid", feature = "regexp"))]
+#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_validate_push_cdata(
     ctxt: XmlValidCtxtPtr,
     data: *const XmlChar,
@@ -8284,7 +8284,7 @@ pub unsafe extern "C" fn xml_validate_push_cdata(
     ret
 }
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 unsafe extern "C" fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
     if (*ctxt).vstate_nr < 1 {
         return -1;
@@ -8307,7 +8307,7 @@ unsafe extern "C" fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
     (*ctxt).vstate_nr
 }
 
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 unsafe extern "C" fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
     if (*ctxt).vstateNr <= 1 {
         return -1;
@@ -8326,7 +8326,7 @@ unsafe extern "C" fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
 ///
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePopElement")]
-#[cfg(all(feature = "valid", feature = "regexp"))]
+#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
@@ -8383,7 +8383,7 @@ pub unsafe extern "C" fn xml_validate_pop_element(
 ///
 /// Returns the first element to consider for validation of the content model
 #[doc(alias = "xmlValidateSkipIgnorable")]
-#[cfg(not(feature = "regexp"))]
+#[cfg(not(feature = "libxml_regexp"))]
 unsafe extern "C" fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
     while !child.is_null() {
         match (*child).typ {
@@ -8656,7 +8656,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_attribute_decl() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -8690,7 +8690,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_attribute_table() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -8724,7 +8724,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_element_decl() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -8758,7 +8758,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_element_table() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -8792,7 +8792,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_notation_decl() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -8826,7 +8826,7 @@ mod tests {
 
     #[test]
     fn test_xml_dump_notation_table() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -9344,7 +9344,7 @@ mod tests {
 
     #[test]
     fn test_xml_sprintf_element_content() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -9383,7 +9383,7 @@ mod tests {
 
     #[test]
     fn test_xml_valid_build_content_model() {
-        #[cfg(all(feature = "valid", feature = "regexp"))]
+        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10255,7 +10255,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_pop_element() {
-        #[cfg(all(feature = "valid", feature = "regexp"))]
+        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10300,7 +10300,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_push_cdata() {
-        #[cfg(all(feature = "valid", feature = "regexp"))]
+        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10343,7 +10343,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_push_element() {
-        #[cfg(all(feature = "valid", feature = "regexp"))]
+        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 

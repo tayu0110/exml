@@ -2061,7 +2061,7 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *
 
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNodeCtxt")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         return;
@@ -2098,7 +2098,7 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
     if !list.is_null() {
         match (*list).typ {
             XmlXPathObjectType::XpathNodeset => {
-                #[cfg(feature = "output")]
+                #[cfg(feature = "libxml_output")]
                 if !(*list).nodesetval.is_null() {
                     for indx in 0..(*(*list).nodesetval).node_nr {
                         xml_shell_print_node_ctxt(
@@ -2109,7 +2109,7 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
                 } else {
                     generic_error!("Empty node set\n");
                 }
-                #[cfg(not(feature = "output"))]
+                #[cfg(not(feature = "libxml_output"))]
                 {
                     generic_error!("Node set\n");
                 }
@@ -2320,7 +2320,7 @@ pub unsafe extern "C" fn xml_shell_load(
 
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNode")]
-#[cfg(all(feature = "xpath", feature = "output"))]
+#[cfg(all(feature = "xpath", feature = "libxml_output"))]
 pub unsafe extern "C" fn xml_shell_print_node(node: XmlNodePtr) {
     xml_shell_print_node_ctxt(null_mut(), node);
 }
@@ -2330,7 +2330,7 @@ pub unsafe extern "C" fn xml_shell_print_node(node: XmlNodePtr) {
 ///
 /// Returns 0
 #[doc(alias = "xmlShellCat")]
-#[cfg(all(feature = "xpath", feature = "output"))]
+#[cfg(all(feature = "xpath", feature = "libxml_output"))]
 pub unsafe extern "C" fn xml_shell_cat(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
@@ -2376,7 +2376,7 @@ pub unsafe extern "C" fn xml_shell_cat(
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellWrite")]
-#[cfg(all(feature = "xpath", feature = "output"))]
+#[cfg(all(feature = "xpath", feature = "libxml_output"))]
 pub unsafe fn xml_shell_write(
     ctxt: XmlShellCtxtPtr,
     filename: &str,
@@ -2441,7 +2441,7 @@ pub unsafe fn xml_shell_write(
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellSave")]
-#[cfg(all(feature = "xpath", feature = "output"))]
+#[cfg(all(feature = "xpath", feature = "libxml_output"))]
 pub unsafe extern "C" fn xml_shell_save(
     ctxt: XmlShellCtxtPtr,
     mut filename: *mut c_char,
@@ -3213,7 +3213,7 @@ pub unsafe fn xml_shell<'a>(
                 "\twhereis      display absolute path of [path] or current working directory"
             );
             writeln!((*ctxt).output, "\tquit         leave shell");
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             {
                 writeln!(
                     (*ctxt).output,
@@ -3273,30 +3273,30 @@ pub unsafe fn xml_shell<'a>(
                 xml_shell_rng_validate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if {
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             {
                 strcmp(command.as_ptr(), c"save".as_ptr()) == 0
             }
-            #[cfg(not(feature = "output"))]
+            #[cfg(not(feature = "libxml_output"))]
             {
                 false
             }
         } {
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             {
                 xml_shell_save(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if {
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             {
                 strcmp(command.as_ptr(), c"write".as_ptr()) == 0
             }
-            #[cfg(not(feature = "output"))]
+            #[cfg(not(feature = "libxml_output"))]
             {
                 false
             }
         } {
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             if arg[0] == 0 {
                 generic_error!("Write command requires a filename argument\n");
             } else {
@@ -3833,16 +3833,16 @@ pub unsafe fn xml_shell<'a>(
                 (*(*ctxt).pctxt).node = null_mut();
             }
         } else if {
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             {
                 strcmp(command.as_ptr(), c"cat".as_ptr()) == 0
             }
-            #[cfg(not(feature = "output"))]
+            #[cfg(not(feature = "libxml_output"))]
             {
                 false
             }
         } {
-            #[cfg(feature = "output")]
+            #[cfg(feature = "libxml_output")]
             if arg[0] == 0 {
                 xml_shell_cat(ctxt, null_mut(), (*ctxt).node, null_mut());
             } else {
@@ -4490,7 +4490,7 @@ mod tests {
 
     #[test]
     fn test_xml_shell_cat() {
-        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "output"))]
+        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -4771,7 +4771,7 @@ mod tests {
 
     #[test]
     fn test_xml_shell_save() {
-        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "output"))]
+        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 

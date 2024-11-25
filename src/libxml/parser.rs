@@ -2596,7 +2596,7 @@ pub unsafe extern "C" fn xml_init_parser() {
         xml_init_memory_internal();
         __xml_initialize_dict();
         register_default_input_callbacks();
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         {
             register_default_output_callbacks();
         }
@@ -2640,7 +2640,7 @@ pub unsafe extern "C" fn xml_cleanup_parser() {
     }
     xml_cleanup_dict_internal();
     cleanup_input_callbacks();
-    #[cfg(feature = "output")]
+    #[cfg(feature = "libxml_output")]
     {
         cleanup_output_callbacks();
     }
@@ -11181,7 +11181,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
             cfg!(feature = "tree")
         }
         Some(XmlFeature::XmlWithOutput) => {
-            cfg!(feature = "output")
+            cfg!(feature = "libxml_output")
         }
         Some(XmlFeature::XmlWithPush) => {
             cfg!(feature = "push")
@@ -11193,7 +11193,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
             cfg!(feature = "libxml_pattern")
         }
         Some(XmlFeature::XmlWithWriter) => {
-            cfg!(feature = "writer")
+            cfg!(feature = "libxml_writer")
         }
         Some(XmlFeature::XmlWithSax1) => {
             cfg!(feature = "sax1")
@@ -11234,7 +11234,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
             cfg!(feature = "libxml_unicode")
         }
         Some(XmlFeature::XmlWithRegexp) => {
-            cfg!(feature = "regexp")
+            cfg!(feature = "libxml_regexp")
         }
         Some(XmlFeature::XmlWithAutomata) => {
             cfg!(feature = "libxml_automata")

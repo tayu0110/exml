@@ -874,7 +874,7 @@ pub fn xml_nanohttp_read(ctxt: &mut XmlNanoHTTPCtxt, dest: &mut [u8]) -> usize {
 ///
 /// Returns -1 in case of failure, 0 in case of success.
 #[doc(alias = "xmlNanoHTTPSave")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub fn xml_nanohttp_save(ctxt: &mut XmlNanoHTTPCtxt, filename: &str) -> i32 {
     use std::{fs::Permissions, os::unix::fs::PermissionsExt};
 

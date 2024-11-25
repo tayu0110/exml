@@ -183,15 +183,15 @@ pub(crate) const GEN_NB_XML_TEXT_READER_PTR: i32 = 4;
 pub(crate) const GEN_NB_XML_SCHEMA_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_SCHEMA_VALID_CTXT_PTR: i32 = 1;
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) const GEN_NB_XML_REGEXP_PTR: i32 = 1;
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) const GEN_NB_XML_REG_EXEC_CTXT_PTR: i32 = 1;
-#[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) const GEN_NB_XML_EXP_CTXT_PTR: i32 = 1;
-#[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) const GEN_NB_XML_EXP_NODE_PTR: i32 = 1;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub(crate) const GEN_NB_XML_SAVE_CTXT_PTR: i32 = 1;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_XML_SCHEMA_SAXPLUG_PTR: i32 = 1;
@@ -213,7 +213,7 @@ pub(crate) const GEN_NB_XML_SCHEMA_VAL_TYPE: i32 = 4;
 pub(crate) const GEN_NB_UNSIGNED_LONG: i32 = 4;
 #[cfg(feature = "schema")]
 pub(crate) const GEN_NB_UNSIGNED_LONG_PTR: i32 = 2;
-#[cfg(feature = "writer")]
+#[cfg(feature = "libxml_writer")]
 pub(crate) const GEN_NB_XML_TEXT_WRITER_PTR: i32 = 2;
 #[cfg(feature = "xpath")]
 pub(crate) const GEN_NB_XML_XPATH_COMP_EXPR_PTR: i32 = 1;
@@ -346,7 +346,7 @@ pub(crate) fn gen_xml_xpath_context_ptr(_no: i32, _nr: i32) -> XmlXPathContextPt
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_xpath_context_ptr(_no: i32, _val: XmlXPathContextPtr, _nr: i32) {}
 
-#[cfg(feature = "writer")]
+#[cfg(feature = "libxml_writer")]
 pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(
     no: i32,
     _nr: i32,
@@ -359,14 +359,14 @@ pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(
     null_mut()
 }
 
-#[cfg(feature = "writer")]
+#[cfg(feature = "libxml_writer")]
 pub(crate) unsafe extern "C" fn des_xml_text_writer_ptr(_no: i32, val: XmlTextWriterPtr, _nr: i32) {
     if !val.is_null() {
         xml_free_text_writer(val);
     }
 }
 
-#[cfg(feature = "writer")]
+#[cfg(feature = "libxml_writer")]
 pub(crate) unsafe extern "C" fn desret_xml_text_writer_ptr(val: XmlTextWriterPtr) {
     xml_free_text_writer(val);
 }
@@ -500,43 +500,43 @@ pub(crate) fn gen_xml_schema_saxplug_ptr(_no: i32, _nr: i32) -> XmlSchemaSAXPlug
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_schema_saxplug_ptr(_no: i32, _val: XmlSchemaSAXPlugPtr, _nr: i32) {}
 
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub(crate) fn gen_xml_save_ctxt_ptr(_no: i32, _nr: i32) -> XmlSaveCtxtPtr<'static> {
     null_mut()
 }
 
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub(crate) fn des_xml_save_ctxt_ptr(_no: i32, _val: XmlSaveCtxtPtr, _nr: i32) {}
 
-#[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) fn gen_xml_exp_ctxt_ptr(_no: i32, _nr: i32) -> XmlExpCtxtPtr {
     null_mut()
 }
 
-#[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) fn des_xml_exp_ctxt_ptr(_no: i32, _val: XmlExpCtxtPtr, _nr: i32) {}
 
-#[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) fn gen_xml_exp_node_ptr(_no: i32, _nr: i32) -> XmlExpNodePtr {
     null_mut()
 }
-#[cfg(all(feature = "regexp", feature = "libxml_expr"))]
+#[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) fn des_xml_exp_node_ptr(_no: i32, _val: XmlExpNodePtr, _nr: i32) {}
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) fn gen_xml_reg_exec_ctxt_ptr(_no: i32, _nr: i32) -> XmlRegExecCtxtPtr {
     null_mut()
 }
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) fn des_xml_reg_exec_ctxt_ptr(_no: i32, _val: XmlRegExecCtxtPtr, _nr: i32) {}
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) fn gen_xml_regexp_ptr(_no: i32, _nr: i32) -> XmlRegexpPtr {
     null_mut()
 }
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub(crate) fn des_xml_regexp_ptr(_no: i32, _val: XmlRegexpPtr, _nr: i32) {}
 
 #[cfg(feature = "schema")]
@@ -1519,7 +1519,7 @@ pub(crate) fn gen_void_ptr(_no: i32, _nr: i32) -> *mut c_void {
 }
 pub(crate) fn des_void_ptr(_no: i32, _val: *mut c_void, _nr: i32) {}
 
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub(crate) unsafe fn gen_xml_output_buffer_ptr(
     no: i32,
     _nr: i32,
@@ -1530,7 +1530,7 @@ pub(crate) unsafe fn gen_xml_output_buffer_ptr(
     None
 }
 
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub(crate) fn des_xml_output_buffer_ptr(_no: i32, _val: XmlOutputBuffer, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr {

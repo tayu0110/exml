@@ -3205,7 +3205,7 @@ mod tests {
 
     #[test]
     fn test_xml_new_text_writer_push_parser() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3247,7 +3247,7 @@ mod tests {
 
     #[test]
     fn test_xml_new_text_writer_tree() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3287,7 +3287,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_attribute() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3316,7 +3316,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_cdata() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3345,7 +3345,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_comment() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3374,7 +3374,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_dtd() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3403,7 +3403,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_dtdattlist() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3432,7 +3432,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_dtdelement() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3461,7 +3461,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_dtdentity() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3490,7 +3490,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_document() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3519,7 +3519,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_element() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3548,7 +3548,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_end_pi() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3577,7 +3577,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_flush() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3606,7 +3606,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_full_end_element() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3635,7 +3635,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_set_indent() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3669,7 +3669,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_set_indent_string() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3703,7 +3703,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_set_quote_char() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3737,7 +3737,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_attribute() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3771,7 +3771,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_attribute_ns() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3815,7 +3815,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_cdata() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3844,7 +3844,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_comment() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3873,7 +3873,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_dtd() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3917,7 +3917,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_dtdattlist() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3951,7 +3951,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_dtdelement() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3985,7 +3985,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_dtdentity() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4024,7 +4024,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_document() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4068,7 +4068,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_element() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4102,7 +4102,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_element_ns() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4146,7 +4146,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_start_pi() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4180,7 +4180,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_attribute() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4219,7 +4219,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_attribute_ns() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4271,7 +4271,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_base64() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4321,7 +4321,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_bin_hex() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4371,7 +4371,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_cdata() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4405,7 +4405,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_comment() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4439,7 +4439,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtd() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4488,7 +4488,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdattlist() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4527,7 +4527,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdelement() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4566,7 +4566,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdentity() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4621,7 +4621,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdexternal_entity() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4671,7 +4671,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdexternal_entity_contents() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4711,7 +4711,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdinternal_entity() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4749,7 +4749,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_dtdnotation() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4793,7 +4793,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_element() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4832,7 +4832,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_element_ns() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -4965,7 +4965,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_pi() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -5004,7 +5004,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_raw() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -5038,7 +5038,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_raw_len() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 
@@ -5080,7 +5080,7 @@ mod tests {
 
     #[test]
     fn test_xml_text_writer_write_string() {
-        #[cfg(feature = "writer")]
+        #[cfg(feature = "libxml_writer")]
         unsafe {
             let mut leaks = 0;
 

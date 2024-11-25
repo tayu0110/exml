@@ -23,13 +23,13 @@ default = [
     "valid",
     "push",
     "html",
-    "writer",
-    "regexp",
     "tree",
     "xinclude",
-    "output",
     "http",
     "ftp",
+    "libxml_output",
+    "libxml_regexp",
+    "libxml_writer",
     "libxml_expr",
     "libxml_automata",
     "libxml_unicode",
@@ -50,13 +50,13 @@ valid = []
 legacy = []
 push = []
 html = []
-writer = []
-regexp = []
 tree = []
 xinclude = []
-output = []
 http = []
 ftp = []
+libxml_output = []
+libxml_regexp = []
+libxml_writer = []
 libxml_expr = []
 libxml_automata = []
 libxml_unicode = []
@@ -80,7 +80,7 @@ required-features = ["schema", "xpath"]
 
 [[test]]
 name = "runtest"
-required-features = ["output"]
+required-features = ["libxml_output"]
 
 [[test]]
 name = "testchar"

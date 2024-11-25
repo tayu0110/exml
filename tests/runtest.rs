@@ -5309,7 +5309,7 @@ unsafe fn threads_test(
     test_thread()
 }
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 unsafe extern "C" fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
     use exml::libxml::xmlregexp::xml_regexp_exec;
 
@@ -5329,7 +5329,7 @@ unsafe extern "C" fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *
     }
 }
 
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 unsafe fn regexp_test(
     filename: &str,
     result: Option<String>,
@@ -6505,7 +6505,7 @@ fn svg_parsing_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 fn regexp_regression_test() {
     test_common(&TestDesc {
         desc: "Regexp regression tests",

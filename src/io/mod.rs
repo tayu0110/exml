@@ -4,7 +4,7 @@
 //! Please refer to original libxml2 documents also.
 
 mod input;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 mod output;
 
 use std::{
@@ -51,7 +51,7 @@ use crate::{
 };
 
 pub use input::*;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub use output::*;
 
 ///  Handle an out of memory condition
@@ -314,7 +314,7 @@ pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *m
 /// if the return value is positive, else unpredictable.
 /// The value of `outlen` after return is the number of octets consumed.
 #[doc(alias = "xmlEscapeContent")]
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 fn xml_escape_content(input: &str, output: &mut String) -> i32 {
     for input in input.chars() {
         match input {
@@ -823,7 +823,7 @@ mod tests {
 
     #[test]
     fn test_xml_cleanup_output_callbacks() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -1003,7 +1003,7 @@ mod tests {
 
     #[test]
     fn test_xml_register_default_output_callbacks() {
-        #[cfg(feature = "output")]
+        #[cfg(feature = "libxml_output")]
         unsafe {
             let mut leaks = 0;
 
@@ -1027,7 +1027,7 @@ mod tests {
 
     #[test]
     fn test_xml_register_httppost_callbacks() {
-        #[cfg(all(feature = "output", feature = "http"))]
+        #[cfg(all(feature = "libxml_output", feature = "http"))]
         unsafe {
             let mut leaks = 0;
 

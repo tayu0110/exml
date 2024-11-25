@@ -1,4 +1,4 @@
-#[cfg(all(feature = "libxml_c14n", feature = "output"))]
+#[cfg(all(feature = "libxml_c14n", feature = "libxml_output"))]
 pub mod c14n;
 #[cfg(feature = "catalog")]
 pub mod catalog;
@@ -36,15 +36,15 @@ pub mod valid;
 pub mod xinclude;
 #[cfg(feature = "libxml_xptr")]
 pub mod xlink;
-#[cfg(any(feature = "regexp", feature = "libxml_automata"))]
+#[cfg(any(feature = "libxml_regexp", feature = "libxml_automata"))]
 pub mod xmlautomata;
 pub mod xmlmemory;
 #[cfg(feature = "libxml_modules")]
 pub mod xmlmodule;
 pub mod xmlreader;
-#[cfg(feature = "regexp")]
+#[cfg(feature = "libxml_regexp")]
 pub mod xmlregexp;
-#[cfg(feature = "output")]
+#[cfg(feature = "libxml_output")]
 pub mod xmlsave;
 #[cfg(feature = "schema")]
 pub mod xmlschemas;
@@ -53,7 +53,7 @@ pub mod xmlschemastypes;
 pub mod xmlstring;
 #[cfg(feature = "libxml_unicode")]
 pub mod xmlunicode;
-#[cfg(feature = "writer")]
+#[cfg(feature = "libxml_writer")]
 pub mod xmlwriter;
 pub mod xpath;
 #[cfg(feature = "xpath")]

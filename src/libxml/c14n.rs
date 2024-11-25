@@ -2458,7 +2458,7 @@ mod tests {
 
     #[test]
     fn test_xml_c14n_doc_dump_memory() {
-        #[cfg(all(feature = "libxml_c14n", feature = "output"))]
+        #[cfg(all(feature = "libxml_c14n", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
@@ -2525,7 +2525,7 @@ mod tests {
 
     #[test]
     fn test_xml_c14n_doc_save() {
-        #[cfg(all(feature = "libxml_c14n", feature = "output"))]
+        #[cfg(all(feature = "libxml_c14n", feature = "libxml_output"))]
         unsafe {
             let mut leaks = 0;
 
