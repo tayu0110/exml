@@ -362,7 +362,6 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).xml_register_node_default_value = XML_REGISTER_NODE_DEFAULT_VALUE_THR_DEF;
     (*gs).xml_deregister_node_default_value = XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF;
 
-    // (*gs).xml_output_buffer_create_filename_value = XML_OUTPUT_BUFFER_CREATE_FILENAME_VALUE_THR_DEF;
     memset(
         addr_of_mut!((*gs).xml_last_error) as _,
         0,
@@ -449,13 +448,8 @@ macro_rules! IS_MAIN_THREAD {
 /// Returns a pointer to the newly allocated block or NULL in case of error
 #[doc(alias = "xmlMalloc")]
 pub(in crate::libxml) static mut _XML_MALLOC: Option<XmlMallocFunc> = Some(malloc);
-#[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_malloc(size: usize) -> *mut c_void {
     _XML_MALLOC.expect("Failed to allocate memory : _XML_MALLOC is None")(size)
-}
-#[cfg(feature = "thread_alloc")]
-pub unsafe extern "C" fn xml_malloc(size: usize) -> *mut c_void {
-    __xml_malloc().expect("Failed to allocate memory : _XML_MALLOC is None")(size)
 }
 
 pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
@@ -471,26 +465,16 @@ pub fn set_xml_malloc(malloc: Option<XmlMallocFunc>) {
 /// Returns a pointer to the newly allocated block or NULL in case of error
 #[doc(alias = "xmlMallocAtomic")]
 pub(in crate::libxml) static mut _XML_MALLOC_ATOMIC: XmlMallocFunc = malloc;
-#[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
     _XML_MALLOC_ATOMIC(size)
-}
-#[cfg(feature = "thread_alloc")]
-pub unsafe extern "C" fn xml_malloc_atomic(size: usize) -> *mut c_void {
-    __xml_malloc_atomic()(size)
 }
 /// The variable holding the libxml realloc() implementation
 ///
 /// Returns a pointer to the newly reallocated block or NULL in case of error
 #[doc(alias = "xmlRealloc")]
 pub(in crate::libxml) static mut _XML_REALLOC: Option<XmlReallocFunc> = Some(realloc);
-#[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_realloc(mem: *mut c_void, size: usize) -> *mut c_void {
     _XML_REALLOC.expect("Failed to reallocate memory : _XML_REALLOC is None")(mem, size)
-}
-#[cfg(feature = "thread_alloc")]
-pub unsafe extern "C" fn xml_realloc(mem: *mut c_void, size: usize) -> *mut c_void {
-    __xml_realloc().expect("Failed to reallocate memory : _XML_REALLOC is None")(mem, size)
 }
 pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
     unsafe {
@@ -501,13 +485,8 @@ pub fn set_xml_realloc(realloc: Option<XmlReallocFunc>) {
 /// The variable holding the libxml free() implementation
 #[doc(alias = "xmlFree")]
 pub(in crate::libxml) static mut _XML_FREE: Option<XmlFreeFunc> = Some(free);
-#[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_free(mem: *mut c_void) {
     _XML_FREE.expect("Failed to deallocate memory : _XML_FREE is None")(mem);
-}
-#[cfg(feature = "thread_alloc")]
-pub unsafe extern "C" fn xml_free(mem: *mut c_void) {
-    __xml_free().expect("Failed to deallocate memory : _XML_FREE is None")(mem);
 }
 pub fn set_xml_free(free: Option<XmlFreeFunc>) {
     unsafe {
@@ -528,13 +507,8 @@ unsafe extern "C" fn xml_posix_strdup(cur: *const XmlChar) -> *mut XmlChar {
 /// Returns the copy of the string or NULL in case of error
 #[doc(alias = "xmlMemStrdup")]
 pub(in crate::libxml) static mut _XML_MEM_STRDUP: Option<XmlStrdupFunc> = Some(xml_posix_strdup);
-#[cfg(not(feature = "thread_alloc"))]
 pub unsafe extern "C" fn xml_mem_strdup(str: *const XmlChar) -> *mut XmlChar {
     _XML_MEM_STRDUP.expect("Failed to duplicate xml string : _XML_MEM_STRDUP is None")(str)
-}
-#[cfg(feature = "thread_alloc")]
-pub unsafe extern "C" fn xml_mem_strdup(str: *const XmlChar) -> *mut XmlChar {
-    __xml_mem_strdup().expect("Failed to duplicate xml string : _XML_MEM_STRDUP is None")(str)
 }
 pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
     unsafe {
@@ -542,79 +516,6 @@ pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
         (*xml_get_global_state()).xml_mem_strdup = mem_strdup;
     }
 }
-
-#[cfg(feature = "thread_alloc")]
-mod __globals_internal_for_thread_alloc {
-    use super::*;
-    use crate::libxml::threads::xml_get_global_state;
-
-    #[cfg(feature = "thread")]
-    pub unsafe extern "C" fn __xml_malloc() -> Option<XmlMallocFunc> {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_MALLOC
-        } else {
-            (*xml_get_global_state()).xml_malloc
-        }
-    }
-    #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn __xmlMalloc() -> XmlMallocFunc {
-        _XML_MALLOC
-    }
-
-    #[cfg(feature = "thread")]
-    pub unsafe extern "C" fn __xml_malloc_atomic() -> XmlMallocFunc {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_MALLOC_ATOMIC
-        } else {
-            (*xml_get_global_state()).xml_malloc_atomic.unwrap()
-        }
-    }
-    #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn __xmlMallocAtomic() -> XmlMallocFunc {
-        _XML_MALLOC_ATOMIC
-    }
-
-    #[cfg(feature = "thread")]
-    pub unsafe extern "C" fn __xml_realloc() -> Option<XmlReallocFunc> {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_REALLOC
-        } else {
-            (*xml_get_global_state()).xml_realloc
-        }
-    }
-    #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn __xmlRealloc() -> XmlReallocFunc {
-        _XML_REALLOC
-    }
-
-    #[cfg(feature = "thread")]
-    pub unsafe extern "C" fn __xml_free() -> Option<XmlFreeFunc> {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_FREE
-        } else {
-            (*xml_get_global_state()).xml_free
-        }
-    }
-    #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn __xmlFree() -> XmlFreeFunc {
-        _XML_FREE
-    }
-
-    #[cfg(feature = "thread")]
-    pub unsafe extern "C" fn __xml_mem_strdup() -> Option<XmlStrdupFunc> {
-        if IS_MAIN_THREAD!() != 0 {
-            _XML_MEM_STRDUP
-        } else {
-            (*xml_get_global_state()).xml_mem_strdup
-        }
-    }
-    #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn __xmlMemStrdup() -> XmlStrdupFunc {
-        _XML_MEM_STRDUP
-    }
-}
-#[cfg(feature = "thread_alloc")]
-pub use __globals_internal_for_thread_alloc::*;
 
 /// Default old SAX v1 handler for HTML, builds the DOM tree
 #[doc(alias = "htmlDefaultSAXHandler")]

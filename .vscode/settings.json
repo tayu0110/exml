@@ -8,7 +8,6 @@
         // "legacy",
         "push",
         "thread",
-        // "thread_alloc",
         "html",
         "writer",
         "regexp",

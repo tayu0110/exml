@@ -5208,16 +5208,6 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         let filename: *const c_char = (*params).filename.as_ptr();
         let mut okay: i32 = 1;
 
-        #[cfg(feature = "thread_alloc")]
-        {
-            xml_mem_setup(
-                Some(xml_mem_free),
-                Some(xml_mem_malloc),
-                Some(xml_mem_realloc),
-                Some(xml_memory_strdup),
-            );
-        }
-
         if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
             set_do_validity_checking_default_value(0);
             let stdout: Box<dyn Write> = Box::new(stdout());
