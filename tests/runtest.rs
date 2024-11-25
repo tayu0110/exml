@@ -5145,22 +5145,20 @@ unsafe fn c14n11_without_comment_test(
     )
 }
 
-/*
- * mostly a cut and paste from testThreads.c
- */
-#[cfg(all(feature = "thread", feature = "catalog"))]
+// mostly a cut and paste from testThreads.c
+#[cfg(feature = "catalog")]
 const MAX_ARGC: usize = 20;
 
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 #[repr(C)]
 struct XmlThreadParams<'a> {
     filename: &'a CStr,
     okay: i32,
 }
 
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 const CATALOG: &CStr = c"./test/threads/complex.xml";
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
     XmlThreadParams {
         filename: c"./test/threads/abc.xml",
@@ -5191,10 +5189,10 @@ static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
         okay: 0,
     },
 ];
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 static NUM_THREADS: usize = unsafe { THREAD_PARAMS.len() };
 
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     use std::io::{stderr, stdout};
 
@@ -5245,10 +5243,10 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     null_mut()
 }
 
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 static TID: Mutex<[pthread_t; MAX_ARGC]> = Mutex::new([0; MAX_ARGC]);
 
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 unsafe extern "C" fn test_thread() -> i32 {
     use exml::libxml::catalog::{xml_catalog_cleanup, xml_load_catalog};
     use libc::{pthread_create, pthread_join};
@@ -5301,7 +5299,7 @@ unsafe extern "C" fn test_thread() -> i32 {
     res
 }
 
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 unsafe fn threads_test(
     _filename: &str,
     _resul: Option<String>,
@@ -6480,7 +6478,7 @@ fn c14n_1_1_without_comments_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "thread", feature = "catalog"))]
+#[cfg(feature = "catalog")]
 fn catalog_and_threads_regression_test() {
     test_common(&TestDesc {
         desc: "Catalog and Threads regression tests",

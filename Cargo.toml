@@ -22,7 +22,6 @@ default = [
     "sax1",
     "valid",
     "push",
-    "thread",
     "html",
     "writer",
     "regexp",
@@ -50,7 +49,6 @@ sax1 = []
 valid = []
 legacy = []
 push = []
-thread = []
 html = []
 writer = []
 regexp = []
@@ -98,7 +96,7 @@ name = "testrecurse"
 
 [[test]]
 name = "test_threads"
-required-features = ["catalog", "thread"]
+required-features = ["catalog"]
 
 [[bin]]
 name = "xmllint"

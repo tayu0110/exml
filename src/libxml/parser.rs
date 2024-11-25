@@ -2589,11 +2589,8 @@ pub unsafe extern "C" fn xml_init_parser() {
         return;
     }
 
-    #[cfg(feature = "thread")]
-    {
-        __xml_global_init_mutex_lock();
-    }
-    if !cfg!(feature = "thread") || !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
+    __xml_global_init_mutex_lock();
+    if !XML_PARSER_INITIALIZED.load(Ordering::Acquire) {
         xml_init_threads_internal();
         xml_init_globals_internal();
         xml_init_memory_internal();
@@ -2610,10 +2607,7 @@ pub unsafe extern "C" fn xml_init_parser() {
         XML_PARSER_INITIALIZED.store(true, Ordering::Release);
     }
 
-    #[cfg(feature = "thread")]
-    {
-        __xml_global_init_mutex_unlock();
-    }
+    __xml_global_init_mutex_unlock();
 }
 
 /// This function name is somewhat misleading. It does not clean up
@@ -11182,9 +11176,7 @@ pub enum XmlFeature {
 #[doc(alias = "xmlHasFeature")]
 pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
     match feature {
-        Some(XmlFeature::XmlWithThread) => {
-            cfg!(feature = "thread")
-        }
+        Some(XmlFeature::XmlWithThread) => true,
         Some(XmlFeature::XmlWithTree) => {
             cfg!(feature = "tree")
         }

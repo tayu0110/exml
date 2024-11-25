@@ -28,8 +28,6 @@ use std::{
 
 use libc::{memcpy, memmove, memset, snprintf, strlen, INT_MAX, INT_MIN};
 
-#[cfg(not(feature = "thread"))]
-use crate::libxml::xpath_internals::XML_XPATH_DISABLE_OPTIMIZER;
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{
     xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
@@ -1979,8 +1977,6 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     to_bool: i32,
 ) -> i32 {
     let res_obj: XmlXPathObjectPtr;
-    #[cfg(not(feature = "thread"))]
-    static mut REENTANCE: i32 = 0;
 
     CHECK_CTXT_NEG!(ctxt);
 
@@ -1988,14 +1984,6 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
         return -1;
     }
     xml_init_parser();
-
-    #[cfg(not(feature = "thread"))]
-    {
-        REENTANCE += 1;
-        if REENTANCE > 1 {
-            XML_XPATH_DISABLE_OPTIMIZER = 1;
-        }
-    }
 
     let pctxt: XmlXPathParserContextPtr = xml_xpath_comp_parser_context(comp, ctxt);
     if pctxt.is_null() {
@@ -2027,10 +2015,6 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
 
     (*pctxt).comp = null_mut();
     xml_xpath_free_parser_context(pctxt);
-    #[cfg(not(feature = "thread"))]
-    {
-        REENTANCE -= 1;
-    }
 
     res
 }

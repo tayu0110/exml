@@ -428,18 +428,9 @@ pub unsafe extern "C" fn xml_thr_def_deregister_node_default(
 // Helpful Macro
 #[doc(hidden)]
 #[macro_export]
-#[cfg(feature = "thread")]
 macro_rules! IS_MAIN_THREAD {
     () => {
         $crate::libxml::threads::xml_is_main_thread()
-    };
-}
-#[doc(hidden)]
-#[macro_export]
-#[cfg(not(feature = "thread"))]
-macro_rules! IS_MAIN_THREAD {
-    () => {
-        1
     };
 }
 
@@ -564,14 +555,8 @@ mod __globals_internal_for_html {
             addr_of_mut!((*xml_get_global_state()).html_default_sax_handler)
         }
     }
-    #[cfg(feature = "thread")]
     pub unsafe extern "C" fn html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
         __html_default_sax_handler()
-    }
-    #[deprecated]
-    #[cfg(not(feature = "thread"))]
-    pub unsafe extern "C" fn html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
-        addr_of_mut!(_HTML_DEFAULT_SAXHANDLER)
     }
 }
 #[cfg(feature = "html")]
@@ -621,14 +606,8 @@ static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     initialized: 1,
 };
 
-#[cfg(feature = "thread")]
 pub unsafe extern "C" fn xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
     __xml_default_sax_handler()
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
-    addr_of_mut!(_XML_DEFAULT_SAXHANDLER)
 }
 
 #[deprecated]
@@ -655,14 +634,8 @@ static mut _XML_DEFAULT_SAXLOCATOR: XmlSAXLocator = XmlSAXLocator {
     get_column_number: xml_sax2_get_column_number,
 };
 
-#[cfg(feature = "thread")]
 pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
     __xml_default_sax_locator()
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_default_sax_locator() -> *mut XmlSAXLocator {
-    addr_of_mut!(_XML_DEFAULT_SAXLOCATOR)
 }
 
 #[deprecated]
@@ -676,14 +649,8 @@ pub unsafe extern "C" fn __xml_register_node_default_value() -> XmlRegisterNodeF
     }
 }
 
-#[cfg(feature = "thread")]
 pub unsafe extern "C" fn xml_register_node_default_value(node: XmlNodePtr) {
     __xml_register_node_default_value()(node)
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_register_node_default_value(node: XmlNodePtr) {
-    _XML_REGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
 
 #[deprecated]
@@ -697,14 +664,8 @@ pub unsafe extern "C" fn __xml_deregister_node_default_value() -> XmlDeregisterN
     }
 }
 
-#[cfg(feature = "thread")]
 pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
     __xml_deregister_node_default_value()(node)
-}
-#[deprecated]
-#[cfg(not(feature = "thread"))]
-pub unsafe extern "C" fn xml_deregister_node_default_value(node: XmlNodePtr) {
-    _XML_DEREGISTER_NODE_DEFAULT_VALUE.unwrap()(node)
 }
 
 /**

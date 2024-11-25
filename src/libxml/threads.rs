@@ -260,7 +260,6 @@ pub unsafe extern "C" fn xml_cleanup_threads() {}
 ///
 /// Returns the newly allocated xmlGlobalStatePtr or NULL in case of error
 #[doc(alias = "xmlNewGlobalState")]
-#[cfg(feature = "thread")]
 unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
     use crate::generic_error;
 
@@ -282,34 +281,27 @@ unsafe extern "C" fn xml_new_global_state() -> XmlGlobalStatePtr {
 /// Returns the thread global state or NULL in case of error
 #[doc(alias = "xmlGetGlobalState")]
 pub(crate) unsafe extern "C" fn xml_get_global_state() -> XmlGlobalStatePtr {
-    #[cfg(feature = "thread")]
-    {
-        if !XML_IS_THREADED {
+    if !XML_IS_THREADED {
+        return null_mut();
+    }
+
+    let globalval: *mut XmlGlobalState = pthread_getspecific(GLOBALKEY) as *mut XmlGlobalState;
+    if globalval.is_null() {
+        let tsd: *mut XmlGlobalState = xml_new_global_state();
+        if tsd.is_null() {
             return null_mut();
         }
 
-        let globalval: *mut XmlGlobalState = pthread_getspecific(GLOBALKEY) as *mut XmlGlobalState;
-        if globalval.is_null() {
-            let tsd: *mut XmlGlobalState = xml_new_global_state();
-            if tsd.is_null() {
-                return null_mut();
-            }
-
-            pthread_setspecific(GLOBALKEY, tsd as _);
-            return tsd;
-        }
-        globalval
+        pthread_setspecific(GLOBALKEY, tsd as _);
+        return tsd;
     }
-    #[cfg(not(feature = "thread"))]
-    {
-        null_mut()
-    }
+    globalval
 }
 
 // #if defined(LIBXML_THREAD_ENABLED) && defined(_WIN32) && \
 //     !defined(HAVE_COMPILER_TLS) && defined(LIBXML_STATIC_FOR_DLL)
 #[doc(hidden)]
-#[cfg(all(feature = "thread", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 pub unsafe extern "C" fn xmlDllMain(
     hinstDLL: *mut c_void,
     fdwReason: c_ulong,

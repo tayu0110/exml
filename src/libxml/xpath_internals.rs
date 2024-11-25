@@ -7089,26 +7089,9 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     total
 }
 
-/*
- * Optimizer is disabled only when threaded apps are detected while
- * the library ain't compiled for thread safety.
- */
-#[cfg(not(feature = "thread"))]
-pub(crate) static mut XML_XPATH_DISABLE_OPTIMIZER: i32 = 0;
-
 /// Swaps 2 operations in the compiled expression
 #[doc(alias = "xmlXPathCompSwap")]
 unsafe extern "C" fn xml_xpath_comp_swap(op: XmlXPathStepOpPtr) {
-    /*
-     * Since this manipulates possibly shared variables, this is
-     * disabled if one detects that the library is used in a multithreaded
-     * application
-     */
-    #[cfg(not(feature = "thread"))]
-    if XML_XPATH_DISABLE_OPTIMIZER != 0 {
-        return;
-    }
-
     std::mem::swap(&mut (*op).ch1, &mut (*op).ch2);
 }
 

@@ -7,7 +7,6 @@
         "valid",
         // "legacy",
         "push",
-        "thread",
         "html",
         "writer",
         "regexp",
