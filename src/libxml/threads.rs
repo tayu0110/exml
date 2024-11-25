@@ -13,19 +13,19 @@
 // daniel@veillard.com
 
 use std::{
+    ffi::c_void,
     mem::{size_of, size_of_val},
-    ptr::null_mut,
+    ptr::{null, null_mut},
 };
 
 use libc::{
     free, malloc, memcpy, memset, pthread_cond_destroy, pthread_cond_init, pthread_cond_signal,
-    pthread_cond_t, pthread_cond_wait, pthread_getspecific, pthread_key_t, pthread_mutex_destroy,
-    pthread_mutex_init, pthread_mutex_lock, pthread_mutex_t, pthread_mutex_unlock, pthread_self,
-    pthread_setspecific, pthread_t, PTHREAD_MUTEX_INITIALIZER,
+    pthread_cond_t, pthread_cond_wait, pthread_getspecific, pthread_key_create, pthread_key_delete,
+    pthread_key_t, pthread_mutex_destroy, pthread_mutex_init, pthread_mutex_lock, pthread_mutex_t,
+    pthread_mutex_unlock, pthread_self, pthread_setspecific, pthread_t, PTHREAD_MUTEX_INITIALIZER,
 };
 
 use crate::libxml::globals::XmlGlobalStatePtr;
-use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 
 use super::{globals::XmlGlobalState, parser::xml_init_parser};
 
@@ -308,3 +308,66 @@ pub unsafe extern "C" fn xmlDllMain(
     lpvReserved: *mut c_void,
 ) -> i32;
 // #endif
+
+/// Makes sure that the global initialization mutex is initialized and locks it.
+#[doc(alias = "xmlGlobalInitMutexLock")]
+pub(crate) unsafe extern "C" fn __xml_global_init_mutex_lock() {
+    /* Make sure the global init lock is initialized and then lock it. */
+    if !XML_IS_THREADED {
+        return;
+    }
+    /* The mutex is statically initialized, so we just lock it. */
+    pthread_mutex_lock(&raw mut GLOBAL_INIT_LOCK);
+}
+
+pub(crate) unsafe extern "C" fn __xml_global_init_mutex_unlock() {
+    if !XML_IS_THREADED {
+        return;
+    }
+    pthread_mutex_unlock(&raw mut GLOBAL_INIT_LOCK);
+}
+
+/// Makes sure that the global initialization mutex is destroyed before
+/// application termination.
+#[doc(alias = "xmlGlobalInitMutexDestroy")]
+pub(crate) unsafe extern "C" fn __xml_global_init_mutex_destroy() {}
+
+/// xmlFreeGlobalState() is called when a thread terminates with a non-NULL
+/// global state. It is is used here to reclaim memory resources.
+#[doc(alias = "xmlFreeGlobalState")]
+unsafe extern "C" fn xml_free_global_state(state: *mut c_void) {
+    let gs: *mut XmlGlobalState = state as _;
+
+    /* free any memory allocated in the thread's xmlLastError */
+    (*gs).xml_last_error.reset();
+    free(state);
+}
+
+/// Used to to initialize all the thread related data.
+#[doc(alias = "xmlInitThreadsInternal")]
+pub(crate) unsafe extern "C" fn xml_init_threads_internal() {
+    pthread_key_create(&raw mut GLOBALKEY, Some(xml_free_global_state));
+    MAINTHREAD = pthread_self();
+}
+
+/// Used to to cleanup all the thread related data.
+#[doc(alias = "xmlCleanupThreadsInternal")]
+pub(crate) unsafe extern "C" fn xml_cleanup_threads_internal() {
+    pthread_key_delete(GLOBALKEY);
+}
+
+/// Initialize a mutex.
+#[doc(alias = "xmlInitMutex")]
+pub(crate) unsafe extern "C" fn xml_init_mutex(mutex: XmlMutexPtr) {
+    if !XML_IS_NEVER_THREADED {
+        pthread_mutex_init(&mut (*mutex).lock as _, null());
+    }
+}
+
+/// Reclaim resources associated with a mutex.
+#[doc(alias = "xmlCleanupMutex")]
+pub(crate) unsafe extern "C" fn xml_cleanup_mutex(mutex: XmlMutexPtr) {
+    if !XML_IS_NEVER_THREADED {
+        pthread_mutex_destroy(&mut (*mutex).lock as _);
+    }
+}

@@ -24,10 +24,11 @@ use crate::libxml::globals::{
     xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc,
 };
 use crate::libxml::parser::xml_init_parser;
-use crate::private::threads::{xml_cleanup_mutex, xml_init_mutex};
 
 use super::globals::{_XML_FREE, _XML_MALLOC, _XML_MALLOC_ATOMIC, _XML_MEM_STRDUP, _XML_REALLOC};
-use super::threads::{xml_mutex_lock, xml_mutex_unlock, XmlMutex};
+use super::threads::{
+    xml_cleanup_mutex, xml_init_mutex, xml_mutex_lock, xml_mutex_unlock, XmlMutex,
+};
 use super::xmlstring::XmlChar;
 
 thread_local! {

@@ -33,7 +33,6 @@ use crate::{
         parser::{XmlSAXHandlerV1, XmlSAXLocator},
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
-    private::threads::{__xml_global_init_mutex_destroy, xml_cleanup_mutex, xml_init_mutex},
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
 };
 
@@ -50,7 +49,10 @@ use super::{
         xml_sax2_resolve_entity, xml_sax2_set_document_locator, xml_sax2_start_document,
         xml_sax2_start_element, xml_sax2_unparsed_entity_decl,
     },
-    threads::{xml_get_global_state, xml_mutex_lock, xml_mutex_unlock, XmlMutex},
+    threads::{
+        xml_cleanup_mutex, xml_get_global_state, xml_init_mutex, xml_mutex_lock, xml_mutex_unlock,
+        XmlMutex, __xml_global_init_mutex_destroy,
+    },
     xmlstring::{xml_char_strdup, xml_strdup, XmlChar},
 };
 

@@ -122,10 +122,6 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
         xpath::xml_init_xpath_internal,
     },
-    private::threads::{
-        __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
-        xml_init_threads_internal,
-    },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
@@ -149,6 +145,10 @@ use super::{
         XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
     },
     sax2::{xml_sax2_end_element, xml_sax2_start_element},
+    threads::{
+        __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
+        xml_init_threads_internal,
+    },
 };
 
 /// The default version of XML used: 1.0
