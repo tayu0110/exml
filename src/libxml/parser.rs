@@ -49,7 +49,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 use libc::strcmp;
 use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, strncmp, strstr};
 
@@ -1239,7 +1239,7 @@ impl XmlParserCtxt {
     ///
     /// Returns the name just removed
     #[doc(alias = "nameNsPop")]
-    #[cfg(feature = "push")]
+    #[cfg(feature = "libxml_push")]
     pub(crate) fn name_ns_pop(&mut self) -> *const XmlChar {
         let res = self.name_tab.pop().unwrap_or(null_mut());
         self.name = *self.name_tab.last().unwrap_or(&null());
@@ -3816,7 +3816,7 @@ pub unsafe extern "C" fn xml_parse_entity(filename: *const c_char) -> XmlDocPtr 
 ///
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 #[doc(alias = "xmlSAXParseDTD")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
     sax: XmlSAXHandlerPtr,
     external_id: *const XmlChar,
@@ -3949,7 +3949,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
 ///
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 #[doc(alias = "xmlParseDTD")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_parse_dtd(
     external_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -3962,7 +3962,7 @@ pub unsafe extern "C" fn xml_parse_dtd(
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 /// `input` will be freed by the function in any case.
 #[doc(alias = "xmlIOParseDTD")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe fn xml_io_parse_dtd(
     sax: XmlSAXHandlerPtr,
     input: XmlParserInputBuffer,
@@ -5181,7 +5181,7 @@ pub unsafe extern "C" fn xml_create_doc_parser_ctxt(cur: *const XmlChar) -> XmlP
     xml_create_memory_parser_ctxt(CStr::from_ptr(cur as *const i8).to_bytes().to_vec())
 }
 
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 const XML_FEATURES_LIST: &[*const c_char] = &[
     c"validate".as_ptr() as _,
     c"load subset".as_ptr() as _,
@@ -5239,7 +5239,7 @@ const XML_FEATURES_LIST: &[*const c_char] = &[
  *            strings must not be deallocated
  */
 #[deprecated]
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 pub unsafe extern "C" fn xml_get_features_list(len: *mut i32, result: *mut *const c_char) -> i32 {
     let ret: i32 = XML_FEATURES_LIST.len() as i32;
     if len.is_null() || result.is_null() {
@@ -5268,7 +5268,7 @@ pub unsafe extern "C" fn xml_get_features_list(len: *mut i32, result: *mut *cons
  * Returns -1 in case or error, 0 otherwise
  */
 #[deprecated]
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 pub unsafe extern "C" fn xml_get_feature(
     ctxt: XmlParserCtxtPtr,
     name: *const c_char,
@@ -5376,7 +5376,7 @@ pub unsafe extern "C" fn xml_get_feature(
  * Returns -1 in case or error, 0 otherwise
  */
 #[deprecated]
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 pub unsafe extern "C" fn xml_set_feature(
     ctxt: XmlParserCtxtPtr,
     name: *const c_char,
@@ -5493,7 +5493,7 @@ pub unsafe extern "C" fn xml_set_feature(
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreatePushParserCtxt")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 pub unsafe fn xml_create_push_parser_ctxt(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
@@ -9304,7 +9304,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
 /// Returns the number of bytes to pass if okay, a negative index where an
 /// UTF-8 error occurred otherwise
 #[doc(alias = "xmlCheckCdataPush")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe extern "C" fn xml_check_cdata_push(utf: *const XmlChar, len: i32, complete: i32) -> i32 {
     use super::chvalid::xml_is_char;
 
@@ -9387,7 +9387,7 @@ unsafe extern "C" fn xml_check_cdata_push(utf: *const XmlChar, len: i32, complet
 
 /// Check whether there's enough data in the input buffer to finish parsing the internal subset.
 #[doc(alias = "xmlParseLookupInternalSubset")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe extern "C" fn xml_parse_lookup_internal_subset(ctxt: XmlParserCtxtPtr) -> i32 {
     /*
      * Sorry, but progressive parsing of the internal subset is not
@@ -9737,7 +9737,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                      * The Name in the document type declaration must match
                      * the element type of the root element.
                      */
-                    #[cfg(feature = "valid")]
+                    #[cfg(feature = "libxml_valid")]
                     if (*ctxt).validate != 0
                         && (*ctxt).well_formed != 0
                         && !(*ctxt).my_doc.is_null()
@@ -10238,7 +10238,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
 ///
 /// Returns zero if no error, the xmlParserErrors otherwise.
 #[doc(alias = "xmlParseChunk")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 pub unsafe extern "C" fn xml_parse_chunk(
     ctxt: XmlParserCtxtPtr,
     chunk: *const c_char,
@@ -11178,13 +11178,13 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
     match feature {
         Some(XmlFeature::XmlWithThread) => true,
         Some(XmlFeature::XmlWithTree) => {
-            cfg!(feature = "tree")
+            cfg!(feature = "libxml_tree")
         }
         Some(XmlFeature::XmlWithOutput) => {
             cfg!(feature = "libxml_output")
         }
         Some(XmlFeature::XmlWithPush) => {
-            cfg!(feature = "push")
+            cfg!(feature = "libxml_push")
         }
         Some(XmlFeature::XmlWithReader) => {
             cfg!(feature = "libxml_reader")
@@ -11205,16 +11205,16 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
             cfg!(feature = "http")
         }
         Some(XmlFeature::XmlWithValid) => {
-            cfg!(feature = "valid")
+            cfg!(feature = "libxml_valid")
         }
         Some(XmlFeature::XmlWithHtml) => {
             cfg!(feature = "html")
         }
         Some(XmlFeature::XmlWithLegacy) => {
-            cfg!(feature = "legacy")
+            cfg!(feature = "libxml_legacy")
         }
         Some(XmlFeature::XmlWithC14n) => {
-            cfg!(feature = "libxml_c14n")
+            cfg!(feature = "c14n")
         }
         Some(XmlFeature::XmlWithCatalog) => {
             cfg!(feature = "catalog")
@@ -11223,7 +11223,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
             cfg!(feature = "xpath")
         }
         Some(XmlFeature::XmlWithXptr) => {
-            cfg!(feature = "libxml_xptr")
+            cfg!(feature = "xpointer")
         }
         Some(XmlFeature::XmlWithXinclude) => {
             cfg!(feature = "xinclude")
@@ -11246,7 +11246,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
             cfg!(feature = "schema")
         }
         Some(XmlFeature::XmlWithSchematron) => {
-            cfg!(feature = "libxml_schematron")
+            cfg!(feature = "schematron")
         }
         //   xmlFeature::XML_WITH_MODULES => {}
         //   xmlFeature::XML_WITH_DEBUG => {}
@@ -13675,7 +13675,7 @@ mod tests {
 
     #[test]
     fn test_xml_parse_chunk() {
-        #[cfg(feature = "push")]
+        #[cfg(feature = "libxml_push")]
         unsafe {
             let mut leaks = 0;
 
@@ -13767,7 +13767,7 @@ mod tests {
 
     #[test]
     fn test_xml_parse_dtd() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -14191,7 +14191,7 @@ mod tests {
 
     #[test]
     fn test_xml_saxparse_dtd() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 

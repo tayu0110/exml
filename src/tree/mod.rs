@@ -399,13 +399,13 @@ macro_rules! CUR_SCHAR {
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateNCName")]
 #[cfg(any(
-    feature = "tree",
+    feature = "libxml_tree",
     feature = "xpath",
     feature = "schema",
     feature = "html",
     feature = "sax1",
     feature = "libxml_writer",
-    feature = "legacy"
+    feature = "libxml_legacy"
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
@@ -500,7 +500,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) 
 /// Returns 0 if this validates, a positive error code number otherwise
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateQName")]
-#[cfg(any(feature = "tree", feature = "schema"))]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
@@ -630,7 +630,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -
 /// Returns 0 if this validates, a positive error code number otherwise
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateName")]
-#[cfg(any(feature = "tree", feature = "schema"))]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
@@ -726,7 +726,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) ->
 /// Returns 0 if this validates, a positive error code number otherwise
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateNMToken")]
-#[cfg(any(feature = "tree", feature = "schema"))]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
@@ -1377,7 +1377,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         }
 
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 return xml_copy_doc(node as _, extended) as _;
             }
@@ -1591,7 +1591,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
     let mut q: XmlNodePtr;
 
     while !node.is_null() {
-        #[cfg(feature = "tree")]
+        #[cfg(feature = "libxml_tree")]
         {
             if matches!((*node).typ, XmlElementType::XmlDTDNode) {
                 if doc.is_null() {
@@ -1617,7 +1617,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
                 q = xml_static_copy_node(node, doc, parent, 1);
             }
         }
-        #[cfg(not(feature = "tree"))]
+        #[cfg(not(feature = "libxml_tree"))]
         {
             q = xml_static_copy_node(node, doc, parent, 1);
         }
@@ -1805,7 +1805,7 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
 ///
 /// Returns: a new #xmlDtdPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDtd")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     use std::ffi::CString;
 
@@ -1922,7 +1922,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
 ///
 /// Returns: a new #xmlDocPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDoc")]
-#[cfg(any(feature = "tree", feature = "schema"))]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocPtr {
     use crate::libxml::globals::xml_mem_strdup;
 
@@ -1950,7 +1950,7 @@ pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocP
 
     (*ret).last = None;
     (*ret).children = None;
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     {
         if !(*doc).int_subset.is_null() {
             (*ret).int_subset = xml_copy_dtd((*doc).int_subset);
@@ -2144,7 +2144,7 @@ pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar)
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewChild")]
-#[cfg(any(feature = "tree", feature = "schema"))]
+#[cfg(any(feature = "libxml_tree", feature = "schema"))]
 pub unsafe extern "C" fn xml_new_child(
     parent: XmlNodePtr,
     ns: XmlNsPtr,
@@ -2573,7 +2573,7 @@ pub unsafe extern "C" fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextChild")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_new_text_child(
     parent: XmlNodePtr,
     ns: XmlNsPtr,
@@ -2641,7 +2641,7 @@ pub unsafe extern "C" fn xml_new_text_child(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocRawNode")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_new_doc_raw_node(
     doc: XmlDocPtr,
     ns: XmlNsPtr,
@@ -2662,7 +2662,7 @@ pub unsafe extern "C" fn xml_new_doc_raw_node(
 /// Creation of a new Fragment node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocFragment")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
     /*
      * Allocate a new DocumentFragment node and fill the fields.
@@ -2693,7 +2693,7 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
 ///
 /// Returns the @old node
 #[doc(alias = "xmlReplaceNode")]
-#[cfg(any(feature = "tree", feature = "libxml_writer"))]
+#[cfg(any(feature = "libxml_tree", feature = "libxml_writer"))]
 pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
     if old == cur {
         return null_mut();
@@ -6034,7 +6034,7 @@ mod tests {
 
     #[test]
     fn test_xml_copy_doc() {
-        #[cfg(any(feature = "tree", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
 
@@ -6066,7 +6066,7 @@ mod tests {
 
     #[test]
     fn test_xml_copy_dtd() {
-        #[cfg(feature = "tree")]
+        #[cfg(feature = "libxml_tree")]
         unsafe {
             let mut leaks = 0;
 
@@ -6582,10 +6582,10 @@ mod tests {
 
     #[test]
     fn test_xml_new_child() {
-        #[cfg(any(feature = "tree", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 for n_parent in 0..GEN_NB_XML_NODE_PTR {
                     for n_ns in 0..GEN_NB_XML_NS_PTR {
@@ -6681,7 +6681,7 @@ mod tests {
 
     #[test]
     fn test_xml_new_doc_fragment() {
-        #[cfg(feature = "tree")]
+        #[cfg(feature = "libxml_tree")]
         unsafe {
             let mut leaks = 0;
 
@@ -6861,7 +6861,7 @@ mod tests {
 
     #[test]
     fn test_xml_new_doc_raw_node() {
-        #[cfg(feature = "tree")]
+        #[cfg(feature = "libxml_tree")]
         unsafe {
             let mut leaks = 0;
 
@@ -7185,10 +7185,10 @@ mod tests {
 
     #[test]
     fn test_xml_new_prop() {
-        #[cfg(any(feature = "tree", feature = "html", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 for n_node in 0..GEN_NB_XML_NODE_PTR {
                     for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
@@ -7279,7 +7279,7 @@ mod tests {
 
     #[test]
     fn test_xml_new_text_child() {
-        #[cfg(feature = "tree")]
+        #[cfg(feature = "libxml_tree")]
         unsafe {
             let mut leaks = 0;
 
@@ -7455,14 +7455,14 @@ mod tests {
     #[test]
     fn test_xml_validate_ncname() {
         #[cfg(any(
-            feature = "tree",
+            feature = "libxml_tree",
             feature = "xpath",
             feature = "schema",
             feature = "libxml_debug"
         ))]
         unsafe {
             let mut leaks = 0;
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_space in 0..GEN_NB_INT {
@@ -7493,10 +7493,10 @@ mod tests {
 
     #[test]
     fn test_xml_validate_nmtoken() {
-        #[cfg(any(feature = "tree", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_space in 0..GEN_NB_INT {
@@ -7530,10 +7530,10 @@ mod tests {
 
     #[test]
     fn test_xml_validate_name() {
-        #[cfg(any(feature = "tree", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_space in 0..GEN_NB_INT {
@@ -7564,10 +7564,10 @@ mod tests {
 
     #[test]
     fn test_xml_validate_qname() {
-        #[cfg(any(feature = "tree", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
                     for n_space in 0..GEN_NB_INT {

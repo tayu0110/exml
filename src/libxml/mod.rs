@@ -1,4 +1,4 @@
-#[cfg(all(feature = "libxml_c14n", feature = "libxml_output"))]
+#[cfg(all(feature = "c14n", feature = "libxml_output"))]
 pub mod c14n;
 #[cfg(feature = "catalog")]
 pub mod catalog;
@@ -22,19 +22,19 @@ pub mod parser_internals;
 pub mod pattern;
 #[cfg(feature = "schema")]
 pub mod relaxng;
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 pub mod sax;
 pub mod sax2;
 #[cfg(feature = "schema")]
 pub mod schemas_internals;
-#[cfg(feature = "libxml_schematron")]
+#[cfg(feature = "schematron")]
 pub mod schematron;
 pub mod threads;
 pub mod uri;
 pub mod valid;
 #[cfg(feature = "xinclude")]
 pub mod xinclude;
-#[cfg(feature = "libxml_xptr")]
+#[cfg(feature = "xpointer")]
 pub mod xlink;
 #[cfg(any(feature = "libxml_regexp", feature = "libxml_automata"))]
 pub mod xmlautomata;
@@ -58,5 +58,5 @@ pub mod xmlwriter;
 pub mod xpath;
 #[cfg(feature = "xpath")]
 pub mod xpath_internals;
-#[cfg(feature = "libxml_xptr")]
+#[cfg(feature = "xpointer")]
 pub mod xpointer;

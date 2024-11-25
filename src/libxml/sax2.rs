@@ -888,7 +888,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         xml_free_enumeration(tree);
         return;
     }
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         if (*ctxt).vctxt.valid == 0 {
             (*ctxt).valid = 0;
@@ -958,7 +958,7 @@ pub unsafe fn xml_sax2_element_decl(
         );
         return;
     }
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         if elem.is_null() {
             (*ctxt).valid = 0;
@@ -1031,7 +1031,7 @@ pub unsafe fn xml_sax2_notation_decl(
         );
         return;
     }
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         if nota.is_null() {
             (*ctxt).valid = 0;
@@ -1256,7 +1256,7 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
@@ -1347,7 +1347,7 @@ unsafe extern "C" fn xml_ns_warn_msg(
     feature = "sax1",
     feature = "html",
     feature = "libxml_writer",
-    feature = "legacy"
+    feature = "libxml_legacy"
 ))]
 unsafe extern "C" fn xml_ns_err_msg(
     ctxt: XmlParserCtxtPtr,
@@ -1402,7 +1402,7 @@ unsafe extern "C" fn xml_ns_err_msg(
     feature = "sax1",
     feature = "html",
     feature = "libxml_writer",
-    feature = "legacy"
+    feature = "libxml_legacy"
 ))]
 unsafe fn xml_sax2_attribute_internal(
     ctx: Option<GenericErrorContext>,
@@ -1474,7 +1474,7 @@ unsafe fn xml_sax2_attribute_internal(
         nval = xml_strdup(fullname);
         value = nval;
     } else {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             /*
              * Do the last stage of the attribute normalization
@@ -1496,7 +1496,7 @@ unsafe fn xml_sax2_attribute_internal(
                 value = nval;
             }
         }
-        #[cfg(not(feature = "valid"))]
+        #[cfg(not(feature = "libxml_valid"))]
         {
             nval = null_mut();
         }
@@ -1567,7 +1567,7 @@ unsafe fn xml_sax2_attribute_internal(
         /* a default namespace definition */
         let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, null_mut());
 
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             /*
              * Validate also for namespace decls, they are attributes from
@@ -1666,7 +1666,7 @@ unsafe fn xml_sax2_attribute_internal(
         /* a standard namespace definition */
         let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, name);
         xml_free(ns as _);
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             /*
              * Validate also for namespace decls, they are attributes from
@@ -1787,9 +1787,9 @@ unsafe fn xml_sax2_attribute_internal(
         }
     }
 
-    #[cfg(not(feature = "valid"))]
+    #[cfg(not(feature = "libxml_valid"))]
     let f = false;
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     let f = (*ctxt).html == 0
         && (*ctxt).validate != 0
         && (*ctxt).well_formed != 0
@@ -1917,7 +1917,7 @@ unsafe fn xml_sax2_attribute_internal(
     feature = "sax1",
     feature = "html",
     feature = "libxml_writer",
-    feature = "legacy"
+    feature = "libxml_legacy"
 ))]
 unsafe extern "C" fn xml_check_defaulted_attributes(
     ctxt: XmlParserCtxtPtr,
@@ -2109,7 +2109,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
     feature = "sax1",
     feature = "html",
     feature = "libxml_writer",
-    feature = "legacy"
+    feature = "libxml_legacy"
 ))]
 pub unsafe fn xml_sax2_start_element(
     ctx: Option<GenericErrorContext>,
@@ -2327,7 +2327,7 @@ pub unsafe fn xml_sax2_start_element(
         }
     }
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         /*
          * If it's the Document root, finish the DTD validation and
@@ -2357,7 +2357,7 @@ pub unsafe fn xml_sax2_start_element(
     feature = "sax1",
     feature = "html",
     feature = "libxml_writer",
-    feature = "legacy"
+    feature = "libxml_legacy"
 ))]
 pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
     if ctx.is_none() {
@@ -2372,7 +2372,7 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: *con
 
     (*ctxt).nodemem = -1;
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0
@@ -2541,7 +2541,7 @@ pub unsafe fn xml_sax2_start_element_ns(
              */
             continue;
         }
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             if (*ctxt).html == 0
                 && (*ctxt).validate != 0
@@ -2678,7 +2678,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         }
     }
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         /*
          * If it's the Document root, finish the DTD validation and
@@ -2798,7 +2798,7 @@ unsafe extern "C" fn xml_sax2_text_node(
 ///
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2DecodeAttrEntities")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_sax2_decode_attr_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
@@ -2954,16 +2954,16 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
         }
     }
 
-    #[cfg(not(feature = "valid"))]
+    #[cfg(not(feature = "libxml_valid"))]
     let f = false;
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     let f = (*ctxt).html == 0
         && (*ctxt).validate != 0
         && (*ctxt).well_formed != 0
         && !(*ctxt).my_doc.is_null()
         && !(*(*ctxt).my_doc).int_subset.is_null();
     if f {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             /*
              * If we don't substitute entities, the validation should be
@@ -3085,10 +3085,10 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                 feature = "sax1",
                 feature = "html",
                 feature = "libxml_writer",
-                feature = "legacy"
+                feature = "libxml_legacy"
             ))]
             {
-                #[cfg(feature = "valid")]
+                #[cfg(feature = "libxml_valid")]
                 if xml_validate_ncname(content, 1) != 0 {
                     xml_err_valid(
                         ctxt,
@@ -3145,7 +3145,7 @@ pub unsafe fn xml_sax2_end_element_ns(
     };
     (*ctxt).nodemem = -1;
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         if (*ctxt).validate != 0
             && (*ctxt).well_formed != 0

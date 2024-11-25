@@ -125,7 +125,7 @@ pub(crate) const GEN_NB_CONST_XML_PARSER_NODE_INFO_SEQ_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_PARSER_INPUT_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_PARSER_CTXT_PTR: i32 = 3;
 pub(crate) const GEN_NB_XML_PARSER_NODE_INFO_SEQ_PTR: i32 = 1;
-#[cfg(any(feature = "sax1", feature = "valid", feature = "push"))]
+#[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
 pub(crate) const GEN_NB_XML_SAXHANDLER_PTR: i32 = 2;
 pub(crate) const GEN_NB_PARSEROPTIONS: i32 = 5;
 pub(crate) const GEN_NB_XML_FEATURE: i32 = 4;
@@ -146,7 +146,7 @@ pub(crate) const GEN_NB_XML_RELAXNG_VALID_CTXT_PTR: i32 = 1;
     feature = "schema"
 ))]
 pub(crate) const GEN_NB_VOID_PTR_PTR: i32 = 1;
-#[cfg(feature = "libxml_schematron")]
+#[cfg(feature = "schematron")]
 pub(crate) const GEN_NB_XML_SCHEMATRON_VALID_CTXT_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_DOMWRAP_CTXT_PTR: i32 = 1;
 pub(crate) const GEN_NB_XML_ATTR_PTR: i32 = 2;
@@ -700,14 +700,14 @@ pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
 pub(crate) fn des_xml_attribute_type(_no: i32, _val: XmlAttributeType, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn gen_xml_valid_ctxt_ptr(no: i32, _nr: i32) -> XmlValidCtxtPtr {
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if no == 0 {
         return xml_new_valid_ctxt();
     }
     null_mut()
 }
 pub(crate) unsafe extern "C" fn des_xml_valid_ctxt_ptr(_no: i32, val: XmlValidCtxtPtr, _nr: i32) {
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if !val.is_null() {
         xml_free_valid_ctxt(val);
     }
@@ -822,14 +822,14 @@ pub(crate) unsafe extern "C" fn des_xml_dtd_ptr(no: i32, val: XmlDtdPtr, _nr: i3
 
 unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     #[cfg(any(
-        feature = "tree",
+        feature = "libxml_tree",
         feature = "xinclude",
         feature = "schema",
         feature = "html"
     ))]
     static mut NR: i32 = 0;
     #[cfg(any(
-        feature = "tree",
+        feature = "libxml_tree",
         feature = "xinclude",
         feature = "schema",
         feature = "html"
@@ -848,7 +848,7 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     }
     API_ATTR.set(null_mut());
     #[cfg(any(
-        feature = "tree",
+        feature = "libxml_tree",
         feature = "xinclude",
         feature = "schema",
         feature = "html"
@@ -886,12 +886,12 @@ pub(crate) fn gen_xml_domwrap_ctxt_ptr(_no: i32, _nr: i32) -> XmlDOMWrapCtxtPtr 
 
 pub(crate) fn des_xml_domwrap_ctxt_ptr(_no: i32, _val: XmlDOMWrapCtxtPtr, _nr: i32) {}
 
-#[cfg(feature = "libxml_schematron")]
+#[cfg(feature = "schematron")]
 pub(crate) fn gen_xml_schematron_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchematronValidCtxtPtr {
     null_mut()
 }
 
-#[cfg(feature = "libxml_schematron")]
+#[cfg(feature = "schematron")]
 pub(crate) fn des_xml_schematron_valid_ctxt_ptr(
     _no: i32,
     _val: XmlSchematronValidCtxtPtr,
@@ -1035,7 +1035,7 @@ pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
 
 pub(crate) fn des_xml_feature(_no: i32, _val: Option<XmlFeature>, _nr: i32) {}
 
-#[cfg(any(feature = "sax1", feature = "valid", feature = "push"))]
+#[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
 pub(crate) unsafe extern "C" fn gen_xml_saxhandler_ptr(no: i32, _nr: i32) -> XmlSAXHandlerPtr {
     #[cfg(feature = "sax1")]
     if no == 0 {
@@ -1045,7 +1045,7 @@ pub(crate) unsafe extern "C" fn gen_xml_saxhandler_ptr(no: i32, _nr: i32) -> Xml
     null_mut()
 }
 
-#[cfg(any(feature = "sax1", feature = "valid", feature = "push"))]
+#[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
 pub(crate) fn des_xml_saxhandler_ptr(_no: i32, _val: XmlSAXHandlerPtr, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {

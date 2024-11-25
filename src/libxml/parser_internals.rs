@@ -20,7 +20,7 @@ use std::slice::from_raw_parts;
 use std::str::from_utf8_mut;
 use std::sync::atomic::Ordering;
 
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
@@ -3687,7 +3687,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
         while !cur.is_null() {
-            #[cfg(feature = "valid")]
+            #[cfg(feature = "libxml_valid")]
             if (*oldctxt).validate != 0
                 && (*oldctxt).well_formed != 0
                 && !(*oldctxt).my_doc.is_null()
@@ -3746,7 +3746,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
  *
  * Notify of a reference to an entity of type xmlEntityType::XML_EXTERNAL_GENERAL_PARSED_ENTITY
  */
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 unsafe extern "C" fn xml_add_entity_reference(
     ent: XmlEntityPtr,
     first_node: XmlNodePtr,
@@ -4007,7 +4007,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
                 }
                 list = (*ent).children.load(Ordering::Relaxed) as _;
-                #[cfg(feature = "legacy")]
+                #[cfg(feature = "libxml_legacy")]
                 if matches!(
                     (*ent).etype,
                     Some(XmlEntityType::XmlExternalGeneralParsedEntity)
@@ -4215,7 +4215,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     }
                     cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 }
-                #[cfg(feature = "legacy")]
+                #[cfg(feature = "libxml_legacy")]
                 if matches!(
                     (*ent).etype,
                     Some(XmlEntityType::XmlExternalGeneralParsedEntity)
@@ -4260,7 +4260,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 if (*ent).owner == 0 {
                     (*ent).owner = 1;
                 }
-                #[cfg(feature = "legacy")]
+                #[cfg(feature = "libxml_legacy")]
                 if matches!(
                     (*ent).etype,
                     Some(XmlEntityType::XmlExternalGeneralParsedEntity)
@@ -4959,7 +4959,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
      * The Name in the document type declaration must match the element
      * type of the root element.
      */
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if (*ctxt).validate != 0
         && (*ctxt).well_formed != 0
         && !(*ctxt).my_doc.is_null()
@@ -6239,7 +6239,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
  * Specific function to keep track of entities references
  * and used by the XSLT debugger.
  */
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 mod __parser_internal_for_legacy {
     use std::{
         ffi::i32,

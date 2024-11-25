@@ -3072,7 +3072,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_build_node_list() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3102,7 +3102,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_eval() {
-        #[cfg(feature = "libxml_xptr")]
+        #[cfg(feature = "xpointer")]
         unsafe {
             let mut leaks = 0;
 
@@ -3134,7 +3134,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_eval_range_predicate() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3163,7 +3163,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_collapsed_range() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3199,7 +3199,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_location_set_node_set() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3229,7 +3229,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_location_set_nodes() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3264,7 +3264,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_range() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3306,7 +3306,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_range_node_object() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3341,7 +3341,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_range_node_point() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3376,7 +3376,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_range_nodes() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3411,7 +3411,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_range_point_node() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3446,7 +3446,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_new_range_points() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 
@@ -3481,7 +3481,7 @@ mod tests {
 
     #[test]
     fn test_xml_xptr_range_to_function() {
-        #[cfg(all(feature = "libxml_xptr", feature = "libxml_xptr_locs"))]
+        #[cfg(all(feature = "xpointer", feature = "libxml_xptr_locs"))]
         unsafe {
             let mut leaks = 0;
 

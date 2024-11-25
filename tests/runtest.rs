@@ -1835,7 +1835,7 @@ unsafe fn old_parse_test(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn push_parse_test(
     filename: &str,
     result: Option<String>,
@@ -1993,17 +1993,17 @@ unsafe fn push_parse_test(
 }
 
 thread_local! {
-    #[cfg(feature = "push")]
+    #[cfg(feature = "libxml_push")]
     static PUSH_BOUNDARY_COUNT: Cell<i32> = const { Cell::new(0) };
-    #[cfg(feature = "push")]
+    #[cfg(feature = "libxml_push")]
     static PUSH_BOUNDARY_REF_COUNT: Cell<i32> = const { Cell::new(0) };
-    #[cfg(feature = "push")]
+    #[cfg(feature = "libxml_push")]
     static PUSH_BOUNDARY_CHARS_COUNT: Cell<i32> = const { Cell::new(0) };
-    #[cfg(feature = "push")]
+    #[cfg(feature = "libxml_push")]
     static PUSH_BOUNDARY_CDATA_COUNT: Cell<i32> = const { Cell::new(0) };
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn internal_subset_bnd(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
@@ -2016,7 +2016,7 @@ unsafe fn internal_subset_bnd(
     xml_sax2_internal_subset(ctx, name, external_id, system_id);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     use exml::libxml::sax2::xml_sax2_reference;
 
@@ -2024,7 +2024,7 @@ unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) 
     xml_sax2_reference(ctx, name);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     use exml::libxml::sax2::xml_sax2_characters;
 
@@ -2033,7 +2033,7 @@ unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, l
     xml_sax2_characters(ctx, ch, len);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
     use exml::libxml::sax2::xml_sax2_cdata_block;
 
@@ -2042,7 +2042,7 @@ unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, 
     xml_sax2_cdata_block(ctx, ch, len);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn processing_instruction_bnd(
     ctx: Option<GenericErrorContext>,
     target: *const XmlChar,
@@ -2054,7 +2054,7 @@ unsafe fn processing_instruction_bnd(
     xml_sax2_processing_instruction(ctx, target, data);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
     use exml::libxml::sax2::xml_sax2_comment;
 
@@ -2069,7 +2069,7 @@ unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
     xml_sax2_comment(ctx, value);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn start_element_bnd(
     ctx: Option<GenericErrorContext>,
     xname: *const XmlChar,
@@ -2090,7 +2090,7 @@ unsafe fn start_element_bnd(
     xml_sax2_start_element(ctx, xname, atts);
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
     /*pushBoundaryCount++;*/
 
@@ -2099,7 +2099,7 @@ unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar
 }
 
 #[allow(clippy::too_many_arguments)]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn start_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
@@ -2127,7 +2127,7 @@ unsafe fn start_element_ns_bnd(
     );
 }
 
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn end_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
@@ -2149,7 +2149,7 @@ unsafe fn end_element_ns_bnd(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe fn push_boundary_test(
     filename: &str,
     result: Option<String>,
@@ -2900,12 +2900,12 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     let res: XmlXPathObjectPtr;
     let ctxt: XmlXPathContextPtr;
 
-    /* Don't print generic errors to stderr. */
+    // Don't print generic errors to stderr.
     set_generic_error(Some(ignore_generic_error), None);
 
     NB_TESTS.set(NB_TESTS.get() + 1);
-    if cfg!(feature = "libxml_xptr") && xptr != 0 {
-        #[cfg(feature = "libxml_xptr")]
+    if cfg!(feature = "xpointer") && xptr != 0 {
+        #[cfg(feature = "xpointer")]
         {
             ctxt = xml_xptr_new_context(XPATH_DOCUMENT.get(), null_mut(), null_mut());
             res = xml_xptr_eval(str as _, ctxt);
@@ -3190,7 +3190,7 @@ unsafe fn xpath_doc_test(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_xptr"))]
+#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "xpointer"))]
 unsafe fn xptr_doc_test(
     filename: &str,
     _resul: Option<String>,
@@ -3279,7 +3279,7 @@ unsafe fn xptr_doc_test(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "valid"))]
+#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_valid"))]
 unsafe fn xmlid_doc_test(
     filename: &str,
     result: Option<String>,
@@ -4658,7 +4658,7 @@ unsafe fn pattern_test(
     ret
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe extern "C" fn load_xpath_expr(
     parent_doc: XmlDocPtr,
     filename: *const c_char,
@@ -4785,7 +4785,7 @@ unsafe extern "C" fn load_xpath_expr(
 /*
  * Macro used to grow the current buffer.
  */
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 macro_rules! xxx_grow_buffer_reentrant {
     ($buffer_size:expr, $buffer:expr) => {
         $buffer_size *= 2;
@@ -4800,7 +4800,7 @@ macro_rules! xxx_grow_buffer_reentrant {
     };
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
     use exml::libxml::globals::xml_malloc;
     use libc::perror;
@@ -4850,7 +4850,7 @@ unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
     buffer
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe extern "C" fn c14n_run_test(
     xml_filename: *const c_char,
     with_comments: i32,
@@ -4998,7 +4998,7 @@ unsafe extern "C" fn c14n_run_test(
     ret
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe fn c14n_common_test(
     filename: &str,
     with_comments: i32,
@@ -5077,7 +5077,7 @@ unsafe fn c14n_common_test(
     ret
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe fn c14n_with_comment_test(
     filename: &str,
     _resul: Option<String>,
@@ -5094,7 +5094,7 @@ unsafe fn c14n_with_comment_test(
     )
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe fn c14n_without_comment_test(
     filename: &str,
     _resul: Option<String>,
@@ -5111,7 +5111,7 @@ unsafe fn c14n_without_comment_test(
     )
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe fn c14n_exc_without_comment_test(
     filename: &str,
     _resul: Option<String>,
@@ -5128,7 +5128,7 @@ unsafe fn c14n_exc_without_comment_test(
     )
 }
 
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 unsafe fn c14n11_without_comment_test(
     filename: &str,
     _resul: Option<String>,
@@ -5765,7 +5765,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: Some(".err"),
         options: 0,
     },
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     TestDesc {
         desc: "Error cases regression tests",
         func: err_parse_test,
@@ -5775,7 +5775,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: Some(".err"),
         options: 0,
     },
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     TestDesc {
         desc: "Error cases regression tests with entity substitution",
         func: err_parse_test,
@@ -5785,7 +5785,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: Some(".ent"),
         options: XmlParserOption::XmlParseNoent as i32,
     },
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     TestDesc {
         desc: "Error cases regression tests (old 1.0)",
         func: err_parse_test,
@@ -5795,7 +5795,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: Some(".err"),
         options: XmlParserOption::XmlParseOld10 as i32,
     },
-    #[cfg(all(feature = "libxml_reader", feature = "valid"))]
+    #[cfg(all(feature = "libxml_reader", feature = "libxml_valid"))]
     TestDesc {
         desc: "Error cases stream regression tests",
         func: stream_parse_test,
@@ -6130,7 +6130,7 @@ fn test_common(desc: &TestDesc) {
 }
 
 #[test]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 fn xml_push_regression_test() {
     test_common(&TestDesc {
         desc: "XML push regression tests",
@@ -6144,7 +6144,7 @@ fn xml_push_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 fn xml_push_boundary_test() {
     test_common(&TestDesc {
         desc: "XML push boundary tests",
@@ -6172,7 +6172,7 @@ fn html_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "html", feature = "push"))]
+#[cfg(all(feature = "html", feature = "libxml_push"))]
 fn push_html_regression_test() {
     test_common(&TestDesc {
         desc: "Push HTML regression tests",
@@ -6186,7 +6186,7 @@ fn push_html_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "html", feature = "push"))]
+#[cfg(all(feature = "html", feature = "libxml_push"))]
 fn push_html_boundary_test() {
     test_common(&TestDesc {
         desc: "Push HTML boundary tests",
@@ -6214,7 +6214,7 @@ fn html_sax_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 fn valid_documents_regression_test() {
     test_common(&TestDesc {
         desc: "Valid documents regression tests",
@@ -6228,7 +6228,7 @@ fn valid_documents_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 fn validity_checking_regression_test() {
     test_common(&TestDesc {
         desc: "Validity checking regression tests",
@@ -6242,7 +6242,7 @@ fn validity_checking_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "valid", feature = "libxml_reader"))]
+#[cfg(all(feature = "libxml_valid", feature = "libxml_reader"))]
 fn streaming_validity_checking_regression_test() {
     test_common(&TestDesc {
         desc: "Streaming validity checking regression tests",
@@ -6256,7 +6256,7 @@ fn streaming_validity_checking_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "valid", feature = "libxml_reader"))]
+#[cfg(all(feature = "libxml_valid", feature = "libxml_reader"))]
 fn streaming_validity_error_checking_regression_test() {
     test_common(&TestDesc {
         desc: "Streaming validity error checking regression tests",
@@ -6270,7 +6270,7 @@ fn streaming_validity_error_checking_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 fn general_documents_valid_regression_test() {
     test_common(&TestDesc {
         desc: "General documents valid regression tests",
@@ -6312,7 +6312,7 @@ fn xpath_document_queries_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_xptr"))]
+#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "xpointer"))]
 fn xpointer_document_queries_regression_test() {
     test_common(&TestDesc {
         desc: "XPointer document queries regression tests",
@@ -6326,7 +6326,7 @@ fn xpointer_document_queries_regression_test() {
 }
 
 #[test]
-#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "valid"))]
+#[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_valid"))]
 fn xml_id_regression_test() {
     test_common(&TestDesc {
         desc: "xml:id regression tests",
@@ -6422,7 +6422,7 @@ fn pattern_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 fn c14n_with_comments_regression_test() {
     test_common(&TestDesc {
         desc: "C14N with comments regression tests",
@@ -6436,7 +6436,7 @@ fn c14n_with_comments_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 fn c14n_without_comments_regression_test() {
     test_common(&TestDesc {
         desc: "C14N without comments regression tests",
@@ -6450,7 +6450,7 @@ fn c14n_without_comments_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 fn c14n_exclusive_without_comments_regression_test() {
     test_common(&TestDesc {
         desc: "C14N exclusive without comments regression tests",
@@ -6464,7 +6464,7 @@ fn c14n_exclusive_without_comments_regression_test() {
 }
 
 #[test]
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 fn c14n_1_1_without_comments_regression_test() {
     test_common(&TestDesc {
         desc: "C14N 1.1 without comments regression tests",

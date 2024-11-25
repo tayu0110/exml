@@ -205,7 +205,7 @@ pub unsafe extern "C" fn xml_new_doc_prop(
 /// Create a new property carried by a node.  
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewProp")]
-#[cfg(any(feature = "tree", feature = "html", feature = "schema"))]
+#[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
 pub unsafe fn xml_new_prop(
     node: XmlNodePtr,
     name: *const XmlChar,

@@ -1284,7 +1284,7 @@ unsafe extern "C" fn xml_text_reader_push_data(reader: &mut XmlTextReader) -> i3
 unsafe extern "C" fn xml_text_reader_validate_pop(reader: &mut XmlTextReader) {
     let node: XmlNodePtr = reader.node;
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if reader.validate == XmlTextReaderValidate::ValidateDtd
         && !reader.ctxt.is_null()
         && (*reader.ctxt).validate == 1
@@ -1656,7 +1656,7 @@ unsafe extern "C" fn xml_text_reader_ent_push(
 unsafe extern "C" fn xml_text_reader_validate_push(reader: &mut XmlTextReader) {
     let mut node: XmlNodePtr = reader.node;
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if reader.validate == XmlTextReaderValidate::ValidateDtd
         && !reader.ctxt.is_null()
         && (*reader.ctxt).validate == 1
@@ -1724,7 +1724,7 @@ unsafe extern "C" fn xml_text_reader_validate_cdata(
     data: *const XmlChar,
     len: i32,
 ) {
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if reader.validate == XmlTextReaderValidate::ValidateDtd
         && !reader.ctxt.is_null()
         && (*reader.ctxt).validate == 1
@@ -3426,7 +3426,7 @@ pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i3
         reader.faketext = null_mut();
     }
     if !reader.ctxt.is_null() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         if !(*reader.ctxt).vctxt.vstate_tab.is_null() && (*reader.ctxt).vctxt.vstate_max > 0 {
             #[cfg(feature = "libxml_regexp")]
             while (*reader.ctxt).vctxt.vstate_nr > 0 {

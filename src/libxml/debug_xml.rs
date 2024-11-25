@@ -391,7 +391,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
             );
             return;
         }
-        #[cfg(any(feature = "tree", feature = "schema"))]
+        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         if xml_validate_name(name, 0) != 0 {
             xml_debug_err3(
                 ctxt,
@@ -2500,7 +2500,7 @@ pub unsafe extern "C" fn xml_shell_save(
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellValidate")]
-#[cfg(all(feature = "xpath", feature = "valid"))]
+#[cfg(all(feature = "xpath", feature = "libxml_valid"))]
 pub unsafe extern "C" fn xml_shell_validate(
     ctxt: XmlShellCtxtPtr,
     dtd: *mut c_char,
@@ -2971,7 +2971,7 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
 ///
 /// Returns 0
 #[doc(alias = "xmlShellSetBase")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 unsafe extern "C" fn xml_shell_set_base(
     _ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
@@ -3224,7 +3224,7 @@ pub unsafe fn xml_shell<'a>(
                     "\twrite [name] write the current node to the filename"
                 );
             }
-            #[cfg(feature = "valid")]
+            #[cfg(feature = "libxml_valid")]
             {
                 writeln!(
                     (*ctxt).output,
@@ -3243,16 +3243,16 @@ pub unsafe fn xml_shell<'a>(
                 "\tgrep string  search for a string in the subtree"
             );
         } else if {
-            #[cfg(feature = "valid")]
+            #[cfg(feature = "libxml_valid")]
             {
                 strcmp(command.as_ptr(), c"validate".as_ptr()) == 0
             }
-            #[cfg(not(feature = "valid"))]
+            #[cfg(not(feature = "libxml_valid"))]
             {
                 false
             }
         } {
-            #[cfg(feature = "valid")]
+            #[cfg(feature = "libxml_valid")]
             {
                 xml_shell_validate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
@@ -3480,16 +3480,16 @@ pub unsafe fn xml_shell<'a>(
                 xml_xpath_free_object(list);
             }
         } else if {
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 strcmp(command.as_ptr(), c"setbase".as_ptr()) == 0
             }
-            #[cfg(not(feature = "tree"))]
+            #[cfg(not(feature = "libxml_tree"))]
             {
                 false
             }
         } {
-            #[cfg(feature = "tree")]
+            #[cfg(feature = "libxml_tree")]
             {
                 xml_shell_set_base(ctxt, arg.as_mut_ptr(), (*ctxt).node, null_mut());
             }
@@ -4813,7 +4813,7 @@ mod tests {
 
     #[test]
     fn test_xml_shell_validate() {
-        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "valid"))]
+        #[cfg(all(feature = "libxml_debug", feature = "xpath", feature = "libxml_valid"))]
         unsafe {
             let mut leaks = 0;
 

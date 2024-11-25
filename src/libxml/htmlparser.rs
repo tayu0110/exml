@@ -10256,7 +10256,7 @@ pub unsafe extern "C" fn html_handle_omitted_elem(val: i32) -> i32 {
 /// Create a new input stream structure
 /// Returns the new input stream or NULL
 #[doc(alias = "htmlNewInputStream")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParserInputPtr {
     let input: HtmlParserInputPtr = xml_malloc(size_of::<HtmlParserInput>()) as XmlParserInputPtr;
     if input.is_null() {
@@ -10289,7 +10289,7 @@ unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParse
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreatePushParserCtxt")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 pub unsafe fn html_create_push_parser_ctxt(
     sax: HtmlSaxhandlerPtr,
     user_data: Option<GenericErrorContext>,
@@ -10382,7 +10382,7 @@ pub unsafe fn html_create_push_parser_ctxt(
 ///
 /// Returns the index to the current parsing point if the full sequence is available, -1 otherwise.
 #[doc(alias = "htmlParseLookupSequence")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe extern "C" fn html_parse_lookup_sequence(
     ctxt: HtmlParserCtxtPtr,
     first: XmlChar,
@@ -10456,7 +10456,7 @@ unsafe extern "C" fn html_parse_lookup_sequence(
 ///
 /// Returns the index to the current parsing point if the full sequence is available, -1 otherwise.
 #[doc(alias = "htmlParseLookupCommentEnd")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut mark: i32;
     let mut offset: i32;
@@ -10486,7 +10486,7 @@ unsafe extern "C" fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i
 ///
 /// Returns zero if no parsing was possible
 #[doc(alias = "htmlParseTryOrFinish")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i32 {
     let ret: i32 = 0;
     let mut input: HtmlParserInputPtr;
@@ -11208,7 +11208,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
 ///
 /// Returns zero if no error, the xmlParserErrors otherwise.
 #[doc(alias = "htmlParseChunk")]
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 pub unsafe extern "C" fn html_parse_chunk(
     ctxt: HtmlParserCtxtPtr,
     chunk: *const c_char,
@@ -12379,7 +12379,7 @@ mod tests {
 
     #[test]
     fn test_html_parse_chunk() {
-        #[cfg(all(feature = "html", feature = "push"))]
+        #[cfg(all(feature = "html", feature = "libxml_push"))]
         unsafe {
             let mut leaks = 0;
 

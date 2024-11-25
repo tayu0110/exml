@@ -412,7 +412,7 @@ impl XmlNode {
     /// Returns the new path or null_mut() in case of error.  
     /// The caller must free the returned string.
     #[doc(alias = "xmlGetNodePath")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn get_node_path(&self) -> *mut XmlChar {
         use std::ptr::null_mut;
 
@@ -1112,7 +1112,7 @@ impl XmlNode {
             }
         }
 
-        #[cfg(feature = "tree")]
+        #[cfg(feature = "libxml_tree")]
         {
             if !use_dtd {
                 return null_mut();
@@ -1302,7 +1302,7 @@ impl XmlNode {
     /// Returns an NULL terminated array of all the `xmlNsPtr` found
     /// that need to be freed by the caller or NULL if no namespace if defined.
     #[doc(alias = "xmlGetNsList")]
-    #[cfg(any(feature = "tree", feature = "xpath", feature = "schema"))]
+    #[cfg(any(feature = "libxml_tree", feature = "xpath", feature = "schema"))]
     pub unsafe fn get_ns_list(&self, _doc: *const XmlDoc) -> *mut XmlNsPtr {
         use crate::{
             libxml::{globals::xml_realloc, xmlstring::xml_str_equal},
@@ -1484,7 +1484,7 @@ impl XmlNode {
     ///
     /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
     #[doc(alias = "xmlNodeListGetRawString")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn get_raw_string(&self, doc: *const XmlDoc, in_line: i32) -> *mut XmlChar {
         use crate::libxml::entities::xml_encode_special_chars;
 
@@ -1549,7 +1549,7 @@ impl XmlNode {
 
     /// Set (or reset) the name of a node.
     #[doc(alias = "xmlNodeSetName")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn set_name(&mut self, name: &str) {
         use crate::{
             dict::{xml_dict_lookup, xml_dict_owns},
@@ -1614,7 +1614,7 @@ impl XmlNode {
     /// Returns the attribute pointer.
     #[doc(alias = "xmlSetProp")]
     #[cfg(any(
-        feature = "tree",
+        feature = "libxml_tree",
         feature = "xinclude",
         feature = "schema",
         feature = "html"
@@ -1656,7 +1656,7 @@ impl XmlNode {
     ///
     /// Returns 0 if successful, -1 if not found
     #[doc(alias = "xmlUnsetProp")]
-    #[cfg(any(feature = "tree", feature = "schema"))]
+    #[cfg(any(feature = "libxml_tree", feature = "schema"))]
     pub unsafe fn unset_prop(&mut self, name: &str) -> i32 {
         let prop: XmlAttrPtr = self.get_prop_node_internal(name, None, false);
         if prop.is_null() {
@@ -1673,7 +1673,7 @@ impl XmlNode {
     /// Returns the attribute pointer.
     #[doc(alias = "xmlSetNsProp")]
     #[cfg(any(
-        feature = "tree",
+        feature = "libxml_tree",
         feature = "xinclude",
         feature = "schema",
         feature = "html"
@@ -1763,7 +1763,7 @@ impl XmlNode {
     ///
     /// Returns 0 if successful, -1 if not found
     #[doc(alias = "xmlUnsetNsProp")]
-    #[cfg(any(feature = "tree", feature = "schema"))]
+    #[cfg(any(feature = "libxml_tree", feature = "schema"))]
     pub unsafe fn unset_ns_prop(&mut self, ns: XmlNsPtr, name: &str) -> i32 {
         let href = if !ns.is_null() {
             (*ns).href as *const i8
@@ -1798,7 +1798,7 @@ impl XmlNode {
 
     /// Set (or reset) the base URI of a node, i.e. the value of the xml:base attribute.
     #[doc(alias = "xmlNodeSetBase")]
-    #[cfg(any(feature = "tree", feature = "xinclude"))]
+    #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
     pub unsafe fn set_base(&mut self, uri: Option<&str>) {
         use std::ffi::CStr;
 
@@ -1872,7 +1872,7 @@ impl XmlNode {
     /// Set the language of a node, i.e. the values of the xml:lang
     /// attribute.
     #[doc(alias = "xmlNodeSetLang")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn set_lang(&mut self, lang: Option<&str>) {
         match self.typ {
             XmlElementType::XmlTextNode
@@ -1908,7 +1908,7 @@ impl XmlNode {
     /// Set (or reset) the space preserving behaviour of a node,   
     /// i.e. the value of the xml:space attribute.
     #[doc(alias = "xmlNodeSetSpacePreserve")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn set_space_preserve(&mut self, val: i32) {
         match self.typ {
             XmlElementType::XmlTextNode
@@ -2026,7 +2026,7 @@ impl XmlNode {
     /// references, but XML special chars need to be escaped first by using
     /// xmlEncodeEntitiesReentrant() resp. xmlEncodeSpecialChars().
     #[doc(alias = "xmlNodeSetContentLen")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn set_content_len(&mut self, content: *const XmlChar, len: i32) {
         use crate::libxml::xmlstring::xml_strndup;
 
@@ -2316,7 +2316,7 @@ impl XmlNode {
     /// Returns the new node or null_mut() in case of error.
     #[doc(alias = "xmlAddPrevSibling")]
     #[cfg(any(
-        feature = "tree",
+        feature = "libxml_tree",
         feature = "html",
         feature = "schema",
         feature = "xinclude"
@@ -2591,7 +2591,7 @@ impl XmlNode {
     ///
     /// Returns the count of element child or 0 if not available
     #[doc(alias = "xmlChildElementCount")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn child_element_count(&self) -> u64 {
         let mut ret = 0;
 
@@ -2622,7 +2622,7 @@ impl XmlNode {
     ///
     /// Returns the next element sibling or NULL if not available
     #[doc(alias = "xmlNextElementSibling")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn next_element_sibling(&self) -> XmlNodePtr {
         let mut cur = match self.typ {
             XmlElementType::XmlElementNode
@@ -2656,7 +2656,7 @@ impl XmlNode {
     ///
     /// Returns the first element child or NULL if not available.
     #[doc(alias = "xmlFirstElementChild")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn first_element_child(&self) -> XmlNodePtr {
         let mut next = match self.typ {
             XmlElementType::XmlElementNode
@@ -2685,7 +2685,7 @@ impl XmlNode {
     ///
     /// Returns the last element child or NULL if not available.
     #[doc(alias = "xmlLastElementChild")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn last_element_child(&self) -> XmlNodePtr {
         let mut cur = match self.typ {
             XmlElementType::XmlElementNode
@@ -2714,7 +2714,7 @@ impl XmlNode {
     ///
     /// Returns the previous element sibling or null_mut() if not available
     #[doc(alias = "xmlPreviousElementSibling")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn previous_element_sibling(&self) -> XmlNodePtr {
         let mut node = match self.typ {
             XmlElementType::XmlElementNode
@@ -2946,7 +2946,7 @@ impl XmlNode {
     ///
     /// Returns the number of namespace declarations created or -1 in case of error.
     #[doc(alias = "xmlReconciliateNs")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub unsafe fn reconciliate_ns(&mut self, doc: XmlDocPtr) -> i32 {
         use crate::libxml::globals::xml_realloc;
 

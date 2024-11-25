@@ -24,7 +24,7 @@ use std::{
 
 use libc::{free, malloc, memset, realloc};
 
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
     error::{parser_error, parser_warning, XmlError},
@@ -325,7 +325,7 @@ static mut XML_DEREGISTER_NODE_DEFAULT_VALUE_THR_DEF: Option<XmlDeregisterNodeFu
 pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     xml_mutex_lock(addr_of_mut!(XML_THR_DEF_MUTEX));
 
-    #[cfg(all(feature = "html", feature = "legacy", feature = "sax1"))]
+    #[cfg(all(feature = "html", feature = "libxml_legacy", feature = "sax1"))]
     {
         inithtmlDefaultSAXHandler(addr_of_mut!((*gs).html_default_sax_handler));
     }
@@ -333,7 +333,7 @@ pub unsafe extern "C" fn xml_initialize_global_state(gs: XmlGlobalStatePtr) {
     (*gs).old_xml_wd_compatibility = 0;
     (*gs).xml_buffer_alloc_scheme = XML_BUFFER_ALLOC_SCHEME_THR_DEF;
     (*gs).xml_default_buffer_size = XML_DEFAULT_BUFFER_SIZE_THR_DEF;
-    #[cfg(all(feature = "sax1", feature = "legacy"))]
+    #[cfg(all(feature = "sax1", feature = "libxml_legacy"))]
     {
         initxmlDefaultSAXHandler(addr_of_mut!((*gs).xml_default_sax_handler), 1);
     }

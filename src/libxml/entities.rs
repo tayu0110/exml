@@ -23,7 +23,7 @@ use std::{
 
 use libc::{memset, size_t, snprintf, strchr};
 
-#[cfg(feature = "legacy")]
+#[cfg(feature = "libxml_legacy")]
 use crate::generic_error;
 use crate::{
     __xml_raise_error,
@@ -1272,7 +1272,7 @@ pub unsafe extern "C" fn xml_create_entities_table() -> XmlEntitiesTablePtr {
 ///
 /// Returns the new xmlEntitiesPtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntity")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let ent: XmlEntityPtr = payload as XmlEntityPtr;
 
@@ -1315,7 +1315,7 @@ extern "C" fn xml_copy_entity(payload: *mut c_void, _name: *const XmlChar) -> *m
 ///
 /// Returns the new xmlEntitiesTablePtr or NULL in case of error.
 #[doc(alias = "xmlCopyEntitiesTable")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_copy_entities_table(
     table: XmlEntitiesTablePtr,
 ) -> XmlEntitiesTablePtr {

@@ -126,7 +126,7 @@ static mut SHELL: c_int = 0;
 static mut DEBUGENT: c_int = 0;
 static mut DEBUG: c_int = 0;
 static mut MAXMEM: c_int = 0;
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 static mut COPY: c_int = 0;
 static mut RECOVERY: c_int = 0;
 static mut NOENT: c_int = 0;
@@ -141,13 +141,13 @@ static OUTPUT: Mutex<Option<CString>> = Mutex::new(None);
 static mut COMPRESS: c_int = 0;
 #[cfg(feature = "libxml_output")]
 static mut OLDOUT: c_int = 0;
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 static mut VALID: c_int = 0;
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 static mut POSTVALID: c_int = 0;
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 static DTDVALID: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 static DTDVALIDFPI: Mutex<Option<CString>> = Mutex::new(None);
 #[cfg(feature = "schema")]
 static mut RELAXNG: Mutex<Option<CString>> = Mutex::new(None);
@@ -157,22 +157,22 @@ static RELAXNGSCHEMAS: AtomicPtr<XmlRelaxNG> = AtomicPtr::new(null_mut());
 static mut SCHEMA: Mutex<Option<CString>> = Mutex::new(None);
 #[cfg(feature = "schema")]
 static WXSCHEMAS: AtomicPtr<XmlSchema> = AtomicPtr::new(null_mut());
-#[cfg(feature = "libxml_schematron")]
+#[cfg(feature = "schematron")]
 static SCHEMATRON: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "libxml_schematron")]
+#[cfg(feature = "schematron")]
 static WXSCHEMATRON: AtomicPtr<XmlSchematron> = AtomicPtr::new(null_mut());
 static mut REPEAT: c_int = 0;
 static mut INSERT: c_int = 0;
-#[cfg(any(feature = "html", feature = "valid"))]
+#[cfg(any(feature = "html", feature = "libxml_valid"))]
 static mut HTML: c_int = 0;
-#[cfg(any(feature = "html", feature = "valid"))]
+#[cfg(any(feature = "html", feature = "libxml_valid"))]
 static mut XMLOUT: c_int = 0;
 static mut HTMLOUT: c_int = 0;
 #[cfg(feature = "html")]
 static mut NODEFDTD: c_int = 0;
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 static mut PUSH: c_int = 0;
-#[cfg(feature = "push")]
+#[cfg(feature = "libxml_push")]
 static mut PUSHSIZE: c_int = 4096;
 static mut MEMORY: c_int = 0;
 static mut TEST_IO: c_int = 0;
@@ -190,11 +190,11 @@ static mut DROPDTD: c_int = 0;
 static mut CATALOGS: c_int = 0;
 #[cfg(feature = "catalog")]
 static mut NOCATALOGS: c_int = 0;
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 static mut CANONICAL: c_int = 0;
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 static mut CANONICAL_11: c_int = 0;
-#[cfg(feature = "libxml_c14n")]
+#[cfg(feature = "c14n")]
 static mut EXC_CANONICAL: c_int = 0;
 #[cfg(feature = "libxml_reader")]
 static mut STREAM: c_int = 0;
@@ -1861,7 +1861,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             );
 
             if is_match != 0 {
-                #[cfg(any(feature = "tree", feature = "libxml_debug"))]
+                #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                 {
                     path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
                     println!(
@@ -1870,7 +1870,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                         PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy()
                     );
                 }
-                #[cfg(not(any(feature = "tree", feature = "libxml_debug")))]
+                #[cfg(not(any(feature = "libxml_tree", feature = "libxml_debug")))]
                 {
                     println!(
                         "Node {} matches pattern {}",
@@ -1894,7 +1894,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                     xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
                     PATSTREAM.store(null_mut(), Ordering::Relaxed);
                 } else if ret != is_match {
-                    #[cfg(any(feature = "tree", feature = "libxml_debug"))]
+                    #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                     if path.is_null() {
                         path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
                     }
@@ -1993,7 +1993,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
     }
 
     if !reader.is_null() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         if VALID != 0 {
             xml_text_reader_set_parser_prop(
                 &mut *reader,
@@ -2007,7 +2007,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
                 1,
             );
         }
-        #[cfg(not(feature = "valid"))]
+        #[cfg(not(feature = "libxml_valid"))]
         if LOADDTD != 0 {
             xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoaddtd, 1);
         }
@@ -2066,14 +2066,14 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             ret = xml_text_reader_read(&mut *reader);
         }
         if TIMING != 0 && REPEAT == 0 {
-            #[cfg(any(feature = "schema", feature = "valid"))]
+            #[cfg(any(feature = "schema", feature = "libxml_valid"))]
             {
                 let mut is_validating = false;
                 #[cfg(feature = "schema")]
                 {
                     is_validating |= RELAXNG.lock().unwrap().is_some();
                 }
-                #[cfg(feature = "valid")]
+                #[cfg(feature = "libxml_valid")]
                 {
                     is_validating |= VALID != 0;
                 }
@@ -2083,13 +2083,13 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
                     end_timer!("Parsing");
                 }
             }
-            #[cfg(not(any(feature = "schema", feature = "valid")))]
+            #[cfg(not(any(feature = "schema", feature = "libxml_valid")))]
             {
                 end_timer!("Parsing");
             }
         }
 
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         if VALID != 0 && xml_text_reader_is_valid(&mut *reader) != 1 {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
@@ -2369,15 +2369,15 @@ unsafe extern "C" fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
  ************************************************************************/
 unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr) {
     let mut doc: XmlDocPtr = null_mut();
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     let tmp: XmlDocPtr;
 
     if TIMING != 0 && REPEAT == 0 {
         start_timer();
     }
 
-    if cfg!(feature = "tree") && filename.is_none() {
-        #[cfg(feature = "tree")]
+    if cfg!(feature = "libxml_tree") && filename.is_none() {
+        #[cfg(feature = "libxml_tree")]
         {
             if GENERATE != 0 {
                 doc = xml_new_doc(Some("1.0"));
@@ -2386,8 +2386,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 (*doc).set_root_element(n);
             }
         }
-    } else if cfg!(feature = "html") && cfg!(feature = "push") && HTML != 0 && PUSH != 0 {
-        #[cfg(all(feature = "html", feature = "push"))]
+    } else if cfg!(feature = "html") && cfg!(feature = "libxml_push") && HTML != 0 && PUSH != 0 {
+        #[cfg(all(feature = "html", feature = "libxml_push"))]
         {
             extern "C" {
                 static stdin: *mut FILE;
@@ -2471,11 +2471,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             let filename = filename.map(|f| CString::new(f).unwrap());
             doc = html_read_file(filename.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
         }
-    } else if cfg!(feature = "push") && PUSH != 0 {
+    } else if cfg!(feature = "libxml_push") && PUSH != 0 {
         /*
          * build an XML tree from a string;
          */
-        #[cfg(feature = "push")]
+        #[cfg(feature = "libxml_push")]
         {
             extern "C" {
                 static stdin: *mut FILE;
@@ -2605,8 +2605,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
         munmap(base as _, info.st_size as _);
         close(fd);
-    } else if cfg!(feature = "valid") && VALID != 0 {
-        #[cfg(feature = "valid")]
+    } else if cfg!(feature = "libxml_valid") && VALID != 0 {
+        #[cfg(feature = "libxml_valid")]
         {
             let ctxt: XmlParserCtxtPtr;
 
@@ -2696,7 +2696,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     /*
      * test intermediate copy if needed.
      */
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     if COPY != 0 {
         tmp = doc;
         if TIMING != 0 {
@@ -2715,8 +2715,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
     }
 
-    if cfg!(feature = "valid") && INSERT != 0 && HTML == 0 {
-        #[cfg(feature = "valid")]
+    if cfg!(feature = "libxml_valid") && INSERT != 0 && HTML == 0 {
+        #[cfg(feature = "libxml_valid")]
         {
             let mut list: [*const XmlChar; 256] = [null(); 256];
 
@@ -2812,8 +2812,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         end_timer!("Saving");
                     }
                 }
-            } else if cfg!(feature = "libxml_c14n") && CANONICAL != 0 {
-                #[cfg(feature = "libxml_c14n")]
+            } else if cfg!(feature = "c14n") && CANONICAL != 0 {
+                #[cfg(feature = "c14n")]
                 {
                     let mut result: *mut XmlChar = null_mut();
 
@@ -2835,8 +2835,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                 }
-            } else if cfg!(feature = "libxml_c14n") && CANONICAL_11 != 0 {
-                #[cfg(feature = "libxml_c14n")]
+            } else if cfg!(feature = "c14n") && CANONICAL_11 != 0 {
+                #[cfg(feature = "c14n")]
                 {
                     let mut result: *mut XmlChar = null_mut();
 
@@ -2858,8 +2858,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                 }
-            } else if cfg!(feature = "libxml_c14n") && EXC_CANONICAL != 0 {
-                #[cfg(feature = "libxml_c14n")]
+            } else if cfg!(feature = "c14n") && EXC_CANONICAL != 0 {
+                #[cfg(feature = "c14n")]
                 {
                     let mut result: *mut XmlChar = null_mut();
 
@@ -2974,7 +2974,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     save_opts |= XmlSaveOption::XmlSaveWsnonsig as i32;
                 }
 
-                #[cfg(any(feature = "html", feature = "valid"))]
+                #[cfg(any(feature = "html", feature = "libxml_valid"))]
                 if XMLOUT != 0 {
                     save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
                 }
@@ -3032,7 +3032,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     /*
      * A posteriori validation test
      */
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if DTDVALID.lock().unwrap().is_some() || DTDVALIDFPI.lock().unwrap().is_some() {
         let dtd: XmlDtdPtr;
 
@@ -3133,7 +3133,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
         xml_free_valid_ctxt(cvp);
     }
-    #[cfg(feature = "libxml_schematron")]
+    #[cfg(feature = "schematron")]
     if !WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
@@ -3260,7 +3260,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
     }
 
-    #[cfg(all(feature = "libxml_debug", any(feature = "html", feature = "valid")))]
+    #[cfg(all(
+        feature = "libxml_debug",
+        any(feature = "html", feature = "libxml_valid")
+    ))]
     if DEBUGENT != 0 && HTML == 0 {
         xml_debug_dump_entities(stderr(), doc);
     }
@@ -3427,7 +3430,7 @@ fn usage(f: &mut impl Write, name: &str) {
             writeln!(f, "\t--debug : dump the nodes content when using --stream",).ok();
         }
     }
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     {
         writeln!(
             f,
@@ -3462,7 +3465,7 @@ fn usage(f: &mut impl Write, name: &str) {
     writeln!(f, "\t--nocompact : do not generate compact text nodes").ok();
     writeln!(f, "\t--htmlout : output results as HTML").ok();
     writeln!(f, "\t--nowrap : do not put HTML doc wrapper").ok();
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         writeln!(
             f,
@@ -3506,7 +3509,7 @@ fn usage(f: &mut impl Write, name: &str) {
         .ok();
         writeln!(f, "\t--nodefdtd : do not default HTML doctype").ok();
     }
-    #[cfg(feature = "push")]
+    #[cfg(feature = "libxml_push")]
     {
         writeln!(f, "\t--push : use the push mode of the parser").ok();
         writeln!(
@@ -3546,7 +3549,7 @@ fn usage(f: &mut impl Write, name: &str) {
         )
         .ok();
     }
-    #[cfg(feature = "libxml_c14n")]
+    #[cfg(feature = "c14n")]
     {
         writeln!(
             f,
@@ -3630,7 +3633,7 @@ fn usage(f: &mut impl Write, name: &str) {
         )
         .ok();
     }
-    #[cfg(feature = "libxml_schematron")]
+    #[cfg(feature = "schematron")]
     {
         writeln!(
             f,
@@ -3730,7 +3733,7 @@ fn main() {
             } else if cfg!(feature = "libxml_debug") && (arg == "-shell" || arg == "--shell") {
                 SHELL += 1;
                 NOOUT = 1;
-            } else if cfg!(feature = "tree") && (arg == "-copy" || arg == "--copy") {
+            } else if cfg!(feature = "libxml_tree") && (arg == "-copy" || arg == "--copy") {
                 COPY += 1;
             } else if arg == "-recover" || arg == "--recover" {
                 RECOVERY += 1;
@@ -3776,19 +3779,24 @@ fn main() {
                 LOADDTD += 1;
                 DTDATTRS += 1;
                 OPTIONS |= XmlParserOption::XmlParseDtdattr as i32;
-            } else if cfg!(feature = "valid") && (arg == "-valid" || arg == "--valid") {
+            } else if cfg!(feature = "libxml_valid") && (arg == "-valid" || arg == "--valid") {
                 VALID += 1;
                 OPTIONS |= XmlParserOption::XmlParseDtdvalid as i32;
-            } else if cfg!(feature = "valid") && (arg == "-postvalid" || arg == "--postvalid") {
+            } else if cfg!(feature = "libxml_valid")
+                && (arg == "-postvalid" || arg == "--postvalid")
+            {
                 POSTVALID += 1;
                 LOADDTD += 1;
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "valid") && (arg == "-dtdvalid" || arg == "--dtdvalid") {
+            } else if cfg!(feature = "libxml_valid") && (arg == "-dtdvalid" || arg == "--dtdvalid")
+            {
                 *DTDVALID.lock().unwrap() =
                     CString::new(args.next().expect("--dtdvalid: DTD is not specified")).ok();
                 LOADDTD += 1;
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "valid") && (arg == "-dtdvalidfpi" || arg == "--dtdvalidfpi") {
+            } else if cfg!(feature = "libxml_valid")
+                && (arg == "-dtdvalidfpi" || arg == "--dtdvalidfpi")
+            {
                 *DTDVALIDFPI.lock().unwrap() =
                     CString::new(args.next().expect("--dtdvalidfpi: DTD is not specified")).ok();
                 LOADDTD += 1;
@@ -3809,9 +3817,10 @@ fn main() {
                 } else {
                     REPEAT = 100;
                 }
-            } else if cfg!(feature = "push") && (arg == "-push" || arg == "--push") {
+            } else if cfg!(feature = "libxml_push") && (arg == "-push" || arg == "--push") {
                 PUSH += 1;
-            } else if cfg!(feature = "push") && (arg == "-pushsmall" || arg == "--pushsmall") {
+            } else if cfg!(feature = "libxml_push") && (arg == "-pushsmall" || arg == "--pushsmall")
+            {
                 PUSH += 1;
                 PUSHSIZE = 10;
             } else if arg == "-memory" || arg == "--memory" {
@@ -3849,17 +3858,17 @@ fn main() {
             {
                 DEBUGENT += 1;
                 set_parser_debug_entities(1);
-            } else if cfg!(feature = "libxml_c14n") && (arg == "-c14n" || arg == "--c14n") {
+            } else if cfg!(feature = "c14n") && (arg == "-c14n" || arg == "--c14n") {
                 CANONICAL += 1;
                 OPTIONS |= XmlParserOption::XmlParseNoent as i32
                     | XmlParserOption::XmlParseDtdattr as i32
                     | XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "libxml_c14n") && (arg == "-c14n11" || arg == "--c14n11") {
+            } else if cfg!(feature = "c14n") && (arg == "-c14n11" || arg == "--c14n11") {
                 CANONICAL_11 += 1;
                 OPTIONS |= XmlParserOption::XmlParseNoent as i32
                     | XmlParserOption::XmlParseDtdattr as i32
                     | XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "libxml_c14n") && (arg == "-exc-c14n" || arg == "--exc-c14n") {
+            } else if cfg!(feature = "c14n") && (arg == "-exc-c14n" || arg == "--exc-c14n") {
                 EXC_CANONICAL += 1;
                 OPTIONS |= XmlParserOption::XmlParseNoent as i32
                     | XmlParserOption::XmlParseDtdattr as i32
@@ -3915,7 +3924,7 @@ fn main() {
                 *SCHEMA.lock().unwrap() =
                     CString::new(args.next().expect("--schema: Schema is not specified")).ok();
                 NOENT = 1;
-            } else if cfg!(feature = "libxml_schematron")
+            } else if cfg!(feature = "schematron")
                 && (arg == "-schematron" || arg == "--schematron")
             {
                 *SCHEMATRON.lock().unwrap() = CString::new(
@@ -4012,7 +4021,7 @@ fn main() {
         let not_stream = STREAM == 0;
         #[cfg(not(feature = "libxml_reader"))]
         let not_stream = true;
-        #[cfg(feature = "libxml_schematron")]
+        #[cfg(feature = "schematron")]
         if SAX == 0 && not_stream {
             let mut schematron = SCHEMATRON.lock().unwrap();
             if let Some(s) = schematron.as_ref() {
@@ -4211,7 +4220,7 @@ fn main() {
             usage(&mut stderr(), &program_name);
             PROGRESULT = XmllintReturnCode::ErrUnclass;
         }
-        #[cfg(feature = "libxml_schematron")]
+        #[cfg(feature = "schematron")]
         {
             let wxschematron = WXSCHEMATRON.load(Ordering::Relaxed);
             if !wxschematron.is_null() {

@@ -2069,7 +2069,7 @@ mod tests {
 
     #[test]
     fn test_xml_schematron_validate_doc() {
-        #[cfg(feature = "libxml_schematron")]
+        #[cfg(feature = "schematron")]
         unsafe {
             let mut leaks = 0;
 

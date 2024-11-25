@@ -1446,7 +1446,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
     let mut fragment: *mut XmlChar = null_mut();
     let mut ret: i32 = -1;
     let cache_nr: i32;
-    #[cfg(feature = "libxml_xptr")]
+    #[cfg(feature = "xpointer")]
     let save_flags: i32;
 
     /*
@@ -1533,7 +1533,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             /*
              * Load it.
              */
-            #[cfg(feature = "libxml_xptr")]
+            #[cfg(feature = "xpointer")]
             {
                 /*
                  * If this is an XPointer evaluation, we want to assure that
@@ -1548,7 +1548,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             }
 
             doc = xml_xinclude_parse_file(ctxt, url as _);
-            #[cfg(feature = "libxml_xptr")]
+            #[cfg(feature = "xpointer")]
             {
                 (*ctxt).parse_flags = save_flags;
             }
@@ -1629,7 +1629,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
              */
             (*refe).inc = xml_doc_copy_node((*doc).get_root_element(), (*ctxt).doc, 1);
         } else {
-            #[cfg(feature = "libxml_xptr")]
+            #[cfg(feature = "xpointer")]
             {
                 /*
                  * Computes the XPointer expression and make a copy used

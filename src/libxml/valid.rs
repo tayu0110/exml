@@ -420,7 +420,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
      * Check the DTD for previous declarations of the ATTLIST
      */
     if xml_hash_add_entry(table, name, ret as _) != 0 {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             xml_err_valid(
                 null_mut(),
@@ -439,7 +439,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
 ///
 /// Returns the new xmlNotationPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyNotation")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let nota: XmlNotationPtr = payload as XmlNotationPtr;
 
@@ -461,7 +461,7 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
 ///
 /// Returns the new xmlNotationTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyNotationTable")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_copy_notation_table(
     table: XmlNotationTablePtr,
 ) -> XmlNotationTablePtr {
@@ -969,7 +969,7 @@ unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
 
 /// Handle a validation error, provide contextual information
 #[doc(alias = "xmlErrValidNode")]
-#[cfg(any(feature = "valid", feature = "schema"))]
+#[cfg(any(feature = "libxml_valid", feature = "schema"))]
 unsafe extern "C" fn xml_err_valid_node(
     ctxt: XmlValidCtxtPtr,
     node: XmlNodePtr,
@@ -1185,7 +1185,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
     ret = xml_hash_lookup2(table, name.as_ptr() as *const u8, ns) as _;
     if !ret.is_null() {
         if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
-            #[cfg(feature = "valid")]
+            #[cfg(feature = "libxml_valid")]
             {
                 /*
                  * The element is already defined in this DTD.
@@ -1243,7 +1243,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
          * Insertion must not fail
          */
         if xml_hash_add_entry2(table, name.as_ptr() as *const u8, ns, ret as _) != 0 {
-            #[cfg(feature = "valid")]
+            #[cfg(feature = "libxml_valid")]
             {
                 /*
                  * The element is already defined in this DTD.
@@ -1315,7 +1315,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
 ///
 /// Returns the new xmlElementPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElement")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let elem: XmlElementPtr = payload as XmlElementPtr;
 
@@ -1342,7 +1342,7 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
 ///
 /// Returns the new xmlElementTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElementTable")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
     xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
 }
@@ -1617,7 +1617,7 @@ pub unsafe extern "C" fn xml_free_enumeration(cur: XmlEnumerationPtr) {
 ///
 /// Returns the xmlEnumerationPtr just created or null_mut() in case of error.
 #[doc(alias = "xmlCopyEnumeration")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_copy_enumeration(cur: XmlEnumerationPtr) -> XmlEnumerationPtr {
     if cur.is_null() {
         return null_mut();
@@ -1636,7 +1636,7 @@ pub unsafe extern "C" fn xml_copy_enumeration(cur: XmlEnumerationPtr) -> XmlEnum
     ret
 }
 
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: i32) -> i32 {
     use super::parser_internals::xml_is_letter;
 
@@ -1670,7 +1670,7 @@ unsafe extern "C" fn xml_is_doc_name_start_char(doc: XmlDocPtr, c: i32) -> i32 {
     0
 }
 
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_digit, xml_is_extender},
@@ -1727,7 +1727,7 @@ unsafe extern "C" fn xml_is_doc_name_char(doc: XmlDocPtr, c: i32) -> i32 {
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNamesValueInternal")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_validate_names_value_internal(
     doc: XmlDocPtr,
     value: *const XmlChar,
@@ -1781,7 +1781,7 @@ unsafe extern "C" fn xml_validate_names_value_internal(
     1
 }
 
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_validate_name_value_internal(
     doc: XmlDocPtr,
     value: *const XmlChar,
@@ -1820,7 +1820,7 @@ unsafe extern "C" fn xml_validate_name_value_internal(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokensValueInternal")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_validate_nmtokens_value_internal(
     doc: XmlDocPtr,
     value: *const XmlChar,
@@ -1888,7 +1888,7 @@ unsafe extern "C" fn xml_validate_nmtokens_value_internal(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokenValueInternal")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_validate_nmtoken_value_internal(
     doc: XmlDocPtr,
     value: *const XmlChar,
@@ -1926,7 +1926,7 @@ unsafe extern "C" fn xml_validate_nmtoken_value_internal(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeValueInternal")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_validate_attribute_value_internal(
     doc: XmlDocPtr,
     typ: XmlAttributeType,
@@ -2152,7 +2152,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
 ///
 /// Returns the number of ID attributes found.
 #[doc(alias = "xmlScanIDAttributeDecl")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 unsafe extern "C" fn xml_scan_id_attribute_decl(
     ctxt: XmlValidCtxtPtr,
     elem: XmlElementPtr,
@@ -2225,7 +2225,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
         dict = (*(*dtd).doc).dict;
     }
 
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     {
         /*
          * Check the type and possibly the default value.
@@ -2378,7 +2378,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
         ret as _,
     ) < 0
     {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             /*
              * The attribute is already defined in this DTD.
@@ -2403,7 +2403,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
      */
     let elem_def: XmlElementPtr = xml_get_dtd_element_desc2(ctxt, dtd, elem, 1);
     if !elem_def.is_null() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         {
             if matches!(typ, XmlAttributeType::XmlAttributeID)
                 && xml_scan_id_attribute_decl(null_mut(), elem_def, 1) != 0
@@ -2473,7 +2473,7 @@ pub unsafe extern "C" fn xml_add_attribute_decl(
 ///
 /// Returns the new xmlAttributePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyAttribute")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
     let attr: XmlAttributePtr = payload as XmlAttributePtr;
 
@@ -2505,7 +2505,7 @@ extern "C" fn xml_copy_attribute(payload: *mut c_void, _name: *const XmlChar) ->
 ///
 /// Returns the new xmlAttributeTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyAttributeTable")]
-#[cfg(feature = "tree")]
+#[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_copy_attribute_table(
     table: XmlAttributeTablePtr,
 ) -> XmlAttributeTablePtr {
@@ -2778,7 +2778,7 @@ pub unsafe extern "C" fn xml_add_id(
         /*
          * The id is already defined in this DTD.
          */
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         if !ctxt.is_null() {
             xml_err_valid_node(
                 ctxt,
@@ -3300,7 +3300,7 @@ pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar)
 ///
 /// Returns null_mut() if not, otherwise the new validation context structure
 #[doc(alias = "xmlNewValidCtxt")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
     let ret: XmlValidCtxtPtr = xml_malloc(size_of::<XmlValidCtxt>()) as _;
     if ret.is_null() {
@@ -3315,7 +3315,7 @@ pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
 
 /// Free a validation context structure.
 #[doc(alias = "xmlFreeValidCtxt")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
     if cur.is_null() {
         return;
@@ -3337,7 +3337,7 @@ pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateRoot")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let ret: i32;
 
@@ -3429,7 +3429,7 @@ macro_rules! CHECK_DTD {
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateElementDecl")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_element_decl(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -3633,7 +3633,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
 /// Returns a new normalized string if normalization is needed, null_mut() otherwise
 /// the caller must free the returned value.
 #[doc(alias = "xmlValidNormalizeAttributeValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -3704,7 +3704,7 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
 /// Returns a new normalized string if normalization is needed, null_mut() otherwise
 /// the caller must free the returned value.
 #[doc(alias = "xmlValidCtxtNormalizeAttributeValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -3868,7 +3868,7 @@ unsafe extern "C" fn xml_err_valid_node_nr(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeDecl")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_attribute_decl(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -4055,7 +4055,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_attribute_value(
     typ: XmlAttributeType,
     value: *const XmlChar,
@@ -4071,7 +4071,7 @@ pub unsafe extern "C" fn xml_validate_attribute_value(
 ///
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNotationDecl")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_notation_decl(
     _ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
@@ -4090,7 +4090,7 @@ pub unsafe extern "C" fn xml_validate_notation_decl(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDtd")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_dtd(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -4435,7 +4435,7 @@ extern "C" fn xml_validate_notation_callback(
 ///
 /// Returns 1 if valid or 0 if invalid and -1 if not well-formed
 #[doc(alias = "xmlValidateDtdFinal")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let mut dtd: XmlDtdPtr;
     let mut table: XmlAttributeTablePtr;
@@ -4478,7 +4478,7 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
 ///
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDocument")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     use std::ffi::CString;
 
@@ -4581,7 +4581,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateElement")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -5825,7 +5825,7 @@ unsafe extern "C" fn xml_validate_element_content(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateOneElement")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -6378,7 +6378,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateOneAttribute")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -6633,7 +6633,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateOneNamespace")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_one_namespace(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -7117,7 +7117,7 @@ extern "C" fn xml_validate_check_ref_callback(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDocumentFinal")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     if ctxt.is_null() {
         return 0;
@@ -7159,7 +7159,7 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNotationUse")]
-#[cfg(any(feature = "valid", feature = "schema"))]
+#[cfg(any(feature = "libxml_valid", feature = "schema"))]
 pub unsafe extern "C" fn xml_validate_notation_use(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -7365,7 +7365,7 @@ pub unsafe extern "C" fn xml_get_dtd_element_desc(
 ///
 /// Returns the number of element in the list, or -1 in case of error.
 #[doc(alias = "xmlValidGetPotentialChildren")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_valid_get_potential_children(
     ctree: *mut XmlElementContent,
     names: *mut *const XmlChar,
@@ -7431,7 +7431,7 @@ fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 /// the function returns the value @max the caller is invited to grow the
 /// receiving array and retry.
 #[doc(alias = "xmlValidGetValidElements")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_valid_get_valid_elements(
     prev: *mut XmlNode,
     next: *mut XmlNode,
@@ -7569,7 +7569,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNameValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_name_value(value: *const XmlChar) -> i32 {
     xml_validate_name_value_internal(null_mut(), value)
 }
@@ -7578,7 +7578,7 @@ pub unsafe extern "C" fn xml_validate_name_value(value: *const XmlChar) -> i32 {
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNamesValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_names_value(value: *const XmlChar) -> i32 {
     xml_validate_names_value_internal(null_mut(), value)
 }
@@ -7589,7 +7589,7 @@ pub unsafe extern "C" fn xml_validate_names_value(value: *const XmlChar) -> i32 
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokenValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_nmtoken_value(value: *const XmlChar) -> i32 {
     xml_validate_nmtoken_value_internal(null_mut(), value)
 }
@@ -7600,7 +7600,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken_value(value: *const XmlChar) -> i3
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokensValue")]
-#[cfg(feature = "valid")]
+#[cfg(feature = "libxml_valid")]
 pub unsafe extern "C" fn xml_validate_nmtokens_value(value: *const XmlChar) -> i32 {
     xml_validate_nmtokens_value_internal(null_mut(), value)
 }
@@ -7804,7 +7804,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
 ///
 /// Returns 1 in case of success, 0 in case of error
 #[doc(alias = "xmlValidBuildContentModel")]
-#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+#[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_valid_build_content_model(
     ctxt: XmlValidCtxtPtr,
     elem: XmlElementPtr,
@@ -8095,7 +8095,7 @@ unsafe extern "C" fn vstate_vpush(
 ///
 /// returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushElement")]
-#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+#[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
@@ -8209,7 +8209,7 @@ pub unsafe extern "C" fn xml_validate_push_element(
 ///
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushCData")]
-#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+#[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_validate_push_cdata(
     ctxt: XmlValidCtxtPtr,
     data: *const XmlChar,
@@ -8326,7 +8326,7 @@ unsafe extern "C" fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
 ///
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePopElement")]
-#[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+#[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
 pub unsafe extern "C" fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
@@ -9383,7 +9383,7 @@ mod tests {
 
     #[test]
     fn test_xml_valid_build_content_model() {
-        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -9418,7 +9418,7 @@ mod tests {
 
     #[test]
     fn test_xml_valid_ctxt_normalize_attribute_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9464,7 +9464,7 @@ mod tests {
 
     #[test]
     fn test_xml_valid_get_potential_children() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9514,7 +9514,7 @@ mod tests {
 
     #[test]
     fn test_xml_valid_get_valid_elements() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9564,7 +9564,7 @@ mod tests {
 
     #[test]
     fn test_xml_valid_normalize_attribute_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9610,7 +9610,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_attribute_decl() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9650,7 +9650,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_attribute_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9685,7 +9685,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_document() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9720,7 +9720,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_document_final() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9755,7 +9755,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_dtd() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9792,7 +9792,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_dtd_final() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9827,7 +9827,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_element() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9867,7 +9867,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_element_decl() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9907,7 +9907,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_name_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9937,7 +9937,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_names_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9967,7 +9967,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_nmtoken_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -9997,7 +9997,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_nmtokens_value() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -10027,7 +10027,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_notation_decl() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -10067,7 +10067,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_notation_use() {
-        #[cfg(any(feature = "valid", feature = "schema"))]
+        #[cfg(any(feature = "libxml_valid", feature = "schema"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10107,7 +10107,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_one_attribute() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -10158,7 +10158,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_one_element() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -10198,7 +10198,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_one_namespace() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 
@@ -10255,7 +10255,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_pop_element() {
-        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10300,7 +10300,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_push_cdata() {
-        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10343,7 +10343,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_push_element() {
-        #[cfg(all(feature = "valid", feature = "libxml_regexp"))]
+        #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
         unsafe {
             let mut leaks = 0;
 
@@ -10388,7 +10388,7 @@ mod tests {
 
     #[test]
     fn test_xml_validate_root() {
-        #[cfg(feature = "valid")]
+        #[cfg(feature = "libxml_valid")]
         unsafe {
             let mut leaks = 0;
 

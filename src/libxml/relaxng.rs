@@ -11375,7 +11375,7 @@ unsafe extern "C" fn xml_relaxng_validate_document(
     if ret != 0 {
         xml_relaxng_dump_valid_error(ctxt);
     }
-    #[cfg(feature = "valid")]
+    #[cfg(feature = "libxml_valid")]
     if (*ctxt).idref == 1 {
         let mut vctxt = XmlValidCtxt {
             user_data: (*ctxt).user_data.clone(),

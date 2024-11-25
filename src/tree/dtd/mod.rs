@@ -53,7 +53,7 @@ impl XmlDtd {
     ///
     /// Returns A pointer to the entity structure or null_mut() if not found.
     #[doc(alias = "xmlGetEntityFromDtd")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub(super) unsafe fn get_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
         use std::ptr::null_mut;
 
@@ -71,7 +71,7 @@ impl XmlDtd {
     ///
     /// Returns A pointer to the entity structure or NULL if not found.
     #[doc(alias = "xmlGetParameterEntityFromDtd")]
-    #[cfg(feature = "tree")]
+    #[cfg(feature = "libxml_tree")]
     pub(super) unsafe fn get_parameter_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
         use crate::{hash::xml_hash_lookup, libxml::entities::XmlEntitiesTablePtr};
 
