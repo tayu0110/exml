@@ -26,6 +26,7 @@ use std::{
 use libc::memset;
 
 use crate::{
+    buf::libxml_api::xml_buf_set_allocation_scheme,
     buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
@@ -45,7 +46,7 @@ use crate::{
         },
         xmlstring::{xml_str_equal, XmlChar},
     },
-    private::{buf::xml_buf_set_allocation_scheme, save::xml_buf_attr_serialize_txt_content},
+    private::save::xml_buf_attr_serialize_txt_content,
     tree::{
         is_xhtml, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme,
         XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr, XmlNsPtr,

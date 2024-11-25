@@ -29,9 +29,9 @@ use libc::{memcpy, memset};
 
 use crate::{
     __xml_raise_error,
+    buf::libxml_api::xml_buf_write_quoted_string,
     error::XmlParserErrors,
     io::XmlOutputBuffer,
-    private::buf::xml_buf_write_quoted_string,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
         XmlNs, XmlNsPtr, XML_XML_NAMESPACE,

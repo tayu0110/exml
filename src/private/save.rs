@@ -6,6 +6,7 @@
 use std::{ffi::c_int, ptr::null_mut};
 
 use crate::{
+    buf::libxml_api::xml_buf_add,
     error::XmlParserErrors,
     io::XmlOutputBuffer,
     libxml::{
@@ -15,8 +16,6 @@ use crate::{
     },
     tree::{XmlAttrPtr, XmlBufPtr, XmlDocPtr, XmlNsPtr},
 };
-
-use super::buf::xml_buf_add;
 
 /// Serialize text attribute values to an xmlBufPtr
 #[doc(alias = "xmlBufAttrSerializeTxtContent")]

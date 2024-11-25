@@ -1,4 +1,3 @@
-pub mod buf;
 pub mod entities;
 pub mod parser;
 #[cfg(feature = "output")]

@@ -46,13 +46,7 @@ use crate::{
             XmlChar,
         },
     },
-    private::{
-        buf::{
-            xml_buf_add, xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_detach,
-            xml_buf_free, xml_buf_is_empty, xml_buf_set_allocation_scheme,
-        },
-        entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
-    },
+    private::entities::{xml_encode_attribute_entities, XML_ENT_EXPANDING, XML_ENT_PARSED},
 };
 
 pub use attribute::*;

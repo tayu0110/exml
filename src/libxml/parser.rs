@@ -55,6 +55,7 @@ use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen,
 
 use crate::{
     __xml_raise_error,
+    buf::libxml_api::{xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme},
     buf::{libxml_api::xml_buf_create, xml_buf_overflow_error, XmlBufRef},
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{parser_validity_error, parser_validity_warning, XmlError, XmlParserErrors},
@@ -122,7 +123,6 @@ use crate::{
         xpath::xml_init_xpath_internal,
     },
     private::{
-        buf::{xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme},
         entities::{
             XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
             XML_ENT_PARSED,

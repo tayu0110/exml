@@ -36,6 +36,7 @@ use crate::libxml::xpointer::{
 };
 use crate::{
     __xml_raise_error,
+    buf::libxml_api::{xml_buf_add, xml_buf_create, xml_buf_free},
     error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
     libxml::{
@@ -76,7 +77,6 @@ use crate::{
             XPATH_MAX_NODESET_LENGTH, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
         },
     },
-    private::buf::{xml_buf_add, xml_buf_create, xml_buf_free},
     tree::{
         xml_buf_content, xml_build_qname, NodePtr, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
         XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,

@@ -29,6 +29,7 @@ use libc::memset;
 
 use crate::{
     buf::libxml_api::{xml_buf_cat, xml_buf_create, xml_buf_free, XmlBufPtr},
+    buf::libxml_api::{xml_buf_create_size, xml_buf_empty, xml_buf_set_allocation_scheme},
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
     },
@@ -76,7 +77,6 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
-    private::buf::{xml_buf_create_size, xml_buf_empty, xml_buf_set_allocation_scheme},
     tree::{
         xml_buf_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd, xml_doc_copy_node,
         xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns, xml_free_ns_list, xml_new_doc_text,
@@ -2304,7 +2304,7 @@ pub unsafe extern "C" fn xml_text_reader_read(reader: &mut XmlTextReader) -> i32
 pub unsafe extern "C" fn xml_text_reader_read_inner_xml(
     reader: &mut XmlTextReader,
 ) -> *mut XmlChar {
-    use crate::{buf::XmlBufRef, private::buf::xml_buf_detach};
+    use crate::buf::{libxml_api::xml_buf_detach, XmlBufRef};
 
     let mut node: XmlNodePtr;
     let mut cur_node: XmlNodePtr;
