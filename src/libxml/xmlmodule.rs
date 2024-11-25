@@ -3,6 +3,16 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// xmlmodule.c : basic API for dynamic module loading added 2.6.17
+//
+// See Copyright for the status of this software.
+//
+// joelwreed@comcast.net
+//
+// http://www.fortran-2000.com/ArnaudRecipes/sharedlib.html
+
 use std::{
     ffi::c_char,
     mem::size_of,

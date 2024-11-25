@@ -3,6 +3,22 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// regexp.c: generic and extensible Regular Expression engine
+//
+// Basically designed with the purpose of compiling regexps for
+// the variety of validation/schemas mechanisms now available in
+// XML related specifications these include:
+//    - XML-1.0 DTD validation
+//    - XML Schemas structure part 1
+//    - XML Schemas Datatypes part 2 especially Appendix F
+//    - RELAX-NG/TREX i.e. the counter proposal
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <veillard@redhat.com>
+
 use std::{
     ffi::{c_char, CStr},
     io::Write,

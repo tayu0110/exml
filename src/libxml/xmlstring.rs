@@ -3,6 +3,21 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// string.c : an XML string utilities module
+//
+// This module provides various utility functions for manipulating
+// the xmlChar* type. All functions named xmlStr* have been moved here
+// from the parser.c file (their original home).
+//
+// See Copyright for the status of this software.
+//
+// UTF8 string routines from:
+// William Brack <wbrack@mmm.com.hk>
+//
+// daniel@veillard.com
+
 use std::ffi::c_char;
 use std::ptr::{null, null_mut};
 

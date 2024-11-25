@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// entities.c : implementation for the XML entities handling
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     any::type_name,
     borrow::Cow,

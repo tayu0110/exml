@@ -3,12 +3,22 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// uri.c: set of generic URI related routines
+//
+// Reference: RFCs 3986, 2732 and 2373
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     borrow::Cow,
     ffi::{c_char, CStr},
     io::Write,
     mem::{size_of, size_of_val, zeroed},
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut},
     string::FromUtf8Error,
 };
 
@@ -945,26 +955,26 @@ unsafe extern "C" fn xml_parse3986_host(uri: XmlURIPtr, str: *mut *const c_char)
          */
         if ISA_DIGIT!(cur) {
             'not_ipv4: {
-                if xml_parse3986_dec_octet(addr_of_mut!(cur)) != 0 {
+                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
                     break 'not_ipv4;
                 }
                 if *cur != b'.' as i8 {
                     break 'not_ipv4;
                 }
                 cur = cur.add(1);
-                if xml_parse3986_dec_octet(addr_of_mut!(cur)) != 0 {
+                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
                     break 'not_ipv4;
                 }
                 if *cur != b'.' as i8 {
                     break 'not_ipv4;
                 }
-                if xml_parse3986_dec_octet(addr_of_mut!(cur)) != 0 {
+                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
                     break 'not_ipv4;
                 }
                 if *cur != b'.' as i8 {
                     break 'not_ipv4;
                 }
-                if xml_parse3986_dec_octet(addr_of_mut!(cur)) != 0 {
+                if xml_parse3986_dec_octet(&raw mut cur) != 0 {
                     break 'not_ipv4;
                 }
                 break 'found;
@@ -1052,19 +1062,19 @@ unsafe extern "C" fn xml_parse3986_authority(uri: XmlURIPtr, str: *mut *const c_
     /*
      * try to parse an userinfo and check for the trailing @
      */
-    ret = xml_parse3986_userinfo(uri, addr_of_mut!(cur));
+    ret = xml_parse3986_userinfo(uri, &raw mut cur);
     if ret != 0 || *cur != b'@' as i8 {
         cur = *str;
     } else {
         cur = cur.add(1);
     }
-    ret = xml_parse3986_host(uri, addr_of_mut!(cur));
+    ret = xml_parse3986_host(uri, &raw mut cur);
     if ret != 0 {
         return ret;
     }
     if *cur == b':' as i8 {
         cur = cur.add(1);
-        ret = xml_parse3986_port(uri, addr_of_mut!(cur));
+        ret = xml_parse3986_port(uri, &raw mut cur);
         if ret != 0 {
             return ret;
         }
@@ -1120,7 +1130,7 @@ unsafe extern "C" fn xml_parse3986_path_ab_empty(uri: XmlURIPtr, str: *mut *cons
 
     while *cur == b'/' as i8 {
         cur = cur.add(1);
-        ret = xml_parse3986_segment(addr_of_mut!(cur), 0, 1);
+        ret = xml_parse3986_segment(&raw mut cur, 0, 1);
         if ret != 0 {
             return ret;
         }
@@ -1159,11 +1169,11 @@ unsafe extern "C" fn xml_parse3986_path_absolute(uri: XmlURIPtr, str: *mut *cons
         return 1;
     }
     cur = cur.add(1);
-    ret = xml_parse3986_segment(addr_of_mut!(cur), 0, 0);
+    ret = xml_parse3986_segment(&raw mut cur, 0, 0);
     if ret == 0 {
         while *cur == b'/' as i8 {
             cur = cur.add(1);
-            ret = xml_parse3986_segment(addr_of_mut!(cur), 0, 1);
+            ret = xml_parse3986_segment(&raw mut cur, 0, 1);
             if ret != 0 {
                 return ret;
             }
@@ -1200,13 +1210,13 @@ unsafe extern "C" fn xml_parse3986_path_rootless(uri: XmlURIPtr, str: *mut *cons
 
     cur = *str;
 
-    ret = xml_parse3986_segment(addr_of_mut!(cur), 0, 0);
+    ret = xml_parse3986_segment(&raw mut cur, 0, 0);
     if ret != 0 {
         return ret;
     }
     while *cur == b'/' as i8 {
         cur = cur.add(1);
-        ret = xml_parse3986_segment(addr_of_mut!(cur), 0, 1);
+        ret = xml_parse3986_segment(&raw mut cur, 0, 1);
         if ret != 0 {
             return ret;
         }
@@ -1249,7 +1259,7 @@ unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_
 
     if *cur == b'/' as i8 && *cur.add(1) == b'/' as i8 {
         cur = cur.add(2);
-        ret = xml_parse3986_authority(uri, addr_of_mut!(cur));
+        ret = xml_parse3986_authority(uri, &raw mut cur);
         if ret != 0 {
             return ret;
         }
@@ -1259,19 +1269,19 @@ unsafe extern "C" fn xml_parse3986_hier_part(uri: XmlURIPtr, str: *mut *const c_
         if (*uri).server.is_null() && (*uri).port == PORT_EMPTY {
             (*uri).port = PORT_EMPTY_SERVER;
         }
-        ret = xml_parse3986_path_ab_empty(uri, addr_of_mut!(cur));
+        ret = xml_parse3986_path_ab_empty(uri, &raw mut cur);
         if ret != 0 {
             return ret;
         }
         *str = cur;
         return 0;
     } else if *cur == b'/' as i8 {
-        ret = xml_parse3986_path_absolute(uri, addr_of_mut!(cur));
+        ret = xml_parse3986_path_absolute(uri, &raw mut cur);
         if ret != 0 {
             return ret;
         }
     } else if ISA_PCHAR!(cur) {
-        ret = xml_parse3986_path_rootless(uri, addr_of_mut!(cur));
+        ret = xml_parse3986_path_rootless(uri, &raw mut cur);
         if ret != 0 {
             return ret;
         }
@@ -1401,7 +1411,7 @@ unsafe extern "C" fn xml_parse3986_fragment(uri: XmlURIPtr, str: *mut *const c_c
 unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -> i32 {
     let mut ret: i32;
 
-    ret = xml_parse3986_scheme(uri, addr_of_mut!(str));
+    ret = xml_parse3986_scheme(uri, &raw mut str);
     if ret != 0 {
         return ret;
     }
@@ -1409,20 +1419,20 @@ unsafe extern "C" fn xml_parse3986_uri(uri: XmlURIPtr, mut str: *const c_char) -
         return 1;
     }
     str = str.add(1);
-    ret = xml_parse3986_hier_part(uri, addr_of_mut!(str));
+    ret = xml_parse3986_hier_part(uri, &raw mut str);
     if ret != 0 {
         return ret;
     }
     if *str == b'?' as i8 {
         str = str.add(1);
-        ret = xml_parse3986_query(uri, addr_of_mut!(str));
+        ret = xml_parse3986_query(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
     }
     if *str == b'#' as i8 {
         str = str.add(1);
-        ret = xml_parse3986_fragment(uri, addr_of_mut!(str));
+        ret = xml_parse3986_fragment(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
@@ -1446,13 +1456,13 @@ unsafe extern "C" fn xml_parse3986_path_no_scheme(uri: XmlURIPtr, str: *mut *con
 
     cur = *str;
 
-    ret = xml_parse3986_segment(addr_of_mut!(cur), b':' as i8, 0);
+    ret = xml_parse3986_segment(&raw mut cur, b':' as i8, 0);
     if ret != 0 {
         return ret;
     }
     while *cur == b'/' as i8 {
         cur = cur.add(1);
-        ret = xml_parse3986_segment(addr_of_mut!(cur), 0, 1);
+        ret = xml_parse3986_segment(&raw mut cur, 0, 1);
         if ret != 0 {
             return ret;
         }
@@ -1493,21 +1503,21 @@ unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const 
 
     if *str == b'/' as i8 && *str.add(1) == b'/' as i8 {
         str = str.add(2);
-        ret = xml_parse3986_authority(uri, addr_of_mut!(str));
+        ret = xml_parse3986_authority(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
-        ret = xml_parse3986_path_ab_empty(uri, addr_of_mut!(str));
+        ret = xml_parse3986_path_ab_empty(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
     } else if *str == b'/' as i8 {
-        ret = xml_parse3986_path_absolute(uri, addr_of_mut!(str));
+        ret = xml_parse3986_path_absolute(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
     } else if ISA_PCHAR!(str) {
-        ret = xml_parse3986_path_no_scheme(uri, addr_of_mut!(str));
+        ret = xml_parse3986_path_no_scheme(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
@@ -1523,14 +1533,14 @@ unsafe extern "C" fn xml_parse3986_relative_ref(uri: XmlURIPtr, mut str: *const 
 
     if *str == b'?' as i8 {
         str = str.add(1);
-        ret = xml_parse3986_query(uri, addr_of_mut!(str));
+        ret = xml_parse3986_query(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
     }
     if *str == b'#' as i8 {
         str = str.add(1);
-        ret = xml_parse3986_fragment(uri, addr_of_mut!(str));
+        ret = xml_parse3986_fragment(uri, &raw mut str);
         if ret != 0 {
             return ret;
         }
@@ -1776,7 +1786,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
             p = (*uri).scheme;
             while *p != 0 {
                 if len >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -1787,7 +1797,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 p = p.add(1);
             }
             if len >= max {
-                temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                temp = xml_save_uri_realloc(ret, &raw mut max);
                 if temp.is_null() {
                     break 'mem_error;
                 }
@@ -1800,7 +1810,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
             p = (*uri).opaque;
             while *p != 0 {
                 if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -1826,7 +1836,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
         } else {
             if !(*uri).server.is_null() || (*uri).port != PORT_EMPTY {
                 if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -1840,7 +1850,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     p = (*uri).user;
                     while *p != 0 {
                         if len + 3 >= max {
-                            temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
                             if temp.is_null() {
                                 break 'mem_error;
                             }
@@ -1874,7 +1884,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                         }
                     }
                     if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -1887,7 +1897,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     p = (*uri).server;
                     while *p != 0 {
                         if len >= max {
-                            temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                            temp = xml_save_uri_realloc(ret, &raw mut max);
                             if temp.is_null() {
                                 break 'mem_error;
                             }
@@ -1901,7 +1911,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 }
                 if (*uri).port > 0 {
                     if len + 10 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -1916,7 +1926,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 }
             } else if !(*uri).authority.is_null() {
                 if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -1929,7 +1939,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 p = (*uri).authority;
                 while *p != 0 {
                     if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -1962,7 +1972,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     }
                 }
             } else if !(*uri).scheme.is_null() && len + 3 >= max {
-                temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                temp = xml_save_uri_realloc(ret, &raw mut max);
                 if temp.is_null() {
                     break 'mem_error;
                 }
@@ -1982,7 +1992,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                     && xml_str_equal((*uri).scheme as _, c"file".as_ptr() as _)
                 {
                     if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -2000,7 +2010,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 }
                 while *p != 0 {
                     if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -2035,7 +2045,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
             }
             if !(*uri).query_raw.is_null() {
                 if len + 1 >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -2046,7 +2056,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 p = (*uri).query_raw;
                 while *p != 0 {
                     if len + 1 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -2058,7 +2068,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 }
             } else if !(*uri).query.is_null() {
                 if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -2069,7 +2079,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
                 p = (*uri).query;
                 while *p != 0 {
                     if len + 3 >= max {
-                        temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                        temp = xml_save_uri_realloc(ret, &raw mut max);
                         if temp.is_null() {
                             break 'mem_error;
                         }
@@ -2096,7 +2106,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
         }
         if !(*uri).fragment.is_null() {
             if len + 3 >= max {
-                temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                temp = xml_save_uri_realloc(ret, &raw mut max);
                 if temp.is_null() {
                     break 'mem_error;
                 }
@@ -2107,7 +2117,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
             p = (*uri).fragment;
             while *p != 0 {
                 if len + 3 >= max {
-                    temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+                    temp = xml_save_uri_realloc(ret, &raw mut max);
                     if temp.is_null() {
                         break 'mem_error;
                     }
@@ -2132,7 +2142,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
             }
         }
         if len >= max {
-            temp = xml_save_uri_realloc(ret, addr_of_mut!(max));
+            temp = xml_save_uri_realloc(ret, &raw mut max);
             if temp.is_null() {
                 break 'mem_error;
             }
@@ -2195,7 +2205,7 @@ pub unsafe extern "C" fn xml_uri_escape_str(
     out = 0;
     while *input != 0 {
         if len - out <= 3 {
-            temp = xml_save_uri_realloc(ret, addr_of_mut!(len));
+            temp = xml_save_uri_realloc(ret, &raw mut len);
             if temp.is_null() {
                 xml_uri_err_memory(c"escaping URI value\n".as_ptr() as _);
                 xml_free(ret as _);
@@ -2977,9 +2987,9 @@ pub unsafe extern "C" fn xml_path_to_uri(path: *const XmlChar) -> *mut XmlChar {
             ret = ret.add(1);
         }
     }
-    memset(addr_of_mut!(temp) as _, 0, size_of_val(&temp));
+    memset(&raw mut temp as _, 0, size_of_val(&temp));
     temp.path = cal as *mut c_char;
-    let ret: *mut XmlChar = xml_save_uri(addr_of_mut!(temp));
+    let ret: *mut XmlChar = xml_save_uri(&raw mut temp);
     xml_free(cal as _);
     ret
 }

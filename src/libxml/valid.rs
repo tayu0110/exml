@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// valid.c : part of the code use to do the DTD handling and the validity checking
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},

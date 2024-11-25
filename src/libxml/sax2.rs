@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// SAX2.c : Default SAX2 handler to build a tree.
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <daniel@veillard.com>
+
 use std::{
     ffi::{c_char, c_void, CStr, CString},
     mem::{replace, size_of},

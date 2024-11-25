@@ -53,7 +53,6 @@ pub mod xmlschemastypes;
 pub mod xmlstring;
 #[cfg(feature = "libxml_unicode")]
 pub mod xmlunicode;
-pub mod xmlversion;
 #[cfg(feature = "writer")]
 pub mod xmlwriter;
 pub mod xpath;

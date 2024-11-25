@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// HTMLtree.c : implementation of access function for an HTML tree.
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     ffi::{c_char, CStr, CString},
     io::Write,

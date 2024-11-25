@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// schematron.c : implementation of the Schematron schema validity checking
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <daniel@veillard.com>
+
 use std::{
     ffi::{c_char, CStr},
     mem::size_of,

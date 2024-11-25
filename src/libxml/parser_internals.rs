@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// parserInternals.c : Internal routines (and obsolete ones) needed for the XML and HTML parsers.
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::cell::RefCell;
 use std::ffi::{c_char, CStr, CString};
 use std::mem::{size_of, zeroed};

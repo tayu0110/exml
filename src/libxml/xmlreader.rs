@@ -3,6 +3,18 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// xmlreader.c: implements the xmlTextReader streaming node API
+//
+// NOTE:
+//   XmlTextReader.Normalization Property won't be supported, since
+//     it makes the parser non compliant to the XML recommendation
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     any::type_name,
     ffi::c_char,

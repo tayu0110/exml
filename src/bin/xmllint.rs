@@ -1,11 +1,12 @@
 //! Rust implementation of `xmllint.c` in the original libxml2.  
-//! Copyright of the original code is the following.
-//! --------
-//! xmllint.c : a small tester program for XML input.
-//!
-//! See Copyright for the status of this software.
-//!
-//! daniel@veillard.com
+
+// Copyright of the original code is the following.
+// --------
+// xmllint.c : a small tester program for XML input.
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
 #![allow(unused)]
 
 use std::{

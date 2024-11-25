@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// schemastypes.c : implementation of the XML Schema Datatypes definition and validity checking
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <veillard@redhat.com>
+
 use std::{
     cell::Cell,
     ffi::{c_char, CStr},

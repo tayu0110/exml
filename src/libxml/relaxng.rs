@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// relaxng.c : implementation of the Relax-NG handling and validity checking
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <veillard@redhat.com>
+
 use std::{
     any::type_name,
     cell::Cell,

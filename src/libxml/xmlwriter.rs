@@ -9,6 +9,14 @@
 //! it is simpler and more natural to limit the API to writing a single string,
 //! since it is easy to write the format to a single String using `format!`.
 
+// Copyright of the original code is the following.
+// --------
+// xmlwriter.c: XML text writer implementation
+//
+// For license and disclaimer see the license and disclaimer of libxml2.
+//
+// alfred@mickautsch.de
+
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},

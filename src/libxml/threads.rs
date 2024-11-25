@@ -3,9 +3,18 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// threads.c: set of generic threading related routines
+//
+// See Copyright for the status of this software.
+//
+// Gary Pennington <Gary.Pennington@uk.sun.com>
+// daniel@veillard.com
+
 use std::{
     mem::{size_of, size_of_val},
-    ptr::{addr_of, addr_of_mut, null_mut},
+    ptr::null_mut,
 };
 
 use libc::{
@@ -171,7 +180,7 @@ pub unsafe extern "C" fn xml_rmutex_unlock(tok: XmlRMutexPtr) {
         if (*tok).waiters != 0 {
             pthread_cond_signal(&mut (*tok).cv as _);
         }
-        memset(addr_of_mut!((*tok).tid) as _, 0, size_of_val(&(*tok).tid));
+        memset(&raw mut (*tok).tid as _, 0, size_of_val(&(*tok).tid));
     }
     pthread_mutex_unlock(&mut (*tok).lock as _);
 }
@@ -221,7 +230,7 @@ pub(crate) unsafe extern "C" fn xml_get_thread_id() -> i32 {
     }
     let id: pthread_t = pthread_self();
     /* horrible but preserves compat, see warning above */
-    memcpy(addr_of_mut!(ret) as _, addr_of!(id) as _, size_of_val(&ret));
+    memcpy(&raw mut ret as _, &raw const id as _, size_of_val(&ret));
     ret
 }
 

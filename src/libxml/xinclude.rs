@@ -3,6 +3,17 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// xinclude.c : Code to implement XInclude processing
+//
+// World Wide Web Consortium W3C Last Call Working Draft 10 November 2003
+// http://www.w3.org/TR/2003/WD-xinclude-20031110
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},

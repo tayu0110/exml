@@ -3,6 +3,12 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// xmlmemory.c:  libxml memory allocator wrapper.
+//
+// daniel@veillard.com
+
 use std::cell::Cell;
 use std::ffi::{c_char, c_void};
 use std::io::Write;

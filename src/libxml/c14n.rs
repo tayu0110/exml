@@ -3,6 +3,18 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// "Canonical XML" implementation
+// http://www.w3.org/TR/xml-c14n
+//
+// "Exclusive XML Canonicalization" implementation
+// http://www.w3.org/TR/xml-exc-c14n
+//
+// See Copyright for the status of this software.
+//
+// Author: Aleksey Sanin <aleksey@aleksey.com>
+
 use std::{
     any::type_name,
     cell::RefCell,

@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// SAX.c : Old SAX v1 handlers to build a tree. Deprecated except for compatibility
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <daniel@veillard.com>
+
 use std::{ffi::c_void, ptr::null_mut};
 
 use crate::libxml::{

@@ -3,6 +3,19 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// pattern.c: Implementation of selectors for nodes
+//
+// Reference:
+//   http://www.w3.org/TR/2001/REC-xmlschema-1-20010502/
+//   to some extent
+//   http://www.w3.org/TR/1999/REC-xml-19991116
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     mem::size_of,
     os::raw::c_void,

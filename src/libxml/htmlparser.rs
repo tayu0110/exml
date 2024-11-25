@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// HTMLparser.c : an HTML 4.0 non-verifying parser
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},

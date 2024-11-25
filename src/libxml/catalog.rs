@@ -3,13 +3,27 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// catalog.c: set of generic Catalog related routines
+//
+// Reference:  SGML Open Technical Resolution TR9401:1997.
+//             http://www.jclark.com/sp/catalog.htm
+//
+//             XML Catalogs Working Draft 06 August 2001
+//             http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+//
+// See Copyright for the status of this software.
+//
+// Daniel.Veillard@imag.fr
+
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr},
     io::Write,
     mem::{size_of, transmute, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{null, null_mut},
     rc::Rc,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
@@ -249,7 +263,7 @@ unsafe extern "C" fn xml_load_file_content(filename: *const c_char) -> *mut XmlC
         return null_mut();
     }
 
-    if stat(filename, addr_of_mut!(info)) < 0 {
+    if stat(filename, &raw mut info) < 0 {
         return null_mut();
     }
 
@@ -673,7 +687,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
             let mut name: *mut XmlChar = null_mut();
             let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
 
-            cur = xml_parse_sgml_catalog_name(cur, addr_of_mut!(name));
+            cur = xml_parse_sgml_catalog_name(cur, &raw mut name);
             if cur.is_null() || name.is_null() {
                 /* error */
                 break;
@@ -708,7 +722,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                 typ = XmlCatalogEntryType::SgmlCataBase;
             } else if xml_str_equal(name, c"OVERRIDE".as_ptr() as _) {
                 xml_free(name as _);
-                cur = xml_parse_sgml_catalog_name(cur, addr_of_mut!(name));
+                cur = xml_parse_sgml_catalog_name(cur, &raw mut name);
                 if name.is_null() {
                     /* error */
                     break;
@@ -728,7 +742,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                     if matches!(ty, XmlCatalogEntryType::SgmlCataEntity) && *cur == b'%' {
                         typ = XmlCatalogEntryType::SgmlCataPentity;
                     }
-                    cur = xml_parse_sgml_catalog_name(cur, addr_of_mut!(name));
+                    cur = xml_parse_sgml_catalog_name(cur, &raw mut name);
                     if cur.is_null() {
                         /* error */
                         break 'to_break;
@@ -738,7 +752,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                         break 'to_break;
                     }
                     SKIP_BLANKS!(cur);
-                    cur = xml_parse_sgml_catalog_pubid(cur, addr_of_mut!(sysid));
+                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut sysid);
                     if cur.is_null() {
                         /* error */
                         break 'to_break;
@@ -747,7 +761,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                 XmlCatalogEntryType::SgmlCataPublic
                 | XmlCatalogEntryType::SgmlCataSystem
                 | XmlCatalogEntryType::SgmlCataDelegate => 'to_break: {
-                    cur = xml_parse_sgml_catalog_pubid(cur, addr_of_mut!(name));
+                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut name);
                     if cur.is_null() {
                         /* error */
                         break 'to_break;
@@ -771,7 +785,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                         break 'to_break;
                     }
                     SKIP_BLANKS!(cur);
-                    cur = xml_parse_sgml_catalog_pubid(cur, addr_of_mut!(sysid));
+                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut sysid);
                     if cur.is_null() {
                         /* error */
                         break 'to_break;
@@ -781,7 +795,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog(
                 | XmlCatalogEntryType::SgmlCataCatalog
                 | XmlCatalogEntryType::SgmlCataDocument
                 | XmlCatalogEntryType::SgmlCataSGMLDecl => 'to_break: {
-                    cur = xml_parse_sgml_catalog_pubid(cur, addr_of_mut!(sysid));
+                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut sysid);
                     if cur.is_null() {
                         /* error */
                         break 'to_break;
@@ -3350,7 +3364,7 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
             /* the XML_CATALOG_FILES envvar is allowed to contain a
             space-separated list of entries. */
             cur = catalogs;
-            nextent = addr_of_mut!((*catal).xml);
+            nextent = &raw mut (*catal).xml;
             while *cur != b'\0' as i8 {
                 while xml_is_blank_char(*cur as u32) {
                     cur = cur.add(1);
@@ -3371,7 +3385,7 @@ pub unsafe extern "C" fn xml_initialize_catalog() {
                             null_mut(),
                         );
                         if !(*nextent).is_null() {
-                            nextent = addr_of_mut!((*(*nextent)).next);
+                            nextent = &raw mut (*(*nextent)).next;
                         }
                         xml_free(path as _);
                     }

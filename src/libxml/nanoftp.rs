@@ -3,6 +3,12 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// nanoftp.c: basic FTP client support
+//
+// Reference: RFC 959
+
 use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ulong},
     mem::{size_of, size_of_val, zeroed},

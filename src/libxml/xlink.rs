@@ -3,6 +3,15 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// xlink.c : implementation of the hyperlinks detection module
+//           This version supports both XML XLinks and HTML simple links
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     ffi::{c_char, CStr},
     os::raw::c_void,

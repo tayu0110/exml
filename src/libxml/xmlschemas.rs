@@ -3,6 +3,14 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// schemas.c : implementation of the XML Schema handling and schema validity checking
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <veillard@redhat.com>
+
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
