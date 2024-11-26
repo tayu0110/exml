@@ -2930,10 +2930,10 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
 ///
 /// Returns: XML_ATTRIBUTE_ENUMERATION or XML_ATTRIBUTE_NOTATION
 #[doc(alias = "xmlParseEnumeratedType")]
-pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
+pub(crate) unsafe fn xml_parse_enumerated_type(
     ctxt: XmlParserCtxtPtr,
     tree: *mut XmlEnumerationPtr,
-) -> i32 {
+) -> Option<XmlAttributeType> {
     if (*ctxt).content_bytes().starts_with(b"NOTATION") {
         (*ctxt).advance(8);
         if (*ctxt).skip_blanks() == 0 {
@@ -2942,19 +2942,19 @@ pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
                 XmlParserErrors::XmlErrSpaceRequired,
                 c"Space required after 'NOTATION'\n".as_ptr() as _,
             );
-            return 0;
+            return None;
         }
         *tree = xml_parse_notation_type(ctxt);
         if (*tree).is_null() {
-            return 0;
+            return None;
         }
-        return XmlAttributeType::XmlAttributeNotation as i32;
+        return Some(XmlAttributeType::XmlAttributeNotation);
     }
     *tree = xml_parse_enumeration_type(ctxt);
     if (*tree).is_null() {
-        return 0;
+        return None;
     }
-    XmlAttributeType::XmlAttributeEnumeration as i32
+    Some(XmlAttributeType::XmlAttributeEnumeration)
 }
 
 /// Parse the Attribute list def for an element
@@ -2995,34 +2995,34 @@ pub(crate) unsafe extern "C" fn xml_parse_enumerated_type(
 ///
 /// Returns the attribute type
 #[doc(alias = "xmlParseAttributeType")]
-pub(crate) unsafe extern "C" fn xml_parse_attribute_type(
+pub(crate) unsafe fn xml_parse_attribute_type(
     ctxt: XmlParserCtxtPtr,
     tree: *mut XmlEnumerationPtr,
-) -> i32 {
+) -> Option<XmlAttributeType> {
     if (*ctxt).content_bytes().starts_with(b"CDATA") {
         (*ctxt).advance(5);
-        return XmlAttributeType::XmlAttributeCDATA as i32;
+        return Some(XmlAttributeType::XmlAttributeCDATA);
     } else if (*ctxt).content_bytes().starts_with(b"IDREFS") {
         (*ctxt).advance(6);
-        return XmlAttributeType::XmlAttributeIDREFS as i32;
+        return Some(XmlAttributeType::XmlAttributeIDREFS);
     } else if (*ctxt).content_bytes().starts_with(b"IDREF") {
         (*ctxt).advance(5);
-        return XmlAttributeType::XmlAttributeIDREF as i32;
+        return Some(XmlAttributeType::XmlAttributeIDREF);
     } else if (*ctxt).current_byte() == b'I' && NXT!(ctxt, 1) == b'D' {
         (*ctxt).advance(2);
-        return XmlAttributeType::XmlAttributeID as i32;
+        return Some(XmlAttributeType::XmlAttributeID);
     } else if (*ctxt).content_bytes().starts_with(b"ENTITY") {
         (*ctxt).advance(6);
-        return XmlAttributeType::XmlAttributeEntity as i32;
+        return Some(XmlAttributeType::XmlAttributeEntity);
     } else if (*ctxt).content_bytes().starts_with(b"ENTITIES") {
         (*ctxt).advance(8);
-        return XmlAttributeType::XmlAttributeEntities as i32;
+        return Some(XmlAttributeType::XmlAttributeEntities);
     } else if (*ctxt).content_bytes().starts_with(b"NMTOKENS") {
         (*ctxt).advance(8);
-        return XmlAttributeType::XmlAttributeNmtokens as i32;
+        return Some(XmlAttributeType::XmlAttributeNmtokens);
     } else if (*ctxt).content_bytes().starts_with(b"NMTOKEN") {
         (*ctxt).advance(7);
-        return XmlAttributeType::XmlAttributeNmtoken as i32;
+        return Some(XmlAttributeType::XmlAttributeNmtoken);
     }
     xml_parse_enumerated_type(ctxt, tree)
 }
@@ -3184,7 +3184,7 @@ pub(crate) unsafe extern "C" fn xml_add_special_attr(
     ctxt: XmlParserCtxtPtr,
     fullname: *const XmlChar,
     fullattr: *const XmlChar,
-    typ: i32,
+    typ: XmlAttributeType,
 ) {
     if (*ctxt).atts_special.is_null() {
         (*ctxt).atts_special = xml_hash_create_dict(10, (*ctxt).dict);

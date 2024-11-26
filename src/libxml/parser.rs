@@ -11957,10 +11957,9 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 break;
             }
 
-            let typ: i32 = xml_parse_attribute_type(ctxt, addr_of_mut!(tree));
-            if typ <= 0 {
+            let Some(typ) = xml_parse_attribute_type(ctxt, addr_of_mut!(tree)) else {
                 break;
-            }
+            };
 
             (*ctxt).grow();
             if (*ctxt).skip_blanks() == 0 {
@@ -11985,7 +11984,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 }
                 break;
             }
-            if typ != XmlAttributeType::XmlAttributeCDATA as i32 && !default_value.is_null() {
+            if typ != XmlAttributeType::XmlAttributeCDATA && !default_value.is_null() {
                 xml_attr_normalize_space(default_value, default_value);
             }
 
@@ -12013,7 +12012,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                         (*ctxt).user_data.clone(),
                         elem_name,
                         attr_name,
-                        typ,
+                        typ as i32,
                         def,
                         default_value,
                         tree,
