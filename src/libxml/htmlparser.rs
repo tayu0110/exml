@@ -35,7 +35,7 @@ use crate::{
     libxml::{
         dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-        hash::{xml_hash_default_deallocator, xml_hash_free},
+        hash::xml_hash_free,
         parser::{
             xml_free_parser_ctxt, xml_init_node_info_seq, xml_init_parser,
             xml_load_external_entity, xml_new_io_input_stream, xml_parser_add_node_info,
@@ -11397,10 +11397,10 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).catalogs = null_mut();
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
 
-    if !(*ctxt).atts_default.is_null() {
-        xml_hash_free((*ctxt).atts_default, Some(xml_hash_default_deallocator));
-        (*ctxt).atts_default = null_mut();
+    if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
+        table.clear_with(|data, _| xml_free(data as _));
     }
+
     if !(*ctxt).atts_special.is_null() {
         xml_hash_free((*ctxt).atts_special, None);
         (*ctxt).atts_special = null_mut();

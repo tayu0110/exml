@@ -1309,6 +1309,14 @@ impl<'a, T> XmlHashTableRef<'a, T> {
     }
 }
 
+impl<'a, T> Clone for XmlHashTableRef<'a, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, T> Copy for XmlHashTableRef<'a, T> {}
+
 impl<'a, T> Deref for XmlHashTableRef<'a, T> {
     type Target = XmlHashTable<'a, T>;
 

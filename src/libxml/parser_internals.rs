@@ -25,6 +25,7 @@ pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
 use crate::error::XmlParserErrors;
+use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 #[cfg(feature = "catalog")]
 use crate::{
@@ -47,9 +48,7 @@ use crate::{
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, xml_dict_reference},
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-        hash::{
-            xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2, xml_hash_update_entry2,
-        },
+        hash::{xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2},
         parser::{
             xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
             xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
@@ -86,9 +85,11 @@ use crate::{
     },
 };
 
+use super::dict::XmlDictRef;
 use super::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
+use super::hash::XmlHashTable;
 
 macro_rules! VALID_CTXT {
     ($ctxt:expr) => {
@@ -3049,17 +3050,20 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
     }
 
     'mem_error: {
-        if (*ctxt).atts_default.is_null() {
-            (*ctxt).atts_default = xml_hash_create_dict(10, (*ctxt).dict);
-            if (*ctxt).atts_default.is_null() {
+        let mut atts_default = if let Some(table) = (*ctxt).atts_default {
+            table
+        } else {
+            let dict = XmlDictRef::from_raw((*ctxt).dict);
+            let table = XmlHashTable::with_capacity_dict(10, dict);
+            let Some(table) = XmlHashTableRef::from_table(table) else {
                 break 'mem_error;
-            }
-        }
+            };
+            (*ctxt).atts_default = Some(table);
+            table
+        };
 
-        /*
-         * split the element name into prefix:localname , the string found
-         * are within the DTD and then not associated to namespace names.
-         */
+        // split the element name into prefix:localname , the string found
+        // are within the DTD and then not associated to namespace names.
         name = xml_split_qname3(fullname, addr_of_mut!(len));
         if name.is_null() {
             name = xml_dict_lookup((*ctxt).dict, fullname, -1);
@@ -3069,10 +3073,13 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             prefix = xml_dict_lookup((*ctxt).dict, fullname, len);
         }
 
-        /*
-         * make sure there is some storage
-         */
-        defaults = xml_hash_lookup2((*ctxt).atts_default, name, prefix) as _;
+        // make sure there is some storage
+        defaults = atts_default
+            .lookup2(
+                CStr::from_ptr(name as *const i8),
+                (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+            )
+            .map_or(null_mut(), |p| *p);
         if defaults.is_null() {
             defaults =
                 xml_malloc(size_of::<XmlDefAttrs>() + (4 * 5) * size_of::<*const XmlChar>()) as _;
@@ -3081,7 +3088,15 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             }
             (*defaults).nb_attrs = 0;
             (*defaults).max_attrs = 4;
-            if xml_hash_update_entry2((*ctxt).atts_default, name, prefix, defaults as _, None) < 0 {
+            if atts_default
+                .update_entry2(
+                    CStr::from_ptr(name as *const i8),
+                    (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                    defaults,
+                    |_, _| {},
+                )
+                .is_err()
+            {
                 xml_free(defaults as _);
                 break 'mem_error;
             }
@@ -3096,7 +3111,15 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             }
             defaults = temp;
             (*defaults).max_attrs *= 2;
-            if xml_hash_update_entry2((*ctxt).atts_default, name, prefix, defaults as _, None) < 0 {
+            if atts_default
+                .update_entry2(
+                    CStr::from_ptr(name as *const i8),
+                    (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                    defaults,
+                    |_, _| {},
+                )
+                .is_err()
+            {
                 xml_free(defaults as _);
                 break 'mem_error;
             }
@@ -3841,7 +3864,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*oldctxt).nb_warnings = (*ctxt).nb_warnings;
     (*ctxt).sax = oldsax as _;
     (*ctxt).dict = null_mut();
-    (*ctxt).atts_default = null_mut();
+    (*ctxt).atts_default = None;
     (*ctxt).atts_special = null_mut();
     xml_free_parser_ctxt(ctxt);
     if !new_doc.is_null() {
