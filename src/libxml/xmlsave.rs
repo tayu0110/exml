@@ -798,11 +798,11 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
             buf.push_quoted_cstr(&system_id);
         }
     }
-    if (*dtd).entities.is_null()
+    if (*dtd).entities.is_none()
         && (*dtd).elements.is_null()
         && (*dtd).attributes.is_null()
         && (*dtd).notations.is_null()
-        && (*dtd).pentities.is_null()
+        && (*dtd).pentities.is_none()
     {
         (*ctxt).buf.borrow_mut().write_bytes(b">");
         return;

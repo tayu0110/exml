@@ -11,7 +11,6 @@ use libc::memset;
 
 use crate::{
     dict::xml_dict_owns,
-    hash::{xml_hash_lookup, xml_hash_remove_entry},
     libxml::{
         entities::{
             xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_get_doc_entity,
@@ -214,51 +213,35 @@ pub trait NodeCommon {
             let name = self.name().map(|n| CString::new(n.as_ref()).unwrap());
             if !doc.is_null() {
                 if !(*doc).int_subset.is_null() {
-                    if xml_hash_lookup(
-                        (*(*doc).int_subset).entities as _,
-                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                    ) == self as *mut Self as *mut c_void
+                    if let (Some(mut table), Some(name)) =
+                        ((*(*doc).int_subset).entities, name.as_deref())
                     {
-                        xml_hash_remove_entry(
-                            (*(*doc).int_subset).entities as _,
-                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                            None,
-                        );
+                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                            table.remove_entry(name, |_, _| {});
+                        }
                     }
-                    if xml_hash_lookup(
-                        (*(*doc).int_subset).pentities as _,
-                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                    ) == self as *mut Self as *mut c_void
+                    if let (Some(mut table), Some(name)) =
+                        ((*(*doc).int_subset).pentities, name.as_deref())
                     {
-                        xml_hash_remove_entry(
-                            (*(*doc).int_subset).pentities as _,
-                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                            None,
-                        );
+                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                            table.remove_entry(name, |_, _| {});
+                        }
                     }
                 }
                 if !(*doc).ext_subset.is_null() {
-                    if xml_hash_lookup(
-                        (*(*doc).ext_subset).entities as _,
-                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                    ) == self as *mut Self as *mut c_void
+                    if let (Some(mut table), Some(name)) =
+                        ((*(*doc).ext_subset).entities, name.as_deref())
                     {
-                        xml_hash_remove_entry(
-                            (*(*doc).ext_subset).entities as _,
-                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                            None,
-                        );
+                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                            table.remove_entry(name, |_, _| {});
+                        }
                     }
-                    if xml_hash_lookup(
-                        (*(*doc).ext_subset).pentities as _,
-                        name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                    ) == self as *mut Self as *mut c_void
+                    if let (Some(mut table), Some(name)) =
+                        ((*(*doc).ext_subset).pentities, name.as_deref())
                     {
-                        xml_hash_remove_entry(
-                            (*(*doc).ext_subset).pentities as _,
-                            name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                            None,
-                        );
+                        if table.lookup(name).copied() == Some(self as *mut Self as XmlEntityPtr) {
+                            table.remove_entry(name, |_, _| {});
+                        }
                     }
                 }
             }

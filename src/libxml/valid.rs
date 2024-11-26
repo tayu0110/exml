@@ -42,7 +42,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-        entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityPtr, XmlEntityType},
+        entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_add_entry3, xml_hash_copy,
@@ -4394,13 +4394,7 @@ extern "C" fn xml_validate_attribute_callback(
     }
 }
 
-extern "C" fn xml_validate_notation_callback(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
-) {
-    let cur: XmlEntityPtr = payload as XmlEntityPtr;
-    let ctxt: XmlValidCtxtPtr = data as XmlValidCtxtPtr;
+extern "C" fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCtxtPtr) {
     if cur.is_null() {
         return;
     }
@@ -4439,7 +4433,6 @@ extern "C" fn xml_validate_notation_callback(
 pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let mut dtd: XmlDtdPtr;
     let mut table: XmlAttributeTablePtr;
-    let mut entities: XmlEntitiesTablePtr;
 
     if doc.is_null() || ctxt.is_null() {
         return 0;
@@ -4454,18 +4447,24 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
         table = (*dtd).attributes as XmlAttributeTablePtr;
         xml_hash_scan(table, Some(xml_validate_attribute_callback), ctxt as _);
     }
-    if !dtd.is_null() && !(*dtd).entities.is_null() {
-        entities = (*dtd).entities as XmlEntitiesTablePtr;
-        xml_hash_scan(entities, Some(xml_validate_notation_callback), ctxt as _);
+    if !dtd.is_null() {
+        if let Some(entities) = (*dtd).entities {
+            entities.scan(|payload, _, _, _| {
+                xml_validate_notation_callback(*payload, ctxt);
+            });
+        }
     }
     dtd = (*doc).ext_subset;
     if !dtd.is_null() && !(*dtd).attributes.is_null() {
         table = (*dtd).attributes as XmlAttributeTablePtr;
         xml_hash_scan(table, Some(xml_validate_attribute_callback), ctxt as _);
     }
-    if !dtd.is_null() && !(*dtd).entities.is_null() {
-        entities = (*dtd).entities as XmlEntitiesTablePtr;
-        xml_hash_scan(entities, Some(xml_validate_notation_callback), ctxt as _);
+    if !dtd.is_null() {
+        if let Some(entities) = (*dtd).entities {
+            entities.scan(|entity, _, _, _| {
+                xml_validate_notation_callback(*entity, ctxt);
+            });
+        }
     }
     (*ctxt).valid
 }

@@ -1046,11 +1046,11 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     if !(*cur).attributes.is_null() {
         xml_free_attribute_table((*cur).attributes as XmlAttributeTablePtr);
     }
-    if !(*cur).entities.is_null() {
-        xml_free_entities_table((*cur).entities as _);
+    if let Some(entities) = (*cur).entities.take() {
+        xml_free_entities_table(entities);
     }
-    if !(*cur).pentities.is_null() {
-        xml_free_entities_table((*cur).pentities as _);
+    if let Some(pentities) = (*cur).pentities.take() {
+        xml_free_entities_table(pentities);
     }
 
     xml_free(cur as _);
@@ -1831,8 +1831,8 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     if ret.is_null() {
         return null_mut();
     }
-    if !(*dtd).entities.is_null() {
-        (*ret).entities = xml_copy_entities_table((*dtd).entities as _) as _;
+    if let Some(entities) = (*dtd).entities {
+        (*ret).entities = xml_copy_entities_table(entities);
     }
     if !(*dtd).notations.is_null() {
         (*ret).notations = xml_copy_notation_table((*dtd).notations as XmlNotationTablePtr) as _;
@@ -1844,8 +1844,8 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         (*ret).attributes =
             xml_copy_attribute_table((*dtd).attributes as XmlAttributeTablePtr) as _;
     }
-    if !(*dtd).pentities.is_null() {
-        (*ret).pentities = xml_copy_entities_table((*dtd).pentities as _) as _;
+    if let Some(pentities) = (*dtd).pentities {
+        (*ret).pentities = xml_copy_entities_table(pentities);
     }
 
     let mut cur = (*dtd).children.map_or(null_mut(), |c| c.as_ptr());

@@ -11,10 +11,13 @@ pub use enumeration::*;
 use libc::memset;
 pub use notation::*;
 
-use crate::libxml::{
-    entities::XmlEntityPtr,
-    globals::{xml_free, xml_malloc, xml_register_node_default_value},
-    xmlstring::{xml_strdup, XmlChar},
+use crate::{
+    hash::XmlHashTableRef,
+    libxml::{
+        entities::XmlEntityPtr,
+        globals::{xml_free, xml_malloc, xml_register_node_default_value},
+        xmlstring::{xml_strdup, XmlChar},
+    },
 };
 
 use super::{
@@ -41,10 +44,10 @@ pub struct XmlDtd {
     pub(crate) notations: *mut c_void, /* Hash table for notations if any */
     pub(crate) elements: *mut c_void,  /* Hash table for elements if any */
     pub(crate) attributes: *mut c_void, /* Hash table for attributes if any */
-    pub(crate) entities: *mut c_void,  /* Hash table for entities if any */
+    pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
-    pub(crate) system_id: Option<String>, /* URI for a SYSTEM or PUBLIC DTD */
-    pub(crate) pentities: *mut c_void, /* Hash table for param entities if any */
+    pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
+    pub(crate) pentities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for param entities if any */
 }
 
 impl XmlDtd {
@@ -55,13 +58,10 @@ impl XmlDtd {
     #[doc(alias = "xmlGetEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
     pub(super) unsafe fn get_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
-        use std::ptr::null_mut;
-
-        use crate::hash::xml_hash_lookup;
-
-        if !self.entities.is_null() {
-            let table = self.entities as _;
-            return xml_hash_lookup(table, name) as _;
+        if let Some(table) = self.entities {
+            return table
+                .lookup(CStr::from_ptr(name as *const i8))
+                .map_or(null_mut(), |p| *p);
         }
         null_mut()
     }
@@ -73,12 +73,10 @@ impl XmlDtd {
     #[doc(alias = "xmlGetParameterEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
     pub(super) unsafe fn get_parameter_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
-        use crate::{hash::xml_hash_lookup, libxml::entities::XmlEntitiesTablePtr};
-
-        if !self.pentities.is_null() {
-            let table = self.pentities as XmlEntitiesTablePtr;
-            return xml_hash_lookup(table, name) as _;
-            /* return(xmlGetEntityFromTable(table, name)); */
+        if let Some(table) = self.pentities {
+            return table
+                .lookup(CStr::from_ptr(name as *const i8))
+                .map_or(null_mut(), |p| *p);
         }
         null_mut()
     }
@@ -99,10 +97,10 @@ impl Default for XmlDtd {
             notations: null_mut(),
             elements: null_mut(),
             attributes: null_mut(),
-            entities: null_mut(),
+            entities: None,
             external_id: None,
             system_id: None,
-            pentities: null_mut(),
+            pentities: None,
         }
     }
 }

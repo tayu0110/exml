@@ -35,7 +35,6 @@ use crate::{
         dict::{xml_dict_free, xml_dict_reference},
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
-        hash::{xml_hash_scan, XmlHashTablePtr},
         parser::{
             xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
             xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr,
@@ -711,12 +710,7 @@ pub struct XmlXIncludeMergeData {
 
 /// Implements the merge of one entity
 #[doc(alias = "xmlXIncludeMergeOneEntity")]
-extern "C" fn xml_xinclude_merge_entity(
-    payload: *mut c_void,
-    vdata: *mut c_void,
-    _name: *const XmlChar,
-) {
-    let ent: XmlEntityPtr = payload as XmlEntityPtr;
+extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
     let data: XmlXIncludeMergeDataPtr = vdata as XmlXIncludeMergeDataPtr;
     let prev: XmlEntityPtr;
 
@@ -868,36 +862,32 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
     }
 
     source = (*from).int_subset;
-    if !source.is_null() && !(*source).entities.is_null() {
-        let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
+    if !source.is_null() {
+        if let Some(entities) = (*source).entities {
+            let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
+            data.ctxt = ctxt;
+            data.doc = doc;
 
-        data.ctxt = ctxt;
-        data.doc = doc;
-
-        xml_hash_scan(
-            (*source).entities as XmlHashTablePtr,
-            Some(xml_xinclude_merge_entity),
-            addr_of_mut!(data) as _,
-        );
+            entities.scan(|payload, _, _, _| {
+                xml_xinclude_merge_entity(*payload, &raw mut data as _);
+            });
+        }
     }
     source = (*from).ext_subset;
-    if !source.is_null() && !(*source).entities.is_null() {
-        let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
+    if !source.is_null() {
+        if let Some(entities) = (*source).entities {
+            let mut data: XmlXIncludeMergeData = unsafe { zeroed() };
+            data.ctxt = ctxt;
+            data.doc = doc;
 
-        data.ctxt = ctxt;
-        data.doc = doc;
-
-        /*
-         * don't duplicate existing stuff when external subsets are the same
-         */
-        if (*target).external_id != (*source).external_id
-            && (*target).system_id != (*source).system_id
-        {
-            xml_hash_scan(
-                (*source).entities as XmlHashTablePtr,
-                Some(xml_xinclude_merge_entity),
-                addr_of_mut!(data) as _,
-            );
+            // don't duplicate existing stuff when external subsets are the same
+            if (*target).external_id != (*source).external_id
+                && (*target).system_id != (*source).system_id
+            {
+                entities.scan(|payload, _, _, _| {
+                    xml_xinclude_merge_entity(*payload, &raw mut data as _);
+                });
+            }
         }
     }
     0

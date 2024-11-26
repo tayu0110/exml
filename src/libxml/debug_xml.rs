@@ -15,7 +15,6 @@ use std::{
     ffi::{c_char, CStr, CString},
     io::{stdout, Write},
     mem::zeroed,
-    os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     str::from_utf8_unchecked,
     sync::atomic::Ordering,
@@ -39,8 +38,7 @@ use crate::{
 use super::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr};
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-    entities::{xml_get_doc_entity, XmlEntitiesTablePtr, XmlEntityType},
-    hash::xml_hash_scan,
+    entities::{xml_get_doc_entity, XmlEntityType},
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
@@ -1629,13 +1627,7 @@ pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: XmlDtdPtr) {
 }
 
 #[doc(alias = "xmlCtxtDumpEntityCallback")]
-extern "C" fn xml_ctxt_dump_entity_callback(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
-) {
-    let cur: XmlEntityPtr = payload as XmlEntityPtr;
-    let ctxt: XmlDebugCtxtPtr = data as XmlDebugCtxtPtr;
+extern "C" fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtxtPtr) {
     unsafe {
         if cur.is_null() {
             if (*ctxt).check == 0 {
@@ -1709,23 +1701,27 @@ unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
         return;
     }
     xml_ctxt_dump_doc_head(ctxt, doc);
-    if !(*doc).int_subset.is_null() && !(*(*doc).int_subset).entities.is_null() {
-        let table: XmlEntitiesTablePtr = (*(*doc).int_subset).entities as XmlEntitiesTablePtr;
-
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "Entities in internal subset");
+    if !(*doc).int_subset.is_null() {
+        if let Some(table) = (*(*doc).int_subset).entities {
+            if (*ctxt).check == 0 {
+                writeln!((*ctxt).output, "Entities in internal subset");
+            }
+            table.scan(|payload, _, _, _| {
+                xml_ctxt_dump_entity_callback(*payload, ctxt);
+            });
         }
-        xml_hash_scan(table, Some(xml_ctxt_dump_entity_callback), ctxt as _);
     } else {
         writeln!((*ctxt).output, "No entities in internal subset");
     }
-    if !(*doc).ext_subset.is_null() && !(*(*doc).ext_subset).entities.is_null() {
-        let table: XmlEntitiesTablePtr = (*(*doc).ext_subset).entities as XmlEntitiesTablePtr;
-
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "Entities in external subset");
+    if !(*doc).ext_subset.is_null() {
+        if let Some(table) = (*(*doc).ext_subset).entities {
+            if (*ctxt).check == 0 {
+                writeln!((*ctxt).output, "Entities in external subset");
+            }
+            table.scan(|payload, _, _, _| {
+                xml_ctxt_dump_entity_callback(*payload, ctxt);
+            });
         }
-        xml_hash_scan(table, Some(xml_ctxt_dump_entity_callback), ctxt as _);
     } else if (*ctxt).check == 0 {
         writeln!((*ctxt).output, "No entities in external subset");
     }
