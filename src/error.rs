@@ -1,7 +1,7 @@
 use std::{
     borrow::Cow,
     ffi::{c_void, CStr},
-    io::{stderr, Write},
+    io::{stderr, Stderr, Stdout, Write},
     ptr::{null, null_mut, NonNull},
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
@@ -960,22 +960,29 @@ impl XmlError {
 
 /// Default generic error function.
 ///
-/// If `out` is `None`, output `libc:perror`-like format message to stderr.
+/// If the global generic error context is not set, `Stderr` is set and used.  
+/// Otherwise, use the global generic error context.
+///
+/// # Panic
+/// - The global generic error context must be either `Stdout`, `Stderr` or `Box<dyn Write>`.
 pub fn generic_error_default(_context: Option<GenericErrorContext>, msg: &str) {
     let out = GLOBAL_STATE.with_borrow_mut(|state| {
         state
             .generic_error_context
-            .get_or_insert_with(|| {
-                let stderr: Box<dyn Write> = Box::new(stderr());
-                GenericErrorContext::new(stderr)
-            })
+            .get_or_insert_with(|| GenericErrorContext::new(stderr()))
             .clone()
     });
     let mut lock = out.context.lock().unwrap();
-    let context = lock
-        .downcast_mut::<Box<dyn Write>>()
-        .expect("GenericErrorContext is not writable.");
-    write!(context, "{msg}").ok();
+    if lock.downcast_mut::<Stdout>().is_some() {
+        print!("{msg}");
+    } else if lock.downcast_mut::<Stderr>().is_some() {
+        eprint!("{msg}");
+    } else {
+        let context = lock
+            .downcast_mut::<Box<dyn Write>>()
+            .expect("GenericErrorContext is not writable.");
+        write!(context, "{msg}").ok();
+    }
 }
 
 #[macro_export]
