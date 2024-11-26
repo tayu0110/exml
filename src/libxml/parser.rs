@@ -86,7 +86,6 @@ use crate::{
             xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
             xml_free, xml_init_globals_internal, xml_malloc, xml_malloc_atomic, xml_realloc,
         },
-        hash::{xml_hash_free, xml_hash_qlookup2, XmlHashTablePtr},
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
             xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
@@ -540,9 +539,9 @@ pub struct XmlParserCtxt {
     pub(crate) attallocs: *mut i32,         /* which attribute were allocated */
     pub(crate) push_tab: Vec<XmlStartTag>,  /* array of data for push */
     pub(crate) atts_default: Option<XmlHashTableRef<'static, XmlDefAttrsPtr>>, /* defaulted attributes if any */
-    pub(crate) atts_special: XmlHashTablePtr, /* non-CDATA attributes if any */
-    pub(crate) ns_well_formed: i32,           /* is the document XML Namespace okay */
-    pub(crate) options: i32,                  /* Extra options */
+    pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>, /* non-CDATA attributes if any */
+    pub(crate) ns_well_formed: i32, /* is the document XML Namespace okay */
+    pub(crate) options: i32,        /* Extra options */
 
     /*
      * Those fields are needed only for streaming parsing so far
@@ -1681,7 +1680,7 @@ impl Default for XmlParserCtxt {
             attallocs: null_mut(),
             push_tab: vec![],
             atts_default: None,
-            atts_special: null_mut(),
+            atts_special: None,
             ns_well_formed: 0,
             options: 0,
             dict_names: 0,
@@ -3107,17 +3106,17 @@ unsafe extern "C" fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
 /// to parse the DTD and before starting to parse the document root.
 #[doc(alias = "xmlCleanSpecialAttr")]
 unsafe extern "C" fn xml_clean_special_attr(ctxt: XmlParserCtxtPtr) {
-    let Some(mut atts) = XmlHashTableRef::from_raw((*ctxt).atts_special) else {
+    let Some(mut atts) = (*ctxt).atts_special else {
         return;
     };
 
     atts.remove_if(
-        |data, _, _, _| data.0 as isize == XmlAttributeType::XmlAttributeCDATA as isize,
+        |data, _, _, _| *data == XmlAttributeType::XmlAttributeCDATA,
         |_, _| {},
     );
     if atts.is_empty() {
         atts.free();
-        (*ctxt).atts_special = null_mut();
+        (*ctxt).atts_special = None;
     }
 }
 
@@ -4731,7 +4730,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if !oldctxt.is_null() {
         (*ctxt).dict = null_mut();
         (*ctxt).atts_default = None;
-        (*ctxt).atts_special = null_mut();
+        (*ctxt).atts_special = None;
         (*oldctxt).nb_errors = (*ctxt).nb_errors;
         (*oldctxt).nb_warnings = (*ctxt).nb_warnings;
         (*oldctxt).validate = (*ctxt).validate;
@@ -5090,9 +5089,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
         table.clear_with(|data, _| xml_free(data as _));
     }
-    if !(*ctxt).atts_special.is_null() {
-        xml_hash_free((*ctxt).atts_special, None);
-    }
+    let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
     if !(*ctxt).free_elems.is_null() {
         let mut cur = (*ctxt).free_elems;
         while !cur.is_null() {
@@ -7749,13 +7746,17 @@ unsafe extern "C" fn xml_parse_attribute2(
         return null_mut();
     }
 
-    /*
-     * get the type if needed
-     */
-    if !(*ctxt).atts_special.is_null() {
-        let typ: i32 =
-            xml_hash_qlookup2((*ctxt).atts_special, pref, elem, *prefix, name) as ptrdiff_t as i32;
-        if typ != 0 {
+    // get the type if needed
+    if let Some(atts) = (*ctxt).atts_special {
+        if atts
+            .qlookup2(
+                (!pref.is_null()).then(|| CStr::from_ptr(pref as *const i8)),
+                CStr::from_ptr(elem as *const i8),
+                (!(*prefix).is_null()).then(|| CStr::from_ptr(*prefix as *const i8)),
+                (!name.is_null()).then(|| CStr::from_ptr(name as *const i8)),
+            )
+            .is_some()
+        {
             normalize = 1;
         }
     }
@@ -10784,10 +10785,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
         table.clear_with(|data, _| xml_free(data as _));
     }
-    if !(*ctxt).atts_special.is_null() {
-        xml_hash_free((*ctxt).atts_special, None);
-        (*ctxt).atts_special = null_mut();
-    }
+    let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
 
     #[cfg(feature = "catalog")]
     if !(*ctxt).catalogs.is_null() {

@@ -48,7 +48,6 @@ use crate::{
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, xml_dict_reference},
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-        hash::{xml_hash_add_entry2, xml_hash_create_dict, xml_hash_lookup2},
         parser::{
             xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
             xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
@@ -3040,11 +3039,17 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
     let mut name: *const XmlChar;
     let mut prefix: *const XmlChar;
 
-    /*
-     * Allows to detect attribute redefinitions
-     */
-    if !(*ctxt).atts_special.is_null()
-        && !xml_hash_lookup2((*ctxt).atts_special, fullname, fullattr).is_null()
+    // Allows to detect attribute redefinitions
+    if (*ctxt)
+        .atts_special
+        .filter(|t| {
+            t.lookup2(
+                CStr::from_ptr(fullname as *const i8),
+                (!fullattr.is_null()).then(|| CStr::from_ptr(fullattr as *const i8)),
+            )
+            .is_some()
+        })
+        .is_some()
     {
         return;
     }
@@ -3186,24 +3191,26 @@ pub(crate) unsafe extern "C" fn xml_add_special_attr(
     fullattr: *const XmlChar,
     typ: XmlAttributeType,
 ) {
-    if (*ctxt).atts_special.is_null() {
-        (*ctxt).atts_special = xml_hash_create_dict(10, (*ctxt).dict);
-        if (*ctxt).atts_special.is_null() {
-            // goto mem_error;
+    let mut atts_special = if let Some(table) = (*ctxt).atts_special {
+        table
+    } else {
+        let dict = XmlDictRef::from_raw((*ctxt).dict);
+        let table = XmlHashTable::with_capacity_dict(10, dict);
+        let Some(table) = XmlHashTableRef::from_table(table) else {
             xml_err_memory(ctxt, null());
             return;
-        }
-    }
+        };
+        (*ctxt).atts_special = Some(table);
+        table
+    };
 
-    if !xml_hash_lookup2((*ctxt).atts_special, fullname, fullattr).is_null() {
+    let fullname = CStr::from_ptr(fullname as *const i8);
+    let fullattr = (!fullattr.is_null()).then(|| CStr::from_ptr(fullattr as *const i8));
+    if atts_special.lookup2(fullname, fullattr).is_some() {
         return;
     }
 
-    xml_hash_add_entry2((*ctxt).atts_special, fullname, fullattr, typ as isize as _);
-
-    // mem_error:
-    // xmlErrMemory(ctxt, null());
-    // return;
+    atts_special.add_entry2(fullname, fullattr, typ);
 }
 
 /// Parse the declaration for a Mixed Element content
@@ -3865,7 +3872,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     (*ctxt).sax = oldsax as _;
     (*ctxt).dict = null_mut();
     (*ctxt).atts_default = None;
-    (*ctxt).atts_special = null_mut();
+    (*ctxt).atts_special = None;
     xml_free_parser_ctxt(ctxt);
     if !new_doc.is_null() {
         xml_free_doc(new_doc);

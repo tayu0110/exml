@@ -3004,7 +3004,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                      * It need to be done twice ... it's an extra burden related
                      * to the ability to keep references in attributes
                      */
-                    if !(*ctxt).atts_special.is_null() {
+                    if (*ctxt).atts_special.is_some() {
                         let nvalnorm: *mut XmlChar;
                         let mut fname: [XmlChar; 50] = [0; 50];
 
