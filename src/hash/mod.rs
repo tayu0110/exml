@@ -439,7 +439,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     /// table.add_entry(c"hoge", 1u32);
-    /// table.add_entry2(c"foo", c"bar", 2);
+    /// table.add_entry2(c"foo", Some(c"bar"), 2);
     ///
     /// // Update occurs.
     /// let mut updated = false;
@@ -476,11 +476,11 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry2(c"foo", c"bar", 2u32);
-    /// table.add_entry3(c"hoge", c"fuga", c"piyo", 3);
+    /// table.add_entry2(c"foo", Some(c"bar"), 2u32);
+    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 3);
     ///
     /// let mut updated = false;
-    /// assert!(table.update_entry2(c"foo", c"bar", 3, |data, name| {
+    /// assert!(table.update_entry2(c"foo", Some(c"bar"), 3, |data, name| {
     ///     assert_eq!(data, 2);
     ///     assert_eq!(name.unwrap().as_ref(), c"foo");
     ///     updated = true;
@@ -488,7 +488,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// assert!(updated);
     ///
     /// let mut updated = false;
-    /// assert!(table.update_entry2(c"hoge", c"fuga", 4, |_, _| {
+    /// assert!(table.update_entry2(c"hoge", Some(c"fuga"), 4, |_, _| {
     ///     updated = true;
     /// }).is_ok());
     /// assert!(!updated);
@@ -496,11 +496,11 @@ impl<'a, T> XmlHashTable<'a, T> {
     pub fn update_entry2(
         &mut self,
         name: &CStr,
-        name2: &CStr,
+        name2: Option<&CStr>,
         data: T,
         deallocator: impl FnMut(T, Option<Cow<'_, CStr>>),
     ) -> Result<(), anyhow::Error> {
-        self.do_update_entry(name, Some(name2), None, data, deallocator)
+        self.do_update_entry(name, name2, None, data, deallocator)
     }
 
     /// Update a entry specified by all of `name`, `name2` and `name3` with `data`.  
@@ -512,10 +512,10 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry3(c"hoge", c"fuga", c"piyo", 3);
+    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 3);
     ///
     /// let mut updated = false;
-    /// assert!(table.update_entry3(c"hoge", c"fuga", c"piyo", 4, |data, name| {
+    /// assert!(table.update_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 4, |data, name| {
     ///     assert_eq!(data, 3);
     ///     assert_eq!(name.unwrap().as_ref(), c"hoge");
     ///     updated = true;
@@ -525,12 +525,12 @@ impl<'a, T> XmlHashTable<'a, T> {
     pub fn update_entry3(
         &mut self,
         name: &CStr,
-        name2: &CStr,
-        name3: &CStr,
+        name2: Option<&CStr>,
+        name3: Option<&CStr>,
         data: T,
         deallocator: impl FnMut(T, Option<Cow<'_, CStr>>),
     ) -> Result<(), anyhow::Error> {
-        self.do_update_entry(name, Some(name2), Some(name3), data, deallocator)
+        self.do_update_entry(name, name2, name3, data, deallocator)
     }
 
     fn do_add_entry(
@@ -645,16 +645,21 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// assert!(table.add_entry2(c"foo", c"bar", 1u32).is_ok());
+    /// assert!(table.add_entry2(c"foo", Some(c"bar"), 1u32).is_ok());
     /// // (c"foo", c"bar", 1) already exists, so `table` returns `Err`.
-    /// assert!(table.add_entry2(c"foo", c"bar", 2u32).is_err());
+    /// assert!(table.add_entry2(c"foo", Some(c"bar"), 2u32).is_err());
     /// // c"foo" already exists, but the pair of (c"foo", c"hoge") does not yet exist.
-    /// assert!(table.add_entry2(c"foo", c"hoge", 3u32).is_ok());
+    /// assert!(table.add_entry2(c"foo", Some(c"hoge"), 3u32).is_ok());
     ///
     /// assert_eq!(table.lookup2(c"foo", c"bar"), Some(&1));
     /// ```
-    pub fn add_entry2(&mut self, name: &CStr, name2: &CStr, data: T) -> Result<(), anyhow::Error> {
-        self.do_add_entry(Some(name), Some(name2), None, data)
+    pub fn add_entry2(
+        &mut self,
+        name: &CStr,
+        name2: Option<&CStr>,
+        data: T,
+    ) -> Result<(), anyhow::Error> {
+        self.do_add_entry(Some(name), name2, None, data)
     }
 
     /// Add an entry specified all of `name`, `name2` and `name3` with `data`.
@@ -668,23 +673,23 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// assert!(table.add_entry3(c"foo", c"bar", c"fuga", 1u32).is_ok());
+    /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"fuga"), 1u32).is_ok());
     /// // (c"foo", c"bar", 1) already exists, so `table` returns `Err`.
-    /// assert!(table.add_entry3(c"foo", c"bar", c"fuga", 2u32).is_err());
+    /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"fuga"), 2u32).is_err());
     /// // (c"foo", c"bar") already exists,
     /// // but the pair of (c"foo", c"bar", c"piyo") does not yet exist.
-    /// assert!(table.add_entry3(c"foo", c"bar", c"piyo", 3u32).is_ok());
+    /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"piyo"), 3u32).is_ok());
     ///
     /// assert_eq!(table.lookup3(c"foo", c"bar", c"fuga"), Some(&1));
     /// ```
     pub fn add_entry3(
         &mut self,
         name: &CStr,
-        name2: &CStr,
-        name3: &CStr,
+        name2: Option<&CStr>,
+        name3: Option<&CStr>,
         data: T,
     ) -> Result<(), anyhow::Error> {
-        self.do_add_entry(Some(name), Some(name2), Some(name3), data)
+        self.do_add_entry(Some(name), name2, name3, data)
     }
 
     fn do_remove_entry(
@@ -764,7 +769,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// let mut table = XmlHashTable::new();
     ///
     /// table.add_entry(c"hoge", 1);
-    /// table.add_entry2(c"hoge", c"fuga", 2);
+    /// table.add_entry2(c"hoge", Some(c"fuga"), 2);
     ///
     /// assert!(table.remove_entry(c"hoge", |data, _| assert_eq!(data, 1)).is_ok());
     /// // No entries match with c"hoge" are found.
@@ -789,8 +794,8 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry2(c"hoge", c"fuga", 1);
-    /// table.add_entry3(c"hoge", c"fuga", c"piyo", 2);
+    /// table.add_entry2(c"hoge", Some(c"fuga"), 1);
+    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 2);
     ///
     /// assert!(table.remove_entry2(c"hoge", c"fuga", |data, _| assert_eq!(data, 1)).is_ok());
     /// // No entries match with (c"hoge", c"fuga") are found.
@@ -816,7 +821,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry3(c"hoge", c"fuga", c"piyo", 2);
+    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 2);
     ///
     /// assert!(table.remove_entry3(c"hoge", c"fuga", c"piyo", |data, _| assert_eq!(data, 2)).is_ok());
     /// ```
@@ -883,7 +888,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry2(c"hoge", c"fuga", 1u32);
+    /// table.add_entry2(c"hoge", Some(c"fuga"), 1u32);
     ///
     /// assert_eq!(table.lookup2(c"hoge", c"fuga"), Some(&1));
     /// assert_eq!(table.lookup2(c"hoge", c"piyo"), None);
@@ -902,7 +907,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry3(c"hoge", c"fuga", c"piyo", 1u32);
+    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 1u32);
     ///
     /// assert_eq!(table.lookup3(c"hoge", c"fuga", c"piyo"), Some(&1));
     /// assert_eq!(table.lookup3(c"hoge", c"fuga", c"bar"), None);
@@ -1191,8 +1196,8 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     /// table.add_entry(c"foo", 1u32);
-    /// table.add_entry2(c"hoge", c"fuga", 2);
-    /// table.add_entry3(c"foo", c"bar", c"piyo", 3);
+    /// table.add_entry2(c"hoge", Some(c"fuga"), 2);
+    /// table.add_entry3(c"foo", Some(c"bar"), Some(c"piyo"), 3);
     ///
     /// let mut entries = vec![];
     /// table.scan(|data, s1, s2, s3| entries.push(
@@ -1426,7 +1431,7 @@ mod tests {
                 let n1 = gen_ncname(rng);
                 let n2 = gen_ncname(rng);
                 let data = rng.gen::<u64>();
-                table.add_entry2(&n1, &n2, data);
+                table.add_entry2(&n1, Some(&n2), data);
                 assert_eq!(table.lookup2(&n1, &n2), Some(&data));
                 entries.push((n1, Some(n2), None, data));
             }
@@ -1435,7 +1440,7 @@ mod tests {
                 let n2 = gen_ncname(rng);
                 let n3 = gen_ncname(rng);
                 let data = rng.gen::<u64>();
-                table.add_entry3(&n1, &n2, &n3, data);
+                table.add_entry3(&n1, Some(&n2), Some(&n3), data);
                 assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
                 entries.push((n1, Some(n2), Some(n3), data));
             }
@@ -1471,7 +1476,7 @@ mod tests {
                 let n1 = gen_qname(rng);
                 let n2 = gen_qname(rng);
                 let data = rng.gen::<u64>();
-                table.add_entry2(&n1, &n2, data);
+                table.add_entry2(&n1, Some(&n2), data);
                 assert_eq!(table.lookup2(&n1, &n2), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();
@@ -1483,7 +1488,7 @@ mod tests {
                 let n2 = gen_qname(rng);
                 let n3 = gen_qname(rng);
                 let data = rng.gen::<u64>();
-                table.add_entry3(&n1, &n2, &n3, data);
+                table.add_entry3(&n1, Some(&n2), Some(&n3), data);
                 assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();
@@ -1598,12 +1603,14 @@ mod tests {
                         }
                         (n1, Some(n2), None, old) => {
                             assert_eq!(table.lookup2(n1, n2), Some(old));
-                            assert!(table.update_entry2(n1, n2, data, |_, _| {}).is_ok());
+                            assert!(table.update_entry2(n1, Some(n2), data, |_, _| {}).is_ok());
                             assert_eq!(table.lookup2(n1, n2), Some(&data));
                         }
                         (n1, Some(n2), Some(n3), old) => {
                             assert_eq!(table.lookup3(n1, n2, n3), Some(old));
-                            assert!(table.update_entry3(n1, n2, n3, data, |_, _| {}).is_ok());
+                            assert!(table
+                                .update_entry3(n1, Some(n2), Some(n3), data, |_, _| {})
+                                .is_ok());
                             assert_eq!(table.lookup3(n1, n2, n3), Some(&data));
                         }
                         _ => {}
