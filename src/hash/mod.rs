@@ -651,7 +651,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// // c"foo" already exists, but the pair of (c"foo", c"hoge") does not yet exist.
     /// assert!(table.add_entry2(c"foo", Some(c"hoge"), 3u32).is_ok());
     ///
-    /// assert_eq!(table.lookup2(c"foo", c"bar"), Some(&1));
+    /// assert_eq!(table.lookup2(c"foo", Some(c"bar")), Some(&1));
     /// ```
     pub fn add_entry2(
         &mut self,
@@ -680,7 +680,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// // but the pair of (c"foo", c"bar", c"piyo") does not yet exist.
     /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"piyo"), 3u32).is_ok());
     ///
-    /// assert_eq!(table.lookup3(c"foo", c"bar", c"fuga"), Some(&1));
+    /// assert_eq!(table.lookup3(c"foo", Some(c"bar"), Some(c"fuga")), Some(&1));
     /// ```
     pub fn add_entry3(
         &mut self,
@@ -797,17 +797,17 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// table.add_entry2(c"hoge", Some(c"fuga"), 1);
     /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 2);
     ///
-    /// assert!(table.remove_entry2(c"hoge", c"fuga", |data, _| assert_eq!(data, 1)).is_ok());
+    /// assert!(table.remove_entry2(c"hoge", Some(c"fuga"), |data, _| assert_eq!(data, 1)).is_ok());
     /// // No entries match with (c"hoge", c"fuga") are found.
-    /// assert!(table.remove_entry2(c"hoge", c"fuga", |_, _| {}).is_err());
+    /// assert!(table.remove_entry2(c"hoge", Some(c"fuga"), |_, _| {}).is_err());
     /// ```
     pub fn remove_entry2(
         &mut self,
         name: &CStr,
-        name2: &CStr,
+        name2: Option<&CStr>,
         deallocator: impl Fn(T, Option<Cow<'_, CStr>>),
     ) -> Result<(), anyhow::Error> {
-        self.do_remove_entry(name, Some(name2), None, deallocator)
+        self.do_remove_entry(name, name2, None, deallocator)
     }
 
     /// Remove the entry specified by all of `name`, `name2` and `name3`.
@@ -823,16 +823,16 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 2);
     ///
-    /// assert!(table.remove_entry3(c"hoge", c"fuga", c"piyo", |data, _| assert_eq!(data, 2)).is_ok());
+    /// assert!(table.remove_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), |data, _| assert_eq!(data, 2)).is_ok());
     /// ```
     pub fn remove_entry3(
         &mut self,
         name: &CStr,
-        name2: &CStr,
-        name3: &CStr,
+        name2: Option<&CStr>,
+        name3: Option<&CStr>,
         deallocator: impl Fn(T, Option<Cow<'_, CStr>>),
     ) -> Result<(), anyhow::Error> {
-        self.do_remove_entry(name, Some(name2), Some(name3), deallocator)
+        self.do_remove_entry(name, name2, name3, deallocator)
     }
 
     fn do_lookup(&self, name: &CStr, name2: Option<&CStr>, name3: Option<&CStr>) -> Option<&T> {
@@ -890,11 +890,11 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// table.add_entry2(c"hoge", Some(c"fuga"), 1u32);
     ///
-    /// assert_eq!(table.lookup2(c"hoge", c"fuga"), Some(&1));
-    /// assert_eq!(table.lookup2(c"hoge", c"piyo"), None);
+    /// assert_eq!(table.lookup2(c"hoge", Some(c"fuga")), Some(&1));
+    /// assert_eq!(table.lookup2(c"hoge", Some(c"piyo")), None);
     /// ```
-    pub fn lookup2(&self, name: &CStr, name2: &CStr) -> Option<&T> {
-        self.do_lookup(name, Some(name2), None)
+    pub fn lookup2(&self, name: &CStr, name2: Option<&CStr>) -> Option<&T> {
+        self.do_lookup(name, name2, None)
     }
 
     /// Search the entry specified by all of `name`, `name2` and `name3`.  
@@ -909,11 +909,11 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 1u32);
     ///
-    /// assert_eq!(table.lookup3(c"hoge", c"fuga", c"piyo"), Some(&1));
-    /// assert_eq!(table.lookup3(c"hoge", c"fuga", c"bar"), None);
+    /// assert_eq!(table.lookup3(c"hoge", Some(c"fuga"), Some(c"piyo")), Some(&1));
+    /// assert_eq!(table.lookup3(c"hoge", Some(c"fuga"), Some(c"bar")), None);
     /// ```
-    pub fn lookup3(&self, name: &CStr, name2: &CStr, name3: &CStr) -> Option<&T> {
-        self.do_lookup(name, Some(name2), Some(name3))
+    pub fn lookup3(&self, name: &CStr, name2: Option<&CStr>, name3: Option<&CStr>) -> Option<&T> {
+        self.do_lookup(name, name2, name3)
     }
 
     fn do_qlookup(
@@ -1009,9 +1009,9 @@ impl<'a, T> XmlHashTable<'a, T> {
         prefix: Option<&CStr>,
         name: &CStr,
         prefix2: Option<&CStr>,
-        name2: &CStr,
+        name2: Option<&CStr>,
     ) -> Option<&T> {
-        self.do_qlookup(prefix, name, prefix2, Some(name2), None, None)
+        self.do_qlookup(prefix, name, prefix2, name2, None, None)
     }
 
     /// Search the entry specified by the given QNames.  
@@ -1024,11 +1024,11 @@ impl<'a, T> XmlHashTable<'a, T> {
         prefix: Option<&CStr>,
         name: &CStr,
         prefix2: Option<&CStr>,
-        name2: &CStr,
+        name2: Option<&CStr>,
         prefix3: Option<&CStr>,
-        name3: &CStr,
+        name3: Option<&CStr>,
     ) -> Option<&T> {
-        self.do_qlookup(prefix, name, prefix2, Some(name2), prefix3, Some(name3))
+        self.do_qlookup(prefix, name, prefix2, name2, prefix3, name3)
     }
 
     /// Clone the table. `copier` is used for copying each data of entries.
@@ -1432,7 +1432,7 @@ mod tests {
                 let n2 = gen_ncname(rng);
                 let data = rng.gen::<u64>();
                 table.add_entry2(&n1, Some(&n2), data);
-                assert_eq!(table.lookup2(&n1, &n2), Some(&data));
+                assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
                 entries.push((n1, Some(n2), None, data));
             }
             3 => {
@@ -1441,7 +1441,7 @@ mod tests {
                 let n3 = gen_ncname(rng);
                 let data = rng.gen::<u64>();
                 table.add_entry3(&n1, Some(&n2), Some(&n3), data);
-                assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
+                assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
                 entries.push((n1, Some(n2), Some(n3), data));
             }
             _ => {}
@@ -1477,10 +1477,13 @@ mod tests {
                 let n2 = gen_qname(rng);
                 let data = rng.gen::<u64>();
                 table.add_entry2(&n1, Some(&n2), data);
-                assert_eq!(table.lookup2(&n1, &n2), Some(&data));
+                assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();
-                assert_eq!(table.qlookup2(Some(&p1), &l1, Some(&p2), &l2), Some(&data));
+                assert_eq!(
+                    table.qlookup2(Some(&p1), &l1, Some(&p2), Some(&l2)),
+                    Some(&data)
+                );
                 entries.push((n1, Some(n2), None, data));
             }
             3 => {
@@ -1489,12 +1492,12 @@ mod tests {
                 let n3 = gen_qname(rng);
                 let data = rng.gen::<u64>();
                 table.add_entry3(&n1, Some(&n2), Some(&n3), data);
-                assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
+                assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
                 let (p1, l1) = split_qname(&n1).unwrap();
                 let (p2, l2) = split_qname(&n2).unwrap();
                 let (p3, l3) = split_qname(&n3).unwrap();
                 assert_eq!(
-                    table.qlookup3(Some(&p1), &l1, Some(&p2), &l2, Some(&p3), &l3),
+                    table.qlookup3(Some(&p1), &l1, Some(&p2), Some(&l2), Some(&p3), Some(&l3)),
                     Some(&data)
                 );
                 entries.push((n1, Some(n2), Some(n3), data));
@@ -1536,15 +1539,17 @@ mod tests {
                         assert_eq!(table.len(), entries.len());
                     }
                     (n1, Some(n2), None, data) => {
-                        assert_eq!(table.lookup2(&n1, &n2), Some(&data));
-                        assert!(table.remove_entry2(&n1, &n2, |_, _| {}).is_ok());
-                        assert!(table.lookup2(&n1, &n2).is_none());
+                        assert_eq!(table.lookup2(&n1, Some(&n2)), Some(&data));
+                        assert!(table.remove_entry2(&n1, Some(&n2), |_, _| {}).is_ok());
+                        assert!(table.lookup2(&n1, Some(&n2)).is_none());
                         assert_eq!(table.len(), entries.len());
                     }
                     (n1, Some(n2), Some(n3), data) => {
-                        assert_eq!(table.lookup3(&n1, &n2, &n3), Some(&data));
-                        assert!(table.remove_entry3(&n1, &n2, &n3, |_, _| {}).is_ok());
-                        assert!(table.lookup3(&n1, &n2, &n3).is_none());
+                        assert_eq!(table.lookup3(&n1, Some(&n2), Some(&n3)), Some(&data));
+                        assert!(table
+                            .remove_entry3(&n1, Some(&n2), Some(&n3), |_, _| {})
+                            .is_ok());
+                        assert!(table.lookup3(&n1, Some(&n2), Some(&n3)).is_none());
                         assert_eq!(table.len(), entries.len());
                     }
                     _ => [ncname_insertion_test, qname_insertion_test]
@@ -1562,29 +1567,39 @@ mod tests {
                     }
                     Some((n1, Some(n2), None, data)) => {
                         assert_eq!(table.len(), entries.len());
-                        assert_eq!(table.lookup2(n1, n2), Some(data));
+                        assert_eq!(table.lookup2(n1, Some(n2)), Some(data));
                         match (split_qname(n1), split_qname(n2)) {
                             (Some((p1, l1)), Some((p2, l2))) => {
                                 assert_eq!(
-                                    table.qlookup2(Some(&p1), &l1, Some(&p2), &l2),
+                                    table.qlookup2(Some(&p1), &l1, Some(&p2), Some(&l2)),
                                     Some(data)
                                 )
                             }
-                            _ => assert_eq!(table.qlookup2(None, n1, None, n2), Some(data)),
+                            _ => assert_eq!(table.qlookup2(None, n1, None, Some(n2)), Some(data)),
                         }
                     }
                     Some((n1, Some(n2), Some(n3), data)) => {
                         assert_eq!(table.len(), entries.len());
-                        assert_eq!(table.lookup3(n1, n2, n3), Some(data));
+                        assert_eq!(table.lookup3(n1, Some(n2), Some(n3)), Some(data));
                         match (split_qname(n1), split_qname(n2), split_qname(n3)) {
                             (Some((p1, l1)), Some((p2, l2)), Some((p3, l3))) => {
                                 assert_eq!(
-                                    table.qlookup3(Some(&p1), &l1, Some(&p2), &l2, Some(&p3), &l3),
+                                    table.qlookup3(
+                                        Some(&p1),
+                                        &l1,
+                                        Some(&p2),
+                                        Some(&l2),
+                                        Some(&p3),
+                                        Some(&l3)
+                                    ),
                                     Some(data)
                                 );
                             }
                             _ => {
-                                assert_eq!(table.qlookup3(None, n1, None, n2, None, n3), Some(data))
+                                assert_eq!(
+                                    table.qlookup3(None, n1, None, Some(n2), None, Some(n3)),
+                                    Some(data)
+                                )
                             }
                         }
                     }
@@ -1602,16 +1617,16 @@ mod tests {
                             assert_eq!(table.lookup(n1), Some(&data));
                         }
                         (n1, Some(n2), None, old) => {
-                            assert_eq!(table.lookup2(n1, n2), Some(old));
+                            assert_eq!(table.lookup2(n1, Some(n2)), Some(old));
                             assert!(table.update_entry2(n1, Some(n2), data, |_, _| {}).is_ok());
-                            assert_eq!(table.lookup2(n1, n2), Some(&data));
+                            assert_eq!(table.lookup2(n1, Some(n2)), Some(&data));
                         }
                         (n1, Some(n2), Some(n3), old) => {
-                            assert_eq!(table.lookup3(n1, n2, n3), Some(old));
+                            assert_eq!(table.lookup3(n1, Some(n2), Some(n3)), Some(old));
                             assert!(table
                                 .update_entry3(n1, Some(n2), Some(n3), data, |_, _| {})
                                 .is_ok());
-                            assert_eq!(table.lookup3(n1, n2, n3), Some(&data));
+                            assert_eq!(table.lookup3(n1, Some(n2), Some(n3)), Some(&data));
                         }
                         _ => {}
                     }
