@@ -163,18 +163,18 @@ struct XmlHashEntry<'a, T> {
     name: Option<Cow<'a, CStr>>,
     name2: Option<Cow<'a, CStr>>,
     name3: Option<Cow<'a, CStr>>,
-    payload: T,
+    payload: Option<T>,
     valid: i32,
 }
 
-impl<'a, T: Default> Default for XmlHashEntry<'a, T> {
+impl<'a, T> Default for XmlHashEntry<'a, T> {
     fn default() -> Self {
         Self {
             next: None,
             name: None,
             name2: None,
             name3: None,
-            payload: T::default(),
+            payload: None,
             valid: 0,
         }
     }
@@ -182,7 +182,7 @@ impl<'a, T: Default> Default for XmlHashEntry<'a, T> {
 
 struct XmlHashEntryRef<'a, T>(NonNull<XmlHashEntry<'a, T>>);
 
-impl<'a, T: Default> XmlHashEntryRef<'a, T> {
+impl<'a, T> XmlHashEntryRef<'a, T> {
     fn new() -> Option<Self> {
         let default = XmlHashEntry::default();
         let boxed = Box::new(default);
@@ -229,38 +229,6 @@ pub struct XmlHashTable<'a, T> {
 }
 
 impl<'a, T> XmlHashTable<'a, T> {
-    pub fn clear(&mut self) {
-        self.clear_with(|_, _| {});
-    }
-
-    pub fn clear_with(&mut self, deallocator: impl Fn(T, Option<Cow<'_, CStr>>)) {
-        let table = take(&mut self.table);
-        for XmlHashEntry {
-            mut next,
-            name,
-            payload,
-            valid,
-            ..
-        } in table
-        {
-            if valid == 0 {
-                continue;
-            }
-
-            deallocator(payload, name);
-
-            while let Some(now) = next {
-                next = now.next;
-
-                let XmlHashEntry { name, payload, .. } = now.into_inner();
-                deallocator(payload, name);
-            }
-        }
-        self.num_elems = 0;
-    }
-}
-
-impl<'a, T: Default> XmlHashTable<'a, T> {
     /// Create new `XmlHashTable`.
     pub fn new() -> Self {
         Self::with_capacity(256)
@@ -365,6 +333,36 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
         Ok(())
     }
 
+    pub fn clear(&mut self) {
+        self.clear_with(|_, _| {});
+    }
+
+    pub fn clear_with(&mut self, deallocator: impl Fn(T, Option<Cow<'_, CStr>>)) {
+        let table = take(&mut self.table);
+        for XmlHashEntry {
+            mut next,
+            name,
+            payload,
+            valid,
+            ..
+        } in table
+        {
+            if valid == 0 {
+                continue;
+            }
+
+            deallocator(payload.unwrap(), name);
+
+            while let Some(now) = next {
+                next = now.next;
+
+                let XmlHashEntry { name, payload, .. } = now.into_inner();
+                deallocator(payload.unwrap(), name);
+            }
+        }
+        self.num_elems = 0;
+    }
+
     fn do_update_entry(
         &mut self,
         name: &CStr,
@@ -408,8 +406,8 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             let mut entry = &mut self.table[key];
             loop {
                 if entry.name == name && entry.name2 == name2 && entry.name3 == name3 {
-                    let old = replace(&mut entry.payload, data);
-                    deallocator(old, name);
+                    let old = replace(&mut entry.payload, Some(data));
+                    deallocator(old.unwrap(), name);
                     return Ok(());
                 }
                 let Some(next) = entry.next.as_mut() else {
@@ -428,7 +426,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             &mut self.table[key]
         };
 
-        entry.payload = data;
+        entry.payload = Some(data);
         entry.valid = 1;
         entry.name = name;
         entry.name2 = name2;
@@ -609,7 +607,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             &mut self.table[key]
         };
 
-        entry.payload = data;
+        entry.payload = Some(data);
         entry.valid = 1;
         entry.name = name;
         entry.name2 = name2;
@@ -732,7 +730,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                         self.table[key].name.take(),
                     )
                 };
-                deallocator(payload, name);
+                deallocator(payload.unwrap(), name);
 
                 self.num_elems -= 1;
                 return Ok(());
@@ -751,7 +749,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                         self.table[key].next = next;
                     }
 
-                    deallocator(payload, name);
+                    deallocator(payload.unwrap(), name);
 
                     self.num_elems -= 1;
                     return Ok(());
@@ -860,7 +858,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
             let mut now = &self.table[key];
             loop {
                 if now.name == name && now.name2 == name2 && now.name3 == name3 {
-                    return Some(&now.payload);
+                    return now.payload.as_ref();
                 }
                 now = now.next.as_ref()?.deref();
             }
@@ -976,7 +974,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                         name3,
                         now.name3.as_ref().map_or(null(), |n| n.as_ptr()) as _,
                     ) {
-                        return Some(&now.payload);
+                        return now.payload.as_ref();
                     }
                     now = now.next.as_ref()?.deref();
                 }
@@ -1079,7 +1077,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                     entry.name.as_ref().map(|n| n.as_ref()),
                     entry.name2.as_ref().map(|n| n.as_ref()),
                     entry.name3.as_ref().map(|n| n.as_ref()),
-                    copier(&entry.payload, entry.name.as_ref()),
+                    copier(entry.payload.as_ref().unwrap(), entry.name.as_ref()),
                 );
 
                 let Some(next) = entry.next.as_ref() else {
@@ -1145,7 +1143,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
         for entry in &mut self.table {
             while entry.valid != 0
                 && cond(
-                    &entry.payload,
+                    entry.payload.as_ref().unwrap(),
                     entry.name.as_ref(),
                     entry.name2.as_ref(),
                     entry.name3.as_ref(),
@@ -1158,7 +1156,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                     entry.valid = 0;
                     (take(&mut entry.payload), entry.name.take())
                 };
-                deallocator(payload, name);
+                deallocator(payload.unwrap(), name);
                 self.num_elems -= 1;
             }
 
@@ -1169,7 +1167,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                     next = now.next;
 
                     if cond(
-                        &now.payload,
+                        now.payload.as_ref().unwrap(),
                         now.name.as_ref(),
                         now.name2.as_ref(),
                         now.name3.as_ref(),
@@ -1185,7 +1183,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
                         } else {
                             entry.next = next;
                         }
-                        deallocator(payload, name);
+                        deallocator(payload.unwrap(), name);
                         self.num_elems -= 1;
                     } else {
                         prev = Some(now);
@@ -1242,7 +1240,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
 
             loop {
                 f(
-                    &entry.payload,
+                    entry.payload.as_ref().unwrap(),
                     entry.name.as_ref(),
                     entry.name2.as_ref(),
                     entry.name3.as_ref(),
@@ -1265,7 +1263,7 @@ impl<'a, T: Default> XmlHashTable<'a, T> {
     }
 }
 
-impl<'a, T: Default> Default for XmlHashTable<'a, T> {
+impl<'a, T> Default for XmlHashTable<'a, T> {
     fn default() -> Self {
         Self::new()
     }
@@ -1283,7 +1281,7 @@ impl<'a, T> Drop for XmlHashTable<'a, T> {
 
 pub struct XmlHashTableRef<'a, T>(NonNull<XmlHashTable<'a, T>>);
 
-impl<'a, T: Default> XmlHashTableRef<'a, T> {
+impl<'a, T> XmlHashTableRef<'a, T> {
     pub fn new() -> Option<Self> {
         let table = XmlHashTable::new();
         Self::from_table(table)
@@ -1321,7 +1319,7 @@ impl<'a, T: Default> XmlHashTableRef<'a, T> {
     }
 }
 
-impl<'a, T: Default> Deref for XmlHashTableRef<'a, T> {
+impl<'a, T> Deref for XmlHashTableRef<'a, T> {
     type Target = XmlHashTable<'a, T>;
 
     fn deref(&self) -> &Self::Target {
@@ -1329,7 +1327,7 @@ impl<'a, T: Default> Deref for XmlHashTableRef<'a, T> {
     }
 }
 
-impl<'a, T: Default> DerefMut for XmlHashTableRef<'a, T> {
+impl<'a, T> DerefMut for XmlHashTableRef<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
     }
@@ -1351,7 +1349,7 @@ impl<'a, T> Drain<'a, T> {
     }
 }
 
-impl<'a, T: Default> Iterator for Drain<'a, T> {
+impl<'a, T> Iterator for Drain<'a, T> {
     type Item = (
         T,
         Option<Cow<'a, CStr>>,
@@ -1370,7 +1368,7 @@ impl<'a, T: Default> Iterator for Drain<'a, T> {
                 payload,
                 ..
             } = list.into_inner();
-            return Some((payload, name, name2, name3));
+            return Some((payload.unwrap(), name, name2, name3));
         }
 
         while self.next_index < self.table.table.len() {
@@ -1387,7 +1385,7 @@ impl<'a, T: Default> Iterator for Drain<'a, T> {
                 self.list = next;
                 self.next_index += 1;
 
-                return Some((payload, name, name2, name3));
+                return Some((payload.unwrap(), name, name2, name3));
             }
             self.next_index += 1;
         }
