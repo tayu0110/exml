@@ -164,7 +164,6 @@ struct XmlHashEntry<'a, T> {
     name2: Option<Cow<'a, CStr>>,
     name3: Option<Cow<'a, CStr>>,
     payload: Option<T>,
-    valid: i32,
 }
 
 impl<'a, T> Default for XmlHashEntry<'a, T> {
@@ -175,7 +174,6 @@ impl<'a, T> Default for XmlHashEntry<'a, T> {
             name2: None,
             name3: None,
             payload: None,
-            valid: 0,
         }
     }
 }
@@ -189,9 +187,7 @@ impl<'a, T> XmlHashEntryRef<'a, T> {
         let leaked = Box::leak(boxed);
         NonNull::new(leaked).map(Self)
     }
-}
 
-impl<'a, T> XmlHashEntryRef<'a, T> {
     fn into_inner(self) -> XmlHashEntry<'a, T> {
         unsafe { *Box::from_raw(self.0.as_ptr()) }
     }
@@ -285,7 +281,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         std::mem::swap(&mut old_table, &mut self.table);
 
         for entry in &mut old_table {
-            if entry.valid == 0 {
+            if entry.payload.is_none() {
                 continue;
             }
 
@@ -296,7 +292,6 @@ impl<'a, T> XmlHashTable<'a, T> {
                 entry.name3.as_ref(),
             );
             let new = &mut self.table[key as usize];
-            new.valid = 1;
             new.name = entry.name.take();
             new.name2 = entry.name2.take();
             new.name3 = entry.name3.take();
@@ -316,10 +311,9 @@ impl<'a, T> XmlHashTable<'a, T> {
                     now.name3.as_ref(),
                 );
 
-                if self.table[key as usize].valid == 0 {
+                if self.table[key as usize].payload.is_none() {
                     self.table[key as usize] = now.into_inner();
                     self.table[key as usize].next = None;
-                    self.table[key as usize].valid = 1;
                 } else {
                     now.next = self.table[key as usize].next;
                     self.table[key as usize].next = Some(now);
@@ -343,15 +337,14 @@ impl<'a, T> XmlHashTable<'a, T> {
             mut next,
             name,
             payload,
-            valid,
             ..
         } in table
         {
-            if valid == 0 {
+            let Some(payload) = payload else {
                 continue;
-            }
+            };
 
-            deallocator(payload.unwrap(), name);
+            deallocator(payload, name);
 
             while let Some(now) = next {
                 next = now.next;
@@ -402,7 +395,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         let key =
             xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
-        let entry = if self.table[key].valid != 0 {
+        let entry = if self.table[key].payload.is_some() {
             let mut entry = &mut self.table[key];
             loop {
                 if entry.name == name && entry.name2 == name2 && entry.name3 == name3 {
@@ -427,7 +420,6 @@ impl<'a, T> XmlHashTable<'a, T> {
         };
 
         entry.payload = Some(data);
-        entry.valid = 1;
         entry.name = name;
         entry.name2 = name2;
         entry.name3 = name3;
@@ -580,7 +572,7 @@ impl<'a, T> XmlHashTable<'a, T> {
             xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
         let mut chain_length = 0;
-        let entry = if self.table[key].valid != 0 {
+        let entry = if self.table[key].payload.is_some() {
             if self.table[key].name == name
                 && self.table[key].name2 == name2
                 && self.table[key].name3 == name3
@@ -608,7 +600,6 @@ impl<'a, T> XmlHashTable<'a, T> {
         };
 
         entry.payload = Some(data);
-        entry.valid = 1;
         entry.name = name;
         entry.name2 = name2;
         entry.name3 = name3;
@@ -713,7 +704,7 @@ impl<'a, T> XmlHashTable<'a, T> {
             let key =
                 xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
-            ensure!(self.table[key].valid != 0, "Entry is not found");
+            ensure!(self.table[key].payload.is_some(), "Entry is not found");
 
             if self.table[key].name == name
                 && self.table[key].name2 == name2
@@ -724,7 +715,6 @@ impl<'a, T> XmlHashTable<'a, T> {
                     let XmlHashEntry { name, payload, .. } = replace(&mut self.table[key], next);
                     (payload, name)
                 } else {
-                    self.table[key].valid = 0;
                     (
                         take(&mut self.table[key].payload),
                         self.table[key].name.take(),
@@ -851,9 +841,7 @@ impl<'a, T> XmlHashTable<'a, T> {
             let key =
                 xml_hash_compute_key(self, name.as_ref(), name2.as_ref(), name3.as_ref()) as usize;
 
-            if self.table[key].valid == 0 {
-                return None;
-            }
+            self.table[key].payload.as_ref()?;
 
             let mut now = &self.table[key];
             loop {
@@ -943,9 +931,7 @@ impl<'a, T> XmlHashTable<'a, T> {
                 name3.as_ref().map(|&p| Cow::Borrowed(p)).as_ref(),
             ) as usize;
 
-            if self.table[key].valid == 0 {
-                return None;
-            }
+            self.table[key].payload.as_ref()?;
 
             unsafe {
                 let (prefix, prefix2, prefix3) = (
@@ -1068,7 +1054,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     pub fn clone_with(&self, mut copier: impl FnMut(&T, Option<&Cow<'a, CStr>>) -> T) -> Self {
         let mut res = Self::with_capacity(self.table.len());
         for mut entry in &self.table {
-            if entry.valid == 0 {
+            if entry.payload.is_none() {
                 continue;
             }
 
@@ -1141,7 +1127,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         mut deallocator: impl FnMut(T, Option<Cow<'a, CStr>>),
     ) {
         for entry in &mut self.table {
-            while entry.valid != 0
+            while entry.payload.is_some()
                 && cond(
                     entry.payload.as_ref().unwrap(),
                     entry.name.as_ref(),
@@ -1153,14 +1139,13 @@ impl<'a, T> XmlHashTable<'a, T> {
                     let old = replace(entry, next.into_inner());
                     (old.payload, old.name)
                 } else {
-                    entry.valid = 0;
                     (take(&mut entry.payload), entry.name.take())
                 };
                 deallocator(payload.unwrap(), name);
                 self.num_elems -= 1;
             }
 
-            if entry.valid != 0 {
+            if entry.payload.is_some() {
                 let mut prev = None::<XmlHashEntryRef<'_, T>>;
                 let mut next = entry.next;
                 while let Some(now) = next {
@@ -1234,7 +1219,7 @@ impl<'a, T> XmlHashTable<'a, T> {
     ) {
         let num_elems = self.num_elems;
         for mut entry in &self.table {
-            if entry.valid == 0 {
+            if entry.payload.is_none() {
                 continue;
             }
 
@@ -1372,7 +1357,7 @@ impl<'a, T> Iterator for Drain<'a, T> {
         }
 
         while self.next_index < self.table.table.len() {
-            if self.table.table[self.next_index].valid != 0 {
+            if self.table.table[self.next_index].payload.is_some() {
                 let XmlHashEntry {
                     next,
                     name,
