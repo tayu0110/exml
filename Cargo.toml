@@ -2,17 +2,22 @@
 name = "exml"
 version = "0.1.0"
 edition = "2021"
+authors = ["tayu0110"]
+license = "MIT"
+repository = "https://github.com/tayu0110/exml.git"
+description = "Pure Rust XML library based on libxml2"
+keywords = ["xml", "xpath", "catalog", "schema", "relaxng", "dtd"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.86"
-clap = { version = "4.5.20", features = ["derive"] }
-const_format = { version = "0.2.32" }
-encoding_rs = "0.8.34"
-libc = "0.2.155"
+anyhow = "1.0.93"
+clap = { version = "4.5.21", features = ["derive"] }
+const_format = { version = "0.2.33" }
+encoding_rs = "0.8.35"
+libc = "0.2.164"
 rand = "0.8.5"
-url = "2.5.2"
+url = "2.5.4"
 
 [features]
 default = [
