@@ -189,7 +189,7 @@ pub struct XmlRelaxNGGrammar {
     combine: XmlRelaxNGCombine,      /* the default combine value */
     start_list: XmlRelaxNGDefinePtr, /* list of <start> definitions */
     defs: XmlHashTablePtr,           /* define* */
-    refs: XmlHashTablePtr,           /* references */
+    refs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* references */
 }
 
 #[repr(C)]
@@ -4231,12 +4231,10 @@ extern "C" fn xml_relaxng_check_combine(
 /// element of a given grammar using the same name.
 #[doc(alias = "xmlRelaxNGCheckReference")]
 extern "C" fn xml_relaxng_check_reference(
-    payload: *mut c_void,
-    data: *mut c_void,
+    refe: XmlRelaxNGDefinePtr,
+    ctxt: XmlRelaxNGParserCtxtPtr,
     name: *const XmlChar,
 ) {
-    let refe: XmlRelaxNGDefinePtr = payload as _;
-    let ctxt: XmlRelaxNGParserCtxtPtr = data as _;
     let def: XmlRelaxNGDefinePtr;
     let mut cur: XmlRelaxNGDefinePtr;
 
@@ -5165,20 +5163,26 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
 /// Import import one references into the current grammar
 #[doc(alias = "xmlRelaxNGParseImportRef")]
 extern "C" fn xml_relaxng_parse_import_ref(
-    payload: *mut c_void,
-    data: *mut c_void,
+    def: XmlRelaxNGDefinePtr,
+    ctxt: XmlRelaxNGParserCtxtPtr,
     name: *const XmlChar,
 ) {
-    let ctxt: XmlRelaxNGParserCtxtPtr = data as _;
-    let def: XmlRelaxNGDefinePtr = payload as _;
-
     unsafe {
         (*def).dflags |= IS_EXTERNAL_REF as i16;
 
-        let tmp: i32 = xml_hash_add_entry((*(*ctxt).grammar).refs, name, def as _);
-        if tmp < 0 {
-            let prev: XmlRelaxNGDefinePtr =
-                xml_hash_lookup((*(*ctxt).grammar).refs, (*def).name) as _;
+        if (*(*ctxt).grammar)
+            .refs
+            .and_then(|mut table| table.add_entry(CStr::from_ptr(name as *const i8), def).ok())
+            .is_none()
+        {
+            let prev = (*(*ctxt).grammar)
+                .refs
+                .and_then(|table| {
+                    table
+                        .lookup(CStr::from_ptr((*def).name as *const i8))
+                        .copied()
+                })
+                .unwrap_or(null_mut());
             if prev.is_null() {
                 if !(*def).name.is_null() {
                     xml_rng_perr(
@@ -5218,13 +5222,14 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
     if ctxt.is_null() || grammar.is_null() || (*ctxt).grammar.is_null() {
         return -1;
     }
-    if (*grammar).refs.is_null() {
+    if (*grammar).refs.is_none() {
         return 0;
     }
-    if (*(*ctxt).grammar).refs.is_null() {
-        (*(*ctxt).grammar).refs = xml_hash_create(10);
+    if (*(*ctxt).grammar).refs.is_none() {
+        (*(*ctxt).grammar).refs = XmlHashTableRef::with_capacity(10);
     }
-    if (*(*ctxt).grammar).refs.is_null() {
+
+    let Some(refs) = (*(*ctxt).grammar).refs else {
         xml_rng_perr(
             ctxt,
             null_mut(),
@@ -5234,12 +5239,14 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
             null_mut(),
         );
         return -1;
-    }
-    xml_hash_scan(
-        (*grammar).refs,
-        Some(xml_relaxng_parse_import_ref),
-        ctxt as _,
-    );
+    };
+    refs.scan(|data, name, _, _| {
+        xml_relaxng_parse_import_ref(
+            *data,
+            ctxt,
+            name.map_or(null_mut(), |p| p.as_ptr() as *const u8),
+        );
+    });
     0
 }
 
@@ -5320,7 +5327,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
             (*ctxt).flags = oldflags;
             if !(*docu).schema.is_null() && !(*(*docu).schema).topgrammar.is_null() {
                 (*docu).content = (*(*(*docu).schema).topgrammar).start;
-                if !(*(*(*docu).schema).topgrammar).refs.is_null() {
+                if (*(*(*docu).schema).topgrammar).refs.is_some() {
                     xml_relaxng_parse_import_refs(ctxt, (*(*docu).schema).topgrammar);
                 }
             }
@@ -5517,24 +5524,19 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 null_mut(),
             );
         }
-        if (*(*ctxt).grammar).refs.is_null() {
-            (*(*ctxt).grammar).refs = xml_hash_create(10);
+        if (*(*ctxt).grammar).refs.is_none() {
+            (*(*ctxt).grammar).refs = XmlHashTableRef::with_capacity(10);
         }
-        if (*(*ctxt).grammar).refs.is_null() {
-            xml_rng_perr(
-                ctxt,
-                node,
-                XmlParserErrors::XmlRngpRefCreateFailed,
-                c"Could not create references hash\n".as_ptr() as _,
-                null_mut(),
-                null_mut(),
-            );
-            def = null_mut();
-        } else {
-            let tmp: i32 = xml_hash_add_entry((*(*ctxt).grammar).refs, (*def).name, def as _);
-            if tmp < 0 {
-                let prev: XmlRelaxNGDefinePtr =
-                    xml_hash_lookup((*(*ctxt).grammar).refs, (*def).name) as _;
+        if let Some(mut refs) = (*(*ctxt).grammar).refs {
+            if !(*def).name.is_null()
+                && refs
+                    .add_entry(CStr::from_ptr((*def).name as *const i8), def)
+                    .is_err()
+            {
+                let prev = refs
+                    .lookup(CStr::from_ptr((*def).name as *const i8))
+                    .copied()
+                    .unwrap_or(null_mut());
                 if prev.is_null() {
                     if !(*def).name.is_null() {
                         xml_rng_perr(
@@ -5561,6 +5563,16 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                     (*prev).next_hash = def;
                 }
             }
+        } else {
+            xml_rng_perr(
+                ctxt,
+                node,
+                XmlParserErrors::XmlRngpRefCreateFailed,
+                c"Could not create references hash\n".as_ptr() as _,
+                null_mut(),
+                null_mut(),
+            );
+            def = null_mut();
         }
     } else if IS_RELAXNG!(node, c"data".as_ptr() as _) {
         def = xml_relaxng_parse_data(ctxt, node);
@@ -5669,24 +5681,19 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 null_mut(),
             );
         }
-        if (*(*ctxt).parentgrammar).refs.is_null() {
-            (*(*ctxt).parentgrammar).refs = xml_hash_create(10);
+        if (*(*ctxt).parentgrammar).refs.is_none() {
+            (*(*ctxt).parentgrammar).refs = XmlHashTableRef::with_capacity(10);
         }
-        if (*(*ctxt).parentgrammar).refs.is_null() {
-            xml_rng_perr(
-                ctxt,
-                node,
-                XmlParserErrors::XmlRngpParentRefCreateFailed,
-                c"Could not create references hash\n".as_ptr() as _,
-                null_mut(),
-                null_mut(),
-            );
-            def = null_mut();
-        } else if !(*def).name.is_null() {
-            let tmp: i32 = xml_hash_add_entry((*(*ctxt).parentgrammar).refs, (*def).name, def as _);
-            if tmp < 0 {
-                let prev: XmlRelaxNGDefinePtr =
-                    xml_hash_lookup((*(*ctxt).parentgrammar).refs, (*def).name) as _;
+        if let Some(mut refs) = (*(*ctxt).parentgrammar).refs {
+            if !(*def).name.is_null()
+                && refs
+                    .add_entry(CStr::from_ptr((*def).name as *const i8), def)
+                    .is_err()
+            {
+                let prev = refs
+                    .lookup(CStr::from_ptr((*def).name as *const i8))
+                    .copied()
+                    .unwrap_or(null_mut());
                 if prev.is_null() {
                     xml_rng_perr(
                         ctxt,
@@ -5702,6 +5709,16 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                     (*prev).next_hash = def;
                 }
             }
+        } else {
+            xml_rng_perr(
+                ctxt,
+                node,
+                XmlParserErrors::XmlRngpParentRefCreateFailed,
+                c"Could not create references hash\n".as_ptr() as _,
+                null_mut(),
+                null_mut(),
+            );
+            def = null_mut();
         }
     } else if IS_RELAXNG!(node, c"mixed".as_ptr() as _) {
         if (*node).children.is_none() {
@@ -6458,11 +6475,15 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
         xml_hash_scan((*ret).defs, Some(xml_relaxng_check_combine), ctxt as _);
     }
 
-    /*
-     * link together defines and refs in this grammar
-     */
-    if !(*ret).refs.is_null() {
-        xml_hash_scan((*ret).refs, Some(xml_relaxng_check_reference), ctxt as _);
+    // link together defines and refs in this grammar
+    if let Some(refs) = (*ret).refs {
+        refs.scan(|data, name, _, _| {
+            xml_relaxng_check_reference(
+                *data,
+                ctxt,
+                name.map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            )
+        });
     }
 
     /* @@@@ */
@@ -8311,8 +8332,8 @@ unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
     if !(*grammar).next.is_null() {
         xml_relaxng_free_grammar((*grammar).next);
     }
-    if !(*grammar).refs.is_null() {
-        xml_hash_free((*grammar).refs, None);
+    if let Some(mut refs) = (*grammar).refs.take().map(|t| t.into_inner()) {
+        refs.clear();
     }
     if !(*grammar).defs.is_null() {
         xml_hash_free((*grammar).defs, None);
