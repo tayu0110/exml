@@ -40,7 +40,6 @@ use crate::{
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
         globals::{xml_free, xml_malloc},
-        hash::XmlHashTablePtr,
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, xml_strlen, XmlChar},
@@ -370,9 +369,9 @@ pub struct XmlXPathContext {
     pub(crate) origin: XmlNodePtr, /* for origin() */
 
     /* the set of namespace declarations in scope for the expression */
-    pub(crate) ns_hash: XmlHashTablePtr, /* The namespaces hash table */
-    pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>, /* variable lookup func */
-    pub(crate) var_lookup_data: *mut c_void, /* variable lookup data */
+    pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut XmlChar>>, /* The namespaces hash table */
+    pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>,     /* variable lookup func */
+    pub(crate) var_lookup_data: *mut c_void,                            /* variable lookup data */
 
     /* Possibility to link in an extra item */
     pub(crate) extra: *mut c_void, /* needed for XSLT */
@@ -1437,7 +1436,7 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
     (*ret).max_axis = 0;
     (*ret).axis = null_mut();
 
-    (*ret).ns_hash = null_mut();
+    (*ret).ns_hash = None;
     (*ret).user = null_mut();
 
     (*ret).context_size = -1;

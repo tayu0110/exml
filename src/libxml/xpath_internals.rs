@@ -46,7 +46,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_create, xml_hash_default_deallocator, xml_hash_free,
-            xml_hash_lookup, xml_hash_remove_entry, xml_hash_update_entry, XmlHashTablePtr,
+            xml_hash_lookup, XmlHashTablePtr,
         },
         parser_internals::{xml_copy_char, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
@@ -1968,32 +1968,37 @@ pub unsafe extern "C" fn xml_xpath_register_ns(
         return -1;
     }
 
-    if (*ctxt).ns_hash.is_null() {
-        (*ctxt).ns_hash = xml_hash_create(10);
-    }
-    if (*ctxt).ns_hash.is_null() {
-        return -1;
-    }
+    let mut ns_hash = if let Some(table) = (*ctxt).ns_hash {
+        table
+    } else {
+        let Some(table) = XmlHashTableRef::with_capacity(10) else {
+            return -1;
+        };
+        (*ctxt).ns_hash = Some(table);
+        table
+    };
     if ns_uri.is_null() {
-        return xml_hash_remove_entry((*ctxt).ns_hash, prefix, Some(xml_hash_default_deallocator));
+        return match ns_hash.remove_entry(CStr::from_ptr(prefix as *const i8), |data, _| {
+            xml_free(data as _);
+        }) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        };
     }
 
     let copy: *mut XmlChar = xml_strdup(ns_uri);
     if copy.is_null() {
         return -1;
     }
-    if xml_hash_update_entry(
-        (*ctxt).ns_hash,
-        prefix,
-        copy as _,
-        Some(xml_hash_default_deallocator),
-    ) < 0
-    {
-        xml_free(copy as _);
-        return -1;
+    match ns_hash.update_entry(CStr::from_ptr(prefix as *const i8), copy, |data, _| {
+        xml_free(data as _);
+    }) {
+        Ok(_) => 0,
+        Err(_) => {
+            xml_free(copy as _);
+            -1
+        }
     }
-
-    0
 }
 
 /// Search in the namespace declaration array of the context for the given
@@ -2026,7 +2031,10 @@ pub unsafe extern "C" fn xml_xpath_ns_lookup(
         }
     }
 
-    xml_hash_lookup((*ctxt).ns_hash, prefix) as _
+    (*ctxt)
+        .ns_hash
+        .and_then(|table| table.lookup(CStr::from_ptr(prefix as *const i8)).copied())
+        .unwrap_or(null_mut())
 }
 
 /// Cleanup the XPath context data associated to registered variables
@@ -2036,8 +2044,11 @@ pub unsafe extern "C" fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPt
         return;
     }
 
-    xml_hash_free((*ctxt).ns_hash, Some(xml_hash_default_deallocator));
-    (*ctxt).ns_hash = null_mut();
+    if let Some(mut table) = (*ctxt).ns_hash.take().map(|t| t.into_inner()) {
+        table.clear_with(|data, _| {
+            xml_free(data as _);
+        });
+    }
 }
 
 /// Register a new function. If @f is NULL it unregisters the function
