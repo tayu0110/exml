@@ -34,8 +34,7 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
-            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
-            xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
+            xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTablePtr,
         },
         parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
@@ -188,7 +187,7 @@ pub struct XmlRelaxNGGrammar {
     start: XmlRelaxNGDefinePtr,      /* <start> content */
     combine: XmlRelaxNGCombine,      /* the default combine value */
     start_list: XmlRelaxNGDefinePtr, /* list of <start> definitions */
-    defs: XmlHashTablePtr,           /* define* */
+    defs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* define* */
     refs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* references */
 }
 
@@ -4072,12 +4071,10 @@ unsafe extern "C" fn xml_relaxng_new_define(
 /// element of a given grammar using the same name.
 #[doc(alias = "xmlRelaxNGCheckCombine")]
 extern "C" fn xml_relaxng_check_combine(
-    payload: *mut c_void,
-    data: *mut c_void,
+    define: XmlRelaxNGDefinePtr,
+    ctxt: XmlRelaxNGParserCtxtPtr,
     name: *const XmlChar,
 ) {
-    let define: XmlRelaxNGDefinePtr = payload as _;
-    let ctxt: XmlRelaxNGParserCtxtPtr = data as _;
     let mut combine: *mut XmlChar;
     let mut choice_or_interleave: i32 = -1;
     let mut missing: i32 = 0;
@@ -4235,7 +4232,6 @@ extern "C" fn xml_relaxng_check_reference(
     ctxt: XmlRelaxNGParserCtxtPtr,
     name: *const XmlChar,
 ) {
-    let def: XmlRelaxNGDefinePtr;
     let mut cur: XmlRelaxNGDefinePtr;
 
     /*
@@ -4269,8 +4265,11 @@ extern "C" fn xml_relaxng_check_reference(
             );
             return;
         }
-        if !(*grammar).defs.is_null() {
-            def = xml_hash_lookup((*grammar).defs, name) as _;
+        if let Some(defs) = (*grammar).defs {
+            let def = defs
+                .lookup(CStr::from_ptr(name as *const i8))
+                .copied()
+                .unwrap_or(null_mut());
             if !def.is_null() {
                 cur = refe;
                 while !cur.is_null() {
@@ -6050,7 +6049,6 @@ unsafe extern "C" fn xml_relaxng_parse_define(
     node: XmlNodePtr,
 ) -> i32 {
     let mut ret: i32 = 0;
-    let tmp: i32;
     let def: XmlRelaxNGDefinePtr;
     let olddefine: *const XmlChar;
 
@@ -6098,25 +6096,18 @@ unsafe extern "C" fn xml_relaxng_parse_define(
                 null_mut(),
             );
         }
-        if (*(*ctxt).grammar).defs.is_null() {
-            (*(*ctxt).grammar).defs = xml_hash_create(10);
+        if (*(*ctxt).grammar).defs.is_none() {
+            (*(*ctxt).grammar).defs = XmlHashTableRef::with_capacity(10);
         }
-        if (*(*ctxt).grammar).defs.is_null() {
-            xml_rng_perr(
-                ctxt,
-                node,
-                XmlParserErrors::XmlRngpDefineCreateFailed,
-                c"Could not create definition hash\n".as_ptr() as _,
-                null_mut(),
-                null_mut(),
-            );
-            ret = -1;
-        } else {
-            tmp = xml_hash_add_entry((*(*ctxt).grammar).defs, name, def as _);
-            if tmp < 0 {
-                let mut prev: XmlRelaxNGDefinePtr;
-
-                prev = xml_hash_lookup((*(*ctxt).grammar).defs, name) as _;
+        if let Some(mut defs) = (*(*ctxt).grammar).defs {
+            if defs
+                .add_entry(CStr::from_ptr(name as *const i8), def)
+                .is_err()
+            {
+                let mut prev = defs
+                    .lookup(CStr::from_ptr(name as *const i8))
+                    .copied()
+                    .unwrap_or(null_mut());
                 if prev.is_null() {
                     xml_rng_perr(
                         ctxt,
@@ -6134,6 +6125,16 @@ unsafe extern "C" fn xml_relaxng_parse_define(
                     (*prev).next_hash = def;
                 }
             }
+        } else {
+            xml_rng_perr(
+                ctxt,
+                node,
+                XmlParserErrors::XmlRngpDefineCreateFailed,
+                c"Could not create definition hash\n".as_ptr() as _,
+                null_mut(),
+                null_mut(),
+            );
+            ret = -1;
         }
     }
     ret
@@ -6471,8 +6472,14 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
      * Apply 4.17 merging rules to defines and starts
      */
     xml_relaxng_combine_start(ctxt, ret);
-    if !(*ret).defs.is_null() {
-        xml_hash_scan((*ret).defs, Some(xml_relaxng_check_combine), ctxt as _);
+    if let Some(defs) = (*ret).defs {
+        defs.scan(|data, name, _, _| {
+            xml_relaxng_check_combine(
+                *data,
+                ctxt,
+                name.map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            )
+        });
     }
 
     // link together defines and refs in this grammar
@@ -8335,8 +8342,8 @@ unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
     if let Some(mut refs) = (*grammar).refs.take().map(|t| t.into_inner()) {
         refs.clear();
     }
-    if !(*grammar).defs.is_null() {
-        xml_hash_free((*grammar).defs, None);
+    if let Some(mut defs) = (*grammar).defs.take().map(|t| t.into_inner()) {
+        defs.clear();
     }
 
     xml_free(grammar as _);
