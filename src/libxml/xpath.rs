@@ -36,6 +36,7 @@ use crate::{
     error::XmlError,
     generic_error,
     globals::{GenericErrorContext, StructuredError},
+    hash::XmlHashTableRef,
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
         globals::{xml_free, xml_malloc},
@@ -340,7 +341,7 @@ pub struct XmlXPathContext {
 
     pub(crate) nb_variables_unused: i32, /* unused (hash table) */
     pub(crate) max_variables_unused: i32, /* unused (hash table) */
-    pub(crate) var_hash: XmlHashTablePtr, /* Hash table of defined variables */
+    pub(crate) var_hash: Option<XmlHashTableRef<'static, XmlXPathObjectPtr>>, /* Hash table of defined variables */
 
     pub(crate) nb_types: i32,          /* number of defined types */
     pub(crate) max_types: i32,         /* max number of types */
@@ -1424,7 +1425,7 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
     (*ret).doc = doc;
     (*ret).node = null_mut();
 
-    (*ret).var_hash = null_mut();
+    (*ret).var_hash = None;
 
     (*ret).nb_types = 0;
     (*ret).max_types = 0;

@@ -39,6 +39,7 @@ use crate::{
     buf::libxml_api::{xml_buf_add, xml_buf_create, xml_buf_free},
     error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
     generic_error,
+    hash::XmlHashTableRef,
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_char},
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
@@ -46,7 +47,7 @@ use crate::{
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_default_deallocator,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_remove_entry,
-            xml_hash_remove_entry2, xml_hash_update_entry, xml_hash_update_entry2, XmlHashTablePtr,
+            xml_hash_remove_entry2, xml_hash_update_entry, XmlHashTablePtr,
         },
         parser_internals::{xml_copy_char, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
@@ -2099,9 +2100,9 @@ pub unsafe extern "C" fn xml_xpath_register_variable(
     xml_xpath_register_variable_ns(ctxt, name, null(), value)
 }
 
-extern "C" fn xml_xpath_free_object_entry(obj: *mut c_void, _name: *const XmlChar) {
+extern "C" fn xml_xpath_free_object_entry(obj: XmlXPathObjectPtr) {
     unsafe {
-        xml_xpath_free_object(obj as XmlXPathObjectPtr);
+        xml_xpath_free_object(obj);
     }
 }
 
@@ -2122,27 +2123,39 @@ pub unsafe extern "C" fn xml_xpath_register_variable_ns(
         return -1;
     }
 
-    if (*ctxt).var_hash.is_null() {
-        (*ctxt).var_hash = xml_hash_create(0);
-    }
-    if (*ctxt).var_hash.is_null() {
-        return -1;
-    }
+    let mut var_hash = if let Some(var_hash) = (*ctxt).var_hash {
+        var_hash
+    } else {
+        let Some(table) = XmlHashTableRef::with_capacity(0) else {
+            return -1;
+        };
+        (*ctxt).var_hash = Some(table);
+        table
+    };
     if value.is_null() {
-        return xml_hash_remove_entry2(
-            (*ctxt).var_hash,
-            name,
-            ns_uri,
-            Some(xml_xpath_free_object_entry),
-        );
+        return match var_hash.remove_entry2(
+            CStr::from_ptr(name as *const i8),
+            (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+            |data, _| {
+                xml_xpath_free_object_entry(data);
+            },
+        ) {
+            Ok(_) => 0,
+            Err(_) => -1,
+        };
     }
-    xml_hash_update_entry2(
-        (*ctxt).var_hash,
-        name,
-        ns_uri,
-        value as _,
-        Some(xml_xpath_free_object_entry),
-    )
+
+    match var_hash.update_entry2(
+        CStr::from_ptr(name as *const i8),
+        (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+        value,
+        |data, _| {
+            xml_xpath_free_object_entry(data);
+        },
+    ) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
 }
 
 /// Search in the Function array of the context for the given function.
@@ -2516,17 +2529,21 @@ pub unsafe extern "C" fn xml_xpath_variable_lookup_ns(
         }
     }
 
-    if (*ctxt).var_hash.is_null() {
+    let Some(var_hash) = (*ctxt).var_hash else {
         return null_mut();
-    }
+    };
     if name.is_null() {
         return null_mut();
     }
 
-    xml_xpath_cache_object_copy(
-        ctxt,
-        xml_hash_lookup2((*ctxt).var_hash, name, ns_uri) as XmlXPathObjectPtr,
-    )
+    let obj = var_hash
+        .lookup2(
+            CStr::from_ptr(name as *const i8),
+            (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+        )
+        .copied()
+        .unwrap_or(null_mut());
+    xml_xpath_cache_object_copy(ctxt, obj)
 }
 
 /// Cleanup the XPath context data associated to registered variables
@@ -2536,8 +2553,11 @@ pub unsafe extern "C" fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathCo
         return;
     }
 
-    xml_hash_free((*ctxt).var_hash, Some(xml_xpath_free_object_entry));
-    (*ctxt).var_hash = null_mut();
+    if let Some(mut var_hash) = (*ctxt).var_hash.take() {
+        var_hash.clear_with(|data, _| {
+            xml_xpath_free_object_entry(data);
+        });
+    }
 }
 
 /// Create a new Xpath component
