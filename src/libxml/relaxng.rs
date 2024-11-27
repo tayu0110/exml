@@ -23,13 +23,14 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::{memcpy, memset, ptrdiff_t, snprintf};
+use libc::{memcpy, memset, snprintf};
 
 use crate::{
     __xml_raise_error,
     error::XmlParserErrors,
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
+    hash::XmlHashTableRef,
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
@@ -358,7 +359,7 @@ pub type XmlRelaxNGPartitionPtr = *mut XmlRelaxNGPartition;
 #[repr(C)]
 pub struct XmlRelaxNGPartition {
     nbgroups: i32, /* number of groups in the partitions */
-    triage: XmlHashTablePtr, /* hash table used to direct nodes to the
+    triage: Option<XmlHashTableRef<'static, i32>>, /* hash table used to direct nodes to the
                     * right group when possible */
     flags: i32, /* determinist ? */
     groups: *mut XmlRelaxNGInterleaveGroupPtr,
@@ -1793,8 +1794,8 @@ unsafe extern "C" fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionP
             }
             xml_free((*partitions).groups as _);
         }
-        if !(*partitions).triage.is_null() {
-            xml_hash_free((*partitions).triage, None);
+        if let Some(mut table) = (*partitions).triage.take().map(|t| t.into_inner()) {
+            table.clear();
         }
         xml_free(partitions as _);
     }
@@ -2502,7 +2503,6 @@ extern "C" fn xml_relaxng_compute_interleaves(
     let mut partitions: XmlRelaxNGPartitionPtr = null_mut();
     let mut group: XmlRelaxNGInterleaveGroupPtr;
     let mut ret: i32;
-    let mut res: i32;
     let mut nbgroups: i32 = 0;
     let mut nbchild: i32 = 0;
     let mut is_mixed: i32 = 0;
@@ -2555,7 +2555,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
             }
             memset(partitions as _, 0, size_of::<XmlRelaxNGPartition>());
             (*partitions).nbgroups = nbgroups;
-            (*partitions).triage = xml_hash_create(nbgroups);
+            (*partitions).triage = XmlHashTableRef::with_capacity(nbgroups as usize);
             for i in 0..nbgroups {
                 group = *groups.add(i as usize);
                 for j in i + 1..nbgroups {
@@ -2598,56 +2598,69 @@ extern "C" fn xml_relaxng_compute_interleaves(
                 if !tmp.is_null() && !(*tmp).is_null() {
                     while !(*tmp).is_null() {
                         if (*(*tmp)).typ == XmlRelaxNGType::Text {
-                            res = xml_hash_add_entry2(
-                                (*partitions).triage,
-                                c"#text".as_ptr() as _,
-                                null_mut(),
-                                (i + 1) as _,
-                            );
-                            if res != 0 {
+                            if (*partitions)
+                                .triage
+                                .and_then(|mut t| t.add_entry2(c"#text", None, i + 1).ok())
+                                .is_none()
+                            {
                                 is_determinist = -1;
                             }
                         } else if (*(*tmp)).typ == XmlRelaxNGType::Element
                             && !(*(*tmp)).name.is_null()
                         {
-                            if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                                res = xml_hash_add_entry2(
-                                    (*partitions).triage,
-                                    (*(*tmp)).name,
-                                    null_mut(),
-                                    (i + 1) as _,
-                                );
+                            let res = if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
+                                (*partitions)
+                                    .triage
+                                    .and_then(|mut t| {
+                                        t.add_entry2(
+                                            CStr::from_ptr((*(*tmp)).name as *const i8),
+                                            None,
+                                            i + 1,
+                                        )
+                                        .ok()
+                                    })
+                                    .is_none()
                             } else {
-                                res = xml_hash_add_entry2(
-                                    (*partitions).triage,
-                                    (*(*tmp)).name,
-                                    (*(*tmp)).ns,
-                                    (i + 1) as _,
-                                );
-                            }
-                            if res != 0 {
+                                (*partitions)
+                                    .triage
+                                    .and_then(|mut t| {
+                                        t.add_entry2(
+                                            CStr::from_ptr((*(*tmp)).name as *const i8),
+                                            (!(*(*tmp)).ns.is_null())
+                                                .then(|| CStr::from_ptr((*(*tmp)).ns as *const i8)),
+                                            i + 1,
+                                        )
+                                        .ok()
+                                    })
+                                    .is_none()
+                            };
+                            if res {
                                 is_determinist = -1;
                             }
                         } else if (*(*tmp)).typ == XmlRelaxNGType::Element {
-                            if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
-                                res = xml_hash_add_entry2(
-                                    (*partitions).triage,
-                                    c"#any".as_ptr() as _,
-                                    null_mut(),
-                                    (i + 1) as _,
-                                );
+                            let res = if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
+                                (*partitions)
+                                    .triage
+                                    .and_then(|mut t| t.add_entry2(c"#any", None, i + 1).ok())
+                                    .is_none()
                             } else {
-                                res = xml_hash_add_entry2(
-                                    (*partitions).triage,
-                                    c"#any".as_ptr() as _,
-                                    (*(*tmp)).ns,
-                                    (i + 1) as _,
-                                );
-                            }
+                                (*partitions)
+                                    .triage
+                                    .and_then(|mut t| {
+                                        t.add_entry2(
+                                            c"#any",
+                                            (!(*(*tmp)).ns.is_null())
+                                                .then(|| CStr::from_ptr((*(*tmp)).ns as *const i8)),
+                                            i + 1,
+                                        )
+                                        .ok()
+                                    })
+                                    .is_none()
+                            };
                             if !(*(*tmp)).name_class.is_null() {
                                 is_determinist = 2;
                             }
-                            if res != 0 {
+                            if res {
                                 is_determinist = -1;
                             }
                         } else {
@@ -10149,42 +10162,53 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
     let start: XmlNodePtr = cur;
     while !cur.is_null() {
         (*(*ctxt).state).seq = cur;
-        if !(*partitions).triage.is_null() && (*partitions).flags & IS_DETERMINIST != 0 {
-            let mut tmp: *mut c_void = null_mut();
+        if let Some(triage) = (*partitions)
+            .triage
+            .filter(|_| (*partitions).flags & IS_DETERMINIST != 0)
+        {
+            let mut tmp = None;
 
             if matches!(
                 (*cur).typ,
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
-                tmp = xml_hash_lookup2((*partitions).triage, c"#text".as_ptr() as _, null_mut());
+                tmp = triage.lookup2(c"#text", None).copied();
             } else if (*cur).typ == XmlElementType::XmlElementNode {
                 if !(*cur).ns.is_null() {
-                    tmp = xml_hash_lookup2((*partitions).triage, (*cur).name, (*(*cur).ns).href);
-                    if tmp.is_null() {
-                        tmp = xml_hash_lookup2(
-                            (*partitions).triage,
-                            c"#any".as_ptr() as _,
-                            (*(*cur).ns).href,
-                        );
-                    }
+                    tmp = triage
+                        .lookup2(
+                            CStr::from_ptr((*cur).name as *const i8),
+                            (!(*(*cur).ns).href.is_null())
+                                .then(|| CStr::from_ptr((*(*cur).ns).href as *const i8)),
+                        )
+                        .or_else(|| {
+                            triage.lookup2(
+                                c"#any",
+                                (!(*(*cur).ns).href.is_null())
+                                    .then(|| CStr::from_ptr((*(*cur).ns).href as *const i8)),
+                            )
+                        })
+                        .copied();
                 } else {
-                    tmp = xml_hash_lookup2((*partitions).triage, (*cur).name, null_mut());
+                    tmp = triage
+                        .lookup2(CStr::from_ptr((*cur).name as *const i8), None)
+                        .copied();
                 }
-                if tmp.is_null() {
-                    tmp = xml_hash_lookup2((*partitions).triage, c"#any".as_ptr() as _, null_mut());
+                if tmp.is_none() {
+                    tmp = triage.lookup2(c"#any", None).copied();
                 }
             }
 
-            if tmp.is_null() {
-                i = nbgroups;
-            } else {
-                i = (tmp as ptrdiff_t - 1) as _;
+            if let Some(t) = tmp {
+                i = t - 1;
                 if (*partitions).flags & IS_NEEDCHECK != 0 {
                     group = *(*partitions).groups.add(i as usize);
                     if xml_relaxng_node_matches_list(cur, (*group).defs) == 0 {
                         i = nbgroups;
                     }
                 }
+            } else {
+                i = nbgroups;
             }
         } else {
             i = 0;
