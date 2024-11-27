@@ -299,7 +299,7 @@ pub struct XmlRelaxNGParserCtxt {
     def: XmlRelaxNGDefinePtr,            /* the current define */
 
     nb_interleaves: i32,
-    interleaves: XmlHashTablePtr, /* keep track of all the interleaves */
+    interleaves: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* keep track of all the interleaves */
 
     documents: XmlRelaxNGDocumentPtr, /* all the documents loaded */
     includes: XmlRelaxNGIncludePtr,   /* all the includes loaded */
@@ -1936,8 +1936,8 @@ pub unsafe extern "C" fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxt
     if !(*ctxt).doc.is_null() {
         xml_relaxng_free_document((*ctxt).doc);
     }
-    if !(*ctxt).interleaves.is_null() {
-        xml_hash_free((*ctxt).interleaves, None);
+    if let Some(mut table) = (*ctxt).interleaves.take().map(|t| t.into_inner()) {
+        table.clear();
     }
     if !(*ctxt).documents.is_null() {
         xml_relaxng_free_document_list((*ctxt).documents);
@@ -2497,12 +2497,9 @@ unsafe extern "C" fn xml_rng_perr(
 ///     algorithm
 #[doc(alias = "xmlRelaxNGComputeInterleaves")]
 extern "C" fn xml_relaxng_compute_interleaves(
-    payload: *mut c_void,
-    data: *mut c_void,
-    _name: *const XmlChar,
+    def: XmlRelaxNGDefinePtr,
+    ctxt: XmlRelaxNGParserCtxtPtr,
 ) {
-    let def: XmlRelaxNGDefinePtr = payload as _;
-    let ctxt: XmlRelaxNGParserCtxtPtr = data as _;
     let mut cur: XmlRelaxNGDefinePtr;
     let mut tmp: *mut XmlRelaxNGDefinePtr;
     let mut partitions: XmlRelaxNGPartitionPtr = null_mut();
@@ -4190,19 +4187,10 @@ extern "C" fn xml_relaxng_check_combine(
         }
         (*define).content = cur;
         if choice_or_interleave == 0 {
-            if (*ctxt).interleaves.is_null() {
-                (*ctxt).interleaves = xml_hash_create(10);
+            if (*ctxt).interleaves.is_none() {
+                (*ctxt).interleaves = XmlHashTableRef::with_capacity(10);
             }
-            if (*ctxt).interleaves.is_null() {
-                xml_rng_perr(
-                    ctxt,
-                    (*define).node,
-                    XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                    c"Failed to create interleaves hash table\n".as_ptr() as _,
-                    null_mut(),
-                    null_mut(),
-                );
-            } else {
+            if let Some(mut table) = (*ctxt).interleaves {
                 let mut tmpname: [c_char; 32] = [0; 32];
 
                 snprintf(
@@ -4212,7 +4200,10 @@ extern "C" fn xml_relaxng_check_combine(
                     (*ctxt).nb_interleaves,
                 );
                 (*ctxt).nb_interleaves += 1;
-                if xml_hash_add_entry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
+                if table
+                    .add_entry(CStr::from_ptr(tmpname.as_ptr()), cur)
+                    .is_err()
+                {
                     xml_rng_perr(
                         ctxt,
                         (*define).node,
@@ -4222,6 +4213,15 @@ extern "C" fn xml_relaxng_check_combine(
                         null_mut(),
                     );
                 }
+            } else {
+                xml_rng_perr(
+                    ctxt,
+                    (*define).node,
+                    XmlParserErrors::XmlRngpInterleaveCreateFailed,
+                    c"Failed to create interleaves hash table\n".as_ptr() as _,
+                    null_mut(),
+                    null_mut(),
+                );
             }
         }
     }
@@ -5103,12 +5103,10 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
     }
     (*def).typ = XmlRelaxNGType::Interleave;
 
-    if (*ctxt).interleaves.is_null() {
-        (*ctxt).interleaves = xml_hash_create(10);
+    if (*ctxt).interleaves.is_none() {
+        (*ctxt).interleaves = XmlHashTableRef::with_capacity(10);
     }
-    if (*ctxt).interleaves.is_null() {
-        xml_rng_perr_memory(ctxt, c"create interleaves\n".as_ptr() as _);
-    } else {
+    if let Some(mut table) = (*ctxt).interleaves {
         let mut name: [c_char; 32] = [0; 32];
 
         snprintf(
@@ -5118,7 +5116,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
             (*ctxt).nb_interleaves,
         );
         (*ctxt).nb_interleaves += 1;
-        if xml_hash_add_entry((*ctxt).interleaves, name.as_ptr() as _, def as _) < 0 {
+        if table.add_entry(CStr::from_ptr(name.as_ptr()), def).is_err() {
             xml_rng_perr(
                 ctxt,
                 node,
@@ -5128,6 +5126,8 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
                 null_mut(),
             );
         }
+    } else {
+        xml_rng_perr_memory(ctxt, c"create interleaves\n".as_ptr() as _);
     }
     child = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     if child.is_null() {
@@ -6356,19 +6356,10 @@ unsafe extern "C" fn xml_relaxng_combine_start(
     (*cur).content = (*grammar).start;
     (*grammar).start = cur;
     if choice_or_interleave == 0 {
-        if (*ctxt).interleaves.is_null() {
-            (*ctxt).interleaves = xml_hash_create(10);
+        if (*ctxt).interleaves.is_none() {
+            (*ctxt).interleaves = XmlHashTableRef::with_capacity(10);
         }
-        if (*ctxt).interleaves.is_null() {
-            xml_rng_perr(
-                ctxt,
-                (*cur).node,
-                XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                c"Failed to create interleaves hash table\n".as_ptr() as _,
-                null_mut(),
-                null_mut(),
-            );
-        } else {
+        if let Some(mut table) = (*ctxt).interleaves {
             let mut tmpname: [c_char; 32] = [0; 32];
 
             snprintf(
@@ -6378,7 +6369,10 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 (*ctxt).nb_interleaves,
             );
             (*ctxt).nb_interleaves += 1;
-            if xml_hash_add_entry((*ctxt).interleaves, tmpname.as_ptr() as _, cur as _) < 0 {
+            if table
+                .add_entry(CStr::from_ptr(tmpname.as_ptr()), cur)
+                .is_err()
+            {
                 xml_rng_perr(
                     ctxt,
                     (*cur).node,
@@ -6388,6 +6382,15 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                     null_mut(),
                 );
             }
+        } else {
+            xml_rng_perr(
+                ctxt,
+                (*cur).node,
+                XmlParserErrors::XmlRngpInterleaveCreateFailed,
+                c"Failed to create interleaves hash table\n".as_ptr() as _,
+                null_mut(),
+                null_mut(),
+            );
         }
     }
 }
@@ -8242,18 +8245,12 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
         return null_mut();
     }
 
-    /*
-     * Check the ref/defines links
-     */
-    /*
-     * try to preprocess interleaves
-     */
-    if !(*ctxt).interleaves.is_null() {
-        xml_hash_scan(
-            (*ctxt).interleaves,
-            Some(xml_relaxng_compute_interleaves),
-            ctxt as _,
-        );
+    // Check the ref/defines links
+    // try to preprocess interleaves
+    if let Some(interleaves) = (*ctxt).interleaves {
+        interleaves.scan(|data, _, _, _| {
+            xml_relaxng_compute_interleaves(*data, ctxt);
+        });
     }
 
     /*
