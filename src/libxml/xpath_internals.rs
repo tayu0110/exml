@@ -23,7 +23,7 @@ use std::{
     io::Write,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of, addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut, NonNull},
 };
 
 use libc::{memcpy, memset, INT_MAX, INT_MIN};
@@ -45,9 +45,8 @@ use crate::{
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
-            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_default_deallocator,
-            xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_remove_entry,
-            xml_hash_remove_entry2, xml_hash_update_entry, XmlHashTablePtr,
+            xml_hash_add_entry, xml_hash_create, xml_hash_default_deallocator, xml_hash_free,
+            xml_hash_lookup, xml_hash_remove_entry, xml_hash_update_entry, XmlHashTablePtr,
         },
         parser_internals::{xml_copy_char, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
@@ -2070,22 +2069,33 @@ pub unsafe extern "C" fn xml_xpath_register_func_ns(
         return -1;
     }
 
-    if (*ctxt).func_hash.is_null() {
-        (*ctxt).func_hash = xml_hash_create(0);
-    }
-    if (*ctxt).func_hash.is_null() {
-        return -1;
-    }
-    if let Some(f) = f {
-        xml_hash_add_entry2(
-            (*ctxt).func_hash,
-            name,
-            ns_uri,
-            *(addr_of!(f) as *const *mut c_void),
-        )
+    let mut func_hash = if let Some(table) = (*ctxt).func_hash {
+        table
     } else {
-        xml_hash_remove_entry2((*ctxt).func_hash, name, ns_uri, None)
-    }
+        let Some(table) = XmlHashTableRef::with_capacity(0) else {
+            return -1;
+        };
+        (*ctxt).func_hash = Some(table);
+        table
+    };
+    let res = if let Some(f) = f {
+        func_hash
+            .add_entry2(
+                CStr::from_ptr(name as *const i8),
+                (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+                f,
+            )
+            .is_err()
+    } else {
+        func_hash
+            .remove_entry2(
+                CStr::from_ptr(name as *const i8),
+                (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+                |_, _| {},
+            )
+            .is_err()
+    };
+    -(res as i32)
 }
 
 /// Register a new variable value. If @value is NULL it unregisters the variable
@@ -2200,12 +2210,13 @@ pub unsafe extern "C" fn xml_xpath_function_lookup_ns(
         }
     }
 
-    if (*ctxt).func_hash.is_null() {
-        return None;
-    }
-
-    let ret = xml_hash_lookup2((*ctxt).func_hash, name, ns_uri);
-    (!ret.is_null()).then(|| *(addr_of!(ret) as *const XmlXPathFunction))
+    (*ctxt)
+        .func_hash?
+        .lookup2(
+            CStr::from_ptr(name as *const i8),
+            (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+        )
+        .copied()
 }
 
 /// Cleanup the XPath context data associated to registered functions
@@ -2215,8 +2226,9 @@ pub unsafe extern "C" fn xml_xpath_registered_funcs_cleanup(ctxt: XmlXPathContex
         return;
     }
 
-    xml_hash_free((*ctxt).func_hash, None);
-    (*ctxt).func_hash = null_mut();
+    if let Some(mut func_hash) = (*ctxt).func_hash.take().map(|t| t.into_inner()) {
+        func_hash.clear();
+    }
 }
 
 /// Search in the Variable array of the context for the given variable value.
@@ -2265,9 +2277,6 @@ unsafe extern "C" fn xml_xpath_cache_wrap_node_set(
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XpathNodeset;
             (*ret).nodesetval = val;
-            // #ifdef XP_DEBUG_OBJ_USAGE
-            // 	    xmlXPathDebugObjUsageRequested(ctxt, XpathNodeset);
-            // #endif
             return ret;
         }
     }
@@ -2553,7 +2562,7 @@ pub unsafe extern "C" fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathCo
         return;
     }
 
-    if let Some(mut var_hash) = (*ctxt).var_hash.take() {
+    if let Some(mut var_hash) = (*ctxt).var_hash.take().map(|t| t.into_inner()) {
         var_hash.clear_with(|data, _| {
             xml_xpath_free_object_entry(data);
         });

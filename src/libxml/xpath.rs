@@ -40,7 +40,7 @@ use crate::{
     libxml::{
         dict::{xml_dict_free, XmlDictPtr},
         globals::{xml_free, xml_malloc},
-        hash::{xml_hash_create, XmlHashTablePtr},
+        hash::XmlHashTablePtr,
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, xml_strlen, XmlChar},
@@ -347,9 +347,9 @@ pub struct XmlXPathContext {
     pub(crate) max_types: i32,         /* max number of types */
     pub(crate) types: XmlXPathTypePtr, /* Array of defined types */
 
-    pub(crate) nb_funcs_unused: i32,       /* unused (hash table) */
-    pub(crate) max_funcs_unused: i32,      /* unused (hash table) */
-    pub(crate) func_hash: XmlHashTablePtr, /* Hash table of defined funcs */
+    pub(crate) nb_funcs_unused: i32,  /* unused (hash table) */
+    pub(crate) max_funcs_unused: i32, /* unused (hash table) */
+    pub(crate) func_hash: Option<XmlHashTableRef<'static, XmlXPathFunction>>, /* Hash table of defined funcs */
 
     pub(crate) nb_axis: i32,          /* number of defined axis */
     pub(crate) max_axis: i32,         /* max number of axis */
@@ -1431,7 +1431,7 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
     (*ret).max_types = 0;
     (*ret).types = null_mut();
 
-    (*ret).func_hash = xml_hash_create(0);
+    (*ret).func_hash = XmlHashTableRef::with_capacity(0);
 
     (*ret).nb_axis = 0;
     (*ret).max_axis = 0;
