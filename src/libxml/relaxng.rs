@@ -35,7 +35,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
-            xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTable, XmlHashTablePtr,
+            xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
         },
         parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
@@ -70,7 +70,7 @@ use crate::{
     },
 };
 
-use super::{chvalid::xml_is_blank_char, hash::CVoidWrapper};
+use super::chvalid::xml_is_blank_char;
 
 /// Signature of an error callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityErrorFunc")]
@@ -542,8 +542,8 @@ pub struct XmlRelaxNGTypeLibrary {
 
 thread_local! {
     static XML_RELAXNG_TYPE_INITIALIZED: Cell<bool> = const { Cell::new(false) };
-    static XML_RELAXNG_REGISTERED_TYPES: Cell<*mut XmlHashTable<'static, CVoidWrapper>> =
-        const { Cell::new(null_mut()) };
+    static XML_RELAXNG_REGISTERED_TYPES: Cell<Option<XmlHashTableRef<'static, XmlRelaxNGTypeLibraryPtr>>> =
+        const { Cell::new(None) };
 }
 
 macro_rules! VALID_ERR {
@@ -1159,11 +1159,16 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     facet: Option<XmlRelaxNGFacetCheck>,
     freef: Option<XmlRelaxNGTypeFree>,
 ) -> i32 {
-    let registered_types = XML_RELAXNG_REGISTERED_TYPES.get();
-    if registered_types.is_null() || namespace.is_null() || check.is_none() || comp.is_none() {
+    let Some(mut registered_types) = XML_RELAXNG_REGISTERED_TYPES.get() else {
+        return -1;
+    };
+    if namespace.is_null() || check.is_none() || comp.is_none() {
         return -1;
     }
-    if !xml_hash_lookup(registered_types, namespace).is_null() {
+    if registered_types
+        .lookup(CStr::from_ptr(namespace as *const i8))
+        .is_some()
+    {
         generic_error!(
             "Relax-NG types library '{}' already registered\n",
             CStr::from_ptr(namespace as *const i8).to_string_lossy()
@@ -1183,16 +1188,17 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     (*lib).check = check;
     (*lib).facet = facet;
     (*lib).freef = freef;
-    let ret: i32 = xml_hash_add_entry(registered_types, namespace, lib as _);
-    if ret < 0 {
-        generic_error!(
-            "Relax-NG types library failed to register '{}'\n",
-            CStr::from_ptr(namespace as *const i8).to_string_lossy()
-        );
-        xml_relaxng_free_type_library(lib as _, namespace);
-        return -1;
+    match registered_types.add_entry(CStr::from_ptr(namespace as *const i8), lib) {
+        Ok(_) => 0,
+        Err(_) => {
+            generic_error!(
+                "Relax-NG types library failed to register '{}'\n",
+                CStr::from_ptr(namespace as *const i8).to_string_lossy()
+            );
+            xml_relaxng_free_type_library(lib as _);
+            -1
+        }
     }
-    0
 }
 
 /// Check if the given type is provided by the W3C XMLSchema Datatype library.
@@ -1543,13 +1549,12 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
         return 0;
     }
 
-    let registered_types = xml_hash_create(10);
-    if registered_types.is_null() {
+    let Some(registered_types) = XmlHashTableRef::with_capacity(10) else {
         generic_error!("Failed to allocate sh table for Relax-NG types\n");
         return -1;
-    }
+    };
 
-    XML_RELAXNG_REGISTERED_TYPES.set(registered_types);
+    XML_RELAXNG_REGISTERED_TYPES.set(Some(registered_types));
     xml_relaxng_register_type_library(
         c"http://www.w3.org/2001/XMLSchema-datatypes".as_ptr() as _,
         null_mut(),
@@ -1574,8 +1579,7 @@ pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
 
 /// Free the structure associated to the type library
 #[doc(alias = "xmlRelaxNGFreeTypeLibrary")]
-extern "C" fn xml_relaxng_free_type_library(payload: *mut c_void, _namespace: *const XmlChar) {
-    let lib: XmlRelaxNGTypeLibraryPtr = payload as _;
+extern "C" fn xml_relaxng_free_type_library(lib: XmlRelaxNGTypeLibraryPtr) {
     if lib.is_null() {
         return;
     }
@@ -1594,10 +1598,11 @@ pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
     if !XML_RELAXNG_TYPE_INITIALIZED.get() {
         return;
     }
-    xml_hash_free(
-        XML_RELAXNG_REGISTERED_TYPES.get(),
-        Some(xml_relaxng_free_type_library),
-    );
+    if let Some(mut table) = XML_RELAXNG_REGISTERED_TYPES.take().map(|t| t.into_inner()) {
+        table.clear_with(|data, _| {
+            xml_relaxng_free_type_library(data);
+        });
+    }
     XML_RELAXNG_TYPE_INITIALIZED.set(false);
 }
 
@@ -4690,8 +4695,10 @@ unsafe extern "C" fn xml_relaxng_parse_data(
     (*def).name = typ;
     (*def).ns = library;
 
-    let lib: XmlRelaxNGTypeLibraryPtr =
-        xml_hash_lookup(XML_RELAXNG_REGISTERED_TYPES.get(), library) as _;
+    let lib = XML_RELAXNG_REGISTERED_TYPES
+        .get()
+        .and_then(|table| table.lookup(CStr::from_ptr(library as *const i8)).copied())
+        .unwrap_or(null_mut());
     if lib.is_null() {
         xml_rng_perr(
             ctxt,
@@ -4980,7 +4987,10 @@ unsafe extern "C" fn xml_relaxng_parse_value(
         (*def).name = typ;
         (*def).ns = library;
 
-        lib = xml_hash_lookup(XML_RELAXNG_REGISTERED_TYPES.get(), library) as _;
+        lib = XML_RELAXNG_REGISTERED_TYPES
+            .get()
+            .and_then(|table| table.lookup(CStr::from_ptr(library as *const i8)).copied())
+            .unwrap_or(null_mut());
         if lib.is_null() {
             xml_rng_perr(
                 ctxt,
