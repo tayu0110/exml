@@ -44,10 +44,6 @@ use crate::{
         chvalid::{xml_is_blank_char, xml_is_char},
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-        hash::{
-            xml_hash_add_entry, xml_hash_create, xml_hash_default_deallocator, xml_hash_free,
-            xml_hash_lookup, XmlHashTablePtr,
-        },
         parser_internals::{xml_copy_char, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
             xml_free_pattern, xml_free_pattern_list, xml_free_stream_ctxt, xml_pattern_from_root,
@@ -87,6 +83,7 @@ use crate::{
 
 use super::{
     chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
+    hash::XmlHashTable,
     parser_internals::xml_is_letter,
 };
 
@@ -1686,21 +1683,22 @@ pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlN
         return ret;
     }
     let l: i32 = xml_xpath_node_set_get_length!(nodes);
-    let hash: XmlHashTablePtr = xml_hash_create(l);
+    let mut hash = XmlHashTable::with_capacity(l as usize);
     for i in 0..l {
         cur = xml_xpath_node_set_item!(nodes, i);
         strval = xml_xpath_cast_node_to_string(cur);
-        if xml_hash_lookup(hash, strval).is_null() {
-            if xml_hash_add_entry(hash, strval, strval as _) < 0 {
+        if hash.lookup(CStr::from_ptr(strval as *const i8)).is_none() {
+            if hash
+                .add_entry(CStr::from_ptr(strval as *const i8), strval)
+                .is_err()
+            {
                 xml_free(strval as _);
-                // goto error;
-                xml_hash_free(hash, Some(xml_hash_default_deallocator));
+                hash.clear_with(|data, _| xml_free(data as _));
                 xml_xpath_free_node_set(ret);
                 return null_mut();
             }
             if xml_xpath_node_set_add_unique(ret, cur) < 0 {
-                // goto error;
-                xml_hash_free(hash, Some(xml_hash_default_deallocator));
+                hash.clear_with(|data, _| xml_free(data as _));
                 xml_xpath_free_node_set(ret);
                 return null_mut();
             }
@@ -1708,13 +1706,8 @@ pub unsafe extern "C" fn xml_xpath_distinct_sorted(nodes: XmlNodeSetPtr) -> XmlN
             xml_free(strval as _);
         }
     }
-    xml_hash_free(hash, Some(xml_hash_default_deallocator));
+    hash.clear_with(|data, _| xml_free(data as _));
     ret
-
-    // error:
-    // xmlHashFree(hash, Some(xmlHashDefaultDeallocator));
-    // xmlXPathFreeNodeSet(ret);
-    // return null_mut();
 }
 
 /// Implements the EXSLT - Sets distinct() function:
