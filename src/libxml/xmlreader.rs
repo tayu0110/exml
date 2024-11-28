@@ -2661,8 +2661,7 @@ impl XmlTextReader {
 
     /// A shorthand reference to the namespace associated with the node.
     ///
-    /// Returns the prefix or NULL if not available,
-    /// if non NULL it need to be freed by the caller.
+    /// Returns the prefix or `None` if not available.
     #[doc(alias = "xmlTextReaderPrefix")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn prefix(&self) -> Option<String> {
@@ -2726,15 +2725,25 @@ impl XmlTextReader {
 
     /// The xml:lang scope within which the node resides.
     ///
-    /// Returns the xml:lang value or NULL if none exists.,
-    /// if non NULL it need to be freed by the caller.
+    /// Returns the xml:lang value or `None` if none exists.
     #[doc(alias = "xmlTextReaderXmlLang")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn xml_lang(&self) -> *mut XmlChar {
+    pub unsafe fn xml_lang(&self) -> Option<String> {
+        use std::ffi::CStr;
+
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
-        (*self.node).get_lang()
+        let res = (*self.node).get_lang();
+        let r = (!res.is_null()).then(|| {
+            CStr::from_ptr(res as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        if !res.is_null() {
+            xml_free(res as _);
+        }
+        r
     }
 
     /// This tells the XML Reader to preserve the current node.
