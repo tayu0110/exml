@@ -1040,9 +1040,7 @@ unsafe extern "C" fn reader_test(
     options: i32,
     fail: i32,
 ) -> i32 {
-    use exml::libxml::xmlreader::{
-        xml_free_text_reader, xml_reader_for_file, xml_text_reader_read, XmlTextReaderPtr,
-    };
+    use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file, XmlTextReaderPtr};
 
     let mut res: i32;
 
@@ -1057,9 +1055,9 @@ unsafe extern "C" fn reader_test(
         );
         return 1;
     }
-    let mut ret = xml_text_reader_read(&mut *reader);
+    let mut ret = (*reader).read();
     while ret == 1 {
-        ret = xml_text_reader_read(&mut *reader);
+        ret = (*reader).read();
     }
     if ret != 0 {
         if fail != 0 {

@@ -2642,15 +2642,12 @@ unsafe fn err_parse_test(
 
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
-    use exml::libxml::xmlreader::{
-        xml_text_reader_const_name, xml_text_reader_const_value, xml_text_reader_depth,
-        xml_text_reader_has_value, xml_text_reader_is_empty_element, xml_text_reader_node_type,
-    };
+    use exml::libxml::xmlreader::{xml_text_reader_const_name, xml_text_reader_const_value};
 
     let mut name: *const XmlChar;
 
-    let typ: i32 = xml_text_reader_node_type(&mut *reader);
-    let empty: i32 = xml_text_reader_is_empty_element(&mut *reader);
+    let typ: i32 = (*reader).node_type();
+    let empty: i32 = (*reader).is_empty_element();
 
     name = xml_text_reader_const_name(&mut *reader);
     if name.is_null() {
@@ -2662,11 +2659,11 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
     write!(
         out,
         "{} {} {} {} {}",
-        xml_text_reader_depth(&mut *reader),
+        (*reader).depth(),
         typ,
         CStr::from_ptr(name as _).to_string_lossy(),
         empty,
-        xml_text_reader_has_value(&mut *reader),
+        (*reader).has_value(),
     )
     .ok();
     if value.is_null() {
@@ -2685,9 +2682,7 @@ unsafe fn stream_process_test(
     rng: *const c_char,
     _options: i32,
 ) -> i32 {
-    use exml::libxml::xmlreader::{
-        xml_text_reader_is_valid, xml_text_reader_read, xml_text_reader_relaxng_validate,
-    };
+    use exml::libxml::xmlreader::xml_text_reader_relaxng_validate;
 
     let mut ret: i32;
     let mut temp = None;
@@ -2734,18 +2729,18 @@ unsafe fn stream_process_test(
             return 0;
         }
     }
-    ret = xml_text_reader_read(&mut *reader);
+    ret = (*reader).read();
     while ret == 1 {
         if let Some(t) = t.as_mut().filter(|_| rng.is_null()) {
             process_node(t, reader);
         }
-        ret = xml_text_reader_read(&mut *reader);
+        ret = (*reader).read();
     }
     if ret != 0 {
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
     }
     if !rng.is_null() {
-        if xml_text_reader_is_valid(&mut *reader) != 1 {
+        if (*reader).is_valid() != 1 {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
         } else {
             test_error_handler(None, format!("{filename} validates\n").as_str());
@@ -4402,24 +4397,22 @@ unsafe extern "C" fn pattern_node(
     use exml::libxml::{
         pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
         xmlreader::{
-            xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri,
-            xml_text_reader_current_node, xml_text_reader_is_empty_element,
-            xml_text_reader_node_type, XmlReaderTypes,
+            xml_text_reader_const_local_name, xml_text_reader_const_namespace_uri, XmlReaderTypes,
         },
     };
 
     let mut path: *mut XmlChar = null_mut();
     let mut is_match: i32 = -1;
 
-    let typ: i32 = xml_text_reader_node_type(&mut *reader);
-    let empty: i32 = xml_text_reader_is_empty_element(&mut *reader);
+    let typ: i32 = (*reader).node_type();
+    let empty: i32 = (*reader).is_empty_element();
 
     if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
         /* do the check only on element start */
-        is_match = xml_pattern_match(patternc, xml_text_reader_current_node(&mut *reader));
+        is_match = xml_pattern_match(patternc, (*reader).current_node());
 
         if is_match != 0 {
-            path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
+            path = (*(*reader).current_node()).get_node_path();
             writeln!(
                 out,
                 "Node {} matches pattern {}",
@@ -4444,7 +4437,7 @@ unsafe extern "C" fn pattern_node(
                 patstream = null_mut();
             } else if ret != is_match {
                 if path.is_null() {
-                    path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
+                    path = (*(*reader).current_node()).get_node_path();
                 }
                 writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
                 writeln!(
@@ -4495,7 +4488,7 @@ unsafe fn pattern_test(
                 xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
                 xml_patterncompile, xml_stream_push,
             },
-            xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
+            xmlreader::{xml_free_text_reader, xml_reader_walker},
         },
         tree::XmlNsPtr,
     };
@@ -4626,10 +4619,10 @@ unsafe fn pattern_test(
                     NB_TESTS.set(NB_TESTS.get() + 1);
 
                     reader = xml_reader_walker(doc);
-                    res = xml_text_reader_read(&mut *reader);
+                    res = (*reader).read();
                     while res == 1 {
                         pattern_node(&mut o, reader, str.as_ptr() as _, patternc, patstream);
-                        res = xml_text_reader_read(&mut *reader);
+                        res = (*reader).read();
                     }
                     if res != 0 {
                         writeln!(o, "{filename} : failed to parse",).ok();

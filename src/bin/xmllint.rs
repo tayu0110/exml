@@ -1814,17 +1814,15 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
         pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
         xmlreader::{
             xml_text_reader_const_local_name, xml_text_reader_const_name,
-            xml_text_reader_const_namespace_uri, xml_text_reader_const_value,
-            xml_text_reader_current_node, xml_text_reader_depth, xml_text_reader_has_value,
-            xml_text_reader_is_empty_element, xml_text_reader_node_type, XmlReaderTypes,
+            xml_text_reader_const_namespace_uri, xml_text_reader_const_value, XmlReaderTypes,
         },
     };
 
     let mut name: *const XmlChar;
     let value: *const XmlChar;
 
-    let typ: c_int = xml_text_reader_node_type(&mut *reader);
-    let empty: c_int = xml_text_reader_is_empty_element(&mut *reader);
+    let typ: c_int = (*reader).node_type();
+    let empty: c_int = (*reader).is_empty_element();
 
     if DEBUG != 0 {
         name = xml_text_reader_const_name(&mut *reader);
@@ -1836,11 +1834,11 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
 
         print!(
             "{} {} {} {} {}",
-            xml_text_reader_depth(&mut *reader),
+            (*reader).depth(),
             typ,
             CStr::from_ptr(name as _).to_string_lossy(),
             empty,
-            xml_text_reader_has_value(&mut *reader)
+            (*reader).has_value()
         );
         if value.is_null() {
             println!();
@@ -1855,15 +1853,13 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
 
         if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
             /* do the check only on element start */
-            is_match = xml_pattern_match(
-                PATTERNC.load(Ordering::Relaxed),
-                xml_text_reader_current_node(&mut *reader),
-            );
+            is_match =
+                xml_pattern_match(PATTERNC.load(Ordering::Relaxed), (*reader).current_node());
 
             if is_match != 0 {
                 #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                 {
-                    path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
+                    path = (*(*reader).current_node()).get_node_path();
                     println!(
                         "Node {} matches pattern {}",
                         CStr::from_ptr(path as _).to_string_lossy(),
@@ -1896,7 +1892,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                 } else if ret != is_match {
                     #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                     if path.is_null() {
-                        path = (*xml_text_reader_current_node(&mut *reader)).get_node_path();
+                        path = (*(*reader).current_node()).get_node_path();
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
                     if !path.is_null() {
@@ -1940,8 +1936,8 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         pattern::{xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_stream_push},
         xmlreader::{
             xml_free_text_reader, xml_reader_for_file, xml_reader_for_memory,
-            xml_text_reader_is_valid, xml_text_reader_read, xml_text_reader_relaxng_validate,
-            xml_text_reader_schema_validate, xml_text_reader_set_parser_prop, XmlParserProperties,
+            xml_text_reader_relaxng_validate, xml_text_reader_schema_validate,
+            xml_text_reader_set_parser_prop, XmlParserProperties,
         },
     };
     use libc::{close, mmap, munmap, stat, MAP_FAILED, MAP_SHARED, PROT_READ};
@@ -2054,7 +2050,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
-        ret = xml_text_reader_read(&mut *reader);
+        ret = (*reader).read();
         while ret == 1 {
             #[cfg(feature = "libxml_pattern")]
             let f = !PATTERNC.load(Ordering::Relaxed).is_null();
@@ -2063,7 +2059,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             if DEBUG != 0 || f {
                 process_node(reader);
             }
-            ret = xml_text_reader_read(&mut *reader);
+            ret = (*reader).read();
         }
         if TIMING != 0 && REPEAT == 0 {
             #[cfg(any(feature = "schema", feature = "libxml_valid"))]
@@ -2090,14 +2086,14 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         }
 
         #[cfg(feature = "libxml_valid")]
-        if VALID != 0 && xml_text_reader_is_valid(&mut *reader) != 1 {
+        if VALID != 0 && (*reader).is_valid() != 1 {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         #[cfg(feature = "schema")]
         if RELAXNG.lock().unwrap().is_some() || SCHEMA.lock().unwrap().is_some() {
-            if xml_text_reader_is_valid(&mut *reader) != 1 {
+            if (*reader).is_valid() != 1 {
                 eprintln!(
                     "{} fails to validate",
                     CStr::from_ptr(filename).to_string_lossy()
@@ -2147,7 +2143,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
                 xml_free_stream_ctxt, xml_pattern_get_stream_ctxt, xml_patterncompile,
                 xml_stream_push,
             },
-            xmlreader::{xml_free_text_reader, xml_reader_walker, xml_text_reader_read},
+            xmlreader::{xml_free_text_reader, xml_reader_walker},
         },
         tree::XmlNodePtr,
     };
@@ -2220,7 +2216,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
-        ret = xml_text_reader_read(&mut *reader);
+        ret = (*reader).read();
         while ret == 1 {
             #[cfg(feature = "libxml_pattern")]
             let f = !PATTERNC.load(Ordering::Relaxed).is_null();
@@ -2229,7 +2225,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
             if DEBUG != 0 || f {
                 process_node(reader);
             }
-            ret = xml_text_reader_read(&mut *reader);
+            ret = (*reader).read();
         }
         if TIMING != 0 && REPEAT == 0 {
             end_timer!("walking through the doc");
