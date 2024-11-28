@@ -1871,12 +1871,10 @@ impl XmlTextReader {
             self.allocs -= XML_TEXTREADER_INPUT;
             self.input.take()
         } else {
-            /*
-             * Hum, one may need to duplicate the data structure because
-             * without reference counting the input may be freed twice:
-             *   - by the layer which allocated it.
-             *   - by the layer to which would have been returned to.
-             */
+            // Hum, one may need to duplicate the data structure because
+            // without reference counting the input may be freed twice:
+            //   - by the layer which allocated it.
+            //   - by the layer to which would have been returned to.
             // TODO
             None
         }
@@ -1885,17 +1883,13 @@ impl XmlTextReader {
     /// Retrieve the error callback function and user argument.
     #[doc(alias = "xmlTextReaderGetErrorHandler")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_error_handler(
+    pub fn get_error_handler(
         &self,
-        f: *mut Option<XmlTextReaderErrorFunc>,
-        arg: *mut Option<GenericErrorContext>,
+        f: &mut Option<XmlTextReaderErrorFunc>,
+        arg: &mut Option<GenericErrorContext>,
     ) {
-        if !f.is_null() {
-            *f = self.error_func;
-        }
-        if !arg.is_null() {
-            *arg = self.error_func_arg.clone();
-        }
+        *f = self.error_func;
+        *arg = self.error_func_arg.clone();
     }
 
     /// Moves the position of the current instance to the node that
@@ -1935,7 +1929,7 @@ impl XmlTextReader {
             return -1;
         }
 
-        /* TODO: handle the xmlDecl */
+        // TODO: handle the xmlDecl
         if (*self.node).typ != XmlElementType::XmlElementNode {
             return 0;
         }
