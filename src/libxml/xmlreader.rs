@@ -2218,12 +2218,12 @@ impl XmlTextReader {
 
     /// The quotation mark character used to enclose the value of an attribute.
     ///
-    /// Returns " or ' and -1 in case of error
+    /// Returns " or ' and `None` in case of error
     #[doc(alias = "xmlTextReaderQuoteChar")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn quote_char(&self) -> i32 {
-        /* TODO maybe lookup the attribute value for " first */
-        b'"' as _
+    pub fn quote_char(&self) -> Option<char> {
+        // TODO maybe lookup the attribute value for " first
+        Some('"')
     }
 
     /// Gets the read state of the reader.
