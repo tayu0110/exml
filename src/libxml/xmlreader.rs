@@ -1352,9 +1352,7 @@ impl XmlTextReader {
                             // continue;
                             break 'inner;
                         } else {
-                            /*
-                             * The error has probably been raised already.
-                             */
+                            // The error has probably been raised already.
                             if node == oldnode {
                                 break 'main;
                             }
@@ -1372,9 +1370,7 @@ impl XmlTextReader {
                             self.validate_cdata((*node).content, xml_strlen((*node).content));
                         }
                     }
-                    /*
-                     * go to next node
-                     */
+                    // go to next node
                     if let Some(children) = (*node).children {
                         node = children.as_ptr();
                         // continue;
@@ -1564,7 +1560,7 @@ impl XmlTextReader {
         {
             return 1;
         }
-        /* TODO: handle the xmlDecl */
+        // TODO: handle the xmlDecl
         0
     }
 
@@ -1617,16 +1613,14 @@ impl XmlTextReader {
             return null_mut();
         }
 
-        /* TODO: handle the xmlDecl */
+        // TODO: handle the xmlDecl
         if (*self.node).typ != XmlElementType::XmlElementNode {
             return null_mut();
         }
 
         let localname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
         if localname.is_null() {
-            /*
-             * Namespace default decl
-             */
+            // Namespace default decl
             if xml_str_equal(name, c"xmlns".as_ptr() as _) {
                 ns = (*self.node).ns_def;
                 while !ns.is_null() {
@@ -1641,9 +1635,7 @@ impl XmlTextReader {
                 .get_no_ns_prop(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref());
         }
 
-        /*
-         * Namespace default decl
-         */
+        // Namespace default decl
         if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
@@ -1757,7 +1749,7 @@ impl XmlTextReader {
         if !self.curnode.is_null() {
             return null_mut();
         }
-        /* TODO: handle the xmlDecl */
+        // TODO: handle the xmlDecl
         if (*self.node).typ != XmlElementType::XmlElementNode {
             return null_mut();
         }
@@ -1783,7 +1775,7 @@ impl XmlTextReader {
                 return null_mut();
             }
         }
-        /* TODO walk the DTD if present */
+        // TODO walk the DTD if present
 
         let ret: *mut XmlChar = (*cur)
             .children
@@ -1799,28 +1791,27 @@ impl XmlTextReader {
     /// Returns the value, usually 0 or 1, or -1 in case of error.
     #[doc(alias = "xmlTextReaderGetParserProp")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_parser_prop(&mut self, prop: i32) -> i32 {
+    pub unsafe fn get_parser_prop(&mut self, prop: XmlParserProperties) -> i32 {
         if self.ctxt.is_null() {
             return -1;
         }
-        let ctxt: XmlParserCtxtPtr = self.ctxt;
+        let ctxt = self.ctxt;
 
-        match XmlParserProperties::try_from(prop) {
-            Ok(XmlParserProperties::XmlParserLoaddtd) => {
+        match prop {
+            XmlParserProperties::XmlParserLoaddtd => {
                 if (*ctxt).loadsubset != 0 || (*ctxt).validate != 0 {
                     return 1;
                 }
                 0
             }
-            Ok(XmlParserProperties::XmlParserDefaultattrs) => {
+            XmlParserProperties::XmlParserDefaultattrs => {
                 if (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0 {
                     return 1;
                 }
                 0
             }
-            Ok(XmlParserProperties::XmlParserValidate) => self.validate as i32,
-            Ok(XmlParserProperties::XmlParserSubstEntities) => (*ctxt).replace_entities,
-            _ => -1,
+            XmlParserProperties::XmlParserValidate => self.validate as i32,
+            XmlParserProperties::XmlParserSubstEntities => (*ctxt).replace_entities,
         }
     }
 
