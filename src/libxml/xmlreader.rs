@@ -1592,47 +1592,59 @@ impl XmlTextReader {
 
     /// Provides the value of the attribute with the specified qualified name.
     ///
-    /// Returns a string containing the value of the specified attribute, or NULL in case of error.  
-    /// The string must be deallocated by the caller.
+    /// Returns a string containing the value of the specified attribute, or `None` in case of error.  
     #[doc(alias = "xmlTextReaderGetAttribute")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_attribute(&mut self, name: *const XmlChar) -> *mut XmlChar {
-        use std::ffi::CStr;
+    pub unsafe fn get_attribute(&mut self, name: &str) -> Option<String> {
+        use std::ffi::{CStr, CString};
 
         let mut prefix: *mut XmlChar = null_mut();
         let mut ns: XmlNsPtr;
         let mut ret: *mut XmlChar = null_mut();
 
-        if name.is_null() {
-            return null_mut();
-        }
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         if !self.curnode.is_null() {
-            return null_mut();
+            return None;
         }
 
         // TODO: handle the xmlDecl
         if (*self.node).typ != XmlElementType::XmlElementNode {
-            return null_mut();
+            return None;
         }
 
-        let localname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
+        let cname = CString::new(name).unwrap();
+        let localname: *mut XmlChar =
+            xml_split_qname2(cname.as_ptr() as *const u8, addr_of_mut!(prefix));
         if localname.is_null() {
             // Namespace default decl
-            if xml_str_equal(name, c"xmlns".as_ptr() as _) {
+            if name == "xmlns" {
                 ns = (*self.node).ns_def;
                 while !ns.is_null() {
                     if (*ns).prefix.is_null() {
-                        return xml_strdup((*ns).href);
+                        return Some(
+                            CStr::from_ptr((*ns).href as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
                     }
                     ns = (*ns).next;
                 }
-                return null_mut();
+                return None;
             }
-            return (*self.node)
-                .get_no_ns_prop(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref());
+            let res = (*self.node).get_no_ns_prop(name);
+            return if !res.is_null() {
+                let r = Some(
+                    CStr::from_ptr(res as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+                xml_free(res as _);
+                r
+            } else {
+                None
+            };
         }
 
         // Namespace default decl
@@ -1669,7 +1681,13 @@ impl XmlTextReader {
         if !prefix.is_null() {
             xml_free(prefix as _);
         }
-        ret
+        let r = Some(
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        );
+        xml_free(ret as _);
+        r
     }
 
     /// Provides the value of the specified attribute
