@@ -1821,7 +1821,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
     let mut name: *const XmlChar;
     let value: *const XmlChar;
 
-    let typ: c_int = (*reader).node_type();
+    let typ = (*reader).node_type();
     let empty: c_int = (*reader).is_empty_element();
 
     if DEBUG != 0 {
@@ -1835,7 +1835,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
         print!(
             "{} {} {} {} {}",
             (*reader).depth(),
-            typ,
+            typ as i32,
             CStr::from_ptr(name as _).to_string_lossy(),
             empty,
             (*reader).has_value()
@@ -1851,7 +1851,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
         let mut path: *mut XmlChar = null_mut();
         let mut is_match: c_int = -1;
 
-        if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
+        if typ == XmlReaderTypes::XmlReaderTypeElement {
             /* do the check only on element start */
             is_match =
                 xml_pattern_match(PATTERNC.load(Ordering::Relaxed), (*reader).current_node());
@@ -1879,7 +1879,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
         if !PATSTREAM.load(Ordering::Relaxed).is_null() {
             let mut ret: c_int;
 
-            if typ == XmlReaderTypes::XmlReaderTypeElement as i32 {
+            if typ == XmlReaderTypes::XmlReaderTypeElement {
                 ret = xml_stream_push(
                     PATSTREAM.load(Ordering::Relaxed),
                     xml_text_reader_const_local_name(&mut *reader),
@@ -1911,8 +1911,8 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                     }
                 }
             }
-            if typ == XmlReaderTypes::XmlReaderTypeEndElement as i32
-                || (typ == XmlReaderTypes::XmlReaderTypeElement as i32 && empty != 0)
+            if typ == XmlReaderTypes::XmlReaderTypeEndElement
+                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty != 0)
             {
                 ret = xml_stream_pop(PATSTREAM.load(Ordering::Relaxed));
                 if ret < 0 {

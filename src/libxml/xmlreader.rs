@@ -311,7 +311,7 @@ impl XmlTextReader {
 
         let mut val: i32;
         let mut olddepth = 0;
-        let mut oldstate: XmlTextReaderState = XmlTextReaderState::Start;
+        let mut oldstate = XmlTextReaderState::Start;
         let mut oldnode: XmlNodePtr = null_mut();
 
         self.curnode = null_mut();
@@ -467,9 +467,7 @@ impl XmlTextReader {
                         self.node = next.as_ptr();
                         self.state = XmlTextReaderState::Element;
 
-                        /*
-                         * Cleanup of the old node
-                         */
+                        // Cleanup of the old node
                         #[cfg(not(feature = "xinclude"))]
                         let f = true;
                         #[cfg(feature = "xinclude")]
@@ -2457,9 +2455,9 @@ impl XmlTextReader {
     /// Returns the xmlReaderTypes of the current node or -1 in case of error
     #[doc(alias = "xmlTextReaderNodeType")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn node_type(&self) -> i32 {
+    pub unsafe fn node_type(&self) -> XmlReaderTypes {
         if self.node.is_null() {
-            return XmlReaderTypes::XmlReaderTypeNone as i32;
+            return XmlReaderTypes::XmlReaderTypeNone;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -2472,45 +2470,43 @@ impl XmlTextReader {
                     self.state,
                     XmlTextReaderState::End | XmlTextReaderState::Backtrack
                 ) {
-                    return XmlReaderTypes::XmlReaderTypeEndElement as i32;
+                    return XmlReaderTypes::XmlReaderTypeEndElement;
                 }
-                XmlReaderTypes::XmlReaderTypeElement as i32
+                XmlReaderTypes::XmlReaderTypeElement
             }
             XmlElementType::XmlNamespaceDecl | XmlElementType::XmlAttributeNode => {
-                XmlReaderTypes::XmlReaderTypeAttribute as i32
+                XmlReaderTypes::XmlReaderTypeAttribute
             }
             XmlElementType::XmlTextNode => {
                 if (*self.node).is_blank_node() {
                     if (*self.node).get_space_preserve() != 0 {
-                        XmlReaderTypes::XmlReaderTypeSignificantWhitespace as i32
+                        XmlReaderTypes::XmlReaderTypeSignificantWhitespace
                     } else {
-                        XmlReaderTypes::XmlReaderTypeWhitespace as i32
+                        XmlReaderTypes::XmlReaderTypeWhitespace
                     }
                 } else {
-                    XmlReaderTypes::XmlReaderTypeText as i32
+                    XmlReaderTypes::XmlReaderTypeText
                 }
             }
-            XmlElementType::XmlCDATASectionNode => XmlReaderTypes::XmlReaderTypeCdata as i32,
-            XmlElementType::XmlEntityRefNode => XmlReaderTypes::XmlReaderTypeEntityReference as i32,
-            XmlElementType::XmlEntityNode => XmlReaderTypes::XmlReaderTypeEntity as i32,
-            XmlElementType::XmlPINode => XmlReaderTypes::XmlReaderTypeProcessingInstruction as i32,
-            XmlElementType::XmlCommentNode => XmlReaderTypes::XmlReaderTypeComment as i32,
+            XmlElementType::XmlCDATASectionNode => XmlReaderTypes::XmlReaderTypeCdata,
+            XmlElementType::XmlEntityRefNode => XmlReaderTypes::XmlReaderTypeEntityReference,
+            XmlElementType::XmlEntityNode => XmlReaderTypes::XmlReaderTypeEntity,
+            XmlElementType::XmlPINode => XmlReaderTypes::XmlReaderTypeProcessingInstruction,
+            XmlElementType::XmlCommentNode => XmlReaderTypes::XmlReaderTypeComment,
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                XmlReaderTypes::XmlReaderTypeDocument as i32
+                XmlReaderTypes::XmlReaderTypeDocument
             }
-            XmlElementType::XmlDocumentFragNode => {
-                XmlReaderTypes::XmlReaderTypeDocumentFragment as i32
-            }
-            XmlElementType::XmlNotationNode => XmlReaderTypes::XmlReaderTypeNotation as i32,
+            XmlElementType::XmlDocumentFragNode => XmlReaderTypes::XmlReaderTypeDocumentFragment,
+            XmlElementType::XmlNotationNode => XmlReaderTypes::XmlReaderTypeNotation,
             XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
-                XmlReaderTypes::XmlReaderTypeDocumentType as i32
+                XmlReaderTypes::XmlReaderTypeDocumentType
             }
 
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
             | XmlElementType::XmlEntityDecl
             | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => XmlReaderTypes::XmlReaderTypeNone as i32,
+            | XmlElementType::XmlXIncludeEnd => XmlReaderTypes::XmlReaderTypeNone,
             _ => unreachable!(),
         }
         // return -1;
