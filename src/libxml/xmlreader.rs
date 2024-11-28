@@ -107,8 +107,9 @@ pub enum XmlParserSeverities {
 #[doc(alias = "xmlTextReaderMode")]
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlTextReaderMode {
+    #[default]
     XmlTextreaderModeInitial = 0,
     XmlTextreaderModeInteractive = 1,
     XmlTextreaderModeError = 2,
@@ -217,7 +218,7 @@ pub type XmlTextReaderPtr = *mut XmlTextReader;
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 pub struct XmlTextReader {
-    mode: i32,                       /* the parsing mode */
+    mode: XmlTextReaderMode,         /* the parsing mode */
     doc: XmlDocPtr,                  /* when walking an existing doc */
     validate: XmlTextReaderValidate, /* is there any validation */
     allocs: i32,                     /* what structure were deallocated */
@@ -322,20 +323,20 @@ impl XmlTextReader {
         }
 
         let mut node_found = false;
-        if self.mode == XmlTextReaderMode::XmlTextreaderModeInitial as i32 {
-            self.mode = XmlTextReaderMode::XmlTextreaderModeInteractive as i32;
+        if self.mode == XmlTextReaderMode::XmlTextreaderModeInitial {
+            self.mode = XmlTextReaderMode::XmlTextreaderModeInteractive;
             /*
              * Initial state
              */
             while {
                 val = self.push_data();
                 if val < 0 {
-                    self.mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
+                    self.mode = XmlTextReaderMode::XmlTextreaderModeError;
                     self.state = XmlTextReaderState::Error;
                     return -1;
                 }
                 (*self.ctxt).node.is_null()
-                    && (self.mode != XmlTextReaderMode::XmlTextreaderModeEof as i32
+                    && (self.mode != XmlTextReaderMode::XmlTextreaderModeEof
                         && self.state != XmlTextReaderState::Done)
             } {}
             if (*self.ctxt).node.is_null() {
@@ -345,7 +346,7 @@ impl XmlTextReader {
                         .map_or(null_mut(), |c| c.as_ptr());
                 }
                 if self.node.is_null() {
-                    self.mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
+                    self.mode = XmlTextReaderMode::XmlTextreaderModeError;
                     self.state = XmlTextReaderState::Error;
                     return -1;
                 }
@@ -375,7 +376,7 @@ impl XmlTextReader {
         'get_next_node: loop {
             if !node_found {
                 if self.node.is_null() {
-                    if self.mode == XmlTextReaderMode::XmlTextreaderModeEof as i32 {
+                    if self.mode == XmlTextReaderMode::XmlTextreaderModeEof {
                         return 0;
                     } else {
                         return -1;
@@ -415,7 +416,7 @@ impl XmlTextReader {
                     {
                         val = self.push_data();
                         if val < 0 {
-                            self.mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
+                            self.mode = XmlTextReaderMode::XmlTextreaderModeError;
                             self.state = XmlTextReaderState::Error;
                             return -1;
                         }
@@ -515,7 +516,7 @@ impl XmlTextReader {
                             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
                         )
                     {
-                        if self.mode != XmlTextReaderMode::XmlTextreaderModeEof as i32 {
+                        if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
                             val = xml_parse_chunk(self.ctxt, c"".as_ptr() as _, 0, 1);
                             self.state = XmlTextReaderState::Done;
                             if val != 0 {
@@ -994,16 +995,16 @@ impl XmlTextReader {
             if ((*self.ctxt).node_tab.len() as i32) < self.depth {
                 return 1;
             }
-            if self.mode == XmlTextReaderMode::XmlTextreaderModeEof as i32 {
+            if self.mode == XmlTextReaderMode::XmlTextreaderModeEof {
                 return 1;
             }
             val = self.push_data();
             if val < 0 {
-                self.mode = XmlTextReaderMode::XmlTextreaderModeError as i32;
+                self.mode = XmlTextReaderMode::XmlTextreaderModeError;
                 return -1;
             }
 
-            self.mode != XmlTextReaderMode::XmlTextreaderModeEof as i32
+            self.mode != XmlTextReaderMode::XmlTextreaderModeEof
         } {}
         1
     }
@@ -1052,22 +1053,22 @@ impl XmlTextReader {
                 /*
                  * Refill the buffer unless we are at the end of the stream
                  */
-                if self.mode != XmlTextReaderMode::XmlTextreaderModeEof as i32 {
+                if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
                     val = self.input.as_mut().unwrap().read(4096);
                     if val == 0 && self.input.as_ref().unwrap().context.is_none() {
                         if xml_buf_use(inbuf) == self.cur as _ {
-                            self.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
+                            self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                             self.state = oldstate;
                         }
                     } else if val < 0 {
-                        self.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
+                        self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                         self.state = oldstate;
                         if oldstate != XmlTextReaderState::Start || !(*self.ctxt).my_doc.is_null() {
                             return val;
                         }
                     } else if val == 0 {
-                        /* mark the end of the stream and process the remains */
-                        self.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
+                        // mark the end of the stream and process the remains
+                        self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                         break;
                     }
                 } else {
@@ -1111,7 +1112,7 @@ impl XmlTextReader {
         /*
          * Discard the consumed input when needed and possible
          */
-        if self.mode == XmlTextReaderMode::XmlTextreaderModeInteractive as i32 {
+        if self.mode == XmlTextReaderMode::XmlTextreaderModeInteractive {
             if self.input.as_ref().unwrap().context.is_some()
                 && (self.cur >= 4096 && xml_buf_use(inbuf) - self.cur as usize <= CHUNK_SIZE)
             {
@@ -1125,7 +1126,7 @@ impl XmlTextReader {
          * At the end of the stream signal that the work is done to the Push
          * parser.
          */
-        else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof as i32
+        else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
             && self.state != XmlTextReaderState::Done
         {
             s = (xml_buf_use(inbuf) - self.cur as usize) as i32;
@@ -1147,7 +1148,7 @@ impl XmlTextReader {
         }
         self.state = oldstate;
         if (*self.ctxt).well_formed == 0 {
-            self.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
+            self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
             return -1;
         }
 
@@ -1867,7 +1868,7 @@ impl XmlTextReader {
 
         self.node = null_mut();
         self.curnode = null_mut();
-        self.mode = XmlTextReaderMode::XmlTextreaderModeEof as i32;
+        self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
         if !self.ctxt.is_null() {
             (*self.ctxt).stop();
             if !(*self.ctxt).my_doc.is_null() {
@@ -2231,7 +2232,7 @@ impl XmlTextReader {
     /// Returns the state value, or -1 in case of error
     #[doc(alias = "xmlTextReaderReadState")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn read_state(&self) -> i32 {
+    pub fn read_state(&self) -> XmlTextReaderMode {
         self.mode
     }
 
@@ -2859,7 +2860,7 @@ impl XmlTextReader {
 impl Default for XmlTextReader {
     fn default() -> Self {
         Self {
-            mode: 0,
+            mode: XmlTextReaderMode::default(),
             doc: null_mut(),
             validate: XmlTextReaderValidate::default(),
             allocs: 0,
@@ -3340,7 +3341,7 @@ pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
         }
         xml_free((*reader).pattern_tab as _);
     }
-    if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed as i32 {
+    if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeClosed {
         xml_text_reader_close(&mut *reader);
     }
     if !(*reader).ctxt.is_null() {
@@ -4381,7 +4382,7 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
 pub unsafe extern "C" fn xml_text_reader_close(reader: &mut XmlTextReader) -> i32 {
     reader.node = null_mut();
     reader.curnode = null_mut();
-    reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed as i32;
+    reader.mode = XmlTextReaderMode::XmlTextreaderModeClosed;
     if !reader.faketext.is_null() {
         xml_free_node(reader.faketext);
         reader.faketext = null_mut();
@@ -4495,7 +4496,7 @@ pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
         Ok(XmlParserProperties::XmlParserLoaddtd) => {
             if value != 0 {
                 if (*ctxt).loadsubset == 0 {
-                    if reader.mode != XmlTextReaderMode::XmlTextreaderModeInitial as i32 {
+                    if reader.mode != XmlTextReaderMode::XmlTextreaderModeInitial {
                         return -1;
                     }
                     (*ctxt).loadsubset = XML_DETECT_IDS as i32;
@@ -4806,7 +4807,7 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
     }
 
     if (!rng.is_null() || !ctxt.is_null())
-        && ((*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial as i32
+        && ((*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial
             || (*reader).ctxt.is_null())
     {
         return -1;
@@ -4953,7 +4954,7 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
         (*reader).rng_preserve_ctxt = 0;
         return 0;
     }
-    if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial as i32 {
+    if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial {
         return -1;
     }
     if !(*reader).rng_schemas.is_null() {
@@ -5071,7 +5072,7 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
     }
 
     if (!xsd.is_null() || !ctxt.is_null())
-        && ((*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial as i32
+        && ((*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial
             || (*reader).ctxt.is_null())
     {
         return -1;
@@ -5243,7 +5244,7 @@ pub unsafe extern "C" fn xml_text_reader_set_schema(
         }
         return 0;
     }
-    if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial as i32 {
+    if (*reader).mode != XmlTextReaderMode::XmlTextreaderModeInitial {
         return -1;
     }
     if !(*reader).xsd_plug.is_null() {
@@ -5359,7 +5360,7 @@ pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
     (*ret).ent_nr = 0;
     // (*ret).input = None;
     std::ptr::write(&raw mut (*ret).input, None);
-    (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial as i32;
+    (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
     (*ret).node = null_mut();
     (*ret).curnode = null_mut();
     (*ret).base = 0;
@@ -5490,7 +5491,7 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
 
     (*reader).ent_nr = 0;
     (*reader).input = None;
-    (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial as i32;
+    (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial;
     (*reader).node = null_mut();
     (*reader).curnode = null_mut();
     (*reader).base = 0;
