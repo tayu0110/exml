@@ -1457,7 +1457,7 @@ impl XmlTextReader {
 
     /// Retrieve the validity status from the parser context
     ///
-    /// Returns the flag value 1 if valid, 0 if no, and -1 in case of error
+    /// Returns the flag value `Some(true)` if valid, `Some(false)` if no, and `None` in case of error
     #[doc(alias = "xmlTextReaderIsValid")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn is_valid(&self) -> Option<bool> {
@@ -1482,11 +1482,11 @@ impl XmlTextReader {
 
     /// Whether an Attribute  node was generated from the default value defined in the DTD or schema.
     ///
-    /// Returns 0 if not defaulted, 1 if defaulted, and -1 in case of error
+    /// Returns `false` if not defaulted, `true` if defaulted
     #[doc(alias = "xmlTextReaderIsDefault")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_default(&self) -> i32 {
-        0
+    pub unsafe fn is_default(&self) -> bool {
+        false
     }
 
     /// Check if the current node is empty
@@ -1494,30 +1494,30 @@ impl XmlTextReader {
     /// Returns 1 if empty, 0 if not and -1 in case of error
     #[doc(alias = "xmlTextReaderIsEmptyElement")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_empty_element(&self) -> i32 {
+    pub unsafe fn is_empty_element(&self) -> Option<bool> {
         if self.node.is_null() {
-            return -1;
+            return None;
         }
         if (*self.node).typ != XmlElementType::XmlElementNode {
-            return 0;
+            return Some(false);
         }
         if !self.curnode.is_null() {
-            return 0;
+            return Some(false);
         }
         if (*self.node).children.is_some() {
-            return 0;
+            return Some(false);
         }
         if self.state == XmlTextReaderState::End {
-            return 0;
+            return Some(false);
         }
         if !self.doc.is_null() {
-            return 1;
+            return Some(true);
         }
         #[cfg(feature = "xinclude")]
         if self.in_xinclude > 0 {
-            return 1;
+            return Some(true);
         }
-        ((*self.node).extra & NODE_IS_EMPTY as u16 != 0) as i32
+        Some((*self.node).extra & NODE_IS_EMPTY as u16 != 0)
     }
 
     /// Determine whether the current node is a namespace declaration

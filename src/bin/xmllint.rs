@@ -1822,7 +1822,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
     let value: *const XmlChar;
 
     let typ = (*reader).node_type();
-    let empty: c_int = (*reader).is_empty_element();
+    let empty = (*reader).is_empty_element();
 
     if DEBUG != 0 {
         name = xml_text_reader_const_name(&mut *reader);
@@ -1837,7 +1837,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             (*reader).depth(),
             typ as i32,
             CStr::from_ptr(name as _).to_string_lossy(),
-            empty,
+            empty.map_or(-1, |e| e as i32),
             (*reader).has_value()
         );
         if value.is_null() {
@@ -1912,7 +1912,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                 }
             }
             if typ == XmlReaderTypes::XmlReaderTypeEndElement
-                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty != 0)
+                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
             {
                 ret = xml_stream_pop(PATSTREAM.load(Ordering::Relaxed));
                 if ret < 0 {
