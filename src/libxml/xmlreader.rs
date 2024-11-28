@@ -2665,9 +2665,11 @@ impl XmlTextReader {
     /// if non NULL it need to be freed by the caller.
     #[doc(alias = "xmlTextReaderPrefix")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn prefix(&self) -> *mut XmlChar {
+    pub unsafe fn prefix(&self) -> Option<String> {
+        use std::ffi::CStr;
+
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -2677,20 +2679,24 @@ impl XmlTextReader {
         if (*node).typ == XmlElementType::XmlNamespaceDecl {
             let ns: XmlNsPtr = node as XmlNsPtr;
             if (*ns).prefix.is_null() {
-                return null_mut();
+                return None;
             }
-            return xml_strdup(c"xmlns".as_ptr() as _);
+            return Some("xmlns".to_owned());
         }
         if !matches!(
             (*node).typ,
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         ) {
-            return null_mut();
+            return None;
         }
         if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-            return xml_strdup((*(*node).ns).prefix);
+            return Some(
+                CStr::from_ptr((*(*node).ns).prefix as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         }
-        null_mut()
+        None
     }
 
     /// Determine the standalone status of the document being read.
