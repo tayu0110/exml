@@ -1735,23 +1735,24 @@ impl XmlTextReader {
     /// Provides the value of the attribute with the specified index relative
     /// to the containing element.
     ///
-    /// Returns a string containing the value of the specified attribute, or NULL in case of error.  
-    /// The string must be deallocated by the caller.
+    /// Returns a string containing the value of the specified attribute, or `None` in case of error.  
     #[doc(alias = "xmlTextReaderGetAttributeNo")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn get_attribute_no(&mut self, no: i32) -> *mut XmlChar {
+    pub unsafe fn get_attribute_no(&mut self, no: i32) -> Option<String> {
+        use std::ffi::CStr;
+
         let mut cur: XmlAttrPtr;
         let mut ns: XmlNsPtr;
 
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         if !self.curnode.is_null() {
-            return null_mut();
+            return None;
         }
         // TODO: handle the xmlDecl
         if (*self.node).typ != XmlElementType::XmlElementNode {
-            return null_mut();
+            return None;
         }
 
         ns = (*self.node).ns_def;
@@ -1762,17 +1763,21 @@ impl XmlTextReader {
         }
 
         if !ns.is_null() {
-            return xml_strdup((*ns).href);
+            return Some(
+                CStr::from_ptr((*ns).href as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         }
         cur = (*self.node).properties;
         if cur.is_null() {
-            return null_mut();
+            return None;
         }
 
         for _ in i..no {
             cur = (*cur).next;
             if cur.is_null() {
-                return null_mut();
+                return None;
             }
         }
         // TODO walk the DTD if present
@@ -1781,9 +1786,13 @@ impl XmlTextReader {
             .children
             .map_or(null_mut(), |c| c.get_string((*self.node).doc, 1));
         if ret.is_null() {
-            return xml_strdup(c"".as_ptr() as _);
+            return Some("".to_owned());
         }
-        ret
+        let r = CStr::from_ptr(ret as *const i8)
+            .to_string_lossy()
+            .into_owned();
+        xml_free(ret as _);
+        Some(r)
     }
 
     /// Read the parser internal property.
