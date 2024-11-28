@@ -1460,20 +1460,24 @@ impl XmlTextReader {
     /// Returns the flag value 1 if valid, 0 if no, and -1 in case of error
     #[doc(alias = "xmlTextReaderIsValid")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_valid(&self) -> i32 {
+    pub unsafe fn is_valid(&self) -> Option<bool> {
         #[cfg(feature = "schema")]
         {
             if self.validate == XmlTextReaderValidate::ValidateRng {
-                return (self.rng_valid_errors == 0) as i32;
+                return Some(self.rng_valid_errors == 0);
             }
             if self.validate == XmlTextReaderValidate::ValidateXsd {
-                return (self.xsd_valid_errors == 0) as i32;
+                return Some(self.xsd_valid_errors == 0);
             }
         }
         if !self.ctxt.is_null() && (*self.ctxt).validate == 1 {
-            return (*self.ctxt).valid;
+            return if (*self.ctxt).valid < 0 {
+                None
+            } else {
+                Some((*self.ctxt).valid != 0)
+            };
         }
-        0
+        Some(false)
     }
 
     /// Whether an Attribute  node was generated from the default value defined in the DTD or schema.

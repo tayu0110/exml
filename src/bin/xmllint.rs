@@ -2086,14 +2086,14 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         }
 
         #[cfg(feature = "libxml_valid")]
-        if VALID != 0 && (*reader).is_valid() != 1 {
+        if VALID != 0 && !(*reader).is_valid().unwrap_or(false) {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         #[cfg(feature = "schema")]
         if RELAXNG.lock().unwrap().is_some() || SCHEMA.lock().unwrap().is_some() {
-            if (*reader).is_valid() != 1 {
+            if !(*reader).is_valid().unwrap_or(false) {
                 eprintln!(
                     "{} fails to validate",
                     CStr::from_ptr(filename).to_string_lossy()

@@ -2740,7 +2740,7 @@ unsafe fn stream_process_test(
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
     }
     if !rng.is_null() {
-        if (*reader).is_valid() != 1 {
+        if !(*reader).is_valid().unwrap_or(false) {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
         } else {
             test_error_handler(None, format!("{filename} validates\n").as_str());
