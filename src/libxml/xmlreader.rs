@@ -1523,13 +1523,14 @@ impl XmlTextReader {
     /// Determine whether the current node is a namespace declaration
     /// rather than a regular attribute.
     ///
-    /// Returns 1 if the current node is a namespace declaration, 0 if it
-    /// is a regular attribute or other type of node, or -1 in case of error.
+    /// Returns `Some(true)` if the current node is a namespace declaration,
+    /// `Some(false)` if it is a regular attribute or other type of node,
+    /// or `None` in case of error.
     #[doc(alias = "xmlTextReaderIsNamespaceDecl")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_namespace_decl(&self) -> i32 {
+    pub unsafe fn is_namespace_decl(&self) -> Option<bool> {
         if self.node.is_null() {
-            return -1;
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -1537,11 +1538,7 @@ impl XmlTextReader {
             self.node
         };
 
-        if XmlElementType::XmlNamespaceDecl == (*node).typ {
-            1
-        } else {
-            0
-        }
+        Some(XmlElementType::XmlNamespaceDecl == (*node).typ)
     }
 
     /// Whether the node has attributes.
