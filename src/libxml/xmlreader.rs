@@ -2626,13 +2626,14 @@ impl XmlTextReader {
 
     /// The URI defining the namespace associated with the node.
     ///
-    /// Returns the namespace URI or NULL if not available,
-    /// if non NULL it need to be freed by the caller.
+    /// Returns the namespace URI or `None` if not available.
     #[doc(alias = "xmlTextReaderNamespaceUri")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn namespace_uri(&self) -> *mut XmlChar {
+    pub unsafe fn namespace_uri(&self) -> Option<String> {
+        use std::ffi::CStr;
+
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -2640,18 +2641,22 @@ impl XmlTextReader {
             self.node
         };
         if (*node).typ == XmlElementType::XmlNamespaceDecl {
-            return xml_strdup(c"http://www.w3.org/2000/xmlns/".as_ptr() as _);
+            return Some("http://www.w3.org/2000/xmlns/".to_owned());
         }
         if !matches!(
             (*node).typ,
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         ) {
-            return null_mut();
+            return None;
         }
         if !(*node).ns.is_null() {
-            return xml_strdup((*(*node).ns).href);
+            return Some(
+                CStr::from_ptr((*(*node).ns).href as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
         }
-        null_mut()
+        None
     }
 
     /// A shorthand reference to the namespace associated with the node.
