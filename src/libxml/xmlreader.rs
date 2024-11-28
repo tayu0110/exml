@@ -1680,56 +1680,51 @@ impl XmlTextReader {
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_attribute_ns(
         &mut self,
-        local_name: *const XmlChar,
-        namespace_uri: *const XmlChar,
-    ) -> *mut XmlChar {
-        use std::ffi::CStr;
+        local_name: &str,
+        namespace_uri: Option<&str>,
+    ) -> Option<String> {
+        use std::ffi::{CStr, CString};
 
-        let mut prefix: *mut XmlChar = null_mut();
-        let mut ns: XmlNsPtr;
-
-        if local_name.is_null() {
-            return null_mut();
-        }
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         if !self.curnode.is_null() {
-            return null_mut();
+            return None;
         }
 
-        /* TODO: handle the xmlDecl */
+        // TODO: handle the xmlDecl
         if (*self.node).typ != XmlElementType::XmlElementNode {
-            return null_mut();
+            return None;
         }
 
-        if xml_str_equal(
-            namespace_uri,
-            c"http://www.w3.org/2000/xmlns/".as_ptr() as _,
-        ) {
-            if !xml_str_equal(local_name, c"xmlns".as_ptr() as _) {
-                prefix = local_name as _;
-            }
-            ns = (*self.node).ns_def;
+        if namespace_uri == Some("http://www.w3.org/2000/xmlns/") {
+            let prefix = (local_name != "xmlns").then_some(local_name);
+            let localname = CString::new(local_name).unwrap();
+            let mut ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if (prefix.is_null() && (*ns).prefix.is_null())
-                    || (!(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, local_name))
+                if (prefix.is_none() && (*ns).prefix.is_null())
+                    || (!(*ns).prefix.is_null()
+                        && xml_str_equal((*ns).prefix, localname.as_ptr() as *const u8))
                 {
-                    return xml_strdup((*ns).href);
+                    return Some(
+                        CStr::from_ptr((*ns).href as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
                 }
                 ns = (*ns).next;
             }
-            return null_mut();
+            return None;
         }
 
-        (*self.node).get_ns_prop(
-            CStr::from_ptr(local_name as *const i8)
+        let res = (*self.node).get_ns_prop(local_name, namespace_uri);
+        let r = (!res.is_null()).then(|| {
+            CStr::from_ptr(res as *const i8)
                 .to_string_lossy()
-                .as_ref(),
-            (!namespace_uri.is_null())
-                .then(|| CStr::from_ptr(namespace_uri as *const i8).to_string_lossy())
-                .as_deref(),
-        )
+                .into_owned()
+        });
+        xml_free(res as _);
+        r
     }
 
     /// Provides the value of the attribute with the specified index relative
