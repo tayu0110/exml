@@ -1822,7 +1822,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
     let value: *const XmlChar;
 
     let typ = (*reader).node_type();
-    let empty: c_int = (*reader).is_empty_element();
+    let empty = (*reader).is_empty_element();
 
     if DEBUG != 0 {
         name = xml_text_reader_const_name(&mut *reader);
@@ -1837,7 +1837,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
             (*reader).depth(),
             typ as i32,
             CStr::from_ptr(name as _).to_string_lossy(),
-            empty,
+            empty.map_or(-1, |e| e as i32),
             (*reader).has_value()
         );
         if value.is_null() {
@@ -1912,7 +1912,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                 }
             }
             if typ == XmlReaderTypes::XmlReaderTypeEndElement
-                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty != 0)
+                || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap_or(true))
             {
                 ret = xml_stream_pop(PATSTREAM.load(Ordering::Relaxed));
                 if ret < 0 {
@@ -2086,14 +2086,14 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
         }
 
         #[cfg(feature = "libxml_valid")]
-        if VALID != 0 && (*reader).is_valid() != 1 {
+        if VALID != 0 && !(*reader).is_valid() {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         #[cfg(feature = "schema")]
         if RELAXNG.lock().unwrap().is_some() || SCHEMA.lock().unwrap().is_some() {
-            if (*reader).is_valid() != 1 {
+            if !(*reader).is_valid() {
                 eprintln!(
                     "{} fails to validate",
                     CStr::from_ptr(filename).to_string_lossy()

@@ -1457,75 +1457,76 @@ impl XmlTextReader {
 
     /// Retrieve the validity status from the parser context
     ///
-    /// Returns the flag value 1 if valid, 0 if no, and -1 in case of error
+    /// Returns the flag value `true` if valid, `false` if no
     #[doc(alias = "xmlTextReaderIsValid")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_valid(&self) -> i32 {
+    pub unsafe fn is_valid(&self) -> bool {
         #[cfg(feature = "schema")]
         {
             if self.validate == XmlTextReaderValidate::ValidateRng {
-                return (self.rng_valid_errors == 0) as i32;
+                return self.rng_valid_errors == 0;
             }
             if self.validate == XmlTextReaderValidate::ValidateXsd {
-                return (self.xsd_valid_errors == 0) as i32;
+                return self.xsd_valid_errors == 0;
             }
         }
         if !self.ctxt.is_null() && (*self.ctxt).validate == 1 {
-            return (*self.ctxt).valid;
+            return (*self.ctxt).valid != 0;
         }
-        0
+        false
     }
 
     /// Whether an Attribute  node was generated from the default value defined in the DTD or schema.
     ///
-    /// Returns 0 if not defaulted, 1 if defaulted, and -1 in case of error
+    /// Returns `false` if not defaulted, `true` if defaulted.
     #[doc(alias = "xmlTextReaderIsDefault")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_default(&self) -> i32 {
-        0
+    pub fn is_default(&self) -> bool {
+        false
     }
 
     /// Check if the current node is empty
     ///
-    /// Returns 1 if empty, 0 if not and -1 in case of error
+    /// Returns `Some(true)` if empty, `Some(false)` if not and `None` in case of error
     #[doc(alias = "xmlTextReaderIsEmptyElement")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_empty_element(&self) -> i32 {
+    pub unsafe fn is_empty_element(&self) -> Option<bool> {
         if self.node.is_null() {
-            return -1;
+            return None;
         }
         if (*self.node).typ != XmlElementType::XmlElementNode {
-            return 0;
+            return Some(false);
         }
         if !self.curnode.is_null() {
-            return 0;
+            return Some(false);
         }
         if (*self.node).children.is_some() {
-            return 0;
+            return Some(false);
         }
         if self.state == XmlTextReaderState::End {
-            return 0;
+            return Some(false);
         }
         if !self.doc.is_null() {
-            return 1;
+            return Some(true);
         }
         #[cfg(feature = "xinclude")]
         if self.in_xinclude > 0 {
-            return 1;
+            return Some(true);
         }
-        ((*self.node).extra & NODE_IS_EMPTY as u16 != 0) as i32
+        Some((*self.node).extra & NODE_IS_EMPTY as u16 != 0)
     }
 
     /// Determine whether the current node is a namespace declaration
     /// rather than a regular attribute.
     ///
-    /// Returns 1 if the current node is a namespace declaration, 0 if it
-    /// is a regular attribute or other type of node, or -1 in case of error.
+    /// Returns `Some(true)` if the current node is a namespace declaration,
+    /// `Some(false)` if it is a regular attribute or other type of node,
+    /// or `None` in case of error.
     #[doc(alias = "xmlTextReaderIsNamespaceDecl")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_namespace_decl(&self) -> i32 {
+    pub unsafe fn is_namespace_decl(&self) -> Option<bool> {
         if self.node.is_null() {
-            return -1;
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -1533,21 +1534,17 @@ impl XmlTextReader {
             self.node
         };
 
-        if XmlElementType::XmlNamespaceDecl == (*node).typ {
-            1
-        } else {
-            0
-        }
+        Some(XmlElementType::XmlNamespaceDecl == (*node).typ)
     }
 
     /// Whether the node has attributes.
     ///
-    /// Returns 1 if true, 0 if false, and -1 in case or error
+    /// Returns `true` if true, `false` if false.
     #[doc(alias = "xmlTextReaderHasAttributes")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn has_attributes(&self) -> i32 {
+    pub unsafe fn has_attributes(&self) -> bool {
         if self.node.is_null() {
-            return 0;
+            return false;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -1558,20 +1555,18 @@ impl XmlTextReader {
         if (*node).typ == XmlElementType::XmlElementNode
             && (!(*node).properties.is_null() || !(*node).ns_def.is_null())
         {
-            return 1;
+            return true;
         }
         // TODO: handle the xmlDecl
-        0
+        false
     }
 
     /// Whether the node can have a text value.
-    ///
-    /// Returns 1 if true, 0 if false, and -1 in case or error
     #[doc(alias = "xmlTextReaderHasValue")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn has_value(&self) -> i32 {
+    pub unsafe fn has_value(&self) -> bool {
         if self.node.is_null() {
-            return 0;
+            return false;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -1579,15 +1574,15 @@ impl XmlTextReader {
             self.node
         };
 
-        match (*node).typ {
+        matches!(
+            (*node).typ,
             XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlNamespaceDecl => 1,
-            _ => 0,
-        }
+                | XmlElementType::XmlTextNode
+                | XmlElementType::XmlCDATASectionNode
+                | XmlElementType::XmlPINode
+                | XmlElementType::XmlCommentNode
+                | XmlElementType::XmlNamespaceDecl
+        )
     }
 
     /// Provides the value of the attribute with the specified qualified name.

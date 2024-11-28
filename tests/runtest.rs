@@ -2647,7 +2647,7 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
     let mut name: *const XmlChar;
 
     let typ = (*reader).node_type();
-    let empty: i32 = (*reader).is_empty_element();
+    let empty = (*reader).is_empty_element();
 
     name = xml_text_reader_const_name(&mut *reader);
     if name.is_null() {
@@ -2662,7 +2662,7 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
         (*reader).depth(),
         typ as i32,
         CStr::from_ptr(name as _).to_string_lossy(),
-        empty,
+        empty.map_or(-1, |e| e as i32),
         (*reader).has_value(),
     )
     .ok();
@@ -2740,7 +2740,7 @@ unsafe fn stream_process_test(
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
     }
     if !rng.is_null() {
-        if (*reader).is_valid() != 1 {
+        if !(*reader).is_valid() {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
         } else {
             test_error_handler(None, format!("{filename} validates\n").as_str());
@@ -4405,7 +4405,7 @@ unsafe extern "C" fn pattern_node(
     let mut is_match: i32 = -1;
 
     let typ = (*reader).node_type();
-    let empty: i32 = (*reader).is_empty_element();
+    let empty = (*reader).is_empty_element();
 
     if typ == XmlReaderTypes::XmlReaderTypeElement {
         /* do the check only on element start */
@@ -4450,7 +4450,7 @@ unsafe extern "C" fn pattern_node(
             }
         }
         if typ == XmlReaderTypes::XmlReaderTypeEndElement
-            || (typ == XmlReaderTypes::XmlReaderTypeElement && empty != 0)
+            || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap_or(true))
         {
             ret = xml_stream_pop(patstream);
             if ret < 0 {
