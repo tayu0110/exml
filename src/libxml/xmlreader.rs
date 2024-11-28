@@ -2838,13 +2838,14 @@ impl XmlTextReader {
 
     /// Provides the text value of the node if present
     ///
-    /// Returns the string or NULL if not available.  
-    /// The result must be deallocated with xml_free()
+    /// Returns the string or `None` if not available.  
     #[doc(alias = "xmlTextReaderValue")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn text_value(&self) -> *mut XmlChar {
+    pub unsafe fn text_value(&self) -> Option<String> {
+        use std::ffi::CStr;
+
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -2853,31 +2854,50 @@ impl XmlTextReader {
         };
 
         match (*node).typ {
-            XmlElementType::XmlNamespaceDecl => return xml_strdup((*(node as XmlNsPtr)).href),
+            XmlElementType::XmlNamespaceDecl => {
+                return Some(
+                    CStr::from_ptr((*(node as XmlNsPtr)).href as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                )
+            }
             XmlElementType::XmlAttributeNode => {
                 let attr: XmlAttrPtr = node as XmlAttrPtr;
 
-                if let Some(parent) = (*attr).parent {
-                    return (*attr)
+                let res = if let Some(parent) = (*attr).parent {
+                    (*attr)
                         .children
-                        .map_or(null_mut(), |c| c.get_string(parent.doc, 1));
+                        .map_or(null_mut(), |c| c.get_string(parent.doc, 1))
                 } else {
-                    return (*attr)
+                    (*attr)
                         .children
-                        .map_or(null_mut(), |c| c.get_string(null_mut(), 1));
-                }
+                        .map_or(null_mut(), |c| c.get_string(null_mut(), 1))
+                };
+                return if !res.is_null() {
+                    let r = CStr::from_ptr(res as *const i8)
+                        .to_string_lossy()
+                        .into_owned();
+                    xml_free(res as _);
+                    Some(r)
+                } else {
+                    None
+                };
             }
             XmlElementType::XmlTextNode
             | XmlElementType::XmlCDATASectionNode
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode => {
                 if !(*node).content.is_null() {
-                    return xml_strdup((*node).content);
+                    return Some(
+                        CStr::from_ptr((*node).content as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
                 }
             }
             _ => {}
         }
-        null_mut()
+        None
     }
 }
 
