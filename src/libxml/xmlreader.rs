@@ -1457,31 +1457,35 @@ impl XmlTextReader {
 
     /// Retrieve the validity status from the parser context
     ///
-    /// Returns the flag value `true` if valid, `false` if no
+    /// Returns the flag value `Some(true)` if valid, `Some(false)` if no, and `None` in case of error
     #[doc(alias = "xmlTextReaderIsValid")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn is_valid(&self) -> bool {
+    pub unsafe fn is_valid(&self) -> Option<bool> {
         #[cfg(feature = "schema")]
         {
             if self.validate == XmlTextReaderValidate::ValidateRng {
-                return self.rng_valid_errors == 0;
+                return Some(self.rng_valid_errors == 0);
             }
             if self.validate == XmlTextReaderValidate::ValidateXsd {
-                return self.xsd_valid_errors == 0;
+                return Some(self.xsd_valid_errors == 0);
             }
         }
         if !self.ctxt.is_null() && (*self.ctxt).validate == 1 {
-            return (*self.ctxt).valid != 0;
+            return if (*self.ctxt).valid < 0 {
+                None
+            } else {
+                Some((*self.ctxt).valid != 0)
+            };
         }
-        false
+        Some(false)
     }
 
     /// Whether an Attribute  node was generated from the default value defined in the DTD or schema.
     ///
-    /// Returns `false` if not defaulted, `true` if defaulted.
+    /// Returns `false` if not defaulted, `true` if defaulted
     #[doc(alias = "xmlTextReaderIsDefault")]
     #[cfg(feature = "libxml_reader")]
-    pub fn is_default(&self) -> bool {
+    pub unsafe fn is_default(&self) -> bool {
         false
     }
 

@@ -2663,7 +2663,7 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
         typ as i32,
         CStr::from_ptr(name as _).to_string_lossy(),
         empty.map_or(-1, |e| e as i32),
-        (*reader).has_value(),
+        (*reader).has_value() as i32,
     )
     .ok();
     if value.is_null() {
@@ -2740,7 +2740,7 @@ unsafe fn stream_process_test(
         test_error_handler(None, format!("{filename} : failed to parse\n").as_str());
     }
     if !rng.is_null() {
-        if !(*reader).is_valid() {
+        if !(*reader).is_valid().unwrap_or(false) {
             test_error_handler(None, format!("{filename} fails to validate\n").as_str());
         } else {
             test_error_handler(None, format!("{filename} validates\n").as_str());
@@ -4450,7 +4450,7 @@ unsafe extern "C" fn pattern_node(
             }
         }
         if typ == XmlReaderTypes::XmlReaderTypeEndElement
-            || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap_or(true))
+            || (typ == XmlReaderTypes::XmlReaderTypeElement && empty.unwrap())
         {
             ret = xml_stream_pop(patstream);
             if ret < 0 {
