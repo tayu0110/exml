@@ -2023,18 +2023,11 @@ impl XmlTextReader {
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttributeNs")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn move_to_attribute_ns(
-        &mut self,
-        local_name: *const XmlChar,
-        namespace_uri: *const XmlChar,
-    ) -> i32 {
-        let mut prop: XmlAttrPtr;
-        let mut ns: XmlNsPtr;
-        let mut prefix: *mut XmlChar = null_mut();
+    pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
+        use std::ffi::CString;
 
-        if local_name.is_null() || namespace_uri.is_null() {
-            return -1;
-        }
+        let mut ns: XmlNsPtr;
+
         if self.node.is_null() {
             return -1;
         }
@@ -2043,17 +2036,14 @@ impl XmlTextReader {
         }
         let node: XmlNodePtr = self.node;
 
-        if xml_str_equal(
-            namespace_uri,
-            c"http://www.w3.org/2000/xmlns/".as_ptr() as _,
-        ) {
-            if !xml_str_equal(local_name, c"xmlns".as_ptr() as _) {
-                prefix = local_name as _;
-            }
+        let clocal_name = CString::new(local_name).unwrap();
+        if namespace_uri == "http://www.w3.org/2000/xmlns/" {
+            let prefix = (local_name != "xmlns").then_some(local_name);
             ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if (prefix.is_null() && (*ns).prefix.is_null())
-                    || (!(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, local_name))
+                if (prefix.is_none() && (*ns).prefix.is_null())
+                    || (!(*ns).prefix.is_null()
+                        && xml_str_equal((*ns).prefix, clocal_name.as_ptr() as *const u8))
                 {
                     self.curnode = ns as XmlNodePtr;
                     return 1;
@@ -2063,15 +2053,15 @@ impl XmlTextReader {
             return 0;
         }
 
-        prop = (*node).properties;
+        let cns = CString::new(namespace_uri).unwrap();
+        let mut prop = (*node).properties;
         while !prop.is_null() {
-            /*
-             * One need to have
-             *   - same attribute names
-             *   - and the attribute carrying that namespace
-             */
-            if xml_str_equal((*prop).name, local_name)
-                && (!(*prop).ns.is_null() && xml_str_equal((*(*prop).ns).href, namespace_uri))
+            // One need to have
+            //   - same attribute names
+            //   - and the attribute carrying that namespace
+            if xml_str_equal((*prop).name, clocal_name.as_ptr() as *const u8)
+                && (!(*prop).ns.is_null()
+                    && xml_str_equal((*(*prop).ns).href, cns.as_ptr() as *const u8))
             {
                 self.curnode = prop as XmlNodePtr;
                 return 1;
