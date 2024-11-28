@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: regular expressions handling
+// Description: basic API for libxml regular expressions handling used
+//              for XML Schemas and validation.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // regexp.c: generic and extensible Regular Expression engine
 //
 // Basically designed with the purpose of compiling regexps for

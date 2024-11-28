@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: the core parser module
+// Description: Interfaces, constants and types related to the XML parser
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // parser.c : an XML 1.0 parser, namespaces and validity support are mostly
 //            implemented on top of the SAX interfaces
 //

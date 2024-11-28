@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: interfaces for thread handling
+// Description: set of generic threading related routines
+//              should work with pthreads, Windows native or TLS threads
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // threads.c: set of generic threading related routines
 //
 // See Copyright for the status of this software.

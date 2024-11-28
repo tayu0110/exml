@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: specific APIs to process HTML tree, especially serialization
+// Description: this module implements a few function needed to process
+//              tree in an HTML specific way.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // HTMLtree.c : implementation of access function for an HTML tree.
 //
 // See Copyright for the status of this software.

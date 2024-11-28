@@ -5,6 +5,21 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: Provide Canonical XML and Exclusive XML Canonicalization
+// Description: the c14n modules provides a
+//
+// "Canonical XML" implementation
+// http://www.w3.org/TR/xml-c14n
+//
+// and an
+//
+// "Exclusive XML Canonicalization" implementation
+// http://www.w3.org/TR/xml-exc-c14n
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Aleksey Sanin <aleksey@aleksey.com>
+// --------
 // "Canonical XML" implementation
 // http://www.w3.org/TR/xml-c14n
 //

@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: pattern expression handling
+// Description: allows to compile and test pattern expressions for nodes
+//              either in a tree or based on a parser state.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // pattern.c: Implementation of selectors for nodes
 //
 // Reference:

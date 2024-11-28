@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: set of routines to process strings
+// Description: type and interfaces needed for the internal string handling
+//              of the library, especially UTF8 processing.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // string.c : an XML string utilities module
 //
 // This module provides various utility functions for manipulating

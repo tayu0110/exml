@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: unfinished XLink detection module
+// Description: unfinished XLink detection module
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // xlink.c : implementation of the hyperlinks detection module
 //           This version supports both XML XLinks and HTML simple links
 //

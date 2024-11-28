@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: implementation of the Relax-NG validation
+// Description: implementation of the Relax-NG validation
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // relaxng.c : implementation of the Relax-NG handling and validity checking
 //
 // See Copyright for the status of this software.

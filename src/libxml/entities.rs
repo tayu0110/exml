@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: interface for the XML entities handling
+// Description: this module provides some of the entity API needed
+//              for the parser and applications.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // entities.c : implementation for the XML entities handling
 //
 // See Copyright for the status of this software.

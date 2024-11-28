@@ -11,6 +11,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: text writing API for XML
+// Description: text writing API for XML
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Alfred Mickautsch <alfred@mickautsch.de>
+// --------
 // xmlwriter.c: XML text writer implementation
 //
 // For license and disclaimer see the license and disclaimer of libxml2.

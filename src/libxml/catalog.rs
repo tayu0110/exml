@@ -5,6 +5,20 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: interfaces to the Catalog handling system
+// Description: the catalog module implements the support for
+// XML Catalogs and SGML catalogs
+//
+// SGML Open Technical Resolution TR9401:1997.
+// http://www.jclark.com/sp/catalog.htm
+//
+// XML Catalogs Working Draft 06 August 2001
+// http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // catalog.c: set of generic Catalog related routines
 //
 // Reference:  SGML Open Technical Resolution TR9401:1997.

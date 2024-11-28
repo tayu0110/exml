@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: the XML document serializer
+// Description: API to save document or subtree of document
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // xmlsave.c: Implementation of the document serializer
 //
 // See Copyright for the status of this software.

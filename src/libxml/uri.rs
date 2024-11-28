@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: library of generic URI related routines
+// Description: library of generic URI related routines
+//              Implements RFC 2396
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // uri.c: set of generic URI related routines
 //
 // Reference: RFCs 3986, 2732 and 2373

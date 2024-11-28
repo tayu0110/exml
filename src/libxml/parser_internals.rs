@@ -5,6 +5,15 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: internals routines and limits exported by the parser.
+// Description: this module exports a number of internal parsing routines
+//              they are not really all intended for applications but
+//              can prove useful doing low level processing.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // parserInternals.c : Internal routines (and obsolete ones) needed for the XML and HTML parsers.
 //
 // See Copyright for the status of this software.

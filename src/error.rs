@@ -1,3 +1,18 @@
+// Copyright of the original code is the following.
+// --------
+// Summary: error handling
+// Description: the API used to report errors
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
+// error.c: module displaying/handling XML parser errors
+//
+// See Copyright for the status of this software.
+//
+// Daniel Veillard <daniel@veillard.com>
+
 use std::{
     borrow::Cow,
     ffi::{c_void, CStr},

@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: dynamic module loading
+// Description: basic API for dynamic module loading, used by libexslt added in 2.6.17
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Joel W. Reed
+// --------
 // xmlmodule.c : basic API for dynamic module loading added 2.6.17
 //
 // See Copyright for the status of this software.

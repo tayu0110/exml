@@ -5,6 +5,15 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: minimal FTP implementation
+// Description: minimal FTP implementation allowing to fetch resources
+//              like external subset. This module is DEPRECATED, do not
+//              use any of its functions.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // nanoftp.c: basic FTP client support
 //
 // Reference: RFC 959

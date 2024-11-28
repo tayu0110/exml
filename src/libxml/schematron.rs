@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: XML Schematron implementation
+// Description: interface to the XML Schematron validity checking.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // schematron.c : implementation of the Schematron schema validity checking
 //
 // See Copyright for the status of this software.

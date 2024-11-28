@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: The DTD validation
+// Description: API for the DTD handling and the validity checking
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // valid.c : part of the code use to do the DTD handling and the validity checking
 //
 // See Copyright for the status of this software.

@@ -4,6 +4,12 @@
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
+// Summary: Old SAX version 1 handler, deprecated
+// Description: DEPRECATED set of SAX version 1 interfaces used to build the DOM tree.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
 // --------
 // SAX.c : Old SAX v1 handlers to build a tree. Deprecated except for compatibility
 //

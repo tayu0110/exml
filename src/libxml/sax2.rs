@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: SAX2 parser interface used to build the DOM tree
+// Description: those are the default SAX2 interfaces used by
+//              the library when building DOM tree.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // SAX2.c : Default SAX2 handler to build a tree.
 //
 // See Copyright for the status of this software.

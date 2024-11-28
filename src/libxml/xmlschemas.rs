@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: incomplete XML Schemas structure implementation
+// Description: interface to the XML Schemas handling and schema validity
+//              checking, it is incomplete right now.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // schemas.c : implementation of the XML Schema handling and schema validity checking
 //
 // See Copyright for the status of this software.

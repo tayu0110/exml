@@ -5,6 +5,14 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: interface for the memory allocator
+// Description: provides interfaces for the memory allocator,
+//              including debugging capabilities.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // xmlmemory.c:  libxml memory allocator wrapper.
 //
 // daniel@veillard.com

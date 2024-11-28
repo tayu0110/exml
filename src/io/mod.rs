@@ -3,6 +3,23 @@
 //!
 //! Please refer to original libxml2 documents also.
 
+// Copyright of the original code is the following.
+// --------
+// Summary: interface for the I/O interfaces used by the parser
+// Description: interface for the I/O interfaces used by the parser
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
+// xmlIO.c : implementation of the I/O interfaces used by the parser
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+//
+// 14 Nov 2000 ht - for VMS, truncated name of long functions to under 32 char
+
 mod input;
 #[cfg(feature = "libxml_output")]
 mod output;

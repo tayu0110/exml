@@ -4,6 +4,12 @@
 //! Please refer to original libxml2 documents also.
 
 // Copyright of the original code is the following.
+// Summary: API to build regexp automata
+// Description: the API to build regexp automata
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
 // --------
 // regexp.c: generic and extensible Regular Expression engine
 //

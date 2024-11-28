@@ -5,6 +5,13 @@
 
 // Copyright of the original code is the following.
 // --------
+// Summary: the XMLReader implementation
+// Description: API of the XML streaming API based on C# interfaces.
+//
+// Copy: See Copyright for the status of this software.
+//
+// Author: Daniel Veillard
+// --------
 // xmlreader.c: implements the xmlTextReader streaming node API
 //
 // NOTE:

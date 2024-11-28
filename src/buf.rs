@@ -1,3 +1,17 @@
+// Copyright of the original code is the following.
+// --------
+// buf.c: memory buffers for libxml2
+//
+// new buffer structures and entry points to simplify the maintenance
+// of libxml2 and ensure we keep good control over memory allocations
+// and stay 64 bits clean.
+// The new entry point use the xmlBufPtr opaque structure and
+// xmlBuf...() counterparts to the old xmlBuf...() functions
+//
+// See Copyright for the status of this software.
+//
+// daniel@veillard.com
+
 use std::{
     ffi::{CStr, CString},
     io::{ErrorKind, Write},
