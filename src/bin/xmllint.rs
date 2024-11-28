@@ -1848,7 +1848,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
     }
     #[cfg(feature = "libxml_pattern")]
     if !PATTERNC.load(Ordering::Relaxed).is_null() {
-        let mut path: *mut XmlChar = null_mut();
+        let mut path = None;
         let mut is_match: c_int = -1;
 
         if typ == XmlReaderTypes::XmlReaderTypeElement {
@@ -1862,7 +1862,7 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                     path = (*(*reader).current_node()).get_node_path();
                     println!(
                         "Node {} matches pattern {}",
-                        CStr::from_ptr(path as _).to_string_lossy(),
+                        path.as_deref().unwrap(),
                         PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy()
                     );
                 }
@@ -1891,15 +1891,14 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                     PATSTREAM.store(null_mut(), Ordering::Relaxed);
                 } else if ret != is_match {
                     #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
-                    if path.is_null() {
+                    if path.is_none() {
                         path = (*(*reader).current_node()).get_node_path();
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
-                    if !path.is_null() {
+                    if let Some(path) = path.as_deref() {
                         eprintln!(
-                            "  pattern {} node {}",
+                            "  pattern {} node {path}",
                             PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy(),
-                            CStr::from_ptr(path as _).to_string_lossy()
                         );
                     } else {
                         eprintln!(
@@ -1921,9 +1920,6 @@ unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
                     PATSTREAM.store(null_mut(), Ordering::Relaxed);
                 }
             }
-        }
-        if !path.is_null() {
-            xml_free(path as _);
         }
     }
 }

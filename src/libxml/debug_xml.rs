@@ -2654,29 +2654,23 @@ pub unsafe extern "C" fn xml_shell_pwd(
 ) -> i32 {
     use libc::snprintf;
 
-    use crate::libxml::globals::xml_free;
-
     if node.is_null() || buffer.is_null() {
         return -1;
     }
 
-    let path: *mut XmlChar = (*node).get_node_path();
-    if path.is_null() {
+    let Some(path) = (*node).get_node_path() else {
         return -1;
-    }
+    };
 
-    /*
-     * This test prevents buffer overflow, because this routine
-     * is only called by xmlShell, in which the second argument is
-     * 500 chars long.
-     * It is a dirty hack before a cleaner solution is found.
-     * Documentation should mention that the second argument must
-     * be at least 500 chars long, and could be stripped if too long.
-     */
+    // This test prevents buffer overflow, because this routine
+    // is only called by xmlShell, in which the second argument is
+    // 500 chars long.
+    // It is a dirty hack before a cleaner solution is found.
+    // Documentation should mention that the second argument must
+    // be at least 500 chars long, and could be stripped if too long.
+    std::ptr::copy_nonoverlapping(path.as_ptr() as *const i8, buffer, path.len().min(499));
     snprintf(buffer as _, 499, c"%s".as_ptr(), path);
     *buffer.add(499) = b'0' as _;
-    xml_free(path as _);
-
     0
 }
 
@@ -2771,15 +2765,14 @@ unsafe extern "C" fn xml_shell_grep(
     while !node.is_null() {
         if (*node).typ == XmlElementType::XmlCommentNode {
             if !xml_strstr((*node).content, arg as *mut XmlChar).is_null() {
-                let path = CStr::from_ptr((*node).get_node_path() as *const i8).to_string_lossy();
+                let path = (*node).get_node_path().unwrap();
                 write!((*ctxt).output, "{path} : ");
                 xml_shell_list(ctxt, null_mut(), node, null_mut());
             }
         } else if (*node).typ == XmlElementType::XmlTextNode
             && !xml_strstr((*node).content, arg as *mut XmlChar).is_null()
         {
-            let path = CStr::from_ptr((*node).parent.unwrap().get_node_path() as *const i8)
-                .to_string_lossy();
+            let path = (*node).parent.unwrap().get_node_path().unwrap();
             write!((*ctxt).output, "{path} : ");
             xml_shell_list(
                 ctxt,

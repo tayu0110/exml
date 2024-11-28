@@ -414,11 +414,10 @@ impl XmlNode {
 
     /// Build a structure based Path for the given node
     ///
-    /// Returns the new path or null_mut() in case of error.  
-    /// The caller must free the returned string.
+    /// Returns the new path or `None` in case of error.  
     #[doc(alias = "xmlGetNodePath")]
     #[cfg(feature = "libxml_tree")]
-    pub unsafe fn get_node_path(&self) -> *mut XmlChar {
+    pub unsafe fn get_node_path(&self) -> Option<String> {
         use std::ptr::null_mut;
 
         use libc::snprintf;
@@ -444,20 +443,20 @@ impl XmlNode {
         let mut generic: i32;
 
         if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
 
         buf_len = 500;
         buffer = xml_malloc_atomic(buf_len) as _;
         if buffer.is_null() {
             xml_tree_err_memory(c"getting node path".as_ptr() as _);
-            return null_mut();
+            return None;
         }
         buf = xml_malloc_atomic(buf_len) as _;
         if buf.is_null() {
             xml_tree_err_memory(c"getting node path".as_ptr() as _);
             xml_free(buffer as _);
-            return null_mut();
+            return None;
         }
 
         *buffer.add(0) = 0;
@@ -685,7 +684,7 @@ impl XmlNode {
             } else {
                 xml_free(buf as _);
                 xml_free(buffer as _);
-                return null_mut();
+                return None;
             }
 
             /*
@@ -698,7 +697,7 @@ impl XmlNode {
                     xml_tree_err_memory(c"getting node path".as_ptr() as _);
                     xml_free(buf as _);
                     xml_free(buffer as _);
-                    return null_mut();
+                    return None;
                 }
                 buffer = temp;
                 temp = xml_realloc(buf as _, buf_len) as _;
@@ -706,7 +705,7 @@ impl XmlNode {
                     xml_tree_err_memory(c"getting node path".as_ptr() as _);
                     xml_free(buf as _);
                     xml_free(buffer as _);
-                    return null_mut();
+                    return None;
                 }
                 buf = temp;
             }
@@ -734,7 +733,11 @@ impl XmlNode {
             cur = next;
         }
         xml_free(buf as _);
-        buffer
+        let res = CStr::from_ptr(buffer as *const i8)
+            .to_string_lossy()
+            .into_owned();
+        xml_free(buffer as _);
+        Some(res)
     }
 
     /// Search the last child of a node.

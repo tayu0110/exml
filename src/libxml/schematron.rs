@@ -19,7 +19,7 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of, null, null_mut},
@@ -1665,7 +1665,6 @@ unsafe extern "C" fn xml_schematron_report_success(
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
         // TODO
     } else {
-        let mut path: *mut XmlChar;
         let mut msg: [c_char; 1000] = [0; 1000];
 
         let mut report: *const XmlChar = null_mut();
@@ -1676,10 +1675,11 @@ unsafe extern "C" fn xml_schematron_report_success(
             return;
         }
         let line: i64 = (*cur).get_line_no();
-        path = (*cur).get_node_path();
-        if path.is_null() {
-            path = (*cur).name as _;
-        }
+        let path = (*cur)
+            .get_node_path()
+            .map_or(CStr::from_ptr((*cur).name as *const i8).to_owned(), |c| {
+                CString::new(c).unwrap()
+            });
         if !(*test).node.is_null() {
             report = xml_schematron_format_report(ctxt, (*test).node, cur);
         }
@@ -1694,7 +1694,7 @@ unsafe extern "C" fn xml_schematron_report_success(
             msg.as_mut_ptr() as _,
             999,
             c"%s line %ld: %s\n".as_ptr() as _,
-            path,
+            path.as_ptr(),
             line,
             report,
         );
@@ -1738,10 +1738,7 @@ unsafe extern "C" fn xml_schematron_report_success(
                             .into(),
                     )
                 },
-                (!path.is_null()).then(|| CStr::from_ptr(path as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-                    .into()),
+                Some(path.to_string_lossy().into_owned().into()),
                 (!report.is_null()).then(|| CStr::from_ptr(report as *const i8)
                     .to_string_lossy()
                     .into_owned()
@@ -1756,10 +1753,6 @@ unsafe extern "C" fn xml_schematron_report_success(
         }
 
         xml_free(report as _);
-
-        if !path.is_null() && path != (*cur).name as _ {
-            xml_free(path as _);
-        }
     }
 }
 

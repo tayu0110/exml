@@ -4401,7 +4401,7 @@ unsafe extern "C" fn pattern_node(
         },
     };
 
-    let mut path: *mut XmlChar = null_mut();
+    let mut path = None;
     let mut is_match: i32 = -1;
 
     let typ = (*reader).node_type();
@@ -4416,7 +4416,7 @@ unsafe extern "C" fn pattern_node(
             writeln!(
                 out,
                 "Node {} matches pattern {}",
-                CStr::from_ptr(path as _).to_string_lossy(),
+                path.as_deref().unwrap(),
                 CStr::from_ptr(pattern).to_string_lossy()
             )
             .ok();
@@ -4436,7 +4436,7 @@ unsafe extern "C" fn pattern_node(
                 xml_free_stream_ctxt(patstream);
                 patstream = null_mut();
             } else if ret != is_match {
-                if path.is_null() {
+                if path.is_none() {
                     path = (*(*reader).current_node()).get_node_path();
                 }
                 writeln!(out, "xmlPatternMatch and xmlStreamPush disagree").ok();
@@ -4444,7 +4444,7 @@ unsafe extern "C" fn pattern_node(
                     out,
                     "  pattern {} node {}",
                     CStr::from_ptr(pattern).to_string_lossy(),
-                    CStr::from_ptr(path as _).to_string_lossy()
+                    path.as_deref().unwrap()
                 )
                 .ok();
             }
@@ -4459,9 +4459,6 @@ unsafe extern "C" fn pattern_node(
                 // patstream = null_mut();
             }
         }
-    }
-    if !path.is_null() {
-        xml_free(path as _);
     }
 }
 
