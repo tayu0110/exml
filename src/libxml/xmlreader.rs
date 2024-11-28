@@ -2701,12 +2701,12 @@ impl XmlTextReader {
 
     /// Determine the standalone status of the document being read.
     ///
-    /// Returns 1 if the document was declared to be standalone, 0 if it
-    /// was declared to be not standalone, or -1 if the document did not
-    /// specify its standalone status or in case of error.
+    /// Returns `Some(true)` if the document was declared to be standalone,
+    /// `Some(false)`  if it was declared to be not standalone,
+    /// or `None` if the document did not specify its standalone status or in case of error.
     #[doc(alias = "xmlTextReaderStandalone")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn standalone(&self) -> i32 {
+    pub unsafe fn standalone(&self) -> Option<bool> {
         let mut doc: XmlDocPtr = null_mut();
         if !self.doc.is_null() {
             doc = self.doc;
@@ -2714,10 +2714,14 @@ impl XmlTextReader {
             doc = (*self.ctxt).my_doc;
         }
         if doc.is_null() {
-            return -1;
+            return None;
         }
 
-        (*doc).standalone
+        match (*doc).standalone {
+            1 => Some(true),
+            0 => Some(false),
+            _ => None,
+        }
     }
 
     /// The xml:lang scope within which the node resides.
