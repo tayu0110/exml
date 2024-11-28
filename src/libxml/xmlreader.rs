@@ -1546,9 +1546,9 @@ impl XmlTextReader {
     /// Returns 1 if true, 0 if false, and -1 in case or error
     #[doc(alias = "xmlTextReaderHasAttributes")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn has_attributes(&self) -> i32 {
+    pub unsafe fn has_attributes(&self) -> bool {
         if self.node.is_null() {
-            return 0;
+            return false;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -1559,10 +1559,10 @@ impl XmlTextReader {
         if (*node).typ == XmlElementType::XmlElementNode
             && (!(*node).properties.is_null() || !(*node).ns_def.is_null())
         {
-            return 1;
+            return true;
         }
         // TODO: handle the xmlDecl
-        0
+        false
     }
 
     /// Whether the node can have a text value.
@@ -1570,9 +1570,9 @@ impl XmlTextReader {
     /// Returns 1 if true, 0 if false, and -1 in case or error
     #[doc(alias = "xmlTextReaderHasValue")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn has_value(&self) -> i32 {
+    pub unsafe fn has_value(&self) -> bool {
         if self.node.is_null() {
-            return 0;
+            return false;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -1580,15 +1580,15 @@ impl XmlTextReader {
             self.node
         };
 
-        match (*node).typ {
+        matches!(
+            (*node).typ,
             XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlNamespaceDecl => 1,
-            _ => 0,
-        }
+                | XmlElementType::XmlTextNode
+                | XmlElementType::XmlCDATASectionNode
+                | XmlElementType::XmlPINode
+                | XmlElementType::XmlCommentNode
+                | XmlElementType::XmlNamespaceDecl
+        )
     }
 
     /// Provides the value of the attribute with the specified qualified name.

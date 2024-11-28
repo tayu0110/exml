@@ -2663,7 +2663,7 @@ unsafe extern "C" fn process_node(out: &mut File, reader: XmlTextReaderPtr) {
         typ as i32,
         CStr::from_ptr(name as _).to_string_lossy(),
         empty.map_or(-1, |e| e as i32),
-        (*reader).has_value(),
+        (*reader).has_value() as i32,
     )
     .ok();
     if value.is_null() {
