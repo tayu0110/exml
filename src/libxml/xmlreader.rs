@@ -2791,18 +2791,18 @@ impl XmlTextReader {
     #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
     pub unsafe fn preserve_pattern(
         &mut self,
-        pattern: *const XmlChar,
+        pattern: &str,
         namespaces: *mut *const XmlChar,
     ) -> i32 {
+        use std::ffi::CString;
+
         use crate::generic_error;
 
         use super::globals::xml_realloc;
 
-        if pattern.is_null() {
-            return -1;
-        }
-
-        let comp: XmlPatternPtr = xml_patterncompile(pattern, self.dict, 0, namespaces);
+        let pattern = CString::new(pattern).unwrap();
+        let comp: XmlPatternPtr =
+            xml_patterncompile(pattern.as_ptr() as *const u8, self.dict, 0, namespaces);
         if comp.is_null() {
             return -1;
         }
