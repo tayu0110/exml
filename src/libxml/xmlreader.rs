@@ -2482,14 +2482,27 @@ impl XmlTextReader {
 
     /// The base URI of the node.
     ///
-    /// Returns the base URI or NULL if not available, if non NULL it need to be freed by the caller.
+    /// Returns the base URI or `None` if not available.
     #[doc(alias = "xmlTextReaderBaseUri")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn base_uri(&self) -> *mut XmlChar {
+    pub unsafe fn base_uri(&self) -> Option<String> {
+        use std::ffi::CStr;
+
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
-        (*self.node).get_base(null_mut())
+        let res = (*self.node).get_base(null_mut());
+        if !res.is_null() {
+            let r = Some(
+                CStr::from_ptr(res as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(res as _);
+            r
+        } else {
+            None
+        }
     }
 
     /// The local name of the node.
