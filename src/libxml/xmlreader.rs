@@ -1917,14 +1917,13 @@ impl XmlTextReader {
     /// Returns 1 in case of success, -1 in case of error, 0 if not found
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn move_to_attribute(&mut self, name: *const XmlChar) -> i32 {
+    pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
+        use std::ffi::CString;
+
         let mut prefix: *mut XmlChar = null_mut();
         let mut ns: XmlNsPtr;
         let mut prop: XmlAttrPtr;
 
-        if name.is_null() {
-            return -1;
-        }
         if self.node.is_null() {
             return -1;
         }
@@ -1934,12 +1933,12 @@ impl XmlTextReader {
             return 0;
         }
 
-        let localname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix));
+        let cname = CString::new(name).unwrap();
+        let localname: *mut XmlChar =
+            xml_split_qname2(cname.as_ptr() as *const u8, addr_of_mut!(prefix));
         if localname.is_null() {
-            /*
-             * Namespace default decl
-             */
-            if xml_str_equal(name, c"xmlns".as_ptr() as _) {
+            // Namespace default decl
+            if name == "xmlns" {
                 ns = (*self.node).ns_def;
                 while !ns.is_null() {
                     if (*ns).prefix.is_null() {
@@ -1953,12 +1952,10 @@ impl XmlTextReader {
 
             prop = (*self.node).properties;
             while !prop.is_null() {
-                /*
-                 * One need to have
-                 *   - same attribute names
-                 *   - and the attribute carrying that namespace
-                 */
-                if xml_str_equal((*prop).name, name)
+                // One need to have
+                //   - same attribute names
+                //   - and the attribute carrying that namespace
+                if xml_str_equal((*prop).name, cname.as_ptr() as *const u8)
                     && ((*prop).ns.is_null() || (*(*prop).ns).prefix.is_null())
                 {
                     self.curnode = prop as XmlNodePtr;
@@ -1969,9 +1966,7 @@ impl XmlTextReader {
             return 0;
         }
 
-        /*
-         * Namespace default decl
-         */
+        // Namespace default decl
         if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
@@ -1992,11 +1987,9 @@ impl XmlTextReader {
         } else {
             prop = (*self.node).properties;
             while !prop.is_null() {
-                /*
-                 * One need to have
-                 *   - same attribute names
-                 *   - and the attribute carrying that namespace
-                 */
+                // One need to have
+                //   - same attribute names
+                //   - and the attribute carrying that namespace
                 if xml_str_equal((*prop).name, localname)
                     && !(*prop).ns.is_null()
                     && xml_str_equal((*(*prop).ns).prefix, prefix)
