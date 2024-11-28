@@ -2494,12 +2494,14 @@ impl XmlTextReader {
 
     /// The local name of the node.
     ///
-    /// Returns the local name or NULL if not available, if non NULL it need to be freed by the caller.
+    /// Returns the local name or `None` if not available.
     #[doc(alias = "xmlTextReaderLocalName")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn local_name(&self) -> *mut XmlChar {
+    pub unsafe fn local_name(&self) -> Option<String> {
+        use std::ffi::CStr;
+
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -2509,9 +2511,13 @@ impl XmlTextReader {
         if (*node).typ == XmlElementType::XmlNamespaceDecl {
             let ns: XmlNsPtr = node as XmlNsPtr;
             if (*ns).prefix.is_null() {
-                return xml_strdup(c"xmlns".as_ptr() as _);
+                return Some("xmlns".to_owned());
             } else {
-                return xml_strdup((*ns).prefix);
+                return Some(
+                    CStr::from_ptr((*ns).prefix as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                );
             }
         }
         if !matches!(
@@ -2520,20 +2526,23 @@ impl XmlTextReader {
         ) {
             return self.name();
         }
-        xml_strdup((*node).name)
+        (!(*node).name.is_null()).then(|| {
+            CStr::from_ptr((*node).name as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        })
     }
 
     /// The qualified name of the node, equal to Prefix :LocalName.
     ///
-    /// Returns the local name or NULL if not available,
-    /// if non NULL it need to be freed by the caller.
+    /// Returns the local name or `None` if not available.
     #[doc(alias = "xmlTextReaderName")]
     #[cfg(feature = "libxml_reader")]
-    pub unsafe fn name(&self) -> *mut XmlChar {
-        let mut ret: *mut XmlChar;
+    pub unsafe fn name(&self) -> Option<String> {
+        use std::ffi::CStr;
 
         if self.node.is_null() {
-            return null_mut();
+            return None;
         }
         let node = if !self.curnode.is_null() {
             self.curnode
@@ -2543,46 +2552,73 @@ impl XmlTextReader {
         match (*node).typ {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
                 if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
-                    return xml_strdup((*node).name);
+                    return (!(*node).name.is_null()).then(|| {
+                        CStr::from_ptr((*node).name as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    });
                 }
 
-                ret = xml_strdup((*(*node).ns).prefix);
+                let mut ret = xml_strdup((*(*node).ns).prefix);
                 ret = xml_strcat(ret, c":".as_ptr() as _);
                 ret = xml_strcat(ret, (*node).name);
-                ret
+                let res = CStr::from_ptr(ret as *const i8)
+                    .to_string_lossy()
+                    .into_owned();
+                xml_free(ret as _);
+                Some(res)
             }
-            XmlElementType::XmlTextNode => xml_strdup(c"#text".as_ptr() as _),
-            XmlElementType::XmlCDATASectionNode => xml_strdup(c"#cdata-section".as_ptr() as _),
+            XmlElementType::XmlTextNode => Some("#text".to_owned()),
+            XmlElementType::XmlCDATASectionNode => Some("#cdata-section".to_owned()),
             XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode => {
-                xml_strdup((*node).name)
+                (!(*node).name.is_null()).then(|| {
+                    CStr::from_ptr((*node).name as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                })
             }
-            XmlElementType::XmlPINode => xml_strdup((*node).name),
-            XmlElementType::XmlCommentNode => xml_strdup(c"#comment".as_ptr() as _),
+            XmlElementType::XmlPINode => (!(*node).name.is_null()).then(|| {
+                CStr::from_ptr((*node).name as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            }),
+            XmlElementType::XmlCommentNode => Some("#comment".to_owned()),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                xml_strdup(c"#document".as_ptr() as _)
+                Some("#document".to_owned())
             }
-            XmlElementType::XmlDocumentFragNode => xml_strdup(c"#document-fragment".as_ptr() as _),
-            XmlElementType::XmlNotationNode => xml_strdup((*node).name),
+            XmlElementType::XmlDocumentFragNode => Some("#document-fragment".to_owned()),
+            XmlElementType::XmlNotationNode => (!(*node).name.is_null()).then(|| {
+                CStr::from_ptr((*node).name as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            }),
             XmlElementType::XmlDocumentTypeNode | XmlElementType::XmlDTDNode => {
-                xml_strdup((*node).name)
+                (!(*node).name.is_null()).then(|| {
+                    CStr::from_ptr((*node).name as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                })
             }
             XmlElementType::XmlNamespaceDecl => {
                 let ns: XmlNsPtr = node as XmlNsPtr;
 
-                ret = xml_strdup(c"xmlns".as_ptr() as _);
+                let mut ret = "xmlns".to_owned();
                 if (*ns).prefix.is_null() {
-                    return ret;
+                    return Some(ret);
                 }
-                ret = xml_strcat(ret, c":".as_ptr() as _);
-                ret = xml_strcat(ret, (*ns).prefix);
-                ret
+                ret.push(':');
+                ret.push_str(
+                    CStr::from_ptr((*ns).prefix as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
+                Some(ret)
             }
-
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
             | XmlElementType::XmlEntityDecl
             | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => null_mut(),
+            | XmlElementType::XmlXIncludeEnd => None,
             _ => unreachable!(),
         }
         // return null_mut();
