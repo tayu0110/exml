@@ -260,12 +260,13 @@ pub struct XmlRelaxNG {
 
     idref: i32, /* requires idref checking */
 
-    defs: XmlHashTablePtr,             /* define */
-    refs: XmlHashTablePtr,             /* references */
-    documents: XmlRelaxNGDocumentPtr,  /* all the documents loaded */
-    includes: XmlRelaxNGIncludePtr,    /* all the includes loaded */
-    def_nr: i32,                       /* number of defines used */
-    def_tab: *mut XmlRelaxNGDefinePtr, /* pointer to the allocated definitions */
+    // It seems that these tables are unused...
+    defs: Option<XmlHashTableRef<'static, ()>>, /* define */
+    refs: Option<XmlHashTableRef<'static, ()>>, /* references */
+    documents: XmlRelaxNGDocumentPtr,           /* all the documents loaded */
+    includes: XmlRelaxNGIncludePtr,             /* all the includes loaded */
+    def_nr: i32,                                /* number of defines used */
+    def_tab: *mut XmlRelaxNGDefinePtr,          /* pointer to the allocated definitions */
 }
 
 const XML_RELAXNG_IN_ATTRIBUTE: i32 = 1 << 0;
