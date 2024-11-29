@@ -126,6 +126,9 @@ impl NodeCommon for XmlEntity {
     fn document(&self) -> *mut XmlDoc {
         self.doc.load(Ordering::Relaxed)
     }
+    fn set_document(&mut self, doc: *mut XmlDoc) {
+        self.doc.store(doc, Ordering::Relaxed);
+    }
     fn element_type(&self) -> XmlElementType {
         self.typ
     }

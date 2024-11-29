@@ -69,6 +69,7 @@ pub trait NodeCommon {
     fn prev(&self) -> Option<NodePtr>;
     fn set_prev(&mut self, prev: Option<NodePtr>);
     fn document(&self) -> *mut XmlDoc;
+    fn set_document(&mut self, doc: *mut XmlDoc);
 
     /// Add a new node to `self`, at the end of the child (or property) list
     /// merging adjacent TEXT nodes (in which case `cur` is freed)  
@@ -3069,6 +3070,9 @@ impl XmlNode {
 impl NodeCommon for XmlNode {
     fn document(&self) -> *mut XmlDoc {
         self.doc
+    }
+    fn set_document(&mut self, doc: *mut XmlDoc) {
+        self.doc = doc;
     }
     fn element_type(&self) -> XmlElementType {
         self.typ

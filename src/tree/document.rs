@@ -767,6 +767,9 @@ impl NodeCommon for XmlDoc {
     fn document(&self) -> *mut XmlDoc {
         self.doc
     }
+    fn set_document(&mut self, doc: *mut XmlDoc) {
+        self.doc = doc;
+    }
     fn element_type(&self) -> XmlElementType {
         self.typ
     }
