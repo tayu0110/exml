@@ -420,25 +420,10 @@ impl XmlNode {
     pub unsafe fn get_node_path(&self) -> Option<String> {
         use std::ptr::null_mut;
 
-        use libc::snprintf;
-
-        use crate::{
-            libxml::{
-                globals::{xml_free, xml_malloc_atomic, xml_realloc},
-                xmlstring::{xml_str_equal, xml_strlen},
-            },
-            tree::{xml_tree_err_memory, XmlAttrPtr},
-        };
+        use crate::{libxml::xmlstring::xml_str_equal, tree::XmlAttrPtr};
 
         let mut tmp: *const XmlNode;
         let mut next: *const XmlNode;
-        let mut buffer: *mut XmlChar;
-        let mut temp: *mut XmlChar;
-        let mut buf_len: usize;
-        let mut buf: *mut XmlChar;
-        let mut sep: *const i8;
-        let mut name: *const i8;
-        let mut nametemp: [i8; 100] = [0; 100];
         let mut occur: i32;
         let mut generic: i32;
 
@@ -446,64 +431,50 @@ impl XmlNode {
             return None;
         }
 
-        buf_len = 500;
-        buffer = xml_malloc_atomic(buf_len) as _;
-        if buffer.is_null() {
-            xml_tree_err_memory(c"getting node path".as_ptr() as _);
-            return None;
-        }
-        buf = xml_malloc_atomic(buf_len) as _;
-        if buf.is_null() {
-            xml_tree_err_memory(c"getting node path".as_ptr() as _);
-            xml_free(buffer as _);
-            return None;
-        }
-
-        *buffer.add(0) = 0;
+        let mut buffer = String::with_capacity(500);
+        let mut buf = String::with_capacity(500);
         let mut cur = self as *const XmlNode;
+        let mut sep: &str;
+        let mut name: Cow<'static, str>;
         while !cur.is_null() {
-            name = c"".as_ptr() as _;
-            // sep = c"?".as_ptr() as _;
+            name = "".into();
             occur = 0;
             if matches!(
                 (*cur).typ,
                 XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
             ) {
-                if *buffer.add(0) == b'/' {
+                if buffer.starts_with('/') {
                     break;
                 }
-                sep = c"/".as_ptr() as _;
+                sep = "/";
                 next = null_mut();
             } else if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                 generic = 0;
-                sep = c"/".as_ptr() as _;
-                name = (*cur).name as _;
+                sep = "/";
                 if !(*cur).ns.is_null() {
-                    if !(*(*cur).ns).prefix.is_null() {
-                        snprintf(
-                            nametemp.as_mut_ptr() as _,
-                            nametemp.len() - 1,
-                            c"%s:%s".as_ptr() as _,
-                            (*(*cur).ns).prefix as *const i8,
-                            (*cur).name,
-                        );
-                        *nametemp.last_mut().unwrap() = 0;
-                        name = nametemp.as_ptr() as _;
+                    name = if !(*(*cur).ns).prefix.is_null() {
+                        Cow::Owned(format!(
+                            "{}:{}",
+                            CStr::from_ptr((*(*cur).ns).prefix as *const i8).to_string_lossy(),
+                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy(),
+                        ))
                     } else {
-                        /*
-                         * We cannot express named elements in the default
-                         * namespace, so use "*".
-                         */
+                        // We cannot express named elements in the default
+                        // namespace, so use "*".
                         generic = 1;
-                        name = c"*".as_ptr() as _;
-                    }
+                        "*".into()
+                    };
+                } else {
+                    name = Cow::Owned(
+                        CStr::from_ptr((*cur).name as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
                 }
                 next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
-                /*
-                 * Thumbler index computation
-                 * TODO: the occurrence test seems bogus for namespaced names
-                 */
+                // Thumbler index computation
+                // TODO: the occurrence test seems bogus for namespaced names
                 tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     if matches!((*tmp).typ, XmlElementType::XmlElementNode)
@@ -546,13 +517,11 @@ impl XmlNode {
                     occur += 1;
                 }
             } else if matches!((*cur).typ, XmlElementType::XmlCommentNode) {
-                sep = c"/".as_ptr() as _;
-                name = c"comment()".as_ptr() as _;
+                sep = "/";
+                name = "comment()".into();
                 next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
-                /*
-                 * Thumbler index computation
-                 */
+                // Thumbler index computation
                 tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     if matches!((*tmp).typ, XmlElementType::XmlCommentNode) {
@@ -578,13 +547,11 @@ impl XmlNode {
                 (*cur).typ,
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
-                sep = c"/".as_ptr() as _;
-                name = c"text()".as_ptr() as _;
+                sep = "/";
+                name = "text()".into();
                 next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
-                /*
-                 * Thumbler index computation
-                 */
+                // Thumbler index computation
                 tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     if matches!(
@@ -595,10 +562,8 @@ impl XmlNode {
                     }
                     tmp = (*tmp).prev.map_or(null_mut(), |p| p.as_ptr());
                 }
-                /*
-                 * Evaluate if this is the only text- or CDATA-section-node;
-                 * if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
-                 */
+                // Evaluate if this is the only text- or CDATA-section-node;
+                // if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
                 if occur == 0 {
                     tmp = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                     while !tmp.is_null() {
@@ -615,21 +580,15 @@ impl XmlNode {
                     occur += 1;
                 }
             } else if matches!((*cur).typ, XmlElementType::XmlPINode) {
-                sep = c"/".as_ptr() as _;
-                snprintf(
-                    nametemp.as_mut_ptr() as _,
-                    nametemp.len() - 1,
-                    c"processing-instruction('%s')".as_ptr() as _,
-                    (*cur).name,
-                );
-                *nametemp.last_mut().unwrap() = 0;
-                name = nametemp.as_ptr() as _;
+                sep = "/";
+                name = Cow::Owned(format!(
+                    "processing-instruction('{}')",
+                    CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
+                ));
 
                 next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
-                /*
-                 * Thumbler index computation
-                 */
+                // Thumbler index computation
                 tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     if matches!((*tmp).typ, XmlElementType::XmlPINode)
@@ -656,88 +615,48 @@ impl XmlNode {
                     occur += 1;
                 }
             } else if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
-                sep = c"/@".as_ptr() as _;
-                name = (*(cur as XmlAttrPtr)).name as _;
+                sep = "/@";
                 if !(*cur).ns.is_null() {
-                    if !(*(*cur).ns).prefix.is_null() {
-                        snprintf(
-                            nametemp.as_mut_ptr() as _,
-                            nametemp.len() - 1,
-                            c"%s:%s".as_ptr() as _,
-                            (*(*cur).ns).prefix as *const i8,
-                            (*cur).name,
-                        );
+                    name = if !(*(*cur).ns).prefix.is_null() {
+                        format!(
+                            "{}:{}",
+                            CStr::from_ptr((*(*cur).ns).prefix as *const i8).to_string_lossy(),
+                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
+                        )
+                        .into()
                     } else {
-                        snprintf(
-                            nametemp.as_mut_ptr() as _,
-                            nametemp.len() - 1,
-                            c"%s".as_ptr() as _,
-                            (*cur).name,
-                        );
-                    }
-                    *nametemp.last_mut().unwrap() = 0;
-                    name = nametemp.as_ptr() as _;
+                        format!(
+                            "{}",
+                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
+                        )
+                        .into()
+                    };
+                } else {
+                    name = CStr::from_ptr((*(cur as XmlAttrPtr)).name as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                        .into();
                 }
                 next = (*(cur as XmlAttrPtr))
                     .parent
                     .map_or(null_mut(), |p| p.as_ptr());
             } else {
-                xml_free(buf as _);
-                xml_free(buffer as _);
                 return None;
             }
 
-            /*
-             * Make sure there is enough room
-             */
-            if xml_strlen(buffer) as usize + nametemp.len() + 20 > buf_len {
-                buf_len = 2 * buf_len + xml_strlen(buffer) as usize + nametemp.len() + 20;
-                temp = xml_realloc(buffer as _, buf_len) as _;
-                if temp.is_null() {
-                    xml_tree_err_memory(c"getting node path".as_ptr() as _);
-                    xml_free(buf as _);
-                    xml_free(buffer as _);
-                    return None;
+            {
+                use std::fmt::Write as _;
+                if occur == 0 {
+                    write!(buf, "{sep}{name}{buffer}").ok();
+                } else {
+                    write!(buf, "{sep}{name}[{occur}]{buffer}").ok();
                 }
-                buffer = temp;
-                temp = xml_realloc(buf as _, buf_len) as _;
-                if temp.is_null() {
-                    xml_tree_err_memory(c"getting node path".as_ptr() as _);
-                    xml_free(buf as _);
-                    xml_free(buffer as _);
-                    return None;
-                }
-                buf = temp;
             }
-            if occur == 0 {
-                snprintf(
-                    buf as _,
-                    buf_len,
-                    c"%s%s%s".as_ptr() as _,
-                    sep,
-                    name,
-                    buffer,
-                );
-            } else {
-                snprintf(
-                    buf as _,
-                    buf_len,
-                    c"%s%s[%d]%s".as_ptr() as _,
-                    sep,
-                    name,
-                    occur,
-                    buffer,
-                );
-            }
-            snprintf(buffer as _, buf_len, c"%s".as_ptr() as _, buf);
+            (buffer, buf) = (buf, buffer);
+            buf.clear();
             cur = next;
         }
-        xml_free(buf as _);
-        let res = CStr::from_ptr(buffer as *const i8)
-            .to_string_lossy()
-            .into_owned();
-        xml_free(buffer as _);
-        Some(res)
+        Some(buffer)
     }
 
     /// Search the last child of a node.
