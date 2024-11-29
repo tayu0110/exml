@@ -63,7 +63,10 @@ use crate::{
             xml_strncasecmp, xml_strndup, XmlChar,
         },
     },
-    tree::{xml_create_int_subset, xml_free_doc, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr},
+    tree::{
+        xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,
+        XmlNodePtr,
+    },
 };
 
 use super::{

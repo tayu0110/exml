@@ -71,6 +71,22 @@ pub trait NodeCommon {
     fn document(&self) -> *mut XmlDoc;
     fn set_document(&mut self, doc: *mut XmlDoc);
 
+    /// Check whether this node is a Text node or not.
+    #[doc(alias = "xmlNodeIsText")]
+    fn is_text_node(&self) -> bool {
+        matches!(self.element_type(), XmlElementType::XmlTextNode)
+    }
+
+    /// Search the last child of a node.
+    /// Returns the last child or null_mut() if none.
+    #[doc(alias = "xmlGetLastChild")]
+    fn get_last_child(&self) -> XmlNodePtr {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        self.last().map_or(null_mut(), |p| p.as_ptr())
+    }
+
     /// Add a new node to `self`, at the end of the child (or property) list
     /// merging adjacent TEXT nodes (in which case `cur` is freed)  
     /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
@@ -212,7 +228,6 @@ pub trait NodeCommon {
     ///
     /// Note that namespace nodes can't be unlinked as they do not have pointer to their parent.
     #[doc(alias = "xmlUnlinkNode")]
-
     unsafe fn unlink(&mut self) {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return;
@@ -318,17 +333,11 @@ pub struct XmlNode {
 }
 
 impl XmlNode {
-    /// Check whether this node is a Text node or not.
-    #[doc(alias = "xmlNodeIsText")]
-    pub fn is_text_node(&self) -> bool {
-        matches!(self.typ, XmlElementType::XmlTextNode)
-    }
-
     /// Checks whether this node is an empty or whitespace only (and possibly ignorable) text-node.
     #[doc(alias = "xmlIsBlankNode")]
     pub unsafe fn is_blank_node(&self) -> bool {
         if !matches!(
-            self.typ,
+            self.element_type(),
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) {
             return false;
@@ -367,25 +376,27 @@ impl XmlNode {
                 | XmlElementType::XmlPINode
         ) {
             if self.line == 65535 {
-                if matches!(self.typ, XmlElementType::XmlTextNode) && !self.psvi.is_null() {
+                if matches!(self.element_type(), XmlElementType::XmlTextNode)
+                    && !self.psvi.is_null()
+                {
                     result = self.psvi as isize as i64;
                 } else if let Some(children) = self
                     .children
-                    .filter(|_| matches!(self.typ, XmlElementType::XmlElementNode))
+                    .filter(|_| matches!(self.element_type(), XmlElementType::XmlElementNode))
                 {
                     result = children.get_line_no_internal(depth + 1);
-                } else if let Some(next) = self.next {
+                } else if let Some(next) = self.next() {
                     result = next.get_line_no_internal(depth + 1);
-                } else if let Some(prev) = self.prev {
+                } else if let Some(prev) = self.prev() {
                     result = prev.get_line_no_internal(depth + 1);
                 }
             }
             if result == -1 || result == 65535 {
                 result = self.line as i64;
             }
-        } else if let Some(prev) = self.prev.filter(|p| {
+        } else if let Some(prev) = self.prev().filter(|p| {
             matches!(
-                p.typ,
+                p.element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlTextNode
                     | XmlElementType::XmlCommentNode
@@ -394,8 +405,8 @@ impl XmlNode {
         }) {
             result = prev.get_line_no_internal(depth + 1);
         } else if let Some(parent) = self
-            .parent
-            .filter(|p| matches!(p.typ, XmlElementType::XmlElementNode))
+            .parent()
+            .filter(|p| matches!(p.element_type(), XmlElementType::XmlElementNode))
         {
             result = parent.get_line_no_internal(depth + 1);
         }
@@ -441,7 +452,7 @@ impl XmlNode {
             name = "".into();
             occur = 0;
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
             ) {
                 if buffer.starts_with('/') {
@@ -449,7 +460,7 @@ impl XmlNode {
                 }
                 sep = "/";
                 next = null_mut();
-            } else if matches!((*cur).typ, XmlElementType::XmlElementNode) {
+            } else if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                 generic = 0;
                 sep = "/";
                 if !(*cur).ns.is_null() {
@@ -472,13 +483,13 @@ impl XmlNode {
                             .into_owned(),
                     );
                 }
-                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+                next = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
                 // Thumbler index computation
                 // TODO: the occurrence test seems bogus for namespaced names
-                tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
+                tmp = (*cur).prev().map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
-                    if matches!((*tmp).typ, XmlElementType::XmlElementNode)
+                    if matches!((*tmp).element_type(), XmlElementType::XmlElementNode)
                         && (generic != 0
                             || (xml_str_equal((*cur).name, (*tmp).name)
                                 && ((*tmp).ns == (*cur).ns
@@ -491,12 +502,12 @@ impl XmlNode {
                     {
                         occur += 1;
                     }
-                    tmp = (*tmp).prev.map_or(null_mut(), |p| p.as_ptr());
+                    tmp = (*tmp).prev().map_or(null_mut(), |p| p.as_ptr());
                 }
                 if occur == 0 {
-                    tmp = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                    tmp = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
                     while !tmp.is_null() && occur == 0 {
-                        if matches!((*tmp).typ, XmlElementType::XmlElementNode)
+                        if matches!((*tmp).element_type(), XmlElementType::XmlElementNode)
                             && (generic != 0
                                 || (xml_str_equal((*cur).name, (*tmp).name)
                                     && (((*tmp).ns == (*cur).ns)
@@ -509,7 +520,7 @@ impl XmlNode {
                         {
                             occur += 1;
                         }
-                        tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                        tmp = (*tmp).next().map_or(null_mut(), |n| n.as_ptr());
                     }
                     if occur != 0 {
                         occur = 1;
@@ -517,26 +528,26 @@ impl XmlNode {
                 } else {
                     occur += 1;
                 }
-            } else if matches!((*cur).typ, XmlElementType::XmlCommentNode) {
+            } else if matches!((*cur).element_type(), XmlElementType::XmlCommentNode) {
                 sep = "/";
                 name = "comment()".into();
-                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+                next = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
                 // Thumbler index computation
-                tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
+                tmp = (*cur).prev().map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
-                    if matches!((*tmp).typ, XmlElementType::XmlCommentNode) {
+                    if matches!((*tmp).element_type(), XmlElementType::XmlCommentNode) {
                         occur += 1;
                     }
-                    tmp = (*tmp).prev.map_or(null_mut(), |p| p.as_ptr());
+                    tmp = (*tmp).prev().map_or(null_mut(), |p| p.as_ptr());
                 }
                 if occur == 0 {
-                    tmp = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                    tmp = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
                     while !tmp.is_null() && occur == 0 {
-                        if matches!((*tmp).typ, XmlElementType::XmlCommentNode) {
+                        if matches!((*tmp).element_type(), XmlElementType::XmlCommentNode) {
                             occur += 1;
                         }
-                        tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                        tmp = (*tmp).next().map_or(null_mut(), |n| n.as_ptr());
                     }
                     if occur != 0 {
                         occur = 1;
@@ -545,69 +556,69 @@ impl XmlNode {
                     occur += 1;
                 }
             } else if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 sep = "/";
                 name = "text()".into();
-                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+                next = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
                 // Thumbler index computation
-                tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
+                tmp = (*cur).prev().map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     if matches!(
-                        (*tmp).typ,
+                        (*tmp).element_type(),
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                     ) {
                         occur += 1;
                     }
-                    tmp = (*tmp).prev.map_or(null_mut(), |p| p.as_ptr());
+                    tmp = (*tmp).prev().map_or(null_mut(), |p| p.as_ptr());
                 }
                 // Evaluate if this is the only text- or CDATA-section-node;
                 // if yes, then we'll get "text()".as_ptr() as _, otherwise "text()[1]".
                 if occur == 0 {
-                    tmp = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                    tmp = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
                     while !tmp.is_null() {
                         if matches!(
-                            (*tmp).typ,
+                            (*tmp).element_type(),
                             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                         ) {
                             occur = 1;
                             break;
                         }
-                        tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                        tmp = (*tmp).next().map_or(null_mut(), |n| n.as_ptr());
                     }
                 } else {
                     occur += 1;
                 }
-            } else if matches!((*cur).typ, XmlElementType::XmlPINode) {
+            } else if matches!((*cur).element_type(), XmlElementType::XmlPINode) {
                 sep = "/";
                 name = Cow::Owned(format!(
                     "processing-instruction('{}')",
                     CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
                 ));
 
-                next = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+                next = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
                 // Thumbler index computation
-                tmp = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
+                tmp = (*cur).prev().map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
-                    if matches!((*tmp).typ, XmlElementType::XmlPINode)
+                    if matches!((*tmp).element_type(), XmlElementType::XmlPINode)
                         && xml_str_equal((*cur).name, (*tmp).name)
                     {
                         occur += 1;
                     }
-                    tmp = (*tmp).prev.map_or(null_mut(), |p| p.as_ptr());
+                    tmp = (*tmp).prev().map_or(null_mut(), |p| p.as_ptr());
                 }
                 if occur == 0 {
-                    tmp = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
+                    tmp = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
                     while !tmp.is_null() && occur == 0 {
-                        if matches!((*tmp).typ, XmlElementType::XmlPINode)
+                        if matches!((*tmp).element_type(), XmlElementType::XmlPINode)
                             && xml_str_equal((*cur).name, (*tmp).name)
                         {
                             occur += 1;
                         }
-                        tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
+                        tmp = (*tmp).next().map_or(null_mut(), |n| n.as_ptr());
                     }
                     if occur != 0 {
                         occur = 1;
@@ -615,7 +626,7 @@ impl XmlNode {
                 } else {
                     occur += 1;
                 }
-            } else if matches!((*cur).typ, XmlElementType::XmlAttributeNode) {
+            } else if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
                 sep = "/@";
                 if !(*cur).ns.is_null() {
                     name = if !(*(*cur).ns).prefix.is_null() {
@@ -639,7 +650,7 @@ impl XmlNode {
                         .into();
                 }
                 next = (*(cur as XmlAttrPtr))
-                    .parent
+                    .parent()
                     .map_or(null_mut(), |p| p.as_ptr());
             } else {
                 return None;
@@ -658,16 +669,6 @@ impl XmlNode {
             cur = next;
         }
         Some(buffer)
-    }
-
-    /// Search the last child of a node.
-    /// Returns the last child or null_mut() if none.
-    #[doc(alias = "xmlGetLastChild")]
-    pub fn get_last_child(&self) -> XmlNodePtr {
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-        self.last.map_or(null_mut(), |p| p.as_ptr())
     }
 
     /// Searches for the BASE URL. The code should work on both XML
