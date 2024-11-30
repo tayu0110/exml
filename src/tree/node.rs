@@ -71,9 +71,23 @@ pub trait NodeCommon {
     fn document(&self) -> *mut XmlDoc;
     fn set_document(&mut self, doc: *mut XmlDoc);
 
+    fn as_document_node(&self) -> Option<NonNull<XmlDoc>> {
+        match self.element_type() {
+            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                NonNull::new(self as *const Self as *mut XmlDoc)
+            }
+            _ => None,
+        }
+    }
     fn as_entity_decl_node(&self) -> Option<NonNull<XmlEntity>> {
         match self.element_type() {
             XmlElementType::XmlEntityDecl => NonNull::new(self as *const Self as *mut XmlEntity),
+            _ => None,
+        }
+    }
+    fn as_namespace_decl_node(&self) -> Option<NonNull<XmlNs>> {
+        match self.element_type() {
+            XmlElementType::XmlNamespaceDecl => NonNull::new(self as *const Self as *mut XmlNs),
             _ => None,
         }
     }
@@ -113,15 +127,15 @@ pub trait NodeCommon {
                     continue;
                 }
                 let name = now.name().unwrap();
-                if name.to_ascii_lowercase() == "html" {
+                if name.eq_ignore_ascii_case("html") {
                     cur = now.children();
                     continue;
                 }
-                if name.to_ascii_lowercase() == "head" {
+                if name.eq_ignore_ascii_case("head") {
                     cur = now.children();
                     continue;
                 }
-                if name.to_ascii_lowercase() == "base" {
+                if name.eq_ignore_ascii_case("base") {
                     return now.get_prop("href");
                 }
                 cur = now.next();
@@ -890,9 +904,7 @@ impl XmlNode {
                         }
                         _ => {}
                     }
-                    /*
-                     * Skip to next node
-                     */
+                    // Skip to next node
                     if let Some(children) = (*tmp).children().filter(|children| {
                         !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
                     }) {
@@ -981,7 +993,7 @@ impl XmlNode {
                 }
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_buf_cat(buf, (*(self as *const XmlNode as XmlNsPtr)).href);
+                xml_buf_cat(buf, self.as_namespace_decl_node().unwrap().as_ref().href);
             }
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
@@ -1043,19 +1055,15 @@ impl XmlNode {
             if !use_dtd {
                 return null_mut();
             }
-            /*
-             * Check if there is a default/fixed attribute declaration in
-             * the internal or external subset.
-             */
+            // Check if there is a default/fixed attribute declaration in
+            // the internal or external subset.
             if !self.doc.is_null() && !(*self.doc).int_subset.is_null() {
                 let doc: XmlDocPtr = self.doc;
                 let mut attr_decl: XmlAttributePtr = null_mut();
                 let elem_qname: *mut XmlChar;
                 let mut tmpstr: *mut XmlChar = null_mut();
 
-                /*
-                 * We need the QName of the element for the DTD-lookup.
-                 */
+                // We need the QName of the element for the DTD-lookup.
                 if !self.ns.is_null() && !(*self.ns).prefix.is_null() {
                     tmpstr = xml_strdup((*self.ns).prefix);
                     tmpstr = xml_strcat(tmpstr, c":".as_ptr() as _);
@@ -1069,9 +1077,7 @@ impl XmlNode {
                 }
                 if let Some(ns_name) = ns_name {
                     if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
-                        /*
-                         * The XML namespace must be bound to prefix 'xml'.
-                         */
+                        // The XML namespace must be bound to prefix 'xml'.
                         attr_decl = xml_get_dtd_qattr_desc(
                             (*doc).int_subset,
                             elem_qname,
@@ -1173,7 +1179,7 @@ impl XmlNode {
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetProp")]
     pub unsafe fn get_prop(&self, name: &str) -> *mut XmlChar {
-        let prop: XmlAttrPtr = self.has_prop(name);
+        let prop = self.has_prop(name);
         if prop.is_null() {
             return null_mut();
         }
@@ -1558,7 +1564,7 @@ impl XmlNode {
         let nqname: *const XmlChar = xml_split_qname3(cname.as_ptr() as *const u8, &raw mut len);
         if !nqname.is_null() {
             let prefix: *mut XmlChar = xml_strndup(cname.as_ptr() as *const u8, len);
-            let ns: XmlNsPtr = self.search_ns(self.document(), Some(&name[..len as usize]));
+            let ns = self.search_ns(self.document(), Some(&name[..len as usize]));
             if !prefix.is_null() {
                 xml_free(prefix as _);
             }
@@ -1582,7 +1588,7 @@ impl XmlNode {
     #[doc(alias = "xmlUnsetProp")]
     #[cfg(any(feature = "libxml_tree", feature = "schema"))]
     pub unsafe fn unset_prop(&mut self, name: &str) -> i32 {
-        let prop: XmlAttrPtr = self.get_prop_node_internal(name, None, false);
+        let prop = self.get_prop_node_internal(name, None, false);
         if prop.is_null() {
             return -1;
         }
@@ -1669,9 +1675,7 @@ impl XmlNode {
             }
             return prop;
         }
-        /*
-         * No equal attr found; create a new one.
-         */
+        // No equal attr found; create a new one.
         let name = CString::new(name).unwrap();
         let value = value.map(|v| CString::new(v).unwrap());
         xml_new_prop_internal(
@@ -1694,7 +1698,7 @@ impl XmlNode {
         } else {
             null_mut()
         };
-        let prop: XmlAttrPtr = self.get_prop_node_internal(
+        let prop = self.get_prop_node_internal(
             name,
             (!href.is_null())
                 .then(|| CStr::from_ptr(href).to_string_lossy())
@@ -1726,7 +1730,7 @@ impl XmlNode {
     pub unsafe fn set_base(&mut self, uri: Option<&str>) {
         use std::ffi::CStr;
 
-        use crate::{libxml::uri::xml_path_to_uri, tree::XmlDocPtr};
+        use crate::libxml::uri::xml_path_to_uri;
 
         match self.element_type() {
             XmlElementType::XmlTextNode
@@ -1749,9 +1753,9 @@ impl XmlNode {
             }
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                let doc = self as *mut XmlNode as XmlDocPtr;
+                let doc = self.as_document_node().unwrap().as_mut();
 
-                (*doc).url = uri.and_then(|uri| {
+                doc.url = uri.and_then(|uri| {
                     let uri = CString::new(uri).unwrap();
                     let uri = xml_path_to_uri(uri.as_ptr() as *const u8);
                     (!uri.is_null()).then(|| {
@@ -1767,8 +1771,7 @@ impl XmlNode {
             _ => unreachable!(),
         }
 
-        let ns: XmlNsPtr =
-            self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
+        let ns = self.search_ns_by_href(self.document(), XML_XML_NAMESPACE.to_str().unwrap());
         if ns.is_null() {
             return;
         }
@@ -1823,7 +1826,7 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
+        let ns = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
         if ns.is_null() {
             return;
         }
@@ -1859,7 +1862,7 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             _ => unreachable!(),
         }
-        let ns: XmlNsPtr = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
+        let ns = self.search_ns_by_href(self.doc, XML_XML_NAMESPACE.to_str().unwrap());
         if ns.is_null() {
             return;
         }
@@ -1920,8 +1923,8 @@ impl XmlNode {
                 if let Some(children) = self.children() {
                     xml_free_node_list(children.as_ptr());
                 }
-                self.last = None;
-                self.children = None;
+                self.set_last(None);
+                self.set_children(None);
                 if !content.is_null() {
                     self.content = xml_strdup(content);
                 } else {
@@ -2042,7 +2045,7 @@ impl XmlNode {
                 null_mut()
             };
 
-            if matches!(self.typ, XmlElementType::XmlElementNode) {
+            if matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 prop = self.properties;
                 while !prop.is_null() {
                     if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
@@ -2101,12 +2104,12 @@ impl XmlNode {
         if self.element_type() == XmlElementType::XmlNamespaceDecl {
             return;
         }
-        let mut cur = self as *mut XmlNode;
-        while !cur.is_null() {
-            if (*cur).document() != doc {
-                (*cur).set_doc(doc);
+        let mut cur = NodePtr::from_ptr(self as *mut XmlNode);
+        while let Some(mut now) = cur {
+            if now.document() != doc {
+                now.set_doc(doc);
             }
-            cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+            cur = now.next();
         }
     }
 
@@ -2146,7 +2149,7 @@ impl XmlNode {
             if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
                 // return attribute declaration only if a default value is given
                 // (that includes #FIXED declarations)
-                return attr_decl as _;
+                return attr_decl as *mut XmlAttr;
             }
         }
         null_mut()
@@ -2185,10 +2188,11 @@ impl XmlNode {
             return null_mut();
         }
 
-        let mut cur = self as *mut XmlNode;
+        let cur = self as *mut XmlNode;
         if cur == elem {
             return null_mut();
         }
+        let mut cur = NodePtr::from_ptr(cur).unwrap();
 
         // Constant time is we can rely on the -> parent -> last to find the last sibling.
         if let Some(parent) = self.parent().filter(|p| {
@@ -2196,10 +2200,10 @@ impl XmlNode {
                 && p.children().is_some()
                 && p.last().filter(|l| l.next().is_none()).is_some()
         }) {
-            cur = parent.last().map_or(null_mut(), |l| l.as_ptr());
+            cur = parent.last().unwrap();
         } else {
-            while let Some(next) = (*cur).next() {
-                cur = next.as_ptr();
+            while let Some(next) = cur.next() {
+                cur = next;
             }
         }
 
@@ -2207,20 +2211,20 @@ impl XmlNode {
 
         if matches!((*cur).element_type(), XmlElementType::XmlTextNode)
             && matches!((*elem).element_type(), XmlElementType::XmlTextNode)
-            && (*cur).name == (*elem).name
+            && cur.name() == (*elem).name()
         {
             (*cur).add_content((*elem).content);
             xml_free_node(elem);
-            return cur;
+            return cur.as_ptr();
         } else if matches!((*elem).element_type(), XmlElementType::XmlAttributeNode) {
-            return add_prop_sibling(cur, cur, elem);
+            return add_prop_sibling(cur.as_ptr(), cur.as_ptr(), elem);
         }
 
-        if (*elem).document() != (*cur).document() {
+        if (*elem).document() != cur.document() {
             (*elem).set_doc((*cur).document());
         }
-        let parent = (*cur).parent();
-        (*elem).set_prev(NodePtr::from_ptr(cur));
+        let parent = cur.parent();
+        (*elem).set_prev(Some(cur));
         (*elem).set_next(None);
         (*elem).set_parent(parent);
         (*cur).set_next(NodePtr::from_ptr(elem));
