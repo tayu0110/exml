@@ -1040,7 +1040,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
 
         while (*cur).next.is_none() {
             if !insert_parent.is_null() {
-                (*insert_parent).last = NodePtr::from_ptr(insert_last);
+                (*insert_parent).set_last(NodePtr::from_ptr(insert_last));
             }
             cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
             if cur == elem {

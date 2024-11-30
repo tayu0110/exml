@@ -555,10 +555,10 @@ impl XmlTextReader {
                     if self.preserves == 0
                         && f
                         && self.ent_nr == 0
-                        && (*self.node).last.is_some()
-                        && (*self.node).last.unwrap().extra & NODE_IS_PRESERVED as u16 == 0
+                        && (*self.node).last().is_some()
+                        && (*self.node).last().unwrap().extra & NODE_IS_PRESERVED as u16 == 0
                     {
-                        let tmp: XmlNodePtr = (*self.node).last.unwrap().as_ptr();
+                        let tmp: XmlNodePtr = (*self.node).last().unwrap().as_ptr();
                         (*tmp).unlink();
                         xml_text_reader_free_node(self, tmp);
                     }
@@ -1408,7 +1408,7 @@ impl XmlTextReader {
                         let mut tmp: XmlNodePtr;
                         if self.ent_nr == 0 {
                             while {
-                                tmp = (*node).last.map_or(null_mut(), |l| l.as_ptr());
+                                tmp = (*node).last().map_or(null_mut(), |l| l.as_ptr());
                                 !tmp.is_null()
                             } {
                                 if (*tmp).extra & NODE_IS_PRESERVED as u16 == 0 {

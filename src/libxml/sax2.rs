@@ -3186,15 +3186,13 @@ unsafe extern "C" fn xml_sax2_text(
     if ctxt.is_null() {
         return;
     }
-    /*
-     * Handle the data if any. If there is no child
-     * add it as content, otherwise if the last child is text,
-     * concatenate it, else create a new node of type text.
-     */
+    // Handle the data if any. If there is no child
+    // add it as content, otherwise if the last child is text,
+    // concatenate it, else create a new node of type text.
     if (*ctxt).node.is_null() {
         return;
     }
-    let mut last_child = (*(*ctxt).node).last.map_or(null_mut(), |l| l.as_ptr());
+    let mut last_child = (*(*ctxt).node).last().map_or(null_mut(), |l| l.as_ptr());
 
     /*
      * Here we needed an accelerator mechanism in case of very large
@@ -3208,7 +3206,7 @@ unsafe extern "C" fn xml_sax2_text(
         }
         if !last_child.is_null() {
             (*(*ctxt).node).set_children(NodePtr::from_ptr(last_child));
-            (*(*ctxt).node).last = NodePtr::from_ptr(last_child);
+            (*(*ctxt).node).set_last(NodePtr::from_ptr(last_child));
             (*last_child).parent = NodePtr::from_ptr((*ctxt).node);
             (*last_child).doc = (*(*ctxt).node).doc;
             (*ctxt).nodelen = len;

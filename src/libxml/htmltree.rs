@@ -1185,7 +1185,7 @@ pub unsafe fn html_node_dump_format_output(
                             children.element_type(),
                             HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                         )
-                        && (*cur).children() != (*cur).last
+                        && (*cur).children() != (*cur).last()
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
                     /* p, pre, param */
@@ -1335,10 +1335,10 @@ pub unsafe fn html_node_dump_format_output(
                     && !info.is_null()
                     && (*info).isinline == 0
                     && !matches!(
-                        (*cur).last.unwrap().element_type(),
+                        (*cur).last().unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     )
-                    && (*cur).children() != (*cur).last
+                    && (*cur).children() != (*cur).last()
                     && !(*cur).name.is_null()
                     && *(*cur).name.add(0) != b'p'
                 /* p, pre, param */

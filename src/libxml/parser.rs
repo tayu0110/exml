@@ -4310,13 +4310,11 @@ pub unsafe fn xml_parse_in_node_context(
         ret = XmlParserErrors::XmlErrOK;
     }
 
-    /*
-     * Return the newly created nodeset after unlinking it from
-     * the pseudo sibling.
-     */
+    // Return the newly created nodeset after unlinking it from
+    // the pseudo sibling.
 
     cur = (*fake).next.take().map_or(null_mut(), |n| n.as_ptr());
-    (*node).last = NodePtr::from_ptr(fake);
+    (*node).set_last(NodePtr::from_ptr(fake));
 
     if !cur.is_null() {
         (*cur).prev = None;

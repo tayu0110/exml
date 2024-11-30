@@ -6231,7 +6231,7 @@ unsafe extern "C" fn xml_xpath_next_preceding_internal(
         (*ctxt).ancestor = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     }
     cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
-    while let Some(last) = (*cur).last {
+    while let Some(last) = (*cur).last() {
         cur = last.as_ptr();
     }
     cur
@@ -6242,19 +6242,15 @@ unsafe extern "C" fn xml_xpath_is_positional_predicate(
     op: XmlXPathStepOpPtr,
     max_pos: *mut i32,
 ) -> i32 {
-    /*
-     * BIG NOTE: This is not intended for XPATH_OP_FILTER yet!
-     */
+    // BIG NOTE: This is not intended for XPATH_OP_FILTER yet!
 
-    /*
-     * If not -1, then ch1 will point to:
-     * 1) For predicates (XPATH_OP_PREDICATE):
-     *    - an inner predicate operator
-     * 2) For filters (XPATH_OP_FILTER):
-     *    - an inner filter operator OR
-     *    - an expression selecting the node set.
-     *      E.g. "key('a', 'b')" or "(//foo | //bar)".
-     */
+    // If not -1, then ch1 will point to:
+    // 1) For predicates (XPATH_OP_PREDICATE):
+    //    - an inner predicate operator
+    // 2) For filters (XPATH_OP_FILTER):
+    //    - an inner filter operator OR
+    //    - an expression selecting the node set.
+    //      E.g. "key('a', 'b')" or "(//foo | //bar)".
     if !matches!(
         (*op).op,
         XmlXPathOp::XpathOpPredicate | XmlXPathOp::XpathOpFilter
@@ -11373,7 +11369,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding(
     loop {
         if let Some(prev) = (*cur).prev {
             cur = prev.as_ptr();
-            while let Some(last) = (*cur).last {
+            while let Some(last) = (*cur).last() {
                 cur = last.as_ptr();
             }
             return cur;

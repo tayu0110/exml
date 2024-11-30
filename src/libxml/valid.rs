@@ -7487,7 +7487,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         null_mut()
     };
     let parent_childs: *mut XmlNode = (*parent).children().map_or(null_mut(), |c| c.as_ptr());
-    let parent_last: *mut XmlNode = (*parent).last.map_or(null_mut(), |l| l.as_ptr());
+    let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
 
     /*
      * Creates a dummy node and insert it into the tree
@@ -7516,7 +7516,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     if !next.is_null() {
         (*next).prev = NodePtr::from_ptr(test_node);
     } else {
-        (*parent).last = NodePtr::from_ptr(test_node);
+        (*parent).set_last(NodePtr::from_ptr(test_node));
     }
 
     /*
@@ -7554,7 +7554,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         (*next).prev = NodePtr::from_ptr(next_prev);
     }
     (*parent).set_children(NodePtr::from_ptr(parent_childs));
-    (*parent).last = NodePtr::from_ptr(parent_last);
+    (*parent).set_last(NodePtr::from_ptr(parent_last));
 
     // Free up the dummy node
     (*test_node).name = name;
