@@ -104,35 +104,36 @@ pub trait NodeCommon {
         if doc.is_null() {
             doc = self.document();
         }
-        let mut cur = self as *const Self as *const XmlNode;
+        let mut cur = NodePtr::from_ptr(self as *const Self as *mut XmlNode);
         if !doc.is_null() && matches!((*doc).element_type(), XmlElementType::XmlHTMLDocumentNode) {
-            cur = (*doc).children().map_or(null_mut(), |c| c.as_ptr());
-            while let Some(name) = (!cur.is_null()).then(|| (*cur).name()).flatten() {
-                if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                    cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+            cur = (*doc).children();
+            while let Some(now) = cur.filter(|cur| cur.name().is_some()) {
+                if !matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                    cur = now.next();
                     continue;
                 }
+                let name = now.name().unwrap();
                 if name.to_ascii_lowercase() == "html" {
-                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+                    cur = now.children();
                     continue;
                 }
                 if name.to_ascii_lowercase() == "head" {
-                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+                    cur = now.children();
                     continue;
                 }
                 if name.to_ascii_lowercase() == "base" {
-                    return (*cur).get_prop("href");
+                    return now.get_prop("href");
                 }
-                cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+                cur = now.next();
             }
             return null_mut();
         }
-        while !cur.is_null() {
-            if let Some(ent) = self.as_entity_decl_node() {
+        while let Some(now) = cur {
+            if let Some(ent) = now.as_entity_decl_node() {
                 return xml_strdup(ent.as_ref().uri.load(Ordering::Relaxed));
             }
-            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                base = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
                 if !base.is_null() {
                     if !oldbase.is_null() {
                         newbase = xml_build_uri(oldbase, base);
@@ -156,7 +157,7 @@ pub trait NodeCommon {
                     }
                 }
             }
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = now.parent();
         }
         if !doc.is_null() && (*doc).url.is_some() {
             let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
