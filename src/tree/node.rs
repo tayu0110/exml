@@ -231,6 +231,39 @@ pub trait NodeCommon {
         oldbase
     }
 
+    unsafe fn get_prop_node_value_internal(&self) -> *mut XmlChar {
+        if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
+            // Note that we return at least the empty string.
+            // TODO: Do we really always want that?
+            if let Some(children) = self.children() {
+                if children.next().is_none()
+                    && matches!(
+                        children.element_type(),
+                        XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
+                    )
+                {
+                    // Optimization for the common case: only 1 text node.
+                    return xml_strdup(children.content);
+                } else {
+                    let ret: *mut XmlChar = children.get_string(self.document(), 1);
+                    if !ret.is_null() {
+                        return ret;
+                    }
+                }
+            }
+            xml_strdup(c"".as_ptr() as _)
+        } else if matches!(self.element_type(), XmlElementType::XmlAttributeDecl) {
+            xml_strdup(
+                self.as_attribute_decl_node()
+                    .unwrap()
+                    .as_ref()
+                    .default_value,
+            )
+        } else {
+            null_mut()
+        }
+    }
+
     /// Search the last child of a node.
     /// Returns the last child or null_mut() if none.
     #[doc(alias = "xmlGetLastChild")]
