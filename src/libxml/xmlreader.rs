@@ -3744,7 +3744,7 @@ unsafe extern "C" fn xml_text_reader_free_prop_list(
 #[doc(alias = "xmlTextReaderFreeNodeList")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mut cur: XmlNodePtr) {
-    use crate::tree::NodePtr;
+    use crate::tree::{NodeCommon, NodePtr};
 
     let mut next: XmlNodePtr;
     let mut parent: XmlNodePtr;
@@ -3758,22 +3758,22 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
     if cur.is_null() {
         return;
     }
-    if (*cur).typ == XmlElementType::XmlNamespaceDecl {
+    if (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         xml_free_ns_list(cur as XmlNsPtr);
         return;
     }
     if matches!(
-        (*cur).typ,
+        (*cur).element_type(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
     ) {
-        xml_free_doc(cur as XmlDocPtr);
+        xml_free_doc((*cur).as_document_node().unwrap().as_ptr());
         return;
     }
     loop {
-        while let Some(children) = (*cur).children.filter(|children| {
-            children.parent == NodePtr::from_ptr(cur)
+        while let Some(children) = (*cur).children().filter(|children| {
+            children.parent() == NodePtr::from_ptr(cur)
                 && !matches!(
-                    (*cur).typ,
+                    (*cur).element_type(),
                     XmlElementType::XmlDTDNode | XmlElementType::XmlEntityRefNode
                 )
         }) {
@@ -3781,11 +3781,11 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
             depth += 1;
         }
 
-        next = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-        parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+        next = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+        parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
         /* unroll to speed up freeing the document */
-        if (*cur).typ != XmlElementType::XmlDTDNode {
+        if (*cur).element_type() != XmlElementType::XmlDTDNode {
             if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
                 // if let Some(f) = xmlDeregisterNodeDefaultValue {
                 //     f(cur as _);
@@ -3794,7 +3794,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
             }
 
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
@@ -3804,7 +3804,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
             }
             if (*cur).content != addr_of_mut!((*cur).properties) as _
                 && !matches!(
-                    (*cur).typ,
+                    (*cur).element_type(),
                     XmlElementType::XmlElementNode
                         | XmlElementType::XmlXIncludeStart
                         | XmlElementType::XmlXIncludeEnd
@@ -3814,7 +3814,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
                 DICT_FREE!(dict, (*cur).content);
             }
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlElementNode
                     | XmlElementType::XmlXIncludeStart
                     | XmlElementType::XmlXIncludeEnd
@@ -3827,13 +3827,13 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
              * we don't free element names here they are interned now
              */
             if !matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCommentNode
             ) {
                 DICT_FREE!(dict, (*cur).name);
             }
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlElementNode | XmlElementType::XmlTextNode
             ) && !reader.is_null()
                 && !(*reader).ctxt.is_null()
@@ -3855,7 +3855,7 @@ unsafe extern "C" fn xml_text_reader_free_node_list(reader: XmlTextReaderPtr, mu
             }
             depth -= 1;
             cur = parent;
-            (*cur).children = None;
+            (*cur).set_children(None);
         }
     }
 }

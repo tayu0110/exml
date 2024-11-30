@@ -6121,40 +6121,36 @@ unsafe extern "C" fn xml_xpath_next_child_element(
         if cur.is_null() {
             return null_mut();
         }
-        /*
-        	* Get the first element child.
-        	*/
-        match (*cur).typ {
+        // Get the first element child.
+        match (*cur).element_type() {
             XmlElementType::XmlElementNode
             | XmlElementType::XmlDocumentFragNode
             /* URGENT TODO: entify-refs as well? */
             | XmlElementType::XmlEntityRefNode
             | XmlElementType::XmlEntityNode => {
-                cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+                cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
                 if !cur.is_null() {
-                    if matches!((*cur).typ, XmlElementType::XmlElementNode) {
+                    if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                         return cur;
                     }
                     while {
-                        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-                        !cur.is_null() && !matches!((*cur).typ, XmlElementType::XmlElementNode)
+                        cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+                        !cur.is_null() && !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                     } {}
                     return cur;
                 }
                 return null_mut();
             }
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                return (*(cur as XmlDocPtr)).get_root_element();
+                return (*cur).as_document_node().unwrap().as_ref().get_root_element();
             }
             _ => {
                 return null_mut();
             }
         }
     }
-    /*
-     * Get the next sibling element node.
-     */
-    match (*cur).typ {
+    // Get the next sibling element node.
+    match (*cur).element_type() {
         XmlElementType::XmlElementNode
         | XmlElementType::XmlTextNode
         | XmlElementType::XmlEntityRefNode
@@ -9516,8 +9512,12 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
         return 0;
     }
 
-    if matches!((*node).typ, XmlElementType::XmlDocumentNode) {
-        tmp = (*(node as XmlDocPtr)).get_root_element();
+    if matches!((*node).element_type(), XmlElementType::XmlDocumentNode) {
+        tmp = (*node)
+            .as_document_node()
+            .unwrap()
+            .as_ref()
+            .get_root_element();
         if tmp.is_null() {
             node = (*node).children.map_or(null_mut(), |c| c.as_ptr());
         } else {
@@ -9529,7 +9529,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
         }
     }
 
-    match (*node).typ {
+    match (*node).element_type() {
         XmlElementType::XmlCommentNode
         | XmlElementType::XmlPINode
         | XmlElementType::XmlCDATASectionNode
@@ -9569,7 +9569,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
         }
     }
     while !tmp.is_null() {
-        match (*tmp).typ {
+        match (*tmp).element_type() {
             XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                 string = (*tmp).content;
             }
@@ -9590,8 +9590,8 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
         }
         // Skip to next node
         if let Some(children) = (*tmp).children.filter(|children| {
-            !matches!((*tmp).typ, XmlElementType::XmlDTDNode)
-                && !matches!(children.typ, XmlElementType::XmlEntityDecl)
+            !matches!((*tmp).element_type(), XmlElementType::XmlDTDNode)
+                && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
         }) {
             tmp = children.as_ptr();
             continue;
@@ -10871,7 +10871,10 @@ pub unsafe extern "C" fn xml_xpath_next_child(
             | XmlElementType::XmlDocumentTypeNode
             | XmlElementType::XmlDocumentFragNode
             | XmlElementType::XmlHTMLDocumentNode => {
-                return (*((*(*ctxt).context).node as XmlDocPtr))
+                return (*(*(*ctxt).context).node)
+                    .as_document_node()
+                    .unwrap()
+                    .as_ref()
                     .children
                     .map_or(null_mut(), |c| c.as_ptr());
             }

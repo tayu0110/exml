@@ -1348,8 +1348,11 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                 }
                 match (*(*(*set).node_tab.add(i as usize))).typ {
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                        node =
-                            (*(*(*set).node_tab.add(i as usize) as XmlDocPtr)).get_root_element();
+                        node = (*(*(*set).node_tab.add(i as usize)))
+                            .as_document_node()
+                            .unwrap()
+                            .as_ref()
+                            .get_root_element();
                         if node.is_null() {
                             xml_xinclude_err(
                                 ctxt,

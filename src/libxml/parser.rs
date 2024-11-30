@@ -4173,7 +4173,7 @@ pub unsafe fn xml_parse_in_node_context(
     let doc = if (*node).typ == XmlElementType::XmlElementNode {
         (*node).doc
     } else {
-        node as XmlDocPtr
+        (*node).as_document_node().unwrap().as_ptr()
     };
     if doc.is_null() {
         return XmlParserErrors::XmlErrInternalError;

@@ -319,7 +319,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         )
     {
-        let old_ns: XmlNsPtr = (*(node as XmlDocPtr)).old_ns;
+        let old_ns: XmlNsPtr = (*node).as_document_node().unwrap().as_ref().old_ns;
         if old_ns == ns {
             return 1;
         }
@@ -1921,7 +1921,10 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
             list = (*node).children.map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            list = (*(node as XmlDocPtr))
+            list = (*node)
+                .as_document_node()
+                .unwrap()
+                .as_ref()
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         }
@@ -2083,7 +2086,11 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
     };
     let mut boxed = Box::new(fp);
     if (*node).typ == XmlElementType::XmlDocumentNode {
-        (*(node as XmlDocPtr)).dump_file(&mut boxed);
+        (*node)
+            .as_document_node()
+            .unwrap()
+            .as_mut()
+            .dump_file(&mut boxed);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr_list(&mut boxed, (*node).as_attribute_node().unwrap().as_ptr(), 0);
     } else {
@@ -2174,7 +2181,10 @@ pub unsafe extern "C" fn xml_shell_list(
     if (*node).typ == XmlElementType::XmlDocumentNode
         || (*node).typ == XmlElementType::XmlHTMLDocumentNode
     {
-        cur = (*(node as XmlDocPtr))
+        cur = (*node)
+            .as_document_node()
+            .unwrap()
+            .as_ref()
             .children
             .map_or(null_mut(), |c| c.as_ptr());
     } else if (*node).typ == XmlElementType::XmlNamespaceDecl {
@@ -2249,7 +2259,10 @@ pub unsafe extern "C" fn xml_shell_dir(
     if (*node).typ == XmlElementType::XmlDocumentNode
         || (*node).typ == XmlElementType::XmlHTMLDocumentNode
     {
-        xml_debug_dump_document_head(Some(&mut (*ctxt).output), node as XmlDocPtr);
+        xml_debug_dump_document_head(
+            Some(&mut (*ctxt).output),
+            (*node).as_document_node().unwrap().as_ptr(),
+        );
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr(
             &mut (*ctxt).output,
@@ -2369,12 +2382,20 @@ pub unsafe extern "C" fn xml_shell_cat(
         }
         #[cfg(not(feature = "html"))]
         if (*node).typ == XmlElementType::XmlDocumentNode {
-            (*(node as XmlDocPtr)).dump_file((*ctxt).output);
+            (*node)
+                .as_document_node()
+                .unwrap()
+                .as_mut()
+                .dump_file((*ctxt).output);
         } else {
             xml_elem_dump((*ctxt).output, (*ctxt).doc, node);
         }
     } else if (*node).typ == XmlElementType::XmlDocumentNode {
-        (*(node as XmlDocPtr)).dump_file(&mut (*ctxt).output);
+        (*node)
+            .as_document_node()
+            .unwrap()
+            .as_mut()
+            .dump_file(&mut (*ctxt).output);
     } else {
         (*node).dump_file(&mut (*ctxt).output, (*ctxt).doc);
     }
@@ -2602,7 +2623,10 @@ pub unsafe extern "C" fn xml_shell_du(
         if (*node).typ == XmlElementType::XmlDocumentNode
             || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
-            node = (*(node as XmlDocPtr))
+            node = (*node)
+                .as_document_node()
+                .unwrap()
+                .as_ref()
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         } else if let Some(children) = (*node)
@@ -2794,7 +2818,10 @@ unsafe extern "C" fn xml_shell_grep(
         if (*node).typ == XmlElementType::XmlDocumentNode
             || (*node).typ == XmlElementType::XmlHTMLDocumentNode
         {
-            node = (*(node as XmlDocPtr))
+            node = (*node)
+                .as_document_node()
+                .unwrap()
+                .as_ref()
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         } else if let Some(children) = (*node)

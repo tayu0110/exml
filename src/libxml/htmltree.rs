@@ -1110,7 +1110,13 @@ pub unsafe fn html_node_dump_format_output(
     'main: loop {
         match (*cur).typ {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
-                if !(*(cur as XmlDocPtr)).int_subset.is_null() {
+                if !(*cur)
+                    .as_document_node()
+                    .unwrap()
+                    .as_ref()
+                    .int_subset
+                    .is_null()
+                {
                     html_dtd_dump_output(buf, cur as _, null_mut());
                 }
                 if let Some(children) = (*cur).children {
