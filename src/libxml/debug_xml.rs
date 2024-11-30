@@ -1200,7 +1200,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             }
         }
         XmlElementType::XmlDTDNode => {
-            xml_ctxt_dump_dtd_node(ctxt, node as XmlDtdPtr);
+            xml_ctxt_dump_dtd_node(ctxt, (*node).as_dtd_node().unwrap().as_ptr());
             return;
         }
         XmlElementType::XmlElementDecl => {

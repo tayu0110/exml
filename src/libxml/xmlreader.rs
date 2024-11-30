@@ -761,7 +761,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadOuterXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
-        use crate::buf::XmlBufRef;
+        use crate::{buf::XmlBufRef, tree::NodeCommon};
 
         let mut node: XmlNodePtr;
 
@@ -772,7 +772,7 @@ impl XmlTextReader {
         let doc: XmlDocPtr = (*node).doc;
         /* XXX: Why is the node copied? */
         if (*node).typ == XmlElementType::XmlDTDNode {
-            node = xml_copy_dtd(node as XmlDtdPtr) as XmlNodePtr;
+            node = xml_copy_dtd((*node).as_dtd_node().unwrap().as_ptr()) as XmlNodePtr;
         } else {
             node = xml_doc_copy_node(node, doc, 1);
         }
@@ -3910,7 +3910,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         null_mut()
     };
     if (*cur).typ == XmlElementType::XmlDTDNode {
-        xml_free_dtd(cur as XmlDtdPtr);
+        xml_free_dtd((*cur).as_dtd_node().unwrap().as_ptr());
         return;
     }
     if (*cur).typ == XmlElementType::XmlNamespaceDecl {

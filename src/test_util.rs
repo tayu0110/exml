@@ -796,7 +796,12 @@ unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
             && (*API_DOC.get()).children.is_some()
             && (*API_DOC.get()).children.unwrap().typ == XmlElementType::XmlDTDNode
         {
-            API_DTD.set((*API_DOC.get()).children.unwrap().as_ptr() as XmlDtdPtr);
+            API_DTD.set(
+                (*(*API_DOC.get()).children().unwrap().as_ptr())
+                    .as_dtd_node()
+                    .unwrap()
+                    .as_ptr(),
+            );
         }
     }
     API_DTD.get()

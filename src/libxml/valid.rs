@@ -4365,10 +4365,10 @@ extern "C" fn xml_validate_attribute_callback(
             }
             if elem.is_null()
                 && !(*cur).parent.is_null()
-                && matches!((*(*cur).parent).typ, XmlElementType::XmlDTDNode)
+                && matches!((*(*cur).parent).element_type(), XmlElementType::XmlDTDNode)
             {
                 elem = xml_get_dtd_element_desc(
-                    (*cur).parent as XmlDtdPtr,
+                    (*(*cur).parent).as_dtd_node().unwrap().as_ptr(),
                     cur_elem.as_ptr() as *const u8,
                 );
             }
