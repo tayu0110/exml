@@ -51,8 +51,9 @@ use super::{
     copy_string_for_new_dict_if_needed, xml_buf_cat, xml_buf_create, xml_buf_create_size,
     xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop,
     xml_is_blank_char, xml_new_doc_text_len, xml_ns_in_scope, xml_text_merge, xml_tree_err_memory,
-    XmlAttr, XmlAttrPtr, XmlAttributeType, XmlBufPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr,
-    XmlDtd, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlAttr, XmlAttrPtr, XmlAttribute, XmlAttributeType, XmlBufPtr, XmlBufferAllocationScheme,
+    XmlDoc, XmlDocPtr, XmlDtd, XmlElement, XmlElementType, XmlNs, XmlNsPtr, XML_CHECK_DTD,
+    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {
@@ -71,11 +72,56 @@ pub trait NodeCommon {
     fn document(&self) -> *mut XmlDoc;
     fn set_document(&mut self, doc: *mut XmlDoc);
 
+    fn as_node(&self) -> Option<NonNull<XmlNode>> {
+        // TODO: Remove unneeded types
+        match self.element_type() {
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => NonNull::new(self as *const Self as *mut XmlNode),
+            _ => None,
+        }
+    }
+    fn as_attribute_node(&self) -> Option<NonNull<XmlAttr>> {
+        match self.element_type() {
+            XmlElementType::XmlAttributeNode => NonNull::new(self as *const Self as *mut XmlAttr),
+            _ => None,
+        }
+    }
+    fn as_attribute_decl_node(&self) -> Option<NonNull<XmlAttribute>> {
+        match self.element_type() {
+            XmlElementType::XmlAttributeDecl => {
+                NonNull::new(self as *const Self as *mut XmlAttribute)
+            }
+            _ => None,
+        }
+    }
     fn as_document_node(&self) -> Option<NonNull<XmlDoc>> {
         match self.element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 NonNull::new(self as *const Self as *mut XmlDoc)
             }
+            _ => None,
+        }
+    }
+    fn as_dtd_node(&self) -> Option<NonNull<XmlDtd>> {
+        match self.element_type() {
+            XmlElementType::XmlDTDNode | XmlElementType::XmlDocumentTypeNode => {
+                NonNull::new(self as *const Self as *mut XmlDtd)
+            }
+            _ => None,
+        }
+    }
+    fn as_element_decl_node(&self) -> Option<NonNull<XmlElement>> {
+        match self.element_type() {
+            XmlElementType::XmlElementDecl => NonNull::new(self as *const Self as *mut XmlElement),
             _ => None,
         }
     }
