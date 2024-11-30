@@ -34,14 +34,14 @@ use crate::{
     libxml::{
         entities::{
             xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_get_doc_entity,
-            XmlEntityPtr,
+            XmlEntity, XmlEntityPtr,
         },
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
         valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc, xml_remove_id},
         xmlstring::{
-            xml_str_equal, xml_strcasecmp, xml_strcat, xml_strdup, xml_strlen, xml_strncat,
-            xml_strncat_new, xml_strncmp, XmlChar,
+            xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new,
+            xml_strncmp, XmlChar,
         },
     },
     tree::{xml_free_node_list, XmlAttributePtr},
@@ -71,10 +71,103 @@ pub trait NodeCommon {
     fn document(&self) -> *mut XmlDoc;
     fn set_document(&mut self, doc: *mut XmlDoc);
 
+    fn as_entity_decl_node(&self) -> Option<NonNull<XmlEntity>> {
+        match self.element_type() {
+            XmlElementType::XmlEntityDecl => NonNull::new(self as *const Self as *mut XmlEntity),
+            _ => None,
+        }
+    }
+
     /// Check whether this node is a Text node or not.
     #[doc(alias = "xmlNodeIsText")]
     fn is_text_node(&self) -> bool {
         matches!(self.element_type(), XmlElementType::XmlTextNode)
+    }
+
+    /// Searches for the BASE URL. The code should work on both XML
+    /// and HTML document even if base mechanisms are completely different.  
+    /// It returns the base as defined in RFC 2396 sections
+    /// 5.1.1. Base URI within Document Content and  5.1.2. Base URI from the Encapsulating Entity.  
+    /// However it does not return the document base (5.1.3), use `doc.url` in this case
+    ///
+    /// Returns a pointer to the base URL, or NULL if not found.  
+    /// It's up to the caller to free the memory with `xml_free()`.
+    #[doc(alias = "xmlNodeGetBase")]
+    unsafe fn get_base(&self, mut doc: *const XmlDoc) -> *mut XmlChar {
+        let mut oldbase: *mut XmlChar = null_mut();
+        let mut base: *mut XmlChar;
+        let mut newbase: *mut XmlChar;
+
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
+            return null_mut();
+        }
+        if doc.is_null() {
+            doc = self.document();
+        }
+        let mut cur = self as *const Self as *const XmlNode;
+        if !doc.is_null() && matches!((*doc).element_type(), XmlElementType::XmlHTMLDocumentNode) {
+            cur = (*doc).children().map_or(null_mut(), |c| c.as_ptr());
+            while let Some(name) = (!cur.is_null()).then(|| (*cur).name()).flatten() {
+                if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                    cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+                    continue;
+                }
+                if name.to_ascii_lowercase() == "html" {
+                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+                    continue;
+                }
+                if name.to_ascii_lowercase() == "head" {
+                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+                    continue;
+                }
+                if name.to_ascii_lowercase() == "base" {
+                    return (*cur).get_prop("href");
+                }
+                cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
+            }
+            return null_mut();
+        }
+        while !cur.is_null() {
+            if let Some(ent) = self.as_entity_decl_node() {
+                return xml_strdup(ent.as_ref().uri.load(Ordering::Relaxed));
+            }
+            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+                if !base.is_null() {
+                    if !oldbase.is_null() {
+                        newbase = xml_build_uri(oldbase, base);
+                        if !newbase.is_null() {
+                            xml_free(oldbase as _);
+                            xml_free(base as _);
+                            oldbase = newbase;
+                        } else {
+                            xml_free(oldbase as _);
+                            xml_free(base as _);
+                            return null_mut();
+                        }
+                    } else {
+                        oldbase = base;
+                    }
+                    if xml_strncmp(oldbase, c"http://".as_ptr() as _, 7) == 0
+                        || xml_strncmp(oldbase, c"ftp://".as_ptr() as _, 6) == 0
+                        || xml_strncmp(oldbase, c"urn:".as_ptr() as _, 4) == 0
+                    {
+                        return oldbase;
+                    }
+                }
+            }
+            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+        }
+        if !doc.is_null() && (*doc).url.is_some() {
+            let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
+            if oldbase.is_null() {
+                return xml_strdup(url.as_ptr() as *const u8);
+            }
+            newbase = xml_build_uri(oldbase, url.as_ptr() as *const u8);
+            xml_free(oldbase as _);
+            return newbase;
+        }
+        oldbase
     }
 
     /// Search the last child of a node.
@@ -468,7 +561,7 @@ impl XmlNode {
                         Cow::Owned(format!(
                             "{}:{}",
                             CStr::from_ptr((*(*cur).ns).prefix as *const i8).to_string_lossy(),
-                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy(),
+                            (*cur).name().unwrap(),
                         ))
                     } else {
                         // We cannot express named elements in the default
@@ -477,11 +570,7 @@ impl XmlNode {
                         "*".into()
                     };
                 } else {
-                    name = Cow::Owned(
-                        CStr::from_ptr((*cur).name as *const i8)
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
+                    name = (*cur).name().unwrap();
                 }
                 next = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
@@ -491,7 +580,7 @@ impl XmlNode {
                 while !tmp.is_null() {
                     if matches!((*tmp).element_type(), XmlElementType::XmlElementNode)
                         && (generic != 0
-                            || (xml_str_equal((*cur).name, (*tmp).name)
+                            || ((*cur).name() == (*tmp).name()
                                 && ((*tmp).ns == (*cur).ns
                                     || (!(*tmp).ns.is_null()
                                         && !(*cur).ns.is_null()
@@ -509,7 +598,7 @@ impl XmlNode {
                     while !tmp.is_null() && occur == 0 {
                         if matches!((*tmp).element_type(), XmlElementType::XmlElementNode)
                             && (generic != 0
-                                || (xml_str_equal((*cur).name, (*tmp).name)
+                                || ((*cur).name() == (*tmp).name()
                                     && (((*tmp).ns == (*cur).ns)
                                         || (!(*tmp).ns.is_null()
                                             && !(*cur).ns.is_null()
@@ -595,7 +684,7 @@ impl XmlNode {
                 sep = "/";
                 name = Cow::Owned(format!(
                     "processing-instruction('{}')",
-                    CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
+                    (*cur).name().unwrap()
                 ));
 
                 next = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -604,7 +693,7 @@ impl XmlNode {
                 tmp = (*cur).prev().map_or(null_mut(), |p| p.as_ptr());
                 while !tmp.is_null() {
                     if matches!((*tmp).element_type(), XmlElementType::XmlPINode)
-                        && xml_str_equal((*cur).name, (*tmp).name)
+                        && (*cur).name() == (*tmp).name()
                     {
                         occur += 1;
                     }
@@ -614,7 +703,7 @@ impl XmlNode {
                     tmp = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
                     while !tmp.is_null() && occur == 0 {
                         if matches!((*tmp).element_type(), XmlElementType::XmlPINode)
-                            && xml_str_equal((*cur).name, (*tmp).name)
+                            && (*cur).name() == (*tmp).name()
                         {
                             occur += 1;
                         }
@@ -633,21 +722,14 @@ impl XmlNode {
                         format!(
                             "{}:{}",
                             CStr::from_ptr((*(*cur).ns).prefix as *const i8).to_string_lossy(),
-                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
+                            (*cur).name().unwrap()
                         )
                         .into()
                     } else {
-                        format!(
-                            "{}",
-                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
-                        )
-                        .into()
+                        format!("{}", (*cur).name().unwrap()).into()
                     };
                 } else {
-                    name = CStr::from_ptr((*(cur as XmlAttrPtr)).name as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                        .into();
+                    name = (*(cur as XmlAttrPtr)).name().unwrap();
                 }
                 next = (*(cur as XmlAttrPtr))
                     .parent()
@@ -669,93 +751,6 @@ impl XmlNode {
             cur = next;
         }
         Some(buffer)
-    }
-
-    /// Searches for the BASE URL. The code should work on both XML
-    /// and HTML document even if base mechanisms are completely different.  
-    /// It returns the base as defined in RFC 2396 sections
-    /// 5.1.1. Base URI within Document Content and  5.1.2. Base URI from the Encapsulating Entity.  
-    /// However it does not return the document base (5.1.3), use `doc.url` in this case
-    ///
-    /// Returns a pointer to the base URL, or NULL if not found.  
-    /// It's up to the caller to free the memory with `xml_free()`.
-    #[doc(alias = "xmlNodeGetBase")]
-    pub unsafe fn get_base(&self, mut doc: *const XmlDoc) -> *mut XmlChar {
-        let mut oldbase: *mut XmlChar = null_mut();
-        let mut base: *mut XmlChar;
-        let mut newbase: *mut XmlChar;
-
-        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
-        }
-        if doc.is_null() {
-            doc = self.document();
-        }
-        let mut cur = self as *const XmlNode;
-        if !doc.is_null() && matches!((*doc).element_type(), XmlElementType::XmlHTMLDocumentNode) {
-            cur = (*doc).children().map_or(null_mut(), |c| c.as_ptr());
-            while !cur.is_null() && !(*cur).name.is_null() {
-                if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                    cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
-                    continue;
-                }
-                if xml_strcasecmp((*cur).name, c"html".as_ptr() as _) == 0 {
-                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-                    continue;
-                }
-                if xml_strcasecmp((*cur).name, c"head".as_ptr() as _) == 0 {
-                    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
-                    continue;
-                }
-                if xml_strcasecmp((*cur).name, c"base".as_ptr() as _) == 0 {
-                    return (*cur).get_prop("href");
-                }
-                cur = (*cur).next().map_or(null_mut(), |n| n.as_ptr());
-            }
-            return null_mut();
-        }
-        while !cur.is_null() {
-            if matches!((*cur).element_type(), XmlElementType::XmlEntityDecl) {
-                let ent = cur as XmlEntityPtr;
-                return xml_strdup((*ent).uri.load(Ordering::Relaxed));
-            }
-            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-                if !base.is_null() {
-                    if !oldbase.is_null() {
-                        newbase = xml_build_uri(oldbase, base);
-                        if !newbase.is_null() {
-                            xml_free(oldbase as _);
-                            xml_free(base as _);
-                            oldbase = newbase;
-                        } else {
-                            xml_free(oldbase as _);
-                            xml_free(base as _);
-                            return null_mut();
-                        }
-                    } else {
-                        oldbase = base;
-                    }
-                    if xml_strncmp(oldbase, c"http://".as_ptr() as _, 7) == 0
-                        || xml_strncmp(oldbase, c"ftp://".as_ptr() as _, 6) == 0
-                        || xml_strncmp(oldbase, c"urn:".as_ptr() as _, 4) == 0
-                    {
-                        return oldbase;
-                    }
-                }
-            }
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
-        }
-        if !doc.is_null() && (*doc).url.is_some() {
-            let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
-            if oldbase.is_null() {
-                return xml_strdup(url.as_ptr() as *const u8);
-            }
-            newbase = xml_build_uri(oldbase, url.as_ptr() as *const u8);
-            xml_free(oldbase as _);
-            return newbase;
-        }
-        oldbase
     }
 
     /// Read the value of a node, this can be either the text carried

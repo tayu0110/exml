@@ -34,7 +34,7 @@ use exml::{
             XmlXPathContext,
         },
     },
-    tree::{xml_free_doc, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
+    tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
 };
 use libc::{fdopen, snprintf, strcmp};
 

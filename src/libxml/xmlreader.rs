@@ -2509,6 +2509,8 @@ impl XmlTextReader {
     pub unsafe fn base_uri(&self) -> Option<String> {
         use std::ffi::CStr;
 
+        use crate::tree::NodeCommon;
+
         if self.node.is_null() {
             return None;
         }
@@ -4114,6 +4116,8 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
 pub unsafe extern "C" fn xml_text_reader_const_base_uri(
     reader: &mut XmlTextReader,
 ) -> *const XmlChar {
+    use crate::tree::NodeCommon;
+
     if reader.node.is_null() {
         return null_mut();
     }
@@ -5761,6 +5765,8 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
     /* we know that locator is a xmlParserCtxtPtr */
 
     use std::ffi::CString;
+
+    use crate::tree::NodeCommon;
     let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
     let ret: *mut XmlChar;
 

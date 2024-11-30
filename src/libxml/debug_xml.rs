@@ -2201,7 +2201,7 @@ pub unsafe extern "C" fn xml_shell_base(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use crate::libxml::globals::xml_free;
+    use crate::{libxml::globals::xml_free, tree::NodeCommon};
 
     if ctxt.is_null() {
         return 0;
