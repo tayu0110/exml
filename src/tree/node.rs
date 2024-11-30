@@ -369,7 +369,7 @@ impl XmlNode {
         }
 
         if matches!(
-            self.typ,
+            self.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlTextNode
                 | XmlElementType::XmlCommentNode
@@ -439,7 +439,7 @@ impl XmlNode {
         let mut occur: i32;
         let mut generic: i32;
 
-        if matches!(self.typ, XmlElementType::XmlNamespaceDecl) {
+        if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return None;
         }
 

@@ -18,7 +18,7 @@
 //
 // daniel@veillard.com
 
-use std::{os::raw::c_void, ptr::null_mut};
+use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut};
 
 use libc::memset;
 
@@ -28,8 +28,8 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_tree_err_memory, XmlDoc, XmlElementType, XmlNodePtr, XmlNsType, XML_LOCAL_NAMESPACE,
-    XML_XML_NAMESPACE,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlElementType, XmlNode, XmlNodePtr,
+    XmlNsType, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 /// An XML namespace.
@@ -59,6 +59,44 @@ impl Default for XmlNs {
             context: null_mut(),
         }
     }
+}
+
+impl NodeCommon for XmlNs {
+    fn document(&self) -> *mut XmlDoc {
+        self.context
+    }
+    fn set_document(&mut self, doc: *mut XmlDoc) {
+        self.context = doc;
+    }
+    fn element_type(&self) -> XmlElementType {
+        self.typ
+    }
+    fn name(&self) -> Option<Cow<'_, str>> {
+        (!self.href.is_null())
+            .then(|| unsafe { CStr::from_ptr(self.href as *const i8).to_string_lossy() })
+    }
+    fn children(&self) -> Option<NodePtr> {
+        None
+    }
+    fn set_children(&mut self, _children: Option<NodePtr>) {}
+    fn last(&self) -> Option<NodePtr> {
+        None
+    }
+    fn set_last(&mut self, _last: Option<NodePtr>) {}
+    fn next(&self) -> Option<NodePtr> {
+        NodePtr::from_ptr(self.next as *mut XmlNode)
+    }
+    fn set_next(&mut self, next: Option<NodePtr>) {
+        self.next = next.map_or(null_mut(), |p| p.as_ptr() as *mut XmlNs);
+    }
+    fn prev(&self) -> Option<NodePtr> {
+        None
+    }
+    fn set_prev(&mut self, _prev: Option<NodePtr>) {}
+    fn parent(&self) -> Option<NodePtr> {
+        None
+    }
+    fn set_parent(&mut self, _parent: Option<NodePtr>) {}
 }
 
 /// Creation of a new Namespace. This function will refuse to create
