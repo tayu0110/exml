@@ -1555,7 +1555,7 @@ macro_rules! __xml_raise_error {
                             if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                                 break;
                             }
-                            node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+                            node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
                         }
                         if baseptr.is_null() && !node.is_null() && !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
                             baseptr = node;
@@ -1569,9 +1569,7 @@ macro_rules! __xml_raise_error {
                         }
                     }
 
-                    /*
-                     * Save the information about the error
-                     */
+                    // Save the information about the error
                     to.reset();
                     to.domain = domain;
                     to.code = code;
@@ -1582,11 +1580,9 @@ macro_rules! __xml_raise_error {
                     } else if !baseptr.is_null() {
                         #[cfg(feature = "xinclude")]
                         {
-                            /*
-                             * We check if the error is within an XInclude section and,
-                             * if so, attempt to print out the href of the XInclude instead
-                             * of the usual "base" (doc->URL) for the node (bug 152623).
-                             */
+                            // We check if the error is within an XInclude section and,
+                            // if so, attempt to print out the href of the XInclude instead
+                            // of the usual "base" (doc->URL) for the node (bug 152623).
                             let mut prev: XmlNodePtr = baseptr;
                             let mut href: *mut c_char = null_mut();
                             let mut inclcount: c_int = 0;
@@ -1606,7 +1602,7 @@ macro_rules! __xml_raise_error {
                                         inclcount += 1;
                                     }
                                 } else {
-                                    prev = (*prev).parent.map_or(null_mut(), |p| p.as_ptr());
+                                    prev = (*prev).parent().map_or(null_mut(), |p| p.as_ptr());
                                 }
                             }
                             if !href.is_null() {

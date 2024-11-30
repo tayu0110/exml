@@ -288,17 +288,17 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             return 1;
         }
         if xml_str_equal((*node).name, XINCLUDE_FALLBACK.as_ptr() as _)
-            && ((*node).parent.is_none()
-                || (*node).parent.unwrap().element_type() != XmlElementType::XmlElementNode
-                || (*node).parent.unwrap().ns.is_null()
+            && ((*node).parent().is_none()
+                || (*node).parent().unwrap().element_type() != XmlElementType::XmlElementNode
+                || (*node).parent().unwrap().ns.is_null()
                 || (!xml_str_equal(
-                    (*(*node).parent.unwrap().ns).href,
+                    (*(*node).parent().unwrap().ns).href,
                     XINCLUDE_NS.as_ptr() as _,
                 ) && !xml_str_equal(
-                    (*(*node).parent.unwrap().ns).href,
+                    (*(*node).parent().unwrap().ns).href,
                     XINCLUDE_OLD_NS.as_ptr() as _,
                 ))
-                || !xml_str_equal((*node).parent.unwrap().name, XINCLUDE_NODE.as_ptr() as _))
+                || !xml_str_equal((*node).parent().unwrap().name, XINCLUDE_NODE.as_ptr() as _))
         {
             xml_xinclude_err(
                 ctxt,
@@ -1042,12 +1042,12 @@ unsafe extern "C" fn xml_xinclude_copy_node(
             if !insert_parent.is_null() {
                 (*insert_parent).set_last(NodePtr::from_ptr(insert_last));
             }
-            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
             if cur == elem {
                 return result;
             }
             insert_last = insert_parent;
-            insert_parent = (*insert_parent).parent.map_or(null_mut(), |p| p.as_ptr());
+            insert_parent = (*insert_parent).parent().map_or(null_mut(), |p| p.as_ptr());
         }
 
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
@@ -2462,7 +2462,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
 
     // Check against the risk of generating a multi-rooted document
     if (*cur)
-        .parent
+        .parent()
         .filter(|p| p.element_type() != XmlElementType::XmlElementNode)
         .is_some()
     {
@@ -2489,9 +2489,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
     }
 
     if (*ctxt).parse_flags & XmlParserOption::XmlParseNoxincnode as i32 != 0 {
-        /*
-         * Add the list of nodes
-         */
+        // Add the list of nodes
         while !list.is_null() {
             end = list;
             list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
@@ -2596,7 +2594,7 @@ unsafe extern "C" fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: Xml
                     cur = next.as_ptr();
                     break 'b;
                 }
-                cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+                cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
                 !cur.is_null()
             } {}

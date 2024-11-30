@@ -330,7 +330,7 @@ impl XmlDoc {
                                 (*ent).flags |= XML_ENT_PARSED as i32;
                                 temp = (*ent).children.load(Ordering::Relaxed);
                                 while !temp.is_null() {
-                                    (*temp).parent = NodePtr::from_ptr(ent as *mut XmlNode);
+                                    (*temp).set_parent(NodePtr::from_ptr(ent as *mut XmlNode));
                                     (*ent).last.store(temp, Ordering::Relaxed);
                                     temp = (*temp).next.map_or(null_mut(), |n| n.as_ptr());
                                 }
@@ -623,7 +623,7 @@ impl XmlDoc {
                                 (*ent).flags |= XML_ENT_PARSED as i32;
                                 temp = (*ent).children.load(Ordering::Relaxed);
                                 while !temp.is_null() {
-                                    (*temp).parent = NodePtr::from_ptr(ent as *mut XmlNode);
+                                    (*temp).set_parent(NodePtr::from_ptr(ent as *mut XmlNode));
                                     (*ent).last.store(temp, Ordering::Relaxed);
                                     temp = (*temp).next.map_or(null_mut(), |n| n.as_ptr());
                                 }
@@ -706,7 +706,7 @@ impl XmlDoc {
         }
         (*root).unlink();
         (*root).set_doc(self);
-        (*root).parent = NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode);
+        (*root).set_parent(NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode));
         let mut old = self.children;
         while let Some(now) = old {
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {

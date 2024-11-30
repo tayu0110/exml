@@ -336,7 +336,7 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
     if !(*entity).children.load(Ordering::Relaxed).is_null()
         && (*entity).owner == 1
         && NodePtr::from_ptr(entity as *mut XmlNode)
-            == (*(*entity).children.load(Ordering::Relaxed)).parent
+            == (*(*entity).children.load(Ordering::Relaxed)).parent()
     {
         xml_free_node_list((*entity).children.load(Ordering::Relaxed));
         (*entity).children.store(null_mut(), Ordering::Relaxed);

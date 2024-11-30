@@ -424,7 +424,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     }
 
     let root: XmlNodePtr = cur;
-    parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+    parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
     loop {
         match (*cur).element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -437,7 +437,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 // Always validate (*cur).parent when descending.
                 if let Some(children) = (*cur)
                     .children()
-                    .filter(|_| (*cur).parent == NodePtr::from_ptr(parent))
+                    .filter(|_| (*cur).parent() == NodePtr::from_ptr(parent))
                 {
                     parent = cur;
                     cur = children.as_ptr();
@@ -487,7 +487,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
+                if (*cur).parent() != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     (*ctxt).buf.borrow_mut().write_bytes(b"<");
@@ -726,7 +726,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
             cur = parent;
             /* (*cur).parent was validated when descending. */
-            parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+            parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
             if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                 if (*ctxt).level > 0 {
@@ -890,7 +890,7 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
             }
             (*cur).children = NodePtr::from_ptr(xml_new_doc_text((*cur).doc, (*cur).name));
             if let Some(mut children) = (*cur).children {
-                children.parent = NodePtr::from_ptr(cur as *mut XmlNode);
+                children.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
             }
         }
         xml_attr_dump_output(ctxt, cur);
@@ -1049,7 +1049,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     }
 
     let root: XmlNodePtr = cur;
-    parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+    parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
     loop {
         match (*cur).element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
@@ -1062,10 +1062,10 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 xml_dtd_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDocumentFragNode => {
-                /* Always validate (*cur).parent when descending. */
+                // Always validate (*cur).parent when descending.
                 if let Some(children) = (*cur)
                     .children()
-                    .filter(|_| (*cur).parent == NodePtr::from_ptr(parent))
+                    .filter(|_| (*cur).parent() == NodePtr::from_ptr(parent))
                 {
                     parent = cur;
                     cur = children.as_ptr();
@@ -1115,12 +1115,9 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     (*ctxt).buf.borrow_mut().write_bytes(&(*ctxt).indent[..len]);
                 }
 
-                /*
-                 * Some users like lxml are known to pass nodes with a corrupted
-                 * tree structure. Fall back to a recursive call to handle this
-                 * case.
-                 */
-                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
+                // Some users like lxml are known to pass nodes with a corrupted
+                // tree structure. Fall back to a recursive call to handle this case.
+                if (*cur).parent() != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
                     xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
@@ -1146,9 +1143,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     && (*cur).ns.is_null()
                     && (*cur).ns_def.is_null()
                 {
-                    /*
-                     * 3.1.1. Strictly Conforming Documents A.3.1.1 3/
-                     */
+                    // 3.1.1. Strictly Conforming Documents A.3.1.1 3/
 
                     (*ctxt)
                         .buf
@@ -1160,7 +1155,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 }
 
                 if !parent.is_null()
-                    && ((*parent).parent == NodePtr::from_ptr((*cur).doc as *mut XmlNode))
+                    && ((*parent).parent() == NodePtr::from_ptr((*cur).doc as *mut XmlNode))
                     && xml_str_equal((*cur).name, c"head".as_ptr() as _)
                     && xml_str_equal((*parent).name, c"html".as_ptr() as _)
                 {
@@ -1419,7 +1414,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
 
             cur = parent;
             /* (*cur).parent was validated when descending. */
-            parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+            parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
             if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                 if (*ctxt).level > 0 {

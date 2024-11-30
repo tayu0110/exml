@@ -310,7 +310,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
                 cur = (*cur).next;
             }
         }
-        node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
     }
     /* the xml namespace may be declared on the document node */
     if !node.is_null()
@@ -430,7 +430,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     let dict: XmlDictPtr;
     let doc: XmlDocPtr = (*node).doc;
 
-    if (*node).parent.is_none() {
+    if (*node).parent().is_none() {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoParent,
@@ -458,7 +458,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         }
     }
     if (*node)
-        .parent
+        .parent()
         .filter(|p| {
             (*node).doc != p.doc && !xml_str_equal((*node).name, c"pseudoroot".as_ptr() as _)
         })
@@ -473,7 +473,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     if (*node).prev.is_none() {
         if (*node).element_type() == XmlElementType::XmlAttributeNode {
             if (*node)
-                .parent
+                .parent()
                 .filter(|p| node != p.properties as *mut XmlNode)
                 .is_some()
             {
@@ -484,7 +484,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 );
             }
         } else if (*node)
-            .parent
+            .parent()
             .filter(|p| p.children() != NodePtr::from_ptr(node))
             .is_some()
         {
@@ -509,7 +509,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 c"Node next->prev : forward link wrong\n".as_ptr(),
             );
         }
-        if next.parent != (*node).parent {
+        if next.parent() != (*node).parent() {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongParent,
@@ -517,7 +517,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             );
         }
     } else if (*node)
-        .parent
+        .parent()
         .filter(|p| {
             (*node).element_type() != XmlElementType::XmlAttributeNode
                 && p.last() != NodePtr::from_ptr(node)
@@ -2642,7 +2642,7 @@ pub unsafe extern "C" fn xml_shell_du(
         } else if node != tree {
             // go up to parents->next if needed
             while node != tree {
-                if let Some(parent) = (*node).parent {
+                if let Some(parent) = (*node).parent() {
                     node = parent.as_ptr();
                     indent -= 1;
                 }
@@ -2650,7 +2650,7 @@ pub unsafe extern "C" fn xml_shell_du(
                     node = next.as_ptr();
                     break;
                 }
-                if (*node).parent.is_none() {
+                if (*node).parent().is_none() {
                     node = null_mut();
                     break;
                 }
@@ -2804,12 +2804,12 @@ unsafe extern "C" fn xml_shell_grep(
         } else if (*node).element_type() == XmlElementType::XmlTextNode
             && !xml_strstr((*node).content, arg as *mut XmlChar).is_null()
         {
-            let path = (*node).parent.unwrap().get_node_path().unwrap();
+            let path = (*node).parent().unwrap().get_node_path().unwrap();
             write!((*ctxt).output, "{path} : ");
             xml_shell_list(
                 ctxt,
                 null_mut(),
-                (*node).parent.map_or(null_mut(), |p| p.as_ptr()),
+                (*node).parent().map_or(null_mut(), |p| p.as_ptr()),
                 null_mut(),
             );
         }
@@ -2836,14 +2836,14 @@ unsafe extern "C" fn xml_shell_grep(
         } else {
             // go up to parents->next if needed
             while !node.is_null() {
-                if let Some(parent) = (*node).parent {
+                if let Some(parent) = (*node).parent() {
                     node = parent.as_ptr();
                 }
                 if let Some(next) = (*node).next {
                     node = next.as_ptr();
                     break;
                 }
-                if (*node).parent.is_none() {
+                if (*node).parent().is_none() {
                     node = null_mut();
                     break;
                 }

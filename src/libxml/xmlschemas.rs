@@ -2009,7 +2009,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
 
     if named == 0 && !item_node.is_null() {
         let elem = if (*item_node).element_type() == XmlElementType::XmlAttributeNode {
-            (*item_node).parent.map_or(null_mut(), |p| p.as_ptr())
+            (*item_node).parent().map_or(null_mut(), |p| p.as_ptr())
         } else {
             item_node
         };
@@ -2061,18 +2061,16 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         )
     {
-        /*
-         * Don't try to format other nodes than element and
-         * attribute nodes.
-         * Play safe and return an empty string.
-         */
+        // Don't try to format other nodes than element and
+        // attribute nodes.
+        // Play safe and return an empty string.
         *msg = xml_strdup(c"".as_ptr() as _);
         return *msg;
     }
     if !node.is_null() {
         // Work on tree nodes.
         if (*node).element_type() == XmlElementType::XmlAttributeNode {
-            let elem: XmlNodePtr = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+            let elem: XmlNodePtr = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
 
             *msg = xml_strdup(c"Element '".as_ptr() as _);
             if !(*elem).ns.is_null() {
@@ -4784,7 +4782,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
         }
 
         loop {
-            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
             if cur.is_null() {
                 break;
             }
@@ -13822,7 +13820,7 @@ unsafe extern "C" fn xml_schema_parse_schema_top_level(
                         ctxt,
                         XmlParserErrors::XmlSchemapS4sElemNotAllowed,
                         null_mut(),
-                        (*child).parent.map_or(null_mut(), |p| p.as_ptr()),
+                        (*child).parent().map_or(null_mut(), |p| p.as_ptr()),
                         child,
                         null_mut(),
                         c"((include | import | redefine | annotation)*, (((simpleType | complexType | group | attributeGroup) | element | attribute | notation), annotation*)*)".as_ptr() as _
@@ -28863,7 +28861,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     node = next.as_ptr();
                     continue 'main;
                 } else {
-                    node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
                     break 'goto_leave_node;
                 }
             }
@@ -29037,7 +29035,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 node = next.as_ptr();
                 continue 'main;
             } else {
-                node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+                node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
                 // goto leave_node;
                 continue 'leave_node;
             }

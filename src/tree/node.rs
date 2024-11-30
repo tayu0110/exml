@@ -734,15 +734,15 @@ pub trait NodeCommon {
 pub type XmlNodePtr = *mut XmlNode;
 #[repr(C)]
 pub struct XmlNode {
-    pub _private: *mut c_void,          /* application data */
-    pub(crate) typ: XmlElementType,     /* type number, must be second ! */
-    pub name: *const XmlChar,           /* the name of the node, or the entity */
-    children: Option<NodePtr>,          /* parent->childs link */
-    last: Option<NodePtr>,              /* last child link */
-    pub(crate) parent: Option<NodePtr>, /* child->parent link */
-    pub next: Option<NodePtr>,          /* next sibling link  */
-    pub(crate) prev: Option<NodePtr>,   /* previous sibling link  */
-    pub doc: *mut XmlDoc,               /* the containing document */
+    pub _private: *mut c_void,        /* application data */
+    pub(crate) typ: XmlElementType,   /* type number, must be second ! */
+    pub name: *const XmlChar,         /* the name of the node, or the entity */
+    children: Option<NodePtr>,        /* parent->childs link */
+    last: Option<NodePtr>,            /* last child link */
+    parent: Option<NodePtr>,          /* child->parent link */
+    pub next: Option<NodePtr>,        /* next sibling link  */
+    pub(crate) prev: Option<NodePtr>, /* previous sibling link  */
+    pub doc: *mut XmlDoc,             /* the containing document */
 
     /* End of common part */
     pub(crate) ns: *mut XmlNs, /* pointer to the associated namespace */

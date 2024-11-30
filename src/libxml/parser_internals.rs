@@ -3849,7 +3849,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                 (*oldctxt).valid &=
                     xml_validate_element(addr_of_mut!((*oldctxt).vctxt), (*oldctxt).my_doc, cur);
             }
-            (*cur).parent = None;
+            (*cur).set_parent(None);
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
         (*(*ctxt).my_doc).children.unwrap().set_children(None);
@@ -4137,7 +4137,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             {
                 (*ent).owner = 1;
                 while !list.is_null() {
-                    (*list).parent = NodePtr::from_ptr(ent as *mut XmlNode);
+                    (*list).set_parent(NodePtr::from_ptr(ent as *mut XmlNode));
                     if (*list).doc != (*ent).doc.load(Ordering::Relaxed) as _ {
                         (*list).set_doc((*ent).doc.load(Ordering::Relaxed));
                     }
@@ -4150,7 +4150,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             } else {
                 (*ent).owner = 0;
                 while !list.is_null() {
-                    (*list).parent = NodePtr::from_ptr((*ctxt).node);
+                    (*list).set_parent(NodePtr::from_ptr((*ctxt).node));
                     (*list).doc = (*ctxt).my_doc;
                     if (*list).next.is_none() {
                         (*ent).last.store(list, Ordering::Relaxed);
@@ -4389,7 +4389,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (*ent).last.store(null_mut(), Ordering::Relaxed);
                 while !cur.is_null() {
                     next = (*cur).next.take().map_or(null_mut(), |n| n.as_ptr());
-                    (*cur).parent = None;
+                    (*cur).set_parent(None);
                     nw = xml_doc_copy_node(cur, (*ctxt).my_doc, 1);
                     if !nw.is_null() {
                         if (*nw)._private.is_null() {

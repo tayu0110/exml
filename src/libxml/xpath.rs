@@ -788,12 +788,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     if matches!((*node1).element_type(), XmlElementType::XmlAttributeNode) {
         attr1 = 1;
         attr_node1 = node1;
-        node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
+        node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
     }
     if matches!((*node2).element_type(), XmlElementType::XmlAttributeNode) {
         attr2 = 1;
         attr_node2 = node2;
-        node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
+        node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
     }
     if node1 == node2 {
         if attr1 == attr2 {
@@ -846,12 +846,10 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
         }
     }
 
-    /*
-     * compute depth to root
-     */
+    // compute depth to root
     depth2 = 0;
     cur = node2;
-    while let Some(parent) = (*cur).parent {
+    while let Some(parent) = (*cur).parent() {
         if parent.as_ptr() == node1 {
             return 1;
         }
@@ -862,33 +860,29 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
 
     depth1 = 0;
     cur = node1;
-    while let Some(parent) = (*cur).parent {
+    while let Some(parent) = (*cur).parent() {
         if parent.as_ptr() == node2 {
             return -1;
         }
         depth1 += 1;
         cur = parent.as_ptr();
     }
-    /*
-     * Distinct document (or distinct entities :-( ) case.
-     */
+    // Distinct document (or distinct entities :-( ) case.
     if root != cur {
         return -2;
     }
-    /*
-     * get the nearest common ancestor.
-     */
+    // get the nearest common ancestor.
     while depth1 > depth2 {
         depth1 -= 1;
-        node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
+        node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
     }
     while depth2 > depth1 {
         depth2 -= 1;
-        node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
+        node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
     }
-    while (*node1).parent != (*node2).parent {
-        node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
-        node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
+    while (*node1).parent() != (*node2).parent() {
+        node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
+        node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
         /* should not happen but just in case ... */
         if node1.is_null() || node2.is_null() {
             return -2;
@@ -1643,12 +1637,12 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
                 continue;
             }
         }
-        if let Some(next) = (*cur).next {
+        if let Some(next) = (*cur).next() {
             cur = next.as_ptr();
             continue;
         }
         loop {
-            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
             if cur.is_null() {
                 break;
             }
@@ -1656,7 +1650,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
                 cur = null_mut();
                 break;
             }
-            if let Some(next) = (*cur).next {
+            if let Some(next) = (*cur).next() {
                 cur = next.as_ptr();
                 break;
             }

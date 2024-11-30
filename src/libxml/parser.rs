@@ -4163,7 +4163,7 @@ pub unsafe fn xml_parse_in_node_context(
                 | XmlElementType::XmlHTMLDocumentNode
         )
     {
-        node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
     }
     if node.is_null() {
         return XmlParserErrors::XmlErrInternalError;
@@ -4265,7 +4265,7 @@ pub unsafe fn xml_parse_in_node_context(
                 }
                 ns = (*ns).next as _;
             }
-            cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         }
     }
 
@@ -4323,7 +4323,7 @@ pub unsafe fn xml_parse_in_node_context(
     *lst = cur;
 
     while !cur.is_null() {
-        (*cur).parent = None;
+        (*cur).set_parent(None);
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
     }
 
@@ -4490,7 +4490,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         *lst = cur;
         while !cur.is_null() {
             (*cur).set_doc(doc);
-            (*cur).parent = None;
+            (*cur).set_parent(None);
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
         (*new_doc).children.unwrap().set_children(None);
@@ -4705,7 +4705,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
                 .map_or(null_mut(), |c| c.as_ptr());
             *list = cur;
             while !cur.is_null() {
-                (*cur).parent = None;
+                (*cur).set_parent(None);
                 cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
             (*new_doc).children.unwrap().set_children(None);

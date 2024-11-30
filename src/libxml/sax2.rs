@@ -1781,7 +1781,7 @@ unsafe fn xml_sax2_attribute_internal(
         };
         let mut tmp = (*ret).children;
         while let Some(mut now) = tmp {
-            now.parent = NodePtr::from_ptr(ret as *mut XmlNode);
+            now.set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
             if now.next.is_none() {
                 (*ret).last = Some(now);
             }
@@ -1791,7 +1791,7 @@ unsafe fn xml_sax2_attribute_internal(
         (*ret).children = NodePtr::from_ptr(xml_new_doc_text((*ctxt).my_doc, value));
         (*ret).last = (*ret).children;
         if let Some(mut children) = (*ret).children {
-            children.parent = NodePtr::from_ptr(ret as *mut XmlNode);
+            children.set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
         }
     }
 
@@ -2899,18 +2899,16 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
     }
 
     if (*ctxt).replace_entities == 0 && (*ctxt).html == 0 {
-        /*
-         * We know that if there is an entity reference, then
-         * the string has been dup'ed and terminates with 0
-         * otherwise with ' or "
-         */
+        // We know that if there is an entity reference, then
+        // the string has been dup'ed and terminates with 0
+        // otherwise with ' or "
         if *valueend != 0 {
             let tmp = xml_sax2_text_node(ctxt, value, valueend.offset_from(value) as _);
             (*ret).children = NodePtr::from_ptr(tmp);
             (*ret).last = NodePtr::from_ptr(tmp);
             if !tmp.is_null() {
                 (*tmp).doc = (*ret).doc;
-                (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
+                (*tmp).set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
             }
         } else {
             (*ret).children = if (*ctxt).my_doc.is_null() {
@@ -2924,7 +2922,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             let mut tmp = (*ret).children;
             while let Some(mut now) = tmp {
                 now.doc = (*ret).doc;
-                now.parent = NodePtr::from_ptr(ret as *mut XmlNode);
+                now.set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
                 if now.next.is_none() {
                     (*ret).last = Some(now);
                 }
@@ -2937,7 +2935,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
         (*ret).last = NodePtr::from_ptr(tmp);
         if !tmp.is_null() {
             (*tmp).doc = (*ret).doc;
-            (*tmp).parent = NodePtr::from_ptr(ret as *mut XmlNode);
+            (*tmp).set_parent(NodePtr::from_ptr(ret as *mut XmlNode));
         }
     }
 
@@ -3194,10 +3192,8 @@ unsafe extern "C" fn xml_sax2_text(
     }
     let mut last_child = (*(*ctxt).node).last().map_or(null_mut(), |l| l.as_ptr());
 
-    /*
-     * Here we needed an accelerator mechanism in case of very large
-     * elements. Use an attribute in the structure !!!
-     */
+    // Here we needed an accelerator mechanism in case of very large elements.
+    // Use an attribute in the structure !!!
     if last_child.is_null() {
         if matches!(typ, XmlElementType::XmlTextNode) {
             last_child = xml_sax2_text_node(ctxt, ch, len);
@@ -3207,7 +3203,7 @@ unsafe extern "C" fn xml_sax2_text(
         if !last_child.is_null() {
             (*(*ctxt).node).set_children(NodePtr::from_ptr(last_child));
             (*(*ctxt).node).set_last(NodePtr::from_ptr(last_child));
-            (*last_child).parent = NodePtr::from_ptr((*ctxt).node);
+            (*last_child).set_parent(NodePtr::from_ptr((*ctxt).node));
             (*last_child).doc = (*(*ctxt).node).doc;
             (*ctxt).nodelen = len;
             (*ctxt).nodemem = len + 1;

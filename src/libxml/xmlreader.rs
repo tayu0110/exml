@@ -411,7 +411,7 @@ impl XmlTextReader {
                         && ((*self.ctxt).node.is_null()
                             || (*self.ctxt).node == self.node
                             || (*self.ctxt).node
-                                == (*self.node).parent.map_or(null_mut(), |p| p.as_ptr()))
+                                == (*self.node).parent().map_or(null_mut(), |p| p.as_ptr()))
                         && !matches!((*self.ctxt).instate, XmlParserInputState::XmlParserEOF)
                     {
                         val = self.push_data();
@@ -508,7 +508,7 @@ impl XmlTextReader {
                     if self.preserves > 0 && (*self.node).extra & NODE_IS_SPRESERVED as u16 != 0 {
                         self.preserves -= 1;
                     }
-                    self.node = (*self.node).parent.map_or(null_mut(), |p| p.as_ptr());
+                    self.node = (*self.node).parent().map_or(null_mut(), |p| p.as_ptr());
                     if self.node.is_null()
                         || matches!(
                             (*self.node).element_type(),
@@ -868,7 +868,7 @@ impl XmlTextReader {
                     self.node = next.as_ptr();
                     self.state = XmlTextReaderState::Start;
                     // goto found_node;
-                } else if let Some(parent) = (*self.node).parent {
+                } else if let Some(parent) = (*self.node).parent() {
                     if matches!(
                         parent.element_type(),
                         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
@@ -1396,14 +1396,14 @@ impl XmlTextReader {
                 }
 
                 // skip_children:
-                if let Some(next) = (*node).next {
+                if let Some(next) = (*node).next() {
                     node = next.as_ptr();
                     // continue;
                     break 'inner;
                 }
 
                 loop {
-                    node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
+                    node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
                     if (*node).element_type() == XmlElementType::XmlElementNode {
                         let mut tmp: XmlNodePtr;
                         if self.ent_nr == 0 {
@@ -2398,7 +2398,7 @@ impl XmlTextReader {
             return 1;
         }
 
-        if let Some(parent) = (*self.node).parent {
+        if let Some(parent) = (*self.node).parent() {
             if parent.element_type() == XmlElementType::XmlDocumentNode {
                 self.state = XmlTextReaderState::End;
                 return 0;
@@ -2867,12 +2867,12 @@ impl XmlTextReader {
         }
         self.preserves += 1;
 
-        let mut parent = (*cur).parent;
+        let mut parent = (*cur).parent();
         while let Some(mut now) = parent {
             if now.element_type() == XmlElementType::XmlElementNode {
                 now.extra |= NODE_IS_PRESERVED as u16;
             }
-            parent = now.parent;
+            parent = now.parent();
         }
         cur
     }
@@ -3985,7 +3985,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         .children()
         .filter(|_| (*cur).element_type() != XmlElementType::XmlEntityRefNode)
     {
-        if children.parent == NodePtr::from_ptr(cur) {
+        if children.parent() == NodePtr::from_ptr(cur) {
             xml_text_reader_free_node_list(reader, children.as_ptr());
         }
         (*cur).set_children(None);
@@ -4059,6 +4059,8 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
 #[doc(alias = "xmlTextReaderGetSuccessor")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNodePtr {
+    use crate::tree::NodeCommon;
+
     if cur.is_null() {
         return null_mut(); /* ERROR */
     }
@@ -4066,7 +4068,7 @@ unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNo
         return next.as_ptr();
     }
     'b: while {
-        cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         if cur.is_null() {
             break 'b;
         }

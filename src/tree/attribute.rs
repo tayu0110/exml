@@ -176,13 +176,13 @@ pub unsafe extern "C" fn xml_new_doc_prop(
             .flatten();
         (*cur).last = None;
 
-        let mut tmp = (*cur).children;
+        let mut tmp = (*cur).children();
         while let Some(mut now) = tmp {
-            now.parent = NodePtr::from_ptr(cur as *mut XmlNode);
+            now.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
             if now.next.is_none() {
-                (*cur).last = Some(now);
+                (*cur).set_last(Some(now));
             }
-            tmp = now.next;
+            tmp = now.next();
         }
     }
 

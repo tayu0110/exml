@@ -1856,7 +1856,7 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
     }
 
     loop {
-        cur = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
+        cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         if cur.is_null() {
             break;
         }

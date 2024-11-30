@@ -11850,7 +11850,7 @@ pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> Htm
         XmlElementType::XmlElementNode => {
             if legacy != 0 {
                 if html_element_allowed_here(
-                    html_tag_lookup((*node).parent.unwrap().name),
+                    html_tag_lookup((*node).parent().unwrap().name),
                     (*node).name,
                 ) != 0
                 {
@@ -11860,13 +11860,13 @@ pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> Htm
                 }
             } else {
                 html_element_status_here(
-                    html_tag_lookup((*node).parent.unwrap().name),
+                    html_tag_lookup((*node).parent().unwrap().name),
                     html_tag_lookup((*node).name),
                 )
             }
         }
         XmlElementType::XmlAttributeNode => html_attr_allowed(
-            html_tag_lookup((*node).parent.unwrap().name),
+            html_tag_lookup((*node).parent().unwrap().name),
             (*node).name,
             legacy,
         ),

@@ -4652,7 +4652,7 @@ pub unsafe extern "C" fn xml_validate_element(
             if (*elem).next.is_some() {
                 break;
             }
-            elem = (*elem).parent.map_or(null_mut(), |p| p.as_ptr());
+            elem = (*elem).parent().map_or(null_mut(), |p| p.as_ptr());
         }
         elem = (*elem).next.map_or(null_mut(), |n| n.as_ptr());
     }
@@ -7460,11 +7460,9 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 
     nb_valid_elements = 0;
     let ref_node: *mut XmlNode = if !prev.is_null() { prev } else { next };
-    let parent: *mut XmlNode = (*ref_node).parent.map_or(null_mut(), |p| p.as_ptr());
+    let parent: *mut XmlNode = (*ref_node).parent().map_or(null_mut(), |p| p.as_ptr());
 
-    /*
-     * Retrieves the parent element declaration
-     */
+    // Retrieves the parent element declaration
     element_desc = xml_get_dtd_element_desc((*(*parent).doc).int_subset, (*parent).name);
     if element_desc.is_null() && !(*(*parent).doc).ext_subset.is_null() {
         element_desc = xml_get_dtd_element_desc((*(*parent).doc).ext_subset, (*parent).name);
@@ -7473,9 +7471,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         return -1;
     }
 
-    /*
-     * Do a backup of the current tree structure
-     */
+    // Do a backup of the current tree structure
     let prev_next: *mut XmlNode = if !prev.is_null() {
         (*prev).next.map_or(null_mut(), |n| n.as_ptr())
     } else {
@@ -7489,9 +7485,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     let parent_childs: *mut XmlNode = (*parent).children().map_or(null_mut(), |c| c.as_ptr());
     let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
 
-    /*
-     * Creates a dummy node and insert it into the tree
-     */
+    // Creates a dummy node and insert it into the tree
     let test_node: *mut XmlNode = xml_new_doc_node(
         (*ref_node).doc,
         null_mut(),
@@ -7502,7 +7496,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         return -1;
     }
 
-    (*test_node).parent = NodePtr::from_ptr(parent);
+    (*test_node).set_parent(NodePtr::from_ptr(parent));
     (*test_node).prev = NodePtr::from_ptr(prev);
     (*test_node).next = NodePtr::from_ptr(next);
     let name: *const XmlChar = (*test_node).name;
@@ -7519,10 +7513,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
         (*parent).set_last(NodePtr::from_ptr(test_node));
     }
 
-    /*
-     * Insert each potential child node and check if the parent is
-     * still valid
-     */
+    // Insert each potential child node and check if the parent is still valid
     nb_elements = xml_valid_get_potential_children(
         (*element_desc).content,
         elements.as_mut_ptr(),
