@@ -241,6 +241,84 @@ pub trait NodeCommon {
         self.last().map_or(null_mut(), |p| p.as_ptr())
     }
 
+    /// Append the extra substring to the node content.
+    ///
+    /// # Note
+    /// In contrast to xmlNodeSetContent(), @content is supposed to be raw text,
+    /// so unescaped XML special chars are allowed, entity references are not supported.
+    #[doc(alias = "xmlNodeAddContent")]
+    unsafe fn add_content(&mut self, content: *const XmlChar) {
+        if content.is_null() {
+            return;
+        }
+        let len: i32 = xml_strlen(content);
+        self.add_content_len(content, len);
+    }
+
+    /// Append the extra substring to the node content.
+    ///
+    /// # Note
+    /// In contrast to xmlNodeSetContentLen(), `content` is supposed to be raw text,
+    /// so unescaped XML special chars are allowed, entity references are not supported.
+    #[doc(alias = "xmlNodeAddContentLen")]
+    unsafe fn add_content_len(&mut self, content: *const XmlChar, len: i32) {
+        if len <= 0 {
+            return;
+        }
+        match self.element_type() {
+            XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
+                let last = self.last();
+                let new_node: XmlNodePtr = xml_new_doc_text_len(self.document(), content, len);
+                if !new_node.is_null() {
+                    let tmp = self.add_child(new_node);
+                    if tmp != new_node {
+                        return;
+                    }
+                    if let Some(last) = last.filter(|l| l.next() == NodePtr::from_ptr(new_node)) {
+                        xml_text_merge(last.as_ptr(), new_node);
+                    }
+                }
+            }
+            XmlElementType::XmlAttributeNode => {}
+            XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlNotationNode => {
+                let mut node = self.as_node().unwrap();
+                if !content.is_null() {
+                    if node.as_ref().content == &raw mut node.as_mut().properties as _
+                        || (!node.as_ref().document().is_null()
+                            && !(*node.as_ref().document()).dict.is_null()
+                            && xml_dict_owns(
+                                (*node.as_ref().document()).dict,
+                                node.as_ref().content,
+                            ) != 0)
+                    {
+                        node.as_mut().content =
+                            xml_strncat_new(node.as_ref().content, content, len);
+                        node.as_mut().properties = null_mut();
+                    } else {
+                        node.as_mut().content = xml_strncat(node.as_ref().content, content, len);
+                    }
+                }
+            }
+            XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlHTMLDocumentNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => {}
+            XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl => {}
+            _ => unreachable!(),
+        }
+    }
+
     /// Add a new node to `self`, at the end of the child (or property) list
     /// merging adjacent TEXT nodes (in which case `cur` is freed)  
     /// If the new node is ATTRIBUTE, it is added into properties instead of children.  
@@ -2478,81 +2556,6 @@ impl XmlNode {
         self.set_last(NodePtr::from_ptr(cur));
 
         cur
-    }
-
-    /// Append the extra substring to the node content.
-    ///
-    /// # Note
-    /// In contrast to xmlNodeSetContent(), @content is supposed to be raw text,
-    /// so unescaped XML special chars are allowed, entity references are not supported.
-    #[doc(alias = "xmlNodeAddContent")]
-    pub unsafe fn add_content(&mut self, content: *const XmlChar) {
-        if content.is_null() {
-            return;
-        }
-        let len: i32 = xml_strlen(content);
-        self.add_content_len(content, len);
-    }
-
-    /// Append the extra substring to the node content.
-    ///
-    /// # Note
-    /// In contrast to xmlNodeSetContentLen(), `content` is supposed to be raw text,
-    /// so unescaped XML special chars are allowed, entity references are not supported.
-    #[doc(alias = "xmlNodeAddContentLen")]
-    pub unsafe fn add_content_len(&mut self, content: *const XmlChar, len: i32) {
-        if len <= 0 {
-            return;
-        }
-        match self.element_type() {
-            XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
-                let tmp: XmlNodePtr;
-
-                let last = self.last();
-                let new_node: XmlNodePtr = xml_new_doc_text_len(self.document(), content, len);
-                if !new_node.is_null() {
-                    tmp = self.add_child(new_node);
-                    if tmp != new_node {
-                        return;
-                    }
-                    if let Some(last) = last.filter(|l| l.next() == NodePtr::from_ptr(new_node)) {
-                        xml_text_merge(last.as_ptr(), new_node);
-                    }
-                }
-            }
-            XmlElementType::XmlAttributeNode => {}
-            XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlNotationNode => {
-                if !content.is_null() {
-                    if self.content == &raw mut self.properties as _
-                        || (!self.document().is_null()
-                            && !(*self.document()).dict.is_null()
-                            && xml_dict_owns((*self.document()).dict, self.content) != 0)
-                    {
-                        self.content = xml_strncat_new(self.content, content, len);
-                        self.properties = null_mut();
-                    } else {
-                        self.content = xml_strncat(self.content, content, len);
-                    }
-                }
-            }
-            XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlDTDNode
-            | XmlElementType::XmlHTMLDocumentNode
-            | XmlElementType::XmlDocumentTypeNode
-            | XmlElementType::XmlNamespaceDecl
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => {}
-            XmlElementType::XmlElementDecl
-            | XmlElementType::XmlAttributeDecl
-            | XmlElementType::XmlEntityDecl => {}
-            _ => unreachable!(),
-        }
     }
 
     /// Finds the current number of child nodes of that element which are element nodes.
