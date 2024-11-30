@@ -171,9 +171,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     }
     cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
 
-    /*
-     * Search the html
-     */
+    // Search the html
     'goto_found_meta: {
         'goto_found_head: {
             while !cur.is_null() {
@@ -195,10 +193,8 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             if cur.is_null() {
                 return None;
             }
-            cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
-            /*
-             * Search the head
-             */
+            cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
+            // Search the head
             while !cur.is_null() {
                 if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                     && !(*cur).name.is_null()
@@ -217,7 +213,7 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             }
         }
         // found_head:
-        cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+        cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
     }
 
     /*
@@ -352,7 +348,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         if cur.is_null() {
             return -1;
         }
-        cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+        cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
 
         /*
          * Search the head
@@ -389,7 +385,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                  */
 
                 meta = xml_new_doc_node(doc, null_mut(), c"meta".as_ptr() as _, null_mut());
-                if let Some(mut children) = (*head).children {
+                if let Some(mut children) = (*head).children() {
                     children.add_prev_sibling(meta);
                 } else {
                     (*head).add_child(meta);
@@ -425,7 +421,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
     if !found_meta {
         head = cur;
         assert!(!cur.is_null());
-        let Some(children) = (*cur).children else {
+        let Some(children) = (*cur).children() else {
             // goto create;
             return create(meta, encoding, head, &newcontent, None);
         };
@@ -1126,8 +1122,8 @@ pub unsafe fn html_node_dump_format_output(
                 {
                     html_dtd_dump_output(buf, cur as _, null_mut());
                 }
-                if let Some(children) = (*cur).children {
-                    /* Always validate (*cur).parent when descending. */
+                if let Some(children) = (*cur).children() {
+                    // Always validate (*cur).parent when descending.
                     if (*cur).parent == NodePtr::from_ptr(parent) {
                         parent = cur;
                         cur = children.as_ptr();
@@ -1144,7 +1140,7 @@ pub unsafe fn html_node_dump_format_output(
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children.is_some() {
+                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
                     html_node_dump_format_output(buf, doc, cur, _encoding, format);
                     break 'to_break;
                 }
@@ -1180,7 +1176,7 @@ pub unsafe fn html_node_dump_format_output(
 
                 if !info.is_null() && (*info).empty != 0 {
                     buf.write_str(">");
-                } else if let Some(children) = (*cur).children {
+                } else if let Some(children) = (*cur).children() {
                     buf.write_str(">");
                     if format != 0
                         && !info.is_null()
@@ -1189,7 +1185,7 @@ pub unsafe fn html_node_dump_format_output(
                             children.element_type(),
                             HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                         )
-                        && (*cur).children != (*cur).last
+                        && (*cur).children() != (*cur).last
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
                     /* p, pre, param */
@@ -1342,7 +1338,7 @@ pub unsafe fn html_node_dump_format_output(
                         (*cur).last.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     )
-                    && (*cur).children != (*cur).last
+                    && (*cur).children() != (*cur).last
                     && !(*cur).name.is_null()
                     && *(*cur).name.add(0) != b'p'
                 /* p, pre, param */

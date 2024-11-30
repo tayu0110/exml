@@ -3833,9 +3833,9 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
         // Return the newly created nodeset after unlinking it from
         // they pseudo parent.
         let mut cur = (*(*ctxt).my_doc)
-            .children
+            .children()
             .unwrap()
-            .children
+            .children()
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
         while !cur.is_null() {
@@ -3852,7 +3852,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             (*cur).parent = None;
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        (*(*ctxt).my_doc).children.unwrap().children = None;
+        (*(*ctxt).my_doc).children.unwrap().set_children(None);
     }
     if !(*ctxt).my_doc.is_null() {
         xml_free_node(
@@ -4355,7 +4355,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         if matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
                             && !nw.is_null()
                             && matches!((*nw).element_type(), XmlElementType::XmlElementNode)
-                            && (*nw).children.is_none()
+                            && (*nw).children().is_none()
                         {
                             (*nw).extra = 1;
                         }

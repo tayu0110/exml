@@ -393,10 +393,10 @@ impl XmlTextReader {
                         && (*self.node).next.is_none()
                         && (*self.ctxt).node_tab.len() == olddepth
                         && (oldstate == XmlTextReaderState::Backtrack
-                            || (*self.node).children.is_none()
+                            || (*self.node).children().is_none()
                             || (*self.node).element_type() == XmlElementType::XmlEntityRefNode
                             || (*self.node)
-                                .children
+                                .children()
                                 .filter(|children| {
                                     children.element_type() == XmlElementType::XmlTextNode
                                         && children.next.is_none()
@@ -426,7 +426,7 @@ impl XmlTextReader {
                             return 0;
                         }
                     }
-                    if let Some(children) = (*self.node).children.filter(|_| {
+                    if let Some(children) = (*self.node).children().filter(|_| {
                         oldstate != XmlTextReaderState::Backtrack
                             && !matches!(
                                 (*self.node).element_type(),
@@ -447,7 +447,7 @@ impl XmlTextReader {
                         let f = self.in_xinclude <= 0;
                         if oldstate == XmlTextReaderState::Element
                             && (*self.node).element_type() == XmlElementType::XmlElementNode
-                            && (*self.node).children.is_none()
+                            && (*self.node).children().is_none()
                             && (*self.node).extra & NODE_IS_EMPTY as u16 == 0
                             && f
                         {
@@ -493,7 +493,7 @@ impl XmlTextReader {
                     }
                     if oldstate == XmlTextReaderState::Element
                         && (*self.node).element_type() == XmlElementType::XmlElementNode
-                        && (*self.node).children.is_none()
+                        && (*self.node).children().is_none()
                         && (*self.node).extra & NODE_IS_EMPTY as u16 == 0
                     {
                         self.state = XmlTextReaderState::End;
@@ -634,15 +634,15 @@ impl XmlTextReader {
                 && !self.ctxt.is_null()
                 && (*self.ctxt).replace_entities == 1
             {
-                if let Some(children) = (*self.node).children.filter(|children| {
+                if let Some(children) = (*self.node).children().filter(|children| {
                     children.element_type() == XmlElementType::XmlEntityDecl
-                        && children.children.is_some()
+                        && children.children().is_some()
                 }) {
                     if self.entity_push(self.node) < 0 {
                         // goto get_next_node;
                         continue 'get_next_node;
                     }
-                    self.node = children.children.map_or(null_mut(), |c| c.as_ptr());
+                    self.node = children.children().map_or(null_mut(), |c| c.as_ptr());
                 }
             } else {
                 #[cfg(feature = "libxml_regexp")]
@@ -657,7 +657,7 @@ impl XmlTextReader {
             if !self.node.is_null()
                 && (*self.node).element_type() == XmlElementType::XmlEntityDecl
                 && !self.ent.is_null()
-                && (*self.ent).children == NodePtr::from_ptr(self.node)
+                && (*self.ent).children() == NodePtr::from_ptr(self.node)
             {
                 self.node = self.entity_pop();
                 self.depth += 1;
@@ -720,7 +720,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::buf::{libxml_api::xml_buf_detach, XmlBufRef};
+        use crate::{
+            buf::{libxml_api::xml_buf_detach, XmlBufRef},
+            tree::NodeCommon,
+        };
 
         let mut node: XmlNodePtr;
         let mut cur_node: XmlNodePtr;
@@ -734,7 +737,7 @@ impl XmlTextReader {
             return null_mut();
         }
         xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        cur_node = (*self.node).children.map_or(null_mut(), |c| c.as_ptr());
+        cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
             /* XXX: Why is the node copied? */
             node = xml_doc_copy_node(cur_node, doc, 1);
@@ -832,7 +835,7 @@ impl XmlTextReader {
                             | XmlElementType::XmlEntityRefNode
                     )
                 {
-                    if let Some(children) = (*self.node).children {
+                    if let Some(children) = (*self.node).children() {
                         self.node = children.as_ptr();
                         self.depth += 1;
                         self.state = XmlTextReaderState::Start;
@@ -925,7 +928,7 @@ impl XmlTextReader {
             XmlElementType::XmlElementNode => {
                 if self.do_expand() != -1 {
                     return xml_text_reader_collect_siblings(
-                        (*node).children.map_or(null_mut(), |c| c.as_ptr()),
+                        (*node).children().map_or(null_mut(), |c| c.as_ptr()),
                     );
                 }
             }
@@ -954,7 +957,7 @@ impl XmlTextReader {
             return 0;
         }
         if (*self.curnode).element_type() == XmlElementType::XmlAttributeNode {
-            let Some(children) = (*self.curnode).children else {
+            let Some(children) = (*self.curnode).children() else {
                 return 0;
             };
             self.curnode = children.as_ptr();
@@ -1349,9 +1352,9 @@ impl XmlTextReader {
             'inner: {
                 'skip_children: {
                     if (*node).element_type() == XmlElementType::XmlEntityRefNode {
-                        if let Some(children) = (*node).children.filter(|children| {
+                        if let Some(children) = (*node).children().filter(|children| {
                             children.element_type() == XmlElementType::XmlEntityDecl
-                                && children.children.is_some()
+                                && children.children().is_some()
                         }) {
                             if self.entity_push(node) < 0 {
                                 if node == oldnode {
@@ -1360,7 +1363,7 @@ impl XmlTextReader {
                                 }
                                 break 'skip_children;
                             }
-                            node = children.children.map_or(null_mut(), |c| c.as_ptr());
+                            node = children.children().map_or(null_mut(), |c| c.as_ptr());
                             // continue;
                             break 'inner;
                         } else {
@@ -1383,7 +1386,7 @@ impl XmlTextReader {
                         }
                     }
                     // go to next node
-                    if let Some(children) = (*node).children {
+                    if let Some(children) = (*node).children() {
                         node = children.as_ptr();
                         // continue;
                         break 'inner;
@@ -1421,7 +1424,7 @@ impl XmlTextReader {
                     }
                     if (*node).element_type() == XmlElementType::XmlEntityDecl
                         && !self.ent.is_null()
-                        && (*self.ent).children == NodePtr::from_ptr(node)
+                        && (*self.ent).children() == NodePtr::from_ptr(node)
                     {
                         node = self.entity_pop();
                     }
@@ -1518,7 +1521,7 @@ impl XmlTextReader {
         if !self.curnode.is_null() {
             return Some(false);
         }
-        if (*self.node).children.is_some() {
+        if (*self.node).children().is_some() {
             return Some(false);
         }
         if self.state == XmlTextReaderState::End {
@@ -3979,13 +3982,13 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
     }
 
     if let Some(children) = (*cur)
-        .children
+        .children()
         .filter(|_| (*cur).element_type() != XmlElementType::XmlEntityRefNode)
     {
         if children.parent == NodePtr::from_ptr(cur) {
             xml_text_reader_free_node_list(reader, children.as_ptr());
         }
-        (*cur).children = None;
+        (*cur).set_children(None);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0 {
@@ -4106,7 +4109,7 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
             }
             XmlElementType::XmlElementNode => {
                 let tmp: *mut XmlChar = xml_text_reader_collect_siblings(
-                    (*node).children.map_or(null_mut(), |c| c.as_ptr()),
+                    (*node).children().map_or(null_mut(), |c| c.as_ptr()),
                 );
                 // xml_buffer_cat(buffer, tmp);
                 xml_buf_cat(buffer, tmp);

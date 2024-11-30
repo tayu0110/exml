@@ -4413,7 +4413,7 @@ pub unsafe extern "C" fn html_is_auto_closed(doc: HtmlDocPtr, elem: HtmlNodePtr)
     if elem.is_null() {
         return 1;
     }
-    let mut child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+    let mut child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if html_auto_close_tag(doc, (*elem).name, child) != 0 {
             return 1;
@@ -5481,7 +5481,7 @@ pub unsafe extern "C" fn html_auto_close_tag(
     if html_check_auto_close((*elem).name, name) != 0 {
         return 1;
     }
-    let mut child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+    let mut child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
         if html_auto_close_tag(_doc, name, child) != 0 {
             return 1;

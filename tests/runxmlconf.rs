@@ -758,7 +758,7 @@ unsafe extern "C" fn xmlconf_test_cases(
             xml_free(profile as _);
         }
     }
-    cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         // look only at elements we ignore everything else
         if (*cur).element_type() == XmlElementType::XmlElementNode {
@@ -801,7 +801,7 @@ unsafe extern "C" fn xmlconf_test_suite(
     } else {
         println!("Test suite");
     }
-    cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
         // look only at elements we ignore everything else
         if (*cur).element_type() == XmlElementType::XmlElementNode {

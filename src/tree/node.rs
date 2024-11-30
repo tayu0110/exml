@@ -737,7 +737,7 @@ pub struct XmlNode {
     pub _private: *mut c_void,          /* application data */
     pub(crate) typ: XmlElementType,     /* type number, must be second ! */
     pub name: *const XmlChar,           /* the name of the node, or the entity */
-    pub children: Option<NodePtr>,      /* parent->childs link */
+    children: Option<NodePtr>,          /* parent->childs link */
     pub last: Option<NodePtr>,          /* last child link */
     pub(crate) parent: Option<NodePtr>, /* child->parent link */
     pub next: Option<NodePtr>,          /* next sibling link  */

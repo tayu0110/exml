@@ -485,7 +485,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             }
         } else if (*node)
             .parent
-            .filter(|p| p.children != NodePtr::from_ptr(node))
+            .filter(|p| p.children() != NodePtr::from_ptr(node))
             .is_some()
         {
             xml_debug_err(
@@ -1293,7 +1293,7 @@ unsafe extern "C" fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr)
         return;
     }
     xml_ctxt_dump_one_node(ctxt, node);
-    if let Some(children) = (*node).children.filter(|_| {
+    if let Some(children) = (*node).children().filter(|_| {
         (*node).element_type() != XmlElementType::XmlNamespaceDecl
             && (*node).element_type() != XmlElementType::XmlEntityRefNode
     }) {
@@ -1918,7 +1918,7 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
 
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
-            list = (*node).children.map_or(null_mut(), |c| c.as_ptr());
+            list = (*node).children().map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             list = (*node)
@@ -2190,7 +2190,7 @@ pub unsafe extern "C" fn xml_shell_list(
     } else if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
         xml_ls_one_node(&mut (*ctxt).output, node);
         return 0;
-    } else if let Some(children) = (*node).children {
+    } else if let Some(children) = (*node).children() {
         cur = children.as_ptr();
     } else {
         xml_ls_one_node(&mut (*ctxt).output, node);
@@ -2630,7 +2630,7 @@ pub unsafe extern "C" fn xml_shell_du(
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         } else if let Some(children) = (*node)
-            .children
+            .children()
             .filter(|_| (*node).element_type() != XmlElementType::XmlEntityRefNode)
         {
             // deep first
@@ -2825,7 +2825,7 @@ unsafe extern "C" fn xml_shell_grep(
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         } else if let Some(children) = (*node)
-            .children
+            .children()
             .filter(|_| (*node).element_type() != XmlElementType::XmlEntityRefNode)
         {
             // deep first
@@ -2885,9 +2885,9 @@ unsafe extern "C" fn xml_shell_set_content(
         addr_of_mut!(results),
     );
     if ret == XmlParserErrors::XmlErrOK {
-        if let Some(children) = (*node).children {
+        if let Some(children) = (*node).children() {
             xml_free_node_list(children.as_ptr());
-            (*node).children = None;
+            (*node).set_children(None);
             (*node).last = None;
         }
         (*node).add_child_list(results);

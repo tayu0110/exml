@@ -4482,14 +4482,12 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
     }
 
     if !lst.is_null() && (ret == 0 || recover == 1) {
-        /*
-         * Return the newly created nodeset after unlinking it from
-         * they pseudo parent.
-         */
+        // Return the newly created nodeset after unlinking it from
+        // they pseudo parent.
         let mut cur = (*new_doc)
             .children
             .unwrap()
-            .children
+            .children()
             .map_or(null_mut(), |c| c.as_ptr());
         *lst = cur;
         while !cur.is_null() {
@@ -4497,7 +4495,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
             (*cur).parent = None;
             cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        (*new_doc).children.unwrap().children = None;
+        (*new_doc).children.unwrap().set_children(None);
     }
 
     if !sax.is_null() {
@@ -4703,16 +4701,16 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         if !list.is_null() {
             // Return the newly created nodeset after unlinking it from they pseudo parent.
             let mut cur = (*new_doc)
-                .children
+                .children()
                 .unwrap()
-                .children
+                .children()
                 .map_or(null_mut(), |c| c.as_ptr());
             *list = cur;
             while !cur.is_null() {
                 (*cur).parent = None;
                 cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
             }
-            (*new_doc).children.unwrap().children = None;
+            (*new_doc).children.unwrap().set_children(None);
         }
         ret = XmlParserErrors::XmlErrOK;
     }
@@ -8755,13 +8753,11 @@ unsafe extern "C" fn are_blanks(
         }
     }
 
-    /*
-     * Otherwise, heuristic :-\
-     */
+    // Otherwise, heuristic :-\
     if (*ctxt).current_byte() != b'<' && (*ctxt).current_byte() != 0xD {
         return 0;
     }
-    if (*(*ctxt).node).children.is_none()
+    if (*(*ctxt).node).children().is_none()
         && (*ctxt).current_byte() == b'<'
         && (*ctxt).nth_byte(1) == b'/'
     // index out of bound may occur at this `nth_byte` ??? It may be necessary to fix.
@@ -8778,7 +8774,7 @@ unsafe extern "C" fn are_blanks(
         }
     } else if (*last_child).is_text_node()
         || (*(*ctxt).node)
-            .children
+            .children()
             .filter(|c| c.is_text_node())
             .is_some()
     {

@@ -3207,7 +3207,7 @@ unsafe extern "C" fn xml_sax2_text(
             last_child = xml_new_cdata_block((*ctxt).my_doc, ch, len);
         }
         if !last_child.is_null() {
-            (*(*ctxt).node).children = NodePtr::from_ptr(last_child);
+            (*(*ctxt).node).set_children(NodePtr::from_ptr(last_child));
             (*(*ctxt).node).last = NodePtr::from_ptr(last_child);
             (*last_child).parent = NodePtr::from_ptr((*ctxt).node);
             (*last_child).doc = (*(*ctxt).node).doc;
@@ -3287,7 +3287,7 @@ unsafe extern "C" fn xml_sax2_text(
             if xml_text_concat(last_child, ch, len) != 0 {
                 xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
             }
-            if (*(*ctxt).node).children.is_some() {
+            if (*(*ctxt).node).children().is_some() {
                 (*ctxt).nodelen = xml_strlen((*last_child).content);
                 (*ctxt).nodemem = (*ctxt).nodelen + 1;
             }
@@ -3303,7 +3303,7 @@ unsafe extern "C" fn xml_sax2_text(
             }
             if !last_child.is_null() {
                 (*(*ctxt).node).add_child(last_child);
-                if (*(*ctxt).node).children.is_some() {
+                if (*(*ctxt).node).children().is_some() {
                     (*ctxt).nodelen = len;
                     (*ctxt).nodemem = len + 1;
                 }

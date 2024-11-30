@@ -250,7 +250,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             (*ctxt).legacy = 1;
         }
         if xml_str_equal((*node).name, XINCLUDE_NODE.as_ptr() as _) {
-            let mut child: XmlNodePtr = (*node).children.map_or(null_mut(), |c| c.as_ptr());
+            let mut child: XmlNodePtr = (*node).children().map_or(null_mut(), |c| c.as_ptr());
             let mut nb_fallback: i32 = 0;
 
             while !child.is_null() {
@@ -959,7 +959,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
     let mut cur: XmlNodePtr;
 
     if copy_children != 0 {
-        cur = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+        cur = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
         if cur.is_null() {
             return null_mut();
         }
@@ -1008,7 +1008,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
             }
 
             recurse = ((*cur).element_type() != XmlElementType::XmlEntityRefNode
-                && (*cur).children.is_some()) as i32;
+                && (*cur).children().is_some()) as i32;
         }
 
         if !copy.is_null() {
@@ -1019,7 +1019,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
                 (*insert_last).next = NodePtr::from_ptr(copy);
                 (*copy).prev = NodePtr::from_ptr(insert_last);
             } else if !insert_parent.is_null() {
-                (*insert_parent).children = NodePtr::from_ptr(copy);
+                (*insert_parent).set_children(NodePtr::from_ptr(copy));
             }
             insert_last = copy;
             while let Some(next) = (*insert_last).next {
@@ -1028,7 +1028,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
         }
 
         if recurse != 0 {
-            cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+            cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
             insert_parent = insert_last;
             insert_last = null_mut();
             continue;
@@ -1066,7 +1066,7 @@ unsafe extern "C" fn xml_xinclude_get_nth_child(mut cur: XmlNodePtr, no: i32) ->
     if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return null_mut();
     }
-    cur = (*cur).children;
+    cur = (*cur).children();
     i = 0;
     while i <= no {
         if cur.is_null() {
@@ -1227,7 +1227,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                     cur = xml_xinclude_get_nth_child(cur, index1 - 1);
                     index1 = 0;
                 } else {
-                    cur = (*cur).children;
+                    cur = (*cur).children();
                 }
                 level += 1; /* increment level to show change */
                 /*
@@ -2204,7 +2204,7 @@ unsafe extern "C" fn xml_xinclude_load_fallback(
     {
         return -1;
     }
-    if (*fallback).children.is_some() {
+    if (*fallback).children().is_some() {
         /*
          * It's possible that the fallback also has 'includes'
          * (Bug 129969), so we re-process the fallback just in case
@@ -2326,29 +2326,23 @@ unsafe extern "C" fn xml_xinclude_load_node(
         return -1;
     }
 
-    /*
-     * Save the base for this include (saving the current one)
-     */
+    // Save the base for this include (saving the current one)
     let old_base: *mut XmlChar = (*ctxt).base;
     (*ctxt).base = base;
 
     if xml != 0 {
         ret = xml_xinclude_load_doc(ctxt, uri, refe);
-    /* xmlXIncludeGetFragment(ctxt, cur, URI); */
+    // xmlXIncludeGetFragment(ctxt, cur, URI);
     } else {
         ret = xml_xinclude_load_txt(ctxt, uri, refe);
     }
 
-    /*
-     * Restore the original base before checking for fallback
-     */
+    // Restore the original base before checking for fallback
     (*ctxt).base = old_base;
 
     if ret < 0 {
-        /*
-         * Time to try a fallback if available
-         */
-        let mut children = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+        // Time to try a fallback if available
+        let mut children = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         while !children.is_null() {
             if (*children).element_type() == XmlElementType::XmlElementNode
                 && !(*children).ns.is_null()
@@ -2372,9 +2366,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
         );
     }
 
-    /*
-     * Cleanup
-     */
+    // Cleanup
     if !uri.is_null() {
         xml_free(uri as _);
     }
@@ -2518,7 +2510,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
         }
         (*cur).typ = XmlElementType::XmlXIncludeStart;
         // Remove fallback children
-        let mut child = (*cur).children;
+        let mut child = (*cur).children();
         while let Some(mut now) = child {
             let next = now.next;
             now.unlink();
@@ -2587,7 +2579,7 @@ unsafe extern "C" fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: Xml
                 if !refe.is_null() {
                     (*refe).replace = 1;
                 }
-            } else if let Some(children) = (*cur).children.filter(|_| {
+            } else if let Some(children) = (*cur).children().filter(|_| {
                 matches!(
                     (*cur).element_type(),
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlElementNode

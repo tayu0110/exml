@@ -1126,7 +1126,7 @@ unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> Xml
     if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return cur;
     }
-    cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+    cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
     i = 0;
     while i <= no {
         if cur.is_null() {

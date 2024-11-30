@@ -26,7 +26,7 @@ use exml::{
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
-    tree::{xml_free_doc, XmlDocPtr},
+    tree::{xml_free_doc, NodeCommon, XmlDocPtr},
 };
 use libc::{memset, strlen};
 
@@ -762,7 +762,7 @@ unsafe extern "C" fn test_user_encoding() -> c_int {
         panic!("failed to parse document");
     }
 
-    let text: *mut XmlChar = (*doc).children.unwrap().children.unwrap().content;
+    let text: *mut XmlChar = (*doc).children().unwrap().children().unwrap().content;
     eprintln!(
         "text: {}",
         std::str::from_utf8_unchecked(std::slice::from_raw_parts(text, text_size as usize))

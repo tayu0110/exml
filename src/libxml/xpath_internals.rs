@@ -1143,7 +1143,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_value_tree<'a>(
     xml_xpath_debug_dump_node_list(
         output,
         (*(*(*cur).node_tab.add(0)))
-            .children
+            .children()
             .map_or(null_mut(), |c| c.as_ptr()),
         depth + 1,
     );
@@ -5764,7 +5764,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                     (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
                                 }
                             }
-                            if (*cur).children.is_none() || depth >= max_depth {
+                            if (*cur).children().is_none() || depth >= max_depth {
                                 // ret =
                                 xml_stream_pop(patstream);
                                 while let Some(next) = (*cur).next {
@@ -5788,7 +5788,7 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                 if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
                     break 'main;
                 }
-                if let Some(children) = (*cur).children.filter(|_| depth < max_depth) {
+                if let Some(children) = (*cur).children().filter(|_| depth < max_depth) {
                     /*
                      * Do not descend on entities declarations
                      */
@@ -9517,7 +9517,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             .as_ref()
             .get_root_element();
         if tmp.is_null() {
-            node = (*node).children.map_or(null_mut(), |c| c.as_ptr());
+            node = (*node).children().map_or(null_mut(), |c| c.as_ptr());
         } else {
             node = tmp;
         }
@@ -9560,7 +9560,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
                 .map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlElementNode => {
-            tmp = (*node).children.map_or(null_mut(), |c| c.as_ptr());
+            tmp = (*node).children().map_or(null_mut(), |c| c.as_ptr());
         }
         _ => {
             return 0;
@@ -9587,7 +9587,7 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             }
         }
         // Skip to next node
-        if let Some(children) = (*tmp).children.filter(|children| {
+        if let Some(children) = (*tmp).children().filter(|children| {
             !matches!((*tmp).element_type(), XmlElementType::XmlDTDNode)
                 && !matches!(children.element_type(), XmlElementType::XmlEntityDecl)
         }) {
@@ -10862,7 +10862,7 @@ pub unsafe extern "C" fn xml_xpath_next_child(
             | XmlElementType::XmlNotationNode
             | XmlElementType::XmlDTDNode => {
                 return (*(*(*ctxt).context).node)
-                    .children
+                    .children()
                     .map_or(null_mut(), |c| c.as_ptr());
             }
             XmlElementType::XmlDocumentNode
@@ -10927,14 +10927,14 @@ pub unsafe extern "C" fn xml_xpath_next_descendant(
                 .map_or(null_mut(), |c| c.as_ptr());
         }
         return (*(*(*ctxt).context).node)
-            .children
+            .children()
             .map_or(null_mut(), |c| c.as_ptr());
     }
 
     if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    if let Some(children) = (*cur).children {
+    if let Some(children) = (*cur).children() {
         // Do not descend on entities declarations
         if !matches!(children.element_type(), XmlElementType::XmlEntityDecl) {
             cur = children.as_ptr();
@@ -11158,9 +11158,9 @@ pub unsafe extern "C" fn xml_xpath_next_following(
             (*cur).element_type(),
             XmlElementType::XmlAttributeNode | XmlElementType::XmlNamespaceDecl
         )
-        && (*cur).children.is_some()
+        && (*cur).children().is_some()
     {
-        return (*cur).children.unwrap().as_ptr();
+        return (*cur).children().unwrap().as_ptr();
     }
 
     if cur.is_null() {

@@ -434,9 +434,9 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 xml_dtd_dump_output(ctxt, cur as _);
             }
             XmlElementType::XmlDocumentFragNode => {
-                /* Always validate (*cur).parent when descending. */
+                // Always validate (*cur).parent when descending.
                 if let Some(children) = (*cur)
-                    .children
+                    .children()
                     .filter(|_| (*cur).parent == NodePtr::from_ptr(parent))
                 {
                     parent = cur;
@@ -487,7 +487,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
                 // Some users like lxml are known to pass nodes with a corrupted
                 // tree structure. Fall back to a recursive call to handle this case.
-                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children.is_some() {
+                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     (*ctxt).buf.borrow_mut().write_bytes(b"<");
@@ -513,7 +513,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                         attr = (*attr).next;
                     }
 
-                    if let Some(children) = (*cur).children {
+                    if let Some(children) = (*cur).children() {
                         if (*ctxt).format == 1 {
                             tmp = children.as_ptr();
                             while !tmp.is_null() {
@@ -952,7 +952,7 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
             return 0;
         }
     }
-    if (*node).children.is_some() {
+    if (*node).children().is_some() {
         return 0;
     }
     match *(*node).name.add(0) {
@@ -1064,7 +1064,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             XmlElementType::XmlDocumentFragNode => {
                 /* Always validate (*cur).parent when descending. */
                 if let Some(children) = (*cur)
-                    .children
+                    .children()
                     .filter(|_| (*cur).parent == NodePtr::from_ptr(parent))
                 {
                     parent = cur;
@@ -1120,7 +1120,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                  * tree structure. Fall back to a recursive call to handle this
                  * case.
                  */
-                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children.is_some() {
+                if (*cur).parent != NodePtr::from_ptr(parent) && (*cur).children().is_some() {
                     xhtml_node_dump_output(ctxt, cur);
                     break;
                 }
@@ -1164,7 +1164,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     && xml_str_equal((*cur).name, c"head".as_ptr() as _)
                     && xml_str_equal((*parent).name, c"html".as_ptr() as _)
                 {
-                    tmp = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+                    tmp = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
                     while !tmp.is_null() {
                         if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) {
                             let httpequiv: *mut XmlChar = (*tmp).get_prop("http-equiv");
@@ -1183,7 +1183,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     }
                 }
 
-                if let Some(children) = (*cur).children {
+                if let Some(children) = (*cur).children() {
                     (*ctxt).buf.borrow_mut().write_bytes(b">");
                     if addmeta == 1 {
                         if (*ctxt).format == 1 {

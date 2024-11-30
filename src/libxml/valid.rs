@@ -4638,7 +4638,7 @@ pub unsafe extern "C" fn xml_validate_element(
                 ns = (*ns).next;
             }
 
-            if let Some(children) = (*elem).children {
+            if let Some(children) = (*elem).children() {
                 elem = children.as_ptr();
                 continue;
             }
@@ -4791,20 +4791,20 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
         return 0;
     }
 
-    let child = (*elem).children;
+    let child = (*elem).children();
 
     let mut cur = child;
     'done: while let Some(now) = cur {
         match now.element_type() {
             XmlElementType::XmlEntityRefNode => {
-                /*
-                 * Push the current node to be able to roll back
-                 * and process within the entity
-                 */
-                if let Some(children) = now.children.filter(|children| children.children.is_some())
+                // Push the current node to be able to roll back
+                // and process within the entity
+                if let Some(children) = now
+                    .children()
+                    .filter(|children| children.children().is_some())
                 {
                     node_vpush(ctxt, now.as_ptr());
-                    cur = children.children;
+                    cur = children.children();
                     continue;
                 }
             }
@@ -5512,16 +5512,14 @@ unsafe extern "C" fn xml_validate_element_content(
                     while !cur.is_null() {
                         match (*cur).element_type() {
                             XmlElementType::XmlEntityRefNode => {
-                                /*
-                                 * Push the current node to be able to roll back
-                                 * and process within the entity
-                                 */
+                                // Push the current node to be able to roll back
+                                // and process within the entity
                                 if let Some(children) = (*cur)
-                                    .children
-                                    .filter(|children| children.children.is_some())
+                                    .children()
+                                    .filter(|children| children.children().is_some())
                                 {
                                     node_vpush(ctxt, cur);
-                                    cur = children.children.map_or(null_mut(), |c| c.as_ptr());
+                                    cur = children.children().map_or(null_mut(), |c| c.as_ptr());
                                     continue;
                                 }
                             }
@@ -5863,7 +5861,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
             return 0;
         }
         XmlElementType::XmlTextNode => {
-            if (*elem).children.is_some() {
+            if (*elem).children().is_some() {
                 xml_err_valid_node(
                     ctxt,
                     elem,
@@ -6004,7 +6002,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                 return 0;
             }
             XmlElementTypeVal::XmlElementTypeEmpty => {
-                if (*elem).children.is_some() {
+                if (*elem).children().is_some() {
                     xml_err_valid_node(
                         ctxt,
                         elem,
@@ -6039,7 +6037,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         );
                     }
                 } else {
-                    child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+                    child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
                     /* Hum, this start to get messy */
                     while !child.is_null() {
                         'child_ok: {
@@ -6165,7 +6163,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                      *     - element types with element content, if white space
                      *       occurs directly within any instance of those types.
                      */
-                    child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+                    child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
                     while !child.is_null() {
                         if matches!((*child).element_type(), XmlElementType::XmlTextNode) {
                             let mut content: *const XmlChar = (*child).content;
@@ -6182,7 +6180,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
                     }
                 }
-                child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
+                child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
                 // cont = (*elem_decl).content;
                 tmp = xml_validate_element_content(ctxt, child, elem_decl, 1, elem);
                 if tmp <= 0 {
@@ -7488,7 +7486,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     } else {
         null_mut()
     };
-    let parent_childs: *mut XmlNode = (*parent).children.map_or(null_mut(), |c| c.as_ptr());
+    let parent_childs: *mut XmlNode = (*parent).children().map_or(null_mut(), |c| c.as_ptr());
     let parent_last: *mut XmlNode = (*parent).last.map_or(null_mut(), |l| l.as_ptr());
 
     /*
@@ -7512,7 +7510,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     if !prev.is_null() {
         (*prev).next = NodePtr::from_ptr(test_node);
     } else {
-        (*parent).children = NodePtr::from_ptr(test_node);
+        (*parent).set_children(NodePtr::from_ptr(test_node));
     }
 
     if !next.is_null() {
@@ -7555,7 +7553,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     if !next.is_null() {
         (*next).prev = NodePtr::from_ptr(next_prev);
     }
-    (*parent).children = NodePtr::from_ptr(parent_childs);
+    (*parent).set_children(NodePtr::from_ptr(parent_childs));
     (*parent).last = NodePtr::from_ptr(parent_last);
 
     // Free up the dummy node

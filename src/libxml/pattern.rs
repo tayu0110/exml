@@ -1607,7 +1607,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     break 'rollback;
                                 }
 
-                                lst = (*node).children.map_or(null_mut(), |c| c.as_ptr());
+                                lst = (*node).children().map_or(null_mut(), |c| c.as_ptr());
 
                                 if !(*step).value.is_null() {
                                     while !lst.is_null() {

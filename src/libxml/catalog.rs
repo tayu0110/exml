@@ -1465,12 +1465,10 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             }
         }
         if (*entry).typ == XmlCatalogEntryType::XmlCataGroup {
-            /*
-             * Recurse to propagate prefer to the subtree
-             * (xml:base handling is automated)
-             */
+            // Recurse to propagate prefer to the subtree
+            // (xml:base handling is automated)
             xml_parse_xml_catalog_node_list(
-                (*cur).children.map_or(null_mut(), |c| c.as_ptr()),
+                (*cur).children().map_or(null_mut(), |c| c.as_ptr()),
                 prefer,
                 parent,
                 entry,
@@ -1579,7 +1577,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             }
             xml_free(prop as _);
         }
-        cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
+        cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, parent, null_mut());
     } else {
         xml_catalog_err(
