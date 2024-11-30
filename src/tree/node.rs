@@ -513,6 +513,104 @@ pub trait NodeCommon {
         null_mut()
     }
 
+    /// Finds the current number of child nodes of that element which are element nodes.
+    ///
+    /// Note the handling of entities references is different than in
+    /// the W3C DOM element traversal spec since we don't have back reference
+    /// from entities content to entities references.
+    ///
+    /// Returns the count of element child or 0 if not available
+    #[doc(alias = "xmlChildElementCount")]
+    #[cfg(feature = "libxml_tree")]
+    fn child_element_count(&self) -> u64 {
+        let mut ret = 0;
+
+        let mut next = match self.element_type() {
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlHTMLDocumentNode => self.children(),
+            _ => {
+                return 0;
+            }
+        };
+        while let Some(cur) = next {
+            if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
+                ret += 1;
+            }
+            next = cur.next();
+        }
+        ret
+    }
+
+    /// Finds the first closest next sibling of the node which is an element node.
+    ///
+    /// Note the handling of entities references is different than in
+    /// the W3C DOM element traversal spec since we don't have back reference
+    /// from entities content to entities references.
+    ///
+    /// Returns the next element sibling or NULL if not available
+    #[doc(alias = "xmlNextElementSibling")]
+    #[cfg(feature = "libxml_tree")]
+    fn next_element_sibling(&self) -> XmlNodePtr {
+        let mut cur = match self.element_type() {
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => self.next(),
+            _ => {
+                return null_mut();
+            }
+        };
+        while let Some(now) = cur {
+            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                return now.as_ptr();
+            }
+            cur = now.next();
+        }
+        null_mut()
+    }
+
+    /// Finds the first closest previous sibling of the node which is an element node.
+    ///
+    /// Note the handling of entities references is different than in
+    /// the W3C DOM element traversal spec since we don't have back reference
+    /// from entities content to entities references.
+    ///
+    /// Returns the previous element sibling or null_mut() if not available
+    #[doc(alias = "xmlPreviousElementSibling")]
+    #[cfg(feature = "libxml_tree")]
+    fn previous_element_sibling(&self) -> XmlNodePtr {
+        let mut node = match self.element_type() {
+            XmlElementType::XmlElementNode
+            | XmlElementType::XmlTextNode
+            | XmlElementType::XmlCDATASectionNode
+            | XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlPINode
+            | XmlElementType::XmlCommentNode
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd => self.prev(),
+            _ => {
+                return null_mut();
+            }
+        };
+        while let Some(now) = node {
+            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
+                return now.as_ptr();
+            }
+            node = now.prev();
+        }
+        null_mut()
+    }
+
     /// Unlink a node from it's current context, the node is not freed.  
     /// If one need to free the node, use xmlFreeNode() routine after the unlink to discard it.  
     ///
@@ -2614,104 +2712,6 @@ impl XmlNode {
         self.set_last(NodePtr::from_ptr(cur));
 
         cur
-    }
-
-    /// Finds the current number of child nodes of that element which are element nodes.
-    ///
-    /// Note the handling of entities references is different than in
-    /// the W3C DOM element traversal spec since we don't have back reference
-    /// from entities content to entities references.
-    ///
-    /// Returns the count of element child or 0 if not available
-    #[doc(alias = "xmlChildElementCount")]
-    #[cfg(feature = "libxml_tree")]
-    pub unsafe fn child_element_count(&self) -> u64 {
-        let mut ret = 0;
-
-        let mut next = match self.element_type() {
-            XmlElementType::XmlElementNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlDocumentNode
-            | XmlElementType::XmlDocumentFragNode
-            | XmlElementType::XmlHTMLDocumentNode => self.children(),
-            _ => {
-                return 0;
-            }
-        };
-        while let Some(cur) = next {
-            if matches!(cur.element_type(), XmlElementType::XmlElementNode) {
-                ret += 1;
-            }
-            next = cur.next();
-        }
-        ret
-    }
-
-    /// Finds the first closest next sibling of the node which is an element node.
-    ///
-    /// Note the handling of entities references is different than in
-    /// the W3C DOM element traversal spec since we don't have back reference
-    /// from entities content to entities references.
-    ///
-    /// Returns the next element sibling or NULL if not available
-    #[doc(alias = "xmlNextElementSibling")]
-    #[cfg(feature = "libxml_tree")]
-    pub unsafe fn next_element_sibling(&self) -> XmlNodePtr {
-        let mut cur = match self.element_type() {
-            XmlElementType::XmlElementNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlDTDNode
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => self.next(),
-            _ => {
-                return null_mut();
-            }
-        };
-        while let Some(now) = cur {
-            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return now.as_ptr();
-            }
-            cur = now.next();
-        }
-        null_mut()
-    }
-
-    /// Finds the first closest previous sibling of the node which is an element node.
-    ///
-    /// Note the handling of entities references is different than in
-    /// the W3C DOM element traversal spec since we don't have back reference
-    /// from entities content to entities references.
-    ///
-    /// Returns the previous element sibling or null_mut() if not available
-    #[doc(alias = "xmlPreviousElementSibling")]
-    #[cfg(feature = "libxml_tree")]
-    pub unsafe fn previous_element_sibling(&self) -> XmlNodePtr {
-        let mut node = match self.element_type() {
-            XmlElementType::XmlElementNode
-            | XmlElementType::XmlTextNode
-            | XmlElementType::XmlCDATASectionNode
-            | XmlElementType::XmlEntityRefNode
-            | XmlElementType::XmlEntityNode
-            | XmlElementType::XmlPINode
-            | XmlElementType::XmlCommentNode
-            | XmlElementType::XmlXIncludeStart
-            | XmlElementType::XmlXIncludeEnd => self.prev(),
-            _ => {
-                return null_mut();
-            }
-        };
-        while let Some(now) = node {
-            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                return now.as_ptr();
-            }
-            node = now.prev();
-        }
-        null_mut()
     }
 
     /// Search a Ns registered under a given name space for a document.  
