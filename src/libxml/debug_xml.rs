@@ -1208,7 +1208,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             return;
         }
         XmlElementType::XmlAttributeDecl => {
-            xml_ctxt_dump_attr_decl(ctxt, node as XmlAttributePtr);
+            xml_ctxt_dump_attr_decl(ctxt, (*node).as_attribute_decl_node().unwrap().as_ptr());
             return;
         }
         XmlElementType::XmlEntityDecl => {
