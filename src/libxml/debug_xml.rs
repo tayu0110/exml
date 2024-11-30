@@ -36,9 +36,10 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_free_node_list, xml_validate_name, NodePtr, XmlAttrPtr, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
-        XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
+        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
+        XmlNsPtr,
     },
 };
 
@@ -1925,7 +1926,10 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
                 .map_or(null_mut(), |c| c.as_ptr());
         }
         XmlElementType::XmlAttributeNode => {
-            list = (*(node as XmlAttrPtr))
+            list = (*node)
+                .as_attribute_node()
+                .unwrap()
+                .as_ref()
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         }
@@ -2081,7 +2085,7 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
     if (*node).typ == XmlElementType::XmlDocumentNode {
         (*(node as XmlDocPtr)).dump_file(&mut boxed);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr_list(&mut boxed, node as XmlAttrPtr, 0);
+        xml_debug_dump_attr_list(&mut boxed, (*node).as_attribute_node().unwrap().as_ptr(), 0);
     } else {
         (*node).dump_file(&mut boxed, (*node).doc);
     }
@@ -2247,7 +2251,11 @@ pub unsafe extern "C" fn xml_shell_dir(
     {
         xml_debug_dump_document_head(Some(&mut (*ctxt).output), node as XmlDocPtr);
     } else if (*node).typ == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr(&mut (*ctxt).output, node as XmlAttrPtr, 0);
+        xml_debug_dump_attr(
+            &mut (*ctxt).output,
+            (*node).as_attribute_node().unwrap().as_ptr(),
+            0,
+        );
     } else {
         xml_debug_dump_one_node(&mut (*ctxt).output, node, 0);
     }

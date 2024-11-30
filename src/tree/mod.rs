@@ -4547,46 +4547,36 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 }
                             }
                             // ns_end:
-                            /*
-                             * Further node properties.
-                             * TODO: Is this all?
-                             */
+                            // Further node properties.
+                            // TODO: Is this all?
                             XML_TREE_ADOPT_STR!((*cur).name, adopt_str, source_doc, dest_doc);
                             if matches!((*cur).typ, XmlElementType::XmlElementNode) {
                                 (*cur).psvi = null_mut();
                                 (*cur).line = 0;
                                 (*cur).extra = 0;
-                                /*
-                                 * Walk attributes.
-                                 */
+                                // Walk attributes.
                                 if !(*cur).properties.is_null() {
-                                    /*
-                                     * Process first attribute node.
-                                     */
+                                    // Process first attribute node.
                                     cur = (*cur).properties as _;
                                     continue;
                                 }
                             } else {
-                                /*
-                                 * Attributes.
-                                 */
+                                // Attributes.
                                 if !source_doc.is_null()
                                     && matches!(
-                                        (*(cur as XmlAttrPtr)).atype,
+                                        (*cur).as_attribute_node().unwrap().as_ref().atype,
                                         Some(XmlAttributeType::XmlAttributeID)
                                     )
                                 {
                                     xml_remove_id(source_doc, cur as _);
                                 }
-                                (*(cur as XmlAttrPtr)).atype = None;
-                                (*(cur as XmlAttrPtr)).psvi = null_mut();
+                                (*cur).as_attribute_node().unwrap().as_mut().atype = None;
+                                (*cur).as_attribute_node().unwrap().as_mut().psvi = null_mut();
                             }
                         }
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                            /*
-                             * This puts the content in the dest dict, only if
-                             * it was previously in the source dict.
-                             */
+                            // This puts the content in the dest dict, only if
+                            // it was previously in the source dict.
                             XML_TREE_ADOPT_STR_2!(
                                 (*cur).content,
                                 adopt_str,
@@ -4598,18 +4588,14 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                             leave_node = true;
                         }
                         XmlElementType::XmlEntityRefNode => {
-                            /*
-                             * Remove reference to the entity-node.
-                             */
+                            // Remove reference to the entity-node.
                             (*cur).content = null_mut();
                             (*cur).children = None;
                             (*cur).last = None;
                             if !(*dest_doc).int_subset.is_null()
                                 || !(*dest_doc).ext_subset.is_null()
                             {
-                                /*
-                                 * Assign new entity-node if available.
-                                 */
+                                // Assign new entity-node if available.
                                 let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
                                 if !ent.is_null() {
                                     (*cur).content = (*ent).content.load(Ordering::Relaxed);
@@ -4637,9 +4623,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                     }
 
                     if !leave_node {
-                        /*
-                         * Walk the tree.
-                         */
+                        // Walk the tree.
                         if let Some(children) = (*cur).children {
                             cur = children.as_ptr();
                             continue;
@@ -4658,19 +4642,13 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                             | XmlElementType::XmlXIncludeStart
                             | XmlElementType::XmlXIncludeEnd
                     ) {
-                        /*
-                         * TODO: Do we expect nsDefs on xmlElementType::XML_XINCLUDE_START?
-                         */
+                        // TODO: Do we expect nsDefs on xmlElementType::XML_XINCLUDE_START?
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
-                            /*
-                             * Pop mappings.
-                             */
+                            // Pop mappings.
                             while !(*ns_map).last.is_null() && (*(*ns_map).last).depth >= depth {
                                 XML_NSMAP_POP!(ns_map, mi);
                             }
-                            /*
-                             * Unshadow.
-                             */
+                            // Unshadow.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
                                 if (*mi).shadow_depth >= depth {
                                     (*mi).shadow_depth = -1;
@@ -4702,14 +4680,10 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
     }
 
     // exit:
-    /*
-     * Cleanup.
-     */
+    // Cleanup.
     if !ns_map.is_null() {
         if !ctxt.is_null() && (*ctxt).namespace_map == ns_map as _ {
-            /*
-             * Just cleanup the map but don't free.
-             */
+            // Just cleanup the map but don't free.
             if !(*ns_map).first.is_null() {
                 if !(*ns_map).pool.is_null() {
                     (*(*ns_map).last).next = (*ns_map).pool;

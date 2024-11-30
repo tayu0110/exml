@@ -1219,7 +1219,7 @@ pub unsafe fn html_node_dump_format_output(
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                html_attr_dump_output(buf, doc, cur as XmlAttrPtr);
+                html_attr_dump_output(buf, doc, (*cur).as_attribute_node().unwrap().as_ptr());
             }
 
             HTML_TEXT_NODE => 'to_break: {

@@ -22,7 +22,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null, null_mut, NonNull},
     sync::atomic::Ordering,
 };
 
@@ -2820,34 +2820,33 @@ pub unsafe extern "C" fn xml_free_id_table(table: XmlIDTablePtr) {
 
 /// Search the attribute declaring the given ID
 ///
-/// Returns null_mut() if not found, otherwise the xmlAttrPtr defining the ID
+/// Returns null_mut() if not found,
+/// otherwise the xmlAttrPtr defining the ID or XmlDocPtr as `*mut dyn NodeCommon`.
 #[doc(alias = "xmlGetID")]
-pub unsafe extern "C" fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> XmlAttrPtr {
+pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<dyn NodeCommon>> {
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
 
     if id.is_null() {
-        return null_mut();
+        return None;
     }
 
     let table: XmlIDTablePtr = (*doc).ids as XmlIDTablePtr;
     if table.is_null() {
-        return null_mut();
+        return None;
     }
 
     let id_ptr: XmlIDPtr = xml_hash_lookup(table, id) as _;
     if id_ptr.is_null() {
-        return null_mut();
+        return None;
     }
     if (*id_ptr).attr.is_null() {
-        /*
-         * We are operating on a stream, return a well known reference
-         * since the attribute node doesn't exist anymore
-         */
-        return doc as XmlAttrPtr;
+        // We are operating on a stream, return a well known reference
+        // since the attribute node doesn't exist anymore
+        return NonNull::new(doc as *mut dyn NodeCommon);
     }
-    (*id_ptr).attr
+    NonNull::new((*id_ptr).attr as *mut dyn NodeCommon)
 }
 
 /// Determine whether an attribute is of type ID. In case we have DTD(s)
@@ -6974,8 +6973,6 @@ unsafe extern "C" fn xml_validate_ref(
     ctxt: XmlValidCtxtPtr,
     name: *const XmlChar,
 ) {
-    let mut id: XmlAttrPtr;
-
     if refe.is_null() {
         return;
     }
@@ -7001,8 +6998,7 @@ unsafe extern "C" fn xml_validate_ref(
             }
             save = *cur;
             *cur = 0;
-            id = xml_get_id((*ctxt).doc, str);
-            if id.is_null() {
+            if xml_get_id((*ctxt).doc, str).is_none() {
                 xml_err_valid_node_nr(
                     ctxt,
                     null_mut(),
@@ -7024,8 +7020,7 @@ unsafe extern "C" fn xml_validate_ref(
         }
         xml_free(dup as _);
     } else if matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeIDREF)) {
-        id = xml_get_id((*ctxt).doc, name);
-        if id.is_null() {
+        if xml_get_id((*ctxt).doc, name).is_none() {
             xml_err_valid_node(
                 ctxt,
                 (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
@@ -7056,8 +7051,7 @@ unsafe extern "C" fn xml_validate_ref(
             }
             save = *cur;
             *cur = 0;
-            id = xml_get_id((*ctxt).doc, str);
-            if id.is_null() {
+            if xml_get_id((*ctxt).doc, str).is_none() {
                 xml_err_valid_node(
                     ctxt,
                     (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
@@ -9034,7 +9028,7 @@ mod tests {
                     let id = gen_const_xml_char_ptr(n_id, 1);
 
                     let ret_val = xml_get_id(doc, id);
-                    desret_xml_attr_ptr(ret_val);
+                    desret_xml_attr_ptr(ret_val.map_or(null_mut(), |p| p.as_ptr() as XmlAttrPtr));
                     des_xml_doc_ptr(n_doc, doc, 0);
                     des_const_xml_char_ptr(n_id, id, 1);
                     reset_last_error();

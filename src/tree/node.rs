@@ -820,7 +820,7 @@ impl XmlNode {
     pub unsafe fn get_node_path(&self) -> Option<String> {
         use std::ptr::null_mut;
 
-        use crate::{libxml::xmlstring::xml_str_equal, tree::XmlAttrPtr};
+        use crate::libxml::xmlstring::xml_str_equal;
 
         let mut tmp: *const XmlNode;
         let mut next: *const XmlNode;
@@ -1024,9 +1024,12 @@ impl XmlNode {
                         format!("{}", (*cur).name().unwrap()).into()
                     };
                 } else {
-                    name = (*(cur as XmlAttrPtr)).name().unwrap();
+                    name = (*cur).as_attribute_node().unwrap().as_ref().name().unwrap();
                 }
-                next = (*(cur as XmlAttrPtr))
+                next = (*cur)
+                    .as_attribute_node()
+                    .unwrap()
+                    .as_ref()
                     .parent()
                     .map_or(null_mut(), |p| p.as_ptr());
             } else {
@@ -2681,7 +2684,7 @@ impl XmlNode {
                     self.last().unwrap().element_type(),
                     XmlElementType::XmlTextNode
                 )
-                && (*cur).name == self.last.unwrap().name
+                && (*cur).name() == self.last.unwrap().name()
             {
                 self.last().unwrap().add_content((*cur).content);
                 // if it's the only child, nothing more to be done.
@@ -2731,7 +2734,7 @@ impl XmlNode {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
-        if namespace.filter(|&n| n == "xml").is_some() {
+        if namespace == Some("xml") {
             if doc.is_null() && matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 // The XML-1.0 namespace is normally held on the root element.
                 // In this case exceptionally create it on the node element.
@@ -2754,9 +2757,7 @@ impl XmlNode {
                     return null_mut();
                 }
             }
-            /*
-            	* Return the XML namespace declaration held by the doc.
-            	*/
+            // Return the XML namespace declaration held by the doc.
             if (*doc).old_ns.is_null() {
                 return (*doc).ensure_xmldecl() as _;
             } else {

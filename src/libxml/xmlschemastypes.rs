@@ -64,8 +64,8 @@ use crate::{
     },
     tree::{
         xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
-        xml_validate_qname, XmlAttrPtr, XmlAttributeType, XmlElementType, XmlIDPtr, XmlNodePtr,
-        XmlNsPtr,
+        xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlElementType, XmlIDPtr,
+        XmlNodePtr, XmlNsPtr,
     },
 };
 
@@ -2878,11 +2878,10 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).typ == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr = node as XmlAttrPtr;
+                                    let attr: XmlAttrPtr =
+                                        (*node).as_attribute_node().unwrap().as_ptr();
 
-                                    /*
-                                     * NOTE: the IDness might have already be declared in the DTD
-                                     */
+                                    // NOTE: the IDness might have already be declared in the DTD
                                     if !matches!(
                                         (*attr).atype,
                                         Some(XmlAttributeType::XmlAttributeID)
@@ -2919,7 +2918,8 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).typ == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr = node as XmlAttrPtr;
+                                    let attr: XmlAttrPtr =
+                                        (*node).as_attribute_node().unwrap().as_ptr();
 
                                     let strip: *mut XmlChar = xml_schema_strip(value);
                                     if !strip.is_null() {
@@ -2948,7 +2948,8 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).typ == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr = node as XmlAttrPtr;
+                                    let attr: XmlAttrPtr =
+                                        (*node).as_attribute_node().unwrap().as_ptr();
 
                                     (*attr).atype = Some(XmlAttributeType::XmlAttributeIDREFS);
                                 }
@@ -2988,7 +2989,8 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).typ == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr = node as XmlAttrPtr;
+                                    let attr: XmlAttrPtr =
+                                        (*node).as_attribute_node().unwrap().as_ptr();
 
                                     (*attr).atype = Some(XmlAttributeType::XmlAttributeEntity);
                                 }
@@ -3013,7 +3015,8 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     && !node.is_null()
                                     && (*node).typ == XmlElementType::XmlAttributeNode
                                 {
-                                    let attr: XmlAttrPtr = node as XmlAttrPtr;
+                                    let attr: XmlAttrPtr =
+                                        (*node).as_attribute_node().unwrap().as_ptr();
 
                                     (*attr).atype = Some(XmlAttributeType::XmlAttributeEntities);
                                 }
@@ -3179,10 +3182,8 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     if v.is_null() {
                                         break 'error;
                                     }
-                                    /*
-                                     * Copy only the normalized piece.
-                                     * CRITICAL TODO: Check this.
-                                     */
+                                    // Copy only the normalized piece.
+                                    // CRITICAL TODO: Check this.
                                     cur = xml_strndup(start, i);
                                     if cur.is_null() {
                                         xml_schema_type_err_memory(

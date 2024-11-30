@@ -82,7 +82,7 @@ use crate::{
         },
     },
     tree::{
-        xml_buf_content, xml_build_qname, NodePtr, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
+        xml_buf_content, xml_build_qname, NodeCommon, NodePtr, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
         XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xml_str_printf, xml_xpath_node_set_get_length, xml_xpath_node_set_is_empty,
@@ -1051,7 +1051,10 @@ unsafe extern "C" fn xml_xpath_debug_dump_node<'a>(
     cur: XmlNodePtr,
     depth: i32,
 ) {
-    use crate::libxml::debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node};
+    use crate::{
+        libxml::debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
+        tree::NodeCommon,
+    };
 
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
@@ -1067,7 +1070,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_node<'a>(
         write!(output, "{}", shift);
         writeln!(output, " /");
     } else if (*cur).typ == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr(output, cur as XmlAttrPtr, depth);
+        xml_debug_dump_attr(output, (*cur).as_attribute_node().unwrap().as_ptr(), depth);
     } else {
         xml_debug_dump_one_node(output, cur, depth);
     }
@@ -6959,7 +6962,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                             }
                         }
                         XmlElementType::XmlAttributeNode => {
-                            let attr: XmlAttrPtr = cur as XmlAttrPtr;
+                            let attr: XmlAttrPtr = (*cur).as_attribute_node().unwrap().as_ptr();
 
                             if xml_str_equal(name, (*attr).name) {
                                 if prefix.is_null() {
@@ -9551,7 +9554,10 @@ unsafe extern "C" fn xml_xpath_node_val_hash(mut node: XmlNodePtr) -> u32 {
             return *string.add(0) as u32 + ((*string.add(1) as u32) << 8);
         }
         XmlElementType::XmlAttributeNode => {
-            tmp = (*(node as XmlAttrPtr))
+            tmp = (*node)
+                .as_attribute_node()
+                .unwrap()
+                .as_ref()
                 .children
                 .map_or(null_mut(), |c| c.as_ptr());
         }
@@ -11051,7 +11057,10 @@ pub unsafe extern "C" fn xml_xpath_next_parent(
                 return parent.as_ptr();
             }
             XmlElementType::XmlAttributeNode => {
-                let att: XmlAttrPtr = (*(*ctxt).context).node as XmlAttrPtr;
+                let att: XmlAttrPtr = (*(*(*ctxt).context).node)
+                    .as_attribute_node()
+                    .unwrap()
+                    .as_ptr();
 
                 return (*att).parent.map_or(null_mut(), |p| p.as_ptr());
             }
@@ -11435,7 +11444,10 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
                 return parent.as_ptr();
             }
             XmlElementType::XmlAttributeNode => {
-                let tmp: XmlAttrPtr = (*(*ctxt).context).node as XmlAttrPtr;
+                let tmp: XmlAttrPtr = (*(*(*ctxt).context).node)
+                    .as_attribute_node()
+                    .unwrap()
+                    .as_ptr();
 
                 return (*tmp).parent.map_or(null_mut(), |p| p.as_ptr());
             }
@@ -11492,7 +11504,7 @@ pub unsafe extern "C" fn xml_xpath_next_ancestor(
             parent.as_ptr()
         }
         XmlElementType::XmlAttributeNode => {
-            let att: XmlAttrPtr = cur as XmlAttrPtr;
+            let att: XmlAttrPtr = (*cur).as_attribute_node().unwrap().as_ptr();
 
             (*att).parent.map_or(null_mut(), |p| p.as_ptr())
         }
@@ -11630,7 +11642,6 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
 ) -> XmlNodeSetPtr {
     let mut cur: *const XmlChar = ids;
     let mut id: *mut XmlChar;
-    let mut attr: XmlAttrPtr;
     let mut elem: XmlNodePtr;
 
     if ids.is_null() {
@@ -11659,12 +11670,11 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
              * constraint, like Visa3D spec.
              * if (xmlValidateNCName(ID, 1) == 0)
              */
-            attr = xml_get_id(doc, id);
-            if !attr.is_null() {
-                if matches!((*attr).typ, XmlElementType::XmlAttributeNode) {
-                    elem = (*attr).parent.map_or(null_mut(), |p| p.as_ptr());
-                } else if matches!((*attr).typ, XmlElementType::XmlElementNode) {
-                    elem = attr as XmlNodePtr;
+            if let Some(attr) = xml_get_id(doc, id) {
+                if let Some(attr) = attr.as_ref().as_attribute_node() {
+                    elem = attr.as_ref().parent.map_or(null_mut(), |p| p.as_ptr());
+                } else if matches!(attr.as_ref().element_type(), XmlElementType::XmlElementNode) {
+                    elem = attr.as_ref().as_node().unwrap().as_ptr();
                 } else {
                     elem = null_mut();
                 }

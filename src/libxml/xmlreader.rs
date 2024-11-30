@@ -2880,6 +2880,8 @@ impl XmlTextReader {
     pub unsafe fn text_value(&self) -> Option<String> {
         use std::ffi::CStr;
 
+        use crate::tree::NodeCommon;
+
         if self.node.is_null() {
             return None;
         }
@@ -2898,7 +2900,7 @@ impl XmlTextReader {
                 )
             }
             XmlElementType::XmlAttributeNode => {
-                let attr: XmlAttrPtr = node as XmlAttrPtr;
+                let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
 
                 let res = if let Some(parent) = (*attr).parent {
                     (*attr)
@@ -3900,7 +3902,7 @@ unsafe extern "C" fn xml_text_reader_free_prop(reader: XmlTextReaderPtr, cur: Xm
 #[doc(alias = "xmlTextReaderFreeNode")]
 #[cfg(feature = "libxml_reader")]
 unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: XmlNodePtr) {
-    use crate::tree::NodePtr;
+    use crate::tree::{NodeCommon, NodePtr};
 
     let dict = if !reader.is_null() && !(*reader).ctxt.is_null() {
         (*(*reader).ctxt).dict
@@ -3916,7 +3918,7 @@ unsafe extern "C" fn xml_text_reader_free_node(reader: XmlTextReaderPtr, cur: Xm
         return;
     }
     if (*cur).typ == XmlElementType::XmlAttributeNode {
-        xml_text_reader_free_prop(reader, cur as XmlAttrPtr);
+        xml_text_reader_free_prop(reader, (*cur).as_attribute_node().unwrap().as_ptr());
         return;
     }
 
@@ -4329,7 +4331,7 @@ pub unsafe extern "C" fn xml_text_reader_const_string(
 #[doc(alias = "xmlTextReaderConstValue")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
-    use crate::generic_error;
+    use crate::{generic_error, tree::NodeCommon};
 
     if reader.node.is_null() {
         return null_mut();
@@ -4343,7 +4345,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
     match (*node).typ {
         XmlElementType::XmlNamespaceDecl => return (*(node as XmlNsPtr)).href,
         XmlElementType::XmlAttributeNode => {
-            let attr: XmlAttrPtr = node as XmlAttrPtr;
+            let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
             let mut ret: *const XmlChar;
 
             if let Some(children) = (*attr)
