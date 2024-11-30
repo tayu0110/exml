@@ -3844,7 +3844,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
                 && (*oldctxt).well_formed != 0
                 && !(*oldctxt).my_doc.is_null()
                 && !(*(*oldctxt).my_doc).int_subset.is_null()
-                && (*cur).typ == XmlElementType::XmlElementNode
+                && (*cur).element_type() == XmlElementType::XmlElementNode
             {
                 (*oldctxt).valid &=
                     xml_validate_element(addr_of_mut!((*oldctxt).vctxt), (*oldctxt).my_doc, cur);
@@ -4128,13 +4128,12 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
         if matches!(ret, XmlParserErrors::XmlErrOK) && !list.is_null() {
             (*ent).children.store(list, Ordering::Relaxed);
-            /*
-             * Prune it directly in the generated document
-             * except for single text nodes.
-             */
+            // Prune it directly in the generated document
+            // except for single text nodes.
             if (*ctxt).replace_entities == 0
                 || matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
-                || (matches!((*list).typ, XmlElementType::XmlTextNode) && (*list).next.is_none())
+                || (matches!((*list).element_type(), XmlElementType::XmlTextNode)
+                    && (*list).next.is_none())
             {
                 (*ent).owner = 1;
                 while !list.is_null() {
@@ -4351,13 +4350,11 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                         nw = (*(*ctxt).node).add_child(nw);
                     }
                     if cur == (*ent).last.load(Ordering::Relaxed) as _ {
-                        /*
-                         * needed to detect some strange empty
-                         * node cases in the reader tests
-                         */
+                        // needed to detect some strange empty
+                        // node cases in the reader tests
                         if matches!((*ctxt).parse_mode, XmlParserMode::XmlParseReader)
                             && !nw.is_null()
-                            && matches!((*nw).typ, XmlElementType::XmlElementNode)
+                            && matches!((*nw).element_type(), XmlElementType::XmlElementNode)
                             && (*nw).children.is_none()
                         {
                             (*nw).extra = 1;
@@ -4428,14 +4425,14 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let nbktext: *const XmlChar =
                     xml_dict_lookup((*ctxt).dict, c"nbktext".as_ptr() as _, -1);
                 if matches!(
-                    (*(*ent).children.load(Ordering::Relaxed)).typ,
+                    (*(*ent).children.load(Ordering::Relaxed)).element_type(),
                     XmlElementType::XmlTextNode
                 ) {
                     (*(*ent).children.load(Ordering::Relaxed)).name = nbktext;
                 }
                 if (*ent).last.load(Ordering::Relaxed) != (*ent).children.load(Ordering::Relaxed)
                     && matches!(
-                        (*(*ent).last.load(Ordering::Relaxed)).typ,
+                        (*(*ent).last.load(Ordering::Relaxed)).element_type(),
                         XmlElementType::XmlTextNode
                     )
                 {

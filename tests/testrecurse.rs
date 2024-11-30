@@ -35,7 +35,7 @@ use exml::{
         },
         xmlstring::{xml_strlen, XmlChar},
     },
-    tree::{xml_free_doc, XmlDocPtr, XmlElementType},
+    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 
@@ -270,13 +270,13 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) = node.filter(|n| n.as_ref().typ == XmlElementType::XmlElementNode) {
+        if let Some(node) =
+            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
+        {
             name = node.as_ref().name;
         }
 
-        /*
-         * Maintain the compatibility with the legacy error handling
-         */
+        // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
             input = (*ctxt).input;
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {

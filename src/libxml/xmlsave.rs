@@ -53,7 +53,7 @@ use crate::{
         xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
-        is_xhtml, xml_buf_add, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
+        is_xhtml, xml_buf_add, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
         XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr,
         XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
@@ -282,7 +282,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
     if cur.is_null() {
         return;
     }
-    if matches!((*cur).typ, XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
+    if matches!((*cur).element_type(), XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
         if xml_str_equal((*cur).prefix, c"xml".as_ptr() as _) {
             return;
         }
@@ -355,7 +355,7 @@ unsafe extern "C" fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur:
 unsafe extern "C" fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr) {
     let mut children = (*attr).children;
     while let Some(now) = children {
-        match now.typ {
+        match now.element_type() {
             XmlElementType::XmlTextNode => {
                 xml_buf_attr_serialize_txt_content(
                     buf.buffer.map_or(null_mut(), |buf| buf.as_ptr()),
@@ -426,7 +426,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
     let root: XmlNodePtr = cur;
     parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     loop {
-        match (*cur).typ {
+        match (*cur).element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 xml_doc_content_dump_output(ctxt, cur as _);
             }
@@ -518,7 +518,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             tmp = children.as_ptr();
                             while !tmp.is_null() {
                                 if matches!(
-                                    (*tmp).typ,
+                                    (*tmp).element_type(),
                                     XmlElementType::XmlTextNode
                                         | XmlElementType::XmlCDATASectionNode
                                         | XmlElementType::XmlEntityRefNode
@@ -713,7 +713,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             }
             if (*ctxt).format == 1
                 && !matches!(
-                    (*cur).typ,
+                    (*cur).element_type(),
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                 )
             {
@@ -728,7 +728,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
             /* (*cur).parent was validated when descending. */
             parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
-            if matches!((*cur).typ, XmlElementType::XmlElementNode) {
+            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                 if (*ctxt).level > 0 {
                     (*ctxt).level -= 1;
                 }
@@ -943,7 +943,7 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
     if node.is_null() {
         return -1;
     }
-    if !matches!((*node).typ, XmlElementType::XmlElementNode) {
+    if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         return 0;
     }
     {
@@ -1051,7 +1051,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     let root: XmlNodePtr = cur;
     parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     loop {
-        match (*cur).typ {
+        match (*cur).element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 xml_doc_content_dump_output(ctxt, cur as _);
             }
@@ -1213,8 +1213,11 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     if (*ctxt).format == 1 {
                         tmp = children.as_ptr();
                         while !tmp.is_null() {
-                            if (matches!((*tmp).typ, XmlElementType::XmlTextNode)
-                                || matches!((*tmp).typ, XmlElementType::XmlEntityRefNode))
+                            if (matches!((*tmp).element_type(), XmlElementType::XmlTextNode)
+                                || matches!(
+                                    (*tmp).element_type(),
+                                    XmlElementType::XmlEntityRefNode
+                                ))
                             {
                                 unformatted_node = cur;
                                 (*ctxt).format = 0;
@@ -1418,7 +1421,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             /* (*cur).parent was validated when descending. */
             parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
-            if matches!((*cur).typ, XmlElementType::XmlElementNode) {
+            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                 if (*ctxt).level > 0 {
                     (*ctxt).level -= 1;
                 }
@@ -1486,7 +1489,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
     xml_init_parser();
 
     if !matches!(
-        (*cur).typ,
+        (*cur).element_type(),
         XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
     ) {
         return -1;
@@ -1499,7 +1502,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         encoding = Some(enc.to_owned());
     }
 
-    if (matches!((*cur).typ, XmlElementType::XmlHTMLDocumentNode)
+    if (matches!((*cur).element_type(), XmlElementType::XmlHTMLDocumentNode)
         && ((*ctxt).options & XmlSaveOption::XmlSaveAsXML as i32) == 0
         && ((*ctxt).options & XmlSaveOption::XmlSaveXHTML as i32) == 0)
         || (*ctxt).options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
@@ -1548,7 +1551,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
         {
             return -1;
         }
-    } else if matches!((*cur).typ, XmlElementType::XmlDocumentNode)
+    } else if matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
         || (*ctxt).options & XmlSaveOption::XmlSaveAsXML as i32 != 0
         || (*ctxt).options & XmlSaveOption::XmlSaveXHTML as i32 != 0
     {
@@ -1650,7 +1653,7 @@ pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
                     xml_node_dump_output_internal(ctxt, now.as_ptr());
                 }
                 if !matches!(
-                    now.typ,
+                    now.element_type(),
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
                 ) {
                     (*ctxt).buf.borrow_mut().write_bytes(b"\n");
@@ -1881,7 +1884,7 @@ pub unsafe extern "C" fn xml_save_tree(ctxt: XmlSaveCtxtPtr, node: XmlNodePtr) -
             xhtml_node_dump_output(ctxt, node);
             return ret;
         }
-        if (!matches!((*node).typ, XmlElementType::XmlNamespaceDecl)
+        if (!matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
             && !(*node).doc.is_null()
             && matches!((*(*node).doc).typ, XmlElementType::XmlHTMLDocumentNode)
             && (*ctxt).options & XmlSaveOption::XmlSaveAsXML as i32 == 0)

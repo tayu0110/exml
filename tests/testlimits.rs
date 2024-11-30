@@ -32,7 +32,10 @@ use exml::{
         },
         xmlstring::XmlChar,
     },
-    tree::{xml_free_doc, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr},
+    tree::{
+        xml_free_doc, NodeCommon, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlEnumerationPtr,
+    },
 };
 use libc::{memcpy, strlen, strncmp};
 
@@ -484,7 +487,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) = node.filter(|n| n.as_ref().typ == XmlElementType::XmlElementNode) {
+        if let Some(node) =
+            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
+        {
             name = node.as_ref().name;
         }
 

@@ -91,7 +91,7 @@ impl XmlDoc {
     pub unsafe fn get_int_subset(&self) -> XmlDtdPtr {
         let mut cur = self.children;
         while let Some(now) = cur {
-            if matches!(now.typ, XmlElementType::XmlDTDNode) {
+            if matches!(now.element_type(), XmlElementType::XmlDTDNode) {
                 return now.as_ptr() as *mut XmlDtd;
             }
             cur = now.next;
@@ -107,7 +107,7 @@ impl XmlDoc {
     pub unsafe fn get_root_element(&self) -> XmlNodePtr {
         let mut ret = self.children;
         while let Some(now) = ret {
-            if matches!(now.typ, XmlElementType::XmlElementNode) {
+            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                 return now.as_ptr();
             }
             ret = now.next;
@@ -701,7 +701,7 @@ impl XmlDoc {
     pub unsafe fn set_root_element(&mut self, root: XmlNodePtr) -> XmlNodePtr {
         use crate::tree::{xml_replace_node, NodeCommon};
 
-        if root.is_null() || matches!((*root).typ, XmlElementType::XmlNamespaceDecl) {
+        if root.is_null() || matches!((*root).element_type(), XmlElementType::XmlNamespaceDecl) {
             return null_mut();
         }
         (*root).unlink();
@@ -709,7 +709,7 @@ impl XmlDoc {
         (*root).parent = NodePtr::from_ptr(self as *mut XmlDoc as *mut XmlNode);
         let mut old = self.children;
         while let Some(now) = old {
-            if matches!(now.typ, XmlElementType::XmlElementNode) {
+            if matches!(now.element_type(), XmlElementType::XmlElementNode) {
                 break;
             }
             old = now.next;

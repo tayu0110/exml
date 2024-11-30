@@ -48,8 +48,8 @@ use crate::{
     error::XmlParserErrors,
     io::XmlOutputBuffer,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
-        XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType,
+        XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
 };
 
@@ -168,24 +168,24 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 ) -> i32 {
     let nodes: XmlNodeSetPtr = user_data as XmlNodeSetPtr;
     if !nodes.is_null() && !node.is_null() {
-        if !matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
+        if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
             return xml_xpath_node_set_contains(nodes, node);
         } else {
             let mut ns: XmlNs = unsafe { zeroed() };
 
             memcpy(addr_of_mut!(ns) as _, node as _, size_of_val(&ns));
 
-            /* this is a libxml hack! check xpath.c for details */
-            if !parent.is_null() && matches!((*parent).typ, XmlElementType::XmlAttributeNode) {
+            // this is a libxml hack! check xpath.c for details
+            if !parent.is_null()
+                && matches!((*parent).element_type(), XmlElementType::XmlAttributeNode)
+            {
                 ns.next = (*parent).parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
             } else {
                 ns.next = parent as *mut XmlNs;
             }
 
-            /*
-             * If the input is an XPath node-set, then the node-set must explicitly
-             * contain every node to be rendered to the canonical form.
-             */
+            // If the input is an XPath node-set, then the node-set must explicitly
+            // contain every node to be rendered to the canonical form.
             return xml_xpath_node_set_contains(nodes, addr_of_mut!(ns) as XmlNodePtr);
         }
     }
@@ -616,7 +616,10 @@ unsafe extern "C" fn xml_c14n_check_for_relative_namespaces(
 ) -> i32 {
     let mut ns: XmlNsPtr;
 
-    if ctx.is_null() || cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
+    if ctx.is_null()
+        || cur.is_null()
+        || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+    {
         xml_c14n_err_param(c"checking for relative namespaces".as_ptr() as _);
         return -1;
     }
@@ -928,7 +931,10 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
     let mut already_rendered: i32;
     let mut has_empty_ns: i32 = 0;
 
-    if ctx.is_null() || cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
+    if ctx.is_null()
+        || cur.is_null()
+        || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+    {
         xml_c14n_err_param(c"processing namespaces axis (c14n)".as_ptr() as _);
         return -1;
     }
@@ -1086,7 +1092,10 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     let mut has_visibly_utilized_empty_ns: i32 = 0;
     let mut has_empty_ns_in_inclusive_list: i32 = 0;
 
-    if ctx.is_null() || cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
+    if ctx.is_null()
+        || cur.is_null()
+        || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+    {
         xml_c14n_err_param(c"processing namespaces axis (exc c14n)".as_ptr() as _);
         return -1;
     }
@@ -1705,7 +1714,10 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
     let mut xml_lang_attr: XmlAttrPtr = null_mut();
     let mut xml_space_attr: XmlAttrPtr = null_mut();
 
-    if ctx.is_null() || cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
+    if ctx.is_null()
+        || cur.is_null()
+        || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+    {
         xml_c14n_err_param(c"processing attributes axis".as_ptr() as _);
         return -1;
     }
@@ -1970,7 +1982,10 @@ unsafe extern "C" fn xml_c14n_process_element_node(
     let mut state: XmlC14NVisibleNsStack = unsafe { zeroed() };
     let mut parent_is_doc: i32 = 0;
 
-    if ctx.is_null() || cur.is_null() || !matches!((*cur).typ, XmlElementType::XmlElementNode) {
+    if ctx.is_null()
+        || cur.is_null()
+        || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+    {
         xml_c14n_err_param(c"processing element node".as_ptr() as _);
         return -1;
     }
@@ -2151,7 +2166,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
 
     let visible: i32 =
         xml_c14n_is_visible!(ctx, cur, (*cur).parent.map_or(null_mut(), |p| p.as_ptr()));
-    match (*cur).typ {
+    match (*cur).element_type() {
         XmlElementType::XmlElementNode => {
             ret = xml_c14n_process_element_node(ctx, cur, visible);
         }
@@ -2325,18 +2340,17 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
         | XmlElementType::XmlElementDecl
         | XmlElementType::XmlAttributeDecl
         | XmlElementType::XmlEntityDecl => {
-            /*
-             * should be ignored according to "W3C Canonical XML"
-             */
+            // should be ignored according to "W3C Canonical XML"
         }
         #[cfg(feature = "xinclude")]
         XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
-            /*
-             * should be ignored according to "W3C Canonical XML"
-             */
+            // should be ignored according to "W3C Canonical XML"
         }
         _ => {
-            xml_c14n_err_unknown_node((*cur).typ as i32, c"processing node".as_ptr() as _);
+            xml_c14n_err_unknown_node(
+                (*cur).element_type() as i32,
+                c"processing node".as_ptr() as _,
+            );
             return -1;
         }
     }

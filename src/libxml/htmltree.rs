@@ -177,7 +177,9 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     'goto_found_meta: {
         'goto_found_head: {
             while !cur.is_null() {
-                if matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null() {
+                if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                    && !(*cur).name.is_null()
+                {
                     if xml_str_equal((*cur).name, c"html".as_ptr() as _) {
                         break;
                     }
@@ -198,7 +200,9 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
              * Search the head
              */
             while !cur.is_null() {
-                if matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null() {
+                if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                    && !(*cur).name.is_null()
+                {
                     if xml_str_equal((*cur).name, c"head".as_ptr() as _) {
                         break;
                     }
@@ -222,7 +226,8 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
     // found_meta:
 
     while !cur.is_null() {
-        if (matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null())
+        if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+            && !(*cur).name.is_null())
             && xml_str_equal((*cur).name, c"meta".as_ptr() as _)
         {
             let mut attr: XmlAttrPtr = (*cur).properties;
@@ -232,10 +237,9 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
             content = null_mut();
             http = 0;
             while !attr.is_null() {
-                if let Some(children) = (*attr)
-                    .children
-                    .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
-                {
+                if let Some(children) = (*attr).children.filter(|c| {
+                    matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
+                }) {
                     value = children.content;
                     if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
                         && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
@@ -324,7 +328,8 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
      * Search the html
      */
     while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null() {
+        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) && !(*cur).name.is_null()
+        {
             if xml_strcasecmp((*cur).name, c"html".as_ptr() as _) == 0 {
                 break;
             }
@@ -353,7 +358,9 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
          * Search the head
          */
         while !cur.is_null() {
-            if matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null() {
+            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                && !(*cur).name.is_null()
+            {
                 if xml_strcasecmp((*cur).name, c"head".as_ptr() as _) == 0 {
                     break;
                 }
@@ -432,7 +439,8 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
      */
     let mut content = None;
     while !cur.is_null() {
-        if (matches!((*cur).typ, XmlElementType::XmlElementNode) && !(*cur).name.is_null())
+        if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+            && !(*cur).name.is_null())
             && (xml_strcasecmp((*cur).name, c"meta".as_ptr() as _) == 0)
         {
             let mut attr: XmlAttrPtr = (*cur).properties;
@@ -442,10 +450,9 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
             content = None;
             http = 0;
             while !attr.is_null() {
-                if let Some(children) = (*attr)
-                    .children
-                    .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
-                {
+                if let Some(children) = (*attr).children.filter(|c| {
+                    matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none()
+                }) {
                     value = children.content;
                     if xml_strcasecmp((*attr).name, c"http-equiv".as_ptr() as _) == 0
                         && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
@@ -1108,7 +1115,7 @@ pub unsafe fn html_node_dump_format_output(
     let root: XmlNodePtr = cur;
     parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
     'main: loop {
-        match (*cur).typ {
+        match (*cur).element_type() {
             XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode => {
                 if !(*cur)
                     .as_document_node()
@@ -1178,7 +1185,10 @@ pub unsafe fn html_node_dump_format_output(
                     if format != 0
                         && !info.is_null()
                         && (*info).isinline == 0
-                        && !matches!(children.typ, HTML_TEXT_NODE | HTML_ENTITY_REF_NODE)
+                        && !matches!(
+                            children.element_type(),
+                            HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
+                        )
                         && (*cur).children != (*cur).last
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
@@ -1215,7 +1225,7 @@ pub unsafe fn html_node_dump_format_output(
                     && !info.is_null()
                     && (*info).isinline == 0)
                     && (!matches!(
-                        (*cur).next.unwrap().typ,
+                        (*cur).next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     ) && !parent.is_null()
                         && !(*parent).name.is_null()
@@ -1310,11 +1320,11 @@ pub unsafe fn html_node_dump_format_output(
             }
 
             cur = parent;
-            /* (*cur).parent was validated when descending. */
+            // (*cur).parent was validated when descending.
             parent = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
 
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
             ) {
                 buf.write_str("\n");
@@ -1329,7 +1339,7 @@ pub unsafe fn html_node_dump_format_output(
                     && !info.is_null()
                     && (*info).isinline == 0
                     && !matches!(
-                        (*cur).last.unwrap().typ,
+                        (*cur).last.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     )
                     && (*cur).children != (*cur).last
@@ -1358,7 +1368,7 @@ pub unsafe fn html_node_dump_format_output(
                     && (*info).isinline == 0
                     && (*cur).next.is_some())
                     && (!matches!(
-                        (*cur).next.unwrap().typ,
+                        (*cur).next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
                     ) && !parent.is_null()
                         && !(*parent).name.is_null()

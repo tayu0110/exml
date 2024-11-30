@@ -231,6 +231,7 @@ pub trait NodeCommon {
         oldbase
     }
 
+    #[doc(hidden)]
     unsafe fn get_prop_node_value_internal(&self) -> *mut XmlChar {
         if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
             // Note that we return at least the empty string.
@@ -734,7 +735,7 @@ pub type XmlNodePtr = *mut XmlNode;
 #[repr(C)]
 pub struct XmlNode {
     pub _private: *mut c_void,          /* application data */
-    pub typ: XmlElementType,            /* type number, must be second ! */
+    pub(crate) typ: XmlElementType,     /* type number, must be second ! */
     pub name: *const XmlChar,           /* the name of the node, or the entity */
     pub children: Option<NodePtr>,      /* parent->childs link */
     pub last: Option<NodePtr>,          /* last child link */

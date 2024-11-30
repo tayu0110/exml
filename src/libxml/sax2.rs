@@ -1861,23 +1861,19 @@ unsafe fn xml_sax2_attribute_internal(
     } else if (*ctxt).loadsubset & XML_SKIP_IDS as i32 == 0
         && (((*ctxt).replace_entities == 0 && (*ctxt).external != 2)
             || ((*ctxt).replace_entities != 0 && (*ctxt).in_subset == 0))
-            /* Don't create IDs containing entity references */
+            // Don't create IDs containing entity references
         && (*ret)
             .children
-            .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
+            .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none())
             .is_some()
     {
         let content: *mut XmlChar = (*ret).children.unwrap().content;
-        /*
-         * when validating, the ID registration is done at the attribute
-         * validation level. Otherwise we have to do specific handling here.
-         */
+        // when validating, the ID registration is done at the attribute
+        // validation level. Otherwise we have to do specific handling here.
         if xml_str_equal(fullname, c"xml:id".as_ptr() as _) {
-            /*
-             * Add the xml:id value
-             *
-             * Open issue: normalization of the value.
-             */
+            // Add the xml:id value
+            //
+            // Open issue: normalization of the value.
             if xml_validate_ncname(content, 1) != 0 {
                 xml_err_valid(
                     ctxt,
@@ -2219,11 +2215,9 @@ pub unsafe fn xml_sax2_start_element(
         return;
     }
 
-    /*
-     * Link the child element
-     */
+    // Link the child element
     if !parent.is_null() {
-        if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+        if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
             (*parent).add_child(ret);
         } else {
             (*parent).add_sibling(ret);
@@ -2231,17 +2225,12 @@ pub unsafe fn xml_sax2_start_element(
     }
 
     if (*ctxt).html == 0 {
-        /*
-         * Insert all the defaulted attributes from the DTD especially
-         * namespaces
-         */
+        // Insert all the defaulted attributes from the DTD especially namespaces
         if !(*(*ctxt).my_doc).int_subset.is_null() || !(*(*ctxt).my_doc).ext_subset.is_null() {
             xml_check_defaulted_attributes(ctxt, name, prefix, atts);
         }
 
-        /*
-         * process all the attributes whose name start with "xmlns"
-         */
+        // process all the attributes whose name start with "xmlns"
         if !atts.is_null() {
             i = 0;
             att = *atts.add(i as usize);
@@ -2265,10 +2254,8 @@ pub unsafe fn xml_sax2_start_element(
             }
         }
 
-        /*
-         * Search the namespace, note that since the attributes have been
-         * processed, the local namespaces are available.
-         */
+        // Search the namespace, note that since the attributes have been
+        // processed, the local namespaces are available.
         let pre =
             (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
         ns = (*ret).search_ns((*ctxt).my_doc, pre.as_deref());
@@ -2286,10 +2273,8 @@ pub unsafe fn xml_sax2_start_element(
             );
         }
 
-        /*
-         * set the namespace node, making sure that if the default namespace
-         * is unbound on a parent we simply keep it NULL
-         */
+        // set the namespace node, making sure that if the default namespace
+        // is unbound on a parent we simply keep it NULL
         if !ns.is_null()
             && !(*ns).href.is_null()
             && (*(*ns).href.add(0) != 0 || !(*ns).prefix.is_null())
@@ -2298,9 +2283,7 @@ pub unsafe fn xml_sax2_start_element(
         }
     }
 
-    /*
-     * process all the other attributes
-     */
+    // process all the other attributes
     if !atts.is_null() {
         i = 0;
         att = *atts.add(i as usize);
@@ -2455,9 +2438,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         (*ctxt).validate = 0;
     }
 
-    /*
-     * Take care of the rare case of an undefined namespace prefix
-     */
+    // Take care of the rare case of an undefined namespace prefix
     if !prefix.is_null() && orig_uri.is_null() {
         if (*ctxt).dict_names != 0 {
             let fullname: *const XmlChar = xml_dict_qlookup((*ctxt).dict, prefix, localname);
@@ -2468,9 +2449,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             lname = xml_build_qname(localname, prefix, null_mut(), 0);
         }
     }
-    /*
-     * allocate the node
-     */
+    // allocate the node
     if !(*ctxt).free_elems.is_null() {
         ret = (*ctxt).free_elems;
         (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
@@ -2585,7 +2564,7 @@ pub unsafe fn xml_sax2_start_element_ns(
      * Link the child element
      */
     if !parent.is_null() {
-        if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+        if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
             (*parent).add_child(ret);
         } else {
             (*parent).add_sibling(ret);
@@ -3071,7 +3050,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             /* Don't create IDs containing entity references */
         && (*ret)
             .children
-            .filter(|c| matches!(c.typ, XmlElementType::XmlTextNode) && c.next.is_none())
+            .filter(|c| matches!(c.element_type(), XmlElementType::XmlTextNode) && c.next.is_none())
             .is_some()
     {
         let content: *mut XmlChar = (*ret).children.unwrap().content;
@@ -3239,7 +3218,7 @@ unsafe extern "C" fn xml_sax2_text(
         }
     } else {
         let coalesce_text: i32 = (!last_child.is_null()
-            && (*last_child).typ == typ
+            && (*last_child).element_type() == typ
             && (!matches!(typ, XmlElementType::XmlTextNode)
                 || ((*last_child).name == XML_STRING_TEXT.as_ptr() as _)))
             as i32;
@@ -3402,7 +3381,7 @@ pub unsafe fn xml_sax2_processing_instruction(
         (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
         return;
     }
-    if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+    if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
         (*parent).add_child(ret);
     } else {
         (*parent).add_sibling(ret);
@@ -3444,7 +3423,7 @@ pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const X
         (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
         return;
     }
-    if matches!((*parent).typ, XmlElementType::XmlElementNode) {
+    if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
         (*parent).add_child(ret);
     } else {
         (*parent).add_sibling(ret);

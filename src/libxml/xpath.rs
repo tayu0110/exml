@@ -568,6 +568,8 @@ macro_rules! xml_xpath_node_set_is_empty {
 #[doc(alias = "xmlXPathFreeValueTree")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
+    use crate::tree::NodeCommon;
+
     if obj.is_null() {
         return;
     }
@@ -576,7 +578,7 @@ pub unsafe extern "C" fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
         for i in 0..(*obj).node_nr {
             if !(*(*obj).node_tab.add(i as usize)).is_null() {
                 if matches!(
-                    (*(*(*obj).node_tab.add(i as usize))).typ,
+                    (*(*(*obj).node_tab.add(i as usize))).element_type(),
                     XmlElementType::XmlNamespaceDecl
                 ) {
                     xml_xpath_node_set_free_ns(*(*obj).node_tab.add(i as usize) as XmlNsPtr);
@@ -626,6 +628,8 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
 #[doc(alias = "xmlXPathNodeSetCreate")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSetPtr {
+    use crate::tree::NodeCommon;
+
     let ret: XmlNodeSetPtr = xml_malloc(size_of::<XmlNodeSet>()) as XmlNodeSetPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), c"creating nodeset\n".as_ptr() as _);
@@ -646,7 +650,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
             XML_NODESET_DEFAULT * size_of::<XmlNodePtr>(),
         );
         (*ret).node_max = XML_NODESET_DEFAULT as _;
-        if matches!((*val).typ, XmlElementType::XmlNamespaceDecl) {
+        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = val as XmlNsPtr;
             let ns_node: XmlNodePtr = xml_xpath_node_set_dup_ns((*ns).next as XmlNodePtr, ns);
 
@@ -679,6 +683,8 @@ pub unsafe extern "C" fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
 #[doc(alias = "xmlXPathFreeNodeSet")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
+    use crate::tree::NodeCommon;
+
     if obj.is_null() {
         return;
     }
@@ -687,7 +693,7 @@ pub unsafe extern "C" fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
         for i in 0..(*obj).node_nr {
             if !(*(*obj).node_tab.add(i as usize)).is_null()
                 && matches!(
-                    (*(*(*obj).node_tab.add(i as usize))).typ,
+                    (*(*(*obj).node_tab.add(i as usize))).element_type(),
                     XmlElementType::XmlNamespaceDecl
                 )
             {
@@ -759,7 +765,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
 #[doc(alias = "xmlXPathCmpNodes")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
-    use crate::tree::NodePtr;
+    use crate::tree::{NodeCommon, NodePtr};
 
     let mut depth1: i32;
     let mut depth2: i32;
@@ -779,12 +785,12 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     if node1 == node2 {
         return 0;
     }
-    if matches!((*node1).typ, XmlElementType::XmlAttributeNode) {
+    if matches!((*node1).element_type(), XmlElementType::XmlAttributeNode) {
         attr1 = 1;
         attr_node1 = node1;
         node1 = (*node1).parent.map_or(null_mut(), |p| p.as_ptr());
     }
-    if matches!((*node2).typ, XmlElementType::XmlAttributeNode) {
+    if matches!((*node2).element_type(), XmlElementType::XmlAttributeNode) {
         attr2 = 1;
         attr_node2 = node2;
         node2 = (*node2).parent.map_or(null_mut(), |p| p.as_ptr());
@@ -809,8 +815,8 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
         }
         return -1;
     }
-    if matches!((*node1).typ, XmlElementType::XmlNamespaceDecl)
-        || matches!((*node2).typ, XmlElementType::XmlNamespaceDecl)
+    if matches!((*node1).element_type(), XmlElementType::XmlNamespaceDecl)
+        || matches!((*node2).element_type(), XmlElementType::XmlNamespaceDecl)
     {
         return 1;
     }
@@ -824,8 +830,8 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     /*
      * Speedup using document order if available.
      */
-    if matches!((*node1).typ, XmlElementType::XmlElementNode)
-        && matches!((*node2).typ, XmlElementType::XmlElementNode)
+    if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
+        && matches!((*node2).element_type(), XmlElementType::XmlElementNode)
         && 0 > (*node1).content as isize
         && 0 > (*node2).content as isize
         && (*node1).doc == (*node2).doc
@@ -888,20 +894,16 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
             return -2;
         }
     }
-    /*
-     * Find who's first.
-     */
+    // Find who's first.
     if NodePtr::from_ptr(node1) == (*node2).prev {
         return 1;
     }
     if NodePtr::from_ptr(node1) == (*node2).next {
         return -1;
     }
-    /*
-     * Speedup using document order if available.
-     */
-    if matches!((*node1).typ, XmlElementType::XmlElementNode)
-        && matches!((*node2).typ, XmlElementType::XmlElementNode)
+    // Speedup using document order if available.
+    if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
+        && matches!((*node2).element_type(), XmlElementType::XmlElementNode)
         && 0 > (*node1).content as isize
         && 0 > (*node2).content as isize
         && (*node1).doc == (*node2).doc
@@ -1624,6 +1626,8 @@ pub unsafe extern "C" fn xml_xpath_context_set_cache(
 #[doc(alias = "xmlXPathOrderDocElems")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
+    use crate::tree::NodeCommon;
+
     let mut count: isize = 0;
 
     if doc.is_null() {
@@ -1631,7 +1635,7 @@ pub unsafe extern "C" fn xml_xpath_order_doc_elems(doc: XmlDocPtr) -> i64 {
     }
     let mut cur = (*doc).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
-        if matches!((*cur).typ, XmlElementType::XmlElementNode) {
+        if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
             count += 1;
             (*cur).content = (-count) as _;
             if let Some(children) = (*cur).children {

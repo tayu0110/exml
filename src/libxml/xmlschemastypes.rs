@@ -2876,7 +2876,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 if ret == 0
                                     && !node.is_null()
-                                    && (*node).typ == XmlElementType::XmlAttributeNode
+                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
                                     let attr: XmlAttrPtr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
@@ -2916,7 +2916,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 if ret == 0
                                     && !node.is_null()
-                                    && (*node).typ == XmlElementType::XmlAttributeNode
+                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
                                     let attr: XmlAttrPtr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
@@ -2946,7 +2946,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 if ret == 0
                                     && !node.is_null()
-                                    && (*node).typ == XmlElementType::XmlAttributeNode
+                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
                                     let attr: XmlAttrPtr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
@@ -2987,7 +2987,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 if ret == 0
                                     && !node.is_null()
-                                    && (*node).typ == XmlElementType::XmlAttributeNode
+                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
                                     let attr: XmlAttrPtr =
                                         (*node).as_attribute_node().unwrap().as_ptr();
@@ -3013,7 +3013,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 if ret == 0
                                     && !node.is_null()
-                                    && (*node).typ == XmlElementType::XmlAttributeNode
+                                    && (*node).element_type() == XmlElementType::XmlAttributeNode
                                 {
                                     let attr: XmlAttrPtr =
                                         (*node).as_attribute_node().unwrap().as_ptr();

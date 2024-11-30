@@ -237,7 +237,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
     if node.is_null() {
         return 0;
     }
-    if (*node).typ != XmlElementType::XmlElementNode {
+    if (*node).element_type() != XmlElementType::XmlElementNode {
         return 0;
     }
     if (*node).ns.is_null() {
@@ -254,7 +254,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
             let mut nb_fallback: i32 = 0;
 
             while !child.is_null() {
-                if (*child).typ == XmlElementType::XmlElementNode
+                if (*child).element_type() == XmlElementType::XmlElementNode
                     && !(*child).ns.is_null()
                     && (xml_str_equal((*(*child).ns).href, XINCLUDE_NS.as_ptr() as _)
                         || xml_str_equal((*(*child).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
@@ -289,7 +289,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
         }
         if xml_str_equal((*node).name, XINCLUDE_FALLBACK.as_ptr() as _)
             && ((*node).parent.is_none()
-                || (*node).parent.unwrap().typ != XmlElementType::XmlElementNode
+                || (*node).parent.unwrap().element_type() != XmlElementType::XmlElementNode
                 || (*node).parent.unwrap().ns.is_null()
                 || (!xml_str_equal(
                     (*(*node).parent.unwrap().ns).href,
@@ -972,10 +972,10 @@ unsafe extern "C" fn xml_xinclude_copy_node(
         let mut recurse: i32 = 0;
 
         if matches!(
-            (*cur).typ,
+            (*cur).element_type(),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlDTDNode
         ) {
-        } else if (*cur).typ == XmlElementType::XmlElementNode
+        } else if (*cur).element_type() == XmlElementType::XmlElementNode
             && !(*cur).ns.is_null()
             && xml_str_equal((*cur).name, XINCLUDE_NODE.as_ptr() as _)
             && (xml_str_equal((*(*cur).ns).href, XINCLUDE_NS.as_ptr() as _)
@@ -1007,8 +1007,8 @@ unsafe extern "C" fn xml_xinclude_copy_node(
                 return null_mut();
             }
 
-            recurse = ((*cur).typ != XmlElementType::XmlEntityRefNode && (*cur).children.is_some())
-                as i32;
+            recurse = ((*cur).element_type() != XmlElementType::XmlEntityRefNode
+                && (*cur).children.is_some()) as i32;
         }
 
         if !copy.is_null() {
@@ -1063,7 +1063,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xinclude_get_nth_child(mut cur: XmlNodePtr, no: i32) -> XmlNodePtr {
     let mut i: i32;
-    if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
+    if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return null_mut();
     }
     cur = (*cur).children;
@@ -1073,7 +1073,7 @@ unsafe extern "C" fn xml_xinclude_get_nth_child(mut cur: XmlNodePtr, no: i32) ->
             return cur;
         }
         if matches!(
-            (*cur).typ,
+            (*cur).element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
@@ -1175,7 +1175,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
         }
         if cur == end {
             /* Are we at the end of the range? */
-            if (*cur).typ == XmlElementType::XmlTextNode {
+            if (*cur).element_type() == XmlElementType::XmlTextNode {
                 let mut content: *const XmlChar = (*cur).content;
                 let mut len: i32;
 
@@ -1238,7 +1238,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
         } else if cur == start {
             /* Not at the end, are we at start? */
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 let mut content: *const XmlChar = (*cur).content;
@@ -1346,7 +1346,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                 if (*(*set).node_tab.add(i as usize)).is_null() {
                     continue;
                 }
-                match (*(*(*set).node_tab.add(i as usize))).typ {
+                match (*(*(*set).node_tab.add(i as usize))).element_type() {
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                         node = (*(*(*set).node_tab.add(i as usize)))
                             .as_document_node()
@@ -1721,7 +1721,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         if (*(*set).node_tab.add(i as usize)).is_null() {
                             continue;
                         }
-                        match (*(*(*set).node_tab.add(i as usize))).typ {
+                        match (*(*(*set).node_tab.add(i as usize))).element_type() {
                             XmlElementType::XmlElementNode
                             | XmlElementType::XmlTextNode
                             | XmlElementType::XmlCDATASectionNode
@@ -1829,8 +1829,8 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 /* Adjustment may be needed */
                 node = (*refe).inc;
                 while !node.is_null() {
-                    /* Only work on element nodes */
-                    if (*node).typ == XmlElementType::XmlElementNode {
+                    // Only work on element nodes
+                    if (*node).element_type() == XmlElementType::XmlElementNode {
                         cur_base = (*node).get_base((*node).doc);
                         /* If no current base, set it */
                         if cur_base.is_null() {
@@ -2198,7 +2198,10 @@ unsafe extern "C" fn xml_xinclude_load_fallback(
     let mut ret: i32 = 0;
     let old_nb_errors: i32;
 
-    if fallback.is_null() || (*fallback).typ == XmlElementType::XmlNamespaceDecl || ctxt.is_null() {
+    if fallback.is_null()
+        || (*fallback).element_type() == XmlElementType::XmlNamespaceDecl
+        || ctxt.is_null()
+    {
         return -1;
     }
     if (*fallback).children.is_some() {
@@ -2347,7 +2350,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
          */
         let mut children = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
         while !children.is_null() {
-            if (*children).typ == XmlElementType::XmlElementNode
+            if (*children).element_type() == XmlElementType::XmlElementNode
                 && !(*children).ns.is_null()
                 && xml_str_equal((*children).name, XINCLUDE_FALLBACK.as_ptr() as _)
                 && (xml_str_equal((*(*children).ns).href, XINCLUDE_NS.as_ptr() as _)
@@ -2457,7 +2460,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
         return -1;
     }
     cur = (*refe).elem;
-    if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
+    if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
 
@@ -2465,19 +2468,17 @@ unsafe extern "C" fn xml_xinclude_include_node(
     (*refe).inc = null_mut();
     (*refe).empty_fb = 0;
 
-    /*
-     * Check against the risk of generating a multi-rooted document
-     */
+    // Check against the risk of generating a multi-rooted document
     if (*cur)
         .parent
-        .filter(|p| p.typ != XmlElementType::XmlElementNode)
+        .filter(|p| p.element_type() != XmlElementType::XmlElementNode)
         .is_some()
     {
         let mut nb_elem: i32 = 0;
 
         tmp = list;
         while !tmp.is_null() {
-            if (*tmp).typ == XmlElementType::XmlElementNode {
+            if (*tmp).element_type() == XmlElementType::XmlElementNode {
                 nb_elem += 1;
             }
             tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
@@ -2563,7 +2564,7 @@ unsafe extern "C" fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: Xml
     let mut cur: XmlNodePtr;
     let mut ret: i32 = 0;
 
-    if tree.is_null() || (*tree).typ == XmlElementType::XmlNamespaceDecl {
+    if tree.is_null() || (*tree).element_type() == XmlElementType::XmlNamespaceDecl {
         return -1;
     }
     if ctxt.is_null() {
@@ -2588,7 +2589,7 @@ unsafe extern "C" fn xml_xinclude_do_process(ctxt: XmlXincludeCtxtPtr, tree: Xml
                 }
             } else if let Some(children) = (*cur).children.filter(|_| {
                 matches!(
-                    (*cur).typ,
+                    (*cur).element_type(),
                     XmlElementType::XmlDocumentNode | XmlElementType::XmlElementNode
                 )
             }) {
@@ -2664,7 +2665,10 @@ pub unsafe extern "C" fn xml_xinclude_process_tree_flags_data(
 ) -> i32 {
     let mut ret: i32;
 
-    if tree.is_null() || (*tree).typ == XmlElementType::XmlNamespaceDecl || (*tree).doc.is_null() {
+    if tree.is_null()
+        || (*tree).element_type() == XmlElementType::XmlNamespaceDecl
+        || (*tree).doc.is_null()
+    {
         return -1;
     }
 
@@ -2705,7 +2709,10 @@ pub unsafe extern "C" fn xml_xinclude_process_tree(tree: XmlNodePtr) -> i32 {
 pub unsafe extern "C" fn xml_xinclude_process_tree_flags(tree: XmlNodePtr, flags: i32) -> i32 {
     let mut ret: i32;
 
-    if tree.is_null() || (*tree).typ == XmlElementType::XmlNamespaceDecl || (*tree).doc.is_null() {
+    if tree.is_null()
+        || (*tree).element_type() == XmlElementType::XmlNamespaceDecl
+        || (*tree).doc.is_null()
+    {
         return -1;
     }
     let ctxt: XmlXincludeCtxtPtr = xml_xinclude_new_context((*tree).doc);
@@ -2808,7 +2815,7 @@ pub unsafe extern "C" fn xml_xinclude_process_node(
     let mut ret: i32;
 
     if node.is_null()
-        || (*node).typ == XmlElementType::XmlNamespaceDecl
+        || (*node).element_type() == XmlElementType::XmlNamespaceDecl
         || (*node).doc.is_null()
         || ctxt.is_null()
     {

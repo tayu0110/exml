@@ -25,7 +25,7 @@ use std::{
 use crate::{
     globals::{GenericError, GenericErrorContext, GLOBAL_STATE},
     libxml::parser::{XmlParserCtxtPtr, XmlParserInputPtr},
-    tree::{XmlElementType, XmlNode, XmlNodePtr},
+    tree::{NodeCommon, XmlElementType, XmlNode, XmlNodePtr},
 };
 
 macro_rules! impl_xml_parser_errors {
@@ -1136,7 +1136,7 @@ pub unsafe fn report_error(
         return;
     }
 
-    if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
+    if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         name = (*node).name;
     }
 
@@ -1438,7 +1438,7 @@ macro_rules! __xml_raise_error {
             libxml::{
                 parser::{XmlParserCtxtPtr, XmlParserInputPtr, XML_SAX2_MAGIC},
             },
-            tree::{XmlElementType, XmlNodePtr},
+            tree::{NodeCommon, XmlElementType, XmlNodePtr},
         };
         (|mut schannel: Option<StructuredError>,
             mut channel: Option<GenericError>,
@@ -1552,7 +1552,7 @@ macro_rules! __xml_raise_error {
                         /*	    file = (const c_char *) (*(*node).doc).URL; */
                         }
                         for _ in 0..10 {
-                            if node.is_null() || matches!((*node).typ, XmlElementType::XmlElementNode) {
+                            if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                                 break;
                             }
                             node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
@@ -1561,7 +1561,7 @@ macro_rules! __xml_raise_error {
                             baseptr = node;
                         }
 
-                        if !node.is_null() && matches!((*node).typ, XmlElementType::XmlElementNode) {
+                        if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                             line = (*node).line as _;
                         }
                         if line == 0 || line == 65535 {
@@ -1593,7 +1593,7 @@ macro_rules! __xml_raise_error {
                             while !prev.is_null() {
                                 if let Some(p) = (*prev).prev {
                                     prev = p.as_ptr();
-                                    if matches!((*prev).typ, XmlElementType::XmlXIncludeStart) {
+                                    if matches!((*prev).element_type(), XmlElementType::XmlXIncludeStart) {
                                         if inclcount > 0 {
                                             inclcount -= 1;
                                         } else {
@@ -1602,7 +1602,7 @@ macro_rules! __xml_raise_error {
                                                 break;
                                             }
                                         }
-                                    } else if matches!((*prev).typ, XmlElementType::XmlXIncludeEnd) {
+                                    } else if matches!((*prev).element_type(), XmlElementType::XmlXIncludeEnd) {
                                         inclcount += 1;
                                     }
                                 } else {

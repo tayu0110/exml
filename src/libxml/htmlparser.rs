@@ -8647,11 +8647,11 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
         return 0;
     }
     last_child = (*(*ctxt).node).get_last_child();
-    while !last_child.is_null() && (*last_child).typ == XmlElementType::XmlCommentNode {
+    while !last_child.is_null() && (*last_child).element_type() == XmlElementType::XmlCommentNode {
         last_child = (*last_child).prev.map_or(null_mut(), |p| p.as_ptr());
     }
     if last_child.is_null() {
-        if (*(*ctxt).node).typ != XmlElementType::XmlElementNode
+        if (*(*ctxt).node).element_type() != XmlElementType::XmlElementNode
             && !(*(*ctxt).node).content.is_null()
         {
             return 0;
@@ -11846,7 +11846,7 @@ pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> Htm
         return HtmlStatus::HtmlInvalid;
     }
 
-    match (*node).typ {
+    match (*node).element_type() {
         XmlElementType::XmlElementNode => {
             if legacy != 0 {
                 if html_element_allowed_here(

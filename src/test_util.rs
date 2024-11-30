@@ -794,7 +794,7 @@ unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
         get_api_doc();
         if !API_DOC.get().is_null()
             && (*API_DOC.get()).children.is_some()
-            && (*API_DOC.get()).children.unwrap().typ == XmlElementType::XmlDTDNode
+            && (*API_DOC.get()).children.unwrap().element_type() == XmlElementType::XmlDTDNode
         {
             API_DTD.set(
                 (*(*API_DOC.get()).children().unwrap().as_ptr())
@@ -841,7 +841,9 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     ))]
     let mut name: [XmlChar; 20] = [0; 20];
 
-    if API_ROOT.get().is_null() || (*API_ROOT.get()).typ != XmlElementType::XmlElementNode {
+    if API_ROOT.get().is_null()
+        || (*API_ROOT.get()).element_type() != XmlElementType::XmlElementNode
+    {
         get_api_root();
     }
     if API_ROOT.get().is_null() {
@@ -1275,12 +1277,19 @@ pub(crate) fn gen_xml_enumeration_ptr(_no: i32, _nr: i32) -> XmlEnumerationPtr {
 pub(crate) fn des_xml_enumeration_ptr(_no: i32, _val: XmlEnumerationPtr, _nr: i32) {}
 
 unsafe extern "C" fn get_api_root() -> XmlNodePtr {
-    if (API_ROOT.get().is_null()) || (*API_ROOT.get()).typ != XmlElementType::XmlElementNode {
+    if (API_ROOT.get().is_null())
+        || (*API_ROOT.get()).element_type() != XmlElementType::XmlElementNode
+    {
         get_api_doc();
         if !API_DOC.get().is_null()
             && (*API_DOC.get()).children.is_some()
             && (*API_DOC.get()).children.unwrap().next.is_some()
-            && (*API_DOC.get()).children.unwrap().next.unwrap().typ
+            && (*API_DOC.get())
+                .children
+                .unwrap()
+                .next
+                .unwrap()
+                .element_type()
                 == XmlElementType::XmlElementNode
         {
             API_ROOT.set((*API_DOC.get()).children.unwrap().next.unwrap().as_ptr());

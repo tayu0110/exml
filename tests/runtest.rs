@@ -68,8 +68,8 @@ use exml::{
         xpath::XmlXPathObjectPtr,
     },
     tree::{
-        xml_free_doc, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
-        XmlNodePtr,
+        xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
+        XmlEnumerationPtr, XmlNodePtr,
     },
     SYSCONFDIR,
 };
@@ -200,7 +200,9 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 
     unsafe {
-        if let Some(node) = node.filter(|n| n.as_ref().typ == XmlElementType::XmlElementNode) {
+        if let Some(node) =
+            node.filter(|n| n.as_ref().element_type() == XmlElementType::XmlElementNode)
+        {
             name = node.as_ref().name;
         }
 

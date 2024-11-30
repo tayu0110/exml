@@ -4137,13 +4137,11 @@ pub unsafe fn xml_parse_in_node_context(
     let mut nsnr = 0;
     let ret: XmlParserErrors;
 
-    /*
-     * check all input parameters, grab the document
-     */
+    // check all input parameters, grab the document
     if lst.is_null() || node.is_null() {
         return XmlParserErrors::XmlErrInternalError;
     }
-    match (*node).typ {
+    match (*node).element_type() {
         XmlElementType::XmlElementNode
         | XmlElementType::XmlAttributeNode
         | XmlElementType::XmlTextNode
@@ -4159,7 +4157,7 @@ pub unsafe fn xml_parse_in_node_context(
     }
     while !node.is_null()
         && !matches!(
-            (*node).typ,
+            (*node).element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
@@ -4170,7 +4168,7 @@ pub unsafe fn xml_parse_in_node_context(
     if node.is_null() {
         return XmlParserErrors::XmlErrInternalError;
     }
-    let doc = if (*node).typ == XmlElementType::XmlElementNode {
+    let doc = if (*node).element_type() == XmlElementType::XmlElementNode {
         (*node).doc
     } else {
         (*node).as_document_node().unwrap().as_ptr()
@@ -4241,13 +4239,13 @@ pub unsafe fn xml_parse_in_node_context(
     }
     (*node).add_child(fake);
 
-    if (*node).typ == XmlElementType::XmlElementNode {
+    if (*node).element_type() == XmlElementType::XmlElementNode {
         (*ctxt).node_push(node);
         /*
          * initialize the SAX2 namespaces stack
          */
         cur = node;
-        while !cur.is_null() && (*cur).typ == XmlElementType::XmlElementNode {
+        while !cur.is_null() && (*cur).element_type() == XmlElementType::XmlElementNode {
             let mut ns: XmlNsPtr = (*cur).ns_def;
             let mut iprefix: *const XmlChar;
             let mut ihref: *const XmlChar;
@@ -8773,7 +8771,7 @@ unsafe extern "C" fn are_blanks(
 
     let last_child: XmlNodePtr = (*(*ctxt).node).get_last_child();
     if last_child.is_null() {
-        if (*(*ctxt).node).typ != XmlElementType::XmlElementNode
+        if (*(*ctxt).node).element_type() != XmlElementType::XmlElementNode
             && !(*(*ctxt).node).content.is_null()
         {
             return 0;

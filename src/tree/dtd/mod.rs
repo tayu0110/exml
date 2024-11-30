@@ -219,7 +219,7 @@ pub unsafe fn xml_create_int_subset(
             } else {
                 let mut next = Some(children);
                 while let Some(now) =
-                    next.filter(|n| !matches!(n.typ, XmlElementType::XmlElementNode))
+                    next.filter(|n| !matches!(n.element_type(), XmlElementType::XmlElementNode))
                 {
                     next = now.next;
                 }

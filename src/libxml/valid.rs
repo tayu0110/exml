@@ -4608,7 +4608,7 @@ pub unsafe extern "C" fn xml_validate_element(
     loop {
         ret &= xml_validate_one_element(ctxt, doc, elem);
 
-        if matches!((*elem).typ, XmlElementType::XmlElementNode) {
+        if matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
             attr = (*elem).properties;
             while !attr.is_null() {
                 value = (*attr)
@@ -4786,7 +4786,7 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
     if ctxt.is_null()
         || doc.is_null()
         || elem.is_null()
-        || !matches!((*elem).typ, XmlElementType::XmlElementNode)
+        || !matches!((*elem).element_type(), XmlElementType::XmlElementNode)
     {
         return 0;
     }
@@ -4795,7 +4795,7 @@ unsafe extern "C" fn xml_validate_one_cdata_element(
 
     let mut cur = child;
     'done: while let Some(now) = cur {
-        match now.typ {
+        match now.element_type() {
             XmlElementType::XmlEntityRefNode => {
                 /*
                  * Push the current node to be able to roll back
@@ -4874,7 +4874,7 @@ unsafe extern "C" fn xml_snprintf_elements(
             }
             return;
         }
-        match (*cur).typ {
+        match (*cur).element_type() {
             XmlElementType::XmlElementNode => {
                 if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
                     if size - len < xml_strlen((*(*cur).ns).prefix as _) + 10 {
@@ -5510,7 +5510,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 cur = child;
                 'fail: {
                     while !cur.is_null() {
-                        match (*cur).typ {
+                        match (*cur).element_type() {
                             XmlElementType::XmlEntityRefNode => {
                                 /*
                                  * Push the current node to be able to roll back
@@ -5639,7 +5639,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 DEBUG_VALID_MSG!(c"Found an entity reference, linearizing".as_ptr());
                 cur = child;
                 while !cur.is_null() {
-                    match (*cur).typ {
+                    match (*cur).element_type() {
                         XmlElementType::XmlEntityRefNode => {
                             /*
                              * Push the current node to be able to roll back
@@ -5849,7 +5849,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
     if elem.is_null() {
         return 0;
     }
-    match (*elem).typ {
+    match (*elem).element_type() {
         XmlElementType::XmlAttributeNode => {
             xml_err_valid_node(
                 ctxt,
@@ -6043,7 +6043,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                     /* Hum, this start to get messy */
                     while !child.is_null() {
                         'child_ok: {
-                            if matches!((*child).typ, XmlElementType::XmlElementNode) {
+                            if matches!((*child).element_type(), XmlElementType::XmlElementNode) {
                                 name = (*child).name;
                                 if !(*child).ns.is_null() && !(*(*child).ns).prefix.is_null() {
                                     let mut fname: [XmlChar; 50] = [0; 50];
@@ -6167,7 +6167,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                      */
                     child = (*elem).children.map_or(null_mut(), |c| c.as_ptr());
                     while !child.is_null() {
-                        if matches!((*child).typ, XmlElementType::XmlTextNode) {
+                        if matches!((*child).element_type(), XmlElementType::XmlTextNode) {
                             let mut content: *const XmlChar = (*child).content;
 
                             while xml_is_blank_char(*content as u32) {
@@ -7812,7 +7812,7 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
     if ctxt.is_null() || elem.is_null() {
         return 0;
     }
-    if !matches!((*elem).typ, XmlElementType::XmlElementDecl) {
+    if !matches!((*elem).element_type(), XmlElementType::XmlElementDecl) {
         return 0;
     }
     if !matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeElement) {

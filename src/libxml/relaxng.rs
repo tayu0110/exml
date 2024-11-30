@@ -1405,7 +1405,7 @@ macro_rules! IS_RELAXNG {
     ($node:expr, $typ:expr) => {
         !$node.is_null()
             && !(*$node).ns.is_null()
-            && (*$node).typ == XmlElementType::XmlElementNode
+            && (*$node).element_type() == XmlElementType::XmlElementNode
             && xml_str_equal((*$node).name, $typ)
             && xml_str_equal((*(*$node).ns).href, XML_RELAXNG_NS.as_ptr() as _)
     };
@@ -3433,15 +3433,13 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
         }
 
         'skip_children: {
-            if (*cur).typ == XmlElementType::XmlElementNode {
-                /*
-                 * Simplification 4.1. Annotations
-                 */
+            if (*cur).element_type() == XmlElementType::XmlElementNode {
+                // Simplification 4.1. Annotations
                 if (*cur).ns.is_null()
                     || !xml_str_equal((*(*cur).ns).href, XML_RELAXNG_NS.as_ptr() as _)
                 {
                     if let Some(parent) = (*cur).parent.filter(|p| {
-                        p.typ == XmlElementType::XmlElementNode
+                        p.element_type() == XmlElementType::XmlElementNode
                             && (xml_str_equal(p.name, c"name".as_ptr() as _)
                                 || xml_str_equal(p.name, c"value".as_ptr() as _)
                                 || xml_str_equal(p.name, c"param".as_ptr() as _))
@@ -3466,7 +3464,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         ns = (*cur).get_prop("ns");
                         if ns.is_null() {
                             tmp = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
-                            while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
+                            while !tmp.is_null()
+                                && (*tmp).element_type() == XmlElementType::XmlElementNode
+                            {
                                 ns = (*tmp).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
@@ -3628,7 +3628,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         ns = (*cur).get_prop("ns");
                         if ns.is_null() {
                             tmp = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
-                            while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
+                            while !tmp.is_null()
+                                && (*tmp).element_type() == XmlElementType::XmlElementNode
+                            {
                                 ns = (*tmp).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
@@ -3718,15 +3720,15 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         || xml_str_equal((*cur).name, c"nsName".as_ptr() as _)
                         || xml_str_equal((*cur).name, c"value".as_ptr() as _)
                     {
-                        /*
-                         * Simplification 4.8. name attribute of element
-                         * and attribute elements
-                         */
+                        // Simplification 4.8. name attribute of element
+                        // and attribute elements
                         if (*cur).has_prop("ns").is_null() {
                             let mut ns: *mut XmlChar = null_mut();
 
                             let mut node = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
-                            while !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
+                            while !node.is_null()
+                                && (*node).element_type() == XmlElementType::XmlElementNode
+                            {
                                 ns = (*node).get_prop("ns");
                                 if !ns.is_null() {
                                     break;
@@ -3912,17 +3914,15 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                     }
                 }
             }
-            /*
-             * Simplification 4.2 whitespaces
-             */
+            // Simplification 4.2 whitespaces
             else if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 if IS_BLANK_NODE!(cur) {
                     if let Some(parent) = (*cur)
                         .parent
-                        .filter(|p| p.typ == XmlElementType::XmlElementNode)
+                        .filter(|p| p.element_type() == XmlElementType::XmlElementNode)
                     {
                         if !xml_str_equal(parent.name, c"value".as_ptr() as _)
                             && !xml_str_equal(parent.name, c"param".as_ptr() as _)
@@ -3939,12 +3939,10 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                 break 'skip_children;
             }
 
-            /*
-             * Skip to next node
-             */
+            // Skip to next node
             if let Some(children) = (*cur).children.filter(|children| {
                 !matches!(
-                    children.typ,
+                    children.element_type(),
                     XmlElementType::XmlEntityDecl
                         | XmlElementType::XmlEntityRefNode
                         | XmlElementType::XmlEntityNode
@@ -4628,7 +4626,7 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
         }
     }
     node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
-    while !node.is_null() && (*node).typ == XmlElementType::XmlElementNode {
+    while !node.is_null() && (*node).element_type() == XmlElementType::XmlElementNode {
         ret = (*node).get_prop("datatypeLibrary");
         if !ret.is_null() {
             if *ret.add(0) == 0 {
@@ -5036,7 +5034,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
         .children
         .filter(|children| {
             !matches!(
-                children.typ,
+                children.element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) || children.next.is_some()
         })
@@ -5306,7 +5304,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
             ns = (*root).get_prop("ns");
             if ns.is_null() {
                 tmp = node;
-                while !tmp.is_null() && (*tmp).typ == XmlElementType::XmlElementNode {
+                while !tmp.is_null() && (*tmp).element_type() == XmlElementType::XmlElementNode {
                     ns = (*tmp).get_prop("ns");
                     if !ns.is_null() {
                         break;
@@ -8995,13 +8993,13 @@ unsafe extern "C" fn xml_relaxng_skip_ignored(
      */
     while !node.is_null()
         && (matches!(
-            (*node).typ,
+            (*node).element_type(),
             XmlElementType::XmlCommentNode
                 | XmlElementType::XmlPINode
                 | XmlElementType::XmlXIncludeStart
                 | XmlElementType::XmlXIncludeEnd
         ) || (matches!(
-            (*node).typ,
+            (*node).element_type(),
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) && ((*ctxt).flags & FLAGS_MIXED_CONTENT != 0 || IS_BLANK_NODE!(node))))
     {
@@ -9741,7 +9739,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
     cur = content;
     while !cur.is_null() {
         (*(*ctxt).state).seq = cur;
-        match (*cur).typ {
+        match (*cur).element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                 if (*cur).is_blank_node() {
                     // break;
@@ -10103,13 +10101,15 @@ unsafe extern "C" fn xml_relaxng_node_matches_list(
     cur = *list.add(i as usize);
     i += 1;
     while !cur.is_null() {
-        if (*node).typ == XmlElementType::XmlElementNode && (*cur).typ == XmlRelaxNGType::Element {
+        if (*node).element_type() == XmlElementType::XmlElementNode
+            && (*cur).typ == XmlRelaxNGType::Element
+        {
             tmp = xml_relaxng_element_match(null_mut(), cur, node);
             if tmp == 1 {
                 return 1;
             }
         } else if matches!(
-            (*node).typ,
+            (*node).element_type(),
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
         ) && matches!(
             (*cur).typ,
@@ -10212,11 +10212,11 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
             let mut tmp = None;
 
             if matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 tmp = triage.lookup2(c"#text", None).copied();
-            } else if (*cur).typ == XmlElementType::XmlElementNode {
+            } else if (*cur).element_type() == XmlElementType::XmlElementNode {
                 if !(*cur).ns.is_null() {
                     tmp = triage
                         .lookup2(
@@ -10512,7 +10512,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
         XmlRelaxNGType::Text => {
             while !node.is_null()
                 && matches!(
-                    (*node).typ,
+                    (*node).element_type(),
                     XmlElementType::XmlTextNode
                         | XmlElementType::XmlCommentNode
                         | XmlElementType::XmlPINode
@@ -10538,7 +10538,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 }
                 break 'to_break;
             }
-            if (*node).typ != XmlElementType::XmlElementNode {
+            if (*node).element_type() != XmlElementType::XmlElementNode {
                 VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNotelem);
                 ret = -1;
                 if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
@@ -10993,11 +10993,11 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                  * possible branch out !
                  */
                 if matches!(
-                    (*node).typ,
+                    (*node).element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     list = xml_hash_lookup2(triage, c"#text".as_ptr() as _, null_mut()) as _;
-                } else if (*node).typ == XmlElementType::XmlElementNode {
+                } else if (*node).element_type() == XmlElementType::XmlElementNode {
                     if !(*node).ns.is_null() {
                         list = xml_hash_lookup2(triage, (*node).name, (*(*node).ns).href) as _;
                         if list.is_null() {
@@ -11095,7 +11095,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
 
             child = node;
             while !child.is_null() {
-                if (*child).typ == XmlElementType::XmlElementNode {
+                if (*child).element_type() == XmlElementType::XmlElementNode {
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrDataelem,
@@ -11104,7 +11104,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     ret = -1;
                     break;
                 } else if matches!(
-                    (*child).typ,
+                    (*child).element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     content = xml_strcat(content, (*child).content);
@@ -11146,7 +11146,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
 
             child = node;
             while !child.is_null() {
-                if (*child).typ == XmlElementType::XmlElementNode {
+                if (*child).element_type() == XmlElementType::XmlElementNode {
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrValelem,
@@ -11155,7 +11155,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     ret = -1;
                     break;
                 } else if matches!(
-                    (*child).typ,
+                    (*child).element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     content = xml_strcat(content, (*child).content);
@@ -11201,7 +11201,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             content = null_mut();
             child = node;
             while !child.is_null() {
-                if (*child).typ == XmlElementType::XmlElementNode {
+                if (*child).element_type() == XmlElementType::XmlElementNode {
                     VALID_ERR2!(
                         ctxt,
                         XmlRelaxNGValidErr::XmlRelaxngErrListelem,
@@ -11210,7 +11210,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     ret = -1;
                     break;
                 } else if matches!(
-                    (*child).typ,
+                    (*child).element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
                 ) {
                     content = xml_strcat(content, (*child).content);
@@ -11482,7 +11482,7 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
 
     if node.is_null()
         || !matches!(
-            (*node).typ,
+            (*node).element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
@@ -11490,13 +11490,13 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
     {
         return;
     }
-    if (*node).typ == XmlElementType::XmlElementNode {
+    if (*node).element_type() == XmlElementType::XmlElementNode {
         (*node).psvi = null_mut();
     }
 
     cur = (*node).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
-        if (*cur).typ == XmlElementType::XmlElementNode {
+        if (*cur).element_type() == XmlElementType::XmlElementNode {
             (*cur).psvi = null_mut();
             if let Some(children) = (*cur).children {
                 cur = children.as_ptr();
@@ -11609,7 +11609,7 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         (*ctxt).pstate = -1;
         return;
     }
-    if !matches!((*node).typ, XmlElementType::XmlElementNode) {
+    if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNotelem);
         if (*ctxt).flags & FLAGS_IGNORABLE == 0 {
             xml_relaxng_dump_valid_error(ctxt);

@@ -60,7 +60,7 @@ use crate::{
             xml_xpath_register_ns, xml_xpath_root,
         },
     },
-    tree::{XmlDocPtr, XmlElementType, XmlNodePtr},
+    tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
     CHECK_ERROR, CHECK_TYPE, XP_ERROR,
 };
 #[cfg(feature = "libxml_xptr_locs")]
@@ -1123,7 +1123,7 @@ unsafe extern "C" fn xml_xptr_get_end_point(
 #[doc(alias = "xmlXPtrGetNthChild")]
 unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> XmlNodePtr {
     let mut i: i32;
-    if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
+    if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return cur;
     }
     cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
@@ -1133,7 +1133,7 @@ unsafe extern "C" fn xml_xptr_get_nth_child(mut cur: XmlNodePtr, no: i32) -> Xml
             return cur;
         }
         if matches!(
-            (*cur).typ,
+            (*cur).element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode

@@ -36,7 +36,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::{xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
-    tree::{xml_free_doc, XmlDocPtr, XmlElementType, XmlNodePtr},
+    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
 };
 
 use super::{
@@ -395,7 +395,7 @@ pub unsafe extern "C" fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronPars
 macro_rules! IS_SCHEMATRON {
     ($node:expr, $elem:expr) => {
         !$node.is_null()
-            && ((*$node).typ == XmlElementType::XmlElementNode)
+            && ((*$node).element_type() == XmlElementType::XmlElementNode)
             && !(*$node).ns.is_null()
             && xml_str_equal((*$node).name, $elem)
             && (xml_str_equal((*(*$node).ns).href, XML_SCHEMATRON_NS.as_ptr() as _)
@@ -406,7 +406,7 @@ macro_rules! IS_SCHEMATRON {
 macro_rules! NEXT_SCHEMATRON {
     ($node:expr) => {
         while !$node.is_null() {
-            if ((*$node).typ == XmlElementType::XmlElementNode)
+            if ((*$node).element_type() == XmlElementType::XmlElementNode)
                 && !(*$node).ns.is_null()
                 && (xml_str_equal((*(*$node).ns).href, XML_SCHEMATRON_NS.as_ptr() as _)
                     || xml_str_equal((*(*$node).ns).href, XML_OLD_SCHEMATRON_NS.as_ptr() as _))
@@ -652,8 +652,8 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
 
     let mut child = (*con).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
-        if ((*child).typ == XmlElementType::XmlTextNode)
-            || ((*child).typ == XmlElementType::XmlCDATASectionNode)
+        if ((*child).element_type() == XmlElementType::XmlTextNode)
+            || ((*child).element_type() == XmlElementType::XmlCDATASectionNode)
         /* Do Nothing */
         {
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
@@ -1527,8 +1527,8 @@ unsafe extern "C" fn xml_schematron_format_report(
 
     let mut child = (*test).children.map_or(null_mut(), |c| c.as_ptr());
     while !child.is_null() {
-        if ((*child).typ == XmlElementType::XmlTextNode)
-            || ((*child).typ == XmlElementType::XmlCDATASectionNode)
+        if ((*child).element_type() == XmlElementType::XmlTextNode)
+            || ((*child).element_type() == XmlElementType::XmlCDATASectionNode)
         {
             ret = xml_strcat(ret, (*child).content);
         } else if IS_SCHEMATRON!(child, c"name".as_ptr() as _) {
@@ -1838,15 +1838,11 @@ unsafe extern "C" fn xml_schematron_unregister_variables(
 
 unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr {
     if let Some(children) = (*cur).children {
-        /*
-         * Do not descend on entities declarations
-         */
-        if children.typ != XmlElementType::XmlEntityDecl {
+        // Do not descend on entities declarations
+        if children.element_type() != XmlElementType::XmlEntityDecl {
             cur = children.as_ptr();
-            /*
-             * Skip DTDs
-             */
-            if (*cur).typ != XmlElementType::XmlDTDNode {
+            // Skip DTDs
+            if (*cur).element_type() != XmlElementType::XmlDTDNode {
                 return cur;
             }
         }
@@ -1854,7 +1850,9 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
 
     while let Some(next) = (*cur).next {
         cur = next.as_ptr();
-        if (*cur).typ != XmlElementType::XmlEntityDecl && (*cur).typ != XmlElementType::XmlDTDNode {
+        if (*cur).element_type() != XmlElementType::XmlEntityDecl
+            && (*cur).element_type() != XmlElementType::XmlDTDNode
+        {
             return cur;
         }
     }
@@ -1864,7 +1862,7 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
         if cur.is_null() {
             break;
         }
-        if (*cur).typ == XmlElementType::XmlDocumentNode {
+        if (*cur).element_type() == XmlElementType::XmlDocumentNode {
             return null_mut();
         }
         if let Some(next) = (*cur).next {

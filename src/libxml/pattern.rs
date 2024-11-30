@@ -40,7 +40,7 @@ use crate::{
         parser_internals::{xml_is_letter, xml_string_current_char},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
-    tree::{XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
+    tree::{NodeCommon, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE},
 };
 
 const XML_STREAM_STEP_DESC: usize = 1;
@@ -1549,12 +1549,15 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 break 'found;
                             }
                             XmlPatOp::XmlOpRoot => {
-                                if matches!((*node).typ, XmlElementType::XmlNamespaceDecl) {
+                                if matches!(
+                                    (*node).element_type(),
+                                    XmlElementType::XmlNamespaceDecl
+                                ) {
                                     break 'rollback;
                                 }
                                 node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                                 if matches!(
-                                    (*node).typ,
+                                    (*node).element_type(),
                                     XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
                                 ) {
@@ -1563,7 +1566,8 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 break 'rollback;
                             }
                             XmlPatOp::XmlOpElem => {
-                                if !matches!((*node).typ, XmlElementType::XmlElementNode) {
+                                if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                                {
                                     break 'rollback;
                                 }
                                 if (*step).value.is_null() {
@@ -1595,7 +1599,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 let mut lst: XmlNodePtr;
 
                                 if !matches!(
-                                    (*node).typ,
+                                    (*node).element_type(),
                                     XmlElementType::XmlElementNode
                                         | XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
@@ -1607,8 +1611,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
 
                                 if !(*step).value.is_null() {
                                     while !lst.is_null() {
-                                        if matches!((*lst).typ, XmlElementType::XmlElementNode)
-                                            && *(*step).value.add(0) == *(*lst).name.add(0)
+                                        if matches!(
+                                            (*lst).element_type(),
+                                            XmlElementType::XmlElementNode
+                                        ) && *(*step).value.add(0) == *(*lst).name.add(0)
                                             && xml_str_equal((*step).value, (*lst).name)
                                         {
                                             break;
@@ -1622,7 +1628,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 break 'rollback;
                             }
                             XmlPatOp::XmlOpAttr => {
-                                if !matches!((*node).typ, XmlElementType::XmlAttributeNode) {
+                                if !matches!(
+                                    (*node).element_type(),
+                                    XmlElementType::XmlAttributeNode
+                                ) {
                                     break 'rollback;
                                 }
                                 if !(*step).value.is_null() {
@@ -1647,7 +1656,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                             }
                             XmlPatOp::XmlOpParent => {
                                 if matches!(
-                                    (*node).typ,
+                                    (*node).element_type(),
                                     XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
                                         | XmlElementType::XmlNamespaceDecl
@@ -1701,7 +1710,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     break 'rollback;
                                 }
                                 if matches!(
-                                    (*node).typ,
+                                    (*node).element_type(),
                                     XmlElementType::XmlDocumentNode
                                         | XmlElementType::XmlHTMLDocumentNode
                                         | XmlElementType::XmlNamespaceDecl
@@ -1710,8 +1719,10 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 }
                                 node = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
                                 while !node.is_null() {
-                                    if matches!((*node).typ, XmlElementType::XmlElementNode)
-                                        && *(*step).value.add(0) == *(*node).name.add(0)
+                                    if matches!(
+                                        (*node).element_type(),
+                                        XmlElementType::XmlElementNode
+                                    ) && *(*step).value.add(0) == *(*node).name.add(0)
                                         && xml_str_equal((*step).value, (*node).name)
                                     {
                                         /* Namespace test */
@@ -1746,7 +1757,8 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 break 'to_continue;
                             }
                             XmlPatOp::XmlOpNs => {
-                                if !matches!((*node).typ, XmlElementType::XmlElementNode) {
+                                if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                                {
                                     break 'rollback;
                                 }
                                 if (*node).ns.is_null() {
@@ -1763,7 +1775,8 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 }
                             }
                             XmlPatOp::XmlOpAll => {
-                                if !matches!((*node).typ, XmlElementType::XmlElementNode) {
+                                if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                                {
                                     break 'rollback;
                                 }
                             }

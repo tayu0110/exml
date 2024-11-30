@@ -2008,7 +2008,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
     }
 
     if named == 0 && !item_node.is_null() {
-        let elem = if (*item_node).typ == XmlElementType::XmlAttributeNode {
+        let elem = if (*item_node).element_type() == XmlElementType::XmlAttributeNode {
             (*item_node).parent.map_or(null_mut(), |p| p.as_ptr())
         } else {
             item_node
@@ -2025,7 +2025,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
         }
         *buf = xml_strcat(*buf, c"'".as_ptr() as _);
     }
-    if !item_node.is_null() && (*item_node).typ == XmlElementType::XmlAttributeNode {
+    if !item_node.is_null() && (*item_node).element_type() == XmlElementType::XmlAttributeNode {
         *buf = xml_strcat(*buf, c", attribute '".as_ptr() as _);
         if !(*item_node).ns.is_null() {
             *buf = xml_strcat(
@@ -2057,7 +2057,7 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
     *msg = null_mut();
     if !node.is_null()
         && !matches!(
-            (*node).typ,
+            (*node).element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode
         )
     {
@@ -2070,10 +2070,8 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
         return *msg;
     }
     if !node.is_null() {
-        /*
-         * Work on tree nodes.
-         */
-        if (*node).typ == XmlElementType::XmlAttributeNode {
+        // Work on tree nodes.
+        if (*node).element_type() == XmlElementType::XmlAttributeNode {
             let elem: XmlNodePtr = (*node).parent.map_or(null_mut(), |p| p.as_ptr());
 
             *msg = xml_strdup(c"Element '".as_ptr() as _);
@@ -2686,7 +2684,7 @@ unsafe extern "C" fn xml_schema_eval_error_node_type(
     node: XmlNodePtr,
 ) -> i32 {
     if !node.is_null() {
-        return (*node).typ as i32;
+        return (*node).element_type() as i32;
     }
     if (*actxt).typ == XML_SCHEMA_CTXT_VALIDATOR
         && !(*(actxt as XmlSchemaValidCtxtPtr)).inode.is_null()
@@ -4699,7 +4697,8 @@ unsafe extern "C" fn xml_schema_perr(
 
 macro_rules! IS_BLANK_NODE {
     ($n:expr) => {
-        (*$n).typ == XmlElementType::XmlTextNode && xml_schema_is_blank((*$n).content, -1) != 0
+        (*$n).element_type() == XmlElementType::XmlTextNode
+            && xml_schema_is_blank((*$n).content, -1) != 0
     };
 }
 
@@ -4752,12 +4751,12 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
             delete = null_mut();
         }
         'skip_children: {
-            if (*cur).typ == XmlElementType::XmlTextNode {
+            if (*cur).element_type() == XmlElementType::XmlTextNode {
                 if IS_BLANK_NODE!(cur) && (*cur).get_space_preserve() != 1 {
                     delete = cur;
                 }
             } else if !matches!(
-                (*cur).typ,
+                (*cur).element_type(),
                 XmlElementType::XmlElementNode | XmlElementType::XmlCDATASectionNode
             ) {
                 delete = cur;
@@ -4768,7 +4767,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
             // Skip to next node
             if let Some(children) = (*cur).children.filter(|children| {
                 !matches!(
-                    children.typ,
+                    children.element_type(),
                     XmlElementType::XmlEntityDecl
                         | XmlElementType::XmlEntityRefNode
                         | XmlElementType::XmlEntityNode
@@ -5867,7 +5866,7 @@ unsafe extern "C" fn xml_schema_psimple_type_err(
          * Use default messages.
          */
         if !typ.is_null() {
-            if (*node).typ == XmlElementType::XmlAttributeNode {
+            if (*node).element_type() == XmlElementType::XmlAttributeNode {
                 msg = xml_strcat(msg, c"'%s' is not a valid value of ".as_ptr() as _);
             } else {
                 msg = xml_strcat(
@@ -5909,7 +5908,7 @@ unsafe extern "C" fn xml_schema_psimple_type_err(
                 msg = xml_strcat(msg, c"'.".as_ptr() as _);
                 FREE_AND_NULL!(str);
             }
-        } else if (*node).typ == XmlElementType::XmlAttributeNode {
+        } else if (*node).element_type() == XmlElementType::XmlAttributeNode {
             msg = xml_strcat(msg, c"The value '%s' is not valid.".as_ptr() as _);
         } else {
             msg = xml_strcat(msg, c"The character content is not valid.".as_ptr() as _);
@@ -5926,7 +5925,7 @@ unsafe extern "C" fn xml_schema_psimple_type_err(
         } else {
             msg = xml_strcat(msg, c"\n".as_ptr() as _);
         }
-        if (*node).typ == XmlElementType::XmlAttributeNode {
+        if (*node).element_type() == XmlElementType::XmlAttributeNode {
             xml_schema_perr(ctxt, node, error, msg as _, value, null_mut());
         } else {
             xml_schema_perr(ctxt, node, error, msg as _, null_mut(), null_mut());
@@ -28870,7 +28869,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     break 'goto_leave_node;
                 }
             }
-            if (*node).typ == XmlElementType::XmlElementNode {
+            if (*node).element_type() == XmlElementType::XmlElementNode {
                 /*
                  * Init the node-info.
                  */
@@ -28954,7 +28953,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                     break 'goto_leave_node;
                 }
             } else if matches!(
-                (*node).typ,
+                (*node).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
                 /*
@@ -28965,7 +28964,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                 }
                 ret = xml_schema_vpush_text(
                     vctxt,
-                    (*node).typ as _,
+                    (*node).element_type() as _,
                     (*node).content,
                     -1,
                     XML_SCHEMA_PUSH_TEXT_PERSIST,
@@ -28985,7 +28984,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                  * element content here?
                  */
             } else if matches!(
-                (*node).typ,
+                (*node).element_type(),
                 XmlElementType::XmlEntityNode | XmlElementType::XmlEntityRefNode
             ) {
                 /*
@@ -29010,7 +29009,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
         }
         // leave_node:
         'leave_node: loop {
-            if (*node).typ == XmlElementType::XmlElementNode {
+            if (*node).element_type() == XmlElementType::XmlElementNode {
                 /*
                  * Leaving the scope of an element.
                  */
@@ -29319,7 +29318,8 @@ pub unsafe extern "C" fn xml_schema_validate_one_element(
     ctxt: XmlSchemaValidCtxtPtr,
     elem: XmlNodePtr,
 ) -> i32 {
-    if ctxt.is_null() || elem.is_null() || (*elem).typ != XmlElementType::XmlElementNode {
+    if ctxt.is_null() || elem.is_null() || (*elem).element_type() != XmlElementType::XmlElementNode
+    {
         return -1;
     }
 

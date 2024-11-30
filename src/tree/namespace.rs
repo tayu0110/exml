@@ -112,7 +112,7 @@ pub unsafe fn xml_new_ns(
     href: *const XmlChar,
     prefix: *const XmlChar,
 ) -> XmlNsPtr {
-    if !node.is_null() && !matches!((*node).typ, XmlElementType::XmlElementNode) {
+    if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         return null_mut();
     }
 

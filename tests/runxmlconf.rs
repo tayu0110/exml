@@ -760,8 +760,8 @@ unsafe extern "C" fn xmlconf_test_cases(
     }
     cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
-        /* look only at elements we ignore everything else */
-        if (*cur).typ == XmlElementType::XmlElementNode {
+        // look only at elements we ignore everything else
+        if (*cur).element_type() == XmlElementType::XmlElementNode {
             if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
                 ret += xmlconf_test_cases(logfile, doc, cur, level);
             } else if xml_str_equal((*cur).name, c"TEST".as_ptr() as _) {
@@ -803,8 +803,8 @@ unsafe extern "C" fn xmlconf_test_suite(
     }
     cur = (*cur).children.map_or(null_mut(), |c| c.as_ptr());
     while !cur.is_null() {
-        /* look only at elements we ignore everything else */
-        if (*cur).typ == XmlElementType::XmlElementNode {
+        // look only at elements we ignore everything else
+        if (*cur).element_type() == XmlElementType::XmlElementNode {
             if xml_str_equal((*cur).name, c"TESTCASES".as_ptr() as _) {
                 ret += xmlconf_test_cases(logfile, doc, cur, 1);
             } else {
