@@ -6986,38 +6986,29 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
             break 'main;
         }
 
-        /*
-        	* Apply predicates.
-        	*/
+        // Apply predicates.
         if !pred_op.is_null() && (*seq).node_nr > 0 {
-            /*
-            	* E.g. when we have a "/foo[some expression][n]".
-            	*/
-            /*
-            	* QUESTION TODO: The old predicate evaluation took into
-            	*  account location-sets.
-            	*  (E.g. (*(*ctxt).value).typ == XPATH_LOCATIONSET)
-            	*  Do we expect such a set here?
-            	*  All what I learned now from the evaluation semantics
-            	*  does not indicate that a location-set will be processed
-            	*  here, so this looks OK.
-            	*/
-            /*
-            	* Iterate over all predicates, starting with the outermost
-            	* predicate.
-            	* TODO: Problem: we cannot execute the inner predicates first
-            	*  since we cannot go back *up* the operator tree!
-            	*  Options we have:
-            	*  1) Use of recursive functions (like is it currently done
-            	*     via xmlXPathCompOpEval())
-            	*  2) Add a predicate evaluation information stack to the
-            	*     context struct
-            	*  3) Change the way the operators are linked; we need a
-            	*     "parent" field on xmlXPathStepOp
-            	*
-            	* For the moment, I'll try to solve this with a recursive
-            	* function: xmlXPathCompOpEvalPredicate().
-            	*/
+            // E.g. when we have a "/foo[some expression][n]".
+            // QUESTION TODO: The old predicate evaluation took into
+            // account location-sets.
+            // (E.g. (*(*ctxt).value).typ == XPATH_LOCATIONSET)
+            // Do we expect such a set here?
+            // All what I learned now from the evaluation semantics
+            // does not indicate that a location-set will be processed
+            // here, so this looks OK.
+            // Iterate over all predicates, starting with the outermost predicate.
+            // TODO: Problem: we cannot execute the inner predicates first
+            //  since we cannot go back *up* the operator tree!
+            //  Options we have:
+            //  1) Use of recursive functions (like is it currently done
+            //     via xmlXPathCompOpEval())
+            //  2) Add a predicate evaluation information stack to the
+            //     context struct
+            //  3) Change the way the operators are linked; we need a
+            //     "parent" field on xmlXPathStepOp
+            //
+            // For the moment, I'll try to solve this with a recursive
+            // function: xmlXPathCompOpEvalPredicate().
             if has_predicate_range != 0 {
                 xml_xpath_comp_op_eval_predicate(
                     ctxt,
@@ -7046,14 +7037,12 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
         }
 
         if (*seq).node_nr > 0 {
-            /*
-            	* Add to result set.
-            	*/
+            // Add to result set.
             if out_seq.is_null() {
                 out_seq = seq;
                 seq = null_mut();
             } else {
-                /* TODO: Check memory error. */
+                // TODO: Check memory error.
                 out_seq = merge_and_clear(out_seq, seq);
             }
 
@@ -7066,11 +7055,9 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
 
     // error:
     if (*obj).boolval != 0 && !(*obj).user.is_null() {
-        /*
-        	* QUESTION TODO: What does this do and why?
-        	* TODO: Do we have to do this also for the "error"
-        	* cleanup further down?
-        	*/
+        // QUESTION TODO: What does this do and why?
+        // TODO: Do we have to do this also for the "error"
+        // cleanup further down?
         (*(*ctxt).value).boolval = 1;
         (*(*ctxt).value).user = (*obj).user;
         (*obj).user = null_mut();
@@ -7078,37 +7065,25 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     }
     xml_xpath_release_object(xpctxt, obj);
 
-    /*
-     * Ensure we return at least an empty set.
-     */
+    // Ensure we return at least an empty set.
     if out_seq.is_null() {
         if !seq.is_null() && (*seq).node_nr == 0 {
             out_seq = seq;
         } else {
-            /* TODO: Check memory error. */
+            // TODO: Check memory error.
             out_seq = xml_xpath_node_set_create(null_mut());
         }
     }
     if !seq.is_null() && seq != out_seq {
         xml_xpath_free_node_set(seq);
     }
-    /*
-     * Hand over the result. Better to push the set also in
-     * case of errors.
-     */
+    // Hand over the result. Better to push the set also in case of errors.
     value_push(ctxt, xml_xpath_cache_wrap_node_set(xpctxt, out_seq));
-    /*
-     * Reset the context node.
-     */
+    // Reset the context node.
     (*xpctxt).node = old_context_node;
-    /*
-     * When traversing the namespace axis in "toBool" mode, it's
-     * possible that tmpNsList wasn't freed.
-     */
-    if !(*xpctxt).tmp_ns_list.is_null() {
-        xml_free((*xpctxt).tmp_ns_list as _);
-        (*xpctxt).tmp_ns_list = null_mut();
-    }
+    // When traversing the namespace axis in "toBool" mode, it's
+    // possible that tmpNsList wasn't freed.
+    (*xpctxt).tmp_ns_list = None;
 
     total
 }
@@ -11221,28 +11196,11 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
         return null_mut();
     }
     if cur.is_null() {
-        if !(*(*ctxt).context).tmp_ns_list.is_null() {
-            xml_free((*(*ctxt).context).tmp_ns_list as _);
-        }
-        (*(*ctxt).context).tmp_ns_list = if let Some(list) =
-            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc)
-        {
-            let array = xml_malloc(size_of::<*mut XmlNs>() * (list.len() + 1)) as *mut *mut XmlNs;
-            std::ptr::copy_nonoverlapping(list.as_ptr(), array, list.len());
-            *array.add(list.len()) = null_mut();
-            array
-        } else {
-            null_mut()
-        };
+        (*(*ctxt).context).tmp_ns_list =
+            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc);
         (*(*ctxt).context).tmp_ns_nr = 0;
-        if !(*(*ctxt).context).tmp_ns_list.is_null() {
-            while !(*(*(*ctxt).context)
-                .tmp_ns_list
-                .add((*(*ctxt).context).tmp_ns_nr as usize))
-            .is_null()
-            {
-                (*(*ctxt).context).tmp_ns_nr += 1;
-            }
+        if let Some(list) = (*(*ctxt).context).tmp_ns_list.as_deref() {
+            (*(*ctxt).context).tmp_ns_nr = list.len() as i32;
         }
         // Does it work ???
         let reference = XML_XPATH_XMLNAMESPACE_STRUCT.with(|s| s as *const XmlNs);
@@ -11250,14 +11208,10 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
     }
     if (*(*ctxt).context).tmp_ns_nr > 0 {
         (*(*ctxt).context).tmp_ns_nr -= 1;
-        *(*(*ctxt).context)
-            .tmp_ns_list
-            .add((*(*ctxt).context).tmp_ns_nr as usize) as XmlNodePtr
+        (*(*ctxt).context).tmp_ns_list.as_deref().unwrap()[(*(*ctxt).context).tmp_ns_nr as usize]
+            as XmlNodePtr
     } else {
-        if !(*(*ctxt).context).tmp_ns_list.is_null() {
-            xml_free((*(*ctxt).context).tmp_ns_list as _);
-        }
-        (*(*ctxt).context).tmp_ns_list = null_mut();
+        (*(*ctxt).context).tmp_ns_list = None;
         null_mut()
     }
 }

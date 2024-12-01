@@ -370,58 +370,107 @@ pub struct XmlXPathContext {
     pub(crate) max_axis: i32,         /* max number of axis */
     pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
 
-    /* the namespace nodes of the context node */
+    // the namespace nodes of the context node
     pub(crate) namespaces: *mut XmlNsPtr, /* Array of namespaces */
     pub(crate) ns_nr: i32,                /* number of namespace in scope */
     pub(crate) user: *mut c_void,         /* function to free */
 
-    /* extra variables */
+    // extra variables
     pub(crate) context_size: i32,       /* the context size */
     pub(crate) proximity_position: i32, /* the proximity position */
 
-    /* extra stuff for XPointer */
+    // extra stuff for XPointer
     pub(crate) xptr: i32,          /* is this an XPointer context? */
     pub(crate) here: XmlNodePtr,   /* for here() */
     pub(crate) origin: XmlNodePtr, /* for origin() */
 
-    /* the set of namespace declarations in scope for the expression */
+    // the set of namespace declarations in scope for the expression
     pub(crate) ns_hash: Option<XmlHashTableRef<'static, *mut XmlChar>>, /* The namespaces hash table */
     pub(crate) var_lookup_func: Option<XmlXPathVariableLookupFunc>,     /* variable lookup func */
     pub(crate) var_lookup_data: *mut c_void,                            /* variable lookup data */
 
-    /* Possibility to link in an extra item */
+    // Possibility to link in an extra item
     pub(crate) extra: *mut c_void, /* needed for XSLT */
 
-    /* The function name and URI when calling a function */
+    // The function name and URI when calling a function
     pub(crate) function: *const XmlChar,
     pub(crate) function_uri: *const XmlChar,
 
-    /* function lookup function and data */
+    // function lookup function and data
     pub(crate) func_lookup_func: Option<XmlXPathFuncLookupFunc>, /* function lookup func */
     pub(crate) func_lookup_data: *mut c_void,                    /* function lookup data */
 
-    /* temporary namespace lists kept for walking the namespace axis */
-    pub(crate) tmp_ns_list: *mut XmlNsPtr, /* Array of namespaces */
-    pub(crate) tmp_ns_nr: i32,             /* number of namespaces in scope */
+    // temporary namespace lists kept for walking the namespace axis
+    pub(crate) tmp_ns_list: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
+    pub(crate) tmp_ns_nr: i32,                     /* number of namespaces in scope */
 
-    /* error reporting mechanism */
+    // error reporting mechanism
     pub(crate) user_data: Option<GenericErrorContext>, /* user specific data block */
     pub(crate) error: Option<StructuredError>,         /* the callback in case of errors */
     pub(crate) last_error: XmlError,                   /* the last error */
     pub(crate) debug_node: XmlNodePtr,                 /* the source node XSLT */
 
-    /* dictionary */
+    // dictionary
     pub(crate) dict: XmlDictPtr, /* dictionary if any */
 
     pub(crate) flags: i32, /* flags to control compilation */
 
-    /* Cache for reusal of XPath objects */
+    // Cache for reusal of XPath objects
     pub cache: *mut c_void,
 
-    /* Resource limits */
+    // Resource limits
     pub(crate) op_limit: u64,
     pub(crate) op_count: u64,
     pub(crate) depth: i32,
+}
+
+impl Default for XmlXPathContext {
+    fn default() -> Self {
+        Self {
+            doc: null_mut(),
+            node: null_mut(),
+            nb_variables_unused: 0,
+            max_variables_unused: 0,
+            var_hash: None,
+            nb_types: 0,
+            max_types: 0,
+            types: null_mut(),
+            nb_funcs_unused: 0,
+            max_funcs_unused: 0,
+            func_hash: None,
+            nb_axis: 0,
+            max_axis: 0,
+            axis: null_mut(),
+            namespaces: null_mut(),
+            ns_nr: 0,
+            user: null_mut(),
+            context_size: 0,
+            proximity_position: 0,
+            xptr: 0,
+            here: null_mut(),
+            origin: null_mut(),
+            ns_hash: None,
+            var_lookup_func: None,
+            var_lookup_data: null_mut(),
+            extra: null_mut(),
+            function: null_mut(),
+            function_uri: null_mut(),
+            func_lookup_func: None,
+            func_lookup_data: null_mut(),
+            tmp_ns_list: None,
+            tmp_ns_nr: 0,
+            user_data: None,
+            error: None,
+            last_error: XmlError::default(),
+            debug_node: null_mut(),
+            dict: null_mut(),
+            flags: 0,
+            cache: null_mut(),
+            op_limit: 0,
+            op_count: 0,
+            depth: 0,
+        }
+    }
 }
 
 #[cfg(feature = "xpath")]
@@ -1432,7 +1481,7 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
         xml_xpath_err_memory(null_mut(), c"creating context\n".as_ptr() as _);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathContext>());
+    std::ptr::write(&mut *ret, XmlXPathContext::default());
     (*ret).doc = doc;
     (*ret).node = null_mut();
 
