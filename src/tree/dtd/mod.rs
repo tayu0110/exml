@@ -47,7 +47,7 @@ use crate::{
 };
 
 use super::{
-    xml_split_qname2, xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType,
+    split_qname2, xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType,
     XmlNode, __XML_REGISTER_CALLBACKS,
 };
 
@@ -111,56 +111,37 @@ impl XmlDtd {
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdAttrDesc")]
-    pub unsafe fn get_attr_desc(&self, elem: &str, name: &str) -> XmlAttributePtr {
-        let cur: XmlAttributePtr;
-
+    pub fn get_attr_desc(&self, elem: &str, name: &str) -> XmlAttributePtr {
         let Some(table) = self.attributes else {
             return null_mut();
         };
 
-        let mut prefix: *mut XmlChar = null_mut();
-        let cname = CString::new(name).unwrap();
-        let uqname: *mut XmlChar =
-            xml_split_qname2(cname.as_ptr() as *const u8, &raw mut prefix) as _;
-
-        if !uqname.is_null() {
-            cur = table
+        if let Some((prefix, local)) = split_qname2(name) {
+            table
                 .lookup3(
-                    CStr::from_ptr(uqname as *const i8),
-                    (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                    CString::new(local).unwrap().as_c_str(),
+                    Some(CString::new(prefix).unwrap().as_c_str()),
                     Some(CString::new(elem).unwrap().as_c_str()),
                 )
                 .copied()
-                .unwrap_or(null_mut());
-            if !prefix.is_null() {
-                xml_free(prefix as _);
-            }
-            if !uqname.is_null() {
-                xml_free(uqname as _);
-            }
+                .unwrap_or(null_mut())
         } else {
-            cur = table
+            table
                 .lookup3(
                     CString::new(name).unwrap().as_c_str(),
                     None,
                     Some(CString::new(elem).unwrap().as_c_str()),
                 )
                 .copied()
-                .unwrap_or(null_mut());
+                .unwrap_or(null_mut())
         }
-        cur
     }
 
     /// Search the DTD for the description of this qualified attribute on this element.
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdQAttrDesc")]
-    pub unsafe fn get_qattr_desc(
-        &self,
-        elem: &str,
-        name: &str,
-        prefix: Option<&str>,
-    ) -> XmlAttributePtr {
+    pub fn get_qattr_desc(&self, elem: &str, name: &str, prefix: Option<&str>) -> XmlAttributePtr {
         let Some(table) = self.attributes else {
             return null_mut();
         };

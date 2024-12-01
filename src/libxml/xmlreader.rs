@@ -87,8 +87,8 @@ use crate::{
     tree::{
         xml_buf_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd, xml_doc_copy_node,
         xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns, xml_free_ns_list, xml_new_doc_text,
-        xml_split_qname2, XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr,
-        XmlElementType, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
+        XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -1618,11 +1618,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderGetAttribute")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn get_attribute(&mut self, name: &str) -> Option<String> {
-        use std::ffi::{CStr, CString};
+        use std::ffi::CStr;
 
-        use crate::tree::NodeCommon;
+        use crate::tree::{split_qname2, NodeCommon};
 
-        let mut prefix: *mut XmlChar = null_mut();
         let mut ns: XmlNsPtr;
         let mut ret: *mut XmlChar = null_mut();
 
@@ -1638,10 +1637,7 @@ impl XmlTextReader {
             return None;
         }
 
-        let cname = CString::new(name).unwrap();
-        let localname: *mut XmlChar =
-            xml_split_qname2(cname.as_ptr() as *const u8, addr_of_mut!(prefix));
-        if localname.is_null() {
+        let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
             if name == "xmlns" {
                 ns = (*self.node).ns_def;
@@ -1669,31 +1665,29 @@ impl XmlTextReader {
             } else {
                 None
             };
-        }
+        };
 
         // Namespace default decl
-        if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
+        if prefix == "xmlns" {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if !(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, localname) {
+                if !(*ns).prefix.is_null()
+                    && CStr::from_ptr((*ns).prefix as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                        == localname
+                {
                     ret = xml_strdup((*ns).href);
                     break;
                 }
                 ns = (*ns).next;
             }
         } else {
-            ns = (*self.node).search_ns(
-                (*self.node).doc,
-                (!prefix.is_null())
-                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                    .as_deref(),
-            );
+            ns = (*self.node).search_ns((*self.node).doc, Some(prefix));
             if !ns.is_null() {
                 let href = (*ns).href;
                 ret = (*self.node).get_ns_prop(
-                    CStr::from_ptr(localname as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
+                    localname,
                     (!href.is_null())
                         .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
                         .as_deref(),
@@ -1701,10 +1695,6 @@ impl XmlTextReader {
             }
         }
 
-        xml_free(localname as _);
-        if !prefix.is_null() {
-            xml_free(prefix as _);
-        }
         let r = Some(
             CStr::from_ptr(ret as *const i8)
                 .to_string_lossy()
@@ -1970,11 +1960,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
-        use std::ffi::CString;
+        use std::ffi::CStr;
 
-        use crate::tree::NodeCommon;
+        use crate::tree::{split_qname2, NodeCommon};
 
-        let mut prefix: *mut XmlChar = null_mut();
         let mut ns: XmlNsPtr;
         let mut prop: XmlAttrPtr;
 
@@ -1987,10 +1976,7 @@ impl XmlTextReader {
             return 0;
         }
 
-        let cname = CString::new(name).unwrap();
-        let localname: *mut XmlChar =
-            xml_split_qname2(cname.as_ptr() as *const u8, addr_of_mut!(prefix));
-        if localname.is_null() {
+        let Some((prefix, localname)) = split_qname2(name) else {
             // Namespace default decl
             if name == "xmlns" {
                 ns = (*self.node).ns_def;
@@ -2009,7 +1995,7 @@ impl XmlTextReader {
                 // One need to have
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
-                if xml_str_equal((*prop).name, cname.as_ptr() as *const u8)
+                if (*prop).name().as_deref() == Some(name)
                     && ((*prop).ns.is_null() || (*(*prop).ns).prefix.is_null())
                 {
                     self.curnode = prop as XmlNodePtr;
@@ -2018,21 +2004,19 @@ impl XmlTextReader {
                 prop = (*prop).next;
             }
             return 0;
-        }
+        };
 
         // Namespace default decl
-        if xml_str_equal(prefix, c"xmlns".as_ptr() as _) {
+        if prefix == "xmlns" {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if !(*ns).prefix.is_null() && xml_str_equal((*ns).prefix, localname) {
+                if !(*ns).prefix.is_null()
+                    && CStr::from_ptr((*ns).prefix as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                        == localname
+                {
                     self.curnode = ns as XmlNodePtr;
-                    // goto found;
-                    if !localname.is_null() {
-                        xml_free(localname as _);
-                    }
-                    if !prefix.is_null() {
-                        xml_free(prefix as _);
-                    }
                     return 1;
                 }
                 ns = (*ns).next;
@@ -2044,29 +2028,18 @@ impl XmlTextReader {
                 // One need to have
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
-                if xml_str_equal((*prop).name, localname)
+                if (*prop).name().as_deref() == Some(localname)
                     && !(*prop).ns.is_null()
-                    && xml_str_equal((*(*prop).ns).prefix, prefix)
+                    && CStr::from_ptr((*(*prop).ns).prefix as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                        == prefix
                 {
                     self.curnode = prop as XmlNodePtr;
-                    // goto found;
-                    if !localname.is_null() {
-                        xml_free(localname as _);
-                    }
-                    if !prefix.is_null() {
-                        xml_free(prefix as _);
-                    }
                     return 1;
                 }
                 prop = (*prop).next;
             }
-        }
-        // not_found:
-        if !localname.is_null() {
-            xml_free(localname as _);
-        }
-        if !prefix.is_null() {
-            xml_free(prefix as _);
         }
         0
     }
