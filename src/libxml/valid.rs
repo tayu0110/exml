@@ -2888,7 +2888,7 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
         };
 
         if !fullelemname.is_null() && !fullattrname.is_null() {
-            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+            attr_decl = (*(*doc).int_subset).get_attr_desc(
                 CStr::from_ptr(fullelemname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -2897,7 +2897,7 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
                     .as_ref(),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                attr_decl = (*(*doc).ext_subset).get_attr_desc(
                     CStr::from_ptr(fullelemname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -3176,12 +3176,12 @@ pub(crate) unsafe extern "C" fn xml_is_ref(
         if elem.is_null() {
             return 0;
         }
-        attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+        attr_decl = (*(*doc).int_subset).get_attr_desc(
             (*elem).name().as_deref().unwrap(),
             (*attr).name().as_deref().unwrap(),
         );
         if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-            attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+            attr_decl = (*(*doc).ext_subset).get_attr_desc(
                 (*elem).name().as_deref().unwrap(),
                 (*attr).name().as_deref().unwrap(),
             );
@@ -3676,10 +3676,9 @@ pub unsafe fn xml_valid_normalize_attribute_value(
             xml_free(fullname as _);
         }
     }
-    attr_decl = (*(*doc).int_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
+    attr_decl = (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
     if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-        attr_decl =
-            (*(*doc).ext_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
+        attr_decl = (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
     }
 
     if attr_decl.is_null() {
@@ -3743,14 +3742,14 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
         if fullname.is_null() {
             return null_mut();
         }
-        attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+        attr_decl = (*(*doc).int_subset).get_attr_desc(
             CStr::from_ptr(fullname as *const i8)
                 .to_string_lossy()
                 .as_ref(),
             name,
         );
         if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-            attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+            attr_decl = (*(*doc).ext_subset).get_attr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -3765,12 +3764,10 @@ pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
         }
     }
     if attr_decl.is_null() && !(*doc).int_subset.is_null() {
-        attr_decl =
-            (*(*doc).int_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
+        attr_decl = (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
     }
     if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-        attr_decl =
-            (*(*doc).ext_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
+        attr_decl = (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), name);
         if !attr_decl.is_null() {
             extsubset = 1;
         }
@@ -6406,7 +6403,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
             return 0;
         }
         if !(*attr).ns.is_null() {
-            attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+            attr_decl = (*(*doc).int_subset).get_qattr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -6416,7 +6413,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                     .as_deref(),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -6429,14 +6426,14 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                 );
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+            attr_decl = (*(*doc).int_subset).get_attr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 (*attr).name().as_deref().unwrap(),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                attr_decl = (*(*doc).ext_subset).get_attr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -6450,7 +6447,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
     }
     if attr_decl.is_null() {
         if !(*attr).ns.is_null() {
-            attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+            attr_decl = (*(*doc).int_subset).get_qattr_desc(
                 (*elem).name().unwrap().as_ref(),
                 (*attr).name().as_deref().unwrap(),
                 (!(*(*attr).ns).prefix.is_null())
@@ -6458,7 +6455,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                     .as_deref(),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                     (*elem).name().unwrap().as_ref(),
                     (*attr).name().as_deref().unwrap(),
                     (!(*(*attr).ns).prefix.is_null())
@@ -6469,12 +6466,12 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                 );
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+            attr_decl = (*(*doc).int_subset).get_attr_desc(
                 (*elem).name().as_deref().unwrap(),
                 (*attr).name().as_deref().unwrap(),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                attr_decl = (*(*doc).ext_subset).get_attr_desc(
                     (*elem).name().as_deref().unwrap(),
                     (*attr).name().as_deref().unwrap(),
                 );
@@ -6687,7 +6684,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             return 0;
         }
         if !(*ns).prefix.is_null() {
-            attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+            attr_decl = (*(*doc).int_subset).get_qattr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -6697,7 +6694,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 Some("xmlns"),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -6708,14 +6705,14 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 );
             }
         } else {
-            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+            attr_decl = (*(*doc).int_subset).get_attr_desc(
                 CStr::from_ptr(fullname as *const i8)
                     .to_string_lossy()
                     .as_ref(),
                 "xmlns",
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                attr_decl = (*(*doc).ext_subset).get_attr_desc(
                     CStr::from_ptr(fullname as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -6729,7 +6726,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
     }
     if attr_decl.is_null() {
         if !(*ns).prefix.is_null() {
-            attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+            attr_decl = (*(*doc).int_subset).get_qattr_desc(
                 (*elem).name().unwrap().as_ref(),
                 CStr::from_ptr((*ns).prefix as *const i8)
                     .to_string_lossy()
@@ -6737,7 +6734,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 Some("xmlns"),
             );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                     (*elem).name().unwrap().as_ref(),
                     CStr::from_ptr((*ns).prefix as *const i8)
                         .to_string_lossy()
@@ -6747,10 +6744,10 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             }
         } else {
             attr_decl =
-                (*(*doc).int_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
+                (*(*doc).int_subset).get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = (*(*doc).ext_subset)
-                    .get_dtd_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
+                attr_decl =
+                    (*(*doc).ext_subset).get_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
             }
         }
     }

@@ -1383,7 +1383,7 @@ impl XmlNode {
                 if let Some(ns_name) = ns_name {
                     if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
                         // The XML namespace must be bound to prefix 'xml'.
-                        attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+                        attr_decl = (*(*doc).int_subset).get_qattr_desc(
                             CStr::from_ptr(elem_qname as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
@@ -1391,7 +1391,7 @@ impl XmlNode {
                             Some("xml"),
                         );
                         if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                            attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                            attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                                 CStr::from_ptr(elem_qname as *const i8)
                                     .to_string_lossy()
                                     .as_ref(),
@@ -1414,7 +1414,7 @@ impl XmlNode {
                                 let prefix = (!(*cur).prefix.is_null()).then(|| {
                                     CStr::from_ptr((*cur).prefix as *const i8).to_string_lossy()
                                 });
-                                attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+                                attr_decl = (*(*doc).int_subset).get_qattr_desc(
                                     CStr::from_ptr(elem_qname as *const i8)
                                         .to_string_lossy()
                                         .as_ref(),
@@ -1425,7 +1425,7 @@ impl XmlNode {
                                     break;
                                 }
                                 if !(*doc).ext_subset.is_null() {
-                                    attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                                    attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                                         CStr::from_ptr(elem_qname as *const i8)
                                             .to_string_lossy()
                                             .as_ref(),
@@ -1441,7 +1441,7 @@ impl XmlNode {
                     }
                 } else {
                     // The common and nice case: Attr in no namespace.
-                    attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+                    attr_decl = (*(*doc).int_subset).get_qattr_desc(
                         CStr::from_ptr(elem_qname as *const i8)
                             .to_string_lossy()
                             .as_ref(),
@@ -1449,7 +1449,7 @@ impl XmlNode {
                         None,
                     );
                     if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                        attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                        attr_decl = (*(*doc).ext_subset).get_qattr_desc(
                             CStr::from_ptr(elem_qname as *const i8)
                                 .to_string_lossy()
                                 .as_ref(),
@@ -2426,10 +2426,10 @@ impl XmlNode {
         let doc = self.document();
         if !doc.is_null() && !(*doc).int_subset.is_null() {
             let mut attr_decl =
-                (*(*doc).int_subset).get_dtd_attr_desc(self.name().as_deref().unwrap(), name);
+                (*(*doc).int_subset).get_attr_desc(self.name().as_deref().unwrap(), name);
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
                 attr_decl =
-                    (*(*doc).ext_subset).get_dtd_attr_desc(self.name().as_deref().unwrap(), name);
+                    (*(*doc).ext_subset).get_attr_desc(self.name().as_deref().unwrap(), name);
             }
             if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
                 // return attribute declaration only if a default value is given

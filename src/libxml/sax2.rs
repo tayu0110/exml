@@ -1945,13 +1945,13 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                 while !attr.is_null() {
                     let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
                     if !(*attr).default_value.is_null()
-                        && (*(*(*ctxt).my_doc).ext_subset).get_dtd_qattr_desc(
+                        && (*(*(*ctxt).my_doc).ext_subset).get_qattr_desc(
                             (*attr).elem.as_deref().unwrap(),
                             (*attr).name().as_deref().unwrap(),
                             (*attr).prefix.as_deref(),
                         ) == attr
                         && (*(*(*ctxt).my_doc).int_subset)
-                            .get_dtd_qattr_desc(
+                            .get_qattr_desc(
                                 (*attr).elem.as_deref().unwrap(),
                                 (*attr).name().as_deref().unwrap(),
                                 (*attr).prefix.as_deref(),
@@ -2020,12 +2020,11 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
                         let pre = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
-                        let tst: XmlAttributePtr = (*(*(*ctxt).my_doc).int_subset)
-                            .get_dtd_qattr_desc(
-                                (*attr).elem.as_deref().unwrap(),
-                                (*attr).name().as_deref().unwrap(),
-                                (*attr).prefix.as_deref(),
-                            );
+                        let tst: XmlAttributePtr = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
+                            (*attr).elem.as_deref().unwrap(),
+                            (*attr).name().as_deref().unwrap(),
+                            (*attr).prefix.as_deref(),
+                        );
                         if tst == attr || tst.is_null() {
                             let mut fname: [XmlChar; 50] = [0; 50];
 

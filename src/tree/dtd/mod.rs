@@ -111,7 +111,7 @@ impl XmlDtd {
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdAttrDesc")]
-    pub unsafe fn get_dtd_attr_desc(&self, elem: &str, name: &str) -> XmlAttributePtr {
+    pub unsafe fn get_attr_desc(&self, elem: &str, name: &str) -> XmlAttributePtr {
         let cur: XmlAttributePtr;
 
         let Some(table) = self.attributes else {
@@ -155,7 +155,7 @@ impl XmlDtd {
     ///
     /// returns the xmlAttributePtr if found or null_mut()
     #[doc(alias = "xmlGetDtdQAttrDesc")]
-    pub unsafe fn get_dtd_qattr_desc(
+    pub unsafe fn get_qattr_desc(
         &self,
         elem: &str,
         name: &str,

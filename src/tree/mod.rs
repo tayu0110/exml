@@ -1888,7 +1888,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
             ) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlAttributeDecl) {
             let tmp: XmlAttributePtr = cur as _;
-            q = (*ret).get_dtd_qattr_desc(
+            q = (*ret).get_qattr_desc(
                 (*tmp).elem.as_deref().unwrap(),
                 (*tmp).name().as_deref().unwrap(),
                 (*tmp).prefix.as_deref(),
