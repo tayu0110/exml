@@ -5776,7 +5776,7 @@ unsafe extern "C" fn xml_schema_get_prop_node(node: XmlNodePtr, name: *const c_c
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> *const XmlChar {
+unsafe fn xml_schema_get_node_content_no_dict(node: XmlNodePtr) -> Option<String> {
     (*node).get_content()
 }
 
@@ -5960,18 +5960,19 @@ unsafe extern "C" fn xml_schema_pval_attr_node_id(
     attr: XmlAttrPtr,
 ) -> i32 {
     let mut ret: i32;
-    let mut value: *const XmlChar;
 
     if attr.is_null() {
         return 0;
     }
-    value = xml_schema_get_node_content_no_dict(attr as XmlNodePtr);
+    let value =
+        xml_schema_get_node_content_no_dict(attr as XmlNodePtr).map(|c| CString::new(c).unwrap());
+    let mut value = value
+        .as_ref()
+        .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *mut u8));
     ret = xml_validate_ncname(value, 1);
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
-            /*
-             * NOTE: the IDness might have already be declared in the DTD
-             */
+            // NOTE: the IDness might have already be declared in the DTD
             if !matches!((*attr).atype, Some(XmlAttributeType::XmlAttributeID)) {
                 /*
                  * TODO: Use xmlSchemaStrip here; it's not exported at this
@@ -6042,16 +6043,13 @@ unsafe extern "C" fn xml_schema_get_node_content(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
 ) -> *const XmlChar {
-    let mut val = if node.is_null() {
-        null_mut()
+    let val = if node.is_null() {
+        "".to_owned()
     } else {
-        (*node).get_content()
+        (*node).get_content().unwrap_or_else(|| "".to_owned())
     };
-    if val.is_null() {
-        val = xml_strdup(c"".as_ptr() as _);
-    }
-    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val, -1);
-    xml_free(val as _);
+    let val = CString::new(val).unwrap();
+    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val.as_ptr() as *const u8, -1);
     if ret.is_null() {
         xml_schema_perr_memory(ctxt, c"getting node content".as_ptr() as _, node);
     }
@@ -8019,21 +8017,20 @@ unsafe extern "C" fn xml_schema_pget_bool_node_value(
 ) -> i32 {
     let mut res: i32 = 0;
 
-    let value: *mut XmlChar = (*node).get_content();
-    /*
-     * 3.2.2.1 Lexical representation
-     * An instance of a datatype that is defined as `boolean`
-     * can have the following legal literals {true, false, 1, 0}.
-     */
-    if xml_str_equal(value, c"true".as_ptr() as _) {
+    let value = (*node).get_content();
+    // 3.2.2.1 Lexical representation
+    // An instance of a datatype that is defined as `boolean`
+    // can have the following legal literals {true, false, 1, 0}.
+    if value.as_deref() == Some("true") {
         res = 1;
-    } else if xml_str_equal(value, c"false".as_ptr() as _) {
+    } else if value.as_deref() == Some("false") {
         res = 0;
-    } else if xml_str_equal(value, c"1".as_ptr() as _) {
+    } else if value.as_deref() == Some("1") {
         res = 1;
-    } else if xml_str_equal(value, c"0".as_ptr() as _) {
+    } else if value.as_deref() == Some("0") {
         res = 0;
     } else {
+        let value = value.map(|c| CString::new(c).unwrap());
         xml_schema_psimple_type_err(
             ctxt,
             XmlParserErrors::XmlSchemapInvalidBoolean,
@@ -8041,14 +8038,13 @@ unsafe extern "C" fn xml_schema_pget_bool_node_value(
             node,
             xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasBoolean),
             null_mut(),
-            value,
+            value
+                .as_ref()
+                .map_or(null_mut(), |c| c.as_ptr() as *const u8),
             null_mut(),
             null_mut(),
             null_mut(),
         );
-    }
-    if !value.is_null() {
-        xml_free(value as _);
     }
     res
 }
@@ -22668,14 +22664,8 @@ unsafe extern "C" fn xml_schema_annot_dump<'a>(
         return;
     }
 
-    let content: *mut XmlChar = (*(*annot).content).get_content();
-    if !content.is_null() {
-        writeln!(
-            output,
-            "  Annot: {}",
-            CStr::from_ptr(content as *const i8).to_string_lossy()
-        );
-        xml_free(content as _);
+    if let Some(content) = (*(*annot).content).get_content() {
+        writeln!(output, "  Annot: {content}");
     } else {
         writeln!(output, "  Annot: empty");
     }

@@ -23,7 +23,7 @@ use std::io::Write;
 use std::{
     any::type_name,
     cell::Cell,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -70,9 +70,9 @@ use crate::{
         },
     },
     tree::{
-        xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
-        xml_new_doc_text, xml_split_qname2, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr,
-        XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        split_qname2, xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
+        xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,
+        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -3749,25 +3749,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             }
                         }
                         if xml_str_equal((*cur).name, c"name".as_ptr() as _) {
-                            let local: *mut XmlChar;
-                            let mut prefix: *mut XmlChar = null_mut();
-
-                            /*
-                             * Simplification: 4.10. QNames
-                             */
-                            let name: *mut XmlChar = (*cur).get_content();
-                            if !name.is_null() {
-                                local = xml_split_qname2(name, addr_of_mut!(prefix));
-                                if !local.is_null() {
-                                    let ns: XmlNsPtr = (*cur).search_ns(
-                                        (*cur).doc,
-                                        Some(
-                                            CStr::from_ptr(prefix as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        ),
-                                    );
+                            // Simplification: 4.10. QNames
+                            if let Some(name) = (*cur).get_content() {
+                                if let Some((prefix, local)) = split_qname2(&name) {
+                                    let ns: XmlNsPtr = (*cur).search_ns((*cur).doc, Some(prefix));
                                     if ns.is_null() {
+                                        let prefix = CString::new(prefix).unwrap();
                                         xml_rng_perr(
                                             ctxt,
                                             cur,
@@ -3775,7 +3762,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                             c"xmlRelaxNGParse: no namespace for prefix %s\n"
                                                 .as_ptr()
                                                 as _,
-                                            prefix,
+                                            prefix.as_ptr() as *const u8,
                                             null_mut(),
                                         );
                                     } else {
@@ -3789,17 +3776,13 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                                 })
                                                 .as_deref(),
                                         );
-                                        (*cur).set_content(local);
+                                        let local = CString::new(local).unwrap();
+                                        (*cur).set_content(local.as_ptr() as *const u8);
                                     }
-                                    xml_free(local as _);
-                                    xml_free(prefix as _);
                                 }
-                                xml_free(name as _);
                             }
                         }
-                        /*
-                         * 4.16
-                         */
+                        // 4.16
                         if xml_str_equal((*cur).name, c"nsName".as_ptr() as _)
                             && (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0
                         {
@@ -4423,7 +4406,10 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
         }
     }
     if IS_RELAXNG!(node, c"name".as_ptr() as _) {
-        val = (*node).get_content();
+        let tmp = (*node).get_content().map(|c| CString::new(c).unwrap());
+        val = tmp
+            .as_ref()
+            .map_or(null_mut(), |t| xml_strdup(t.as_ptr() as *const u8));
         xml_relaxng_norm_ext_space(val);
         if xml_validate_ncname(val, 0) != 0 {
             if let Some(parent) = (*node).parent() {
@@ -4775,7 +4761,10 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                         null_mut(),
                     );
                 }
-                (*param).value = (*content).get_content();
+                let tmp = (*content).get_content().map(|c| CString::new(c).unwrap());
+                (*param).value = tmp
+                    .as_ref()
+                    .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
                 if lastparam.is_null() {
                     (*def).attrs = param;
                     lastparam = param;
@@ -5042,7 +5031,10 @@ unsafe extern "C" fn xml_relaxng_parse_value(
     } else if (*node).children().is_none() {
         (*def).value = xml_strdup(c"".as_ptr() as _);
     } else if !def.is_null() {
-        (*def).value = (*node).get_content();
+        let tmp = (*node).get_content().map(|c| CString::new(c).unwrap());
+        (*def).value = tmp
+            .as_ref()
+            .map_or(null_mut(), |t| xml_strdup(t.as_ptr() as *const u8));
         if (*def).value.is_null() {
             xml_rng_perr(
                 ctxt,

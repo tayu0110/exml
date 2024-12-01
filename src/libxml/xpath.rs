@@ -1065,15 +1065,14 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_number(val: *const XmlChar) ->
 #[doc(alias = "xmlXPathCastNodeToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: XmlNodePtr) -> f64 {
+    use std::ffi::CString;
+
     if node.is_null() {
         return XML_XPATH_NAN;
     }
-    let strval: *mut XmlChar = xml_xpath_cast_node_to_string(node);
-    if strval.is_null() {
-        return XML_XPATH_NAN;
-    }
-    let ret: f64 = xml_xpath_cast_string_to_number(strval);
-    xml_free(strval as _);
+    let strval = xml_xpath_cast_node_to_string(node);
+    let strval = CString::new(strval).unwrap();
+    let ret: f64 = xml_xpath_cast_string_to_number(strval.as_ptr() as *const u8);
 
     ret
 }
@@ -1084,12 +1083,15 @@ pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: XmlNodePtr) -> f64 
 #[doc(alias = "xmlXPathCastNodeSetToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_set_to_number(ns: XmlNodeSetPtr) -> f64 {
+    use std::ffi::CString;
+
     if ns.is_null() {
         return XML_XPATH_NAN;
     }
-    let str: *mut XmlChar = xml_xpath_cast_node_set_to_string(ns);
-    let ret: f64 = xml_xpath_cast_string_to_number(str);
-    xml_free(str as _);
+    let str = xml_xpath_cast_node_set_to_string(ns).map(|c| CString::new(c).unwrap());
+    let ret: f64 = xml_xpath_cast_string_to_number(
+        str.as_ref().map_or(null_mut(), |c| c.as_ptr() as *const u8),
+    );
     ret
 }
 
@@ -1333,16 +1335,12 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeToString")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> *mut XmlChar {
-    let mut ret: *mut XmlChar = if node.is_null() {
-        null_mut()
+pub unsafe fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> String {
+    if node.is_null() {
+        "".to_owned()
     } else {
-        (*node).get_content()
-    };
-    if ret.is_null() {
-        ret = xml_strdup(c"".as_ptr() as *const XmlChar);
+        (*node).get_content().unwrap_or_else(|| "".to_owned())
     }
-    ret
 }
 
 /// Converts a node-set to its string value.
@@ -1350,15 +1348,15 @@ pub unsafe extern "C" fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> *mut
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> *mut XmlChar {
+pub unsafe fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> Option<String> {
     if ns.is_null() || (*ns).node_nr == 0 || (*ns).node_tab.is_null() {
-        return xml_strdup(c"".as_ptr() as *const XmlChar);
+        return Some("".to_owned());
     }
 
     if (*ns).node_nr > 1 {
         xml_xpath_node_set_sort(ns);
     }
-    xml_xpath_cast_node_to_string(*(*ns).node_tab.add(0))
+    Some(xml_xpath_cast_node_to_string(*(*ns).node_tab.add(0)))
 }
 
 /// Converts an existing object to its string() equivalent
@@ -1368,13 +1366,18 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) ->
 #[doc(alias = "xmlXPathCastToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mut XmlChar {
+    use std::ffi::CString;
+
     if val.is_null() {
         return xml_strdup(c"".as_ptr() as *const XmlChar);
     }
     match (*val).typ {
         XmlXPathObjectType::XpathUndefined => xml_strdup(c"".as_ptr() as *const XmlChar),
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
-            xml_xpath_cast_node_set_to_string((*val).nodesetval)
+            let res = xml_xpath_cast_node_set_to_string((*val).nodesetval)
+                .map(|c| CString::new(c).unwrap());
+            res.as_ref()
+                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8))
         }
         XmlXPathObjectType::XpathString => xml_strdup((*val).stringval),
         XmlXPathObjectType::XpathBoolean => xml_xpath_cast_boolean_to_string((*val).boolval),
@@ -1433,6 +1436,8 @@ pub unsafe extern "C" fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> Xml
 #[doc(alias = "xmlXPathConvertString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
+    use std::ffi::CString;
+
     let mut res: *mut XmlChar = null_mut();
 
     if val.is_null() {
@@ -1442,7 +1447,11 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
     match (*val).typ {
         XmlXPathObjectType::XpathUndefined => {}
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
-            res = xml_xpath_cast_node_set_to_string((*val).nodesetval);
+            let tmp = xml_xpath_cast_node_set_to_string((*val).nodesetval)
+                .map(|c| CString::new(c).unwrap());
+            res = tmp
+                .as_ref()
+                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
         }
         XmlXPathObjectType::XpathString => {
             return val;
@@ -2333,8 +2342,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ns = gen_xml_node_set_ptr(n_ns, 0);
 
-                let ret_val = xml_xpath_cast_node_set_to_string(ns);
-                desret_xml_char_ptr(ret_val);
+                let _ = xml_xpath_cast_node_set_to_string(ns);
+                // desret_xml_char_ptr(ret_val);
                 des_xml_node_set_ptr(n_ns, ns, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
@@ -2393,8 +2402,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let node = gen_xml_node_ptr(n_node, 0);
 
-                let ret_val = xml_xpath_cast_node_to_string(node);
-                desret_xml_char_ptr(ret_val);
+                let _ = xml_xpath_cast_node_to_string(node);
+                // desret_xml_char_ptr(ret_val);
                 des_xml_node_ptr(n_node, node, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {

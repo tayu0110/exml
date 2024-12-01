@@ -4707,27 +4707,23 @@ unsafe extern "C" fn load_xpath_expr(
         return null_mut();
     }
 
-    let expr: *mut XmlChar = (*node).get_content();
-    if expr.is_null() {
+    let Some(expr) = (*node).get_content() else {
         eprintln!(
             "Error: XPath content element is NULL \"{}\"",
             CStr::from_ptr(filename).to_string_lossy(),
         );
         xml_free_doc(doc);
         return null_mut();
-    }
+    };
 
     let ctx: XmlXPathContextPtr = xml_xpath_new_context(parent_doc);
     if ctx.is_null() {
         eprintln!("Error: unable to create new context");
-        xml_free(expr as _);
         xml_free_doc(doc);
         return null_mut();
     }
 
-    /*
-     * Register namespaces
-     */
+    // Register namespaces
     ns = (*node).ns_def;
     while !ns.is_null() {
         if xml_xpath_register_ns(ctx, (*ns).prefix, (*ns).href) != 0 {
@@ -4736,7 +4732,6 @@ unsafe extern "C" fn load_xpath_expr(
                 CStr::from_ptr((*ns).prefix as _).to_string_lossy(),
                 CStr::from_ptr((*ns).href as _).to_string_lossy(),
             );
-            xml_free(expr as _);
             xml_xpath_free_context(ctx);
             xml_free_doc(doc);
             return null_mut();
@@ -4744,21 +4739,18 @@ unsafe extern "C" fn load_xpath_expr(
         ns = (*ns).next;
     }
 
-    /*
-     * Evaluate xpath
-     */
-    let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(expr, ctx);
+    // Evaluate xpath
+    let expr = CString::new(expr).unwrap();
+    let xpath: XmlXPathObjectPtr = xml_xpath_eval_expression(expr.as_ptr() as *const u8, ctx);
     if xpath.is_null() {
         eprintln!("Error: unable to evaluate xpath expression");
-        xml_free(expr as _);
         xml_xpath_free_context(ctx);
         xml_free_doc(doc);
         return null_mut();
     }
 
-    /* print_xpath_nodes((*xpath).nodesetval); */
+    // print_xpath_nodes((*xpath).nodesetval);
 
-    xml_free(expr as _);
     xml_xpath_free_context(ctx);
     xml_free_doc(doc);
     xpath

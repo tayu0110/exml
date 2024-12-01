@@ -902,7 +902,8 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 xml_free(test as _);
             } else {
                 xml_schematron_parse_test_report_msg(ctxt, cur);
-                report = (*cur).get_content();
+                let tmp = (*cur).get_content().map(|c| CString::new(c).unwrap());
+                report = tmp.map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
 
                 testptr = xml_schematron_add_test(
                     ctxt,
@@ -940,7 +941,8 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 xml_free(test as _);
             } else {
                 xml_schematron_parse_test_report_msg(ctxt, cur);
-                report = (*cur).get_content();
+                let tmp = (*cur).get_content().map(|c| CString::new(c).unwrap());
+                report = tmp.map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
 
                 testptr = xml_schematron_add_test(
                     ctxt,
@@ -1148,10 +1150,9 @@ pub unsafe extern "C" fn xml_schematron_parse(
             cur = (*root).children().map_or(null_mut(), |c| c.as_ptr());
             NEXT_SCHEMATRON!(cur);
             if IS_SCHEMATRON!(cur, c"title".as_ptr() as _) {
-                let title: *mut XmlChar = (*cur).get_content();
-                if !title.is_null() {
-                    (*ret).title = xml_dict_lookup((*ret).dict, title, -1);
-                    xml_free(title as _);
+                if let Some(title) = (*cur).get_content() {
+                    let title = CString::new(title).unwrap();
+                    (*ret).title = xml_dict_lookup((*ret).dict, title.as_ptr() as *const u8, -1);
                 }
                 cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 NEXT_SCHEMATRON!(cur);
