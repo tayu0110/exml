@@ -47,8 +47,8 @@ use crate::{
 };
 
 use super::{
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
-    __XML_REGISTER_CALLBACKS,
+    xml_split_qname2, xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType,
+    XmlNode, __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML DTD, as defined by <!DOCTYPE ... There is actually one for
@@ -105,6 +105,50 @@ impl XmlDtd {
                 .map_or(null_mut(), |p| *p);
         }
         null_mut()
+    }
+
+    /// Search the DTD for the description of this attribute on this element.
+    ///
+    /// returns the xmlAttributePtr if found or null_mut()
+    #[doc(alias = "xmlGetDtdAttrDesc")]
+    pub unsafe fn get_dtd_attr_desc(&self, elem: &str, name: &str) -> XmlAttributePtr {
+        let cur: XmlAttributePtr;
+
+        let Some(table) = self.attributes else {
+            return null_mut();
+        };
+
+        let mut prefix: *mut XmlChar = null_mut();
+        let cname = CString::new(name).unwrap();
+        let uqname: *mut XmlChar =
+            xml_split_qname2(cname.as_ptr() as *const u8, &raw mut prefix) as _;
+
+        if !uqname.is_null() {
+            cur = table
+                .lookup3(
+                    CStr::from_ptr(uqname as *const i8),
+                    (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                    Some(CString::new(elem).unwrap().as_c_str()),
+                )
+                .copied()
+                .unwrap_or(null_mut());
+            if !prefix.is_null() {
+                xml_free(prefix as _);
+            }
+            if !uqname.is_null() {
+                xml_free(uqname as _);
+            }
+        } else {
+            cur = table
+                .lookup3(
+                    CString::new(name).unwrap().as_c_str(),
+                    None,
+                    Some(CString::new(elem).unwrap().as_c_str()),
+                )
+                .copied()
+                .unwrap_or(null_mut());
+        }
+        cur
     }
 
     /// Search the DTD for the description of this qualified attribute on this element.

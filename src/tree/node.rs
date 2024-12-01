@@ -38,7 +38,7 @@ use crate::{
         },
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
-        valid::{xml_get_dtd_attr_desc, xml_remove_id},
+        valid::xml_remove_id,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new,
             xml_strncmp, XmlChar,
@@ -2411,10 +2411,9 @@ impl XmlNode {
             return null_mut();
         }
         // Check on the properties attached to the node
-        let name = CString::new(name).unwrap();
         let mut prop = self.properties;
         while !prop.is_null() {
-            if xml_str_equal((*prop).name, name.as_ptr() as *const u8) {
+            if (*prop).name().as_deref() == Some(name) {
                 return prop;
             }
             prop = (*prop).next;
@@ -2427,10 +2426,10 @@ impl XmlNode {
         let doc = self.document();
         if !doc.is_null() && !(*doc).int_subset.is_null() {
             let mut attr_decl =
-                xml_get_dtd_attr_desc((*doc).int_subset, self.name, name.as_ptr() as *const u8);
+                (*(*doc).int_subset).get_dtd_attr_desc(self.name().as_deref().unwrap(), name);
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
                 attr_decl =
-                    xml_get_dtd_attr_desc((*doc).ext_subset, self.name, name.as_ptr() as *const u8);
+                    (*(*doc).ext_subset).get_dtd_attr_desc(self.name().as_deref().unwrap(), name);
             }
             if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
                 // return attribute declaration only if a default value is given

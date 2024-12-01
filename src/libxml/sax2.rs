@@ -1411,7 +1411,7 @@ unsafe extern "C" fn xml_ns_err_msg(
 ))]
 unsafe fn xml_sax2_attribute_internal(
     ctx: Option<GenericErrorContext>,
-    fullname: *const XmlChar,
+    fullname: &str,
     mut value: *const XmlChar,
     prefix: *const XmlChar,
 ) {
@@ -1428,22 +1428,21 @@ unsafe fn xml_sax2_attribute_internal(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
+    let cfullname = CString::new(fullname).unwrap();
     if (*ctxt).html != 0 {
-        name = xml_strdup(fullname);
+        name = xml_strdup(cfullname.as_ptr() as *const u8);
         ns = null_mut();
         // namespace = null_mut();
     } else {
-        /*
-         * Split the full name into a namespace prefix and the tag name
-         */
-        name = xml_split_qname(ctxt, fullname, addr_of_mut!(ns));
+        // Split the full name into a namespace prefix and the tag name
+        name = xml_split_qname(ctxt, cfullname.as_ptr() as *const u8, addr_of_mut!(ns));
         if !name.is_null() && *name.add(0) == 0 {
             if xml_str_equal(ns, c"xmlns".as_ptr() as _) {
                 xml_ns_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrNsDeclError,
                     c"invalid namespace declaration '%s'\n".as_ptr() as _,
-                    fullname,
+                    cfullname.as_ptr() as *const u8,
                     null(),
                 );
             } else {
@@ -1451,7 +1450,7 @@ unsafe fn xml_sax2_attribute_internal(
                     ctxt,
                     XmlParserErrors::XmlWarNsColumn,
                     c"Avoid attribute ending with ':' like '%s'\n".as_ptr() as _,
-                    fullname,
+                    cfullname.as_ptr() as *const u8,
                     null(),
                 );
             }
@@ -1460,7 +1459,7 @@ unsafe fn xml_sax2_attribute_internal(
             }
             ns = null_mut();
             xml_free(name as _);
-            name = xml_strdup(fullname);
+            name = xml_strdup(cfullname.as_ptr() as *const u8);
         }
     }
     if name.is_null() {
@@ -1474,9 +1473,11 @@ unsafe fn xml_sax2_attribute_internal(
     #[cfg(not(feature = "html"))]
     let f = false;
     #[cfg(feature = "html")]
-    let f = (*ctxt).html != 0 && value.is_null() && html_is_boolean_attr(fullname) != 0;
+    let f = (*ctxt).html != 0
+        && value.is_null()
+        && html_is_boolean_attr(cfullname.as_ptr() as *const u8) != 0;
     if f {
-        nval = xml_strdup(fullname);
+        nval = xml_strdup(cfullname.as_ptr() as *const u8);
         value = nval;
     } else {
         #[cfg(feature = "libxml_valid")]
@@ -1507,9 +1508,7 @@ unsafe fn xml_sax2_attribute_internal(
         }
     }
 
-    /*
-     * Check whether it's a namespace definition
-     */
+    // Check whether it's a namespace definition
     if (*ctxt).html == 0
         && ns.is_null()
         && *name.add(0) == b'x'
@@ -1569,15 +1568,12 @@ unsafe fn xml_sax2_attribute_internal(
             }
         }
 
-        /* a default namespace definition */
+        // a default namespace definition
         let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, null_mut());
 
         #[cfg(feature = "libxml_valid")]
         {
-            /*
-             * Validate also for namespace decls, they are attributes from
-             * an XML-1.0 perspective
-             */
+            // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             if !nsret.is_null()
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
@@ -1673,10 +1669,7 @@ unsafe fn xml_sax2_attribute_internal(
         xml_free(ns as _);
         #[cfg(feature = "libxml_valid")]
         {
-            /*
-             * Validate also for namespace decls, they are attributes from
-             * an XML-1.0 perspective
-             */
+            // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
             if !nsret.is_null()
                 && (*ctxt).validate != 0
                 && (*ctxt).well_formed != 0
@@ -1715,7 +1708,7 @@ unsafe fn xml_sax2_attribute_internal(
             xml_ns_err_msg(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                "Namespace prefix %s of attribute %s is not defined\n".as_ptr() as _,
+                c"Namespace prefix %s of attribute %s is not defined\n".as_ptr() as _,
                 ns,
                 name,
             );
@@ -1867,7 +1860,7 @@ unsafe fn xml_sax2_attribute_internal(
         let content: *mut XmlChar = (*ret).children.unwrap().content;
         // when validating, the ID registration is done at the attribute
         // validation level. Otherwise we have to do specific handling here.
-        if xml_str_equal(fullname, c"xml:id".as_ptr() as _) {
+        if fullname == "xml:id" {
             // Add the xml:id value
             //
             // Open issue: normalization of the value.
@@ -2063,7 +2056,9 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                             if att.is_null() {
                                 xml_sax2_attribute_internal(
                                     Some(GenericErrorContext::new(ctxt)),
-                                    fulln,
+                                    CStr::from_ptr(fulln as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
                                     (*attr).default_value,
                                     prefix,
                                 );
@@ -2225,7 +2220,12 @@ pub unsafe fn xml_sax2_start_element(
                     && (*att.add(3) == b'n')
                     && (*att.add(4) == b's')
                 {
-                    xml_sax2_attribute_internal(ctx.clone(), att, value, prefix);
+                    xml_sax2_attribute_internal(
+                        ctx.clone(),
+                        CStr::from_ptr(att as *const i8).to_string_lossy().as_ref(),
+                        value,
+                        prefix,
+                    );
                 }
 
                 att = *atts.add(i as usize);
@@ -2273,7 +2273,12 @@ pub unsafe fn xml_sax2_start_element(
         i += 1;
         if (*ctxt).html != 0 {
             while !att.is_null() {
-                xml_sax2_attribute_internal(ctx.clone(), att, value, null_mut());
+                xml_sax2_attribute_internal(
+                    ctx.clone(),
+                    CStr::from_ptr(att as *const i8).to_string_lossy().as_ref(),
+                    value,
+                    null_mut(),
+                );
                 att = *atts.add(i as usize);
                 i += 1;
                 value = *atts.add(i as usize);
@@ -2287,7 +2292,12 @@ pub unsafe fn xml_sax2_start_element(
                     || (*att.add(3) != b'n')
                     || (*att.add(4) != b's')
                 {
-                    xml_sax2_attribute_internal(ctx.clone(), att, value, null_mut());
+                    xml_sax2_attribute_internal(
+                        ctx.clone(),
+                        CStr::from_ptr(att as *const i8).to_string_lossy().as_ref(),
+                        value,
+                        null_mut(),
+                    );
                 }
 
                 /*
@@ -2963,13 +2973,11 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                         );
                     }
                 } else {
-                    /*
-                     * dup now contains a string of the flattened attribute
-                     * content with entities substituted. Check if we need to
-                     * apply an extra layer of normalization.
-                     * It need to be done twice ... it's an extra burden related
-                     * to the ability to keep references in attributes
-                     */
+                    // dup now contains a string of the flattened attribute
+                    // content with entities substituted. Check if we need to
+                    // apply an extra layer of normalization.
+                    // It need to be done twice ... it's an extra burden related
+                    // to the ability to keep references in attributes
                     if (*ctxt).atts_special.is_some() {
                         let nvalnorm: *mut XmlChar;
                         let mut fname: [XmlChar; 50] = [0; 50];
@@ -2982,7 +2990,9 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                                 addr_of_mut!((*ctxt).vctxt) as _,
                                 (*ctxt).my_doc,
                                 (*ctxt).node,
-                                fullname,
+                                CStr::from_ptr(fullname as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
                                 dup,
                             );
                             if (*ctxt).vctxt.valid != 1 {

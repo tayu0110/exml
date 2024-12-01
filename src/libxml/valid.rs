@@ -2888,9 +2888,23 @@ pub unsafe extern "C" fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAt
         };
 
         if !fullelemname.is_null() && !fullattrname.is_null() {
-            attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, fullelemname, fullattrname);
+            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+                CStr::from_ptr(fullelemname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                CStr::from_ptr(fullattrname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, fullelemname, fullattrname);
+                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                    CStr::from_ptr(fullelemname as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    CStr::from_ptr(fullattrname as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
         }
 
@@ -3162,9 +3176,15 @@ pub(crate) unsafe extern "C" fn xml_is_ref(
         if elem.is_null() {
             return 0;
         }
-        attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, (*elem).name, (*attr).name);
+        attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+            (*elem).name().as_deref().unwrap(),
+            (*attr).name().as_deref().unwrap(),
+        );
         if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-            attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, (*elem).name, (*attr).name);
+            attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                (*elem).name().as_deref().unwrap(),
+                (*attr).name().as_deref().unwrap(),
+            );
         }
 
         if !attr_decl.is_null()
@@ -3622,10 +3642,10 @@ pub unsafe extern "C" fn xml_validate_element_decl(
 /// the caller must free the returned value.
 #[doc(alias = "xmlValidNormalizeAttributeValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
+pub unsafe fn xml_valid_normalize_attribute_value(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
-    name: *const XmlChar,
+    name: &str,
     value: *const XmlChar,
 ) -> *mut XmlChar {
     let mut attr_decl: XmlAttributePtr;
@@ -3634,9 +3654,6 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
         return null_mut();
     }
     if elem.is_null() {
-        return null_mut();
-    }
-    if name.is_null() {
         return null_mut();
     }
     if value.is_null() {
@@ -3659,9 +3676,10 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
             xml_free(fullname as _);
         }
     }
-    attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, (*elem).name, name);
+    attr_decl = (*(*doc).int_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
     if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-        attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, (*elem).name, name);
+        attr_decl =
+            (*(*doc).ext_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
     }
 
     if attr_decl.is_null() {
@@ -3693,11 +3711,11 @@ pub unsafe extern "C" fn xml_valid_normalize_attribute_value(
 /// the caller must free the returned value.
 #[doc(alias = "xmlValidCtxtNormalizeAttributeValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
+pub unsafe fn xml_valid_ctxt_normalize_attribute_value(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
-    name: *const XmlChar,
+    name: &str,
     value: *const XmlChar,
 ) -> *mut XmlChar {
     let mut attr_decl: XmlAttributePtr = null_mut();
@@ -3707,9 +3725,6 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
         return null_mut();
     }
     if elem.is_null() {
-        return null_mut();
-    }
-    if name.is_null() {
         return null_mut();
     }
     if value.is_null() {
@@ -3728,9 +3743,19 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
         if fullname.is_null() {
             return null_mut();
         }
-        attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, fullname, name);
+        attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+            CStr::from_ptr(fullname as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            name,
+        );
         if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-            attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, fullname, name);
+            attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                CStr::from_ptr(fullname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                name,
+            );
             if !attr_decl.is_null() {
                 extsubset = 1;
             }
@@ -3740,10 +3765,12 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
         }
     }
     if attr_decl.is_null() && !(*doc).int_subset.is_null() {
-        attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, (*elem).name, name);
+        attr_decl =
+            (*(*doc).int_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
     }
     if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-        attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, (*elem).name, name);
+        attr_decl =
+            (*(*doc).ext_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), name);
         if !attr_decl.is_null() {
             extsubset = 1;
         }
@@ -3762,9 +3789,10 @@ pub unsafe extern "C" fn xml_valid_ctxt_normalize_attribute_value(
     }
     xml_valid_normalize_string(ret);
     if (*doc).standalone != 0 && extsubset == 1 && !xml_str_equal(value, ret) {
+        let name = CString::new(name).unwrap();
         xml_err_valid_node(ctxt, elem, XmlParserErrors::XmlDTDNotStandalone,
 c"standalone: %s on %s value had to be normalized based on external subset declaration\n".as_ptr() as _,
-	       name, (*elem).name, null_mut());
+	       name.as_ptr() as *const u8, (*elem).name, null_mut());
         (*ctxt).valid = 0;
     }
     ret
@@ -6401,9 +6429,19 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                 );
             }
         } else {
-            attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, fullname, (*attr).name);
+            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+                CStr::from_ptr(fullname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (*attr).name().as_deref().unwrap(),
+            );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, fullname, (*attr).name);
+                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                    CStr::from_ptr(fullname as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    (*attr).name().as_deref().unwrap(),
+                );
             }
         }
         if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
@@ -6431,9 +6469,15 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
                 );
             }
         } else {
-            attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, (*elem).name, (*attr).name);
+            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+                (*elem).name().as_deref().unwrap(),
+                (*attr).name().as_deref().unwrap(),
+            );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl = xml_get_dtd_attr_desc((*doc).ext_subset, (*elem).name, (*attr).name);
+                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                    (*elem).name().as_deref().unwrap(),
+                    (*attr).name().as_deref().unwrap(),
+                );
             }
         }
     }
@@ -6664,10 +6708,19 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
                 );
             }
         } else {
-            attr_decl = xml_get_dtd_attr_desc((*doc).int_subset, fullname, c"xmlns".as_ptr() as _);
+            attr_decl = (*(*doc).int_subset).get_dtd_attr_desc(
+                CStr::from_ptr(fullname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                "xmlns",
+            );
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl =
-                    xml_get_dtd_attr_desc((*doc).ext_subset, fullname, c"xmlns".as_ptr() as _);
+                attr_decl = (*(*doc).ext_subset).get_dtd_attr_desc(
+                    CStr::from_ptr(fullname as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    "xmlns",
+                );
             }
         }
         if fullname != fname.as_ptr() as _ && fullname != (*elem).name as _ {
@@ -6694,10 +6747,10 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
             }
         } else {
             attr_decl =
-                xml_get_dtd_attr_desc((*doc).int_subset, (*elem).name, c"xmlns".as_ptr() as _);
+                (*(*doc).int_subset).get_dtd_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
             if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                attr_decl =
-                    xml_get_dtd_attr_desc((*doc).ext_subset, (*elem).name, c"xmlns".as_ptr() as _);
+                attr_decl = (*(*doc).ext_subset)
+                    .get_dtd_attr_desc((*elem).name().as_deref().unwrap(), "xmlns");
             }
         }
     }
@@ -7209,57 +7262,6 @@ pub unsafe extern "C" fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlCh
             1
         }
     }
-}
-
-/// Search the DTD for the description of this attribute on this element.
-///
-/// returns the xmlAttributePtr if found or null_mut()
-#[doc(alias = "xmlGetDtdAttrDesc")]
-pub unsafe extern "C" fn xml_get_dtd_attr_desc(
-    dtd: XmlDtdPtr,
-    elem: *const XmlChar,
-    name: *const XmlChar,
-) -> XmlAttributePtr {
-    let cur: XmlAttributePtr;
-
-    let mut prefix: *mut XmlChar = null_mut();
-
-    if dtd.is_null() {
-        return null_mut();
-    }
-
-    let Some(table) = (*dtd).attributes else {
-        return null_mut();
-    };
-
-    let uqname: *mut XmlChar = xml_split_qname2(name, addr_of_mut!(prefix) as _) as _;
-
-    if !uqname.is_null() {
-        cur = table
-            .lookup3(
-                CStr::from_ptr(uqname as *const i8),
-                (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
-                (!elem.is_null()).then(|| CStr::from_ptr(elem as *const i8)),
-            )
-            .copied()
-            .unwrap_or(null_mut());
-        if !prefix.is_null() {
-            xml_free(prefix as _);
-        }
-        if !uqname.is_null() {
-            xml_free(uqname as _);
-        }
-    } else {
-        cur = table
-            .lookup3(
-                CStr::from_ptr(name as *const i8),
-                None,
-                (!elem.is_null()).then(|| CStr::from_ptr(elem as *const i8)),
-            )
-            .copied()
-            .unwrap_or(null_mut());
-    }
-    cur
 }
 
 /// Search the DTD for the description of this notation
@@ -8744,42 +8746,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_get_dtd_attr_desc() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                for n_elem in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let dtd = gen_xml_dtd_ptr(n_dtd, 0);
-                        let elem = gen_const_xml_char_ptr(n_elem, 1);
-                        let name = gen_const_xml_char_ptr(n_name, 2);
-
-                        let ret_val = xml_get_dtd_attr_desc(dtd, elem, name);
-                        desret_xml_attribute_ptr(ret_val);
-                        des_xml_dtd_ptr(n_dtd, dtd, 0);
-                        des_const_xml_char_ptr(n_elem, elem, 1);
-                        des_const_xml_char_ptr(n_name, name, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlGetDtdAttrDesc",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlGetDtdAttrDesc()");
-                            eprint!(" {}", n_dtd);
-                            eprint!(" {}", n_elem);
-                            eprintln!(" {}", n_name);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_get_dtd_element_desc() {
         unsafe {
             let mut leaks = 0;
@@ -9252,52 +9218,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_valid_ctxt_normalize_attribute_value() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                                let doc = gen_xml_doc_ptr(n_doc, 1);
-                                let elem = gen_xml_node_ptr(n_elem, 2);
-                                let name = gen_const_xml_char_ptr(n_name, 3);
-                                let value = gen_const_xml_char_ptr(n_value, 4);
-
-                                let ret_val = xml_valid_ctxt_normalize_attribute_value(
-                                    ctxt, doc, elem, name, value,
-                                );
-                                desret_xml_char_ptr(ret_val);
-                                des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_xml_doc_ptr(n_doc, doc, 1);
-                                des_xml_node_ptr(n_elem, elem, 2);
-                                des_const_xml_char_ptr(n_name, name, 3);
-                                des_const_xml_char_ptr(n_value, value, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!("Leak of {} blocks found in xmlValidCtxtNormalizeAttributeValue", xml_mem_blocks() - mem_base);
-                                    assert!(leaks == 0, "{leaks} Leaks are found in xmlValidCtxtNormalizeAttributeValue()");
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_doc);
-                                    eprint!(" {}", n_elem);
-                                    eprint!(" {}", n_name);
-                                    eprintln!(" {}", n_value);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_valid_get_potential_children() {
         #[cfg(feature = "libxml_valid")]
         unsafe {
@@ -9389,52 +9309,6 @@ mod tests {
                                 eprint!(" {}", n_next);
                                 eprint!(" {}", n_names);
                                 eprintln!(" {}", n_max);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_valid_normalize_attribute_value() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let doc = gen_xml_doc_ptr(n_doc, 0);
-                            let elem = gen_xml_node_ptr(n_elem, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let value = gen_const_xml_char_ptr(n_value, 3);
-
-                            let ret_val =
-                                xml_valid_normalize_attribute_value(doc, elem, name, value);
-                            desret_xml_char_ptr(ret_val);
-                            des_xml_doc_ptr(n_doc, doc, 0);
-                            des_xml_node_ptr(n_elem, elem, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_value, value, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlValidNormalizeAttributeValue",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlValidNormalizeAttributeValue()"
-                                );
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_elem);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_value);
                             }
                         }
                     }
