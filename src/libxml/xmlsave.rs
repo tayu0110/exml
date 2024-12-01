@@ -807,7 +807,7 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     }
     if (*dtd).entities.is_none()
         && (*dtd).elements.is_null()
-        && (*dtd).attributes.is_null()
+        && (*dtd).attributes.is_none()
         && (*dtd).notations.is_null()
         && (*dtd).pentities.is_none()
     {

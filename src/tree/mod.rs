@@ -58,7 +58,7 @@ use crate::{
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::{
             xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_notation_table,
-            xml_is_id, XmlAttributeTablePtr, XmlElementTablePtr, XmlNotationTablePtr,
+            xml_is_id, XmlElementTablePtr, XmlNotationTablePtr,
         },
         valid::{xml_free_id_table, xml_free_ref_table, xml_remove_id},
         xmlstring::{
@@ -1063,8 +1063,8 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     if !(*cur).elements.is_null() {
         xml_free_element_table((*cur).elements as XmlElementTablePtr);
     }
-    if !(*cur).attributes.is_null() {
-        xml_free_attribute_table((*cur).attributes as XmlAttributeTablePtr);
+    if let Some(table) = (*cur).attributes.take().map(|t| t.into_inner()) {
+        xml_free_attribute_table(table);
     }
     if let Some(entities) = (*cur).entities.take() {
         xml_free_entities_table(entities);
@@ -1821,7 +1821,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         entities::xml_copy_entities_table,
         valid::{
             xml_copy_attribute_table, xml_copy_element_table, xml_copy_notation_table,
-            xml_get_dtd_qattr_desc, xml_get_dtd_qelement_desc,
+            xml_get_dtd_qelement_desc,
         },
     };
 
@@ -1849,9 +1849,8 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     if !(*dtd).elements.is_null() {
         (*ret).elements = xml_copy_element_table((*dtd).elements as XmlElementTablePtr) as _;
     }
-    if !(*dtd).attributes.is_null() {
-        (*ret).attributes =
-            xml_copy_attribute_table((*dtd).attributes as XmlAttributeTablePtr) as _;
+    if let Some(table) = (*dtd).attributes {
+        (*ret).attributes = xml_copy_attribute_table(table);
     }
     if let Some(pentities) = (*dtd).pentities {
         (*ret).pentities = xml_copy_entities_table(pentities);
@@ -1889,15 +1888,10 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
             ) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlAttributeDecl) {
             let tmp: XmlAttributePtr = cur as _;
-            let prefix = (*tmp).prefix.as_deref().map(|p| CString::new(p).unwrap());
-            let elem = (*tmp).elem.as_deref().map(|p| CString::new(p).unwrap());
-            q = xml_get_dtd_qattr_desc(
-                ret,
-                elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
-                (*tmp).name,
-                prefix
-                    .as_ref()
-                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            q = (*ret).get_dtd_qattr_desc(
+                (*tmp).elem.as_deref().unwrap(),
+                (*tmp).name().as_deref().unwrap(),
+                (*tmp).prefix.as_deref(),
             ) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlCommentNode) {
             q = xml_copy_node(cur, 0);

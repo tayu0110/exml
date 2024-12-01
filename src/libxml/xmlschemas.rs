@@ -30017,7 +30017,7 @@ unsafe fn entity_decl_split(
 
 unsafe fn attribute_decl_split(
     ctx: Option<GenericErrorContext>,
-    elem: *const XmlChar,
+    elem: &str,
     name: *const XmlChar,
     typ: i32,
     def: i32,

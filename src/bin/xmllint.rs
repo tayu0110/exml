@@ -1065,17 +1065,11 @@ unsafe fn entity_decl_debug(
     );
 }
 
-/**
- * attributeDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the attribute name
- * @type:  the attribute type
- *
- * An attribute definition has been parsed
- */
+/// An attribute definition has been parsed
+#[doc(alias = "attributeDeclDebug")]
 unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    elem: *const XmlChar,
+    elem: &str,
     name: *const XmlChar,
     typ: c_int,
     def: c_int,
@@ -1088,16 +1082,14 @@ unsafe fn attribute_decl_debug(
     }
     if default_value.is_null() {
         println!(
-            "SAX.attributeDecl({}, {}, {}, {}, NULL, ...)",
-            CStr::from_ptr(elem as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {}, {}, {}, NULL, ...)",
             CStr::from_ptr(name as _).to_string_lossy(),
             typ,
             def
         );
     } else {
         println!(
-            "SAX.attributeDecl({}, {}, {}, {}, {}, ...)",
-            CStr::from_ptr(elem as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {}, {}, {}, {}, ...)",
             CStr::from_ptr(name as _).to_string_lossy(),
             typ,
             def,

@@ -845,17 +845,11 @@ unsafe fn entity_decl_debug(
     );
 }
 
-/**
- * attributeDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the attribute name
- * @type:  the attribute type
- *
- * An attribute definition has been parsed
- */
+/// An attribute definition has been parsed
+#[doc(alias = "attributeDeclDebug")]
 unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    elem: *const XmlChar,
+    elem: &str,
     name: *const XmlChar,
     typ: i32,
     def: i32,
@@ -865,16 +859,14 @@ unsafe fn attribute_decl_debug(
     increment_callbacks_counter();
     if default_value.is_null() {
         sax_debugln!(
-            "SAX.attributeDecl({}, {}, {}, {}, NULL, ...)",
-            CStr::from_ptr(elem as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {}, {}, {}, NULL, ...)",
             CStr::from_ptr(name as _).to_string_lossy(),
             typ,
             def,
         );
     } else {
         sax_debugln!(
-            "SAX.attributeDecl({}, {}, {}, {}, {}, ...)",
-            CStr::from_ptr(elem as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {}, {}, {}, {}, ...)",
             CStr::from_ptr(name as _).to_string_lossy(),
             typ,
             def,
@@ -4691,9 +4683,7 @@ unsafe extern "C" fn load_xpath_expr(
         return null_mut();
     }
 
-    /*
-     * Check the document is of the right kind
-     */
+    // Check the document is of the right kind
     if (*doc).get_root_element().is_null() {
         eprintln!(
             "Error: empty document for file \"{}\"",

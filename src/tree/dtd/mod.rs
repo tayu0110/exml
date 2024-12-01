@@ -23,7 +23,13 @@ mod element;
 mod enumeration;
 mod notation;
 
-use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{
+    borrow::Cow,
+    ffi::{CStr, CString},
+    os::raw::c_void,
+    ptr::null_mut,
+    sync::atomic::Ordering,
+};
 
 pub use attribute::*;
 pub use element::*;
@@ -60,10 +66,10 @@ pub struct XmlDtd {
     pub(crate) prev: Option<NodePtr>,     /* previous sibling link  */
     pub(crate) doc: *mut XmlDoc,          /* the containing document */
 
-    /* End of common part */
+    // End of common part
     pub(crate) notations: *mut c_void, /* Hash table for notations if any */
     pub(crate) elements: *mut c_void,  /* Hash table for elements if any */
-    pub(crate) attributes: *mut c_void, /* Hash table for attributes if any */
+    pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
     pub(crate) system_id: Option<String>,   /* URI for a SYSTEM or PUBLIC DTD */
@@ -100,6 +106,30 @@ impl XmlDtd {
         }
         null_mut()
     }
+
+    /// Search the DTD for the description of this qualified attribute on this element.
+    ///
+    /// returns the xmlAttributePtr if found or null_mut()
+    #[doc(alias = "xmlGetDtdQAttrDesc")]
+    pub unsafe fn get_dtd_qattr_desc(
+        &self,
+        elem: &str,
+        name: &str,
+        prefix: Option<&str>,
+    ) -> XmlAttributePtr {
+        let Some(table) = self.attributes else {
+            return null_mut();
+        };
+
+        table
+            .lookup3(
+                CString::new(name).unwrap().as_c_str(),
+                prefix.map(|p| CString::new(p).unwrap()).as_deref(),
+                Some(CString::new(elem).unwrap().as_c_str()),
+            )
+            .copied()
+            .unwrap_or(null_mut())
+    }
 }
 
 impl Default for XmlDtd {
@@ -116,7 +146,7 @@ impl Default for XmlDtd {
             doc: null_mut(),
             notations: null_mut(),
             elements: null_mut(),
-            attributes: null_mut(),
+            attributes: None,
             entities: None,
             external_id: None,
             system_id: None,

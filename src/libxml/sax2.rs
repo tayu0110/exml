@@ -78,11 +78,10 @@ use super::{
     },
     valid::{
         xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
-        xml_add_ref, xml_free_enumeration, xml_get_dtd_qattr_desc, xml_get_dtd_qelement_desc,
-        xml_is_id, xml_is_ref, xml_valid_ctxt_normalize_attribute_value,
-        xml_valid_normalize_attribute_value, xml_validate_dtd_final, xml_validate_element_decl,
-        xml_validate_notation_decl, xml_validate_one_attribute, xml_validate_one_namespace,
-        xml_validate_root,
+        xml_add_ref, xml_free_enumeration, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
+        xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
+        xml_validate_dtd_final, xml_validate_element_decl, xml_validate_notation_decl,
+        xml_validate_one_attribute, xml_validate_one_namespace, xml_validate_root,
     },
     xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
 };
@@ -818,7 +817,7 @@ unsafe extern "C" fn xml_err_valid(
 #[doc(alias = "xmlSAX2AttributeDecl")]
 pub unsafe fn xml_sax2_attribute_decl(
     ctx: Option<GenericErrorContext>,
-    elem: *const XmlChar,
+    elem: &str,
     fullname: *const XmlChar,
     typ: i32,
     def: i32,
@@ -844,9 +843,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     if xml_str_equal(fullname, c"xml:id".as_ptr() as _)
         && typ != XmlAttributeType::XmlAttributeID as i32
     {
-        /*
-         * Raise the error but keep the validity flag
-         */
+        // Raise the error but keep the validity flag
         let tmp: i32 = (*ctxt).valid;
         xml_err_valid(
             ctxt,
@@ -857,7 +854,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         );
         (*ctxt).valid = tmp;
     }
-    /* TODO: optimize name/prefix allocation */
+    // TODO: optimize name/prefix allocation
     let name: *mut XmlChar = xml_split_qname(ctxt, fullname, &raw mut prefix as _);
     (*ctxt).vctxt.valid = 1;
     if (*ctxt).in_subset == 1 {
@@ -865,7 +862,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             &raw mut (*ctxt).vctxt as _,
             (*(*ctxt).my_doc).int_subset,
             elem,
-            name,
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             prefix,
             XmlAttributeType::try_from(typ).unwrap(),
             XmlAttributeDefault::try_from(def).unwrap(),
@@ -877,7 +874,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             &raw mut (*ctxt).vctxt as _,
             (*(*ctxt).my_doc).ext_subset,
             elem,
-            name,
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             prefix,
             XmlAttributeType::try_from(typ).unwrap(),
             XmlAttributeDefault::try_from(def).unwrap(),
@@ -1953,22 +1950,20 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                 && (*ctxt).validate != 0
             {
                 while !attr.is_null() {
-                    let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                     let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
                     if !(*attr).default_value.is_null()
-                        && xml_get_dtd_qattr_desc(
-                            (*(*ctxt).my_doc).ext_subset,
-                            elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
-                            (*attr).name,
-                            prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
+                        && (*(*(*ctxt).my_doc).ext_subset).get_dtd_qattr_desc(
+                            (*attr).elem.as_deref().unwrap(),
+                            (*attr).name().as_deref().unwrap(),
+                            (*attr).prefix.as_deref(),
                         ) == attr
-                        && xml_get_dtd_qattr_desc(
-                            (*(*ctxt).my_doc).int_subset,
-                            elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
-                            (*attr).name,
-                            prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
-                        )
-                        .is_null()
+                        && (*(*(*ctxt).my_doc).int_subset)
+                            .get_dtd_qattr_desc(
+                                (*attr).elem.as_deref().unwrap(),
+                                (*attr).name().as_deref().unwrap(),
+                                (*attr).prefix.as_deref(),
+                            )
+                            .is_null()
                     {
                         let mut fulln: *mut XmlChar;
 
@@ -1985,10 +1980,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                             break;
                         }
 
-                        /*
-                         * Check that the attribute is not declared in the
-                         * serialization
-                         */
+                        // Check that the attribute is not declared in the serialization
                         att = null_mut();
                         if !atts.is_null() {
                             i = 0;
@@ -2017,38 +2009,30 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                 }
             }
 
-            /*
-             * Actually insert defaulted values when needed
-             */
+            // Actually insert defaulted values when needed
             attr = (*elem_decl).attributes;
             while !attr.is_null() {
-                /*
-                 * Make sure that attributes redefinition occurring in the
-                 * internal subset are not overridden by definitions in the
-                 * external subset.
-                 */
+                // Make sure that attributes redefinition occurring in the
+                // internal subset are not overridden by definitions in the external subset.
                 if !(*attr).default_value.is_null() {
-                    /*
-                     * the element should be instantiated in the tree if:
-                     *  - this is a namespace prefix
-                     *  - the user required for completion in the tree
-                     *    like XSLT
-                     *  - there isn't already an attribute definition
-                     *    in the internal subset overriding it.
-                     */
+                    // the element should be instantiated in the tree if:
+                    //  - this is a namespace prefix
+                    //  - the user required for completion in the tree
+                    //    like XSLT
+                    //  - there isn't already an attribute definition
+                    //    in the internal subset overriding it.
                     if (*attr).prefix.as_deref() == Some("xmlns")
                         || ((*attr).prefix.is_none()
                             && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _))
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
                         let pre = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
-                        let elem = (*attr).elem.as_deref().map(|p| CString::new(p).unwrap());
-                        let tst: XmlAttributePtr = xml_get_dtd_qattr_desc(
-                            (*(*ctxt).my_doc).int_subset,
-                            elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
-                            (*attr).name,
-                            pre.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
-                        );
+                        let tst: XmlAttributePtr = (*(*(*ctxt).my_doc).int_subset)
+                            .get_dtd_qattr_desc(
+                                (*attr).elem.as_deref().unwrap(),
+                                (*attr).name().as_deref().unwrap(),
+                                (*attr).prefix.as_deref(),
+                            );
                         if tst == attr || tst.is_null() {
                             let mut fname: [XmlChar; 50] = [0; 50];
 
@@ -2063,10 +2047,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                                 return;
                             }
 
-                            /*
-                             * Check that the attribute is not declared in the
-                             * serialization
-                             */
+                            // Check that the attribute is not declared in the serialization
                             att = null_mut();
                             if !atts.is_null() {
                                 i = 0;
@@ -2151,7 +2132,7 @@ pub unsafe fn xml_sax2_start_element(
         && ((*(*ctxt).my_doc).int_subset.is_null()
             || ((*(*(*ctxt).my_doc).int_subset).notations.is_null()
                 && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
-                && (*(*(*ctxt).my_doc).int_subset).attributes.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
     {
         xml_err_valid(
@@ -2425,7 +2406,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         && ((*(*ctxt).my_doc).int_subset.is_null()
             || ((*(*(*ctxt).my_doc).int_subset).notations.is_null()
                 && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
-                && (*(*(*ctxt).my_doc).int_subset).attributes.is_null()
+                && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
     {
         xml_err_valid(

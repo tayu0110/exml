@@ -1793,7 +1793,7 @@ pub type NotationDeclSAXFunc = unsafe fn(
 #[doc(alias = "attributeDeclSAXFunc")]
 pub type AttributeDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    elem: *const XmlChar,
+    elem: &str,
     fullname: *const XmlChar,
     typ: i32,
     def: i32,
@@ -12007,7 +12007,9 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 if let Some(attr) = (*(*ctxt).sax).attribute_decl {
                     attr(
                         (*ctxt).user_data.clone(),
-                        elem_name,
+                        CStr::from_ptr(elem_name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         attr_name,
                         typ as i32,
                         def,

@@ -38,7 +38,7 @@ use crate::{
         },
         globals::{xml_free, xml_malloc},
         uri::xml_build_uri,
-        valid::{xml_get_dtd_attr_desc, xml_get_dtd_qattr_desc, xml_remove_id},
+        valid::{xml_get_dtd_attr_desc, xml_remove_id},
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new,
             xml_strncmp, XmlChar,
@@ -1323,7 +1323,6 @@ impl XmlNode {
             return null_mut();
         }
 
-        let name = CString::new(name).unwrap();
         if !self.properties.is_null() {
             prop = self.properties;
             if let Some(ns_name) = ns_name {
@@ -1331,7 +1330,7 @@ impl XmlNode {
                 let ns_name = CString::new(ns_name).unwrap();
                 while {
                     if !(*prop).ns.is_null()
-                        && xml_str_equal((*prop).name, name.as_ptr() as *const u8)
+                        && (*prop).name().as_deref() == Some(name)
                         && ((*(*prop).ns).href == ns_name.as_ptr() as _
                             || xml_str_equal((*(*prop).ns).href, ns_name.as_ptr() as *const u8))
                     {
@@ -1345,9 +1344,7 @@ impl XmlNode {
             } else {
                 // We want the attr to be in no namespace.
                 while {
-                    if (*prop).ns.is_null()
-                        && xml_str_equal((*prop).name, name.as_ptr() as *const u8)
-                    {
+                    if (*prop).ns.is_null() && (*prop).name().as_deref() == Some(name) {
                         return prop;
                     }
                     prop = (*prop)
@@ -1386,18 +1383,20 @@ impl XmlNode {
                 if let Some(ns_name) = ns_name {
                     if ns_name == XML_XML_NAMESPACE.to_string_lossy() {
                         // The XML namespace must be bound to prefix 'xml'.
-                        attr_decl = xml_get_dtd_qattr_desc(
-                            (*doc).int_subset,
-                            elem_qname,
-                            name.as_ptr() as *const u8,
-                            c"xml".as_ptr() as _,
+                        attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+                            CStr::from_ptr(elem_qname as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                            name,
+                            Some("xml"),
                         );
                         if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                            attr_decl = xml_get_dtd_qattr_desc(
-                                (*doc).ext_subset,
-                                elem_qname,
-                                name.as_ptr() as *const u8,
-                                c"xml".as_ptr() as _,
+                            attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                                CStr::from_ptr(elem_qname as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                                name,
+                                Some("xml"),
                             );
                         }
                     } else {
@@ -1412,21 +1411,26 @@ impl XmlNode {
                         let ns_name = CString::new(ns_name).unwrap();
                         for cur in ns_list {
                             if xml_str_equal((*cur).href, ns_name.as_ptr() as *const u8) {
-                                attr_decl = xml_get_dtd_qattr_desc(
-                                    (*doc).int_subset,
-                                    elem_qname,
-                                    name.as_ptr() as *const u8,
-                                    (*cur).prefix,
+                                let prefix = (!(*cur).prefix.is_null()).then(|| {
+                                    CStr::from_ptr((*cur).prefix as *const i8).to_string_lossy()
+                                });
+                                attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+                                    CStr::from_ptr(elem_qname as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                    name,
+                                    prefix.as_deref(),
                                 );
                                 if !attr_decl.is_null() {
                                     break;
                                 }
                                 if !(*doc).ext_subset.is_null() {
-                                    attr_decl = xml_get_dtd_qattr_desc(
-                                        (*doc).ext_subset,
-                                        elem_qname,
-                                        name.as_ptr() as *const u8,
-                                        (*cur).prefix,
+                                    attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                                        CStr::from_ptr(elem_qname as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                        name,
+                                        prefix.as_deref(),
                                     );
                                     if !attr_decl.is_null() {
                                         break;
@@ -1437,18 +1441,20 @@ impl XmlNode {
                     }
                 } else {
                     // The common and nice case: Attr in no namespace.
-                    attr_decl = xml_get_dtd_qattr_desc(
-                        (*doc).int_subset,
-                        elem_qname,
-                        name.as_ptr() as *const u8,
-                        null_mut(),
+                    attr_decl = (*(*doc).int_subset).get_dtd_qattr_desc(
+                        CStr::from_ptr(elem_qname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        name,
+                        None,
                     );
                     if attr_decl.is_null() && !(*doc).ext_subset.is_null() {
-                        attr_decl = xml_get_dtd_qattr_desc(
-                            (*doc).ext_subset,
-                            elem_qname,
-                            name.as_ptr() as *const u8,
-                            null_mut(),
+                        attr_decl = (*(*doc).ext_subset).get_dtd_qattr_desc(
+                            CStr::from_ptr(elem_qname as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                            name,
+                            None,
                         );
                     }
                 }
