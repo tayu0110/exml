@@ -11224,8 +11224,16 @@ pub unsafe extern "C" fn xml_xpath_next_namespace(
         if !(*(*ctxt).context).tmp_ns_list.is_null() {
             xml_free((*(*ctxt).context).tmp_ns_list as _);
         }
-        (*(*ctxt).context).tmp_ns_list =
-            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc);
+        (*(*ctxt).context).tmp_ns_list = if let Some(list) =
+            (*(*(*ctxt).context).node).get_ns_list((*(*ctxt).context).doc)
+        {
+            let array = xml_malloc(size_of::<*mut XmlNs>() * (list.len() + 1)) as *mut *mut XmlNs;
+            std::ptr::copy_nonoverlapping(list.as_ptr(), array, list.len());
+            *array.add(list.len()) = null_mut();
+            array
+        } else {
+            null_mut()
+        };
         (*(*ctxt).context).tmp_ns_nr = 0;
         if !(*(*ctxt).context).tmp_ns_list.is_null() {
             while !(*(*(*ctxt).context)

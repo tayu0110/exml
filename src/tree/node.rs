@@ -1111,8 +1111,8 @@ impl XmlNode {
                 null_mut()
             }
             XmlElementType::XmlEntityRefNode => {
-                /* lookup entity declaration */
-                let ent: XmlEntityPtr = xml_get_doc_entity(self.doc, self.name);
+                // lookup entity declaration
+                let ent: XmlEntityPtr = xml_get_doc_entity(self.document(), self.name);
                 if ent.is_null() {
                     return null_mut();
                 }
@@ -1403,22 +1403,20 @@ impl XmlNode {
                     } else {
                         // The ugly case: Search using the prefixes of in-scope
                         // ns-decls corresponding to @nsName.
-                        let ns_list: *mut XmlNsPtr = self.get_ns_list(self.doc);
-                        if ns_list.is_null() {
+                        let Some(ns_list) = self.get_ns_list(self.doc) else {
                             if !tmpstr.is_null() {
                                 xml_free(tmpstr as _);
                             }
                             return null_mut();
-                        }
-                        let mut cur = ns_list;
+                        };
                         let ns_name = CString::new(ns_name).unwrap();
-                        while !(*cur).is_null() {
-                            if xml_str_equal((*(*cur)).href, ns_name.as_ptr() as *const u8) {
+                        for cur in ns_list {
+                            if xml_str_equal((*cur).href, ns_name.as_ptr() as *const u8) {
                                 attr_decl = xml_get_dtd_qattr_desc(
                                     (*doc).int_subset,
                                     elem_qname,
                                     name.as_ptr() as *const u8,
-                                    (*(*cur)).prefix,
+                                    (*cur).prefix,
                                 );
                                 if !attr_decl.is_null() {
                                     break;
@@ -1428,21 +1426,17 @@ impl XmlNode {
                                         (*doc).ext_subset,
                                         elem_qname,
                                         name.as_ptr() as *const u8,
-                                        (*(*cur)).prefix,
+                                        (*cur).prefix,
                                     );
                                     if !attr_decl.is_null() {
                                         break;
                                     }
                                 }
                             }
-                            cur = cur.add(1);
                         }
-                        xml_free(ns_list as _);
                     }
                 } else {
-                    /*
-                     * The common and nice case: Attr in no namespace.
-                     */
+                    // The common and nice case: Attr in no namespace.
                     attr_decl = xml_get_dtd_qattr_desc(
                         (*doc).int_subset,
                         elem_qname,
@@ -1461,9 +1455,7 @@ impl XmlNode {
                 if !tmpstr.is_null() {
                     xml_free(tmpstr as _);
                 }
-                /*
-                 * Only default/fixed attrs are relevant.
-                 */
+                // Only default/fixed attrs are relevant.
                 if !attr_decl.is_null() && !(*attr_decl).default_value.is_null() {
                     return attr_decl as _;
                 }
@@ -1537,58 +1529,38 @@ impl XmlNode {
 
     /// Search all the namespace applying to a given element.
     ///
-    /// Returns an NULL terminated array of all the `xmlNsPtr` found
-    /// that need to be freed by the caller or NULL if no namespace if defined.
+    /// Returns an `Vec` of all the `xmlNsPtr` found.
     #[doc(alias = "xmlGetNsList")]
     #[cfg(any(feature = "libxml_tree", feature = "xpath", feature = "schema"))]
-    pub unsafe fn get_ns_list(&self, _doc: *const XmlDoc) -> *mut XmlNsPtr {
-        use crate::{
-            libxml::{globals::xml_realloc, xmlstring::xml_str_equal},
-            tree::xml_tree_err_memory,
-        };
+    pub unsafe fn get_ns_list(&self, _doc: *const XmlDoc) -> Option<Vec<XmlNsPtr>> {
+        use crate::libxml::xmlstring::xml_str_equal;
 
         let mut cur: XmlNsPtr;
-        let mut ret: *mut XmlNsPtr = null_mut();
-        let mut nbns: i32 = 0;
-        let mut maxns: i32 = 0;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
 
+        let mut ret: Vec<*mut XmlNs> = vec![];
         let mut node = self as *const XmlNode;
         while !node.is_null() {
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                 cur = (*node).ns_def;
                 'b: while !cur.is_null() {
-                    for i in 0..nbns {
-                        if ((*cur).prefix == (*(*ret.add(i as usize))).prefix)
-                            || xml_str_equal((*cur).prefix, (*(*ret.add(i as usize))).prefix)
+                    for i in 0..ret.len() {
+                        if ((*cur).prefix == (*ret[i]).prefix)
+                            || xml_str_equal((*cur).prefix, (*ret[i]).prefix)
                         {
                             cur = (*cur).next;
                             continue 'b;
                         }
                     }
-                    if nbns >= maxns {
-                        maxns = if maxns != 0 { maxns * 2 } else { 10 };
-                        let tmp: *mut XmlNsPtr =
-                            xml_realloc(ret as _, (maxns as usize + 1) * size_of::<XmlNsPtr>())
-                                as _;
-                        if tmp.is_null() {
-                            xml_tree_err_memory(c"getting namespace list".as_ptr() as _);
-                            xml_free(ret as _);
-                            return null_mut();
-                        }
-                        ret = tmp;
-                    }
-                    *ret.add(nbns as usize) = cur;
-                    nbns += 1;
-                    *ret.add(nbns as usize) = null_mut();
+                    ret.push(cur);
                 }
             }
             node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
         }
-        ret
+        Some(ret)
     }
 
     /// Searches the language of a node, i.e. the values of the xml:lang

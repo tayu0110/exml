@@ -10165,29 +10165,17 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
     } else {
         let mut ns_array: *mut *const XmlChar = null_mut();
 
-        /*
-         * Compile the XPath expression.
-         */
-        /*
-         * TODO: We need the array of in-scope namespaces for compilation.
-         * TODO: Call xmlPatterncompile with different options for selector/
-         * field.
-         */
+        // Compile the XPath expression.
+        // TODO: We need the array of in-scope namespaces for compilation.
+        // TODO: Call xmlPatterncompile with different options for selector/field.
         let ns_list = if attr.is_null() {
-            null_mut()
+            None
         } else {
             (*attr).parent.unwrap().get_ns_list((*attr).doc)
         };
-        /*
-         * Build an array of prefixes and namespaces.
-         */
-        if !ns_list.is_null() {
-            let mut count: usize = 0;
-
-            for _ in (0..).take_while(|&i| !(*ns_list.add(i)).is_null()) {
-                count += 1;
-            }
-
+        // Build an array of prefixes and namespaces.
+        if let Some(ns_list) = ns_list {
+            let count: usize = ns_list.len();
             ns_array =
                 xml_malloc((count * 2 + 1) * size_of::<*const XmlChar>()) as *mut *const XmlChar;
             if ns_array.is_null() {
@@ -10196,19 +10184,15 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
                     c"allocating a namespace array".as_ptr() as _,
                     null_mut(),
                 );
-                xml_free(ns_list as _);
                 return -1;
             }
-            for i in 0..count {
-                *ns_array.add(2 * i) = (*(*ns_list.add(i))).href;
-                *ns_array.add(2 * i + 1) = (*(*ns_list.add(i))).prefix;
+            for (i, cur) in ns_list.into_iter().enumerate() {
+                *ns_array.add(2 * i) = (*cur).href;
+                *ns_array.add(2 * i + 1) = (*cur).prefix;
             }
             *ns_array.add(count * 2) = null_mut();
-            xml_free(ns_list as _);
         }
-        /*
-         * TODO: Differentiate between "selector" and "field".
-         */
+        // TODO: Differentiate between "selector" and "field".
         if is_field != 0 {
             (*selector).xpath_comp = xml_patterncompile(
                 (*selector).xpath,
