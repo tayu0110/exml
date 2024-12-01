@@ -803,7 +803,7 @@ impl XmlNode {
                 {
                     result = self.psvi as isize as i64;
                 } else if let Some(children) = self
-                    .children
+                    .children()
                     .filter(|_| matches!(self.element_type(), XmlElementType::XmlElementNode))
                 {
                     result = children.get_line_no_internal(depth + 1);
