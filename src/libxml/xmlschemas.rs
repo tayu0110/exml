@@ -6894,16 +6894,15 @@ unsafe extern "C" fn xml_schema_build_absolute_uri(
             let uri: *mut XmlChar;
             let ret: *const XmlChar;
 
-            let base: *mut XmlChar = (*ctxt_node).get_base((*ctxt_node).doc);
-            if base.is_null() {
+            if let Some(base) = (*ctxt_node).get_base((*ctxt_node).doc) {
+                let base = CString::new(base).unwrap();
+                uri = xml_build_uri(location, base.as_ptr() as *const u8);
+            } else {
                 let url = (*(*ctxt_node).doc)
                     .url
                     .as_deref()
                     .map(|u| CString::new(u).unwrap());
                 uri = xml_build_uri(location, url.map_or(null(), |u| u.as_ptr() as *const u8));
-            } else {
-                uri = xml_build_uri(location, base);
-                xml_free(base as _);
             }
             if !uri.is_null() {
                 ret = xml_dict_lookup(dict, uri, -1);
@@ -7082,13 +7081,8 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
         attr = (*attr).next;
     }
     xml_schema_pval_attr_id(pctxt, node, c"id".as_ptr() as _);
-    /*
-     * Preliminary step, extract the URI-Reference and make an URI
-     * from the base.
-     */
-    /*
-     * Attribute "schemaLocation" is mandatory.
-     */
+    // Preliminary step, extract the URI-Reference and make an URI from the base.
+    // Attribute "schemaLocation" is mandatory.
     attr = xml_schema_get_prop_node(node, c"schemaLocation".as_ptr() as _);
     if !attr.is_null() {
         let uri: *mut XmlChar;
@@ -7104,8 +7098,10 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
             // goto exit_error;
             return (*pctxt).err;
         }
-        let base = (*node).get_base((*node).doc);
-        if base.is_null() {
+        if let Some(base) = (*node).get_base((*node).doc) {
+            let base = CString::new(base).unwrap();
+            uri = xml_build_uri(*schema_location, base.as_ptr() as *const u8);
+        } else {
             let url = (*(*node).doc)
                 .url
                 .as_deref()
@@ -7114,9 +7110,6 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
                 *schema_location,
                 url.map_or(null(), |u| u.as_ptr() as *const u8),
             );
-        } else {
-            uri = xml_build_uri(*schema_location, base);
-            xml_free(base as _);
         }
         if uri.is_null() {
             PERROR_INT!(

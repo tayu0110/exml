@@ -35,7 +35,7 @@
 use std::io::Write;
 use std::{
     cell::RefCell,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     mem::{size_of, transmute, zeroed},
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -1262,8 +1262,14 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
         return null_mut();
     }
 
-    let base: *mut XmlChar = (*cur).get_base((*cur).doc);
-    let url: *mut XmlChar = xml_build_uri(uri_value, base);
+    let base = (*cur)
+        .get_base((*cur).doc)
+        .map(|c| CString::new(c).unwrap());
+    let url: *mut XmlChar = xml_build_uri(
+        uri_value,
+        base.as_ref()
+            .map_or(null_mut(), |b| b.as_ptr() as *const u8),
+    );
     if !url.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {
             if !name_value.is_null() {
@@ -1298,9 +1304,6 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
     }
     if !uri_value.is_null() {
         xml_free(uri_value as _);
-    }
-    if !base.is_null() {
-        xml_free(base as _);
     }
     if !url.is_null() {
         xml_free(url as _);

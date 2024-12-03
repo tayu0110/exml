@@ -26,6 +26,7 @@ pub mod nanohttp;
 #[cfg(test)]
 pub(crate) mod test_util;
 pub mod tree;
+pub mod uri;
 
 pub const SYSCONFDIR: &str = if let Some(sysconfdir) = option_env!("SYSCONFDIR") {
     sysconfdir

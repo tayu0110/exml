@@ -2529,25 +2529,12 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderBaseUri")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn base_uri(&self) -> Option<String> {
-        use std::ffi::CStr;
-
         use crate::tree::NodeCommon;
 
         if self.node.is_null() {
             return None;
         }
-        let res = (*self.node).get_base(null_mut());
-        if !res.is_null() {
-            let r = Some(
-                CStr::from_ptr(res as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(res as _);
-            r
-        } else {
-            None
-        }
+        (*self.node).get_base(null_mut())
     }
 
     /// The local name of the node.
@@ -4156,17 +4143,18 @@ pub unsafe extern "C" fn xml_text_reader_attribute_count(reader: &mut XmlTextRea
 pub unsafe extern "C" fn xml_text_reader_const_base_uri(
     reader: &mut XmlTextReader,
 ) -> *const XmlChar {
+    use std::ffi::CString;
+
     use crate::tree::NodeCommon;
 
     if reader.node.is_null() {
         return null_mut();
     }
-    let tmp: *mut XmlChar = (*reader.node).get_base(null_mut());
-    if tmp.is_null() {
+    let Some(tmp) = (*reader.node).get_base(null_mut()) else {
         return null_mut();
-    }
-    let ret: *const XmlChar = CONSTSTR!(reader, tmp);
-    xml_free(tmp as _);
+    };
+    let tmp = CString::new(tmp).unwrap();
+    let ret: *const XmlChar = CONSTSTR!(reader, tmp.as_ptr() as *const u8);
     ret
 }
 
@@ -5822,7 +5810,10 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
         return null_mut();
     }
     if !(*ctx).node.is_null() {
-        ret = (*(*ctx).node).get_base(null_mut());
+        let tmp = (*(*ctx).node)
+            .get_base(null_mut())
+            .map(|c| CString::new(c).unwrap());
+        ret = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
     } else {
         /* inspired from error.c */
         let mut input: XmlParserInputPtr;

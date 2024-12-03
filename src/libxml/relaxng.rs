@@ -3531,8 +3531,15 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             break 'skip_children;
                         }
                         xml_free_uri(uri);
-                        let base: *mut XmlChar = (*cur).get_base((*cur).doc);
-                        let url: *mut XmlChar = xml_build_uri(href, base);
+                        let base = (*cur)
+                            .get_base((*cur).doc)
+                            .map(|c| CString::new(c).unwrap());
+                        eprintln!("base: {base:?}");
+                        let url: *mut XmlChar = xml_build_uri(
+                            href,
+                            base.as_ref()
+                                .map_or(null_mut(), |b| b.as_ptr() as *const u8),
+                        );
                         if url.is_null() {
                             xml_rng_perr(
                                 ctxt,
@@ -3548,17 +3555,11 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             if !href.is_null() {
                                 xml_free(href as _);
                             }
-                            if !base.is_null() {
-                                xml_free(base as _);
-                            }
                             delete = cur;
                             break 'skip_children;
                         }
                         if !href.is_null() {
                             xml_free(href as _);
-                        }
-                        if !base.is_null() {
-                            xml_free(base as _);
                         }
                         let docu: XmlRelaxNGDocumentPtr =
                             xml_relaxng_load_external_ref(ctxt, url, ns);
@@ -3600,8 +3601,14 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             delete = cur;
                             break 'skip_children;
                         }
-                        let base: *mut XmlChar = (*cur).get_base((*cur).doc);
-                        let url: *mut XmlChar = xml_build_uri(href, base);
+                        let base = (*cur)
+                            .get_base((*cur).doc)
+                            .map(|c| CString::new(c).unwrap());
+                        let url: *mut XmlChar = xml_build_uri(
+                            href,
+                            base.as_ref()
+                                .map_or(null_mut(), |b| b.as_ptr() as *const u8),
+                        );
                         if url.is_null() {
                             xml_rng_perr(
                                 ctxt,
@@ -3614,17 +3621,11 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             if !href.is_null() {
                                 xml_free(href as _);
                             }
-                            if !base.is_null() {
-                                xml_free(base as _);
-                            }
                             delete = cur;
                             break 'skip_children;
                         }
                         if !href.is_null() {
                             xml_free(href as _);
-                        }
-                        if !base.is_null() {
-                            xml_free(base as _);
                         }
                         ns = (*cur).get_prop("ns");
                         if ns.is_null() {

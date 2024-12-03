@@ -37,14 +37,14 @@ use crate::{
             XmlEntity, XmlEntityPtr,
         },
         globals::{xml_free, xml_malloc},
-        uri::xml_build_uri,
         valid::xml_remove_id,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new,
-            xml_strncmp, XmlChar,
+            XmlChar,
         },
     },
     tree::{xml_free_node_list, XmlAttributePtr},
+    uri::build_uri,
 };
 
 use super::{
@@ -153,13 +153,9 @@ pub trait NodeCommon {
     /// Returns a pointer to the base URL, or NULL if not found.  
     /// It's up to the caller to free the memory with `xml_free()`.
     #[doc(alias = "xmlNodeGetBase")]
-    unsafe fn get_base(&self, mut doc: *const XmlDoc) -> *mut XmlChar {
-        let mut oldbase: *mut XmlChar = null_mut();
-        let mut base: *mut XmlChar;
-        let mut newbase: *mut XmlChar;
-
+    unsafe fn get_base(&self, mut doc: *const XmlDoc) -> Option<String> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
         if doc.is_null() {
             doc = self.document();
@@ -182,53 +178,59 @@ pub trait NodeCommon {
                     continue;
                 }
                 if name.eq_ignore_ascii_case("base") {
-                    return now.get_prop("href");
+                    let ret = now.get_prop("href");
+                    let r = (!ret.is_null()).then(|| {
+                        CStr::from_ptr(ret as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    });
+                    xml_free(ret as _);
+                    return r;
                 }
                 cur = now.next();
             }
-            return null_mut();
+            return None;
         }
+        let mut bases: Vec<String> = vec![];
         while let Some(now) = cur {
             if let Some(ent) = now.as_entity_decl_node() {
-                return xml_strdup(ent.as_ref().uri.load(Ordering::Relaxed));
+                let ret = ent.as_ref().uri.load(Ordering::Relaxed);
+                return (!ret.is_null()).then(|| {
+                    CStr::from_ptr(ret as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                });
             }
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                base = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-                if !base.is_null() {
-                    if !oldbase.is_null() {
-                        newbase = xml_build_uri(oldbase, base);
-                        if !newbase.is_null() {
-                            xml_free(oldbase as _);
-                            xml_free(base as _);
-                            oldbase = newbase;
-                        } else {
-                            xml_free(oldbase as _);
-                            xml_free(base as _);
-                            return null_mut();
-                        }
-                    } else {
-                        oldbase = base;
-                    }
-                    if xml_strncmp(oldbase, c"http://".as_ptr() as _, 7) == 0
-                        || xml_strncmp(oldbase, c"ftp://".as_ptr() as _, 6) == 0
-                        || xml_strncmp(oldbase, c"urn:".as_ptr() as _, 4) == 0
+                let b = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+                let base = (!b.is_null()).then(|| {
+                    CStr::from_ptr(b as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                });
+                xml_free(b as _);
+                if let Some(base) = base {
+                    if base.starts_with("http://")
+                        || base.starts_with("ftp://")
+                        || base.starts_with("urn:")
                     {
-                        return oldbase;
+                        return build_uri(bases.into_iter().rev().map(|b| b.into()), &base);
                     }
+                    eprintln!("get_base: {base}");
+                    bases.push(base);
                 }
             }
             cur = now.parent();
         }
         if !doc.is_null() && (*doc).url.is_some() {
-            let url = CString::new((*doc).url.as_deref().unwrap()).unwrap();
-            if oldbase.is_null() {
-                return xml_strdup(url.as_ptr() as *const u8);
+            let url = (*doc).url.as_deref().unwrap();
+            if bases.is_empty() {
+                return Some(url.to_owned());
             }
-            newbase = xml_build_uri(oldbase, url.as_ptr() as *const u8);
-            xml_free(oldbase as _);
-            return newbase;
+            return build_uri(bases.into_iter().rev().map(|b| b.into()), url);
         }
-        oldbase
+        let base = bases.pop()?;
+        build_uri(bases.into_iter().rev().map(|b| b.into()), &base)
     }
 
     #[doc(hidden)]

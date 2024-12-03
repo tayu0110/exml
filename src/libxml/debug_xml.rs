@@ -2215,7 +2215,7 @@ pub unsafe extern "C" fn xml_shell_base(
     node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use crate::{libxml::globals::xml_free, tree::NodeCommon};
+    use crate::tree::NodeCommon;
 
     if ctxt.is_null() {
         return 0;
@@ -2225,14 +2225,10 @@ pub unsafe extern "C" fn xml_shell_base(
         return 0;
     }
 
-    let base: *mut XmlChar = (*node).get_base((*node).doc);
-
-    if base.is_null() {
-        writeln!((*ctxt).output, " No base found !!!");
+    if let Some(base) = (*node).get_base((*node).doc) {
+        writeln!((*ctxt).output, "{base}");
     } else {
-        let b = CStr::from_ptr(base as *const i8).to_string_lossy();
-        writeln!((*ctxt).output, "{b}");
-        xml_free(base as _);
+        writeln!((*ctxt).output, " No base found !!!");
     }
     0
 }

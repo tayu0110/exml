@@ -38,9 +38,9 @@ use crate::{
     encoding::{floor_char_boundary, xml_encoding_err, EncodingError, XmlCharEncodingHandler},
     error::XmlParserErrors,
     globals::GLOBAL_STATE,
-    libxml::uri::unescape_url,
     nanohttp::xml_nanohttp_method,
     tree::XmlBufferAllocationScheme,
+    uri::unescape_url,
 };
 
 use super::{

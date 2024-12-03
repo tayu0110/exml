@@ -361,7 +361,6 @@ unsafe extern "C" fn xmlconf_test_item(
     let mut typ: *mut XmlChar = null_mut();
     let mut filename: *mut XmlChar = null_mut();
     let mut uri: *mut XmlChar = null_mut();
-    let mut base: *mut XmlChar = null_mut();
     let mut rec: *mut XmlChar = null_mut();
     let mut version: *mut XmlChar = null_mut();
     let mut entities: *mut XmlChar = null_mut();
@@ -408,9 +407,6 @@ unsafe extern "C" fn xmlconf_test_item(
                 if !uri.is_null() {
                     xml_free(uri as _);
                 }
-                if !base.is_null() {
-                    xml_free(base as _);
-                }
                 if !id.is_null() {
                     xml_free(id as _);
                 }
@@ -438,8 +434,12 @@ unsafe extern "C" fn xmlconf_test_item(
                 );
                 // goto error;
             } else {
-                base = (*cur).get_base(doc);
-                filename = compose_dir(base, uri);
+                let base = (*cur).get_base(doc).map(|c| CString::new(c).unwrap());
+                filename = compose_dir(
+                    base.as_ref()
+                        .map_or(null_mut(), |b| b.as_ptr() as *const u8),
+                    uri,
+                );
                 if !check_test_file(
                     CStr::from_ptr(filename as *const c_char)
                         .to_string_lossy()
@@ -501,9 +501,6 @@ unsafe extern "C" fn xmlconf_test_item(
                             if !uri.is_null() {
                                 xml_free(uri as _);
                             }
-                            if !base.is_null() {
-                                xml_free(base as _);
-                            }
                             if !id.is_null() {
                                 xml_free(id as _);
                             }
@@ -546,9 +543,6 @@ unsafe extern "C" fn xmlconf_test_item(
                         if !uri.is_null() {
                             xml_free(uri as _);
                         }
-                        if !base.is_null() {
-                            xml_free(base as _);
-                        }
                         if !id.is_null() {
                             xml_free(id as _);
                         }
@@ -559,13 +553,11 @@ unsafe extern "C" fn xmlconf_test_item(
                     }
                     edition = (*cur).get_prop("EDITION");
                     if !edition.is_null() && xml_strchr(edition, b'5').is_null() {
-                        /* test limited to all versions before 5th */
+                        // test limited to all versions before 5th
                         options |= XmlParserOption::XmlParseOld10 as i32;
                     }
 
-                    /*
-                     * Reset errors and check memory usage before the test
-                     */
+                    // Reset errors and check memory usage before the test
                     reset_last_error();
                     TEST_ERRORS_SIZE = 0;
                     TEST_ERRORS[0] = 0;
@@ -630,9 +622,6 @@ unsafe extern "C" fn xmlconf_test_item(
                         if !uri.is_null() {
                             xml_free(uri as _);
                         }
-                        if !base.is_null() {
-                            xml_free(base as _);
-                        }
                         if !id.is_null() {
                             xml_free(id as _);
                         }
@@ -667,9 +656,6 @@ unsafe extern "C" fn xmlconf_test_item(
                         if !uri.is_null() {
                             xml_free(uri as _);
                         }
-                        if !base.is_null() {
-                            xml_free(base as _);
-                        }
                         if !id.is_null() {
                             xml_free(id as _);
                         }
@@ -679,9 +665,7 @@ unsafe extern "C" fn xmlconf_test_item(
                         return ret;
                     }
 
-                    /*
-                     * Reset errors and check memory usage after the test
-                     */
+                    // Reset errors and check memory usage after the test
                     reset_last_error();
                     is_final = xml_mem_used();
                     if is_final > mem {
@@ -722,9 +706,6 @@ unsafe extern "C" fn xmlconf_test_item(
     }
     if !uri.is_null() {
         xml_free(uri as _);
-    }
-    if !base.is_null() {
-        xml_free(base as _);
     }
     if !id.is_null() {
         xml_free(id as _);
