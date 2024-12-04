@@ -178,14 +178,7 @@ pub trait NodeCommon {
                     continue;
                 }
                 if name.eq_ignore_ascii_case("base") {
-                    let ret = now.get_prop("href");
-                    let r = (!ret.is_null()).then(|| {
-                        CStr::from_ptr(ret as *const i8)
-                            .to_string_lossy()
-                            .into_owned()
-                    });
-                    xml_free(ret as _);
-                    return r;
+                    return now.get_prop("href");
                 }
                 cur = now.next();
             }
@@ -1512,12 +1505,19 @@ impl XmlNode {
     /// Returns the attribute value or NULL if not found.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetProp")]
-    pub unsafe fn get_prop(&self, name: &str) -> *mut XmlChar {
+    pub unsafe fn get_prop(&self, name: &str) -> Option<String> {
         let prop = self.has_prop(name);
         if prop.is_null() {
-            return null_mut();
+            return None;
         }
-        (*prop).get_prop_node_value_internal()
+        let ret = (*prop).get_prop_node_value_internal();
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
     }
 
     /// Search and get the value of an attribute associated to a node.

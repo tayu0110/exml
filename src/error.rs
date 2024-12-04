@@ -1584,7 +1584,7 @@ macro_rules! __xml_raise_error {
                             // if so, attempt to print out the href of the XInclude instead
                             // of the usual "base" (doc->URL) for the node (bug 152623).
                             let mut prev: XmlNodePtr = baseptr;
-                            let mut href: *mut c_char = null_mut();
+                            let mut href = None;
                             let mut inclcount: c_int = 0;
                             while !prev.is_null() {
                                 if let Some(p) = (*prev).prev {
@@ -1593,8 +1593,8 @@ macro_rules! __xml_raise_error {
                                         if inclcount > 0 {
                                             inclcount -= 1;
                                         } else {
-                                            href = (*prev).get_prop("href") as *mut c_char;
-                                            if !href.is_null() {
+                                            href = (*prev).get_prop("href");
+                                            if !href.is_none() {
                                                 break;
                                             }
                                         }
@@ -1605,8 +1605,8 @@ macro_rules! __xml_raise_error {
                                     prev = (*prev).parent().map_or(null_mut(), |p| p.as_ptr());
                                 }
                             }
-                            if !href.is_null() {
-                                to.file = Some(CStr::from_ptr(href).to_string_lossy().into());
+                            if !href.is_none() {
+                                to.file = href.map(|h| h.into());
                             } else {
                                 to.file = (*(*baseptr).doc).url.as_deref().map(|u| Cow::Owned(u.to_owned()));
                             }

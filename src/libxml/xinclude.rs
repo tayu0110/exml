@@ -333,8 +333,9 @@ unsafe fn xml_xinclude_get_prop(
             return ret;
         }
     }
-    ret = (*cur).get_prop(name);
-    ret
+    let ret = (*cur).get_prop(name).map(|n| CString::new(n).unwrap());
+    ret.as_ref()
+        .map_or(null_mut(), |r| xml_strdup(r.as_ptr() as *const u8))
 }
 
 /// Handle an out of memory condition
@@ -1888,7 +1889,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     let mut node: XmlNodePtr = null_mut();
     let mut i: i32;
     let mut ret: i32 = -1;
-    let mut encoding: *mut XmlChar = null_mut();
     let mut enc = XmlCharEncoding::None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut input_stream: XmlParserInputPtr = null_mut();
@@ -1898,9 +1898,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         url = c"./-".as_ptr() as _;
     }
 
-    /*
-     * Check the URL and remove any fragment identifier
-     */
+    // Check the URL and remove any fragment identifier
     let uri: XmlURIPtr = xml_parse_uri(url as _);
     if uri.is_null() {
         xml_xinclude_err(
@@ -1914,7 +1912,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
-        xml_free(encoding as _);
         xml_free_uri(uri);
         return ret;
     }
@@ -1930,7 +1927,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
-        xml_free(encoding as _);
         xml_free_uri(uri);
         return ret;
     }
@@ -1948,17 +1944,13 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
-            xml_free(encoding as _);
             xml_free_uri(uri);
             return ret;
         }
         tmp
     };
 
-    /*
-     * Handling of references to the local document are done
-     * directly through (*ctxt).doc.
-     */
+    // Handling of references to the local document are done directly through (*ctxt).doc.
     if *url.add(0) == 0 {
         xml_xinclude_err(
             ctxt,
@@ -1971,15 +1963,12 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
-        xml_free(encoding as _);
         xml_free_uri(uri);
         xml_free(url as _);
         return ret;
     }
 
-    /*
-     * Prevent reloading the document twice.
-     */
+    // Prevent reloading the document twice.
     for i in 0..(*ctxt).txt_nr {
         if xml_str_equal(url, (*(*ctxt).txt_tab.add(i as usize)).url) {
             node = xml_new_doc_text((*ctxt).doc, (*(*ctxt).txt_tab.add(i as usize)).text);
@@ -1989,45 +1978,37 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
-            xml_free(encoding as _);
             xml_free_uri(uri);
             xml_free(url as _);
             return 0;
         }
     }
 
-    /*
-     * Try to get the encoding if available
-     */
+    // Try to get the encoding if available
+    let mut encoding = None;
     if !(*refe).elem.is_null() {
         encoding = (*(*refe).elem).get_prop(XINCLUDE_PARSE_ENCODING.to_str().unwrap());
     }
-    if !encoding.is_null() {
-        /*
-         * TODO: we should not have to remap to the xmlCharEncoding
-         *       predefined set, a better interface than
-         *       xmlParserInputBufferCreateFilename should allow any
-         *       encoding supported by iconv
-         */
-        match CStr::from_ptr(encoding as *const i8)
-            .to_str()
-            .ok()
-            .map(|s| s.parse::<XmlCharEncoding>())
-        {
-            Some(Ok(e)) => enc = e,
+    if let Some(encoding) = encoding {
+        // TODO: we should not have to remap to the xmlCharEncoding
+        //       predefined set, a better interface than
+        //       xmlParserInputBufferCreateFilename should allow any
+        //       encoding supported by iconv
+        match encoding.parse::<XmlCharEncoding>() {
+            Ok(e) => enc = e,
             _ => {
+                let encoding = CString::new(encoding).unwrap();
                 xml_xinclude_err(
                     ctxt,
                     (*refe).elem,
                     XmlParserErrors::XmlXIncludeUnknownEncoding,
                     c"encoding %s not supported\n".as_ptr() as _,
-                    encoding,
+                    encoding.as_ptr() as *const u8,
                 );
                 // goto error;
                 xml_free_node(node);
                 xml_free_input_stream(input_stream);
                 xml_free_parser_ctxt(pctxt);
-                xml_free(encoding as _);
                 xml_free_uri(uri);
                 xml_free(url as _);
                 return ret;
@@ -2042,11 +2023,9 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     input_stream = xml_load_external_entity(url as _, null_mut(), pctxt);
     if input_stream.is_null() {
         // goto error;
-        // return error(ret);
         xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
-        xml_free(encoding as _);
         xml_free_uri(uri);
         xml_free(url as _);
         return ret;
@@ -2056,7 +2035,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
-        xml_free(encoding as _);
         xml_free_uri(uri);
         xml_free(url as _);
         return ret;
@@ -2069,15 +2047,12 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         xml_free_node(node);
         xml_free_input_stream(input_stream);
         xml_free_parser_ctxt(pctxt);
-        xml_free(encoding as _);
         xml_free_uri(uri);
         xml_free(url as _);
         return ret;
     }
 
-    /*
-     * Scan all chars from the resource and add the to the node
-     */
+    // Scan all chars from the resource and add the to the node
     while buf.borrow_mut().grow(4096) > 0 {}
 
     let content: *const XmlChar = buf.borrow().buffer.map_or(null_mut(), |buf| {
@@ -2106,7 +2081,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
-            xml_free(encoding as _);
             xml_free_uri(uri);
             xml_free(url as _);
             return ret;
@@ -2136,7 +2110,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             xml_free_node(node);
             xml_free_input_stream(input_stream);
             xml_free_parser_ctxt(pctxt);
-            xml_free(encoding as _);
             xml_free_uri(uri);
             xml_free(url as _);
             return ret;
@@ -2149,9 +2122,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     (*ctxt).txt_nr += 1;
 
     // loaded:
-    /*
-     * Add the element as the replacement copy.
-     */
+    // Add the element as the replacement copy.
     (*refe).inc = node;
     node = null_mut();
     ret = 0;
@@ -2160,7 +2131,6 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     xml_free_node(node);
     xml_free_input_stream(input_stream);
     xml_free_parser_ctxt(pctxt);
-    xml_free(encoding as _);
     xml_free_uri(uri);
     xml_free(url as _);
     ret

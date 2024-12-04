@@ -3,7 +3,7 @@
 
 use std::{
     env::args,
-    ffi::{c_char, c_int, CStr},
+    ffi::{c_char, c_int, CStr, CString},
     fs::{metadata, File},
     ptr::null_mut,
     slice::from_raw_parts,
@@ -465,7 +465,6 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     let mut ret: c_int = 0;
     let mut mem: c_int;
     let mut memt: c_int;
-    let mut dtd: *mut XmlChar;
 
     reset_entities();
     TEST_ERRORS_SIZE = 0;
@@ -548,12 +547,10 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
         }
         return ret;
     }
-    /*
-     * now scan all the siblings of correct to process the <valid> tests
-     */
+    // now scan all the siblings of correct to process the <valid> tests
     tmp = get_next(cur, c"following-sibling::valid[1]".as_ptr() as _);
     while !tmp.is_null() {
-        dtd = (*tmp).get_prop("dtd");
+        let dtd = (*tmp).get_prop("dtd");
         test = get_next(tmp, c"./*".as_ptr() as _);
         if test.is_null() {
             eprintln!(
@@ -562,14 +559,13 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             );
         } else {
             xml_buf_empty(buf);
-            if !dtd.is_null() {
-                xml_buf_add(buf, dtd, -1);
+            if let Some(dtd) = dtd {
+                let dtd = CString::new(dtd).unwrap();
+                xml_buf_add(buf, dtd.as_ptr() as *const u8, -1);
             }
             (*test).dump_memory(buf, (*test).doc, 0, 0);
 
-            /*
-             * We are ready to run the test
-             */
+            // We are ready to run the test
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
@@ -625,14 +621,9 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
                 NB_LEAKS += 1;
             }
         }
-        if !dtd.is_null() {
-            xml_free(dtd as _);
-        }
         tmp = get_next(tmp, c"following-sibling::valid[1]".as_ptr() as _);
     }
-    /*
-     * now scan all the siblings of correct to process the <invalid> tests
-     */
+    // now scan all the siblings of correct to process the <invalid> tests
     tmp = get_next(cur, c"following-sibling::invalid[1]".as_ptr() as _);
     while !tmp.is_null() {
         test = get_next(tmp, c"./*".as_ptr() as _);
@@ -645,9 +636,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
             xml_buf_empty(buf);
             (*test).dump_memory(buf, (*test).doc, 0, 0);
 
-            /*
-             * We are ready to run the test
-             */
+            // We are ready to run the test
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
             let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
@@ -1265,8 +1254,6 @@ unsafe extern "C" fn xstc_metadata(
     base: *const c_char,
 ) -> c_int {
     let mut cur: XmlNodePtr;
-    let mut contributor: *mut XmlChar;
-    let mut name: *mut XmlChar;
     let mut ret: c_int = 0;
 
     let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoent as _);
@@ -1286,21 +1273,11 @@ unsafe extern "C" fn xstc_metadata(
         );
         return -1;
     }
-    contributor = (*cur).get_prop("contributor");
-    if contributor.is_null() {
-        contributor = xml_strdup(c"Unknown".as_ptr() as _);
-    }
-    name = (*cur).get_prop("name");
-    if name.is_null() {
-        name = xml_strdup(c"Unknown".as_ptr() as _);
-    }
-    println!(
-        "## {} test suite for Schemas version {}",
-        CStr::from_ptr(contributor as _).to_string_lossy(),
-        CStr::from_ptr(name as _).to_string_lossy(),
-    );
-    xml_free(contributor as _);
-    xml_free(name as _);
+    let contributor = (*cur)
+        .get_prop("contributor")
+        .unwrap_or("Unknown".to_owned());
+    let name = (*cur).get_prop("name").unwrap_or("Unknown".to_owned());
+    println!("## {contributor} test suite for Schemas version {name}");
 
     cur = get_next(cur, c"./ts:testGroup[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {

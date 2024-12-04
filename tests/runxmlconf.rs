@@ -6,7 +6,7 @@ use std::{
     ffi::{c_char, c_int, CStr, CString},
     fs::{metadata, File},
     os::fd::AsRawFd,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -17,7 +17,6 @@ use exml::{
         set_pedantic_parser_default_value, set_structured_error, GenericErrorContext,
     },
     libxml::{
-        globals::xml_free,
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader, XmlParserCtxtPtr,
@@ -28,7 +27,7 @@ use exml::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
-        xmlstring::{xml_str_equal, xml_strchr, xml_strdup, XmlChar},
+        xmlstring::xml_str_equal,
         xpath::{
             xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
             XmlXPathContext,
@@ -36,16 +35,15 @@ use exml::{
     },
     tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
 };
-use libc::{fdopen, snprintf, strcmp};
+use libc::{fdopen, snprintf};
 
 static mut VERBOSE: c_int = 0;
 
 const NB_EXPECTED_ERRORS: usize = 15;
 
-const SKIPPED_TESTS: &[*const c_char] = &[
+const SKIPPED_TESTS: &[&str] = &[
     /* http://lists.w3.org/Archives/Public/public-xml-testsuite/2008Jul/0000.html */
-    c"rmt-ns10-035".as_ptr(),
-    null(),
+    "rmt-ns10-035",
 ];
 
 /************************************************************************
@@ -61,24 +59,11 @@ fn check_test_file(filename: &str) -> bool {
     }
 }
 
-unsafe extern "C" fn compose_dir(dir: *const XmlChar, path: *const XmlChar) -> *mut XmlChar {
-    let mut buf: [c_char; 500] = [0; 500];
-
-    if dir.is_null() {
-        return xml_strdup(path);
-    }
-    if path.is_null() {
-        return null_mut();
-    }
-
-    snprintf(
-        buf.as_mut_ptr(),
-        500,
-        c"%s/%s".as_ptr(),
-        dir as *const c_char,
-        path as *const c_char,
-    );
-    xml_strdup(buf.as_mut_ptr() as *const XmlChar)
+fn compose_dir(dir: Option<&str>, path: &str) -> String {
+    let Some(dir) = dir else {
+        return path.to_owned();
+    };
+    format!("{dir}/{path}")
 }
 
 /************************************************************************
@@ -198,40 +183,32 @@ unsafe extern "C" fn initialize_libxml2() {
  *									*
  ************************************************************************/
 
-unsafe extern "C" fn xmlconf_test_invalid(
+unsafe fn xmlconf_test_invalid(
     logfile: &mut Option<File>,
-    id: *const c_char,
-    filename: *const c_char,
-    options: c_int,
-) -> c_int {
-    let mut ret: c_int = 1;
+    id: &str,
+    filename: &str,
+    options: i32,
+) -> i32 {
+    let mut ret: i32 = 1;
 
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
-        test_log!(
-            logfile,
-            "test {} : {} out of memory\n",
-            CStr::from_ptr(id).to_string_lossy(),
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
+    let cfilename = CString::new(filename).unwrap();
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
     if doc.is_null() {
         test_log!(
             logfile,
-            "test {} : {} invalid document turned not well-formed too\n",
-            CStr::from_ptr(id).to_string_lossy(),
-            CStr::from_ptr(filename).to_string_lossy()
+            "test {id} : {filename} invalid document turned not well-formed too\n",
         );
     } else {
         /* invalidity should be reported both in the context and in the document */
         if (*ctxt).valid != 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
             test_log!(
                 logfile,
-                "test {} : {} failed to detect invalid document\n",
-                CStr::from_ptr(id).to_string_lossy(),
-                CStr::from_ptr(filename).to_string_lossy()
+                "test {id} : {filename} failed to detect invalid document\n",
             );
             NB_ERRORS += 1;
             ret = 0;
@@ -242,31 +219,25 @@ unsafe extern "C" fn xmlconf_test_invalid(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_valid(
+unsafe fn xmlconf_test_valid(
     logfile: &mut Option<File>,
-    id: *const c_char,
-    filename: *const c_char,
+    id: &str,
+    filename: &str,
     options: c_int,
 ) -> c_int {
     let mut ret: c_int = 1;
 
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
-        test_log!(
-            logfile,
-            "test {} : {} out of memory\n",
-            CStr::from_ptr(id).to_string_lossy(),
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
+    let cfilename = CString::new(filename).unwrap();
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
     if doc.is_null() {
         test_log!(
             logfile,
-            "test {} : {} failed to parse a valid document\n",
-            CStr::from_ptr(id).to_string_lossy(),
-            CStr::from_ptr(filename).to_string_lossy()
+            "test {id} : {filename} failed to parse a valid document\n",
         );
         NB_ERRORS += 1;
         ret = 0;
@@ -275,9 +246,7 @@ unsafe extern "C" fn xmlconf_test_valid(
         if (*ctxt).valid == 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 == 0 {
             test_log!(
                 logfile,
-                "test {} : {} failed to validate a valid document\n",
-                CStr::from_ptr(id).to_string_lossy(),
-                CStr::from_ptr(filename).to_string_lossy()
+                "test {id} : {filename} failed to validate a valid document\n",
             );
             NB_ERRORS += 1;
             ret = 0;
@@ -288,26 +257,20 @@ unsafe extern "C" fn xmlconf_test_valid(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_not_nswf(
+unsafe fn xmlconf_test_not_nswf(
     logfile: &mut Option<File>,
-    id: *const c_char,
-    filename: *const c_char,
-    options: c_int,
-) -> c_int {
-    let mut ret: c_int = 1;
+    id: &str,
+    filename: &str,
+    options: i32,
+) -> i32 {
+    let mut ret: i32 = 1;
 
-    /*
-     * In case of Namespace errors, libxml2 will still parse the document
-     * but log a Namespace error.
-     */
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    // In case of Namespace errors, libxml2 will still parse the document
+    // but log a Namespace error.
+    let cfilename = CString::new(filename).unwrap();
+    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), None, options);
     if doc.is_null() {
-        test_log!(
-            logfile,
-            "test {} : {} failed to parse the XML\n",
-            CStr::from_ptr(id).to_string_lossy(),
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
         NB_ERRORS += 1;
         ret = 0;
     } else {
@@ -317,9 +280,7 @@ unsafe extern "C" fn xmlconf_test_not_nswf(
         {
             test_log!(
                 logfile,
-                "test {} : {} failed to detect namespace error\n",
-                CStr::from_ptr(id).to_string_lossy(),
-                CStr::from_ptr(filename).to_string_lossy()
+                "test {id} : {filename} failed to detect namespace error\n",
             );
             NB_ERRORS += 1;
             ret = 0;
@@ -329,21 +290,20 @@ unsafe extern "C" fn xmlconf_test_not_nswf(
     ret
 }
 
-unsafe extern "C" fn xmlconf_test_not_wf(
+unsafe fn xmlconf_test_not_wf(
     logfile: &mut Option<File>,
-    id: *const c_char,
-    filename: *const c_char,
-    options: c_int,
-) -> c_int {
-    let mut ret: c_int = 1;
+    id: &str,
+    filename: &str,
+    options: i32,
+) -> i32 {
+    let mut ret: i32 = 1;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, options);
+    let cfilename = CString::new(filename).unwrap();
+    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), None, options);
     if !doc.is_null() {
         test_log!(
             logfile,
-            "test {} : {} failed to detect not well formedness\n",
-            CStr::from_ptr(id).to_string_lossy(),
-            CStr::from_ptr(filename).to_string_lossy()
+            "test {id} : {filename} failed to detect not well formedness\n",
         );
         NB_ERRORS += 1;
         xml_free_doc(doc);
@@ -358,361 +318,128 @@ unsafe extern "C" fn xmlconf_test_item(
     cur: XmlNodePtr,
 ) -> c_int {
     let mut ret: c_int = -1;
-    let mut typ: *mut XmlChar = null_mut();
-    let mut filename: *mut XmlChar = null_mut();
-    let mut uri: *mut XmlChar = null_mut();
-    let mut rec: *mut XmlChar = null_mut();
-    let mut version: *mut XmlChar = null_mut();
-    let mut entities: *mut XmlChar = null_mut();
-    let mut edition: *mut XmlChar = null_mut();
     let mut options: c_int = 0;
     let mut nstest: c_int = 0;
-    let mem: c_int;
-    let is_final: c_int;
 
     TEST_ERRORS_SIZE = 0;
     TEST_ERRORS[0] = 0;
     NB_ERROR = 0;
     NB_FATAL = 0;
-    let id: *mut XmlChar = (*cur).get_prop("ID");
-    if id.is_null() {
+    let Some(id) = (*cur).get_prop("ID") else {
         test_log!(logfile, "test missing ID, line {}\n", (*cur).get_line_no());
-    // goto error;
-    } else {
-        for i in (0..).take_while(|&i| !SKIPPED_TESTS[i].is_null()) {
-            if strcmp(SKIPPED_TESTS[i], id as *mut c_char) == 0 {
-                test_log!(
-                    logfile,
-                    "Skipping test {} from skipped list\n",
-                    CStr::from_ptr(id as _).to_string_lossy()
-                );
-                ret = 0;
-                NB_SKIPPED += 1;
-                // goto error;
-                if !typ.is_null() {
-                    xml_free(typ as _);
-                }
-                if !entities.is_null() {
-                    xml_free(entities as _);
-                }
-                if !edition.is_null() {
-                    xml_free(edition as _);
-                }
-                if !version.is_null() {
-                    xml_free(version as _);
-                }
-                if !filename.is_null() {
-                    xml_free(filename as _);
-                }
-                if !uri.is_null() {
-                    xml_free(uri as _);
-                }
-                if !id.is_null() {
-                    xml_free(id as _);
-                }
-                if !rec.is_null() {
-                    xml_free(rec as _);
-                }
-                return ret;
-            }
-        }
-        typ = (*cur).get_prop("TYPE");
-        if typ.is_null() {
-            test_log!(
-                logfile,
-                "test {} missing TYPE\n",
-                CStr::from_ptr(id as _).to_string_lossy()
-            );
+        return ret;
+    };
+    for &skipped in SKIPPED_TESTS {
+        if skipped == id {
+            test_log!(logfile, "Skipping test {id} from skipped list\n",);
+            ret = 0;
+            NB_SKIPPED += 1;
             // goto error;
-        } else {
-            uri = (*cur).get_prop("URI");
-            if uri.is_null() {
-                test_log!(
-                    logfile,
-                    "test {} missing URI\n",
-                    CStr::from_ptr(id as _).to_string_lossy()
-                );
-                // goto error;
-            } else {
-                let base = (*cur).get_base(doc).map(|c| CString::new(c).unwrap());
-                filename = compose_dir(
-                    base.as_ref()
-                        .map_or(null_mut(), |b| b.as_ptr() as *const u8),
-                    uri,
-                );
-                if !check_test_file(
-                    CStr::from_ptr(filename as *const c_char)
-                        .to_string_lossy()
-                        .as_ref(),
-                ) {
-                    test_log!(
-                        logfile,
-                        "test {} missing file {} \n",
-                        CStr::from_ptr(id as _).to_string_lossy(),
-                        if !filename.is_null() {
-                            CStr::from_ptr(filename as *mut c_char)
-                                .to_string_lossy()
-                                .to_string()
-                        } else {
-                            "NULL".to_owned()
-                        }
-                    );
-                    // goto error;
-                } else {
-                    version = (*cur).get_prop("VERSION");
-
-                    entities = (*cur).get_prop("ENTITIES");
-                    if !xml_str_equal(entities, "none".as_ptr()) {
-                        options |= XmlParserOption::XmlParseDtdload as i32;
-                        options |= XmlParserOption::XmlParseNoent as i32;
-                    }
-                    rec = (*cur).get_prop("RECOMMENDATION");
-                    if rec.is_null()
-                        || xml_str_equal(rec, c"XML1.0".as_ptr() as _)
-                        || xml_str_equal(rec, c"XML1.0-errata2e".as_ptr() as _)
-                        || xml_str_equal(rec, c"XML1.0-errata3e".as_ptr() as _)
-                        || xml_str_equal(rec, c"XML1.0-errata4e".as_ptr() as _)
-                    {
-                        if !version.is_null() && !xml_str_equal(version, c"1.0".as_ptr() as _) {
-                            test_log!(
-                                logfile,
-                                "Skipping test {} for {}\n",
-                                CStr::from_ptr(id as _).to_string_lossy(),
-                                CStr::from_ptr(version as _).to_string_lossy()
-                            );
-                            ret = 0;
-                            NB_SKIPPED += 1;
-                            // goto error;
-                            if !typ.is_null() {
-                                xml_free(typ as _);
-                            }
-                            if !entities.is_null() {
-                                xml_free(entities as _);
-                            }
-                            if !edition.is_null() {
-                                xml_free(edition as _);
-                            }
-                            if !version.is_null() {
-                                xml_free(version as _);
-                            }
-                            if !filename.is_null() {
-                                xml_free(filename as _);
-                            }
-                            if !uri.is_null() {
-                                xml_free(uri as _);
-                            }
-                            if !id.is_null() {
-                                xml_free(id as _);
-                            }
-                            if !rec.is_null() {
-                                xml_free(rec as _);
-                            }
-                            return ret;
-                        }
-                        ret = 1;
-                    } else if xml_str_equal(rec, c"NS1.0".as_ptr() as _)
-                        || xml_str_equal(rec, c"NS1.0-errata1e".as_ptr() as _)
-                    {
-                        ret = 1;
-                        nstest = 1;
-                    } else {
-                        test_log!(
-                            logfile,
-                            "Skipping test {} for REC {}\n",
-                            CStr::from_ptr(id as _).to_string_lossy(),
-                            CStr::from_ptr(rec as _).to_string_lossy()
-                        );
-                        ret = 0;
-                        NB_SKIPPED += 1;
-                        // goto error;
-                        if !typ.is_null() {
-                            xml_free(typ as _);
-                        }
-                        if !entities.is_null() {
-                            xml_free(entities as _);
-                        }
-                        if !edition.is_null() {
-                            xml_free(edition as _);
-                        }
-                        if !version.is_null() {
-                            xml_free(version as _);
-                        }
-                        if !filename.is_null() {
-                            xml_free(filename as _);
-                        }
-                        if !uri.is_null() {
-                            xml_free(uri as _);
-                        }
-                        if !id.is_null() {
-                            xml_free(id as _);
-                        }
-                        if !rec.is_null() {
-                            xml_free(rec as _);
-                        }
-                        return ret;
-                    }
-                    edition = (*cur).get_prop("EDITION");
-                    if !edition.is_null() && xml_strchr(edition, b'5').is_null() {
-                        // test limited to all versions before 5th
-                        options |= XmlParserOption::XmlParseOld10 as i32;
-                    }
-
-                    // Reset errors and check memory usage before the test
-                    reset_last_error();
-                    TEST_ERRORS_SIZE = 0;
-                    TEST_ERRORS[0] = 0;
-                    mem = xml_mem_used();
-
-                    if xml_str_equal(typ, c"not-wf".as_ptr() as _) {
-                        if nstest == 0 {
-                            xmlconf_test_not_wf(
-                                logfile,
-                                id as *mut c_char,
-                                filename as *mut c_char,
-                                options,
-                            );
-                        } else {
-                            xmlconf_test_not_nswf(
-                                logfile,
-                                id as *mut c_char,
-                                filename as *mut c_char,
-                                options,
-                            );
-                        }
-                    } else if xml_str_equal(typ, c"valid".as_ptr() as _) {
-                        options |= XmlParserOption::XmlParseDtdvalid as i32;
-                        xmlconf_test_valid(
-                            logfile,
-                            id as *mut c_char,
-                            filename as *mut c_char,
-                            options,
-                        );
-                    } else if xml_str_equal(typ, c"invalid".as_ptr() as _) {
-                        options |= XmlParserOption::XmlParseDtdvalid as i32;
-                        xmlconf_test_invalid(
-                            logfile,
-                            id as *mut c_char,
-                            filename as *mut c_char,
-                            options,
-                        );
-                    } else if xml_str_equal(typ, c"error".as_ptr() as _) {
-                        test_log!(
-                            logfile,
-                            "Skipping error test {} \n",
-                            CStr::from_ptr(id as _).to_string_lossy()
-                        );
-                        ret = 0;
-                        NB_SKIPPED += 1;
-                        // goto error;
-                        if !typ.is_null() {
-                            xml_free(typ as _);
-                        }
-                        if !entities.is_null() {
-                            xml_free(entities as _);
-                        }
-                        if !edition.is_null() {
-                            xml_free(edition as _);
-                        }
-                        if !version.is_null() {
-                            xml_free(version as _);
-                        }
-                        if !filename.is_null() {
-                            xml_free(filename as _);
-                        }
-                        if !uri.is_null() {
-                            xml_free(uri as _);
-                        }
-                        if !id.is_null() {
-                            xml_free(id as _);
-                        }
-                        if !rec.is_null() {
-                            xml_free(rec as _);
-                        }
-                        return ret;
-                    } else {
-                        test_log!(
-                            logfile,
-                            "test {} unknown TYPE value {}\n",
-                            CStr::from_ptr(id as _).to_string_lossy(),
-                            CStr::from_ptr(typ as _).to_string_lossy()
-                        );
-                        ret = -1;
-                        // goto error;
-                        if !typ.is_null() {
-                            xml_free(typ as _);
-                        }
-                        if !entities.is_null() {
-                            xml_free(entities as _);
-                        }
-                        if !edition.is_null() {
-                            xml_free(edition as _);
-                        }
-                        if !version.is_null() {
-                            xml_free(version as _);
-                        }
-                        if !filename.is_null() {
-                            xml_free(filename as _);
-                        }
-                        if !uri.is_null() {
-                            xml_free(uri as _);
-                        }
-                        if !id.is_null() {
-                            xml_free(id as _);
-                        }
-                        if !rec.is_null() {
-                            xml_free(rec as _);
-                        }
-                        return ret;
-                    }
-
-                    // Reset errors and check memory usage after the test
-                    reset_last_error();
-                    is_final = xml_mem_used();
-                    if is_final > mem {
-                        test_log!(
-                            logfile,
-                            "test {} : {} leaked {} bytes\n",
-                            CStr::from_ptr(id as _).to_string_lossy(),
-                            CStr::from_ptr(filename as _).to_string_lossy(),
-                            is_final - mem
-                        );
-                        NB_LEAKS += 1;
-                        let fp = logfile
-                            .as_ref()
-                            .map_or(null_mut(), |f| fdopen(f.as_raw_fd(), c"w".as_ptr()));
-                        xml_mem_display_last(fp, is_final as i64 - mem as i64);
-                    }
-                    NB_TESTS += 1;
-                }
-            }
+            return ret;
         }
     }
+    let Some(typ) = (*cur).get_prop("TYPE") else {
+        test_log!(logfile, "test {id} missing TYPE\n",);
+        return ret;
+    };
+    let Some(uri) = (*cur).get_prop("URI") else {
+        test_log!(logfile, "test {id} missing URI\n",);
+        return ret;
+    };
+    let base = (*cur).get_base(doc);
+    let filename = compose_dir(base.as_deref(), &uri);
+    if !check_test_file(filename.as_str()) {
+        test_log!(logfile, "test {id} missing file {filename} \n",);
+        return ret;
+    }
+
+    let version = (*cur).get_prop("VERSION");
+    let entities = (*cur).get_prop("ENTITIES");
+    if entities.as_deref() != Some("none") {
+        options |= XmlParserOption::XmlParseDtdload as i32;
+        options |= XmlParserOption::XmlParseNoent as i32;
+    }
+    let rec = (*cur).get_prop("RECOMMENDATION");
+    if rec.as_deref().map_or(true, |rec| {
+        rec == "XML1.0"
+            || rec == "XML1.0-errata2e"
+            || rec == "XML1.0-errata3e"
+            || rec == "XML1.0-errata4e"
+    }) {
+        if let Some(version) = version.as_deref().filter(|&v| v != "1.0") {
+            test_log!(logfile, "Skipping test {id} for {version}\n",);
+            ret = 0;
+            NB_SKIPPED += 1;
+            // goto error;
+            return ret;
+        }
+        ret = 1;
+    } else if rec.as_deref() == Some("NS1.0") || rec.as_deref() == Some("NS1.0-errata1e") {
+        ret = 1;
+        nstest = 1;
+    } else {
+        let rec = rec.as_deref().unwrap();
+        test_log!(logfile, "Skipping test {id} for REC {rec}\n",);
+        ret = 0;
+        NB_SKIPPED += 1;
+        // goto error;
+        return ret;
+    }
+    let edition = (*cur).get_prop("EDITION");
+    if edition.as_deref().filter(|e| !e.contains('5')).is_some() {
+        // test limited to all versions before 5th
+        options |= XmlParserOption::XmlParseOld10 as i32;
+    }
+
+    // Reset errors and check memory usage before the test
+    reset_last_error();
+    TEST_ERRORS_SIZE = 0;
+    TEST_ERRORS[0] = 0;
+    let mem: c_int = xml_mem_used();
+
+    if typ == "not-wf" {
+        if nstest == 0 {
+            xmlconf_test_not_wf(logfile, &id, &filename, options);
+        } else {
+            xmlconf_test_not_nswf(logfile, &id, &filename, options);
+        }
+    } else if typ == "valid" {
+        options |= XmlParserOption::XmlParseDtdvalid as i32;
+        xmlconf_test_valid(logfile, &id, &filename, options);
+    } else if typ == "invalid" {
+        options |= XmlParserOption::XmlParseDtdvalid as i32;
+        xmlconf_test_invalid(logfile, &id, &filename, options);
+    } else if typ == "error" {
+        test_log!(logfile, "Skipping error test {id} \n",);
+        ret = 0;
+        NB_SKIPPED += 1;
+        // goto error;
+        return ret;
+    } else {
+        test_log!(logfile, "test {id} unknown TYPE value {typ}\n",);
+        ret = -1;
+        // goto error;
+        return ret;
+    }
+
+    // Reset errors and check memory usage after the test
+    reset_last_error();
+    let is_final: c_int = xml_mem_used();
+    if is_final > mem {
+        test_log!(
+            logfile,
+            "test {id} : {filename} leaked {} bytes\n",
+            is_final - mem
+        );
+        NB_LEAKS += 1;
+        let fp = logfile
+            .as_ref()
+            .map_or(null_mut(), |f| fdopen(f.as_raw_fd(), c"w".as_ptr()));
+        xml_mem_display_last(fp, is_final as i64 - mem as i64);
+    }
+    NB_TESTS += 1;
 
     // error:
-    if !typ.is_null() {
-        xml_free(typ as _);
-    }
-    if !entities.is_null() {
-        xml_free(entities as _);
-    }
-    if !edition.is_null() {
-        xml_free(edition as _);
-    }
-    if !version.is_null() {
-        xml_free(version as _);
-    }
-    if !filename.is_null() {
-        xml_free(filename as _);
-    }
-    if !uri.is_null() {
-        xml_free(uri as _);
-    }
-    if !id.is_null() {
-        xml_free(id as _);
-    }
-    if !rec.is_null() {
-        xml_free(rec as _);
-    }
     ret
 }
 
@@ -722,21 +449,15 @@ unsafe extern "C" fn xmlconf_test_cases(
     mut cur: XmlNodePtr,
     mut level: c_int,
 ) -> c_int {
-    let profile: *mut XmlChar;
     let mut ret: c_int = 0;
     let mut tests: c_int = 0;
     let mut output: c_int = 0;
 
     if level == 1 {
-        profile = (*cur).get_prop("PROFILE");
-        if !profile.is_null() {
+        if let Some(profile) = (*cur).get_prop("PROFILE") {
             output = 1;
             level += 1;
-            println!(
-                "Test cases: {}",
-                CStr::from_ptr(profile as _).to_string_lossy()
-            );
-            xml_free(profile as _);
+            println!("Test cases: {profile}",);
         }
     }
     cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
@@ -772,13 +493,8 @@ unsafe extern "C" fn xmlconf_test_suite(
 ) -> c_int {
     let mut ret: c_int = 0;
 
-    let profile: *mut XmlChar = (*cur).get_prop("PROFILE");
-    if !profile.is_null() {
-        println!(
-            "Test suite: {}",
-            CStr::from_ptr(profile as _).to_string_lossy()
-        );
-        xml_free(profile as _);
+    if let Some(profile) = (*cur).get_prop("PROFILE") {
+        println!("Test suite: {profile}",);
     } else {
         println!("Test suite");
     }

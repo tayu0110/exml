@@ -1212,7 +1212,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
     cgroup: XmlCatalogEntryPtr,
 ) -> XmlCatalogEntryPtr {
     let mut ok: i32 = 1;
-    let mut name_value: *mut XmlChar = null_mut();
+    let mut name_value = None;
 
     let mut ret: XmlCatalogEntryPtr = null_mut();
 
@@ -1222,7 +1222,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
                 .to_string_lossy()
                 .as_ref(),
         );
-        if name_value.is_null() {
+        if name_value.is_none() {
             xml_catalog_err(
                 ret,
                 cur,
@@ -1235,12 +1235,11 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             ok = 0;
         }
     }
-    let uri_value: *mut XmlChar = (*cur).get_prop(
+    let Some(uri_value) = (*cur).get_prop(
         CStr::from_ptr(uri_attr_name as *const i8)
             .to_string_lossy()
             .as_ref(),
-    );
-    if uri_value.is_null() {
+    ) else {
         xml_catalog_err(
             ret,
             cur,
@@ -1250,33 +1249,27 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             uri_attr_name,
             null_mut(),
         );
-        ok = 0;
-    }
+        return null_mut();
+    };
     if ok == 0 {
-        if !name_value.is_null() {
-            xml_free(name_value as _);
-        }
-        if !uri_value.is_null() {
-            xml_free(uri_value as _);
-        }
         return null_mut();
     }
 
+    let uri_value = CString::new(uri_value).unwrap();
     let base = (*cur)
         .get_base((*cur).doc)
         .map(|c| CString::new(c).unwrap());
     let url: *mut XmlChar = xml_build_uri(
-        uri_value,
+        uri_value.as_ptr() as *const u8,
         base.as_ref()
             .map_or(null_mut(), |b| b.as_ptr() as *const u8),
     );
     if !url.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {
-            if !name_value.is_null() {
+            if let Some(name_value) = name_value.as_deref() {
                 generic_error!(
-                    "Found {}: '{}' '{}'\n",
+                    "Found {}: '{name_value}' '{}'\n",
                     CStr::from_ptr(name as *const i8).to_string_lossy(),
-                    CStr::from_ptr(name_value as *const i8).to_string_lossy(),
                     CStr::from_ptr(url as *const i8).to_string_lossy()
                 );
             } else {
@@ -1287,7 +1280,17 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
                 );
             }
         }
-        ret = xml_new_catalog_entry(typ, name_value, uri_value, url, prefer, cgroup);
+        let name_value = name_value.map(|n| CString::new(n).unwrap());
+        ret = xml_new_catalog_entry(
+            typ,
+            name_value
+                .as_ref()
+                .map_or(null_mut(), |n| n.as_ptr() as *const u8),
+            uri_value.as_ptr() as *const u8,
+            url,
+            prefer,
+            cgroup,
+        );
     } else {
         xml_catalog_err(
             ret,
@@ -1296,14 +1299,8 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             c"%s entry '%s' broken ?: %s\n".as_ptr() as _,
             name,
             uri_attr_name,
-            uri_value,
+            uri_value.as_ptr() as *const u8,
         );
-    }
-    if !name_value.is_null() {
-        xml_free(name_value as _);
-    }
-    if !uri_value.is_null() {
-        xml_free(uri_value as _);
     }
     if !url.is_null() {
         xml_free(url as _);
@@ -1327,40 +1324,38 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
         return;
     }
     if xml_str_equal((*cur).name, c"group".as_ptr() as _) {
-        let mut prop: *mut XmlChar;
         let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
 
-        prop = (*cur).get_prop("prefer");
-        if !prop.is_null() {
-            if xml_str_equal(prop, c"system".as_ptr() as _) {
+        if let Some(prop) = (*cur).get_prop("prefer") {
+            if prop == "system" {
                 prefer = XmlCatalogPrefer::System;
-            } else if xml_str_equal(prop, c"public".as_ptr() as _) {
+            } else if prop == "public" {
                 prefer = XmlCatalogPrefer::Public;
             } else {
+                let prop = CString::new(prop).unwrap();
                 xml_catalog_err(
                     parent,
                     cur,
                     XmlParserErrors::XmlCatalogPreferValue,
                     c"Invalid value for prefer: '%s'\n".as_ptr() as _,
-                    prop,
+                    prop.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
                 );
             }
-            xml_free(prop as _);
             pref = prefer;
         }
-        prop = (*cur).get_prop("id");
+        let prop = (*cur).get_prop("id").map(|p| CString::new(p).unwrap());
         base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
-            prop,
+            prop.as_ref()
+                .map_or(null_mut(), |p| p.as_ptr() as *const u8),
             base,
             null_mut(),
             pref,
             cgroup,
         );
-        xml_free(prop as _);
     } else if xml_str_equal((*cur).name, c"public".as_ptr() as _) {
         entry = xml_parse_xml_catalog_one_node(
             cur,
@@ -1515,7 +1510,6 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
     filename: *const XmlChar,
 ) -> XmlCatalogEntryPtr {
     let mut cur: XmlNodePtr;
-    let prop: *mut XmlChar;
     let parent: XmlCatalogEntryPtr;
 
     if filename.is_null() {
@@ -1561,24 +1555,23 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             return null_mut();
         }
 
-        prop = (*cur).get_prop("prefer");
-        if !prop.is_null() {
-            if xml_str_equal(prop, c"system".as_ptr() as _) {
+        if let Some(prop) = (*cur).get_prop("prefer") {
+            if prop == "system" {
                 prefer = XmlCatalogPrefer::System;
-            } else if xml_str_equal(prop, c"public".as_ptr() as _) {
+            } else if prop == "public" {
                 prefer = XmlCatalogPrefer::Public;
             } else {
+                let prop = CString::new(prop).unwrap();
                 xml_catalog_err(
                     null_mut(),
                     cur,
                     XmlParserErrors::XmlCatalogPreferValue,
                     c"Invalid value for prefer: '%s'\n".as_ptr() as _,
-                    prop,
+                    prop.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
                 );
             }
-            xml_free(prop as _);
         }
         cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, parent, null_mut());
