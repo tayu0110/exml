@@ -2782,21 +2782,10 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderXmlLang")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn xml_lang(&self) -> Option<String> {
-        use std::ffi::CStr;
-
         if self.node.is_null() {
             return None;
         }
-        let res = (*self.node).get_lang();
-        let r = (!res.is_null()).then(|| {
-            CStr::from_ptr(res as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        if !res.is_null() {
-            xml_free(res as _);
-        }
-        r
+        (*self.node).get_lang()
     }
 
     /// This tells the XML Reader to preserve the current node.
@@ -4332,15 +4321,16 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
 pub unsafe extern "C" fn xml_text_reader_const_xml_lang(
     reader: &mut XmlTextReader,
 ) -> *const XmlChar {
+    use std::ffi::CString;
+
     if reader.node.is_null() {
         return null_mut();
     }
-    let tmp: *mut XmlChar = (*reader.node).get_lang();
-    if tmp.is_null() {
+    let Some(tmp) = (*reader.node).get_lang() else {
         return null_mut();
-    }
-    let ret: *const XmlChar = CONSTSTR!(reader, tmp);
-    xml_free(tmp as _);
+    };
+    let tmp = CString::new(tmp).unwrap();
+    let ret: *const XmlChar = CONSTSTR!(reader, tmp.as_ptr() as *const u8);
     ret
 }
 

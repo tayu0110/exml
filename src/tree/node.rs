@@ -380,10 +380,7 @@ pub trait NodeCommon {
         if self as *mut Self as *mut XmlNode == cur {
             return null_mut();
         }
-        /*
-         * If cur is a TEXT node, merge its content with adjacent TEXT nodes
-         * cur is then freed.
-         */
+        // If cur is a TEXT node, merge its content with adjacent TEXT nodes cur is then freed.
         if matches!((*cur).typ, XmlElementType::XmlTextNode) {
             if matches!(self.element_type(), XmlElementType::XmlTextNode)
                 && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
@@ -404,24 +401,19 @@ pub trait NodeCommon {
             }
         }
 
-        /*
-         * add the new element at the end of the children list.
-         */
+        // add the new element at the end of the children list.
         prev = (*cur).parent.map_or(null_mut(), |p| p.as_ptr());
         (*cur).parent = NodePtr::from_ptr(self as *mut Self as *mut XmlNode);
         if (*cur).doc != self.document() {
             (*cur).set_doc(self.document());
         }
-        /* this check prevents a loop on tree-traversions if a developer
-         * tries to add a node to its parent multiple times
-         */
+        // this check prevents a loop on tree-traversions if a developer
+        // tries to add a node to its parent multiple times
         if prev == self as *mut Self as *mut XmlNode {
             return cur;
         }
 
-        /*
-         * Coalescing
-         */
+        // Coalescing
         if matches!(self.element_type(), XmlElementType::XmlTextNode)
             && !(*(self as *mut Self as *mut XmlNode)).content.is_null()
             && self as *mut Self as *mut XmlNode != cur
@@ -435,7 +427,7 @@ pub trait NodeCommon {
                 return null_mut();
             }
             if !(*(self as *mut Self as *mut XmlNode)).properties.is_null() {
-                /* check if an attribute with the same name exists */
+                // check if an attribute with the same name exists
 
                 let lastattr = if (*cur).ns.is_null() {
                     (*(self as *mut Self as *mut XmlNode)).has_ns_prop(
@@ -459,7 +451,7 @@ pub trait NodeCommon {
                     && lastattr != cur as _
                     && !matches!((*lastattr).typ, XmlElementType::XmlAttributeDecl)
                 {
-                    /* different instance, destroy it (attributes must be unique) */
+                    // different instance, destroy it (attributes must be unique)
                     (*lastattr).unlink();
                     xml_free_prop(lastattr);
                 }
@@ -470,7 +462,7 @@ pub trait NodeCommon {
             if (*(self as *mut Self as *mut XmlNode)).properties.is_null() {
                 (*(self as *mut Self as *mut XmlNode)).properties = cur as _;
             } else {
-                /* find the end */
+                // find the end
                 let mut lastattr = (*(self as *mut Self as *mut XmlNode)).properties;
                 while !(*lastattr).next.is_null() {
                     lastattr = (*lastattr).next;
@@ -1611,19 +1603,23 @@ impl XmlNode {
     /// Returns a pointer to the lang value, or null_mut() if not found.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlNodeGetLang")]
-    pub unsafe fn get_lang(&self) -> *mut XmlChar {
+    pub unsafe fn get_lang(&self) -> Option<String> {
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
-            return null_mut();
+            return None;
         }
-        let mut cur = self as *const XmlNode;
-        while !cur.is_null() {
-            let lang = (*cur).get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
+        let mut cur = NodePtr::from_ptr(self as *const XmlNode as *mut XmlNode);
+        while let Some(now) = cur {
+            let lang = now.get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
             if !lang.is_null() {
-                return lang;
+                let ret = CStr::from_ptr(lang as *const i8)
+                    .to_string_lossy()
+                    .into_owned();
+                xml_free(lang as _);
+                return Some(ret);
             }
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = now.parent();
         }
-        null_mut()
+        None
     }
 
     /// Searches the space preserving behaviour of a node, i.e. the values

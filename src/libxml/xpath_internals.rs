@@ -12440,23 +12440,23 @@ pub unsafe extern "C" fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr,
     let lang: *const XmlChar = (*val).stringval;
     let the_lang = (*(*(*ctxt).context).node).get_lang();
     'not_equal: {
-        if !the_lang.is_null() && !lang.is_null() {
+        if let Some(the_lang) = the_lang.filter(|_| !lang.is_null()) {
+            let the_lang = the_lang.as_bytes();
             let mut i = 0;
             while *lang.add(i) != 0 {
-                if (*lang.add(i)).to_ascii_uppercase() != (*the_lang.add(i)).to_ascii_uppercase() {
+                if (*lang.add(i)).to_ascii_uppercase()
+                    != the_lang.get(i).unwrap_or(&0).to_ascii_uppercase()
+                {
                     break 'not_equal;
                 }
                 i += 1;
             }
-            if *the_lang.add(i) == 0 || *the_lang.add(i) == b'-' {
+            if the_lang.get(i).unwrap_or(&0) == &0 || the_lang[i] == b'-' {
                 ret = 1;
             }
         }
     }
     // not_equal:
-    if !the_lang.is_null() {
-        xml_free(the_lang as _);
-    }
 
     xml_xpath_release_object((*ctxt).context, val);
     value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret));
