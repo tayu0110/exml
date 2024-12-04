@@ -20,20 +20,15 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::{c_char, CStr},
+    ffi::CStr,
     os::raw::c_void,
     ptr::null_mut,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use libc::snprintf;
-
 use crate::tree::{XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr};
 
-use super::{
-    globals::xml_free,
-    xmlstring::{xml_str_equal, XmlChar},
-};
+use super::xmlstring::{xml_str_equal, XmlChar};
 
 // Various defines for the various Link properties.
 //
@@ -175,7 +170,6 @@ const XHTML_NAMESPACE: &CStr = c"http://www.w3.org/1999/xhtml/";
 /// Returns the xlinkType of the node (XLINK_TYPE_NONE if there is no link detected.
 #[doc(alias = "xlinkIsLink")]
 pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> XlinkType {
-    let mut role: *mut XmlChar = null_mut();
     let mut ret: XlinkType = XlinkType::XlinkTypeNone;
 
     if node.is_null() {
@@ -185,49 +179,34 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
         doc = (*node).doc;
     }
     if !doc.is_null() && (*doc).typ == XmlElementType::XmlHTMLDocumentNode {
-        /*
-         * This is an HTML document.
-         */
+        // This is an HTML document.
     } else if !(*node).ns.is_null()
         && xml_str_equal((*(*node).ns).href, XHTML_NAMESPACE.as_ptr() as _)
     {
-        /*
-         * !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
-         */
-        /*
-         * This is an XHTML element within an XML document
-         * Check whether it's one of the element able to carry links
-         * and in that case if it holds the attributes.
-         */
+        // !!!! We really need an IS_XHTML_ELEMENT function from HTMLtree.h @@@
+        // This is an XHTML element within an XML document
+        // Check whether it's one of the element able to carry links
+        // and in that case if it holds the attributes.
     }
 
-    /*
-     * We don't prevent a-priori having XML Linking constructs on
-     * XHTML elements
-     */
-    let typ: *mut XmlChar = (*node).get_ns_prop("type", Some(XLINK_NAMESPACE));
-    if !typ.is_null() {
-        if xml_str_equal(typ, c"simple".as_ptr() as _) {
+    // We don't prevent a-priori having XML Linking constructs on XHTML elements
+    if let Some(typ) = (*node).get_ns_prop("type", Some(XLINK_NAMESPACE)) {
+        if typ == "simple" {
             ret = XlinkType::XlinkTypeSimple;
-        } else if xml_str_equal(typ, c"extended".as_ptr() as _) {
-            role = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE));
-            if !role.is_null() {
+        } else if typ == "extended" {
+            if let Some(role) = (*node).get_ns_prop("role", Some(XLINK_NAMESPACE)) {
                 let xlink: XmlNsPtr = (*node).search_ns(doc, Some(XLINK_NAMESPACE));
                 if xlink.is_null() {
                     /* Humm, fallback method */
-                    if xml_str_equal(role, c"xlink:external-linkset".as_ptr() as _) {
+                    if role == "xlink:external-linkset" {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 } else {
-                    let mut buf: [XmlChar; 200] = [0; 200];
-                    snprintf(
-                        buf.as_mut_ptr() as _,
-                        buf.len(),
-                        c"%s:external-linkset".as_ptr() as _,
-                        (*xlink).prefix as *const c_char,
+                    let buf = format!(
+                        "{}:external-linkset",
+                        CStr::from_ptr((*xlink).prefix as *const i8).to_string_lossy()
                     );
-                    buf[buf.len() - 1] = 0;
-                    if xml_str_equal(role, buf.as_ptr() as _) {
+                    if role == buf {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 }
@@ -236,11 +215,5 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
         }
     }
 
-    if !typ.is_null() {
-        xml_free(typ as _);
-    }
-    if !role.is_null() {
-        xml_free(role as _);
-    }
     ret
 }

@@ -323,14 +323,16 @@ unsafe fn xml_xinclude_get_prop(
     cur: XmlNodePtr,
     name: &str,
 ) -> *mut XmlChar {
-    let mut ret = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), Some(name));
-    if !ret.is_null() {
-        return ret;
+    if let Some(ret) = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), Some(name)) {
+        let ret = CString::new(ret).unwrap();
+        return xml_strdup(ret.as_ptr() as *const u8);
     }
     if (*ctxt).legacy != 0 {
-        ret = (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), Some(name));
-        if !ret.is_null() {
-            return ret;
+        if let Some(ret) =
+            (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), Some(name))
+        {
+            let ret = CString::new(ret).unwrap();
+            return xml_strdup(ret.as_ptr() as *const u8);
         }
     }
     let ret = (*cur).get_prop(name).map(|n| CString::new(n).unwrap());
@@ -1787,11 +1789,15 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             && (*doc).parse_flags & XmlParserOption::XmlParseNobasefix as i32 == 0
         {
             let mut node: XmlNodePtr;
-            let mut base: *mut XmlChar;
 
             // The base is only adjusted if "necessary", i.e. if the xinclude node
             // has a base specified, or the URL is relative
-            base = (*(*refe).elem).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+            let base = (*(*refe).elem)
+                .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
+                .map(|b| CString::new(b).unwrap());
+            let mut base = base
+                .as_ref()
+                .map_or(null_mut(), |b| xml_strdup(b.as_ptr() as *const u8));
             if base.is_null() {
                 // No xml:base on the xinclude node, so we check whether the
                 // URI base is different than (relative to) the context base
@@ -1832,10 +1838,12 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                 // If the element already has an xml:base set,
                                 // then relativise it if necessary
 
-                                let xml_base: *mut XmlChar =
-                                    (*node).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-                                if !xml_base.is_null() {
-                                    let rel_base: *mut XmlChar = xml_build_uri(xml_base, base);
+                                if let Some(xml_base) =
+                                    (*node).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
+                                {
+                                    let xml_base = CString::new(xml_base).unwrap();
+                                    let rel_base: *mut XmlChar =
+                                        xml_build_uri(xml_base.as_ptr() as *const u8, base);
                                     if rel_base.is_null() {
                                         // error
                                         xml_xinclude_err(
@@ -1843,7 +1851,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                             (*refe).elem,
                                             XmlParserErrors::XmlXIncludeHrefURI,
                                             c"trying to rebuild base from %s\n".as_ptr() as _,
-                                            xml_base,
+                                            xml_base.as_ptr() as *const u8,
                                         );
                                     } else {
                                         (*node).set_base(Some(
@@ -1853,7 +1861,6 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                         ));
                                         xml_free(rel_base as _);
                                     }
-                                    xml_free(xml_base as _);
                                 }
                             }
                         } else {

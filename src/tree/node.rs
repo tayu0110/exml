@@ -195,13 +195,7 @@ pub trait NodeCommon {
                 });
             }
             if matches!(now.element_type(), XmlElementType::XmlElementNode) {
-                let b = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
-                let base = (!b.is_null()).then(|| {
-                    CStr::from_ptr(b as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                });
-                xml_free(b as _);
+                let base = now.get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
                 if let Some(base) = base {
                     if base.starts_with("http://")
                         || base.starts_with("ftp://")
@@ -1532,13 +1526,20 @@ impl XmlNode {
     /// Returns the attribute value or NULL if not found.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNsProp")]
-    pub unsafe fn get_ns_prop(&self, name: &str, name_space: Option<&str>) -> *mut XmlChar {
+    pub unsafe fn get_ns_prop(&self, name: &str, name_space: Option<&str>) -> Option<String> {
         let prop =
             self.get_prop_node_internal(name, name_space, XML_CHECK_DTD.load(Ordering::Relaxed));
         if prop.is_null() {
-            return null_mut();
+            return None;
         }
-        (*prop).get_prop_node_value_internal()
+        let ret = (*prop).get_prop_node_value_internal();
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
     }
 
     /// Search and get the value of an attribute associated to a node
@@ -1617,12 +1618,8 @@ impl XmlNode {
         let mut cur = NodePtr::from_ptr(self as *const XmlNode as *mut XmlNode);
         while let Some(now) = cur {
             let lang = now.get_ns_prop("lang", XML_XML_NAMESPACE.to_str().ok());
-            if !lang.is_null() {
-                let ret = CStr::from_ptr(lang as *const i8)
-                    .to_string_lossy()
-                    .into_owned();
-                xml_free(lang as _);
-                return Some(ret);
+            if lang.is_some() {
+                return lang;
             }
             cur = now.parent();
         }
@@ -1635,24 +1632,18 @@ impl XmlNode {
     /// Returns -1 if xml:space is not inherited, 0 if "default", 1 if "preserve"
     #[doc(alias = "xmlNodeGetSpacePreserve")]
     pub unsafe fn get_space_preserve(&self) -> i32 {
-        let mut space: *mut XmlChar;
-
         if !matches!(self.element_type(), XmlElementType::XmlElementNode) {
             return -1;
         }
         let mut cur = self as *const XmlNode;
         while !cur.is_null() {
-            space = (*cur).get_ns_prop("space", XML_XML_NAMESPACE.to_str().ok());
-            if !space.is_null() {
-                if xml_str_equal(space, c"preserve".as_ptr() as _) {
-                    xml_free(space as _);
+            if let Some(space) = (*cur).get_ns_prop("space", XML_XML_NAMESPACE.to_str().ok()) {
+                if space == "preserve" {
                     return 1;
                 }
-                if xml_str_equal(space, c"default".as_ptr() as _) {
-                    xml_free(space as _);
+                if space == "default" {
                     return 0;
                 }
-                xml_free(space as _);
             }
             cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
         }

@@ -1317,7 +1317,6 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
     parent: XmlCatalogEntryPtr,
     cgroup: XmlCatalogEntryPtr,
 ) {
-    let mut base: *mut XmlChar = null_mut();
     let mut entry: XmlCatalogEntryPtr = null_mut();
 
     if cur.is_null() {
@@ -1346,12 +1345,15 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             pref = prefer;
         }
         let prop = (*cur).get_prop("id").map(|p| CString::new(p).unwrap());
-        base = (*cur).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
+        let base = (*cur)
+            .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
+            .map(|b| CString::new(b).unwrap());
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
             prop.as_ref()
                 .map_or(null_mut(), |p| p.as_ptr() as *const u8),
-            base,
+            base.as_ref()
+                .map_or(null_mut(), |p| p.as_ptr() as *const u8),
             null_mut(),
             pref,
             cgroup,
@@ -1472,9 +1474,6 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
                 entry,
             );
         }
-    }
-    if !base.is_null() {
-        xml_free(base as _);
     }
 }
 

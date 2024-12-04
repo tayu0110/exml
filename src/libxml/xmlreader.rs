@@ -1623,7 +1623,6 @@ impl XmlTextReader {
         use crate::tree::{split_qname2, NodeCommon};
 
         let mut ns: XmlNsPtr;
-        let mut ret: *mut XmlChar = null_mut();
 
         if self.node.is_null() {
             return None;
@@ -1657,6 +1656,7 @@ impl XmlTextReader {
         };
 
         // Namespace default decl
+        let mut ret = None;
         if prefix == "xmlns" {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
@@ -1666,7 +1666,11 @@ impl XmlTextReader {
                         .as_ref()
                         == localname
                 {
-                    ret = xml_strdup((*ns).href);
+                    ret = Some(
+                        CStr::from_ptr((*ns).href as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
                     break;
                 }
                 ns = (*ns).next;
@@ -1683,14 +1687,7 @@ impl XmlTextReader {
                 );
             }
         }
-
-        let r = Some(
-            CStr::from_ptr(ret as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-        xml_free(ret as _);
-        r
+        ret
     }
 
     /// Provides the value of the specified attribute
@@ -1740,14 +1737,7 @@ impl XmlTextReader {
             return None;
         }
 
-        let res = (*self.node).get_ns_prop(local_name, namespace_uri);
-        let r = (!res.is_null()).then(|| {
-            CStr::from_ptr(res as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        xml_free(res as _);
-        r
+        (*self.node).get_ns_prop(local_name, namespace_uri)
     }
 
     /// Provides the value of the attribute with the specified index relative
