@@ -1553,12 +1553,19 @@ impl XmlNode {
     /// Returns the attribute value or NULL if not found.  
     /// It's up to the caller to free the memory with xml_free().
     #[doc(alias = "xmlGetNoNsProp")]
-    pub unsafe fn get_no_ns_prop(&self, name: &str) -> *mut XmlChar {
+    pub unsafe fn get_no_ns_prop(&self, name: &str) -> Option<String> {
         let prop = self.get_prop_node_internal(name, None, XML_CHECK_DTD.load(Ordering::Relaxed));
         if prop.is_null() {
-            return null_mut();
+            return None;
         }
-        (*prop).get_prop_node_value_internal()
+        let ret = (*prop).get_prop_node_value_internal();
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
     }
 
     /// Search all the namespace applying to a given element.

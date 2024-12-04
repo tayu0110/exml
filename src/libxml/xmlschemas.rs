@@ -5074,12 +5074,11 @@ unsafe extern "C" fn xml_schema_get_prop(
     node: XmlNodePtr,
     name: *const c_char,
 ) -> *const XmlChar {
-    let val: *mut XmlChar = (*node).get_no_ns_prop(CStr::from_ptr(name).to_string_lossy().as_ref());
-    if val.is_null() {
+    let Some(val) = (*node).get_no_ns_prop(CStr::from_ptr(name).to_string_lossy().as_ref()) else {
         return null_mut();
-    }
-    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val, -1);
-    xml_free(val as _);
+    };
+    let val = CString::new(val).unwrap();
+    let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, val.as_ptr() as *const u8, -1);
     ret
 }
 

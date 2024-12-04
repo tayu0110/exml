@@ -1653,18 +1653,7 @@ impl XmlTextReader {
                 }
                 return None;
             }
-            let res = (*self.node).get_no_ns_prop(name);
-            return if !res.is_null() {
-                let r = Some(
-                    CStr::from_ptr(res as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-                xml_free(res as _);
-                r
-            } else {
-                None
-            };
+            return (*self.node).get_no_ns_prop(name);
         };
 
         // Namespace default decl
