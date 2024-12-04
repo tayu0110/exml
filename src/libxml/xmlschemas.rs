@@ -28862,10 +28862,16 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                         } else {
                             ns_name = null_mut();
                         }
-                        /*
-                         * Note that we give it the line number of the
-                         * parent element.
-                         */
+                        // Note that we give it the line number of the parent element.
+                        let value = (*attr)
+                            .children
+                            .and_then(|c| c.get_string((*attr).doc, 1))
+                            .map(|c| CString::new(c).unwrap());
+                        let value = xml_strdup(
+                            value
+                                .as_ref()
+                                .map_or(null_mut(), |v| v.as_ptr() as *const u8),
+                        );
                         ret = xml_schema_validator_push_attribute(
                             vctxt,
                             attr as XmlNodePtr,
@@ -28873,9 +28879,7 @@ unsafe extern "C" fn xml_schema_vdoc_walk(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
                             (*attr).name,
                             ns_name,
                             0,
-                            (*attr)
-                                .children
-                                .map_or(null_mut(), |c| c.get_string((*attr).doc, 1)),
+                            value,
                             1,
                         );
                         if ret == -1 {

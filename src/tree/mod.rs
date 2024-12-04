@@ -36,7 +36,7 @@ mod node;
 use std::{
     any::type_name,
     borrow::Cow,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
@@ -1788,10 +1788,9 @@ unsafe extern "C" fn xml_copy_prop_internal(
             .is_some()
     {
         let children = (*cur).children;
-        let id: *mut XmlChar = children.map_or(null_mut(), |c| c.get_string((*cur).doc, 1));
-        if !id.is_null() {
-            xml_add_id(null_mut(), (*target).doc, id, ret);
-            xml_free(id as _);
+        if let Some(id) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
+            let id = CString::new(id).unwrap();
+            xml_add_id(null_mut(), (*target).doc, id.as_ptr() as *const u8, ret);
         }
     }
     ret
@@ -5787,14 +5786,19 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         && xml_is_id(dest_doc, (*clone).parent().unwrap().as_ptr(), clone as _) != 0
                     {
                         let children = (*cur).children();
-                        let id_val = children.map_or(null_mut(), |c| c.get_string((*cur).doc, 1));
-                        if !id_val.is_null() {
-                            if xml_add_id(null_mut(), dest_doc, id_val, cur as _).is_null() {
-                                /* TODO: error message. */
-                                xml_free(id_val as _);
+                        if let Some(id_val) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
+                            let id_val = CString::new(id_val).unwrap();
+                            if xml_add_id(
+                                null_mut(),
+                                dest_doc,
+                                id_val.as_ptr() as *const u8,
+                                cur as _,
+                            )
+                            .is_null()
+                            {
+                                // TODO: error message.
                                 break 'internal_error;
                             }
-                            xml_free(id_val as _);
                         }
                     }
                     /*

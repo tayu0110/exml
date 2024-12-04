@@ -2972,12 +2972,11 @@ pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 
         return -1;
     }
 
-    let id: *mut XmlChar = (*attr)
-        .children
-        .map_or(null_mut(), |c| c.get_string(doc, 1));
-    if id.is_null() {
+    let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
         return -1;
-    }
+    };
+    let id = CString::new(id).unwrap();
+    let id = xml_strdup(id.as_ptr() as *const u8);
     xml_valid_normalize_string(id);
 
     let id_ptr: XmlIDPtr = xml_hash_lookup(table, id) as _;
@@ -3242,44 +3241,44 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
         return -1;
     }
 
-    let id: *mut XmlChar = (*attr)
-        .children
-        .map_or(null_mut(), |c| c.get_string(doc, 1));
-    if id.is_null() {
+    let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
         return -1;
-    }
+    };
+    let id = CString::new(id).unwrap();
 
-    let ref_list: XmlListPtr = xml_hash_lookup(table, id) as _;
+    let ref_list: XmlListPtr = xml_hash_lookup(table, id.as_ptr() as *const u8) as _;
     if ref_list.is_null() {
-        xml_free(id as _);
         return -1;
     }
 
-    /* At this point, ref_list refers to a list of references which
-     * have the same key as the supplied attr. Our list of references
-     * is ordered by reference address and we don't have that information
-     * here to use when removing. We'll have to walk the list and
-     * check for a matching attribute, when we find one stop the walk
-     * and remove the entry.
-     * The list is ordered by reference, so that means we don't have the
-     * key. Passing the list and the reference to the walker means we
-     * will have enough data to be able to remove the entry.
-     */
+    // At this point, ref_list refers to a list of references which
+    // have the same key as the supplied attr. Our list of references
+    // is ordered by reference address and we don't have that information
+    // here to use when removing. We'll have to walk the list and
+    // check for a matching attribute, when we find one stop the walk
+    // and remove the entry.
+    // The list is ordered by reference, so that means we don't have the
+    // key. Passing the list and the reference to the walker means we
+    // will have enough data to be able to remove the entry.
     target.l = ref_list;
     target.ap = attr;
 
-    /* Remove the supplied attr from our list */
+    // Remove the supplied attr from our list
     xml_list_walk(
         ref_list,
         Some(xml_walk_remove_ref),
         addr_of_mut!(target) as _,
     );
 
-    /*If the list is empty then remove the list entry in the hash */
+    // If the list is empty then remove the list entry in the hash
     if xml_list_empty(ref_list) != 0 {
-        xml_hash_update_entry(table, id, null_mut(), Some(xml_free_ref_table_entry));
+        xml_hash_update_entry(
+            table,
+            id.as_ptr() as *const u8,
+            null_mut(),
+            Some(xml_free_ref_table_entry),
+        );
     }
-    xml_free(id as _);
     0
 }
 
@@ -4585,7 +4584,6 @@ pub unsafe extern "C" fn xml_validate_element(
     let mut elem: XmlNodePtr;
     let mut attr: XmlAttrPtr;
     let mut ns: XmlNsPtr;
-    let mut value: *const XmlChar;
     let mut ret: i32 = 1;
 
     if root.is_null() {
@@ -4601,13 +4599,19 @@ pub unsafe extern "C" fn xml_validate_element(
         if matches!((*elem).element_type(), XmlElementType::XmlElementNode) {
             attr = (*elem).properties;
             while !attr.is_null() {
-                value = (*attr)
+                let value = (*attr)
                     .children
-                    .map_or(null_mut(), |c| c.get_string(doc, 0));
-                ret &= xml_validate_one_attribute(ctxt, doc, elem, attr, value);
-                if !value.is_null() {
-                    xml_free(value as _);
-                }
+                    .and_then(|c| c.get_string(doc, 0))
+                    .map(|c| CString::new(c).unwrap());
+                ret &= xml_validate_one_attribute(
+                    ctxt,
+                    doc,
+                    elem,
+                    attr,
+                    value
+                        .as_ref()
+                        .map_or(null_mut(), |c| c.as_ptr() as *const u8),
+                );
                 attr = (*attr).next;
             }
 

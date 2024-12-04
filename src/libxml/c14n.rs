@@ -33,7 +33,7 @@
 use std::{
     any::type_name,
     cell::RefCell,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -47,6 +47,7 @@ use crate::{
     buf::libxml_api::xml_buf_write_quoted_string,
     error::XmlParserErrors,
     io::XmlOutputBuffer,
+    libxml::uri::xml_build_uri,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType,
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
@@ -59,8 +60,8 @@ use super::{
         xml_list_create, xml_list_delete, xml_list_insert, xml_list_search, xml_list_walk,
         XmlListPtr,
     },
-    uri::{xml_build_uri, xml_free_uri, xml_parse_uri, XmlURIPtr},
-    xmlstring::{xml_str_equal, xml_strcat, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
+    uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
+    xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
     xpath::XmlNodeSetPtr,
     xpath_internals::xml_xpath_node_set_contains,
 };
@@ -1349,9 +1350,6 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
 ) -> XmlAttrPtr {
     let mut cur: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let mut tmp_str: *mut XmlChar;
-    let mut tmp_str2: *mut XmlChar;
-    let mut tmp_str_len: i32;
 
     if ctx.is_null() || xml_base_attr.is_null() {
         xml_c14n_err_param(c"processing xml:base attribute".as_ptr() as _);
@@ -1362,16 +1360,16 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
         return null_mut();
     };
 
-    /* start from current value */
-    let mut res: *mut XmlChar = (*xml_base_attr)
+    // start from current value
+    let Some(mut res) = (*xml_base_attr)
         .children
-        .map_or(null_mut(), |c| c.get_string((*ctx).doc, 1));
-    if res.is_null() {
+        .and_then(|c| c.get_string((*ctx).doc, 1))
+    else {
         xml_c14n_err_internal(
             c"processing xml:base attribute - can't get attr value".as_ptr() as _,
         );
         return null_mut();
-    }
+    };
 
     // go up the stack until we find a node that we rendered already
     cur = parent.parent().map_or(null_mut(), |p| p.as_ptr());
@@ -1381,52 +1379,37 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
         attr = (*cur).has_ns_prop("base", XML_XML_NAMESPACE.to_str().ok());
         if !attr.is_null() {
             /* get attr value */
-            tmp_str = (*attr)
-                .children
-                .map_or(null_mut(), |c| c.get_string((*ctx).doc, 1));
-            if tmp_str.is_null() {
-                xml_free(res as _);
-
+            let Some(mut tmp_str) = (*attr).children.and_then(|c| c.get_string((*ctx).doc, 1))
+            else {
                 xml_c14n_err_internal(
                     c"processing xml:base attribute - can't get attr value".as_ptr() as _,
                 );
                 return null_mut();
-            }
+            };
 
             // we need to add '/' if our current base uri ends with '..' or '.'
             // to ensure that we are forced to go "up" all the time
-            tmp_str_len = xml_strlen(tmp_str);
-            if tmp_str_len > 1 && *tmp_str.add(tmp_str_len as usize - 2) == b'.' {
-                tmp_str2 = xml_strcat(tmp_str, c"/".as_ptr() as _);
-                if tmp_str2.is_null() {
-                    xml_free(tmp_str as _);
-                    xml_free(res as _);
-
-                    xml_c14n_err_internal(
-                        c"processing xml:base attribute - can't modify uri".as_ptr() as _,
-                    );
-                    return null_mut();
-                }
-
-                tmp_str = tmp_str2;
+            let tmp_str_len = tmp_str.len();
+            if tmp_str_len > 1 && tmp_str.as_bytes()[tmp_str_len - 2] == b'.' {
+                tmp_str.push('/');
             }
 
             // build uri
-            tmp_str2 = xml_build_uri(res, tmp_str);
+            let cres = CString::new(res.as_str()).unwrap();
+            let ctmp_str = CString::new(tmp_str).unwrap();
+            let tmp_str2 =
+                xml_build_uri(cres.as_ptr() as *const u8, ctmp_str.as_ptr() as *const u8);
             if tmp_str2.is_null() {
-                xml_free(tmp_str as _);
-                xml_free(res as _);
-
                 xml_c14n_err_internal(
                     c"processing xml:base attribute - can't construct uri".as_ptr() as _,
                 );
                 return null_mut();
-            }
+            };
 
-            // cleanup and set the new res
-            xml_free(tmp_str as _);
-            xml_free(res as _);
-            res = tmp_str2;
+            res = CStr::from_ptr(tmp_str2 as *const i8)
+                .to_string_lossy()
+                .into_owned();
+            xml_free(tmp_str2 as _);
         }
 
         // next
@@ -1434,16 +1417,19 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     // check if result uri is empty or not
-    if res.is_null() || xml_str_equal(res, c"".as_ptr() as _) {
-        xml_free(res as _);
+    if res.is_empty() {
         return null_mut();
     }
 
     // create and return the new attribute node
-    attr = xml_new_ns_prop(null_mut(), (*xml_base_attr).ns, c"base".as_ptr() as _, res);
+    let res = CString::new(res).unwrap();
+    attr = xml_new_ns_prop(
+        null_mut(),
+        (*xml_base_attr).ns,
+        c"base".as_ptr() as _,
+        res.as_ptr() as *const u8,
+    );
     if attr.is_null() {
-        xml_free(res as _);
-
         xml_c14n_err_internal(
             c"processing xml:base attribute - can't construct attribute".as_ptr() as _,
         );
@@ -1451,7 +1437,6 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     }
 
     // done
-    xml_free(res as _);
     attr
 }
 
@@ -1653,13 +1638,10 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
             .write_str(CStr::from_ptr((*attr).name as _).to_string_lossy().as_ref());
         (*ctx).buf.borrow_mut().write_str("=\"");
 
-        let value: *mut XmlChar = (*attr)
-            .children
-            .map_or(null_mut(), |c| c.get_string((*ctx).doc, 1));
         /* todo: should we log an error if value==NULL ? */
-        if !value.is_null() {
-            buffer = xml_c11n_normalize_attr(value);
-            xml_free(value as _);
+        if let Some(value) = (*attr).children.and_then(|c| c.get_string((*ctx).doc, 1)) {
+            let value = CString::new(value).unwrap();
+            buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
             if !buffer.is_null() {
                 (*ctx)
                     .buf

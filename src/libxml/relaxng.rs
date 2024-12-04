@@ -2811,12 +2811,10 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
             } else if xml_str_equal((*cur).name, c"datatypeLibrary".as_ptr() as _) {
                 let uri: XmlURIPtr;
 
-                let val: *mut XmlChar = (*cur)
-                    .children
-                    .map_or(null_mut(), |c| c.get_string((*node).doc, 1));
-                if !val.is_null() {
-                    if *val.add(0) != 0 {
-                        uri = xml_parse_uri(val as _);
+                if let Some(val) = (*cur).children.and_then(|c| c.get_string((*node).doc, 1)) {
+                    if !val.is_empty() {
+                        let val = CString::new(val).unwrap();
+                        uri = xml_parse_uri(val.as_ptr());
                         if uri.is_null() {
                             xml_rng_perr(
                                 ctxt,
@@ -2824,7 +2822,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                                 XmlParserErrors::XmlRngpInvalidURI,
                                 c"Attribute %s contains invalid URI %s\n".as_ptr() as _,
                                 (*cur).name,
-                                val,
+                                val.as_ptr() as *const u8,
                             );
                         } else {
                             if (*uri).scheme.is_null() {
@@ -2834,7 +2832,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                                     XmlParserErrors::XmlRngpURINotAbsolute,
                                     c"Attribute %s URI %s is not absolute\n".as_ptr() as _,
                                     (*cur).name,
-                                    val,
+                                    val.as_ptr() as *const u8,
                                 );
                             }
                             if !(*uri).fragment.is_null() {
@@ -2844,13 +2842,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                                     XmlParserErrors::XmlRngpURIFragment,
                                     c"Attribute %s URI %s has a fragment ID\n".as_ptr() as _,
                                     (*cur).name,
-                                    val,
+                                    val.as_ptr() as *const u8,
                                 );
                             }
                             xml_free_uri(uri);
                         }
                     }
-                    xml_free(val as _);
                 }
             } else if !xml_str_equal((*cur).name, c"ns".as_ptr() as _) {
                 xml_rng_perr(
@@ -9463,7 +9460,6 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
     let ret: i32;
-    let mut value: *mut XmlChar;
     let oldvalue: *mut XmlChar;
     let mut prop: XmlAttrPtr = null_mut();
     let mut tmp: XmlAttrPtr;
@@ -9487,9 +9483,13 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             }
         }
         if !prop.is_null() {
-            value = (*prop)
+            let value = (*prop)
                 .children
-                .map_or(null_mut(), |c| c.get_string((*prop).doc, 1));
+                .and_then(|c| c.get_string((*prop).doc, 1))
+                .map(|c| CString::new(c).unwrap());
+            let mut value = value
+                .as_ref()
+                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
             (*(*ctxt).state).seq = prop as _;
@@ -9525,9 +9525,13 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             }
         }
         if !prop.is_null() {
-            value = (*prop)
+            let value = (*prop)
                 .children
-                .map_or(null_mut(), |c| c.get_string((*prop).doc, 1));
+                .and_then(|c| c.get_string((*prop).doc, 1))
+                .map(|c| CString::new(c).unwrap());
+            let mut value = value
+                .as_ref()
+                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
             oldvalue = (*(*ctxt).state).value;
             oldseq = (*(*ctxt).state).seq;
             (*(*ctxt).state).seq = prop as _;
@@ -9542,9 +9546,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             (*(*ctxt).state).value = oldvalue;
             (*(*ctxt).state).seq = oldseq;
             if ret == 0 {
-                /*
-                 * flag the attribute as processed
-                 */
+                // flag the attribute as processed
                 *(*(*ctxt).state).attrs.add(j as usize) = null_mut();
                 (*(*ctxt).state).nb_attr_left -= 1;
             }

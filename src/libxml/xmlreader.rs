@@ -1792,17 +1792,10 @@ impl XmlTextReader {
         }
         // TODO walk the DTD if present
 
-        let ret: *mut XmlChar = (*cur)
+        (*cur)
             .children
-            .map_or(null_mut(), |c| c.get_string((*self.node).doc, 1));
-        if ret.is_null() {
-            return Some("".to_owned());
-        }
-        let r = CStr::from_ptr(ret as *const i8)
-            .to_string_lossy()
-            .into_owned();
-        xml_free(ret as _);
-        Some(r)
+            .and_then(|c| c.get_string((*self.node).doc, 1))
+            .or_else(|| Some("".to_owned()))
     }
 
     /// Read the parser internal property.
@@ -2889,23 +2882,10 @@ impl XmlTextReader {
             XmlElementType::XmlAttributeNode => {
                 let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
 
-                let res = if let Some(parent) = (*attr).parent {
-                    (*attr)
-                        .children
-                        .map_or(null_mut(), |c| c.get_string(parent.doc, 1))
+                return if let Some(parent) = (*attr).parent {
+                    (*attr).children.and_then(|c| c.get_string(parent.doc, 1))
                 } else {
-                    (*attr)
-                        .children
-                        .map_or(null_mut(), |c| c.get_string(null_mut(), 1))
-                };
-                return if !res.is_null() {
-                    let r = CStr::from_ptr(res as *const i8)
-                        .to_string_lossy()
-                        .into_owned();
-                    xml_free(res as _);
-                    Some(r)
-                } else {
-                    None
+                    (*attr).children.and_then(|c| c.get_string(null_mut(), 1))
                 };
             }
             XmlElementType::XmlTextNode

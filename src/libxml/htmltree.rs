@@ -994,14 +994,10 @@ unsafe extern "C" fn html_attr_dump_output(
 
     use crate::libxml::{chvalid::xml_is_blank_char, globals::xml_free, uri::xml_uri_escape_str};
 
-    let value: *mut XmlChar;
-
-    /*
-     * The html output method should not escape a & character
-     * occurring in an attribute value immediately followed by
-     * a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
-     * This is implemented in xmlEncodeEntitiesReentrant
-     */
+    // The html output method should not escape a & character
+    // occurring in an attribute value immediately followed by
+    // a { character (see Section B.7.1 of the HTML 4.0 Recommendation).
+    // This is implemented in xmlEncodeEntitiesReentrant
 
     if cur.is_null() {
         return;
@@ -1021,8 +1017,7 @@ unsafe extern "C" fn html_attr_dump_output(
         .children
         .filter(|_| html_is_boolean_attr((*cur).name as _) == 0)
     {
-        value = children.get_string(doc, 0);
-        if !value.is_null() {
+        if let Some(value) = children.get_string(doc, 0) {
             buf.write_str("=");
             if (*cur).ns.is_null()
                 && (*cur)
@@ -1037,34 +1032,32 @@ unsafe extern "C" fn html_attr_dump_output(
                     })
                     .is_some()
             {
-                let mut tmp: *mut XmlChar = value;
+                let tmp = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
+                let tmp = CString::new(tmp).unwrap();
+                let value = CString::new(value.as_str()).unwrap();
 
-                while xml_is_blank_char(*tmp as u32) {
-                    tmp = tmp.add(1);
-                }
-
-                /*
-                 * Angle brackets are technically illegal in URIs, but they're
-                 * used in server side includes, for example. Curly brackets
-                 * are illegal as well and often used in templates.
-                 * Don't escape non-whitespace, printable ASCII chars for
-                 * improved interoperability. Only escape space, control
-                 * and non-ASCII chars.
-                 */
-                let escaped: *mut XmlChar =
-                    xml_uri_escape_str(tmp, c"\"#$%&+,/:;<=>?@[\\]^`{|}".as_ptr() as _);
+                // Angle brackets are technically illegal in URIs, but they're
+                // used in server side includes, for example. Curly brackets
+                // are illegal as well and often used in templates.
+                // Don't escape non-whitespace, printable ASCII chars for
+                // improved interoperability. Only escape space, control
+                // and non-ASCII chars.
+                let escaped: *mut XmlChar = xml_uri_escape_str(
+                    tmp.as_ptr() as *const u8,
+                    c"\"#$%&+,/:;<=>?@[\\]^`{|}".as_ptr() as _,
+                );
                 if !escaped.is_null() {
                     if let Some(mut buf) = buf.buffer {
                         buf.push_quoted_cstr(CStr::from_ptr(escaped as *const i8));
                     }
                     xml_free(escaped as _);
                 } else if let Some(mut buf) = buf.buffer {
-                    buf.push_quoted_cstr(CStr::from_ptr(value as *const i8));
+                    buf.push_quoted_cstr(&value);
                 }
             } else if let Some(mut buf) = buf.buffer {
-                buf.push_quoted_cstr(CStr::from_ptr(value as *const i8));
+                let value = CString::new(value.as_str()).unwrap();
+                buf.push_quoted_cstr(&value);
             }
-            xml_free(value as _);
         } else {
             buf.write_str("=\"\"");
         }

@@ -237,15 +237,8 @@ pub trait NodeCommon {
                             .to_string_lossy()
                             .into_owned()
                     });
-                } else {
-                    let ret: *mut XmlChar = children.get_string(self.document(), 1);
-                    if !ret.is_null() {
-                        return Some(
-                            CStr::from_ptr(ret as *const i8)
-                                .to_string_lossy()
-                                .into_owned(),
-                        );
-                    }
+                } else if let Some(ret) = children.get_string(self.document(), 1) {
+                    return Some(ret);
                 }
             }
             Some("".to_owned())
@@ -1638,7 +1631,7 @@ impl XmlNode {
     ///
     /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
     #[doc(alias = "xmlNodeListGetString")]
-    pub unsafe fn get_string(&self, doc: XmlDocPtr, in_line: i32) -> *mut XmlChar {
+    pub unsafe fn get_string(&self, doc: XmlDocPtr, in_line: i32) -> Option<String> {
         let mut node: *const XmlNode = self;
         let mut ret: *mut XmlChar = null_mut();
         let mut ent: XmlEntityPtr;
@@ -1678,14 +1671,9 @@ impl XmlNode {
                         // -> we recursive  call xmlNodeListGetString()
                         // which handles these types
                         let children = (*ent).children();
-                        let buffer = if let Some(children) = children {
-                            children.get_string(doc, 1)
-                        } else {
-                            null_mut()
-                        };
-                        if !buffer.is_null() {
-                            ret = xml_strcat(ret, buffer);
-                            xml_free(buffer as _);
+                        if let Some(buffer) = children.and_then(|c| c.get_string(doc, 1)) {
+                            let buffer = CString::new(buffer).unwrap();
+                            ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
                         }
                     } else {
                         ret = xml_strcat(ret, (*node).content);
@@ -1704,7 +1692,13 @@ impl XmlNode {
             }
             node = (*node).next().map_or(null_mut(), |n| n.as_ptr());
         }
-        ret
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
     }
 
     /// Builds the string equivalent to the text contained in the Node list
