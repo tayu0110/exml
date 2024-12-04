@@ -220,7 +220,7 @@ pub trait NodeCommon {
     }
 
     #[doc(hidden)]
-    unsafe fn get_prop_node_value_internal(&self) -> *mut XmlChar {
+    unsafe fn get_prop_node_value_internal(&self) -> Option<String> {
         if matches!(self.element_type(), XmlElementType::XmlAttributeNode) {
             // Note that we return at least the empty string.
             // TODO: Do we really always want that?
@@ -232,24 +232,36 @@ pub trait NodeCommon {
                     )
                 {
                     // Optimization for the common case: only 1 text node.
-                    return xml_strdup(children.content);
+                    return (!children.content.is_null()).then(|| {
+                        CStr::from_ptr(children.content as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    });
                 } else {
                     let ret: *mut XmlChar = children.get_string(self.document(), 1);
                     if !ret.is_null() {
-                        return ret;
+                        return Some(
+                            CStr::from_ptr(ret as *const i8)
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
                     }
                 }
             }
-            xml_strdup(c"".as_ptr() as _)
+            Some("".to_owned())
         } else if matches!(self.element_type(), XmlElementType::XmlAttributeDecl) {
-            xml_strdup(
-                self.as_attribute_decl_node()
-                    .unwrap()
-                    .as_ref()
-                    .default_value,
-            )
+            let def = self
+                .as_attribute_decl_node()
+                .unwrap()
+                .as_ref()
+                .default_value;
+            (!def.is_null()).then(|| {
+                CStr::from_ptr(def as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            })
         } else {
-            null_mut()
+            None
         }
     }
 
@@ -1086,15 +1098,7 @@ impl XmlNode {
                 Some(r)
             }
             XmlElementType::XmlAttributeNode => {
-                let ret =
-                    (*(self as *const XmlNode as *const XmlAttr)).get_prop_node_value_internal();
-                let r = (!ret.is_null()).then(|| {
-                    CStr::from_ptr(ret as *const i8)
-                        .to_string_lossy()
-                        .into_owned()
-                });
-                xml_free(ret as _);
-                r
+                (*(self as *const XmlNode as *const XmlAttr)).get_prop_node_value_internal()
             }
             XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
                 if !self.content.is_null() {
@@ -1504,14 +1508,7 @@ impl XmlNode {
         if prop.is_null() {
             return None;
         }
-        let ret = (*prop).get_prop_node_value_internal();
-        let r = (!ret.is_null()).then(|| {
-            CStr::from_ptr(ret as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        xml_free(ret as _);
-        r
+        (*prop).get_prop_node_value_internal()
     }
 
     /// Search and get the value of an attribute associated to a node.
@@ -1532,14 +1529,7 @@ impl XmlNode {
         if prop.is_null() {
             return None;
         }
-        let ret = (*prop).get_prop_node_value_internal();
-        let r = (!ret.is_null()).then(|| {
-            CStr::from_ptr(ret as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        xml_free(ret as _);
-        r
+        (*prop).get_prop_node_value_internal()
     }
 
     /// Search and get the value of an attribute associated to a node
@@ -1559,14 +1549,7 @@ impl XmlNode {
         if prop.is_null() {
             return None;
         }
-        let ret = (*prop).get_prop_node_value_internal();
-        let r = (!ret.is_null()).then(|| {
-            CStr::from_ptr(ret as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        xml_free(ret as _);
-        r
+        (*prop).get_prop_node_value_internal()
     }
 
     /// Search all the namespace applying to a given element.
