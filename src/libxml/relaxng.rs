@@ -3534,7 +3534,6 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         let base = (*cur)
                             .get_base((*cur).doc)
                             .map(|c| CString::new(c).unwrap());
-                        eprintln!("base: {base:?}");
                         let url: *mut XmlChar = xml_build_uri(
                             href,
                             base.as_ref()

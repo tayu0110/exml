@@ -216,7 +216,6 @@ pub trait NodeCommon {
                     {
                         return build_uri(bases.into_iter().rev().map(|b| b.into()), &base);
                     }
-                    eprintln!("get_base: {base}");
                     bases.push(base);
                 }
             }
