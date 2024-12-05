@@ -13,6 +13,7 @@ use std::{
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
+    str::from_utf8,
     sync::{
         atomic::{AtomicPtr, AtomicUsize, Ordering},
         Condvar, Mutex, OnceLock,
@@ -50,10 +51,7 @@ use exml::{
         parser_internals::xml_create_file_parser_ctxt,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::{xml_relaxng_init_types, XmlRelaxNGPtr},
-        uri::{
-            xml_build_uri, xml_create_uri, xml_free_uri, xml_normalize_uri_path,
-            xml_parse_uri_reference, xml_print_uri, XmlURIPtr,
-        },
+        uri::xml_build_uri,
         valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
         xmlmemory::{
@@ -71,6 +69,7 @@ use exml::{
         xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
         XmlEnumerationPtr, XmlNodePtr,
     },
+    uri::{normalize_uri_path, XmlURI},
     SYSCONFDIR,
 };
 use libc::{free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
@@ -3333,29 +3332,26 @@ unsafe fn xmlid_doc_test(
     res
 }
 
-unsafe extern "C" fn handle_uri(str: *const c_char, base: *const c_char, o: &mut File) {
-    let ret: i32;
+unsafe fn handle_uri(str: &str, base: *const c_char, o: &mut File) {
     let mut res: *mut XmlChar = null_mut();
-    let uri: XmlURIPtr = xml_create_uri();
+    let mut uri = XmlURI::new();
 
+    let cstr = CString::new(str).unwrap();
     if base.is_null() {
-        ret = xml_parse_uri_reference(uri, str);
-        if ret != 0 {
-            writeln!(
-                o,
-                "{} : error {}",
-                CStr::from_ptr(str).to_string_lossy(),
-                ret
-            )
-            .ok();
+        let ret = uri.parse_uri_reference(str);
+        if let Err(ret) = ret {
+            writeln!(o, "{str} : error {}", ret).ok();
         } else {
-            xml_normalize_uri_path((*uri).path);
-            xml_print_uri(o, uri);
-            writeln!(o).ok();
+            if let Some(path) = uri.path.take() {
+                let new_path = normalize_uri_path(&path);
+                uri.path = Some(new_path.into_owned().into());
+            }
+            eprintln!("str: {str:<20}, uri: {uri}, debug: {uri:?}");
+            writeln!(o, "{uri}").ok();
             o.flush().ok();
         }
     } else {
-        res = xml_build_uri(str as *mut XmlChar, base as *mut XmlChar);
+        res = xml_build_uri(cstr.as_ptr() as *mut XmlChar, base as *mut XmlChar);
         if !res.is_null() {
             writeln!(
                 o,
@@ -3370,7 +3366,7 @@ unsafe extern "C" fn handle_uri(str: *const c_char, base: *const c_char, o: &mut
     if !res.is_null() {
         xml_free(res as _);
     }
-    xml_free_uri(uri);
+    // xml_free_uri(uri);
 }
 
 /**
@@ -3414,15 +3410,10 @@ unsafe fn uri_common_test(
 
     let mut str = vec![];
     loop {
-        /*
-         * read one line in string buffer.
-         */
+        // read one line in string buffer.
         match f.read_until(b'\n', &mut str) {
             Ok(mut len) if len > 0 => {
-                /*
-                 * remove the ending spaces
-                 */
-                str.push(0);
+                // remove the ending spaces
                 while len > 0
                     && (str[len - 1] == b'\n'
                         || str[len - 1] == b'\r'
@@ -3430,14 +3421,10 @@ unsafe fn uri_common_test(
                         || str[len - 1] == b'\t')
                 {
                     len -= 1;
-                    if len == str.len() {
-                        str.push(0);
-                    } else {
-                        str[len] = 0;
-                    }
+                    str.pop();
                 }
                 NB_TESTS.set(NB_TESTS.get() + 1);
-                handle_uri(str.as_ptr() as _, base, &mut o);
+                handle_uri(from_utf8(&str).unwrap(), base, &mut o);
             }
             _ => {
                 break;
