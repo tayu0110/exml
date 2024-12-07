@@ -1179,3 +1179,84 @@ pub fn normalize_uri_path(path: &str) -> Cow<'_, str> {
     }
     Cow::Owned(path)
 }
+
+/// Returns a new canonic path, or a duplicate of the path parameter if the
+/// construction fails. The caller is responsible for freeing the memory occupied
+/// by the returned string. If there is insufficient memory available, or the
+/// argument is NULL, the function returns NULL.
+#[doc(alias = "xmlCanonicPath")]
+pub fn canonic_path(mut path: &str) -> Cow<'_, str> {
+    // For Windows implementations, additional work needs to be done to
+    // replace backslashes in pathnames with "forward slashes"
+    #[cfg(target_os = "windows")]
+    let mut len: i32 = 0;
+    #[cfg(target_os = "windows")]
+    let mut p: *mut c_char = null_mut();
+
+    #[cfg(target_os = "windows")]
+    {
+        // We must not change the backslashes to slashes if the the path
+        // starts with \\?\
+        // Those paths can be up to 32k characters long.
+        // Was added specifically for OpenOffice, those paths can't be converted
+        // to URIs anyway.
+        if path.starts_with("\\\\?\\") {
+            return Cow::Borrowed(path);
+        }
+    }
+
+    // sanitize filename starting with // so it can be used as URI
+    if path.starts_with("//") && (path.len() < 3 || path.as_bytes()[2] != b'/') {
+        path = &path[1..];
+    }
+
+    if XmlURI::parse(path).is_some() {
+        return Cow::Borrowed(path);
+    };
+
+    // Check if this is an "absolute uri"
+    if let Some(pos) = path.find("://") {
+        // this looks like an URI where some parts have not been
+        // escaped leading to a parsing problem.
+        // Check that the first part matches a protocol.
+
+        // Bypass if first part (part before the '://') is > 20 chars
+        if pos <= 20 {
+            // Bypass if any non-alpha characters are present in first part
+            if path[..pos].bytes().all(|c| c.is_ascii_alphabetic()) {
+                // Escape all except the characters specified in the supplied path
+                let esc_uri = escape_url_except(path, b":/?_.#&;=");
+                // Try parsing the escaped path
+                // If successful, return the escaped string
+                if XmlURI::parse(esc_uri.as_ref()).is_some() {
+                    return esc_uri;
+                }
+            }
+        }
+    }
+
+    // For Windows implementations, replace backslashes with 'forward slashes'
+    #[cfg(target_os = "windows")]
+    {
+        // Create a URI structure
+        let uri = XmlURI::new();
+        if len > 2 && IS_WINDOWS_PATH!(path) {
+            // make the scheme 'file'
+            uri.scheme = Some(Cow::Borrowed("file"));
+            // allocate space for leading '/' + path + string terminator
+            uri.path = Some(Cow::Owned(format!("/{}", path.replace('\\', '/'))));
+        } else {
+            uri.path = Some(Cow::Owned(path.replace('\\', '/')));
+        }
+
+        if uri.scheme.is_some() {
+            Cow::Owned(uri.save())
+        } else {
+            uri.path.unwrap()
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Cow::Borrowed(path)
+    }
+}
