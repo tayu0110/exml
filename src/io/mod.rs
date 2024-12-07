@@ -60,10 +60,10 @@ use crate::{
             XML_SAX2_MAGIC,
         },
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
-        uri::xml_canonic_path,
         xmlstring::{xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,
+    uri::canonic_path,
 };
 
 pub use input::*;
@@ -655,8 +655,8 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
 ///
 /// Returns a canonicalized version of the path
 #[doc(alias = "xmlNormalizeWindowsPath")]
-pub unsafe extern "C" fn xml_normalize_windows_path(path: *const XmlChar) -> *mut XmlChar {
-    xml_canonic_path(path)
+pub fn xml_normalize_windows_path(path: &str) -> Cow<'_, str> {
+    canonic_path(path)
 }
 
 /// function checks to see if `path` is a valid source (file, socket...) for XML.
@@ -964,35 +964,6 @@ mod tests {
             }
         }
         drop(lock);
-    }
-
-    #[test]
-    fn test_xml_normalize_windows_path() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_path in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let path = gen_const_xml_char_ptr(n_path, 0);
-
-                let ret_val = xml_normalize_windows_path(path as *const XmlChar);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_char_ptr(n_path, path, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNormalizeWindowsPath",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlNormalizeWindowsPath()"
-                    );
-                    eprintln!(" {}", n_path);
-                }
-            }
-        }
     }
 
     #[test]

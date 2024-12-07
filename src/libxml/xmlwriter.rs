@@ -26,7 +26,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, CStr},
     io::{self, Write},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
@@ -58,10 +58,10 @@ use crate::{
             XmlParserInputState, XmlSAXHandler, XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        uri::xml_canonic_path,
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
     tree::{xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
+    uri::canonic_path,
 };
 
 use super::xmlsave::xml_buf_attr_serialize_txt_content;
@@ -627,16 +627,8 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
         && !(*ctxt).input.is_null()
         && (*(*ctxt).input).filename.is_some()
     {
-        let filename = CString::new((*(*ctxt).input).filename.as_deref().unwrap()).unwrap();
-        let url = xml_canonic_path(filename.as_ptr() as _);
-        if !url.is_null() {
-            (*(*ctxt).my_doc).url = Some(
-                CStr::from_ptr(url as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(url as _);
-        }
+        let url = canonic_path((*(*ctxt).input).filename.as_deref().unwrap());
+        (*(*ctxt).my_doc).url = Some(url.into_owned());
         if (*(*ctxt).my_doc).url.is_none() {
             (*(*ctxt).my_doc).url = (*(*ctxt).input).filename.clone()
         }
