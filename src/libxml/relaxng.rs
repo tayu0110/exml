@@ -45,7 +45,7 @@ use crate::{
         },
         parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
-        uri::{xml_build_uri, xml_free_uri, xml_parse_uri, xml_uri_escape_str, XmlURIPtr},
+        uri::{xml_free_uri, xml_parse_uri, xml_uri_escape_str, XmlURIPtr},
         valid::{xml_validate_document_final, XmlValidCtxt},
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_is_determinist,
@@ -74,6 +74,7 @@ use crate::{
         xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
+    uri::{build_uri, XmlURI},
 };
 
 use super::chvalid::xml_is_blank_char;
@@ -3487,9 +3488,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             delete = cur;
                             break 'skip_children;
                         };
-                        let href = CString::new(href).unwrap();
-                        let uri: XmlURIPtr = xml_parse_uri(href.as_ptr());
-                        if uri.is_null() {
+                        let Some(uri) = XmlURI::parse(&href) else {
+                            let href = CString::new(href).unwrap();
                             xml_rng_perr(
                                 ctxt,
                                 cur,
@@ -3500,8 +3500,9 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             );
                             delete = cur;
                             break 'skip_children;
-                        }
-                        if !(*uri).fragment.is_null() {
+                        };
+                        if uri.fragment.is_some() {
+                            let href = CString::new(href).unwrap();
                             xml_rng_perr(
                                 ctxt,
                                 cur,
@@ -3510,20 +3511,14 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 href.as_ptr() as *const u8,
                                 null_mut(),
                             );
-                            xml_free_uri(uri);
                             delete = cur;
                             break 'skip_children;
                         }
-                        xml_free_uri(uri);
-                        let base = (*cur)
+                        let Some(url) = (*cur)
                             .get_base((*cur).doc)
-                            .map(|c| CString::new(c).unwrap());
-                        let url: *mut XmlChar = xml_build_uri(
-                            href.as_ptr() as *const u8,
-                            base.as_ref()
-                                .map_or(null_mut(), |b| b.as_ptr() as *const u8),
-                        );
-                        if url.is_null() {
+                            .and_then(|base| build_uri(&href, &base))
+                        else {
+                            let href = CString::new(href).unwrap();
                             xml_rng_perr(
                                 ctxt,
                                 cur,
@@ -3534,11 +3529,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             );
                             delete = cur;
                             break 'skip_children;
-                        }
+                        };
+                        let url = CString::new(url).unwrap();
                         let ns = ns.map(|n| CString::new(n).unwrap());
                         let docu: XmlRelaxNGDocumentPtr = xml_relaxng_load_external_ref(
                             ctxt,
-                            url,
+                            url.as_ptr() as *const u8,
                             ns.as_ref().map_or(null_mut(), |n| n.as_ptr() as *const u8),
                         );
                         if docu.is_null() {
@@ -3547,14 +3543,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 cur,
                                 XmlParserErrors::XmlRngpExternalRefFailure,
                                 c"Failed to load externalRef %s\n".as_ptr() as _,
-                                url,
+                                url.as_ptr() as *const u8,
                                 null_mut(),
                             );
-                            xml_free(url as _);
                             delete = cur;
                             break 'skip_children;
                         }
-                        xml_free(url as _);
                         (*cur).psvi = docu as _;
                     } else if xml_str_equal((*cur).name, c"include".as_ptr() as _) {
                         let mut tmp: XmlNodePtr;
@@ -3571,16 +3565,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             delete = cur;
                             break 'skip_children;
                         };
-                        let href = CString::new(href).unwrap();
-                        let base = (*cur)
+
+                        let Some(url) = (*cur)
                             .get_base((*cur).doc)
-                            .map(|c| CString::new(c).unwrap());
-                        let url: *mut XmlChar = xml_build_uri(
-                            href.as_ptr() as *const u8,
-                            base.as_ref()
-                                .map_or(null_mut(), |b| b.as_ptr() as *const u8),
-                        );
-                        if url.is_null() {
+                            .and_then(|base| build_uri(&href, &base))
+                        else {
+                            let href = CString::new(href).unwrap();
                             xml_rng_perr(
                                 ctxt,
                                 cur,
@@ -3591,7 +3581,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             );
                             delete = cur;
                             break 'skip_children;
-                        }
+                        };
+                        let url = CString::new(url).unwrap();
                         let mut ns = (*cur).get_prop("ns");
                         if ns.is_none() {
                             tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -3608,7 +3599,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         let ns = ns.map(|n| CString::new(n).unwrap());
                         let incl: XmlRelaxNGIncludePtr = xml_relaxng_load_include(
                             ctxt,
-                            url,
+                            url.as_ptr() as *const u8,
                             cur,
                             ns.as_ref().map_or(null_mut(), |n| n.as_ptr() as *const u8),
                         );
@@ -3618,14 +3609,12 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 cur,
                                 XmlParserErrors::XmlRngpIncludeFailure,
                                 c"Failed to load include %s\n".as_ptr() as _,
-                                url,
+                                url.as_ptr() as *const u8,
                                 null_mut(),
                             );
-                            xml_free(url as _);
                             delete = cur;
                             break 'skip_children;
                         }
-                        xml_free(url as _);
                         (*cur).psvi = incl as _;
                     } else if xml_str_equal((*cur).name, c"element".as_ptr() as _)
                         || xml_str_equal((*cur).name, c"attribute".as_ptr() as _)
