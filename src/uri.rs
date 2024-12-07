@@ -18,8 +18,6 @@
 
 use std::{borrow::Cow, fmt::Display, string::FromUtf8Error};
 
-use url::Url;
-
 fn is_reserved(c: u8) -> bool {
     c == b';'
         || c == b'/'
@@ -790,21 +788,6 @@ fn parse3986_segment(mut s: &str, forbid: u8, empty: bool) -> Result<&str, i32> 
     Ok(s)
 }
 
-pub fn join_uris<'a>(mut uri: impl Iterator<Item = Cow<'a, str>>, base: &str) -> Option<String> {
-    if let Ok(base) = Url::parse(base) {
-        let res = uri.try_fold(base, |base, uri| base.join(uri.as_ref()).ok())?;
-        Some(res.as_str().to_owned())
-    } else if let Ok(base) = Url::from_directory_path(base) {
-        let res = uri.try_fold(base, |base, uri| base.join(uri.as_ref()).ok())?;
-        Some(res.path().to_owned())
-    } else {
-        let root = Url::from_directory_path("/").ok()?;
-        let base = root.join(base).ok()?;
-        let res = uri.try_fold(base, |base, uri| base.join(uri.as_ref()).ok())?;
-        Some(res.path()[1..].to_owned())
-    }
-}
-
 /// Computes he final URI of the reference done by checking that
 /// the given URI is valid, and building the final URI using the
 /// base URI. This is processed according to section 5.2 of the
@@ -957,8 +940,6 @@ pub fn build_uri(uri: &str, base: &str) -> Option<String> {
         if let Some(bas_path) = bas.path.as_deref() {
             if let Some(pos) = bas_path.rfind('/') {
                 path.push_str(&bas_path[..pos + 1]);
-            } else {
-                path.push_str(bas_path);
             }
         }
 
