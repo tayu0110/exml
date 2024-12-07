@@ -978,6 +978,98 @@ pub fn build_uri(uri: &str, base: &str) -> Option<String> {
     Some(res.save())
 }
 
+/// This routine escapes a string to hex, ignoring reserved characters
+/// (a-z, A-Z, 0-9, "@-_.!~*'()") and the characters in the exception list.
+///
+/// Returns a new escaped string or NULL in case of error.
+#[doc(alias = "xmlURIEscapeStr")]
+pub fn escape_url_except<'a>(s: &'a str, except: &[u8]) -> Cow<'a, str> {
+    if s.is_empty() {
+        return Cow::Borrowed(s);
+    }
+    let mut ret = String::with_capacity(s.len());
+    for ch in s.bytes() {
+        if ch != b'@' && !is_unreserved(ch) && !except.contains(&ch) {
+            ret.push('%');
+            let hi = to_hexdigit(ch >> 4);
+            let lo = to_hexdigit(ch & 0x0F);
+            ret.push(hi);
+            ret.push(lo);
+        } else {
+            ret.push(ch as char);
+        }
+    }
+    Cow::Owned(ret)
+}
+
+/// Escaping routine, does not do validity checks !
+/// It will try to escape the chars needing this, but this is heuristic
+/// based it's impossible to be sure.
+///
+/// Returns an copy of the string, but escaped
+#[doc(alias = "xmlURIEscape")]
+pub fn escape_url(s: &str) -> Option<String> {
+    use std::fmt::Write as _;
+
+    let mut uri = XmlURI::new();
+    // Allow escaping errors in the unescaped form
+    uri.cleanup = 1;
+    uri.parse_uri_reference(s).ok()?;
+
+    let mut ret = String::new();
+
+    if let Some(scheme) = uri.scheme.as_deref() {
+        let segment = escape_url_except(scheme, b"+-.");
+        write!(ret, "{segment}:").ok()?;
+    }
+
+    if let Some(authority) = uri.authority.as_deref() {
+        let segment = escape_url_except(authority, b"/?;:@");
+        write!(ret, "//{segment}").ok()?;
+    }
+
+    if let Some(user) = uri.user.as_deref() {
+        let segment = escape_url_except(user, b";:&=+$,");
+        write!(ret, "//{segment}@").ok()?;
+    }
+
+    if let Some(server) = uri.server.as_deref() {
+        let segment = escape_url_except(server, b"/?;:@");
+        if uri.user.is_none() {
+            write!(ret, "//").ok()?;
+        }
+        write!(ret, "{segment}").ok()?;
+    }
+
+    if let Some(port) = uri.port.filter(|&p| p > 0) {
+        write!(ret, ":{port}");
+    }
+
+    if let Some(path) = uri.path.as_deref() {
+        let segment = escape_url_except(path, b":@&=+$,/?;");
+        write!(ret, "{segment}").ok()?;
+    }
+
+    if let Some(query) = uri.query_raw.as_deref() {
+        write!(ret, "?{query}").ok()?;
+    } else if let Some(query) = uri.query.as_deref() {
+        let segment = escape_url_except(query, b";/?:@&=+,$");
+        write!(ret, "?{segment}").ok()?;
+    }
+
+    if let Some(opaque) = uri.opaque.as_deref() {
+        let segment = escape_url_except(opaque, b"");
+        write!(ret, "{segment}").ok()?;
+    }
+
+    if let Some(fragment) = uri.fragment.as_deref() {
+        let segment = escape_url_except(fragment, b"#");
+        write!(ret, "#{segment}").ok()?;
+    }
+
+    Some(ret)
+}
+
 /// Unescaping routine, but does not check that the string is an URI.
 /// The output is a direct unsigned char translation of %XX values (no encoding)
 ///
