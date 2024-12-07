@@ -992,7 +992,7 @@ unsafe extern "C" fn html_attr_dump_output(
 ) {
     use std::ffi::CStr;
 
-    use crate::libxml::{chvalid::xml_is_blank_char, globals::xml_free, uri::xml_uri_escape_str};
+    use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
 
     // The html output method should not escape a & character
     // occurring in an attribute value immediately followed by
@@ -1033,8 +1033,6 @@ unsafe extern "C" fn html_attr_dump_output(
                     .is_some()
             {
                 let tmp = value.trim_start_matches(|c| xml_is_blank_char(c as u32));
-                let tmp = CString::new(tmp).unwrap();
-                let value = CString::new(value.as_str()).unwrap();
 
                 // Angle brackets are technically illegal in URIs, but they're
                 // used in server side includes, for example. Curly brackets
@@ -1042,17 +1040,10 @@ unsafe extern "C" fn html_attr_dump_output(
                 // Don't escape non-whitespace, printable ASCII chars for
                 // improved interoperability. Only escape space, control
                 // and non-ASCII chars.
-                let escaped: *mut XmlChar = xml_uri_escape_str(
-                    tmp.as_ptr() as *const u8,
-                    c"\"#$%&+,/:;<=>?@[\\]^`{|}".as_ptr() as _,
-                );
-                if !escaped.is_null() {
-                    if let Some(mut buf) = buf.buffer {
-                        buf.push_quoted_cstr(CStr::from_ptr(escaped as *const i8));
-                    }
-                    xml_free(escaped as _);
-                } else if let Some(mut buf) = buf.buffer {
-                    buf.push_quoted_cstr(&value);
+                let escaped = escape_url_except(tmp, b"\"#$%&+,/:;<=>?@[\\]^`{|}");
+                if let Some(mut buf) = buf.buffer {
+                    let escaped = CString::new(escaped.as_ref()).unwrap();
+                    buf.push_quoted_cstr(&escaped);
                 }
             } else if let Some(mut buf) = buf.buffer {
                 let value = CString::new(value.as_str()).unwrap();

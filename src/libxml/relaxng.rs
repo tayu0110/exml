@@ -45,7 +45,7 @@ use crate::{
         },
         parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
-        uri::{xml_free_uri, xml_parse_uri, xml_uri_escape_str, XmlURIPtr},
+        uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{xml_validate_document_final, XmlValidCtxt},
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_is_determinist,
@@ -74,7 +74,7 @@ use crate::{
         xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
-    uri::{build_uri, XmlURI},
+    uri::{build_uri, escape_url_except, XmlURI},
 };
 
 use super::chvalid::xml_is_blank_char;
@@ -4521,8 +4521,6 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     mut node: XmlNodePtr,
 ) -> *mut XmlChar {
-    let escape: *mut XmlChar;
-
     if node.is_null() {
         return null_mut();
     }
@@ -4532,12 +4530,9 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
             if ret.is_empty() {
                 return null_mut();
             }
-            let ret = CString::new(ret).unwrap();
-            escape = xml_uri_escape_str(ret.as_ptr() as *const u8, c":/#?".as_ptr() as _);
-            if escape.is_null() {
-                return xml_strdup(ret.as_ptr() as *const u8);
-            }
-            return escape;
+            let escape = escape_url_except(&ret, b":/#?");
+            let escape = CString::new(escape.as_ref()).unwrap();
+            return xml_strdup(escape.as_ptr() as *const u8);
         }
     }
     node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -4546,12 +4541,9 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
             if ret.is_empty() {
                 return null_mut();
             }
-            let ret = CString::new(ret).unwrap();
-            escape = xml_uri_escape_str(ret.as_ptr() as *const u8, c":/#?".as_ptr() as _);
-            if escape.is_null() {
-                return xml_strdup(ret.as_ptr() as *const u8);
-            }
-            return escape;
+            let escape = escape_url_except(&ret, b":/#?");
+            let escape = CString::new(escape.as_ref()).unwrap();
+            return xml_strdup(escape.as_ptr() as *const u8);
         }
         node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
     }
