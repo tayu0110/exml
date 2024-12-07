@@ -47,11 +47,11 @@ use crate::{
     buf::libxml_api::xml_buf_write_quoted_string,
     error::XmlParserErrors,
     io::XmlOutputBuffer,
-    libxml::uri::xml_build_uri,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType,
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
+    uri::build_uri,
 };
 
 use super::{
@@ -1395,21 +1395,14 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
             }
 
             // build uri
-            let cres = CString::new(res.as_str()).unwrap();
-            let ctmp_str = CString::new(tmp_str).unwrap();
-            let tmp_str2 =
-                xml_build_uri(cres.as_ptr() as *const u8, ctmp_str.as_ptr() as *const u8);
-            if tmp_str2.is_null() {
+            let Some(tmp_str2) = build_uri(&res, &tmp_str) else {
                 xml_c14n_err_internal(
                     c"processing xml:base attribute - can't construct uri".as_ptr() as _,
                 );
                 return null_mut();
             };
 
-            res = CStr::from_ptr(tmp_str2 as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(tmp_str2 as _);
+            res = tmp_str2;
         }
 
         // next
