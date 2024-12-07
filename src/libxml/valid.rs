@@ -4476,9 +4476,7 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
 pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     use std::ffi::CString;
 
-    use crate::libxml::parser::xml_parse_dtd;
-
-    use super::uri::xml_build_uri;
+    use crate::{libxml::parser::xml_parse_dtd, uri::build_uri};
 
     let mut ret: i32;
 
@@ -4498,15 +4496,13 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         && ((*(*doc).int_subset).system_id.is_some() || (*(*doc).int_subset).external_id.is_some())
         && (*doc).ext_subset.is_null()
     {
-        let sys_id: *mut XmlChar;
-        if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
-            let url = (*doc).url.as_deref().map(|u| CString::new(u).unwrap());
-            let system_id = CString::new(system_id).unwrap();
-            sys_id = xml_build_uri(
-                system_id.as_ptr() as *const u8,
-                url.map_or(null(), |u| u.as_ptr() as *const u8),
-            );
-            if sys_id.is_null() {
+        let sys_id = if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
+            let Some(sys_id) = (*doc)
+                .url
+                .as_deref()
+                .and_then(|base| build_uri(system_id, base))
+            else {
+                let system_id = CString::new(system_id).unwrap();
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
@@ -4514,10 +4510,12 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
                     system_id.as_ptr(),
                 );
                 return 0;
-            }
+            };
+            Some(sys_id)
         } else {
-            sys_id = null_mut();
-        }
+            None
+        };
+        let sys_id = sys_id.map(|s| CString::new(s).unwrap());
         let external_id = (*(*doc).int_subset)
             .external_id
             .as_deref()
@@ -4526,11 +4524,10 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
             external_id
                 .as_ref()
                 .map_or(null_mut(), |e| e.as_ptr() as *const u8),
-            sys_id as *const XmlChar,
+            sys_id
+                .as_ref()
+                .map_or(null_mut(), |s| s.as_ptr() as *const u8),
         );
-        if !sys_id.is_null() {
-            xml_free(sys_id as _);
-        }
         if (*doc).ext_subset.is_null() {
             if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
                 let system_id = CString::new(system_id).unwrap();
