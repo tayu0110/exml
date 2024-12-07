@@ -51,10 +51,7 @@ use crate::{
             XmlParserOption, XML_DETECT_IDS,
         },
         parser_internals::{xml_free_input_stream, xml_string_current_char},
-        uri::{
-            xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, xml_uri_escape,
-            XmlURIPtr,
-        },
+        uri::{xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, XmlURIPtr},
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
         xpath::{
             xml_xpath_free_context, xml_xpath_free_object, XmlNodeSetPtr, XmlXPathContextPtr,
@@ -67,7 +64,7 @@ use crate::{
         xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
         NodeCommon, NodePtr, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
-    uri::{build_uri, XmlURI},
+    uri::{build_uri, escape_url, XmlURI},
 };
 
 use super::chvalid::xml_is_char;
@@ -479,8 +476,8 @@ unsafe extern "C" fn xml_xinclude_add_node(
     // compute the URI
     let mut base = None;
     let mut uri = if let Some(b) = (*cur).get_base((*ctxt).doc) {
-        base = Some(CString::new(b.as_str()).unwrap());
-        build_uri(&href, &b)
+        base = Some(b);
+        build_uri(&href, base.as_deref().unwrap())
     } else {
         (*(*ctxt).doc)
             .url
@@ -488,23 +485,11 @@ unsafe extern "C" fn xml_xinclude_add_node(
             .and_then(|base| build_uri(&href, base))
     };
     if uri.is_none() {
-        // Some escaping may be needed
-        let escbase: *mut XmlChar = xml_uri_escape(
-            base.as_ref()
-                .map_or(null_mut(), |b| b.as_ptr() as *const u8),
-        );
-        let href = CString::new(href.as_str()).unwrap();
-        let eschref: *mut XmlChar = xml_uri_escape(href.as_ptr() as *const u8);
-        if !escbase.is_null() && !eschref.is_null() {
-            let href = CStr::from_ptr(eschref as *const i8).to_string_lossy();
-            let base = CStr::from_ptr(escbase as *const i8).to_string_lossy();
-            uri = build_uri(&href, &base);
-        }
-        if !escbase.is_null() {
-            xml_free(escbase as _);
-        }
-        if !eschref.is_null() {
-            xml_free(eschref as _);
+        if let Some(base) = base.as_deref() {
+            // Some escaping may be needed
+            if let (Some(escbase), Some(eschref)) = (escape_url(base), escape_url(&href)) {
+                uri = build_uri(&eschref, &escbase);
+            }
         }
     }
     let Some(uri) = uri else {
@@ -2176,8 +2161,8 @@ unsafe extern "C" fn xml_xinclude_load_node(
     // compute the URI
     let mut base = None;
     let mut uri = if let Some(b) = (*cur).get_base((*ctxt).doc) {
-        base = CString::new(b.as_str()).ok();
-        build_uri(&href, &b)
+        base = Some(b);
+        build_uri(&href, base.as_deref().unwrap())
     } else {
         (*(*ctxt).doc)
             .url
@@ -2185,23 +2170,11 @@ unsafe extern "C" fn xml_xinclude_load_node(
             .and_then(|base| build_uri(&href, base))
     };
     if uri.is_none() {
-        // Some escaping may be needed
-        let escbase: *mut XmlChar = xml_uri_escape(
-            base.as_ref()
-                .map_or(null_mut(), |b| b.as_ptr() as *const u8),
-        );
-        let href = CString::new(href.as_str()).unwrap();
-        let eschref: *mut XmlChar = xml_uri_escape(href.as_ptr() as *const u8);
-        if !escbase.is_null() && !eschref.is_null() {
-            let escbase = CStr::from_ptr(escbase as *const i8).to_string_lossy();
-            let eschref = CStr::from_ptr(eschref as *const i8).to_string_lossy();
-            uri = build_uri(&eschref, &escbase);
-        }
-        if !escbase.is_null() {
-            xml_free(escbase as _);
-        }
-        if !eschref.is_null() {
-            xml_free(eschref as _);
+        if let Some(base) = base.as_deref() {
+            // Some escaping may be needed
+            if let (Some(escbase), Some(eschref)) = (escape_url(base), escape_url(&href)) {
+                uri = build_uri(&eschref, &escbase);
+            }
         }
     }
     let Some(uri) = uri else {
