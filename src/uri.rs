@@ -728,6 +728,18 @@ impl XmlURI {
     pub fn parse_uri_reference(&mut self, s: &str) -> Result<(), i32> {
         self.parse3986_uri_reference(s)
     }
+
+    /// Parse an URI based on RFC 3986
+    ///
+    /// `URI-reference = [ absoluteURI | relativeURI ] [ "#" fragment ]`
+    ///
+    /// Returns a newly built xmlURIPtr or NULL in case of error
+    #[doc(alias = "xmlParseURI")]
+    pub fn parse(s: &str) -> Option<Self> {
+        let mut uri = Self::new();
+        uri.parse3986_uri_reference(s).ok()?;
+        Some(uri)
+    }
 }
 
 impl Display for XmlURI {
