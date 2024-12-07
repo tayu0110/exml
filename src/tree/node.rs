@@ -1350,7 +1350,7 @@ impl XmlNode {
             if let Some(ns_name) = ns_name {
                 // We want the attr to be in the specified namespace.
                 let ns_name = CString::new(ns_name).unwrap();
-                while {
+                while !prop.is_null() {
                     if !(*prop).ns.is_null()
                         && (*prop).name().as_deref() == Some(name)
                         && ((*(*prop).ns).href == ns_name.as_ptr() as _
@@ -1361,8 +1361,7 @@ impl XmlNode {
                     prop = (*prop)
                         .next()
                         .map_or(null_mut(), |p| p.as_ptr() as *mut XmlAttr);
-                    !prop.is_null()
-                } {}
+                }
             } else {
                 // We want the attr to be in no namespace.
                 while {
@@ -1715,10 +1714,10 @@ impl XmlNode {
     /// made of TEXTs and ENTITY_REFs, contrary to `xmlNodeListGetString()`
     /// this function doesn't do any character encoding handling.
     ///
-    /// Returns a pointer to the string copy, the caller must free it with `xml_free()`.
+    /// Returns a pointer to the string copy
     #[doc(alias = "xmlNodeListGetRawString")]
     #[cfg(feature = "libxml_tree")]
-    pub unsafe fn get_raw_string(&self, doc: *const XmlDoc, in_line: i32) -> *mut XmlChar {
+    pub unsafe fn get_raw_string(&self, doc: *const XmlDoc, in_line: i32) -> Option<String> {
         use crate::libxml::entities::xml_encode_special_chars;
 
         let mut node: *const XmlNode = self;
@@ -1751,14 +1750,9 @@ impl XmlNode {
                         // -> we recursive  call xmlNodeListGetRawString()
                         // which handles these types
                         let children = (*ent).children();
-                        let buffer = if let Some(children) = children {
-                            children.get_raw_string(doc, 1)
-                        } else {
-                            null_mut()
-                        };
-                        if !buffer.is_null() {
-                            ret = xml_strcat(ret, buffer);
-                            xml_free(buffer as _);
+                        let buffer = children.and_then(|c| c.get_raw_string(doc, 1));
+                        if let Some(buffer) = buffer.map(|b| CString::new(b).unwrap()) {
+                            ret = xml_strcat(ret, buffer.as_ptr() as *const u8);
                         }
                     } else {
                         ret = xml_strcat(ret, (*node).content);
@@ -1777,7 +1771,13 @@ impl XmlNode {
             }
             node = (*node).next().map_or(null_mut(), |n| n.as_ptr());
         }
-        ret
+        let r = (!ret.is_null()).then(|| {
+            CStr::from_ptr(ret as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        xml_free(ret as _);
+        r
     }
 
     /// Set (or reset) the name of a node.
