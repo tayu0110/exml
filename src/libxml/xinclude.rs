@@ -52,8 +52,8 @@ use crate::{
         },
         parser_internals::{xml_free_input_stream, xml_string_current_char},
         uri::{
-            xml_build_relative_uri, xml_build_uri, xml_free_uri, xml_parse_uri, xml_save_uri,
-            xml_uri_escape, XmlURIPtr,
+            xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, xml_uri_escape,
+            XmlURIPtr,
         },
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
         xpath::{
@@ -67,6 +67,7 @@ use crate::{
         xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
         NodeCommon, NodePtr, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
+    uri::{build_uri, XmlURI},
 };
 
 use super::chvalid::xml_is_char;
@@ -84,9 +85,9 @@ pub const XINCLUDE_HREF: &CStr = c"href";
 /// Macro defining "parse"
 pub const XINCLUDE_PARSE: &CStr = c"parse";
 /// Macro defining "xml"
-pub const XINCLUDE_PARSE_XML: &CStr = c"xml";
+pub const XINCLUDE_PARSE_XML: &str = "xml";
 /// Macro defining "text"
-pub const XINCLUDE_PARSE_TEXT: &CStr = c"text";
+pub const XINCLUDE_PARSE_TEXT: &str = "text";
 /// Macro defining "encoding"
 pub const XINCLUDE_PARSE_ENCODING: &CStr = c"encoding";
 /// Macro defining "xpointer"
@@ -322,22 +323,18 @@ unsafe fn xml_xinclude_get_prop(
     ctxt: XmlXincludeCtxtPtr,
     cur: XmlNodePtr,
     name: &str,
-) -> *mut XmlChar {
+) -> Option<String> {
     if let Some(ret) = (*cur).get_ns_prop(XINCLUDE_NS.to_string_lossy().as_ref(), Some(name)) {
-        let ret = CString::new(ret).unwrap();
-        return xml_strdup(ret.as_ptr() as *const u8);
+        return Some(ret);
     }
     if (*ctxt).legacy != 0 {
         if let Some(ret) =
             (*cur).get_ns_prop(XINCLUDE_OLD_NS.to_string_lossy().as_ref(), Some(name))
         {
-            let ret = CString::new(ret).unwrap();
-            return xml_strdup(ret.as_ptr() as *const u8);
+            return Some(ret);
         }
     }
-    let ret = (*cur).get_prop(name).map(|n| CString::new(n).unwrap());
-    ret.as_ref()
-        .map_or(null_mut(), |r| xml_strdup(r.as_ptr() as *const u8))
+    (*cur).get_prop(name)
 }
 
 /// Handle an out of memory condition
@@ -447,9 +444,6 @@ unsafe extern "C" fn xml_xinclude_add_node(
     ctxt: XmlXincludeCtxtPtr,
     cur: XmlNodePtr,
 ) -> XmlXincludeRefPtr {
-    let mut fragment: *mut XmlChar;
-    let mut href: *mut XmlChar;
-    let mut uri: *mut XmlChar;
     let mut xml: i32 = 1;
     let mut local: i32 = 0;
 
@@ -461,57 +455,51 @@ unsafe extern "C" fn xml_xinclude_add_node(
     }
 
     // read the attributes
-    href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap());
-    if href.is_null() {
-        href = xml_strdup(c"".as_ptr() as _); /* @@@@ href is now optional */
-        if href.is_null() {
-            return null_mut();
-        }
-    }
-    let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
-    if !parse.is_null() {
-        if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) {
+    let href =
+        xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap()).unwrap_or("".to_owned());
+    let parse = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
+    if let Some(parse) = parse {
+        if parse == XINCLUDE_PARSE_XML {
             xml = 1;
-        } else if xml_str_equal(parse, XINCLUDE_PARSE_TEXT.as_ptr() as _) {
+        } else if parse == XINCLUDE_PARSE_TEXT {
             xml = 0;
         } else {
+            let parse = CString::new(parse).unwrap();
             xml_xinclude_err(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeParseValue,
                 c"invalid value %s for 'parse'\n".as_ptr() as _,
-                parse,
+                parse.as_ptr() as *const u8,
             );
-            if !href.is_null() {
-                xml_free(href as _);
-            }
-            if !parse.is_null() {
-                xml_free(parse as _);
-            }
             return null_mut();
         }
     }
 
     // compute the URI
     let mut base = None;
-    if let Some(b) = (*cur).get_base((*ctxt).doc) {
-        base = CString::new(b).ok();
-        uri = xml_build_uri(href, base.as_ref().unwrap().as_ptr() as *const u8);
+    let mut uri = if let Some(b) = (*cur).get_base((*ctxt).doc) {
+        base = Some(CString::new(b.as_str()).unwrap());
+        build_uri(&href, &b)
     } else {
-        let url = (*(*ctxt).doc)
+        (*(*ctxt).doc)
             .url
             .as_deref()
-            .map(|u| CString::new(u).unwrap());
-        uri = xml_build_uri(href, url.map_or(null(), |u| u.as_ptr() as *const u8));
-    }
-    if uri.is_null() {
+            .and_then(|base| build_uri(&href, base))
+    };
+    if uri.is_none() {
         // Some escaping may be needed
         let escbase: *mut XmlChar = xml_uri_escape(
             base.as_ref()
                 .map_or(null_mut(), |b| b.as_ptr() as *const u8),
         );
-        let eschref: *mut XmlChar = xml_uri_escape(href);
-        uri = xml_build_uri(eschref, escbase);
+        let href = CString::new(href.as_str()).unwrap();
+        let eschref: *mut XmlChar = xml_uri_escape(href.as_ptr() as *const u8);
+        if !escbase.is_null() && !eschref.is_null() {
+            let href = CStr::from_ptr(eschref as *const i8).to_string_lossy();
+            let base = CStr::from_ptr(escbase as *const i8).to_string_lossy();
+            uri = build_uri(&href, &base);
+        }
         if !escbase.is_null() {
             xml_free(escbase as _);
         }
@@ -519,13 +507,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
             xml_free(eschref as _);
         }
     }
-    if !parse.is_null() {
-        xml_free(parse as _);
-    }
-    if !href.is_null() {
-        xml_free(href as _);
-    }
-    if uri.is_null() {
+    let Some(uri) = uri else {
         xml_xinclude_err(
             ctxt,
             cur,
@@ -534,97 +516,71 @@ unsafe extern "C" fn xml_xinclude_add_node(
             null(),
         );
         return null_mut();
-    }
-    fragment = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE_XPOINTER.to_str().unwrap());
+    };
+    let mut fragment = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE_XPOINTER.to_str().unwrap());
 
-    /*
-     * Check the URL and remove any fragment identifier
-     */
-    let parsed_uri: XmlURIPtr = xml_parse_uri(uri as _);
-    if parsed_uri.is_null() {
+    // Check the URL and remove any fragment identifier
+    let Some(mut parsed_uri) = XmlURI::parse(&uri) else {
+        let uri = CString::new(uri).unwrap();
         xml_xinclude_err(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
             c"invalid value URI %s\n".as_ptr() as _,
-            uri,
+            uri.as_ptr() as *const u8,
         );
-        if !fragment.is_null() {
-            xml_free(fragment as _);
-        }
-        xml_free(uri as _);
         return null_mut();
-    }
+    };
 
-    if !(*parsed_uri).fragment.is_null() {
+    if parsed_uri.fragment.is_some() {
         if (*ctxt).legacy != 0 {
-            if fragment.is_null() {
-                fragment = (*parsed_uri).fragment as _;
-            } else {
-                xml_free((*parsed_uri).fragment as _);
+            if fragment.is_none() {
+                fragment = parsed_uri.fragment.as_deref().map(|f| f.to_owned());
             }
         } else {
+            let uri = CString::new(uri).unwrap();
             xml_xinclude_err(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeFragmentID,
                 c"Invalid fragment identifier in URI %s use the xpointer attribute\n".as_ptr() as _,
-                uri,
+                uri.as_ptr() as *const u8,
             );
-            if !fragment.is_null() {
-                xml_free(fragment as _);
-            }
-            xml_free_uri(parsed_uri);
-            xml_free(uri as _);
             return null_mut();
         }
-        (*parsed_uri).fragment = null_mut();
+        parsed_uri.fragment = None;
     }
-    let url: *mut XmlChar = xml_save_uri(parsed_uri);
-    xml_free_uri(parsed_uri);
-    if url.is_null() {
-        xml_xinclude_err(
-            ctxt,
-            cur,
-            XmlParserErrors::XmlXIncludeHrefURI,
-            c"invalid value URI %s\n".as_ptr() as _,
-            uri,
-        );
-        if !fragment.is_null() {
-            xml_free(fragment as _);
-        }
-        xml_free(uri as _);
-        return null_mut();
-    }
-    xml_free(uri as _);
+    let url = parsed_uri.save();
 
-    if (*(*ctxt).doc).url.as_deref() == CStr::from_ptr(url as *const i8).to_str().ok() {
+    if (*(*ctxt).doc).url.as_deref() == Some(url.as_str()) {
         local = 1;
     }
 
-    /*
-     * If local and xml then we need a fragment
-     */
-    if local == 1 && xml == 1 && (fragment.is_null() || *fragment.add(0) == 0) {
+    // If local and xml then we need a fragment
+    if local == 1
+        && xml == 1
+        && (fragment.is_none() || fragment.as_deref().map_or(true, |f| f.is_empty()))
+    {
+        let url = CString::new(url).unwrap();
         xml_xinclude_err(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeRecursion,
             c"detected a local recursion with no xpointer in %s\n".as_ptr() as _,
-            url,
+            url.as_ptr() as *const u8,
         );
-        xml_free(url as _);
-        xml_free(fragment as _);
         return null_mut();
     }
+    let url = CString::new(url).unwrap();
 
-    let refe: XmlXincludeRefPtr = xml_xinclude_new_ref(ctxt, url, cur);
-    xml_free(url as _);
+    let refe: XmlXincludeRefPtr = xml_xinclude_new_ref(ctxt, url.as_ptr() as *const u8, cur);
     if refe.is_null() {
-        xml_free(fragment as _);
         return null_mut();
     }
-    (*refe).fragment = fragment;
+    let fragment = fragment.map(|f| CString::new(f).unwrap());
+    (*refe).fragment = fragment
+        .as_ref()
+        .map_or(null_mut(), |f| xml_strdup(f.as_ptr() as *const u8));
     (*refe).xml = xml;
     refe
 }
@@ -1841,10 +1797,12 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                 if let Some(xml_base) =
                                     (*node).get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
                                 {
-                                    let xml_base = CString::new(xml_base).unwrap();
-                                    let rel_base: *mut XmlChar =
-                                        xml_build_uri(xml_base.as_ptr() as *const u8, base);
-                                    if rel_base.is_null() {
+                                    let base = CStr::from_ptr(base as *const i8).to_string_lossy();
+                                    let rel_base = build_uri(&xml_base, &base);
+                                    if let Some(rel_base) = rel_base {
+                                        (*node).set_base(Some(&rel_base));
+                                    } else {
+                                        let xml_base = CString::new(xml_base).unwrap();
                                         // error
                                         xml_xinclude_err(
                                             ctxt,
@@ -1853,13 +1811,6 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                             c"trying to rebuild base from %s\n".as_ptr() as _,
                                             xml_base.as_ptr() as *const u8,
                                         );
-                                    } else {
-                                        (*node).set_base(Some(
-                                            CStr::from_ptr(rel_base as *const i8)
-                                                .to_string_lossy()
-                                                .as_ref(),
-                                        ));
-                                        xml_free(rel_base as _);
                                     }
                                 }
                             }
@@ -2189,8 +2140,6 @@ unsafe extern "C" fn xml_xinclude_load_node(
     ctxt: XmlXincludeCtxtPtr,
     refe: XmlXincludeRefPtr,
 ) -> i32 {
-    let mut href: *mut XmlChar;
-    let mut uri: *mut XmlChar;
     let mut xml: i32 = 1; /* default Issue 64 */
     let mut ret: i32;
 
@@ -2203,57 +2152,51 @@ unsafe extern "C" fn xml_xinclude_load_node(
     }
 
     // read the attributes
-    href = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap());
-    if href.is_null() {
-        href = xml_strdup(c"".as_ptr() as _); /* @@@@ href is now optional */
-        if href.is_null() {
-            return -1;
-        }
-    }
-    let parse: *mut XmlChar = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
-    if !parse.is_null() {
-        if xml_str_equal(parse, XINCLUDE_PARSE_XML.as_ptr() as _) {
+    let href =
+        xml_xinclude_get_prop(ctxt, cur, XINCLUDE_HREF.to_str().unwrap()).unwrap_or("".to_owned());
+    let parse = xml_xinclude_get_prop(ctxt, cur, XINCLUDE_PARSE.to_str().unwrap());
+    if let Some(parse) = parse {
+        if parse == XINCLUDE_PARSE_XML {
             xml = 1;
-        } else if xml_str_equal(parse, XINCLUDE_PARSE_TEXT.as_ptr() as _) {
+        } else if parse == XINCLUDE_PARSE_TEXT {
             xml = 0;
         } else {
+            let parse = CString::new(parse).unwrap();
             xml_xinclude_err(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeParseValue,
                 c"invalid value %s for 'parse'\n".as_ptr() as _,
-                parse,
+                parse.as_ptr() as *const u8,
             );
-            if !href.is_null() {
-                xml_free(href as _);
-            }
-            if !parse.is_null() {
-                xml_free(parse as _);
-            }
             return -1;
         }
     }
 
     // compute the URI
     let mut base = None;
-    if let Some(b) = (*cur).get_base((*ctxt).doc) {
-        base = CString::new(b).ok();
-        uri = xml_build_uri(href, base.as_ref().unwrap().as_ptr() as *const u8);
+    let mut uri = if let Some(b) = (*cur).get_base((*ctxt).doc) {
+        base = CString::new(b.as_str()).ok();
+        build_uri(&href, &b)
     } else {
-        let url = (*(*ctxt).doc)
+        (*(*ctxt).doc)
             .url
             .as_deref()
-            .map(|u| CString::new(u).unwrap());
-        uri = xml_build_uri(href, url.map_or(null(), |u| u.as_ptr() as *const u8));
-    }
-    if uri.is_null() {
+            .and_then(|base| build_uri(&href, base))
+    };
+    if uri.is_none() {
         // Some escaping may be needed
         let escbase: *mut XmlChar = xml_uri_escape(
             base.as_ref()
                 .map_or(null_mut(), |b| b.as_ptr() as *const u8),
         );
-        let eschref: *mut XmlChar = xml_uri_escape(href);
-        uri = xml_build_uri(eschref, escbase);
+        let href = CString::new(href.as_str()).unwrap();
+        let eschref: *mut XmlChar = xml_uri_escape(href.as_ptr() as *const u8);
+        if !escbase.is_null() && !eschref.is_null() {
+            let escbase = CStr::from_ptr(escbase as *const i8).to_string_lossy();
+            let eschref = CStr::from_ptr(eschref as *const i8).to_string_lossy();
+            uri = build_uri(&eschref, &escbase);
+        }
         if !escbase.is_null() {
             xml_free(escbase as _);
         }
@@ -2261,7 +2204,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
             xml_free(eschref as _);
         }
     }
-    if uri.is_null() {
+    let Some(uri) = uri else {
         xml_xinclude_err(
             ctxt,
             cur,
@@ -2269,24 +2212,19 @@ unsafe extern "C" fn xml_xinclude_load_node(
             c"failed build URL\n".as_ptr() as _,
             null(),
         );
-        if !parse.is_null() {
-            xml_free(parse as _);
-        }
-        if !href.is_null() {
-            xml_free(href as _);
-        }
         return -1;
-    }
+    };
+    let uri = CString::new(uri).unwrap();
 
     // Save the base for this include (saving the current one)
     let old_base: *mut XmlChar = (*ctxt).base;
     (*ctxt).base = base.as_ref().map_or(null_mut(), |b| b.as_ptr() as *mut u8);
 
     if xml != 0 {
-        ret = xml_xinclude_load_doc(ctxt, uri, refe);
+        ret = xml_xinclude_load_doc(ctxt, uri.as_ptr() as *const u8, refe);
     // xmlXIncludeGetFragment(ctxt, cur, URI);
     } else {
-        ret = xml_xinclude_load_txt(ctxt, uri, refe);
+        ret = xml_xinclude_load_txt(ctxt, uri.as_ptr() as *const u8, refe);
     }
 
     // Restore the original base before checking for fallback
@@ -2314,23 +2252,10 @@ unsafe extern "C" fn xml_xinclude_load_node(
             cur,
             XmlParserErrors::XmlXIncludeNoFallback,
             c"could not load %s, and no fallback was found\n".as_ptr() as _,
-            uri,
+            uri.as_ptr() as *const u8,
         );
     }
 
-    // Cleanup
-    if !uri.is_null() {
-        xml_free(uri as _);
-    }
-    if !parse.is_null() {
-        xml_free(parse as _);
-    }
-    if !href.is_null() {
-        xml_free(href as _);
-    }
-    // The original code releases `base` here,
-    // thus extending the lifetime at least this far.
-    drop(base);
     0
 }
 
