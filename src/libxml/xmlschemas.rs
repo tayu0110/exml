@@ -102,7 +102,6 @@ use crate::{
             XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE, XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE,
             XML_SCHEMAS_TYPE_WHITESPACE_REPLACE,
         },
-        uri::xml_build_uri,
         valid::{xml_add_id, xml_free_enumeration},
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_new_all_trans,
@@ -143,6 +142,7 @@ use crate::{
         XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
         XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
+    uri::build_uri,
 };
 
 /// This error codes are obsolete; not used any more.
@@ -6883,30 +6883,24 @@ unsafe extern "C" fn xml_schema_build_absolute_uri(
     location: *const XmlChar,
     ctxt_node: XmlNodePtr,
 ) -> *const XmlChar {
-    /*
-     * Build an absolute location URI.
-     */
+    // Build an absolute location URI.
     if !location.is_null() {
         if ctxt_node.is_null() {
             return location;
         } else {
-            let uri: *mut XmlChar;
-            let ret: *const XmlChar;
+            let location = CStr::from_ptr(location as *const i8).to_string_lossy();
 
-            if let Some(base) = (*ctxt_node).get_base((*ctxt_node).doc) {
-                let base = CString::new(base).unwrap();
-                uri = xml_build_uri(location, base.as_ptr() as *const u8);
+            let uri = if let Some(base) = (*ctxt_node).get_base((*ctxt_node).doc) {
+                build_uri(&location, &base)
             } else {
-                let url = (*(*ctxt_node).doc)
+                (*(*ctxt_node).doc)
                     .url
                     .as_deref()
-                    .map(|u| CString::new(u).unwrap());
-                uri = xml_build_uri(location, url.map_or(null(), |u| u.as_ptr() as *const u8));
-            }
-            if !uri.is_null() {
-                ret = xml_dict_lookup(dict, uri, -1);
-                xml_free(uri as _);
-                return ret;
+                    .and_then(|base| build_uri(&location, base))
+            };
+            if let Some(uri) = uri {
+                let uri = CString::new(uri).unwrap();
+                return xml_dict_lookup(dict, uri.as_ptr() as *const u8, -1);
             }
         }
     }
@@ -7052,10 +7046,8 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
     }
 
     *schema_location = null_mut();
-    /*
-     * Check for illegal attributes.
-     * Applies for both <include> and <redefine>.
-     */
+    // Check for illegal attributes.
+    // Applies for both <include> and <redefine>.
     attr = (*node).properties;
     while !attr.is_null() {
         if (*attr).ns.is_null() {
@@ -7084,8 +7076,6 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
     // Attribute "schemaLocation" is mandatory.
     attr = xml_schema_get_prop_node(node, c"schemaLocation".as_ptr() as _);
     if !attr.is_null() {
-        let uri: *mut XmlChar;
-
         if xml_schema_pval_attr_node(
             pctxt,
             null_mut(),
@@ -7097,20 +7087,27 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
             // goto exit_error;
             return (*pctxt).err;
         }
-        if let Some(base) = (*node).get_base((*node).doc) {
-            let base = CString::new(base).unwrap();
-            uri = xml_build_uri(*schema_location, base.as_ptr() as *const u8);
+        let uri = if let Some(base) = (*node).get_base((*node).doc) {
+            (!(*schema_location).is_null())
+                .then(|| {
+                    let schema_location =
+                        CStr::from_ptr(*schema_location as *const i8).to_string_lossy();
+                    build_uri(&schema_location, &base)
+                })
+                .flatten()
         } else {
-            let url = (*(*node).doc)
-                .url
-                .as_deref()
-                .map(|u| CString::new(u).unwrap());
-            uri = xml_build_uri(
-                *schema_location,
-                url.map_or(null(), |u| u.as_ptr() as *const u8),
-            );
-        }
-        if uri.is_null() {
+            (!(*schema_location).is_null())
+                .then(|| {
+                    let schema_location =
+                        CStr::from_ptr(*schema_location as *const i8).to_string_lossy();
+                    (*(*node).doc)
+                        .url
+                        .as_deref()
+                        .and_then(|base| build_uri(&schema_location, base))
+                })
+                .flatten()
+        };
+        let Some(uri) = uri else {
             PERROR_INT!(
                 pctxt,
                 c"xmlSchemaParseIncludeOrRedefine".as_ptr() as _,
@@ -7118,9 +7115,9 @@ unsafe extern "C" fn xml_schema_parse_include_or_redefine_attrs(
             );
             // goto exit_failure;
             return -1;
-        }
-        *schema_location = xml_dict_lookup((*pctxt).dict, uri, -1) as _;
-        xml_free(uri as _);
+        };
+        let uri = CString::new(uri).unwrap();
+        *schema_location = xml_dict_lookup((*pctxt).dict, uri.as_ptr() as *const u8, -1) as _;
     } else {
         xml_schema_pmissing_attr_err(
             pctxt,
