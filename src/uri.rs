@@ -564,9 +564,9 @@ impl XmlURI {
             }
         }
         if self.cleanup & 2 != 0 {
-            self.path = Some(orig[..orig.len() - s.len()].to_owned().into());
+            self.query = Some(orig[..orig.len() - s.len()].to_owned().into());
         } else {
-            self.path = unescape_url(&orig[..orig.len() - s.len()])
+            self.query = unescape_url(&orig[..orig.len() - s.len()])
                 .ok()
                 .map(|u| u.into_owned().into())
         }
@@ -790,16 +790,7 @@ fn parse3986_segment(mut s: &str, forbid: u8, empty: bool) -> Result<&str, i32> 
     Ok(s)
 }
 
-/// Computes he final URI of the reference done by checking that
-/// the given URI is valid, and building the final URI using the
-/// base URI. This is processed according to section 5.2 of the
-/// RFC 2396
-///
-/// 5.2. Resolving Relative References to Absolute Form
-///
-/// Returns a new URI string or `None` if an error occurs.
-#[doc(alias = "xmlBuildURI")]
-pub fn build_uri<'a>(mut uri: impl Iterator<Item = Cow<'a, str>>, base: &str) -> Option<String> {
+pub fn join_uris<'a>(mut uri: impl Iterator<Item = Cow<'a, str>>, base: &str) -> Option<String> {
     if let Ok(base) = Url::parse(base) {
         let res = uri.try_fold(base, |base, uri| base.join(uri.as_ref()).ok())?;
         Some(res.as_str().to_owned())
@@ -812,6 +803,186 @@ pub fn build_uri<'a>(mut uri: impl Iterator<Item = Cow<'a, str>>, base: &str) ->
         let res = uri.try_fold(base, |base, uri| base.join(uri.as_ref()).ok())?;
         Some(res.path()[1..].to_owned())
     }
+}
+
+/// Computes he final URI of the reference done by checking that
+/// the given URI is valid, and building the final URI using the
+/// base URI. This is processed according to section 5.2 of the
+/// RFC 2396
+///
+/// 5.2. Resolving Relative References to Absolute Form
+///
+/// Returns a new URI string or `None` if an error occurs.
+#[doc(alias = "xmlBuildURI")]
+pub fn build_uri(uri: &str, base: &str) -> Option<String> {
+    let mut val = None;
+    let mut refe = None;
+
+    // 1) The URI reference is parsed into the potential four components and
+    //    fragment identifier, as described in Section 4.3.
+    //
+    //    NOTE that a completely empty URI is treated by modern browsers
+    //    as a reference to "." rather than as a synonym for the current URI.
+    //    Should we do that here?
+    if !uri.is_empty() {
+        let mut r = XmlURI::new();
+        r.parse_uri_reference(uri).ok()?;
+        refe = Some(r);
+    }
+    if refe.as_ref().map_or(false, |r| r.scheme.is_some()) {
+        // The URI is absolute don't modify.
+        return Some(uri.to_owned());
+    }
+    let mut bas = XmlURI::new();
+    if bas.parse_uri_reference(base).is_err() {
+        if let Some(refe) = refe.as_ref() {
+            val = Some(refe.save());
+        }
+        return val;
+    }
+    let Some(refe) = refe else {
+        // the base fragment must be ignored
+        bas.fragment = None;
+        return Some(bas.save());
+    };
+
+    // 2) If the path component is empty and the scheme, authority, and
+    //    query components are undefined, then it is a reference to the
+    //    current document and we are done.  Otherwise, the reference URI's
+    //    query and fragment components are defined as found (or not found)
+    //    within the URI reference and not inherited from the base URI.
+    //
+    //    NOTE that in modern browsers, the parsing differs from the above
+    //    in the following aspect:  the query component is allowed to be
+    //    defined while still treating this as a reference to the current
+    //    document.
+    let mut res = XmlURI::new();
+    'step_7: {
+        if refe.scheme.is_none()
+            && refe.path.is_none()
+            && (refe.authority.is_none() && refe.server.is_none() && refe.port.is_none())
+        {
+            res.scheme = bas.scheme.clone();
+            if bas.authority.is_some() {
+                res.authority = bas.authority.clone();
+            } else {
+                res.server = bas.server.clone();
+                res.user = bas.user.clone();
+                res.port = bas.port;
+            }
+            res.path = bas.path.clone();
+            if refe.query_raw.is_some() {
+                res.query_raw = refe.query_raw.clone();
+            } else if refe.query.is_some() {
+                res.query = refe.query.clone();
+            } else if bas.query_raw.is_some() {
+                res.query_raw = bas.query_raw.clone();
+            } else if bas.query.is_some() {
+                res.query = bas.query.clone();
+            }
+            res.fragment = refe.fragment.clone();
+            break 'step_7;
+        }
+
+        // 3) If the scheme component is defined, indicating that the reference
+        //    starts with a scheme name, then the reference is interpreted as an
+        //    absolute URI and we are done.  Otherwise, the reference URI's
+        //    scheme is inherited from the base URI's scheme component.
+        if refe.scheme.is_some() {
+            return Some(refe.save());
+        }
+        if bas.scheme.is_some() {
+            res.scheme = bas.scheme.clone();
+        }
+
+        if refe.query_raw.is_some() {
+            res.query_raw = refe.query_raw.clone();
+        } else if refe.query.is_some() {
+            res.query = refe.query.clone();
+        }
+        if refe.fragment.is_some() {
+            res.fragment = refe.fragment.clone();
+        }
+
+        // 4) If the authority component is defined, then the reference is a
+        //    network-path and we skip to step 7.  Otherwise, the reference
+        //    URI's authority is inherited from the base URI's authority
+        //    component, which will also be undefined if the URI scheme does not
+        //    use an authority component.
+        if refe.authority.is_some() || refe.server.is_some() || refe.port.is_some() {
+            if refe.authority.is_some() {
+                res.authority = refe.authority.clone();
+            } else {
+                if refe.server.is_some() {
+                    res.server = refe.server.clone();
+                }
+                if refe.user.is_some() {
+                    res.user = refe.user.clone();
+                }
+                res.port = refe.port;
+            }
+            if refe.path.is_some() {
+                res.path = refe.path.clone();
+            }
+            break 'step_7;
+        }
+        if bas.authority.is_some() {
+            res.authority = bas.authority.clone();
+        } else if bas.server.is_some() || bas.port.is_some() {
+            if bas.server.is_some() {
+                res.server = bas.server.clone();
+            }
+            if bas.user.is_some() {
+                res.user = bas.user.clone();
+            }
+            res.port = bas.port;
+        }
+
+        // 5) If the path component begins with a slash character ("/"), then
+        //    the reference is an absolute-path and we skip to step 7.
+        if let Some(path) = refe.path.as_deref().filter(|p| p.starts_with('/')) {
+            res.path = Some(path.to_owned().into());
+            break 'step_7;
+        }
+
+        // 6) If this step is reached, then we are resolving a relative-path reference.
+        //    The relative path needs to be merged with the base URI's path.
+        //    Although there are many ways to do this, we will
+        //    describe a simple method using a separate string buffer.
+        let mut path = String::new();
+
+        // a) All but the last segment of the base URI's path component is copied to the buffer.
+        //    In other words, any characters after the
+        //    last (right-most) slash character, if any, are excluded.
+        if let Some(bas_path) = bas.path.as_deref() {
+            if let Some(pos) = bas_path.rfind('/') {
+                path.push_str(&bas_path[..pos + 1]);
+            } else {
+                path.push_str(bas_path);
+            }
+        }
+
+        // b) The reference's path component is appended to the buffer string.
+        if let Some(ref_path) = refe.path.as_deref().filter(|p| !p.is_empty()) {
+            // Ensure the path includes a '/'
+            if path.is_empty() && (bas.server.is_some() || bas.port.is_some()) {
+                path.push('/');
+            }
+            path.push_str(ref_path);
+        }
+
+        // Steps c) to h) are really path normalization steps
+        match normalize_uri_path(&path) {
+            Cow::Owned(path) => res.path = Some(Cow::Owned(path)),
+            Cow::Borrowed(_) => res.path = Some(Cow::Owned(path)),
+        }
+    }
+
+    // step_7:
+
+    // 7) The resulting URI components, including any inherited from the base URI,
+    //    are recombined to give the absolute form of the URI reference.
+    Some(res.save())
 }
 
 /// Unescaping routine, but does not check that the string is an URI.

@@ -51,7 +51,6 @@ use exml::{
         parser_internals::xml_create_file_parser_ctxt,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::{xml_relaxng_init_types, XmlRelaxNGPtr},
-        uri::xml_build_uri,
         valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
         xmlmemory::{
@@ -69,7 +68,7 @@ use exml::{
         xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
         XmlEnumerationPtr, XmlNodePtr,
     },
-    uri::{normalize_uri_path, XmlURI},
+    uri::{build_uri, normalize_uri_path, XmlURI},
     SYSCONFDIR,
 };
 use libc::{free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
@@ -3332,12 +3331,19 @@ unsafe fn xmlid_doc_test(
     res
 }
 
-unsafe fn handle_uri(str: &str, base: *const c_char, o: &mut File) {
-    let mut res: *mut XmlChar = null_mut();
+unsafe fn handle_uri(str: &str, base: Option<&str>, o: &mut File) {
     let mut uri = XmlURI::new();
 
-    let cstr = CString::new(str).unwrap();
-    if base.is_null() {
+    if let Some(base) = base {
+        eprintln!("base: {base}, str: {str}");
+        if let Some(res) = build_uri(str, base) {
+            writeln!(o, "{res}",).ok();
+            eprintln!("OK: {res}");
+        } else {
+            writeln!(o, "::ERROR::").ok();
+            eprintln!("NG...");
+        }
+    } else {
         let ret = uri.parse_uri_reference(str);
         if let Err(ret) = ret {
             writeln!(o, "{str} : error {}", ret).ok();
@@ -3350,40 +3356,18 @@ unsafe fn handle_uri(str: &str, base: *const c_char, o: &mut File) {
             writeln!(o, "{uri}").ok();
             o.flush().ok();
         }
-    } else {
-        res = xml_build_uri(cstr.as_ptr() as *mut XmlChar, base as *mut XmlChar);
-        if !res.is_null() {
-            writeln!(
-                o,
-                "{}",
-                CStr::from_ptr(res as *mut c_char).to_string_lossy()
-            )
-            .ok();
-        } else {
-            writeln!(o, "::ERROR::").ok();
-        }
     }
-    if !res.is_null() {
-        xml_free(res as _);
-    }
-    // xml_free_uri(uri);
 }
 
-/**
- * uriCommonTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing URI and check for errors
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing URI and check for errors
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "uriCommonTest")]
 unsafe fn uri_common_test(
     filename: &str,
     result: Option<String>,
     err: Option<String>,
-    base: *const c_char,
+    base: Option<&str>,
 ) -> i32 {
     let mut res: i32 = 0;
     let mut ret: i32;
@@ -3469,7 +3453,7 @@ unsafe fn uri_parse_test(
     err: Option<String>,
     _options: i32,
 ) -> i32 {
-    uri_common_test(filename, result, err, null_mut())
+    uri_common_test(filename, result, err, None)
 }
 
 /**
@@ -3493,7 +3477,7 @@ unsafe fn uri_base_test(
         filename,
         result,
         err,
-        c"http://foo.com/path/to/index.html?orig#help".as_ptr(),
+        Some("http://foo.com/path/to/index.html?orig#help"),
     )
 }
 

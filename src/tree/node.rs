@@ -44,7 +44,7 @@ use crate::{
         },
     },
     tree::{xml_free_node_list, XmlAttributePtr},
-    uri::build_uri,
+    uri::join_uris,
 };
 
 use super::{
@@ -201,7 +201,7 @@ pub trait NodeCommon {
                         || base.starts_with("ftp://")
                         || base.starts_with("urn:")
                     {
-                        return build_uri(bases.into_iter().rev().map(|b| b.into()), &base);
+                        return join_uris(bases.into_iter().rev().map(|b| b.into()), &base);
                     }
                     bases.push(base);
                 }
@@ -213,10 +213,10 @@ pub trait NodeCommon {
             if bases.is_empty() {
                 return Some(url.to_owned());
             }
-            return build_uri(bases.into_iter().rev().map(|b| b.into()), url);
+            return join_uris(bases.into_iter().rev().map(|b| b.into()), url);
         }
         let base = bases.pop()?;
-        build_uri(bases.into_iter().rev().map(|b| b.into()), &base)
+        join_uris(bases.into_iter().rev().map(|b| b.into()), &base)
     }
 
     #[doc(hidden)]
