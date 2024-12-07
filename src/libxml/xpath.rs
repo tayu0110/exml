@@ -1775,7 +1775,7 @@ macro_rules! CHECK_CTXT {
                 $crate::error::XmlErrorDomain::XmlFromXPath,
                 $crate::error::XmlParserErrors::XmlErrInternalError,
                 $crate::error::XmlErrorLevel::XmlErrFatal,
-                file!().as_ptr() as _,
+                Some(file!().into()),
                 line!() as i32,
                 None,
                 None,
@@ -1979,7 +1979,6 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
 macro_rules! CHECK_CTXT_NEG {
     ($ctxt:expr) => {
         if $ctxt.is_null() {
-            let file = std::ffi::CString::new(file!()).unwrap();
             $crate::__xml_raise_error!(
                 None,
                 None,
@@ -1989,7 +1988,7 @@ macro_rules! CHECK_CTXT_NEG {
                 $crate::error::XmlErrorDomain::XmlFromXPath,
                 $crate::error::XmlParserErrors::XmlErrInternalError,
                 $crate::error::XmlErrorLevel::XmlErrFatal,
-                file.as_ptr() as _,
+                Some(file!().into()),
                 line!() as i32,
                 None,
                 None,

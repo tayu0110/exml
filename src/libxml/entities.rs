@@ -304,7 +304,7 @@ unsafe extern "C" fn xml_entities_warn(
         XmlErrorDomain::XmlFromTree,
         code,
         XmlErrorLevel::XmlErrWarning,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()

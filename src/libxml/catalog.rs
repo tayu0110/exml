@@ -206,7 +206,7 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromCatalog,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
         None,
@@ -1174,7 +1174,7 @@ unsafe extern "C" fn xml_catalog_err(
         XmlErrorDomain::XmlFromCatalog,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()

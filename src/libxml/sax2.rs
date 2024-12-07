@@ -218,7 +218,7 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
             XmlErrorDomain::XmlFromParser,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
             None,
@@ -242,7 +242,7 @@ unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_c
             XmlErrorDomain::XmlFromParser,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
             None,
@@ -456,7 +456,7 @@ unsafe extern "C" fn xml_fatal_err_msg(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -632,7 +632,7 @@ unsafe extern "C" fn xml_warn_msg(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrWarning,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -777,7 +777,7 @@ unsafe extern "C" fn xml_err_valid(
             XmlErrorDomain::XmlFromDTD,
             error,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
             (!str2.is_null()).then(|| CStr::from_ptr(str2).to_string_lossy().into_owned().into()),
@@ -799,7 +799,7 @@ unsafe extern "C" fn xml_err_valid(
             XmlErrorDomain::XmlFromDTD,
             error,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
             (!str2.is_null()).then(|| CStr::from_ptr(str2).to_string_lossy().into_owned().into()),
@@ -1327,7 +1327,7 @@ unsafe extern "C" fn xml_ns_warn_msg(
         XmlErrorDomain::XmlFromNamespace,
         error,
         XmlErrorLevel::XmlErrWarning,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -1379,7 +1379,7 @@ unsafe extern "C" fn xml_ns_err_msg(
         XmlErrorDomain::XmlFromNamespace,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()

@@ -239,7 +239,7 @@ unsafe extern "C" fn xml_err_valid(
             XmlErrorDomain::XmlFromValid,
             error,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
@@ -259,7 +259,7 @@ unsafe extern "C" fn xml_err_valid(
             XmlErrorDomain::XmlFromValid,
             error,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             None,
             None,
@@ -304,7 +304,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             XmlErrorDomain::XmlFromValid,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
@@ -324,7 +324,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             XmlErrorDomain::XmlFromValid,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             None,
             None,
@@ -1019,7 +1019,7 @@ unsafe extern "C" fn xml_err_valid_node(
         XmlErrorDomain::XmlFromValid,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -2002,7 +2002,7 @@ unsafe extern "C" fn xml_err_valid_warning(
         XmlErrorDomain::XmlFromValid,
         error,
         XmlErrorLevel::XmlErrWarning,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -3843,7 +3843,7 @@ unsafe extern "C" fn xml_err_valid_node_nr(
         XmlErrorDomain::XmlFromValid,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()

@@ -17,7 +17,7 @@ use std::{
     borrow::Cow,
     ffi::{c_void, CStr},
     io::{stderr, Stderr, Stdout, Write},
-    ptr::{null, null_mut, NonNull},
+    ptr::{null_mut, NonNull},
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -1424,7 +1424,7 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
         use std::borrow::Cow;
-        use std::ffi::{CStr, CString};
+        use std::ffi::CStr;
         use std::ptr::{null_mut, NonNull};
 
         use libc::{c_char, c_int, c_void};
@@ -1448,7 +1448,7 @@ macro_rules! __xml_raise_error {
             domain: XmlErrorDomain,
             code: XmlParserErrors,
             level: XmlErrorLevel,
-            mut file: *const c_char,
+            mut file: Option<Cow<'static, str>>,
             mut line: c_int,
             str1: Option<Cow<'static, str>>,
             str2: Option<Cow<'static, str>>,
@@ -1463,8 +1463,6 @@ macro_rules! __xml_raise_error {
                     let mut input: XmlParserInputPtr;
                     let mut to = &mut state.last_error;
                     let mut baseptr: XmlNodePtr = null_mut();
-                    #[allow(unused_assignments)]
-                    let mut dummy = None;
 
                     if code == XmlParserErrors::XmlErrOK {
                         return None;
@@ -1502,21 +1500,15 @@ macro_rules! __xml_raise_error {
                             }
                         }
                     }
-                    /*
-                     * Check if structured error handler set
-                     */
+                    // Check if structured error handler set
                     if schannel.is_none() {
                         schannel = state.structured_error;
-                        /*
-                         * if user has defined handler, change data ptr to user's choice
-                         */
+                        // if user has defined handler, change data ptr to user's choice
                         if schannel.is_some() {
                             data = state.structured_error_context.clone();
                         }
                     }
-                    /*
-                     * Formatting the message
-                     */
+                    // Formatting the message
                     let str = if msg.is_null() {
                         Cow::Borrowed("No error message provided")
                     } else {
@@ -1529,27 +1521,24 @@ macro_rules! __xml_raise_error {
                         s.into()
                     };
 
-                    /*
-                     * specific processing if a parser context is provided
-                     */
+                    // specific processing if a parser context is provided
                     if !ctxt.is_null() {
-                        if file.is_null() {
+                        if file.is_none() {
                             input = (*ctxt).input;
                             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
                                 input = (*ctxt).input_tab[(*ctxt).input_tab.len() as usize - 2];
                             }
                             if !input.is_null() {
-                                dummy = (*input).filename.as_deref().map(|f| CString::new(f).unwrap());
-                                file = dummy.as_ref().map_or(null_mut(), |f| f.as_ptr());
+                                file = (*input).filename.as_deref().map(|f| f.to_owned().into());
                                 line = (*input).line;
                                 col = (*input).col;
                             }
                         }
                         to = &mut (*ctxt).last_error;
-                    } else if !node.is_null() && file.is_null() {
+                    } else if !node.is_null() && file.is_none() {
                         if !(*node).doc.is_null() && !(*(*node).doc).url.is_none() {
                             baseptr = node;
-                        /*	    file = (const c_char *) (*(*node).doc).URL; */
+                        // file = (const c_char *) (*(*node).doc).URL;
                         }
                         for _ in 0..10 {
                             if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlElementNode) {
@@ -1575,8 +1564,8 @@ macro_rules! __xml_raise_error {
                     to.code = code;
                     to.message = Some(str.clone());
                     to.level = level;
-                    if !file.is_null() {
-                        to.file = Some(CStr::from_ptr(file as *const i8).to_string_lossy().into());
+                    if let Some(file) = file {
+                        to.file = Some(file.to_owned().into());
                     } else if !baseptr.is_null() {
                         #[cfg(feature = "xinclude")]
                         {
@@ -1638,9 +1627,7 @@ macro_rules! __xml_raise_error {
                         return None;
                     }
 
-                    /*
-                     * Find the callback channel if channel param is NULL
-                     */
+                    // Find the callback channel if channel param is NULL
                     if !ctxt.is_null() && channel.is_none()
                         && state.structured_error.is_none()
                         && !(*ctxt).sax.is_null() {
@@ -1700,7 +1687,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 domain,
                 XmlParserErrors::XmlErrNoMemory,
                 XmlErrorLevel::XmlErrFatal,
-                null(),
+                None,
                 0,
                 Some(CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
                 None,
@@ -1720,7 +1707,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 domain,
                 XmlParserErrors::XmlErrNoMemory,
                 XmlErrorLevel::XmlErrFatal,
-                null(),
+                None,
                 0,
                 None,
                 None,
@@ -1740,7 +1727,7 @@ pub(crate) unsafe fn __xml_simple_error(
             domain,
             code,
             XmlErrorLevel::XmlErrError,
-            null(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,

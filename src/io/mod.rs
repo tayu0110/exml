@@ -385,7 +385,7 @@ pub(crate) unsafe extern "C" fn __xml_loader_err(
         XmlErrorDomain::XmlFromIO,
         XmlParserErrors::XmlIOLoadError,
         level,
-        null_mut(),
+        None,
         0,
         (!filename.is_null()).then(|| CStr::from_ptr(filename)
             .to_string_lossy()

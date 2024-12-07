@@ -882,7 +882,7 @@ unsafe extern "C" fn xml_rng_verr(
         XmlErrorDomain::XmlFromRelaxngv,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -1122,7 +1122,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             XmlErrorDomain::XmlFromRelaxngv,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
@@ -1142,7 +1142,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             XmlErrorDomain::XmlFromRelaxngv,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             None,
             None,
@@ -1640,7 +1640,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             XmlErrorDomain::XmlFromRelaxngp,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
@@ -1660,7 +1660,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             XmlErrorDomain::XmlFromRelaxngp,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             None,
             None,
@@ -2476,7 +2476,7 @@ unsafe extern "C" fn xml_rng_perr(
         XmlErrorDomain::XmlFromRelaxngp,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()

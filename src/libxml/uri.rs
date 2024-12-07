@@ -25,7 +25,7 @@ use std::{
     ffi::{c_char, CStr},
     io::Write,
     mem::{size_of, size_of_val, zeroed},
-    ptr::{null, null_mut},
+    ptr::null_mut,
 };
 
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
@@ -78,7 +78,7 @@ unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
             XmlErrorDomain::XmlFromURI,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
             None,
@@ -98,7 +98,7 @@ unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
             XmlErrorDomain::XmlFromURI,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null(),
+            None,
             0,
             None,
             None,

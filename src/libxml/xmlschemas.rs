@@ -1411,7 +1411,8 @@ unsafe fn xml_schema_err4_line(
                 XmlErrorDomain::XmlFromSchemasv,
                 error,
                 error_level,
-                file,
+                (!file.is_null())
+                    .then(|| CStr::from_ptr(file).to_string_lossy().into_owned().into()),
                 line,
                 (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
                     .to_string_lossy()
@@ -1453,7 +1454,7 @@ unsafe fn xml_schema_err4_line(
                 XmlErrorDomain::XmlFromSchemasp,
                 error,
                 error_level,
-                null_mut(),
+                None,
                 0,
                 (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
                     .to_string_lossy()
@@ -4674,7 +4675,7 @@ unsafe extern "C" fn xml_schema_perr(
         XmlErrorDomain::XmlFromSchemasp,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -5815,7 +5816,7 @@ unsafe extern "C" fn xml_schema_perr_ext(
         XmlErrorDomain::XmlFromSchemasp,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str_data1.is_null()).then(|| CStr::from_ptr(str_data1 as *const i8)
             .to_string_lossy()

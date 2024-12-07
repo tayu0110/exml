@@ -2104,7 +2104,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         None,
         None,
@@ -2148,7 +2148,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         (!val.is_null()).then(|| CStr::from_ptr(val as *const i8)
             .to_string_lossy()
@@ -2195,7 +2195,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_int(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         None,
         None,
@@ -2250,7 +2250,7 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             XmlErrorDomain::XmlFromParser,
             error,
             XmlErrorLevel::XmlErrWarning,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
                 .to_string_lossy()
@@ -2277,7 +2277,7 @@ pub(crate) unsafe extern "C" fn xml_warning_msg(
             XmlErrorDomain::XmlFromParser,
             error,
             XmlErrorLevel::XmlErrWarning,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
                 .to_string_lossy()
@@ -2323,7 +2323,7 @@ pub(crate) unsafe extern "C" fn xml_err_msg_str(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!val.is_null()).then(|| CStr::from_ptr(val as *const i8)
             .to_string_lossy()
@@ -2371,7 +2371,7 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             XmlErrorDomain::XmlFromDTD,
             error,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
                 .to_string_lossy()
@@ -2399,7 +2399,7 @@ pub(crate) unsafe extern "C" fn xml_validity_error(
             XmlErrorDomain::XmlFromDTD,
             error,
             XmlErrorLevel::XmlErrError,
-            null_mut(),
+            None,
             0,
             (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
                 .to_string_lossy()
@@ -2447,7 +2447,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg_str_int_str(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -2501,7 +2501,7 @@ pub(crate) unsafe extern "C" fn xml_ns_err(
         XmlErrorDomain::XmlFromNamespace,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!info1.is_null()).then(|| CStr::from_ptr(info1 as *const i8)
             .to_string_lossy()
@@ -7873,7 +7873,7 @@ unsafe extern "C" fn xml_ns_warn(
         XmlErrorDomain::XmlFromNamespace,
         error,
         XmlErrorLevel::XmlErrWarning,
-        null_mut(),
+        None,
         0,
         (!info1.is_null()).then(|| CStr::from_ptr(info1 as *const i8)
             .to_string_lossy()
@@ -7923,7 +7923,7 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             XmlErrorDomain::XmlFromParser,
             XmlParserErrors::XmlErrAttributeRedefined,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!localname.is_null()).then(|| CStr::from_ptr(localname as *const i8)
                 .to_string_lossy()
@@ -7946,7 +7946,7 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             XmlErrorDomain::XmlFromParser,
             XmlParserErrors::XmlErrAttributeRedefined,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)
                 .to_string_lossy()

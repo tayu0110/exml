@@ -218,7 +218,7 @@ pub(crate) unsafe extern "C" fn xml_err_internal(
         XmlErrorDomain::XmlFromParser,
         XmlParserErrors::XmlErrInternalError,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         (!str.is_null()).then(|| CStr::from_ptr(str as *const i8)
             .to_string_lossy()
@@ -268,7 +268,7 @@ pub(crate) unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *c
             XmlErrorDomain::XmlFromParser,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
                 .to_string_lossy()
@@ -291,7 +291,7 @@ pub(crate) unsafe extern "C" fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: *c
             XmlErrorDomain::XmlFromParser,
             XmlParserErrors::XmlErrNoMemory,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             None,
             None,
@@ -330,7 +330,7 @@ pub(crate) unsafe extern "C" fn __xml_err_encoding(
         XmlErrorDomain::XmlFromParser,
         xmlerr,
         XmlErrorLevel::XmlErrFatal,
-        null(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -1009,7 +1009,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
             XmlErrorDomain::XmlFromParser,
             error,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!info.is_null()).then(|| CStr::from_ptr(info).to_string_lossy().into_owned().into()),
             None,
@@ -1029,7 +1029,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err(
             XmlErrorDomain::XmlFromParser,
             error,
             XmlErrorLevel::XmlErrFatal,
-            null_mut(),
+            None,
             0,
             (!info.is_null()).then(|| CStr::from_ptr(info).to_string_lossy().into_owned().into()),
             None,
@@ -5747,7 +5747,7 @@ pub(crate) unsafe extern "C" fn xml_err_encoding_int(
         XmlErrorDomain::XmlFromParser,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         None,
         None,

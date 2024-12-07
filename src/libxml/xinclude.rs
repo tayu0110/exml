@@ -212,7 +212,7 @@ unsafe extern "C" fn xml_xinclude_err(
         XmlErrorDomain::XmlFromXInclude,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
             .to_string_lossy()
@@ -353,7 +353,7 @@ unsafe extern "C" fn xml_xinclude_err_memory(
         XmlErrorDomain::XmlFromXInclude,
         XmlParserErrors::XmlErrNoMemory,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
         None,

@@ -424,7 +424,7 @@ pub(crate) unsafe fn xml_encoding_err(error: XmlParserErrors, msg: &str, val: &s
         XmlErrorDomain::XmlFromI18N,
         error,
         XmlErrorLevel::XmlErrFatal,
-        null_mut(),
+        None,
         0,
         Some(val.to_owned().into()),
         None,

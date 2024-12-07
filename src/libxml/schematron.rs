@@ -447,7 +447,7 @@ unsafe extern "C" fn xml_schematron_perr(
         XmlErrorDomain::XmlFromSchemasp,
         error,
         XmlErrorLevel::XmlErrError,
-        null_mut(),
+        None,
         0,
         (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
             .to_string_lossy()
@@ -1748,7 +1748,7 @@ unsafe extern "C" fn xml_schematron_report_success(
                     XmlParserErrors::XmlSchematronvReport
                 },
                 XmlErrorLevel::XmlErrError,
-                null_mut(),
+                None,
                 line as _,
                 if pattern.is_null() {
                     None
