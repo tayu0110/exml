@@ -213,7 +213,7 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
         None,
         0,
         0,
-        c"Memory allocation failed : %s\n".as_ptr(),
+        Some("Memory allocation failed : %s\n"),
         extra
     );
 }
@@ -1156,11 +1156,11 @@ static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 
 /// Handle a catalog error
 #[doc(alias = "xmlCatalogErr")]
-unsafe extern "C" fn xml_catalog_err(
+unsafe fn xml_catalog_err(
     catal: XmlCatalogEntryPtr,
     node: XmlNodePtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
     str3: *const XmlChar,
@@ -1227,7 +1227,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
                 ret,
                 cur,
                 XmlParserErrors::XmlCatalogMissingAttr,
-                c"%s entry lacks '%s'\n".as_ptr() as _,
+                Some("%s entry lacks '%s'\n"),
                 name,
                 attr_name,
                 null_mut(),
@@ -1244,7 +1244,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             ret,
             cur,
             XmlParserErrors::XmlCatalogMissingAttr,
-            c"%s entry lacks '%s'\n".as_ptr() as _,
+            Some("%s entry lacks '%s'\n"),
             name,
             uri_attr_name,
             null_mut(),
@@ -1296,7 +1296,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             ret,
             cur,
             XmlParserErrors::XmlCatalogEntryBroken,
-            c"%s entry '%s' broken ?: %s\n".as_ptr() as _,
+            Some("%s entry '%s' broken ?: %s\n"),
             name,
             uri_attr_name,
             uri_value.as_ptr() as *const u8,
@@ -1336,7 +1336,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
                     parent,
                     cur,
                     XmlParserErrors::XmlCatalogPreferValue,
-                    c"Invalid value for prefer: '%s'\n".as_ptr() as _,
+                    Some("Invalid value for prefer: '%s'\n"),
                     prop.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
@@ -1565,7 +1565,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
                     null_mut(),
                     cur,
                     XmlParserErrors::XmlCatalogPreferValue,
-                    c"Invalid value for prefer: '%s'\n".as_ptr() as _,
+                    Some("Invalid value for prefer: '%s'\n"),
                     prop.as_ptr() as *const u8,
                     null_mut(),
                     null_mut(),
@@ -1579,7 +1579,7 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             null_mut(),
             doc as _,
             XmlParserErrors::XmlCatalogNotCatalog,
-            c"File %s is not an XML Catalog\n".as_ptr() as _,
+            Some("File %s is not an XML Catalog\n"),
             filename,
             null_mut(),
             null_mut(),
@@ -2061,15 +2061,13 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
     let mut have_delegate: i32;
     let mut have_next: i32 = 0;
 
-    /*
-     * protection against loops
-     */
+    // protection against loops
     if (*catal).depth > MAX_CATAL_DEPTH as i32 {
         xml_catalog_err(
             catal,
             null_mut(),
             XmlParserErrors::XmlCatalogRecursion,
-            c"Detected recursion in catalog %s\n".as_ptr() as _,
+            Some("Detected recursion in catalog %s\n"),
             (*catal).name,
             null_mut(),
             null_mut(),
@@ -2078,9 +2076,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
     }
     (*catal).depth += 1;
 
-    /*
-     * First tries steps 2/ 3/ 4/ if a system ID is provided.
-     */
+    // First tries steps 2/ 3/ 4/ if a system ID is provided.
     if !sys_id.is_null() {
         let mut rewrite: XmlCatalogEntryPtr = null_mut();
         let mut lenrewrite: i32 = 0;
@@ -2652,7 +2648,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
             catal,
             null_mut(),
             XmlParserErrors::XmlCatalogRecursion,
-            c"Detected recursion in catalog %s\n".as_ptr() as _,
+            Some("Detected recursion in catalog %s\n"),
             (*catal).name,
             null_mut(),
             null_mut(),
@@ -2660,9 +2656,7 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
         return null_mut();
     }
 
-    /*
-     * First tries steps 2/ 3/ 4/ if a system ID is provided.
-     */
+    // First tries steps 2/ 3/ 4/ if a system ID is provided.
     cur = catal;
     have_delegate = 0;
     while !cur.is_null() {

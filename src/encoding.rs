@@ -42,7 +42,6 @@
 use std::{
     borrow::Cow,
     collections::BTreeMap,
-    ffi::CString,
     fmt::Display,
     str::{from_utf8, FromStr},
     sync::{Mutex, RwLock},
@@ -414,7 +413,6 @@ pub(crate) fn cleanup_encoding_handlers() {
 }
 
 pub(crate) unsafe fn xml_encoding_err(error: XmlParserErrors, msg: &str, val: &str) {
-    let msg = CString::new(msg).unwrap();
     __xml_raise_error!(
         None,
         None,
@@ -431,7 +429,7 @@ pub(crate) unsafe fn xml_encoding_err(error: XmlParserErrors, msg: &str, val: &s
         None,
         0,
         0,
-        msg.as_ptr(),
+        Some(msg),
         val
     );
 }

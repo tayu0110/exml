@@ -854,7 +854,7 @@ unsafe extern "C" fn xml_tree_err_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromTree,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null(),
+        None,
         extra,
     );
 }
@@ -3138,17 +3138,13 @@ static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 #[doc(alias = "xmlTreeErr")]
 unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
     let msg = match code {
-        XmlParserErrors::XmlTreeInvalidHex => {
-            c"invalid hexadecimal character value\n".as_ptr() as _
-        }
-        XmlParserErrors::XmlTreeInvalidDec => c"invalid decimal character value\n".as_ptr() as _,
-        XmlParserErrors::XmlTreeUnterminatedEntity => {
-            c"unterminated entity reference %15s\n".as_ptr() as _
-        }
-        XmlParserErrors::XmlTreeNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
-        _ => c"unexpected error number\n".as_ptr() as _,
+        XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n",
+        XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n",
+        XmlParserErrors::XmlTreeUnterminatedEntity => "unterminated entity reference %15s\n",
+        XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n",
+        _ => "unexpected error number\n",
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, node, msg, extra);
+    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, node, Some(msg), extra);
 }
 
 const XHTML_STRICT_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Strict//EN";

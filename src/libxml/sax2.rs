@@ -200,7 +200,7 @@ pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> 
 }
 
 #[doc(alias = "xmlSAX2ErrMemory")]
-unsafe extern "C" fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: *const c_char) {
+unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: Option<&str>) {
     let mut schannel: Option<StructuredError> = None;
     let str1: *const c_char = c"out of memory\n".as_ptr() as _;
 
@@ -296,7 +296,7 @@ pub unsafe fn xml_sax2_internal_subset(
             .as_deref(),
     );
     if (*(*ctxt).my_doc).int_subset.is_null() {
-        xml_sax2_err_memory(ctxt, c"xmlSAX2InternalSubset".as_ptr() as _);
+        xml_sax2_err_memory(ctxt, Some("xmlSAX2InternalSubset"));
     }
 }
 
@@ -431,10 +431,10 @@ pub unsafe fn xml_sax2_external_subset(
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
 #[doc(alias = "xmlFatalErrMsg")]
-unsafe extern "C" fn xml_fatal_err_msg(
+unsafe fn xml_fatal_err_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -521,8 +521,9 @@ pub unsafe fn xml_sax2_get_entity(
                     xml_fatal_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrNotStandalone,
-                        c"Entity(%s) document marked standalone but requires external subset\n"
-                            .as_ptr() as _,
+                        Some(
+                            "Entity(%s) document marked standalone but requires external subset\n",
+                        ),
                         name,
                         null(),
                     );
@@ -608,10 +609,10 @@ pub unsafe fn xml_sax2_resolve_entity(
 
 /// Handle a parser warning
 #[doc(alias = "xmlWarnMsg")]
-unsafe extern "C" fn xml_warn_msg(
+unsafe fn xml_warn_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
 ) {
     if !ctxt.is_null()
@@ -673,7 +674,7 @@ pub unsafe fn xml_sax2_entity_decl(
             xml_warn_msg(
                 ctxt,
                 XmlParserErrors::XmlWarEntityRedefined,
-                c"Entity(%s) already defined in the internal subset\n".as_ptr() as _,
+                Some("Entity(%s) already defined in the internal subset\n"),
                 name,
             );
         }
@@ -739,7 +740,7 @@ pub unsafe fn xml_sax2_entity_decl(
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrEntityProcessing,
-            c"SAX.xmlSAX2EntityDecl(%s) called while not in subset\n".as_ptr() as _,
+            Some("SAX.xmlSAX2EntityDecl(%s) called while not in subset\n"),
             name,
             null(),
         );
@@ -748,10 +749,10 @@ pub unsafe fn xml_sax2_entity_decl(
 
 /// Handle a validation error
 #[doc(alias = "xmlValidError")]
-unsafe extern "C" fn xml_err_valid(
+unsafe fn xml_err_valid(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const c_char,
     str2: *const c_char,
 ) {
@@ -848,7 +849,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         xml_err_valid(
             ctxt,
             XmlParserErrors::XmlDTDXmlidType,
-            c"xml:id : attribute type should be ID\n".as_ptr() as _,
+            Some("xml:id : attribute type should be ID\n"),
             null(),
             null(),
         );
@@ -885,7 +886,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"SAX.xmlSAX2AttributeDecl(%s) called while not in subset\n".as_ptr() as _,
+            Some("SAX.xmlSAX2AttributeDecl(%s) called while not in subset\n"),
             name,
             null(),
         );
@@ -957,7 +958,7 @@ pub unsafe fn xml_sax2_element_decl(
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"SAX.xmlSAX2ElementDecl(%s) called while not in subset\n".as_ptr() as _,
+            Some("SAX.xmlSAX2ElementDecl(%s) called while not in subset\n"),
             name,
             null(),
         );
@@ -1005,7 +1006,7 @@ pub unsafe fn xml_sax2_notation_decl(
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,
-            c"SAX.xmlSAX2NotationDecl(%s) externalID or PublicID missing\n".as_ptr() as _,
+            Some("SAX.xmlSAX2NotationDecl(%s) externalID or PublicID missing\n"),
             name,
             null(),
         );
@@ -1030,7 +1031,7 @@ pub unsafe fn xml_sax2_notation_decl(
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,
-            c"SAX.xmlSAX2NotationDecl(%s) called while not in subset\n".as_ptr() as _,
+            Some("SAX.xmlSAX2NotationDecl(%s) called while not in subset\n"),
             name,
             null(),
         );
@@ -1162,7 +1163,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"SAX.xmlSAX2UnparsedEntityDecl(%s) called while not in subset\n".as_ptr() as _,
+            Some("SAX.xmlSAX2UnparsedEntityDecl(%s) called while not in subset\n"),
             name,
             null(),
         );
@@ -1190,7 +1191,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
                 (*ctxt).my_doc = html_new_doc_no_dtd(null(), null());
             }
             if (*ctxt).my_doc.is_null() {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2StartDocument"));
                 return;
             }
             (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocHTML as i32;
@@ -1219,7 +1220,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
             (*doc).encoding = (*ctxt).encoding().map(|e| e.to_owned());
             (*doc).standalone = (*ctxt).standalone;
         } else {
-            xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
+            xml_sax2_err_memory(ctxt, Some("xmlSAX2StartDocument"));
             return;
         }
         if (*ctxt).dict_names != 0 && !doc.is_null() {
@@ -1245,7 +1246,7 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
             (*(*ctxt).my_doc).url = None;
         }
         if (*(*ctxt).my_doc).url.is_none() {
-            xml_sax2_err_memory(ctxt, c"xmlSAX2StartDocument".as_ptr() as _);
+            xml_sax2_err_memory(ctxt, Some("xmlSAX2StartDocument"));
         }
     }
 }
@@ -1302,10 +1303,10 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
 
 /// Handle a namespace warning
 #[doc(alias = "xmlNsWarnMsg")]
-unsafe extern "C" fn xml_ns_warn_msg(
+unsafe fn xml_ns_warn_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -1354,10 +1355,10 @@ unsafe extern "C" fn xml_ns_warn_msg(
     feature = "libxml_writer",
     feature = "libxml_legacy"
 ))]
-unsafe extern "C" fn xml_ns_err_msg(
+unsafe fn xml_ns_err_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -1441,7 +1442,7 @@ unsafe fn xml_sax2_attribute_internal(
                 xml_ns_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrNsDeclError,
-                    c"invalid namespace declaration '%s'\n".as_ptr() as _,
+                    Some("invalid namespace declaration '%s'\n"),
                     cfullname.as_ptr() as *const u8,
                     null(),
                 );
@@ -1449,7 +1450,7 @@ unsafe fn xml_sax2_attribute_internal(
                 xml_ns_warn_msg(
                     ctxt,
                     XmlParserErrors::XmlWarNsColumn,
-                    c"Avoid attribute ending with ':' like '%s'\n".as_ptr() as _,
+                    Some("Avoid attribute ending with ':' like '%s'\n"),
                     cfullname.as_ptr() as *const u8,
                     null(),
                 );
@@ -1463,7 +1464,7 @@ unsafe fn xml_sax2_attribute_internal(
         }
     }
     if name.is_null() {
-        xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+        xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElement"));
         if !ns.is_null() {
             xml_free(ns as _);
         }
@@ -1525,7 +1526,7 @@ unsafe fn xml_sax2_attribute_internal(
             val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
             (*ctxt).depth -= 1;
             if val.is_null() {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElement"));
                 if !name.is_null() {
                     xml_free(name as _);
                 }
@@ -1617,7 +1618,7 @@ unsafe fn xml_sax2_attribute_internal(
             val = xml_string_decode_entities(ctxt, value, XML_SUBSTITUTE_REF as _, 0, 0, 0);
             (*ctxt).depth -= 1;
             if val.is_null() {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElement"));
                 xml_free(ns as _);
                 if !name.is_null() {
                     xml_free(name as _);
@@ -1635,7 +1636,7 @@ unsafe fn xml_sax2_attribute_internal(
             xml_ns_err_msg(
                 ctxt,
                 XmlParserErrors::XmlNsErrEmpty,
-                c"Empty namespace name for prefix %s\n".as_ptr() as _,
+                Some("Empty namespace name for prefix %s\n"),
                 name,
                 null(),
             );
@@ -1646,7 +1647,7 @@ unsafe fn xml_sax2_attribute_internal(
                 xml_ns_warn_msg(
                     ctxt,
                     XmlParserErrors::XmlWarNsURI,
-                    c"xmlns:%s: %s not a valid URI\n".as_ptr() as _,
+                    Some("xmlns:%s: %s not a valid URI\n"),
                     name,
                     value,
                 );
@@ -1655,7 +1656,7 @@ unsafe fn xml_sax2_attribute_internal(
                     xml_ns_warn_msg(
                         ctxt,
                         XmlParserErrors::XmlWarNsURIRelative,
-                        "xmlns:%s: URI %s is not absolute\n".as_ptr() as _,
+                        Some("xmlns:%s: URI %s is not absolute\n"),
                         name,
                         value,
                     );
@@ -1708,7 +1709,7 @@ unsafe fn xml_sax2_attribute_internal(
             xml_ns_err_msg(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                c"Namespace prefix %s of attribute %s is not defined\n".as_ptr() as _,
+                Some("Namespace prefix %s of attribute %s is not defined\n"),
                 ns,
                 name,
             );
@@ -1725,7 +1726,7 @@ unsafe fn xml_sax2_attribute_internal(
                     xml_ns_err_msg(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
-                        c"Attribute %s in %s redefined\n".as_ptr() as _,
+                        Some("Attribute %s in %s redefined\n"),
                         name,
                         (*namespace).href as _,
                     );
@@ -1868,7 +1869,7 @@ unsafe fn xml_sax2_attribute_internal(
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlDTDXmlidValue,
-                    c"xml:id : attribute value %s is not an NCName\n".as_ptr() as _,
+                    Some("xml:id : attribute value %s is not an NCName\n"),
                     content as _,
                     null(),
                 );
@@ -1969,7 +1970,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                             fulln = xml_strdup((*attr).name);
                         }
                         if fulln.is_null() {
-                            xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                            xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElement"));
                             break;
                         }
 
@@ -1990,8 +1991,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                             xml_err_valid(
                                 ctxt,
                                 XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                c"standalone: attribute %s on %s defaulted from external subset\n"
-                                    .as_ptr() as _,
+                                Some("standalone: attribute %s on %s defaulted from external subset\n"),
                                 fulln as _,
                                 elem.as_ref().map_or(null(), |e| e.as_ptr()),
                             );
@@ -2035,7 +2035,7 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                                 50,
                             );
                             if fulln.is_null() {
-                                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+                                xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElement"));
                                 return;
                             }
 
@@ -2132,7 +2132,7 @@ pub unsafe fn xml_sax2_start_element(
         xml_err_valid(
             ctxt,
             XmlParserErrors::XmlErrNoDTD,
-            c"Validation failed: no DTD found !".as_ptr() as _,
+            Some("Validation failed: no DTD found !"),
             null(),
             null(),
         );
@@ -2159,7 +2159,7 @@ pub unsafe fn xml_sax2_start_element(
         if !prefix.is_null() {
             xml_free(prefix as _);
         }
-        xml_sax2_err_memory(ctxt, c"xmlSAX2StartElement".as_ptr() as _);
+        xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElement"));
         return;
     }
     if let Some(children) = (*(*ctxt).my_doc).children {
@@ -2247,7 +2247,7 @@ pub unsafe fn xml_sax2_start_element(
             xml_ns_warn_msg(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                c"Namespace prefix %s is not defined\n".as_ptr() as _,
+                Some("Namespace prefix %s is not defined\n"),
                 prefix,
                 null(),
             );
@@ -2421,7 +2421,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         xml_err_valid(
             ctxt,
             XmlParserErrors::XmlDTDNoDTD,
-            c"Validation failed: no DTD found !".as_ptr() as _,
+            Some("Validation failed: no DTD found !"),
             null(),
             null(),
         );
@@ -2457,7 +2457,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 (*ret).name = lname;
             }
             if (*ret).name.is_null() {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElementNs"));
                 xml_free(ret as _);
                 return;
             }
@@ -2476,7 +2476,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             ret = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), lname, null_mut());
         }
         if ret.is_null() {
-            xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
+            xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElementNs"));
             return;
         }
     }
@@ -2586,14 +2586,14 @@ pub unsafe fn xml_sax2_start_element_ns(
         if (*ret).ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
             if ns.is_null() {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2StartElementNs".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2StartElementNs"));
                 return;
             }
             if !prefix.is_null() {
                 xml_ns_warn_msg(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
-                    c"Namespace prefix %s was not found\n".as_ptr() as _,
+                    Some("Namespace prefix %s was not found\n"),
                     prefix,
                     null(),
                 );
@@ -2601,7 +2601,7 @@ pub unsafe fn xml_sax2_start_element_ns(
                 xml_ns_warn_msg(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
-                    c"Namespace default prefix was not found\n".as_ptr() as _,
+                    Some("Namespace default prefix was not found\n"),
                     null(),
                     null(),
                 );
@@ -2744,7 +2744,7 @@ unsafe extern "C" fn xml_sax2_text_node(
     if intern.is_null() {
         (*ret).content = xml_strndup(str, len);
         if (*ret).content.is_null() {
-            xml_sax2_err_memory(ctxt, c"xmlSAX2TextNode".as_ptr() as _);
+            xml_sax2_err_memory(ctxt, Some("xmlSAX2TextNode"));
             xml_free(ret as _);
             return null_mut();
         }
@@ -3068,7 +3068,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
                     xml_err_valid(
                         ctxt,
                         XmlParserErrors::XmlDTDXmlidValue,
-                        c"xml:id : attribute value %s is not an NCName\n".as_ptr() as _,
+                        Some("xml:id : attribute value %s is not an NCName\n"),
                         content as _,
                         null(),
                     );
@@ -3198,7 +3198,7 @@ unsafe extern "C" fn xml_sax2_text(
             (*ctxt).nodelen = len;
             (*ctxt).nodemem = len + 1;
         } else {
-            xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+            xml_sax2_err_memory(ctxt, Some("xmlSAX2Characters"));
         }
     } else {
         let coalesce_text: i32 = (!last_child.is_null()
@@ -3223,20 +3223,17 @@ unsafe extern "C" fn xml_sax2_text(
                 (*last_child).content = xml_strdup((*last_child).content);
             }
             if (*last_child).content.is_null() {
-                xml_sax2_err_memory(
-                    ctxt,
-                    c"xmlSAX2Characters: xmlStrdup returned NULL".as_ptr() as _,
-                );
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2Characters: xmlStrdup returned NULL"));
                 return;
             }
             if (*ctxt).nodelen > INT_MAX - len {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2Characters overflow prevented".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2Characters overflow prevented"));
                 return;
             }
             if (*ctxt).nodelen + len > XML_MAX_TEXT_LENGTH as i32
                 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
             {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2Characters: huge text node".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2Characters: huge text node"));
                 return;
             }
             if (*ctxt).nodelen + len >= (*ctxt).nodemem {
@@ -3254,7 +3251,7 @@ unsafe extern "C" fn xml_sax2_text(
                 };
                 let newbuf: *mut XmlChar = xml_realloc((*last_child).content as _, size as _) as _;
                 if newbuf.is_null() {
-                    xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+                    xml_sax2_err_memory(ctxt, Some("xmlSAX2Characters"));
                     return;
                 }
                 (*ctxt).nodemem = size;
@@ -3269,7 +3266,7 @@ unsafe extern "C" fn xml_sax2_text(
             *(*last_child).content.add((*ctxt).nodelen as usize) = 0;
         } else if coalesce_text != 0 {
             if xml_text_concat(last_child, ch, len) != 0 {
-                xml_sax2_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+                xml_sax2_err_memory(ctxt, Some("xmlSAX2Characters"));
             }
             if (*(*ctxt).node).children().is_some() {
                 (*ctxt).nodelen = xml_strlen((*last_child).content);

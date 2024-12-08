@@ -237,7 +237,7 @@ unsafe extern "C" fn xml_c14n_err_param(extra: *const c_char) {
         None,
         0,
         0,
-        c"Invalid parameter : %s\n".as_ptr() as _,
+        Some("Invalid parameter : %s\n"),
         extra
     );
 }
@@ -261,7 +261,7 @@ unsafe extern "C" fn xml_c14n_err_memory(extra: *const c_char) {
         None,
         0,
         0,
-        c"Memory allocation failed : %s\n".as_ptr() as _,
+        Some("Memory allocation failed : %s\n"),
         extra
     );
 }
@@ -285,7 +285,7 @@ unsafe extern "C" fn xml_c14n_err_internal(extra: *const c_char) {
         None,
         0,
         0,
-        c"Internal error : %s\n".as_ptr() as _,
+        Some("Internal error : %s\n"),
         extra
     );
 }
@@ -439,7 +439,7 @@ unsafe extern "C" fn xml_c14n_err(
         None,
         0,
         0,
-        c"%s".as_ptr() as _,
+        Some("%s"),
         msg
     );
 }
@@ -602,7 +602,7 @@ unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
         None,
         0,
         0,
-        c"Relative namespace UR is invalid here : %s\n".as_ptr() as _,
+        Some("Relative namespace UR is invalid here : %s\n"),
         ns_uri
     );
 }
@@ -2096,7 +2096,7 @@ unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: 
         None,
         0,
         0,
-        c"Node %s is invalid here : %s\n".as_ptr() as _,
+        Some("Node %s is invalid here : %s\n"),
         node_type,
         extra
     );
@@ -2121,7 +2121,7 @@ unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: i32, extra: *const c_c
         None,
         0,
         0,
-        c"Unknown node type %d found : %s\n".as_ptr() as _,
+        Some("Unknown node type %d found : %s\n"),
         node_type,
         extra
     );

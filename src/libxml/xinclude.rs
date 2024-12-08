@@ -193,11 +193,11 @@ pub unsafe extern "C" fn xml_xinclude_process_flags_data(
 
 /// Handle an XInclude error
 #[doc(alias = "xmlXIncludeErr")]
-unsafe extern "C" fn xml_xinclude_err(
+unsafe fn xml_xinclude_err(
     ctxt: XmlXincludeCtxtPtr,
     node: XmlNodePtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: &str,
     extra: *const XmlChar,
 ) {
     if !ctxt.is_null() {
@@ -222,7 +222,7 @@ unsafe extern "C" fn xml_xinclude_err(
         None,
         0,
         0,
-        msg,
+        Some(msg),
         extra
     );
 }
@@ -262,7 +262,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                             ctxt,
                             node,
                             XmlParserErrors::XmlXIncludeIncludeInInclude,
-                            c"%s has an 'include' child\n".as_ptr() as _,
+                            "%s has an 'include' child\n",
                             XINCLUDE_NODE.as_ptr() as _,
                         );
                         return 0;
@@ -278,7 +278,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                     ctxt,
                     node,
                     XmlParserErrors::XmlXIncludeFallbacksInInclude,
-                    c"%s has multiple fallback children\n".as_ptr() as _,
+                    "%s has multiple fallback children\n",
                     XINCLUDE_NODE.as_ptr() as _,
                 );
                 return 0;
@@ -302,7 +302,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                 ctxt,
                 node,
                 XmlParserErrors::XmlXIncludeFallbackNotInInclude,
-                c"%s is not the child of an 'include'\n".as_ptr() as _,
+                "%s is not the child of an 'include'\n",
                 XINCLUDE_FALLBACK.as_ptr() as _,
             );
         }
@@ -360,7 +360,7 @@ unsafe extern "C" fn xml_xinclude_err_memory(
         None,
         0,
         0,
-        c"Memory allocation failed : %s\n".as_ptr() as _,
+        Some("Memory allocation failed : %s\n"),
         extra
     );
 }
@@ -466,7 +466,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeParseValue,
-                c"invalid value %s for 'parse'\n".as_ptr() as _,
+                "invalid value %s for 'parse'\n",
                 parse.as_ptr() as *const u8,
             );
             return null_mut();
@@ -497,7 +497,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
-            c"failed build URL\n".as_ptr() as _,
+            "failed build URL\n",
             null(),
         );
         return null_mut();
@@ -511,7 +511,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
-            c"invalid value URI %s\n".as_ptr() as _,
+            "invalid value URI %s\n",
             uri.as_ptr() as *const u8,
         );
         return null_mut();
@@ -528,7 +528,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeFragmentID,
-                c"Invalid fragment identifier in URI %s use the xpointer attribute\n".as_ptr() as _,
+                "Invalid fragment identifier in URI %s use the xpointer attribute\n",
                 uri.as_ptr() as *const u8,
             );
             return null_mut();
@@ -551,7 +551,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeRecursion,
-            c"detected a local recursion with no xpointer in %s\n".as_ptr() as _,
+            "detected a local recursion with no xpointer in %s\n",
             url.as_ptr() as *const u8,
         );
         return null_mut();
@@ -713,7 +713,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
                         ctxt,
                         ent as XmlNodePtr,
                         XmlParserErrors::XmlXIncludeEntityDefMismatch,
-                        c"mismatch in redefinition of entity %s\n".as_ptr() as _,
+                        "mismatch in redefinition of entity %s\n",
                         (*ent).name.load(Ordering::Relaxed) as _,
                     );
                 };
@@ -1297,7 +1297,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                                 ctxt,
                                 *(*set).node_tab.add(i as usize),
                                 XmlParserErrors::XmlErrInternalError,
-                                c"document without root\n".as_ptr() as _,
+                                "document without root\n",
                                 null(),
                             );
                             continue;
@@ -1313,7 +1313,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                             ctxt,
                             *(*set).node_tab.add(i as usize),
                             XmlParserErrors::XmlXIncludeXPtrResult,
-                            c"invalid node type in XPtr result\n".as_ptr() as _,
+                            "invalid node type in XPtr result\n",
                             null(),
                         );
                         continue; /* for */
@@ -1400,7 +1400,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeHrefURI,
-            c"invalid value URI %s\n".as_ptr() as _,
+            "invalid value URI %s\n",
             url,
         );
         // goto error;
@@ -1424,7 +1424,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeHrefURI,
-                c"invalid value URI %s\n".as_ptr() as _,
+                "invalid value URI %s\n",
                 url,
             );
             // goto error;
@@ -1459,7 +1459,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             ctxt,
                             (*refe).elem,
                             XmlParserErrors::XmlXIncludeRecursion,
-                            c"inclusion loop detected\n".as_ptr() as _,
+                            "inclusion loop detected\n",
                             null(),
                         );
                         break 'error;
@@ -1583,7 +1583,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeXPtrFailed,
-                        c"XPointer expressions not allowed in streaming mode\n".as_ptr() as _,
+                        "XPointer expressions not allowed in streaming mode\n",
                         null(),
                     );
                     break 'error;
@@ -1596,7 +1596,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeXPtrFailed,
-                        c"could not create XPointer context\n".as_ptr() as _,
+                        "could not create XPointer context\n",
                         null(),
                     );
                     break 'error;
@@ -1607,7 +1607,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeXPtrFailed,
-                        c"XPointer evaluation failed: #%s\n".as_ptr() as _,
+                        "XPointer evaluation failed: #%s\n",
                         fragment,
                     );
                     xml_xpath_free_context(xptrctxt);
@@ -1624,7 +1624,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             ctxt,
                             (*refe).elem,
                             XmlParserErrors::XmlXIncludeXPtrResult,
-                            c"XPointer is not a range: #%s\n".as_ptr() as _,
+                            "XPointer is not a range: #%s\n",
                             fragment,
                         );
                         xml_xpath_free_object(xptr);
@@ -1637,7 +1637,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             ctxt,
                             (*refe).elem,
                             XmlParserErrors::XmlXIncludeXPtrResult,
-                            c"XPointer is not a range: #%s\n".as_ptr() as _,
+                            "XPointer is not a range: #%s\n",
                             fragment,
                         );
                         xml_xpath_free_object(xptr);
@@ -1676,7 +1676,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                     ctxt,
                                     (*refe).elem,
                                     XmlParserErrors::XmlXIncludeXPtrResult,
-                                    c"XPointer selects an attribute: #%s\n".as_ptr() as _,
+                                    "XPointer selects an attribute: #%s\n",
                                     fragment,
                                 );
                                 *(*set).node_tab.add(i as usize) = null_mut();
@@ -1687,7 +1687,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                     ctxt,
                                     (*refe).elem,
                                     XmlParserErrors::XmlXIncludeXPtrResult,
-                                    c"XPointer selects a namespace: #%s\n".as_ptr() as _,
+                                    "XPointer selects a namespace: #%s\n",
                                     fragment,
                                 );
                                 *(*set).node_tab.add(i as usize) = null_mut();
@@ -1706,7 +1706,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                     ctxt,
                                     (*refe).elem,
                                     XmlParserErrors::XmlXIncludeXPtrResult,
-                                    c"XPointer selects unexpected nodes: #%s\n".as_ptr() as _,
+                                    "XPointer selects unexpected nodes: #%s\n",
                                     fragment,
                                 );
                                 *(*set).node_tab.add(i as usize) = null_mut();
@@ -1749,7 +1749,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeHrefURI,
-                        c"trying to build relative URI from %s\n".as_ptr() as _,
+                        "trying to build relative URI from %s\n",
                         url,
                     );
                 } else {
@@ -1793,7 +1793,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                             ctxt,
                                             (*refe).elem,
                                             XmlParserErrors::XmlXIncludeHrefURI,
-                                            c"trying to rebuild base from %s\n".as_ptr() as _,
+                                            "trying to rebuild base from %s\n",
                                             xml_base.as_ptr() as *const u8,
                                         );
                                     }
@@ -1848,7 +1848,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeHrefURI,
-            c"invalid value URI %s\n".as_ptr() as _,
+            "invalid value URI %s\n",
             url,
         );
         // goto error;
@@ -1863,7 +1863,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeTextFragment,
-            c"fragment identifier forbidden for text: %s\n".as_ptr() as _,
+            "fragment identifier forbidden for text: %s\n",
             (*uri).fragment as _,
         );
         // goto error;
@@ -1880,7 +1880,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeHrefURI,
-                c"invalid value URI %s\n".as_ptr() as _,
+                "invalid value URI %s\n",
                 url,
             );
             // goto error;
@@ -1899,7 +1899,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeTextDocument,
-            c"text serialization of document not available\n".as_ptr() as _,
+            "text serialization of document not available\n",
             null(),
         );
         // goto error;
@@ -1945,7 +1945,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
                     ctxt,
                     (*refe).elem,
                     XmlParserErrors::XmlXIncludeUnknownEncoding,
-                    c"encoding %s not supported\n".as_ptr() as _,
+                    "encoding %s not supported\n",
                     encoding.as_ptr() as *const u8,
                 );
                 // goto error;
@@ -2017,7 +2017,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeInvalidChar,
-                c"%s contains invalid char\n".as_ptr() as _,
+                "%s contains invalid char\n",
                 url,
             );
             // goto error;
@@ -2151,7 +2151,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeParseValue,
-                c"invalid value %s for 'parse'\n".as_ptr() as _,
+                "invalid value %s for 'parse'\n",
                 parse.as_ptr() as *const u8,
             );
             return -1;
@@ -2182,7 +2182,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
-            c"failed build URL\n".as_ptr() as _,
+            "failed build URL\n",
             null(),
         );
         return -1;
@@ -2224,7 +2224,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeNoFallback,
-            c"could not load %s, and no fallback was found\n".as_ptr() as _,
+            "could not load %s, and no fallback was found\n",
             uri.as_ptr() as *const u8,
         );
     }
@@ -2249,7 +2249,7 @@ unsafe extern "C" fn xml_xinclude_expand_node(
             ctxt,
             node,
             XmlParserErrors::XmlXIncludeRecursion,
-            c"maximum recursion depth exceeded\n".as_ptr() as _,
+            "maximum recursion depth exceeded\n",
             null_mut(),
         );
         (*ctxt).fatal_err = 1;
@@ -2263,7 +2263,7 @@ unsafe extern "C" fn xml_xinclude_expand_node(
                     ctxt,
                     node,
                     XmlParserErrors::XmlXIncludeRecursion,
-                    c"inclusion loop detected\n".as_ptr() as _,
+                    "inclusion loop detected\n",
                     null_mut(),
                 );
                 return null_mut();
@@ -2330,7 +2330,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeMultipleRoot,
-                c"XInclude error: would result in multiple root nodes\n".as_ptr() as _,
+                "XInclude error: would result in multiple root nodes\n",
                 null(),
             );
             xml_free_node_list(list);
@@ -2371,7 +2371,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeBuildFailed,
-                c"failed to build node\n".as_ptr() as _,
+                "failed to build node\n",
                 null(),
             );
             xml_free_node_list(list);
@@ -2521,7 +2521,7 @@ pub unsafe extern "C" fn xml_xinclude_process_tree_flags_data(
         .url
         .as_deref()
         .map(|u| CString::new(u).unwrap());
-    (*ctxt).base = xml_strdup(url.map_or(null(), |u| u.as_ptr() as *const u8));
+    (*ctxt).base = xml_strdup(url.as_ref().map_or(null(), |u| u.as_ptr() as *const u8));
     xml_xinclude_set_flags(ctxt, flags);
     ret = xml_xinclude_do_process(ctxt, tree);
     if ret >= 0 && (*ctxt).nb_errors > 0 {

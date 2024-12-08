@@ -125,7 +125,7 @@ unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
         None,
         0,
         0,
-        c"Memory allocation failed : %s\n".as_ptr(),
+        Some("Memory allocation failed : %s\n"),
         extra
     );
 }
@@ -2137,10 +2137,10 @@ macro_rules! NEXT {
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPtrErr")]
-unsafe extern "C" fn xml_xptr_err(
+unsafe fn xml_xptr_err(
     ctxt: XmlXPathParserContextPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: &str,
     extra: *const XmlChar,
 ) {
     if !ctxt.is_null() {
@@ -2166,7 +2166,7 @@ unsafe extern "C" fn xml_xptr_err(
             None,
             0,
             0,
-            msg,
+            Some(msg),
             extra
         );
         return;
@@ -2215,7 +2215,7 @@ unsafe extern "C" fn xml_xptr_err(
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,
-            msg,
+            Some(msg),
             extra
         );
     }
@@ -2256,7 +2256,7 @@ unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, nam
         xml_xptr_err(
             ctxt,
             XmlParserErrors::XmlXPtrChildseqStart,
-            c"warning: ChildSeq not starting by /1\n".as_ptr() as _,
+            "warning: ChildSeq not starting by /1\n",
             null_mut(),
         );
     }
@@ -2463,7 +2463,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         xml_xptr_err(
             ctxt,
             XmlParserErrors::XmlXPtrUnknownScheme,
-            c"unsupported scheme '%s'\n".as_ptr() as _,
+            "unsupported scheme '%s'\n",
             name,
         );
     }
@@ -2641,7 +2641,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
         xml_xptr_err(
             ctxt,
             XmlParserErrors::XmlXPtrEvalFailed,
-            c"xmlXPtrEval: evaluation failed to return a node set\n".as_ptr() as _,
+            "xmlXPtrEval: evaluation failed to return a node set\n",
             null(),
         );
     } else {
@@ -2676,7 +2676,7 @@ pub unsafe extern "C" fn xml_xptr_eval(
         xml_xptr_err(
             ctxt,
             XmlParserErrors::XmlXPtrExtraObjects,
-            c"xmlXPtrEval: object(s) left on the eval stack\n".as_ptr() as _,
+            "xmlXPtrEval: object(s) left on the eval stack\n",
             null(),
         );
     }

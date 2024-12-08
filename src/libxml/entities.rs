@@ -189,7 +189,7 @@ unsafe extern "C" fn xml_entities_err_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromTree,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null(),
+        None,
         extra as _,
     );
 }
@@ -278,23 +278,13 @@ pub unsafe extern "C" fn xml_new_entity(
 
 /// Raise an error.
 #[doc(alias = "xmlEntitiesErr")]
-unsafe extern "C" fn xml_entities_err(code: XmlParserErrors, msg: *const c_char) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromTree,
-        code,
-        null_mut(),
-        msg as _,
-        null(),
-    );
+unsafe fn xml_entities_err(code: XmlParserErrors, msg: Option<&str>) {
+    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, null_mut(), msg, null());
 }
 
 /// Raise a warning.
 #[doc(alias = "xmlEntitiesWarn")]
-unsafe extern "C" fn xml_entities_warn(
-    code: XmlParserErrors,
-    msg: *const c_char,
-    str1: *const XmlChar,
-) {
+unsafe fn xml_entities_warn(code: XmlParserErrors, msg: Option<&str>, str1: *const XmlChar) {
     __xml_raise_error!(
         None,
         None,
@@ -434,8 +424,7 @@ unsafe extern "C" fn xml_add_entity(
                 if valid == 0 {
                     xml_entities_warn(
                         XmlParserErrors::XmlErrEntityProcessing,
-                        c"xmlAddEntity: invalid redeclaration of predefined entity '%s'".as_ptr()
-                            as _,
+                        Some("xmlAddEntity: invalid redeclaration of predefined entity '%s'"),
                         name.as_ptr() as *const u8,
                     );
                     return null_mut();
@@ -501,14 +490,14 @@ pub unsafe extern "C" fn xml_add_doc_entity(
     if doc.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDoc,
-            c"xmlAddDocEntity: document is NULL".as_ptr() as _,
+            Some("xmlAddDocEntity: document is NULL"),
         );
         return null_mut();
     }
     if (*doc).int_subset.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
-            c"xmlAddDocEntity: document without internal subset".as_ptr() as _,
+            Some("xmlAddDocEntity: document without internal subset"),
         );
         return null_mut();
     }
@@ -518,9 +507,7 @@ pub unsafe extern "C" fn xml_add_doc_entity(
         return null_mut();
     }
 
-    /*
-     * Link it to the DTD
-     */
+    // Link it to the DTD
     (*ret).parent.store(dtd as _, Ordering::Relaxed);
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
     if let Some(mut last) = (*dtd).last {
@@ -549,14 +536,14 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
     if doc.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDoc,
-            c"xmlAddDtdEntity: document is NULL".as_ptr() as _,
+            Some("xmlAddDtdEntity: document is NULL"),
         );
         return null_mut();
     }
     if (*doc).ext_subset.is_null() {
         xml_entities_err(
             XmlParserErrors::XmlDTDNoDTD,
-            c"xmlAddDtdEntity: document without external subset".as_ptr() as _,
+            Some("xmlAddDtdEntity: document without external subset"),
         );
         return null_mut();
     }
@@ -1026,7 +1013,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                     {
                         xml_entities_err(
                             XmlParserErrors::XmlCheckNotUTF8,
-                            c"xmlEncodeEntities: input not UTF-8".as_ptr() as _,
+                            Some("xmlEncodeEntities: input not UTF-8"),
                         );
                         if !doc.is_null() {
                             (*doc).encoding = Some("ISO-8859-1".to_owned());
@@ -1071,7 +1058,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                     if l == 1 || !xml_is_char(val as u32) {
                         xml_entities_err(
                             XmlParserErrors::XmlErrInvalidChar,
-                            c"xmlEncodeEntities: char out of range\n".as_ptr() as _,
+                            Some("xmlEncodeEntities: char out of range\n"),
                         );
                         if !doc.is_null() {
                             (*doc).encoding = Some("ISO-8859-1".to_owned());
@@ -1488,7 +1475,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
         _ => {
             xml_entities_err(
                 XmlParserErrors::XmlDTDUnknownEntity,
-                c"xmlDumpEntitiesDecl: internal: unknown type entity type".as_ptr() as _,
+                Some("xmlDumpEntitiesDecl: internal: unknown type entity type"),
             );
         }
     }

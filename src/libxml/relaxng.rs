@@ -851,11 +851,11 @@ unsafe extern "C" fn xml_relaxng_get_error_string(
 
 /// Handle a Relax NG Validation error
 #[doc(alias = "xmlRngVErr")]
-unsafe extern "C" fn xml_rng_verr(
+unsafe fn xml_rng_verr(
     ctxt: XmlRelaxNGValidCtxtPtr,
     node: XmlNodePtr,
     error: i32,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -919,6 +919,10 @@ unsafe extern "C" fn xml_relaxng_show_valid_error(
     if msg.is_null() {
         return;
     }
+    let message = CStr::from_ptr(msg as *const i8)
+        .to_string_lossy()
+        .into_owned();
+    xml_free(msg as _);
 
     if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
         (*ctxt).err_no = err as i32;
@@ -927,11 +931,10 @@ unsafe extern "C" fn xml_relaxng_show_valid_error(
         ctxt,
         if child.is_null() { node } else { child },
         err as _,
-        msg as _,
+        Some(message.as_str()),
         arg1,
         arg2,
     );
-    xml_free(msg as _);
 }
 
 const MAX_ERROR: usize = 5;
@@ -1129,7 +1132,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             None,
             0,
             0,
-            c"Memory allocation failed : %s\n".as_ptr() as _,
+            Some("Memory allocation failed : %s\n"),
             extra
         );
     } else {
@@ -1149,7 +1152,7 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
             None,
             0,
             0,
-            c"Memory allocation failed\n".as_ptr() as _,
+            Some("Memory allocation failed\n"),
         );
     }
 }
@@ -1647,7 +1650,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             None,
             0,
             0,
-            c"Memory allocation failed : %s\n".as_ptr() as _,
+            Some("Memory allocation failed : %s\n"),
             extra
         );
     } else {
@@ -1667,7 +1670,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             None,
             0,
             0,
-            c"Memory allocation failed\n".as_ptr() as _,
+            Some("Memory allocation failed\n"),
         );
     }
 }
@@ -2446,11 +2449,11 @@ unsafe extern "C" fn xml_relaxng_compare_elem_def_lists(
 
 /// Handle a Relax NG Parsing error
 #[doc(alias = "xmlRngPErr")]
-unsafe extern "C" fn xml_rng_perr(
+unsafe fn xml_rng_perr(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -2583,7 +2586,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                             ctxt,
                             (*def).node,
                             XmlParserErrors::XmlRngpElemTextConflict,
-                            c"Element or text conflicts in interleave\n".as_ptr() as _,
+                            Some("Element or text conflicts in interleave\n"),
                             null_mut(),
                             null_mut(),
                         );
@@ -2598,7 +2601,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                             ctxt,
                             (*def).node,
                             XmlParserErrors::XmlRngpAttrConflict,
-                            c"Attributes conflicts in interleave\n".as_ptr() as _,
+                            Some("Attributes conflicts in interleave\n"),
                             null_mut(),
                             null_mut(),
                         );
@@ -2765,7 +2768,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
-                        c"Attribute %s is not allowed on %s\n".as_ptr() as _,
+                        Some("Attribute %s is not allowed on %s\n"),
                         (*cur).name,
                         (*node).name,
                     );
@@ -2778,7 +2781,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
-                        c"Attribute %s is not allowed on %s\n".as_ptr() as _,
+                        Some("Attribute %s is not allowed on %s\n"),
                         (*cur).name,
                         (*node).name,
                     );
@@ -2791,7 +2794,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
-                        c"Attribute %s is not allowed on %s\n".as_ptr() as _,
+                        Some("Attribute %s is not allowed on %s\n"),
                         (*cur).name,
                         (*node).name,
                     );
@@ -2804,7 +2807,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpForbiddenAttribute,
-                        c"Attribute %s is not allowed on %s\n".as_ptr() as _,
+                        Some("Attribute %s is not allowed on %s\n"),
                         (*cur).name,
                         (*node).name,
                     );
@@ -2821,7 +2824,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                                 ctxt,
                                 node,
                                 XmlParserErrors::XmlRngpInvalidURI,
-                                c"Attribute %s contains invalid URI %s\n".as_ptr() as _,
+                                Some("Attribute %s contains invalid URI %s\n"),
                                 (*cur).name,
                                 val.as_ptr() as *const u8,
                             );
@@ -2831,7 +2834,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                                     ctxt,
                                     node,
                                     XmlParserErrors::XmlRngpURINotAbsolute,
-                                    c"Attribute %s URI %s is not absolute\n".as_ptr() as _,
+                                    Some("Attribute %s URI %s is not absolute\n"),
                                     (*cur).name,
                                     val.as_ptr() as *const u8,
                                 );
@@ -2841,7 +2844,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                                     ctxt,
                                     node,
                                     XmlParserErrors::XmlRngpURIFragment,
-                                    c"Attribute %s URI %s has a fragment ID\n".as_ptr() as _,
+                                    Some("Attribute %s URI %s has a fragment ID\n"),
                                     (*cur).name,
                                     val.as_ptr() as *const u8,
                                 );
@@ -2855,7 +2858,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpUnknownAttribute,
-                    c"Unknown attribute %s on %s\n".as_ptr() as _,
+                    Some("Unknown attribute %s on %s\n"),
                     (*cur).name,
                     (*node).name,
                 );
@@ -2944,7 +2947,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
                 ctxt,
                 null_mut(),
                 XmlParserErrors::XmlRngpExternalRefRecurse,
-                c"Detected an externalRef recursion for %s\n".as_ptr() as _,
+                Some("Detected an externalRef recursion for %s\n"),
                 url,
                 null_mut(),
             );
@@ -2961,7 +2964,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
             ctxt,
             null_mut(),
             XmlParserErrors::XmlRngpParseError,
-            c"xmlRelaxNG: could not load %s\n".as_ptr() as _,
+            Some("xmlRelaxNG: could not load %s\n"),
             url,
             null_mut(),
         );
@@ -2977,7 +2980,7 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
             ctxt,
             doc as _,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlRelaxNG: allocate memory for doc %s\n".as_ptr() as _,
+            Some("xmlRelaxNG: allocate memory for doc %s\n"),
             url,
             null_mut(),
         );
@@ -3233,7 +3236,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
                 ctxt,
                 null_mut(),
                 XmlParserErrors::XmlRngpIncludeRecurse,
-                c"Detected an Include recursion for %s\n".as_ptr() as _,
+                Some("Detected an Include recursion for %s\n"),
                 url,
                 null_mut(),
             );
@@ -3250,7 +3253,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
             ctxt,
             node,
             XmlParserErrors::XmlRngpParseError,
-            c"xmlRelaxNG: could not load %s\n".as_ptr() as _,
+            Some("xmlRelaxNG: could not load %s\n"),
             url,
             null_mut(),
         );
@@ -3315,7 +3318,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
             ctxt,
             node,
             XmlParserErrors::XmlRngpEmpty,
-            c"xmlRelaxNG: included document is empty %s\n".as_ptr() as _,
+            Some("xmlRelaxNG: included document is empty %s\n"),
             url,
             null_mut(),
         );
@@ -3326,7 +3329,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
             ctxt,
             node,
             XmlParserErrors::XmlRngpGrammarMissing,
-            c"xmlRelaxNG: included document %s root is not a grammar\n".as_ptr() as _,
+            Some("xmlRelaxNG: included document %s root is not a grammar\n"),
             url,
             null_mut(),
         );
@@ -3350,8 +3353,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpStartMissing,
-                    c"xmlRelaxNG: include %s has a start but not the included grammar\n".as_ptr()
-                        as _,
+                    Some("xmlRelaxNG: include %s has a start but not the included grammar\n"),
                     url,
                     null_mut(),
                 );
@@ -3372,8 +3374,9 @@ unsafe extern "C" fn xml_relaxng_load_include(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpDefineMissing,
-                        c"xmlRelaxNG: include %s has a define %s but not the included grammar\n"
-                            .as_ptr() as _,
+                        Some(
+                            "xmlRelaxNG: include %s has a define %s but not the included grammar\n",
+                        ),
                         url,
                         name,
                     );
@@ -3384,7 +3387,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpNameMissing,
-                    c"xmlRelaxNG: include %s has define without name\n".as_ptr() as _,
+                    Some("xmlRelaxNG: include %s has define without name\n"),
                     url,
                     null_mut(),
                 );
@@ -3450,7 +3453,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             ctxt,
                             cur,
                             XmlParserErrors::XmlRngpForeignElement,
-                            c"element %s doesn't allow foreign elements\n".as_ptr() as _,
+                            Some("element %s doesn't allow foreign elements\n"),
                             parent.name,
                             null_mut(),
                         );
@@ -3480,8 +3483,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpMissingHref,
-                                c"xmlRelaxNGParse: externalRef has no href attribute\n".as_ptr()
-                                    as _,
+                                Some("xmlRelaxNGParse: externalRef has no href attribute\n"),
                                 null_mut(),
                                 null_mut(),
                             );
@@ -3494,7 +3496,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpHrefError,
-                                c"Incorrect URI for externalRef %s\n".as_ptr() as _,
+                                Some("Incorrect URI for externalRef %s\n"),
                                 href.as_ptr() as *const u8,
                                 null_mut(),
                             );
@@ -3507,7 +3509,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpHrefError,
-                                c"Fragment forbidden in URI for externalRef %s\n".as_ptr() as _,
+                                Some("Fragment forbidden in URI for externalRef %s\n"),
                                 href.as_ptr() as *const u8,
                                 null_mut(),
                             );
@@ -3523,7 +3525,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpHrefError,
-                                c"Failed to compute URL for externalRef %s\n".as_ptr() as _,
+                                Some("Failed to compute URL for externalRef %s\n"),
                                 href.as_ptr() as *const u8,
                                 null_mut(),
                             );
@@ -3542,7 +3544,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpExternalRefFailure,
-                                c"Failed to load externalRef %s\n".as_ptr() as _,
+                                Some("Failed to load externalRef %s\n"),
                                 url.as_ptr() as *const u8,
                                 null_mut(),
                             );
@@ -3558,7 +3560,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpMissingHref,
-                                c"xmlRelaxNGParse: include has no href attribute\n".as_ptr() as _,
+                                Some("xmlRelaxNGParse: include has no href attribute\n"),
                                 null_mut(),
                                 null_mut(),
                             );
@@ -3575,7 +3577,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpHrefError,
-                                c"Failed to compute URL for include %s\n".as_ptr() as _,
+                                Some("Failed to compute URL for include %s\n"),
                                 href.as_ptr() as *const u8,
                                 null_mut(),
                             );
@@ -3608,7 +3610,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpIncludeFailure,
-                                c"Failed to load include %s\n".as_ptr() as _,
+                                Some("Failed to load include %s\n"),
                                 url.as_ptr() as *const u8,
                                 null_mut(),
                             );
@@ -3652,7 +3654,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                     ctxt,
                                     cur,
                                     XmlParserErrors::XmlRngpCreateFailure,
-                                    c"Failed to create a name %s element\n".as_ptr() as _,
+                                    Some("Failed to create a name %s element\n"),
                                     name.as_ptr() as *const u8,
                                     null_mut(),
                                 );
@@ -3703,9 +3705,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                             ctxt,
                                             cur,
                                             XmlParserErrors::XmlRngpPrefixUndefined,
-                                            c"xmlRelaxNGParse: no namespace for prefix %s\n"
-                                                .as_ptr()
-                                                as _,
+                                            Some("xmlRelaxNGParse: no namespace for prefix %s\n"),
                                             prefix.as_ptr() as *const u8,
                                             null_mut(),
                                         );
@@ -3734,7 +3734,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpPatNsNameExceptNsName,
-                                c"Found nsName/except//nsName forbidden construct\n".as_ptr() as _,
+                                Some("Found nsName/except//nsName forbidden construct\n"),
                                 null_mut(),
                                 null_mut(),
                             );
@@ -3771,8 +3771,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpPatAnynameExceptAnyname,
-                                c"Found anyName/except//anyName forbidden construct\n".as_ptr()
-                                    as _,
+                                Some("Found anyName/except//anyName forbidden construct\n"),
                                 null_mut(),
                                 null_mut(),
                             );
@@ -3781,7 +3780,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 ctxt,
                                 cur,
                                 XmlParserErrors::XmlRngpPatNsNameExceptAnyName,
-                                c"Found nsName/except//anyName forbidden construct\n".as_ptr() as _,
+                                Some("Found nsName/except//anyName forbidden construct\n"),
                                 null_mut(),
                                 null_mut(),
                             );
@@ -3918,7 +3917,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
             ctxt,
             doc as _,
             XmlParserErrors::XmlRngpEmpty,
-            c"xmlRelaxNGParse: %s is empty\n".as_ptr() as _,
+            Some("xmlRelaxNGParse: %s is empty\n"),
             (*ctxt).url,
             null_mut(),
         );
@@ -4015,7 +4014,7 @@ extern "C" fn xml_relaxng_check_combine(
                             ctxt,
                             (*define).node,
                             XmlParserErrors::XmlRngpDefChoiceAndInterleave,
-                            c"Defines for %s use both 'choice' and 'interleave'\n".as_ptr() as _,
+                            Some("Defines for %s use both 'choice' and 'interleave'\n"),
                             name,
                             null_mut(),
                         );
@@ -4028,7 +4027,7 @@ extern "C" fn xml_relaxng_check_combine(
                             ctxt,
                             (*define).node,
                             XmlParserErrors::XmlRngpDefChoiceAndInterleave,
-                            c"Defines for %s use both 'choice' and 'interleave'\n".as_ptr() as _,
+                            Some("Defines for %s use both 'choice' and 'interleave'\n"),
                             name,
                             null_mut(),
                         );
@@ -4039,7 +4038,7 @@ extern "C" fn xml_relaxng_check_combine(
                         ctxt,
                         (*define).node,
                         XmlParserErrors::XmlRngpUnknownCombine,
-                        c"Defines for %s use unknown combine value '%s''\n".as_ptr() as _,
+                        Some("Defines for %s use unknown combine value '%s''\n"),
                         name,
                         combine.as_ptr() as *const u8,
                     );
@@ -4051,7 +4050,7 @@ extern "C" fn xml_relaxng_check_combine(
                     ctxt,
                     (*define).node,
                     XmlParserErrors::XmlRngpNeedCombine,
-                    c"Some defines for %s needs the combine attribute\n".as_ptr() as _,
+                    Some("Some defines for %s needs the combine attribute\n"),
                     name,
                     null_mut(),
                 );
@@ -4121,7 +4120,7 @@ extern "C" fn xml_relaxng_check_combine(
                         ctxt,
                         (*define).node,
                         XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                        c"Failed to add %s to hash table\n".as_ptr() as _,
+                        Some("Failed to add %s to hash table\n"),
                         tmpname.as_ptr() as _,
                         null_mut(),
                     );
@@ -4131,7 +4130,7 @@ extern "C" fn xml_relaxng_check_combine(
                     ctxt,
                     (*define).node,
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                    c"Failed to create interleaves hash table\n".as_ptr() as _,
+                    Some("Failed to create interleaves hash table\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -4164,7 +4163,7 @@ extern "C" fn xml_relaxng_check_reference(
                 ctxt,
                 (*refe).node,
                 XmlParserErrors::XmlErrInternalError,
-                c"Internal error: no grammar in CheckReference %s\n".as_ptr() as _,
+                Some("Internal error: no grammar in CheckReference %s\n"),
                 name,
                 null_mut(),
             );
@@ -4175,7 +4174,7 @@ extern "C" fn xml_relaxng_check_reference(
                 ctxt,
                 (*refe).node,
                 XmlParserErrors::XmlErrInternalError,
-                c"Internal error: reference has content in CheckReference %s\n".as_ptr() as _,
+                Some("Internal error: reference has content in CheckReference %s\n"),
                 name,
                 null_mut(),
             );
@@ -4197,7 +4196,7 @@ extern "C" fn xml_relaxng_check_reference(
                     ctxt,
                     (*refe).node,
                     XmlParserErrors::XmlRngpRefNoDef,
-                    c"Reference %s has no matching definition\n".as_ptr() as _,
+                    Some("Reference %s has no matching definition\n"),
                     name,
                     null_mut(),
                 );
@@ -4207,7 +4206,7 @@ extern "C" fn xml_relaxng_check_reference(
                 ctxt,
                 (*refe).node,
                 XmlParserErrors::XmlRngpRefNoDef,
-                c"Reference %s has no matching definition\n".as_ptr() as _,
+                Some("Reference %s has no matching definition\n"),
                 name,
                 null_mut(),
             );
@@ -4249,7 +4248,7 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
             ctxt,
             node,
             XmlParserErrors::XmlRngpExceptMissing,
-            c"Expecting an except node\n".as_ptr() as _,
+            Some("Expecting an except node\n"),
             null_mut(),
             null_mut(),
         );
@@ -4260,7 +4259,7 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
             ctxt,
             node,
             XmlParserErrors::XmlRngpExceptMultiple,
-            c"exceptNameClass allows only a single except node\n".as_ptr() as _,
+            Some("exceptNameClass allows only a single except node\n"),
             null_mut(),
             null_mut(),
         );
@@ -4270,7 +4269,7 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
             ctxt,
             node,
             XmlParserErrors::XmlRngpExceptEmpty,
-            c"except has no content\n".as_ptr() as _,
+            Some("except has no content\n"),
             null_mut(),
             null_mut(),
         );
@@ -4352,7 +4351,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpElementName,
-                    c"Element %s name '%s' is not an NCName\n".as_ptr() as _,
+                    Some("Element %s name '%s' is not an NCName\n"),
                     parent.name,
                     val,
                 );
@@ -4361,7 +4360,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpElementName,
-                    c"name '%s' is not an NCName\n".as_ptr() as _,
+                    Some("name '%s' is not an NCName\n"),
                     val,
                     null_mut(),
                 );
@@ -4381,7 +4380,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpXmlNs,
-                c"Attribute with namespace '%s' is not allowed\n".as_ptr() as _,
+                Some("Attribute with namespace '%s' is not allowed\n"),
                 val,
                 null_mut(),
             );
@@ -4395,7 +4394,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpXmlNsName,
-                c"Attribute with QName 'xmlns' is not allowed\n".as_ptr() as _,
+                Some("Attribute with QName 'xmlns' is not allowed\n"),
                 val,
                 null_mut(),
             );
@@ -4421,7 +4420,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpNsNameNoNs,
-                c"nsName has no ns attribute\n".as_ptr() as _,
+                Some("nsName has no ns attribute\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -4434,7 +4433,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpXmlNs,
-                c"Attribute with namespace '%s' is not allowed\n".as_ptr() as _,
+                Some("Attribute with namespace '%s' is not allowed\n"),
                 (*ret).ns,
                 null_mut(),
             );
@@ -4479,7 +4478,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpChoiceEmpty,
-                c"Element choice is empty\n".as_ptr() as _,
+                Some("Element choice is empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -4489,7 +4488,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
             ctxt,
             node,
             XmlParserErrors::XmlRngpChoiceContent,
-            c"expecting name, anyName, nsName or choice : got %s\n".as_ptr() as _,
+            Some("expecting name, anyName, nsName or choice : got %s\n"),
             if node.is_null() {
                 c"nothing".as_ptr() as _
             } else {
@@ -4570,7 +4569,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
             ctxt,
             node,
             XmlParserErrors::XmlRngpTypeMissing,
-            c"data has no type\n".as_ptr() as _,
+            Some("data has no type\n"),
             null_mut(),
             null_mut(),
         );
@@ -4584,7 +4583,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
             ctxt,
             node,
             XmlParserErrors::XmlRngpTypeValue,
-            c"data type '%s' is not an NCName\n".as_ptr() as _,
+            Some("data type '%s' is not an NCName\n"),
             typ,
             null_mut(),
         );
@@ -4613,7 +4612,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
             ctxt,
             node,
             XmlParserErrors::XmlRngpUnknownTypeLib,
-            c"Use of unregistered type library '%s'\n".as_ptr() as _,
+            Some("Use of unregistered type library '%s'\n"),
             library,
             null_mut(),
         );
@@ -4627,7 +4626,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpTypeNotFound,
-                    c"Error type '%s' is not exported by type library '%s'\n".as_ptr() as _,
+                    Some("Error type '%s' is not exported by type library '%s'\n"),
                     (*def).name,
                     library,
                 );
@@ -4644,7 +4643,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpErrorTypeLib,
-                c"Internal error with type library '%s': no 'have'\n".as_ptr() as _,
+                Some("Internal error with type library '%s': no 'have'\n"),
                 library,
                 null_mut(),
             );
@@ -4667,7 +4666,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpParamForbidden,
-                c"Type library '%s' does not allow type parameters\n".as_ptr() as _,
+                Some("Type library '%s' does not allow type parameters\n"),
                 library,
                 null_mut(),
             );
@@ -4690,7 +4689,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpParamNameMissing,
-                        c"param has no name\n".as_ptr() as _,
+                        Some("param has no name\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -4730,7 +4729,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
                 ctxt,
                 content,
                 XmlParserErrors::XmlRngpExceptNoContent,
-                c"except has no content\n".as_ptr() as _,
+                Some("except has no content\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -4758,7 +4757,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
             ctxt,
             content,
             XmlParserErrors::XmlRngpDataContent,
-            c"Element data has unexpected content %s\n".as_ptr() as _,
+            Some("Element data has unexpected content %s\n"),
             (*content).name,
             null_mut(),
         );
@@ -4789,7 +4788,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
             ctxt,
             node,
             XmlParserErrors::XmlRngpAttributeEmpty,
-            c"xmlRelaxNGParseattribute: attribute has no children\n".as_ptr() as _,
+            Some("xmlRelaxNGParseattribute: attribute has no children\n"),
             null_mut(),
             null_mut(),
         );
@@ -4832,7 +4831,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpAttributeContent,
-                        c"attribute has invalid content\n".as_ptr() as _,
+                        Some("attribute has invalid content\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -4842,7 +4841,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpAttributeNoop,
-                        c"RNG Internal error, noop found in attribute\n".as_ptr() as _,
+                        Some("RNG Internal error, noop found in attribute\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -4856,7 +4855,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
             ctxt,
             node,
             XmlParserErrors::XmlRngpAttributeChildren,
-            c"attribute has multiple children\n".as_ptr() as _,
+            Some("attribute has multiple children\n"),
             null_mut(),
             null_mut(),
         );
@@ -4892,7 +4891,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpTypeValue,
-                c"value typ '%s' is not an NCName\n".as_ptr() as _,
+                Some("value typ '%s' is not an NCName\n"),
                 typ,
                 null_mut(),
             );
@@ -4914,7 +4913,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpUnknownTypeLib,
-                c"Use of unregistered type library '%s'\n".as_ptr() as _,
+                Some("Use of unregistered type library '%s'\n"),
                 library,
                 null_mut(),
             );
@@ -4928,7 +4927,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpTypeNotFound,
-                        c"Error type '%s' is not exported by type library '%s'\n".as_ptr() as _,
+                        Some("Error type '%s' is not exported by type library '%s'\n"),
                         (*def).name,
                         library,
                     );
@@ -4938,7 +4937,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpErrorTypeLib,
-                    c"Internal error with type library '%s': no 'have'\n".as_ptr() as _,
+                    Some("Internal error with type library '%s': no 'have'\n"),
                     library,
                     null_mut(),
                 );
@@ -4959,7 +4958,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
             ctxt,
             node,
             XmlParserErrors::XmlRngpTextExpected,
-            c"Expecting a single text value for <value>content\n".as_ptr() as _,
+            Some("Expecting a single text value for <value>content\n"),
             null_mut(),
             null_mut(),
         );
@@ -4975,7 +4974,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpValueNoContent,
-                c"Element <value> has no content\n".as_ptr() as _,
+                Some("Element <value> has no content\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -4994,7 +4993,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpInvalidValue,
-                    c"Value '%s' is not acceptable for type '%s'\n".as_ptr() as _,
+                    Some("Value '%s' is not acceptable for type '%s'\n"),
                     (*def).value,
                     (*def).name,
                 );
@@ -5042,7 +5041,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpInterleaveAdd,
-                c"Failed to add %s to hash table\n".as_ptr() as _,
+                Some("Failed to add %s to hash table\n"),
                 name.as_ptr() as _,
                 null_mut(),
             );
@@ -5056,7 +5055,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
             ctxt,
             node,
             XmlParserErrors::XmlRngpInterleaveNoContent,
-            c"Element interleave is empty\n".as_ptr() as _,
+            Some("Element interleave is empty\n"),
             null_mut(),
             null_mut(),
         );
@@ -5112,7 +5111,7 @@ extern "C" fn xml_relaxng_parse_import_ref(
                         ctxt,
                         null_mut(),
                         XmlParserErrors::XmlRngpRefCreateFailed,
-                        c"Error refs definitions '%s'\n".as_ptr() as _,
+                        Some("Error refs definitions '%s'\n"),
                         (*def).name,
                         null_mut(),
                     );
@@ -5121,7 +5120,7 @@ extern "C" fn xml_relaxng_parse_import_ref(
                         ctxt,
                         null_mut(),
                         XmlParserErrors::XmlRngpRefCreateFailed,
-                        c"Error refs definitions\n".as_ptr() as _,
+                        Some("Error refs definitions\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -5157,7 +5156,7 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
             ctxt,
             null_mut(),
             XmlParserErrors::XmlRngpRefCreateFailed,
-            c"Could not create references hash\n".as_ptr() as _,
+            Some("Could not create references hash\n"),
             null_mut(),
             null_mut(),
         );
@@ -5207,7 +5206,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpExternalRefEmtpy,
-                    c"xmlRelaxNGParse: %s is empty\n".as_ptr() as _,
+                    Some("xmlRelaxNGParse: %s is empty\n"),
                     (*ctxt).url,
                     null_mut(),
                 );
@@ -5282,7 +5281,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyNotEmpty,
-                c"empty: had a child node\n".as_ptr() as _,
+                Some("empty: had a child node\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5298,7 +5297,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpTextHasChild,
-                c"text: had a child node\n".as_ptr() as _,
+                Some("text: had a child node\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5316,7 +5315,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Element %s is empty\n".as_ptr() as _,
+                Some("Element %s is empty\n"),
                 (*node).name,
                 null_mut(),
             );
@@ -5334,7 +5333,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Element %s is empty\n".as_ptr() as _,
+                Some("Element %s is empty\n"),
                 (*node).name,
                 null_mut(),
             );
@@ -5352,7 +5351,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Element %s is empty\n".as_ptr() as _,
+                Some("Element %s is empty\n"),
                 (*node).name,
                 null_mut(),
             );
@@ -5370,7 +5369,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Element %s is empty\n".as_ptr() as _,
+                Some("Element %s is empty\n"),
                 (*node).name,
                 null_mut(),
             );
@@ -5388,7 +5387,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Element %s is empty\n".as_ptr() as _,
+                Some("Element %s is empty\n"),
                 (*node).name,
                 null_mut(),
             );
@@ -5408,7 +5407,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpRefNoName,
-                c"ref has no name\n".as_ptr() as _,
+                Some("ref has no name\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5419,7 +5418,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpRefNameInvalid,
-                    c"ref name '%s' is not an NCName\n".as_ptr() as _,
+                    Some("ref name '%s' is not an NCName\n"),
                     (*def).name,
                     null_mut(),
                 );
@@ -5430,7 +5429,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpRefNotEmpty,
-                c"ref is not empty\n".as_ptr() as _,
+                Some("ref is not empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5454,7 +5453,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                             ctxt,
                             node,
                             XmlParserErrors::XmlRngpRefCreateFailed,
-                            c"Error refs definitions '%s'\n".as_ptr() as _,
+                            Some("Error refs definitions '%s'\n"),
                             (*def).name,
                             null_mut(),
                         );
@@ -5463,7 +5462,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                             ctxt,
                             node,
                             XmlParserErrors::XmlRngpRefCreateFailed,
-                            c"Error refs definitions\n".as_ptr() as _,
+                            Some("Error refs definitions\n"),
                             null_mut(),
                             null_mut(),
                         );
@@ -5479,7 +5478,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpRefCreateFailed,
-                c"Could not create references hash\n".as_ptr() as _,
+                Some("Could not create references hash\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5502,7 +5501,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Element %s is empty\n".as_ptr() as _,
+                Some("Element %s is empty\n"),
                 (*node).name,
                 null_mut(),
             );
@@ -5522,7 +5521,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpNotAllowedNotEmpty,
-                c"xmlRelaxNGParse: notAllowed element is not empty\n".as_ptr() as _,
+                Some("xmlRelaxNGParse: notAllowed element is not empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5548,7 +5547,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpParentRefNoParent,
-                c"Use of parentRef without a parent grammar\n".as_ptr() as _,
+                Some("Use of parentRef without a parent grammar\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5568,7 +5567,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpParentRefNoName,
-                c"parentRef has no name\n".as_ptr() as _,
+                Some("parentRef has no name\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5579,7 +5578,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                     ctxt,
                     node,
                     XmlParserErrors::XmlRngpParentRefNameInvalid,
-                    c"parentRef name '%s' is not an NCName\n".as_ptr() as _,
+                    Some("parentRef name '%s' is not an NCName\n"),
                     (*def).name,
                     null_mut(),
                 );
@@ -5590,7 +5589,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpParentRefNotEmpty,
-                c"parentRef is not empty\n".as_ptr() as _,
+                Some("parentRef is not empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5613,7 +5612,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpParentRefCreateFailed,
-                        c"Internal error parentRef definitions '%s'\n".as_ptr() as _,
+                        Some("Internal error parentRef definitions '%s'\n"),
                         (*def).name,
                         null_mut(),
                     );
@@ -5628,7 +5627,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpParentRefCreateFailed,
-                c"Could not create references hash\n".as_ptr() as _,
+                Some("Could not create references hash\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5640,7 +5639,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpEmptyConstruct,
-                c"Mixed is empty\n".as_ptr() as _,
+                Some("Mixed is empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5673,7 +5672,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
             ctxt,
             node,
             XmlParserErrors::XmlRngpUnknownConstruct,
-            c"Unexpected node %s is not a pattern\n".as_ptr() as _,
+            Some("Unexpected node %s is not a pattern\n"),
             (*node).name,
             null_mut(),
         );
@@ -5704,7 +5703,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
             ctxt,
             node,
             XmlParserErrors::XmlRngpElementEmpty,
-            c"xmlRelaxNGParseElement: element has no children\n".as_ptr() as _,
+            Some("xmlRelaxNGParseElement: element has no children\n"),
             null_mut(),
             null_mut(),
         );
@@ -5720,7 +5719,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
             ctxt,
             node,
             XmlParserErrors::XmlRngpElementNoContent,
-            c"xmlRelaxNGParseElement: element has no content\n".as_ptr() as _,
+            Some("xmlRelaxNGParseElement: element has no content\n"),
             null_mut(),
             null_mut(),
         );
@@ -5777,7 +5776,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpElementContent,
-                        c"RNG Internal error, start found in element\n".as_ptr() as _,
+                        Some("RNG Internal error, start found in element\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -5787,7 +5786,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpElementContent,
-                        c"RNG Internal error, param found in element\n".as_ptr() as _,
+                        Some("RNG Internal error, param found in element\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -5797,7 +5796,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpElementContent,
-                        c"RNG Internal error, except found in element\n".as_ptr() as _,
+                        Some("RNG Internal error, except found in element\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -5807,7 +5806,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpElementContent,
-                        c"RNG Internal error, noop found in element\n".as_ptr() as _,
+                        Some("RNG Internal error, noop found in element\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -5890,7 +5889,7 @@ unsafe extern "C" fn xml_relaxng_parse_start(
             ctxt,
             nodes,
             XmlParserErrors::XmlRngpStartEmpty,
-            c"start has no children\n".as_ptr() as _,
+            Some("start has no children\n"),
             null_mut(),
             null_mut(),
         );
@@ -5907,7 +5906,7 @@ unsafe extern "C" fn xml_relaxng_parse_start(
                 ctxt,
                 nodes,
                 XmlParserErrors::XmlRngpEmptyContent,
-                c"element empty is not empty\n".as_ptr() as _,
+                Some("element empty is not empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5923,7 +5922,7 @@ unsafe extern "C" fn xml_relaxng_parse_start(
                 ctxt,
                 nodes,
                 XmlParserErrors::XmlRngpNotAllowedNotEmpty,
-                c"element notAllowed is not empty\n".as_ptr() as _,
+                Some("element notAllowed is not empty\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -5946,7 +5945,7 @@ unsafe extern "C" fn xml_relaxng_parse_start(
             ctxt,
             nodes,
             XmlParserErrors::XmlRngpStartContent,
-            c"start more than one children\n".as_ptr() as _,
+            Some("start more than one children\n"),
             null_mut(),
             null_mut(),
         );
@@ -5976,7 +5975,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpInvalidDefineName,
-                c"define name '%s' is not an NCName\n".as_ptr() as _,
+                Some("define name '%s' is not an NCName\n"),
                 name,
                 null_mut(),
             );
@@ -5998,7 +5997,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpDefineEmpty,
-                c"define has no children\n".as_ptr() as _,
+                Some("define has no children\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -6020,7 +6019,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
                         ctxt,
                         node,
                         XmlParserErrors::XmlRngpDefineCreateFailed,
-                        c"Internal error on define aggregation of %s\n".as_ptr() as _,
+                        Some("Internal error on define aggregation of %s\n"),
                         name,
                         null_mut(),
                     );
@@ -6037,7 +6036,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
                 ctxt,
                 node,
                 XmlParserErrors::XmlRngpDefineCreateFailed,
-                c"Could not create definition hash\n".as_ptr() as _,
+                Some("Could not create definition hash\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -6048,7 +6047,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
             ctxt,
             node,
             XmlParserErrors::XmlRngpDefineNameMissing,
-            c"define has no name\n".as_ptr() as _,
+            Some("define has no name\n"),
             null_mut(),
             null_mut(),
         );
@@ -6073,7 +6072,7 @@ unsafe extern "C" fn xml_relaxng_parse_include(
             ctxt,
             node,
             XmlParserErrors::XmlRngpIncludeEmpty,
-            c"Include node has no data\n".as_ptr() as _,
+            Some("Include node has no data\n"),
             null_mut(),
             null_mut(),
         );
@@ -6089,7 +6088,7 @@ unsafe extern "C" fn xml_relaxng_parse_include(
             ctxt,
             node,
             XmlParserErrors::XmlRngpEmpty,
-            c"Include document is empty\n".as_ptr() as _,
+            Some("Include document is empty\n"),
             null_mut(),
             null_mut(),
         );
@@ -6100,7 +6099,7 @@ unsafe extern "C" fn xml_relaxng_parse_include(
             ctxt,
             node,
             XmlParserErrors::XmlRngpGrammarMissing,
-            c"Include document root is not a grammar\n".as_ptr() as _,
+            Some("Include document root is not a grammar\n"),
             null_mut(),
             null_mut(),
         );
@@ -6139,7 +6138,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar_content(
             ctxt,
             nodes,
             XmlParserErrors::XmlRngpGrammarEmpty,
-            c"grammar has no children\n".as_ptr() as _,
+            Some("grammar has no children\n"),
             null_mut(),
             null_mut(),
         );
@@ -6157,7 +6156,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar_content(
                     ctxt,
                     nodes,
                     XmlParserErrors::XmlRngpStartEmpty,
-                    c"start has no children\n".as_ptr() as _,
+                    Some("start has no children\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -6177,7 +6176,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar_content(
                 ctxt,
                 nodes,
                 XmlParserErrors::XmlRngpGrammarContent,
-                c"grammar has unexpected child %s\n".as_ptr() as _,
+                Some("grammar has unexpected child %s\n"),
                 (*nodes).name,
                 null_mut(),
             );
@@ -6214,7 +6213,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 ctxt,
                 (*cur).node,
                 XmlParserErrors::XmlRngpStartMissing,
-                c"Internal error: start element not found\n".as_ptr() as _,
+                Some("Internal error: start element not found\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -6232,7 +6231,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                         ctxt,
                         (*cur).node,
                         XmlParserErrors::XmlRngpStartChoiceAndInterleave,
-                        c"<start> use both 'choice' and 'interleave'\n".as_ptr() as _,
+                        Some("<start> use both 'choice' and 'interleave'\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -6245,7 +6244,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                         ctxt,
                         (*cur).node,
                         XmlParserErrors::XmlRngpStartChoiceAndInterleave,
-                        c"<start> use both 'choice' and 'interleave'\n".as_ptr() as _,
+                        Some("<start> use both 'choice' and 'interleave'\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -6256,7 +6255,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpUnknownCombine,
-                    c"<start> uses unknown combine value '%s''\n".as_ptr() as _,
+                    Some("<start> uses unknown combine value '%s''\n"),
                     combine.as_ptr() as *const u8,
                     null_mut(),
                 );
@@ -6268,7 +6267,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 ctxt,
                 (*cur).node,
                 XmlParserErrors::XmlRngpNeedCombine,
-                c"Some <start> element miss the combine attribute\n".as_ptr() as _,
+                Some("Some <start> element miss the combine attribute\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -6312,7 +6311,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                    c"Failed to add %s to hash table\n".as_ptr() as _,
+                    Some("Failed to add %s to hash table\n"),
                     tmpname.as_ptr() as _,
                     null_mut(),
                 );
@@ -6322,7 +6321,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
                 ctxt,
                 (*cur).node,
                 XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                c"Failed to create interleaves hash table\n".as_ptr() as _,
+                Some("Failed to create interleaves hash table\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -6370,7 +6369,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
             ctxt,
             nodes,
             XmlParserErrors::XmlRngpGrammarContent,
-            c"Failed to parse <grammar> content\n".as_ptr() as _,
+            Some("Failed to parse <grammar> content\n"),
             null_mut(),
             null_mut(),
         );
@@ -6379,7 +6378,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
             ctxt,
             nodes,
             XmlParserErrors::XmlRngpGrammarNoStart,
-            c"Element <grammar> has no <start>\n".as_ptr() as _,
+            Some("Element <grammar> has no <start>\n"),
             null_mut(),
             null_mut(),
         );
@@ -6438,7 +6437,7 @@ unsafe extern "C" fn xml_relaxng_check_cycles(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpRefCycle,
-                    c"Detected a cycle in %s references\n".as_ptr() as _,
+                    Some("Detected a cycle in %s references\n"),
                     (*cur).name,
                     null_mut(),
                 );
@@ -6828,7 +6827,7 @@ unsafe extern "C" fn xml_relaxng_check_group_attrs(
                     ctxt,
                     (*def).node,
                     XmlParserErrors::XmlRngpGroupAttrConflict,
-                    c"Attributes conflicts in group\n".as_ptr() as _,
+                    Some("Attributes conflicts in group\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7129,7 +7128,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptRef,
-                    c"Found forbidden pattern data/except//ref\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//ref\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7140,7 +7139,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                         ctxt,
                         (*cur).node,
                         XmlParserErrors::XmlRngpRefNoDef,
-                        c"Internal found no define for parent refs\n".as_ptr() as _,
+                        Some("Internal found no define for parent refs\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -7149,7 +7148,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                         ctxt,
                         (*cur).node,
                         XmlParserErrors::XmlRngpRefNoDef,
-                        c"Internal found no define for ref %s\n".as_ptr() as _,
+                        Some("Internal found no define for ref %s\n"),
                         if !(*cur).name.is_null() {
                             (*cur).name
                         } else {
@@ -7182,7 +7181,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptElem,
-                    c"Found forbidden pattern data/except//element(ref)\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//element(ref)\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7192,7 +7191,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatListElem,
-                    c"Found forbidden pattern list//element(ref)\n".as_ptr() as _,
+                    Some("Found forbidden pattern list//element(ref)\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7202,7 +7201,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatAttrElem,
-                    c"Found forbidden pattern attribute//element(ref)\n".as_ptr() as _,
+                    Some("Found forbidden pattern attribute//element(ref)\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7212,7 +7211,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatAttrElem,
-                    c"Found forbidden pattern attribute//element(ref)\n".as_ptr() as _,
+                    Some("Found forbidden pattern attribute//element(ref)\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7228,7 +7227,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpElemContentEmpty,
-                    c"Element %s attributes have a content type error\n".as_ptr() as _,
+                    Some("Element %s attributes have a content type error\n"),
                     (*cur).name,
                     null_mut(),
                 );
@@ -7239,7 +7238,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpElemContentError,
-                    c"Element %s has a content type error\n".as_ptr() as _,
+                    Some("Element %s has a content type error\n"),
                     (*cur).name,
                     null_mut(),
                 );
@@ -7252,7 +7251,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatAttrAttr,
-                    c"Found forbidden pattern attribute//attribute\n".as_ptr() as _,
+                    Some("Found forbidden pattern attribute//attribute\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7262,7 +7261,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatListAttr,
-                    c"Found forbidden pattern list//attribute\n".as_ptr() as _,
+                    Some("Found forbidden pattern list//attribute\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7272,7 +7271,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatOnemoreGroupAttr,
-                    c"Found forbidden pattern oneOrMore//group//attribute\n".as_ptr() as _,
+                    Some("Found forbidden pattern oneOrMore//group//attribute\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7282,7 +7281,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatOnemoreInterleaveAttr,
-                    c"Found forbidden pattern oneOrMore//interleave//attribute\n".as_ptr() as _,
+                    Some("Found forbidden pattern oneOrMore//interleave//attribute\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7292,7 +7291,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptAttr,
-                    c"Found forbidden pattern data/except//attribute\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//attribute\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7302,7 +7301,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartAttr,
-                    c"Found forbidden pattern start//attribute\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//attribute\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7318,7 +7317,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                         ctxt,
                         (*cur).node,
                         XmlParserErrors::XmlRngpAnynameAttrAncestor,
-                        c"Found anyName attribute without oneOrMore ancestor\n".as_ptr() as _,
+                        Some("Found anyName attribute without oneOrMore ancestor\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -7327,7 +7326,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                         ctxt,
                         (*cur).node,
                         XmlParserErrors::XmlRngpNsNameAttrAncestor,
-                        c"Found nsName attribute without oneOrMore ancestor\n".as_ptr() as _,
+                        Some("Found nsName attribute without oneOrMore ancestor\n"),
                         null_mut(),
                         null_mut(),
                     );
@@ -7345,7 +7344,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptOnemore,
-                    c"Found forbidden pattern data/except//oneOrMore\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//oneOrMore\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7355,7 +7354,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartOnemore,
-                    c"Found forbidden pattern start//oneOrMore\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//oneOrMore\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7369,7 +7368,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatListList,
-                    c"Found forbidden pattern list//list\n".as_ptr() as _,
+                    Some("Found forbidden pattern list//list\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7379,7 +7378,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptList,
-                    c"Found forbidden pattern data/except//list\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//list\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7389,7 +7388,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartList,
-                    c"Found forbidden pattern start//list\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//list\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7402,7 +7401,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptGroup,
-                    c"Found forbidden pattern data/except//group\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//group\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7412,7 +7411,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartGroup,
-                    c"Found forbidden pattern start//group\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//group\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7433,7 +7432,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatListInterleave,
-                    c"Found forbidden pattern list//interleave\n".as_ptr() as _,
+                    Some("Found forbidden pattern list//interleave\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7443,7 +7442,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptInterleave,
-                    c"Found forbidden pattern data/except//interleave\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//interleave\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7453,7 +7452,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptInterleave,
-                    c"Found forbidden pattern start//interleave\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//interleave\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7477,7 +7476,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartData,
-                    c"Found forbidden pattern start//data\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//data\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7490,7 +7489,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartValue,
-                    c"Found forbidden pattern start//value\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//value\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7503,7 +7502,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatListText,
-                    c"Found forbidden pattern list//text\n".as_ptr() as _,
+                    Some("Found forbidden pattern list//text\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7513,7 +7512,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptText,
-                    c"Found forbidden pattern data/except//text\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//text\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7523,7 +7522,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartText,
-                    c"Found forbidden pattern start//text\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//text\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7535,7 +7534,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatDataExceptEmpty,
-                    c"Found forbidden pattern data/except//empty\n".as_ptr() as _,
+                    Some("Found forbidden pattern data/except//empty\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -7545,7 +7544,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                     ctxt,
                     (*cur).node,
                     XmlParserErrors::XmlRngpPatStartEmpty,
-                    c"Found forbidden pattern start//empty\n".as_ptr() as _,
+                    Some("Found forbidden pattern start//empty\n"),
                     null_mut(),
                     null_mut(),
                 );
@@ -8114,7 +8113,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
                 ctxt,
                 null_mut(),
                 XmlParserErrors::XmlRngpParseError,
-                c"xmlRelaxNGParse: could not load %s\n".as_ptr() as _,
+                Some("xmlRelaxNGParse: could not load %s\n"),
                 (*ctxt).url,
                 null_mut(),
             );
@@ -8128,7 +8127,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
                 ctxt,
                 null_mut(),
                 XmlParserErrors::XmlRngpParseError,
-                c"xmlRelaxNGParse: could not parse schemas\n".as_ptr() as _,
+                Some("xmlRelaxNGParse: could not parse schemas\n"),
                 null_mut(),
                 null_mut(),
             );
@@ -8143,7 +8142,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
             ctxt,
             null_mut(),
             XmlParserErrors::XmlRngpEmpty,
-            c"xmlRelaxNGParse: nothing to parse\n".as_ptr() as _,
+            Some("xmlRelaxNGParse: nothing to parse\n"),
             null_mut(),
             null_mut(),
         );
@@ -8170,7 +8169,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
             ctxt,
             doc as _,
             XmlParserErrors::XmlRngpEmpty,
-            c"xmlRelaxNGParse: %s is empty\n".as_ptr() as _,
+            Some("xmlRelaxNGParse: %s is empty\n"),
             if !(*ctxt).url.is_null() {
                 (*ctxt).url
             } else {

@@ -499,13 +499,13 @@ unsafe extern "C" fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extr
     use crate::error::{XmlErrorDomain, __xml_simple_error};
 
     let msg = match code {
-        XmlParserErrors::XmlSaveNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
-        XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
-        XmlParserErrors::XmlSaveUnknownEncoding => c"unknown encoding %s\n".as_ptr() as _,
-        XmlParserErrors::XmlSaveNoDoctype => c"HTML has no DOCTYPE\n".as_ptr() as _,
-        _ => c"unexpected error number\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n",
+        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n",
+        XmlParserErrors::XmlSaveUnknownEncoding => "unknown encoding %s\n",
+        XmlParserErrors::XmlSaveNoDoctype => "HTML has no DOCTYPE\n",
+        _ => "unexpected error number\n",
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, msg, extra);
+    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, Some(msg), extra);
 }
 
 /// Dump an HTML document in memory and return the xmlChar * and it's size.  
@@ -718,7 +718,7 @@ unsafe extern "C" fn html_save_err_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromOutput,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null_mut(),
+        None,
         extra,
     );
 }

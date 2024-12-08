@@ -1424,7 +1424,7 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
         use std::borrow::Cow;
-        use std::ffi::CStr;
+        use std::ffi::{CStr, CString};
         use std::ptr::{null_mut, NonNull};
 
         use libc::{c_char, c_int, c_void};
@@ -1455,7 +1455,7 @@ macro_rules! __xml_raise_error {
             str3: Option<Cow<'static, str>>,
             int1: c_int,
             mut col: c_int,
-            msg: *const c_char| {
+            msg: Option<&str>| {
                 let mut ctxt: XmlParserCtxtPtr = null_mut();
                 let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
                     let mut node: XmlNodePtr = nod as XmlNodePtr;
@@ -1509,16 +1509,17 @@ macro_rules! __xml_raise_error {
                         }
                     }
                     // Formatting the message
-                    let str = if msg.is_null() {
-                        Cow::Borrowed("No error message provided")
-                    } else {
-                        $crate::XML_GET_VAR_STR!(msg, str, $( $args ),*);
+                    let str = if let Some(msg) = msg {
+                        let msg = CString::new(msg).unwrap();
+                        $crate::XML_GET_VAR_STR!(msg.as_ptr() as _, str, $( $args ),*);
                         assert!(!str.is_null());
                         let s = CStr::from_ptr(str).to_string_lossy();
                         let s = s.into_owned();
                         assert!(s.as_ptr() as *const i8 as usize != str as usize);
                         $crate::libxml::globals::xml_free(str as _);
                         s.into()
+                    } else {
+                        Cow::Borrowed("No error message provided")
                     };
 
                     // specific processing if a parser context is provided
@@ -1673,7 +1674,7 @@ pub(crate) unsafe fn __xml_simple_error(
     domain: XmlErrorDomain,
     code: XmlParserErrors,
     node: XmlNodePtr,
-    msg: *const i8,
+    msg: Option<&str>,
     extra: *const i8,
 ) {
     if code == XmlParserErrors::XmlErrNoMemory {
@@ -1694,7 +1695,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 None,
                 0,
                 0,
-                c"Memory allocation failed : %s\n".as_ptr(),
+                Some("Memory allocation failed : %s\n"),
                 extra
             );
         } else {
@@ -1714,7 +1715,7 @@ pub(crate) unsafe fn __xml_simple_error(
                 None,
                 0,
                 0,
-                c"Memory allocation failed\n".as_ptr(),
+                Some("Memory allocation failed\n"),
             );
         }
     } else {

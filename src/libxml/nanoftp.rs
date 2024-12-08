@@ -22,7 +22,7 @@ use std::{
     ffi::{c_char, c_int, c_uchar, c_uint, c_ulong},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of, addr_of_mut, null, null_mut},
+    ptr::{addr_of, addr_of_mut, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
@@ -176,7 +176,7 @@ unsafe extern "C" fn xml_ftp_err_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromFTP,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null(),
+        None,
         extra,
     );
 }

@@ -255,7 +255,7 @@ unsafe extern "C" fn xml_writer_err_msg(
             None,
             0,
             0,
-            c"%s".as_ptr() as _,
+            Some("%s"),
             msg
         );
     } else {
@@ -275,7 +275,7 @@ unsafe extern "C" fn xml_writer_err_msg(
             None,
             0,
             0,
-            c"%s".as_ptr() as _,
+            Some("%s"),
             msg
         );
     }
@@ -385,10 +385,10 @@ pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTe
 
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsgInt")]
-unsafe extern "C" fn xml_writer_err_msg_int(
+unsafe fn xml_writer_err_msg_int(
     ctxt: XmlTextWriterPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: &str,
     val: i32,
 ) {
     if !ctxt.is_null() {
@@ -408,7 +408,7 @@ unsafe extern "C" fn xml_writer_err_msg_int(
             None,
             val,
             0,
-            msg,
+            Some(msg),
             val
         );
     } else {
@@ -428,7 +428,7 @@ unsafe extern "C" fn xml_writer_err_msg_int(
             None,
             val,
             0,
-            msg,
+            Some(msg),
             val
         );
     }
@@ -450,7 +450,7 @@ unsafe extern "C" fn xml_text_writer_write_doc_callback(
         xml_writer_err_msg_int(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterWriteDocCallback : XML error %d !\n".as_ptr() as _,
+            "xmlTextWriterWriteDocCallback : XML error %d !\n",
             rc,
         );
         return -1;
@@ -475,7 +475,7 @@ unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) ->
         xml_writer_err_msg_int(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterCloseDocCallback : XML error %d !\n".as_ptr() as _,
+            "xmlTextWriterCloseDocCallback : XML error %d !\n",
             rc,
         );
         return -1;

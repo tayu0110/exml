@@ -128,13 +128,13 @@ pub(crate) unsafe extern "C" fn xml_save_err(
     extra: *const c_char,
 ) {
     let msg = match code {
-        XmlParserErrors::XmlSaveNotUTF8 => c"string is not in UTF-8\n".as_ptr() as _,
-        XmlParserErrors::XmlSaveCharInvalid => c"invalid character value\n".as_ptr() as _,
-        XmlParserErrors::XmlSaveUnknownEncoding => c"unknown encoding %s\n".as_ptr() as _,
-        XmlParserErrors::XmlSaveNoDoctype => c"document has no DOCTYPE\n".as_ptr() as _,
-        _ => c"unexpected error number\n".as_ptr() as _,
+        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n",
+        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n",
+        XmlParserErrors::XmlSaveUnknownEncoding => "unknown encoding %s\n",
+        XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n",
+        _ => "unexpected error number\n",
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, msg, extra);
+    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, Some(msg), extra);
 }
 
 /// Handle an out of memory condition
@@ -144,7 +144,7 @@ pub(crate) unsafe extern "C" fn xml_save_err_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromOutput,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null(),
+        None,
         extra,
     );
 }

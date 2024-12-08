@@ -35,7 +35,7 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
         XmlErrorDomain::XmlFromBuffer,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null_mut(),
+        None,
         extra.as_ptr(),
     );
     if buf.error.is_ok() {
@@ -52,7 +52,7 @@ pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
         XmlErrorDomain::XmlFromBuffer,
         XmlParserErrors::XmlBufOverflow,
         null_mut(),
-        null_mut(),
+        None,
         extra.as_ptr(),
     );
     if buf.is_ok() {

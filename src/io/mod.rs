@@ -77,69 +77,69 @@ pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
         XmlErrorDomain::XmlFromIO,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
-        null(),
+        None,
         extra as _,
     );
 }
 
-const IOERR: &[*const c_char] = &[
-    c"Unknown IO error".as_ptr() as _,                    /* UNKNOWN */
-    c"Permission denied".as_ptr() as _,                   /* EACCES */
-    c"Resource temporarily unavailable".as_ptr() as _,    /* EAGAIN */
-    c"Bad file descriptor".as_ptr() as _,                 /* EBADF */
-    c"Bad message".as_ptr() as _,                         /* EBADMSG */
-    c"Resource busy".as_ptr() as _,                       /* EBUSY */
-    c"Operation canceled".as_ptr() as _,                  /* ECANCELED */
-    c"No child processes".as_ptr() as _,                  /* ECHILD */
-    c"Resource deadlock avoided".as_ptr() as _,           /* EDEADLK */
-    c"Domain error".as_ptr() as _,                        /* EDOM */
-    c"File exists".as_ptr() as _,                         /* EEXIST */
-    c"Bad address".as_ptr() as _,                         /* EFAULT */
-    c"File too large".as_ptr() as _,                      /* EFBIG */
-    c"Operation in progress".as_ptr() as _,               /* EINPROGRESS */
-    c"Interrupted function call".as_ptr() as _,           /* EINTR */
-    c"Invalid argument".as_ptr() as _,                    /* EINVAL */
-    c"Input/output error".as_ptr() as _,                  /* EIO */
-    c"Is a directory".as_ptr() as _,                      /* EISDIR */
-    c"Too many open files".as_ptr() as _,                 /* EMFILE */
-    c"Too many links".as_ptr() as _,                      /* EMLINK */
-    c"Inappropriate message buffer length".as_ptr() as _, /* EMSGSIZE */
-    c"Filename too long".as_ptr() as _,                   /* ENAMETOOLONG */
-    c"Too many open files in system".as_ptr() as _,       /* ENFILE */
-    c"No such device".as_ptr() as _,                      /* ENODEV */
-    c"No such file or directory".as_ptr() as _,           /* ENOENT */
-    c"Exec format error".as_ptr() as _,                   /* ENOEXEC */
-    c"No locks available".as_ptr() as _,                  /* ENOLCK */
-    c"Not enough space".as_ptr() as _,                    /* ENOMEM */
-    c"No space left on device".as_ptr() as _,             /* ENOSPC */
-    c"Function not implemented".as_ptr() as _,            /* ENOSYS */
-    c"Not a directory".as_ptr() as _,                     /* ENOTDIR */
-    c"Directory not empty".as_ptr() as _,                 /* ENOTEMPTY */
-    c"Not supported".as_ptr() as _,                       /* ENOTSUP */
-    c"Inappropriate I/O control operation".as_ptr() as _, /* ENOTTY */
-    c"No such device or address".as_ptr() as _,           /* ENXIO */
-    c"Operation not permitted".as_ptr() as _,             /* EPERM */
-    c"Broken pipe".as_ptr() as _,                         /* EPIPE */
-    c"Result too large".as_ptr() as _,                    /* ERANGE */
-    c"Read-only file system".as_ptr() as _,               /* EROFS */
-    c"Invalid seek".as_ptr() as _,                        /* ESPIPE */
-    c"No such process".as_ptr() as _,                     /* ESRCH */
-    c"Operation timed out".as_ptr() as _,                 /* ETIMEDOUT */
-    c"Improper link".as_ptr() as _,                       /* EXDEV */
-    c"Attempt to load network entity %s".as_ptr() as _,   /* XML_IO_NETWORK_ATTEMPT */
-    c"encoder error".as_ptr() as _,                       /* XML_IO_ENCODER */
-    c"flush error".as_ptr() as _,
-    c"write error".as_ptr() as _,
-    c"no input".as_ptr() as _,
-    c"buffer full".as_ptr() as _,
-    c"loading error".as_ptr() as _,
-    c"not a socket".as_ptr() as _,           /* ENOTSOCK */
-    c"already connected".as_ptr() as _,      /* EISCONN */
-    c"connection refused".as_ptr() as _,     /* ECONNREFUSED */
-    c"unreachable network".as_ptr() as _,    /* ENETUNREACH */
-    c"address in use".as_ptr() as _,         /* EADDRINUSE */
-    c"already in use".as_ptr() as _,         /* EALREADY */
-    c"unknown address family".as_ptr() as _, /* EAFNOSUPPORT */
+const IOERR: &[&str] = &[
+    "Unknown IO error",                    /* UNKNOWN */
+    "Permission denied",                   /* EACCES */
+    "Resource temporarily unavailable",    /* EAGAIN */
+    "Bad file descriptor",                 /* EBADF */
+    "Bad message",                         /* EBADMSG */
+    "Resource busy",                       /* EBUSY */
+    "Operation canceled",                  /* ECANCELED */
+    "No child processes",                  /* ECHILD */
+    "Resource deadlock avoided",           /* EDEADLK */
+    "Domain error",                        /* EDOM */
+    "File exists",                         /* EEXIST */
+    "Bad address",                         /* EFAULT */
+    "File too large",                      /* EFBIG */
+    "Operation in progress",               /* EINPROGRESS */
+    "Interrupted function call",           /* EINTR */
+    "Invalid argument",                    /* EINVAL */
+    "Input/output error",                  /* EIO */
+    "Is a directory",                      /* EISDIR */
+    "Too many open files",                 /* EMFILE */
+    "Too many links",                      /* EMLINK */
+    "Inappropriate message buffer length", /* EMSGSIZE */
+    "Filename too long",                   /* ENAMETOOLONG */
+    "Too many open files in system",       /* ENFILE */
+    "No such device",                      /* ENODEV */
+    "No such file or directory",           /* ENOENT */
+    "Exec format error",                   /* ENOEXEC */
+    "No locks available",                  /* ENOLCK */
+    "Not enough space",                    /* ENOMEM */
+    "No space left on device",             /* ENOSPC */
+    "Function not implemented",            /* ENOSYS */
+    "Not a directory",                     /* ENOTDIR */
+    "Directory not empty",                 /* ENOTEMPTY */
+    "Not supported",                       /* ENOTSUP */
+    "Inappropriate I/O control operation", /* ENOTTY */
+    "No such device or address",           /* ENXIO */
+    "Operation not permitted",             /* EPERM */
+    "Broken pipe",                         /* EPIPE */
+    "Result too large",                    /* ERANGE */
+    "Read-only file system",               /* EROFS */
+    "Invalid seek",                        /* ESPIPE */
+    "No such process",                     /* ESRCH */
+    "Operation timed out",                 /* ETIMEDOUT */
+    "Improper link",                       /* EXDEV */
+    "Attempt to load network entity %s",   /* XML_IO_NETWORK_ATTEMPT */
+    "encoder error",                       /* XML_IO_ENCODER */
+    "flush error",
+    "write error",
+    "no input",
+    "buffer full",
+    "loading error",
+    "not a socket",           /* ENOTSOCK */
+    "already connected",      /* EISCONN */
+    "connection refused",     /* ECONNREFUSED */
+    "unreachable network",    /* ENETUNREACH */
+    "address in use",         /* EADDRINUSE */
+    "already in use",         /* EALREADY */
+    "unknown address family", /* EAFNOSUPPORT */
 ];
 
 /// Handle an I/O error
@@ -263,7 +263,7 @@ pub(crate) unsafe fn __xml_ioerr(
         idx = 0;
     }
 
-    __xml_simple_error(domain, code, null_mut(), IOERR[idx as usize], extra);
+    __xml_simple_error(domain, code, null_mut(), Some(IOERR[idx as usize]), extra);
 }
 
 /// Handle an I/O error
@@ -346,9 +346,9 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
 
 /// Handle a resource access error
 #[doc(alias = "__xmlLoaderErr")]
-pub(crate) unsafe extern "C" fn __xml_loader_err(
+pub(crate) unsafe fn __xml_loader_err(
     ctx: *mut c_void,
-    msg: *const c_char,
+    msg: Option<&str>,
     filename: *const c_char,
 ) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
@@ -423,13 +423,13 @@ pub unsafe extern "C" fn xml_check_http_input(
                             let filename = CString::new(filename).unwrap();
                             __xml_loader_err(
                                 ctxt as _,
-                                c"failed to load HTTP resource \"%s\"\n".as_ptr() as _,
+                                Some("failed to load HTTP resource \"%s\"\n"),
                                 filename.as_ptr() as *const c_char,
                             );
                         } else {
                             __xml_loader_err(
                                 ctxt as _,
-                                c"failed to load HTTP resource\n".as_ptr() as _,
+                                Some("failed to load HTTP resource\n"),
                                 null(),
                             );
                         }
@@ -449,7 +449,7 @@ pub unsafe extern "C" fn xml_check_http_input(
                                     __xml_err_encoding(
                                         ctxt,
                                         XmlParserErrors::XmlErrUnknownEncoding,
-                                        c"Unknown encoding %s".as_ptr() as _,
+                                        Some("Unknown encoding %s"),
                                         enc.as_ptr() as *const u8,
                                         null(),
                                     );
@@ -506,7 +506,7 @@ pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
         }
         __xml_loader_err(
             ctxt as _,
-            c"failed to load external entity \"%s\"\n".as_ptr() as _,
+            Some("failed to load external entity \"%s\"\n"),
             id,
         );
         return null_mut();

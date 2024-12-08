@@ -5626,10 +5626,10 @@ unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
 #[doc(alias = "htmlParseErrInt")]
-unsafe extern "C" fn html_parse_err_int(
+unsafe fn html_parse_err_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     val: i32,
 ) {
     if !ctxt.is_null()
@@ -5735,10 +5735,10 @@ unsafe extern "C" fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar 
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
 #[doc(alias = "htmlParseErr")]
-unsafe extern "C" fn html_parse_err(
+unsafe fn html_parse_err(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: *const c_char,
+    msg: Option<&str>,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -5820,7 +5820,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                 html_parse_err_int(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    c"Char 0x%X out of allowed range\n".as_ptr() as _,
+                    Some("Char 0x%X out of allowed range\n"),
                     0,
                 );
                 return b' ' as _;
@@ -5854,7 +5854,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidEncoding,
-                    c"Unsupported encoding %s".as_ptr() as _,
+                    Some("Unsupported encoding %s"),
                     guess,
                     null(),
                 );
@@ -5927,7 +5927,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                 html_parse_err_int(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    c"Char 0x%X out of allowed range\n".as_ptr() as _,
+                    Some("Char 0x%X out of allowed range\n"),
                     val as _,
                 );
             }
@@ -5937,7 +5937,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                 html_parse_err_int(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    c"Char 0x%X out of allowed range\n".as_ptr() as _,
+                    Some("Char 0x%X out of allowed range\n"),
                     0,
                 );
                 *len = 1;
@@ -5981,7 +5981,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInvalidEncoding,
-            c"Input is not proper UTF-8, indicate encoding !\n".as_ptr() as _,
+            Some("Input is not proper UTF-8, indicate encoding !\n"),
             buffer.as_ptr() as _,
             null(),
         );
@@ -6050,7 +6050,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrNameTooLong,
-                c"name too long".as_ptr() as _,
+                Some("name too long"),
                 null(),
                 null(),
             );
@@ -6059,10 +6059,8 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
         NEXTL!(ctxt, l);
         c = CUR_CHAR!(ctxt, l);
         if (*(*ctxt).input).base != base {
-            /*
-             * We changed encoding from an unknown encoding
-             * Input buffer changed location, so we better start again
-             */
+            // We changed encoding from an unknown encoding
+            // Input buffer changed location, so we better start again
             return html_parse_name_complex(ctxt);
         }
     }
@@ -6075,7 +6073,7 @@ unsafe extern "C" fn html_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const X
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"unexpected change of input buffer".as_ptr() as _,
+            Some("unexpected change of input buffer"),
             null(),
             null(),
         );
@@ -6160,7 +6158,7 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrNameRequired,
-                c"htmlParseEntityRef: no name\n".as_ptr() as _,
+                Some("htmlParseEntityRef: no name\n"),
                 null(),
                 null(),
             );
@@ -6171,9 +6169,7 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
                     *str = name;
                 }
 
-                /*
-                 * Lookup the entity in the table.
-                 */
+                // Lookup the entity in the table.
                 ent = html_entity_lookup(name);
                 if !ent.is_null() {
                     /* OK that's ugly !!! */
@@ -6183,7 +6179,7 @@ pub(crate) unsafe extern "C" fn html_parse_entity_ref(
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrEntityRefSemicolMissing,
-                    c"htmlParseEntityRef: expecting ';'\n".as_ptr() as _,
+                    Some("htmlParseEntityRef: expecting ';'\n"),
                     null(),
                     null(),
                 );
@@ -6209,7 +6205,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"htmlParseCharRef: context error\n".as_ptr() as _,
+            Some("htmlParseCharRef: context error\n"),
             null(),
             null(),
         );
@@ -6238,7 +6234,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidHexCharRef,
-                    c"htmlParseCharRef: missing semicolon\n".as_ptr() as _,
+                    Some("htmlParseCharRef: missing semicolon\n"),
                     null(),
                     null(),
                 );
@@ -6261,7 +6257,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidDecCharRef,
-                    c"htmlParseCharRef: missing semicolon\n".as_ptr() as _,
+                    Some("htmlParseCharRef: missing semicolon\n"),
                     null(),
                     null(),
                 );
@@ -6276,21 +6272,19 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInvalidCharRef,
-            c"htmlParseCharRef: invalid value\n".as_ptr() as _,
+            Some("htmlParseCharRef: invalid value\n"),
             null(),
             null(),
         );
     }
-    /*
-     * Check the value IS_CHAR ...
-     */
+    // Check the value IS_CHAR ...
     if xml_is_char(val as u32) {
         return val;
     } else if val >= 0x110000 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            c"htmlParseCharRef: value too large\n".as_ptr() as _,
+            Some("htmlParseCharRef: value too large\n"),
             null(),
             null(),
         );
@@ -6298,7 +6292,7 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
         html_parse_err_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            c"htmlParseCharRef: invalid xmlChar value %d\n".as_ptr() as _,
+            Some("htmlParseCharRef: invalid xmlChar value %d\n"),
             val,
         );
     }
@@ -6340,7 +6334,7 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             None,
             0,
             0,
-            c"Memory allocation failed : %s\n".as_ptr() as _,
+            Some("Memory allocation failed : %s\n"),
             extra
         );
     } else {
@@ -6360,7 +6354,7 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             None,
             0,
             0,
-            c"Memory allocation failed\n".as_ptr() as _,
+            Some("Memory allocation failed\n"),
         );
     }
 }
@@ -6760,7 +6754,7 @@ unsafe extern "C" fn html_parse_html_attribute(
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrAttributeNotFinished,
-                c"attribute value too long\n".as_ptr() as _,
+                Some("attribute value too long\n"),
                 null(),
                 null(),
             );
@@ -6791,7 +6785,7 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrAttributeNotFinished,
-                c"AttValue: \" expected\n".as_ptr() as _,
+                Some("AttValue: \" expected\n"),
                 null(),
                 null(),
             );
@@ -6805,7 +6799,7 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrAttributeNotFinished,
-                c"AttValue: ' expected\n".as_ptr() as _,
+                Some("AttValue: ' expected\n"),
                 null(),
                 null(),
             );
@@ -6813,15 +6807,13 @@ unsafe extern "C" fn html_parse_att_value(ctxt: HtmlParserCtxtPtr) -> *mut XmlCh
             (*ctxt).skip_char();
         }
     } else {
-        /*
-         * That's an HTMLism, the attribute value may not be quoted
-         */
+        // That's an HTMLism, the attribute value may not be quoted
         ret = html_parse_html_attribute(ctxt, 0);
         if ret.is_null() {
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrAttributeWithoutValue,
-                c"AttValue: no value found\n".as_ptr() as _,
+                Some("AttValue: no value found\n"),
                 null(),
                 null(),
             );
@@ -6856,16 +6848,14 @@ unsafe extern "C" fn html_parse_attribute(
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrNameRequired,
-            c"error parsing attribute name\n".as_ptr() as _,
+            Some("error parsing attribute name\n"),
             null(),
             null(),
         );
         return null_mut();
     }
 
-    /*
-     * read the value
-     */
+    // read the value
     SKIP_BLANKS!(ctxt);
     if (*ctxt).current_byte() == b'=' {
         (*ctxt).skip_char();
@@ -6922,7 +6912,7 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidEncoding,
-                    c"htmlCheckEncoding: wrong encoding meta\n".as_ptr() as _,
+                    Some("htmlCheckEncoding: wrong encoding meta\n"),
                     null(),
                     null(),
                 );
@@ -6931,9 +6921,7 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
             }
             (*ctxt).charset = XmlCharEncoding::UTF8;
         } else {
-            /*
-             * fallback for unknown encodings
-             */
+            // fallback for unknown encodings
             if let Some(handler) = find_encoding_handler(encoding) {
                 (*ctxt).switch_to_encoding(handler);
                 (*ctxt).charset = XmlCharEncoding::UTF8;
@@ -6942,7 +6930,7 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
-                    c"htmlCheckEncoding: unknown encoding %s\n".as_ptr() as _,
+                    Some("htmlCheckEncoding: unknown encoding %s\n"),
                     enc.as_ptr() as *const u8,
                     null(),
                 );
@@ -6995,7 +6983,7 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidEncoding,
-                    c"htmlCheckEncoding: encoder error\n".as_ptr() as _,
+                    Some("htmlCheckEncoding: encoder error\n"),
                     null(),
                     null(),
                 );
@@ -7109,7 +7097,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"htmlParseStartTag: context error\n".as_ptr() as _,
+            Some("htmlParseStartTag: context error\n"),
             null(),
             null(),
         );
@@ -7132,7 +7120,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrNameRequired,
-            c"htmlParseStartTag: invalid element name\n".as_ptr() as _,
+            Some("htmlParseStartTag: invalid element name\n"),
             null(),
             null(),
         );
@@ -7150,25 +7138,19 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         meta = 1;
     }
 
-    /*
-     * Check for auto-closure of HTML elements.
-     */
+    // Check for auto-closure of HTML elements.
     html_auto_close(ctxt, name);
 
-    /*
-     * Check for implied HTML elements.
-     */
+    // Check for implied HTML elements.
     html_check_implied(ctxt, name);
 
-    /*
-     * Avoid html at any level > 0, head at any level != 1
-     * or any attempt to recurse body
-     */
+    // Avoid html at any level > 0, head at any level != 1
+    // or any attempt to recurse body
     if !(*ctxt).name_tab.is_empty() && xml_str_equal(name, c"html".as_ptr() as _) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLStrucureError,
-            c"htmlParseStartTag: misplaced <html> tag\n".as_ptr() as _,
+            Some("htmlParseStartTag: misplaced <html> tag\n"),
             name,
             null(),
         );
@@ -7179,7 +7161,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLStrucureError,
-            c"htmlParseStartTag: misplaced <head> tag\n".as_ptr() as _,
+            Some("htmlParseStartTag: misplaced <head> tag\n"),
             name,
             null(),
         );
@@ -7192,7 +7174,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlHTMLStrucureError,
-                    c"htmlParseStartTag: misplaced <body> tag\n".as_ptr() as _,
+                    Some("htmlParseStartTag: misplaced <body> tag\n"),
                     name,
                     null(),
                 );
@@ -7216,15 +7198,13 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         (*ctxt).grow();
         attname = html_parse_attribute(ctxt, addr_of_mut!(attvalue));
         if !attname.is_null() {
-            /*
-             * Well formedness requires at most one declaration of an attribute
-             */
+            // Well formedness requires at most one declaration of an attribute
             for i in (0..nbatts).step_by(2) {
                 if xml_str_equal(*atts.add(i as usize), attname) {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
-                        c"Attribute %s redefined\n".as_ptr() as _,
+                        Some("Attribute %s redefined\n"),
                         attname,
                         null(),
                     );
@@ -7237,9 +7217,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 }
             }
 
-            /*
-             * Add the pair to atts
-             */
+            // Add the pair to atts
             if atts.is_null() {
                 maxatts = 22; /* allow for 10 attrs by default */
                 atts = xml_malloc(maxatts as usize * size_of::<*mut XmlChar>()) as _;
@@ -7422,7 +7400,7 @@ unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrTagNameMismatch,
-                        c"Opening and ending tag mismatch: %s and %s\n".as_ptr() as _,
+                        Some("Opening and ending tag mismatch: %s and %s\n"),
                         newtag,
                         (*ctxt).name,
                     );
@@ -7486,7 +7464,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrLtSlashRequired,
-            c"htmlParseEndTag: '</' not found\n".as_ptr() as _,
+            Some("htmlParseEndTag: '</' not found\n"),
             null(),
             null(),
         );
@@ -7506,7 +7484,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrGtRequired,
-            c"End tag : expected '>'\n".as_ptr() as _,
+            Some("End tag : expected '>'\n"),
             null(),
             null(),
         );
@@ -7554,7 +7532,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrTagNameMismatch,
-                    c"Opening and ending tag mismatch: %s and %s\n".as_ptr() as _,
+                    Some("Opening and ending tag mismatch: %s and %s\n"),
                     name,
                     (*ctxt).name,
                 );
@@ -7581,7 +7559,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     html_parse_err(
         ctxt,
         XmlParserErrors::XmlErrTagNameMismatch,
-        c"Unexpected end tag : %s\n".as_ptr() as _,
+        Some("Unexpected end tag : %s\n"),
         name,
         null(),
     );
@@ -7670,7 +7648,7 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrTagNameMismatch,
-                        c"Element %s embeds close tag\n".as_ptr() as _,
+                        Some("Element %s embeds close tag\n"),
                         (*ctxt).name,
                         null(),
                     );
@@ -7687,7 +7665,7 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
             html_parse_err_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                c"Invalid char in CDATA 0x%X\n".as_ptr() as _,
+                Some("Invalid char in CDATA 0x%X\n"),
                 cur,
             );
         }
@@ -7741,7 +7719,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrLiteralNotStarted,
-            c"SystemLiteral \" or ' expected\n".as_ptr() as _,
+            Some("SystemLiteral \" or ' expected\n"),
             null(),
             null(),
         );
@@ -7762,7 +7740,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
             html_parse_err_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                c"Invalid char in SystemLiteral 0x%X\n".as_ptr() as _,
+                Some("Invalid char in SystemLiteral 0x%X\n"),
                 (*ctxt).current_byte() as _,
             );
             err = 1;
@@ -7774,7 +7752,7 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrLiteralNotFinished,
-            c"Unfinished SystemLiteral\n".as_ptr() as _,
+            Some("Unfinished SystemLiteral\n"),
             null(),
             null(),
         );
@@ -7804,7 +7782,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrLiteralNotStarted,
-            c"PubidLiteral \" or ' expected\n".as_ptr() as _,
+            Some("PubidLiteral \" or ' expected\n"),
             null(),
             null(),
         );
@@ -7827,7 +7805,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
             html_parse_err_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                c"Invalid char in PubidLiteral 0x%X\n".as_ptr() as _,
+                Some("Invalid char in PubidLiteral 0x%X\n"),
                 (*ctxt).current_byte() as _,
             );
             err = 1;
@@ -7840,7 +7818,7 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrLiteralNotFinished,
-            c"Unfinished PubidLiteral\n".as_ptr() as _,
+            Some("Unfinished PubidLiteral\n"),
             null(),
             null(),
         );
@@ -7882,7 +7860,7 @@ unsafe extern "C" fn html_parse_external_id(
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
-                c"Space required after 'SYSTEM'\n".as_ptr() as _,
+                Some("Space required after 'SYSTEM'\n"),
                 null(),
                 null(),
             );
@@ -7893,7 +7871,7 @@ unsafe extern "C" fn html_parse_external_id(
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrURIRequired,
-                c"htmlParseExternalID: SYSTEM, no URI\n".as_ptr() as _,
+                Some("htmlParseExternalID: SYSTEM, no URI\n"),
                 null(),
                 null(),
             );
@@ -7910,7 +7888,7 @@ unsafe extern "C" fn html_parse_external_id(
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrSpaceRequired,
-                c"Space required after 'PUBLIC'\n".as_ptr() as _,
+                Some("Space required after 'PUBLIC'\n"),
                 null(),
                 null(),
             );
@@ -7921,7 +7899,7 @@ unsafe extern "C" fn html_parse_external_id(
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrPubidRequired,
-                c"htmlParseExternalID: PUBLIC, no Public Identifier\n".as_ptr() as _,
+                Some("htmlParseExternalID: PUBLIC, no Public Identifier\n"),
                 null(),
                 null(),
             );
@@ -7956,7 +7934,7 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrNameRequired,
-            c"htmlParseDocTypeDecl : no DOCTYPE name !\n".as_ptr() as _,
+            Some("htmlParseDocTypeDecl : no DOCTYPE name !\n"),
             null(),
             null(),
         );
@@ -7980,7 +7958,7 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrDoctypeNotFinished,
-            c"DOCTYPE improperly terminated\n".as_ptr() as _,
+            Some("DOCTYPE improperly terminated\n"),
             null(),
             null(),
         );
@@ -8072,7 +8050,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrCommentAbruptlyEnded,
-                c"Comment abruptly ended".as_ptr() as _,
+                Some("Comment abruptly ended"),
                 null(),
                 null(),
             );
@@ -8086,7 +8064,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrCommentNotFinished,
-                    c"Comment not terminated \n<!--%.50s\n".as_ptr() as _,
+                    Some("Comment not terminated \n<!--%.50s\n"),
                     buf,
                     null(),
                 );
@@ -8097,7 +8075,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrCommentAbruptlyEnded,
-                    c"Comment abruptly ended".as_ptr() as _,
+                    Some("Comment abruptly ended"),
                     null(),
                     null(),
                 );
@@ -8118,7 +8096,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                         html_parse_err(
                             ctxt,
                             XmlParserErrors::XmlErrCommentNotFinished,
-                            c"Comment incorrectly closed by '--!>'".as_ptr() as _,
+                            Some("Comment incorrectly closed by '--!>'"),
                             null(),
                             null(),
                         );
@@ -8143,7 +8121,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                         html_parse_err_int(
                             ctxt,
                             XmlParserErrors::XmlErrInvalidChar,
-                            c"Invalid char in comment 0x%X\n".as_ptr() as _,
+                            Some("Invalid char in comment 0x%X\n"),
                             q,
                         );
                     }
@@ -8151,7 +8129,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                         html_parse_err(
                             ctxt,
                             XmlParserErrors::XmlErrCommentNotFinished,
-                            c"comment too long".as_ptr() as _,
+                            Some("comment too long"),
                             null(),
                             null(),
                         );
@@ -8193,7 +8171,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
     html_parse_err(
         ctxt,
         XmlParserErrors::XmlErrCommentNotFinished,
-        c"Comment not terminated \n<!--%.50s\n".as_ptr() as _,
+        Some("Comment not terminated \n<!--%.50s\n"),
         buf,
         null(),
     );
@@ -8204,7 +8182,7 @@ unsafe extern "C" fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
     html_parse_err(
         ctxt,
         XmlParserErrors::XmlHTMLIncorrectlyOpenedComment,
-        c"Incorrectly opened comment\n".as_ptr() as _,
+        Some("Incorrectly opened comment\n"),
         null(),
         null(),
     );
@@ -8282,7 +8260,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
-                    c"ParsePI: PI %s space expected\n".as_ptr() as _,
+                    Some("ParsePI: PI %s space expected\n"),
                     target,
                     null(),
                 );
@@ -8307,7 +8285,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     html_parse_err_int(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
-                        c"Invalid char in processing instruction 0x%X\n".as_ptr() as _,
+                        Some("Invalid char in processing instruction 0x%X\n"),
                         cur,
                     );
                 }
@@ -8315,7 +8293,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrPINotFinished,
-                        c"PI %s too long".as_ptr() as _,
+                        Some("PI %s too long"),
                         target,
                         null(),
                     );
@@ -8335,7 +8313,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrPINotFinished,
-                    c"ParsePI: PI %s never end ...\n".as_ptr() as _,
+                    Some("ParsePI: PI %s never end ...\n"),
                     target,
                     null(),
                 );
@@ -8361,7 +8339,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
             html_parse_err(
                 ctxt,
                 XmlParserErrors::XmlErrPINotStarted,
-                c"PI is not started correctly".as_ptr() as _,
+                Some("PI is not started correctly"),
                 null(),
                 null(),
             );
@@ -8702,7 +8680,7 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
             html_parse_err_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                c"Invalid char in CDATA 0x%X\n".as_ptr() as _,
+                Some("Invalid char in CDATA 0x%X\n"),
                 cur,
             );
         } else {
@@ -8811,7 +8789,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrNameRequired,
-                    c"htmlParseStartTag: invalid element name\n".as_ptr() as _,
+                    Some("htmlParseStartTag: invalid element name\n"),
                     null(),
                     null(),
                 );
@@ -8870,7 +8848,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlHTMLStrucureError,
-                    c"Misplaced DOCTYPE declaration\n".as_ptr() as _,
+                    Some("Misplaced DOCTYPE declaration\n"),
                     c"DOCTYPE".as_ptr() as _,
                     null(),
                 );
@@ -8953,7 +8931,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"htmlParseElement: context error\n".as_ptr() as _,
+            Some("htmlParseElement: context error\n"),
             null(),
             null(),
         );
@@ -8988,7 +8966,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLUnknownTag,
-            c"Tag %s invalid\n".as_ptr() as _,
+            Some("Tag %s invalid\n"),
             name,
             null(),
         );
@@ -9012,7 +8990,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrGtRequired,
-            c"Couldn't find end of Start Tag %s\n".as_ptr() as _,
+            Some("Couldn't find end of Start Tag %s\n"),
             name,
             null(),
         );
@@ -9299,7 +9277,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"htmlParseElementInternal: context error\n".as_ptr() as _,
+            Some("htmlParseElementInternal: context error\n"),
             null(),
             null(),
         );
@@ -9334,7 +9312,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLUnknownTag,
-            c"Tag %s invalid\n".as_ptr() as _,
+            Some("Tag %s invalid\n"),
             name,
             null(),
         );
@@ -9358,7 +9336,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrGtRequired,
-            c"Couldn't find end of Start Tag %s\n".as_ptr() as _,
+            Some("Couldn't find end of Start Tag %s\n"),
             name,
             null(),
         );
@@ -9451,7 +9429,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrNameRequired,
-                    c"htmlParseStartTag: invalid element name\n".as_ptr() as _,
+                    Some("htmlParseStartTag: invalid element name\n"),
                     null(),
                     null(),
                 );
@@ -9526,7 +9504,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlHTMLStrucureError,
-                    c"Misplaced DOCTYPE declaration\n".as_ptr() as _,
+                    Some("Misplaced DOCTYPE declaration\n"),
                     c"DOCTYPE".as_ptr() as _,
                     null(),
                 );
@@ -9618,7 +9596,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"htmlParseDocument: context error\n".as_ptr() as _,
+            Some("htmlParseDocument: context error\n"),
             null(),
             null(),
         );
@@ -9659,7 +9637,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrDocumentEmpty,
-            c"Document is empty\n".as_ptr() as _,
+            Some("Document is empty\n"),
             null(),
             null(),
         );
@@ -9787,7 +9765,7 @@ unsafe fn html_create_doc_parser_ctxt(
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
-                    c"Unsupported encoding %s\n".as_ptr() as _,
+                    Some("Unsupported encoding %s\n"),
                     encoding.as_ptr() as *const u8,
                     null(),
                 );
@@ -9803,7 +9781,7 @@ unsafe fn html_create_doc_parser_ctxt(
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
-                    c"Unsupported encoding %s\n".as_ptr() as _,
+                    Some("Unsupported encoding %s\n"),
                     encoding.as_ptr() as *const u8,
                     null(),
                 );
@@ -10803,7 +10781,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlHTMLUnknownTag,
-                        c"Tag %s invalid\n".as_ptr() as _,
+                        Some("Tag %s invalid\n"),
                         name,
                         null(),
                     );
@@ -10828,7 +10806,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrGtRequired,
-                        c"Couldn't find end of Start Tag %s\n".as_ptr() as _,
+                        Some("Couldn't find end of Start Tag %s\n"),
                         name,
                         null(),
                     );
@@ -10975,7 +10953,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                         html_parse_err(
                             ctxt,
                             XmlParserErrors::XmlHTMLStrucureError,
-                            c"Misplaced DOCTYPE declaration\n".as_ptr() as _,
+                            Some("Misplaced DOCTYPE declaration\n"),
                             c"DOCTYPE".as_ptr() as _,
                             null(),
                         );
@@ -11071,7 +11049,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == CDATA\n".as_ptr() as _,
+                    Some("HPP: internal error, state == CDATA\n"),
                     null(),
                     null(),
                 );
@@ -11082,7 +11060,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == DTD\n".as_ptr() as _,
+                    Some("HPP: internal error, state == DTD\n"),
                     null(),
                     null(),
                 );
@@ -11093,7 +11071,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == COMMENT\n".as_ptr() as _,
+                    Some("HPP: internal error, state == COMMENT\n"),
                     null(),
                     null(),
                 );
@@ -11104,7 +11082,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == PI\n".as_ptr() as _,
+                    Some("HPP: internal error, state == PI\n"),
                     null(),
                     null(),
                 );
@@ -11115,7 +11093,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == ENTITY_DECL\n".as_ptr() as _,
+                    Some("HPP: internal error, state == ENTITY_DECL\n"),
                     null(),
                     null(),
                 );
@@ -11126,7 +11104,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == ENTITY_VALUE\n".as_ptr() as _,
+                    Some("HPP: internal error, state == ENTITY_VALUE\n"),
                     null(),
                     null(),
                 );
@@ -11137,7 +11115,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == ATTRIBUTE_VALUE\n".as_ptr() as _,
+                    Some("HPP: internal error, state == ATTRIBUTE_VALUE\n"),
                     null(),
                     null(),
                 );
@@ -11148,7 +11126,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == XML_PARSER_SYSTEM_LITERAL\n".as_ptr() as _,
+                    Some("HPP: internal error, state == XML_PARSER_SYSTEM_LITERAL\n"),
                     null(),
                     null(),
                 );
@@ -11159,7 +11137,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == XML_PARSER_IGNORE\n".as_ptr() as _,
+                    Some("HPP: internal error, state == XML_PARSER_IGNORE\n"),
                     null(),
                     null(),
                 );
@@ -11170,7 +11148,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    c"HPP: internal error, state == XML_PARSER_LITERAL\n".as_ptr() as _,
+                    Some("HPP: internal error, state == XML_PARSER_LITERAL\n"),
                     null(),
                     null(),
                 );
@@ -11232,7 +11210,7 @@ pub unsafe extern "C" fn html_parse_chunk(
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            c"htmlParseChunk: context error\n".as_ptr() as _,
+            Some("htmlParseChunk: context error\n"),
             null(),
             null(),
         );
@@ -11275,7 +11253,7 @@ pub unsafe extern "C" fn html_parse_chunk(
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidEncoding,
-                    c"encoder error\n".as_ptr() as _,
+                    Some("encoder error\n"),
                     null(),
                     null(),
                 );
