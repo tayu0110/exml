@@ -406,7 +406,7 @@ unsafe fn xml_schematron_perr(
     ctxt: XmlSchematronParserCtxtPtr,
     node: XmlNodePtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -573,7 +573,7 @@ unsafe extern "C" fn xml_schematron_add_rule(
             ctxt,
             node,
             XmlParserErrors::XmlSchemapNoroot,
-            Some("Failed to compile context expression %s"),
+            "Failed to compile context expression %s",
             context,
             null_mut(),
         );
@@ -642,7 +642,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
                         ctxt,
                         child,
                         XmlParserErrors::XmlSchemavAttrInvalid,
-                        Some("Failed to compile select expression %s"),
+                        "Failed to compile select expression %s",
                         select.as_ptr() as *const u8,
                         null_mut(),
                     );
@@ -651,7 +651,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
                         ctxt,
                         child,
                         XmlParserErrors::XmlSchemavAttrInvalid,
-                        Some("value-of has no select attribute"),
+                        "value-of has no select attribute",
                         null(),
                         null_mut(),
                     );
@@ -689,7 +689,7 @@ unsafe extern "C" fn xml_schematron_add_test(
             ctxt,
             node,
             XmlParserErrors::XmlSchemapNoroot,
-            Some("Failed to compile test expression %s"),
+            "Failed to compile test expression %s",
             test,
             null_mut(),
         );
@@ -744,7 +744,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 ctxt,
                 rule,
                 XmlParserErrors::XmlSchemapNoroot,
-                Some("rule has an empty context attribute"),
+                "rule has an empty context attribute",
                 null(),
                 null_mut(),
             );
@@ -765,7 +765,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 ctxt,
                 rule,
                 XmlParserErrors::XmlSchemapNoroot,
-                Some("rule has no context attribute"),
+                "rule has no context attribute",
                 null(),
                 null_mut(),
             );
@@ -783,7 +783,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("let has an empty name attribute"),
+                        "let has an empty name attribute",
                         null(),
                         null_mut(),
                     );
@@ -798,7 +798,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("let has no name attribute"),
+                        "let has no name attribute",
                         null(),
                         null_mut(),
                     );
@@ -811,7 +811,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("let has an empty value attribute"),
+                        "let has an empty value attribute",
                         null(),
                         null_mut(),
                     );
@@ -823,7 +823,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("let has no value attribute"),
+                        "let has no value attribute",
                         null(),
                         null_mut(),
                     );
@@ -838,7 +838,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                     ctxt,
                     cur,
                     XmlParserErrors::XmlSchemapNoroot,
-                    Some("Failed to compile let expression %s"),
+                    "Failed to compile let expression %s",
                     value.as_ptr() as *const u8,
                     null_mut(),
                 );
@@ -864,7 +864,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("assert has an empty test attribute"),
+                        "assert has an empty test attribute",
                         null(),
                         null_mut(),
                     );
@@ -893,7 +893,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("assert has no test attribute"),
+                        "assert has no test attribute",
                         null(),
                         null_mut(),
                     );
@@ -907,7 +907,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("assert has an empty test attribute"),
+                        "assert has an empty test attribute",
                         null(),
                         null_mut(),
                     );
@@ -936,7 +936,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("assert has no test attribute"),
+                        "assert has no test attribute",
                         null(),
                         null_mut(),
                     );
@@ -947,7 +947,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlSchemapNoroot,
-                Some("Expecting an assert or a report element instead of %s"),
+                "Expecting an assert or a report element instead of %s",
                 (*cur).name,
                 null_mut(),
             );
@@ -960,7 +960,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
             ctxt,
             rule,
             XmlParserErrors::XmlSchemapNoroot,
-            Some("rule has no assert nor report element"),
+            "rule has no assert nor report element",
             null_mut(),
             null_mut(),
         );
@@ -1005,7 +1005,7 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlSchemapNoroot,
-                Some("Expecting a rule element instead of %s"),
+                "Expecting a rule element instead of %s",
                 (*cur).name,
                 null_mut(),
             );
@@ -1018,7 +1018,7 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
             ctxt,
             pat,
             XmlParserErrors::XmlSchemapNoroot,
-            Some("Pattern has no rule element"),
+            "Pattern has no rule element",
             null_mut(),
             null_mut(),
         );
@@ -1054,7 +1054,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                 ctxt,
                 null_mut(),
                 XmlParserErrors::XmlSchemapFailedLoad,
-                Some("xmlSchematronParse: could not load '%s'.\n"),
+                "xmlSchematronParse: could not load '%s'.\n",
                 (*ctxt).url,
                 null_mut(),
             );
@@ -1069,7 +1069,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                 ctxt,
                 null_mut(),
                 XmlParserErrors::XmlSchemapFailedParse,
-                Some("xmlSchematronParse: could not parse.\n"),
+                "xmlSchematronParse: could not parse.\n",
                 null_mut(),
                 null_mut(),
             );
@@ -1087,7 +1087,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
             ctxt,
             null_mut(),
             XmlParserErrors::XmlSchemapNothingToParse,
-            Some("xmlSchematronParse: could not parse.\n"),
+            "xmlSchematronParse: could not parse.\n",
             null_mut(),
             null_mut(),
         );
@@ -1107,7 +1107,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
             ctxt,
             doc as XmlNodePtr,
             XmlParserErrors::XmlSchemapNoroot,
-            Some("The schema has no document element.\n"),
+            "The schema has no document element.\n",
             null_mut(),
             null_mut(),
         );
@@ -1122,7 +1122,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
             ctxt,
             root,
             XmlParserErrors::XmlSchemapNoroot,
-            Some("The XML document '%s' is not a XML schematron document"),
+            "The XML document '%s' is not a XML schematron document",
             (*ctxt).url,
             null_mut(),
         );
@@ -1153,7 +1153,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("ns element has no uri"),
+                        "ns element has no uri",
                         null_mut(),
                         null_mut(),
                     );
@@ -1163,7 +1163,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("ns element has no prefix"),
+                        "ns element has no prefix",
                         null_mut(),
                         null_mut(),
                     );
@@ -1195,7 +1195,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                         ctxt,
                         cur,
                         XmlParserErrors::XmlSchemapNoroot,
-                        Some("Expecting a pattern element instead of %s"),
+                        "Expecting a pattern element instead of %s",
                         (*cur).name,
                         null_mut(),
                     );
@@ -1208,7 +1208,7 @@ pub unsafe extern "C" fn xml_schematron_parse(
                     ctxt,
                     root,
                     XmlParserErrors::XmlSchemapNoroot,
-                    Some("The schematron document '%s' has no pattern"),
+                    "The schematron document '%s' has no pattern",
                     (*ctxt).url,
                     null_mut(),
                 );
@@ -1731,7 +1731,7 @@ unsafe extern "C" fn xml_schematron_report_success(
                     .into()),
                 0,
                 0,
-                Some("%s"),
+                "%s",
                 msg
             );
         } else {

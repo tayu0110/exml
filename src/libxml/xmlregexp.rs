@@ -351,7 +351,7 @@ unsafe extern "C" fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: *co
         None,
         0,
         0,
-        Some("Memory allocation failed : %s\n"),
+        "Memory allocation failed : %s\n",
         extra
     );
 }
@@ -586,7 +586,7 @@ unsafe extern "C" fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: *c
         None,
         idx,
         0,
-        Some("failed to compile: %s\n"),
+        "failed to compile: %s\n",
         extra
     );
 }

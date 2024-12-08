@@ -79,7 +79,7 @@ unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c
         None,
         0,
         0,
-        Some("Memory allocation failed : %s\n"),
+        "Memory allocation failed : %s\n",
         extra
     );
 }
@@ -137,7 +137,7 @@ pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: i32) -> 
             None,
             0,
             0,
-            Some("failed to open %s\n"),
+            "failed to open %s\n",
             name
         );
         return null_mut();
@@ -209,7 +209,7 @@ pub unsafe extern "C" fn xml_module_symbol(
             None,
             0,
             0,
-            Some("null parameter\n"),
+            "null parameter\n",
         );
         return rc;
     }
@@ -233,7 +233,7 @@ pub unsafe extern "C" fn xml_module_symbol(
             None,
             0,
             0,
-            Some("failed to find symbol: %s\n"),
+            "failed to find symbol: %s\n",
             if name.is_null() {
                 c"NULL".as_ptr()
             } else {
@@ -288,7 +288,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
             None,
             0,
             0,
-            Some("null module pointer\n"),
+            "null module pointer\n",
         );
         return -1;
     }
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
             None,
             0,
             0,
-            Some("failed to close: %s\n"),
+            "failed to close: %s\n",
             (*module).name
         );
         return -2;
@@ -347,7 +347,7 @@ pub unsafe extern "C" fn xml_module_free(module: XmlModulePtr) -> i32 {
             None,
             0,
             0,
-            Some("null module pointer\n"),
+            "null module pointer\n",
         );
         return -1;
     }

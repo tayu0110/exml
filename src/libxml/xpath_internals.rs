@@ -953,7 +953,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             None,
             0,
             0,
-            Some("%s"),
+            "%s",
             XML_XPATH_ERROR_MESSAGES[error as usize]
         );
         return;
@@ -986,7 +986,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,
-            Some("%s"),
+            "%s",
             XML_XPATH_ERROR_MESSAGES[error as usize]
         );
         return;
@@ -1039,7 +1039,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,
-            Some("%s"),
+            "%s",
             XML_XPATH_ERROR_MESSAGES[error as usize]
         );
     }
@@ -2337,7 +2337,7 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             None,
             0,
             0,
-            Some("Memory allocation failed : %s\n"),
+            "Memory allocation failed : %s\n",
             extra
         );
     } else {
@@ -2357,7 +2357,7 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             None,
             0,
             0,
-            Some("Memory allocation failed\n"),
+            "Memory allocation failed\n",
         );
     }
 }

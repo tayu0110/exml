@@ -429,7 +429,7 @@ pub(crate) unsafe fn xml_encoding_err(error: XmlParserErrors, msg: &str, val: &s
         None,
         0,
         0,
-        Some(msg),
+        msg,
         val
     );
 }

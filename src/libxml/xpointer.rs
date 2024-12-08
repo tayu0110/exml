@@ -125,7 +125,7 @@ unsafe extern "C" fn xml_xptr_err_memory(extra: *const c_char) {
         None,
         0,
         0,
-        Some("Memory allocation failed : %s\n"),
+        "Memory allocation failed : %s\n",
         extra
     );
 }
@@ -2166,7 +2166,7 @@ unsafe fn xml_xptr_err(
             None,
             0,
             0,
-            Some(msg),
+            msg,
             extra
         );
         return;
@@ -2215,7 +2215,7 @@ unsafe fn xml_xptr_err(
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,
-            Some(msg),
+            msg,
             extra
         );
     }

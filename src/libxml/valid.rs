@@ -246,7 +246,7 @@ unsafe fn xml_err_valid(
             None,
             0,
             0,
-            Some(msg),
+            msg,
             extra
         );
     } else {
@@ -266,7 +266,7 @@ unsafe fn xml_err_valid(
             None,
             0,
             0,
-            Some("%s"),
+            "%s",
             msg
         );
     }
@@ -311,7 +311,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             None,
             0,
             0,
-            Some("Memory allocation failed : %s\n"),
+            "Memory allocation failed : %s\n",
             extra
         );
     } else {
@@ -331,7 +331,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             None,
             0,
             0,
-            Some("Memory allocation failed\n"),
+            "Memory allocation failed\n",
         );
     }
 }
@@ -1035,7 +1035,7 @@ unsafe fn xml_err_valid_node(
             .into()),
         0,
         0,
-        Some(msg),
+        msg,
         str1,
         str2,
         str3
@@ -2018,7 +2018,7 @@ unsafe fn xml_err_valid_warning(
             .into()),
         0,
         0,
-        Some(msg),
+        msg,
         str1,
         str2,
         str3
@@ -3805,7 +3805,7 @@ unsafe fn xml_err_valid_node_nr(
     ctxt: XmlValidCtxtPtr,
     node: XmlNodePtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     int2: i32,
     str3: *const XmlChar,
@@ -3958,7 +3958,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                 ctxt,
                 attr as XmlNodePtr,
                 XmlParserErrors::XmlDTDIDSubset,
-                Some("Element %s has %d ID attribute defined in the internal subset : %s\n"),
+                "Element %s has %d ID attribute defined in the internal subset : %s\n",
                 attr_elem
                     .as_ref()
                     .map_or(null(), |e| e.as_ptr() as *const u8),
@@ -3981,7 +3981,7 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                     ctxt,
                     attr as XmlNodePtr,
                     XmlParserErrors::XmlDTDIDSubset,
-                    Some("Element %s has %d ID attribute defined in the external subset : %s\n"),
+                    "Element %s has %d ID attribute defined in the external subset : %s\n",
                     attr_elem
                         .as_ref()
                         .map_or(null(), |e| e.as_ptr() as *const u8),
@@ -7019,7 +7019,7 @@ unsafe extern "C" fn xml_validate_ref(
                     ctxt,
                     null_mut(),
                     XmlParserErrors::XmlDTDUnknownID,
-                    Some("attribute %s line %d references an unknown ID \"%s\"\n"),
+                    "attribute %s line %d references an unknown ID \"%s\"\n",
                     (*refe).name,
                     (*refe).lineno,
                     str,

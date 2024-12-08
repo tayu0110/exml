@@ -625,7 +625,7 @@ impl XmlParserCtxt {
         if (cur_end > XML_MAX_LOOKUP_LIMIT as isize || cur_base > XML_MAX_LOOKUP_LIMIT as isize)
             && self.options & XmlParserOption::XmlParseHuge as i32 == 0
         {
-            xml_err_internal(self, Some("Huge input lookup"), null());
+            xml_err_internal(self, "Huge input lookup", null());
             self.halt();
             return -1;
         }
@@ -639,7 +639,7 @@ impl XmlParserCtxt {
 
         /* TODO: Get error code from xmlParserInputBufferGrow */
         if ret < 0 {
-            xml_err_internal(self, Some("Growing input buffer"), null());
+            xml_err_internal(self, "Growing input buffer", null());
             self.halt();
         }
 
@@ -777,7 +777,7 @@ impl XmlParserCtxt {
         }
 
         if (*self.input).cur > (*self.input).end {
-            xml_err_internal(self, Some("Parser input data memory error\n"), null());
+            xml_err_internal(self, "Parser input data memory error\n", null());
 
             self.err_no = XmlParserErrors::XmlErrInternalError as i32;
             self.stop();
@@ -852,7 +852,7 @@ impl XmlParserCtxt {
             __xml_err_encoding(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
-                Some("Input is not proper UTF-8, indicate encoding !\n"),
+                "Input is not proper UTF-8, indicate encoding !\n",
                 null(),
                 null(),
             );
@@ -871,7 +871,7 @@ impl XmlParserCtxt {
             __xml_err_encoding(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
-                Some("Input is not proper UTF-8, indicate encoding !\n%s"),
+                "Input is not proper UTF-8, indicate encoding !\n%s",
                 buffer.as_ptr() as _,
                 null(),
             );
@@ -1061,7 +1061,7 @@ impl XmlParserCtxt {
                             __xml_err_encoding(
                                 self,
                                 XmlParserErrors::XmlErrInvalidChar,
-                                Some("Input is not proper UTF-8, indicate encoding !\n"),
+                                "Input is not proper UTF-8, indicate encoding !\n",
                                 null(),
                                 null(),
                             );
@@ -1074,7 +1074,7 @@ impl XmlParserCtxt {
                             __xml_err_encoding(
                                 self,
                                 XmlParserErrors::XmlErrInvalidChar,
-                                Some("Input is not proper UTF-8, indicate encoding !\n%s"),
+                                "Input is not proper UTF-8, indicate encoding !\n%s",
                                 cb.as_ptr() as _,
                                 null(),
                             );
@@ -1096,7 +1096,7 @@ impl XmlParserCtxt {
             xml_err_encoding_int(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
-                Some("Char 0x%X out of allowed range\n"),
+                "Char 0x%X out of allowed range\n",
                 c as i32,
             );
         }
@@ -1147,7 +1147,7 @@ impl XmlParserCtxt {
             xml_fatal_err_msg_int(
                 self,
                 XmlParserErrors::XmlErrInternalError,
-                Some("Excessive depth in document: %d use XML_PARSE_HUGE option\n"),
+                "Excessive depth in document: %d use XML_PARSE_HUGE option\n",
                 XML_PARSER_MAX_DEPTH as i32,
             );
             self.halt();
@@ -1505,7 +1505,7 @@ impl XmlParserCtxt {
         let Some(input_buf) = (*input).buf.as_mut() else {
             xml_err_internal(
                 self,
-                Some("static memory buffer doesn't support encoding\n"),
+                "static memory buffer doesn't support encoding\n",
                 null(),
             );
             return -1;
@@ -1593,7 +1593,7 @@ impl XmlParserCtxt {
         (*input).reset_base();
         if res.is_err() {
             /* TODO: This could be an out of memory or an encoding error. */
-            xml_err_internal(self, Some("switching encoding: encoder error\n"), null());
+            xml_err_internal(self, "switching encoding: encoder error\n", null());
             self.halt();
             return -1;
         }
@@ -2103,7 +2103,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg(
         None,
         0,
         0,
-        Some("%s"),
+        "%s",
         msg
     );
     if !ctxt.is_null() {
@@ -2119,7 +2119,7 @@ pub(crate) unsafe extern "C" fn xml_fatal_err_msg(
 pub(crate) unsafe fn xml_fatal_err_msg_str(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     val: *const XmlChar,
 ) {
     if !ctxt.is_null()
@@ -2166,7 +2166,7 @@ pub(crate) unsafe fn xml_fatal_err_msg_str(
 pub(crate) unsafe fn xml_fatal_err_msg_int(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     val: i32,
 ) {
     if !ctxt.is_null()
@@ -2210,7 +2210,7 @@ pub(crate) unsafe fn xml_fatal_err_msg_int(
 pub(crate) unsafe fn xml_warning_msg(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -2294,7 +2294,7 @@ pub(crate) unsafe fn xml_warning_msg(
 pub(crate) unsafe fn xml_err_msg_str(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     val: *const XmlChar,
 ) {
     if !ctxt.is_null()
@@ -2335,7 +2335,7 @@ pub(crate) unsafe fn xml_err_msg_str(
 pub(crate) unsafe fn xml_validity_error(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -2416,7 +2416,7 @@ pub(crate) unsafe fn xml_validity_error(
 pub(crate) unsafe fn xml_fatal_err_msg_str_int_str(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     val: i32,
     str2: *const XmlChar,
@@ -2470,7 +2470,7 @@ pub(crate) unsafe fn xml_fatal_err_msg_str_int_str(
 pub(crate) unsafe fn xml_ns_err(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     info1: *const XmlChar,
     info2: *const XmlChar,
     info3: *const XmlChar,
@@ -4831,7 +4831,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     let mut input: XmlParserInputPtr;
 
     if ctxt.is_null() {
-        xml_err_internal(null_mut(), Some("Got NULL parser context\n"), null());
+        xml_err_internal(null_mut(), "Got NULL parser context\n", null());
         return -1;
     }
 
@@ -5821,7 +5821,7 @@ unsafe extern "C" fn xml_parse_qname(
                 xml_ns_err(
                     ctxt,
                     XmlParserErrors::XmlNsErrQname,
-                    Some("Failed to parse QName '%s'\n"),
+                    "Failed to parse QName '%s'\n",
                     l,
                     null(),
                     null(),
@@ -5845,7 +5845,7 @@ unsafe extern "C" fn xml_parse_qname(
             xml_ns_err(
                 ctxt,
                 XmlParserErrors::XmlNsErrQname,
-                Some("Failed to parse QName '%s:'\n"),
+                "Failed to parse QName '%s:'\n",
                 p,
                 null(),
                 null(),
@@ -5873,7 +5873,7 @@ unsafe extern "C" fn xml_parse_qname(
             xml_ns_err(
                 ctxt,
                 XmlParserErrors::XmlNsErrQname,
-                Some("Failed to parse QName '%s:%s:'\n"),
+                "Failed to parse QName '%s:%s:'\n",
                 p,
                 l,
                 null(),
@@ -6076,7 +6076,7 @@ unsafe extern "C" fn xml_parse_string_char_ref(
         xml_fatal_err_msg_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("xmlParseStringCharRef: character reference out of bounds\n"),
+            "xmlParseStringCharRef: character reference out of bounds\n",
             val,
         );
     } else if xml_is_char(val as u32) {
@@ -6085,7 +6085,7 @@ unsafe extern "C" fn xml_parse_string_char_ref(
         xml_fatal_err_msg_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("xmlParseStringCharRef: invalid xmlChar value %d\n"),
+            "xmlParseStringCharRef: invalid xmlChar value %d\n",
             val,
         );
     }
@@ -6311,14 +6311,14 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
             xml_fatal_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                Some("Entity '%s' not defined\n"),
+                "Entity '%s' not defined\n",
                 name,
             );
         } else {
             xml_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                Some("Entity '%s' not defined\n"),
+                "Entity '%s' not defined\n",
                 name,
             );
         }
@@ -6334,7 +6334,7 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         xml_fatal_err_msg_str(
             ctxt,
             XmlParserErrors::XmlErrUnparsedEntity,
-            Some("Entity reference to unparsed entity %s\n"),
+            "Entity reference to unparsed entity %s\n",
             name,
         );
     }
@@ -6353,7 +6353,7 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         xml_fatal_err_msg_str(
             ctxt,
             XmlParserErrors::XmlErrEntityIsExternal,
-            Some("Attribute references external entity '%s'\n"),
+            "Attribute references external entity '%s'\n",
             name,
         );
     }
@@ -6380,7 +6380,7 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
             xml_fatal_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrLtInAttribute,
-                Some("'<' in entity '%s' is not allowed in attributes values\n"),
+                "'<' in entity '%s' is not allowed in attributes values\n",
                 name,
             );
         }
@@ -6393,7 +6393,7 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrEntityIsParameter,
-                    Some("Attempt to reference the parameter entity '%s'\n"),
+                    "Attempt to reference the parameter entity '%s'\n",
                     name,
                 );
             }
@@ -6498,7 +6498,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
             xml_fatal_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                Some("PEReference: %%%s; not found\n"),
+                "PEReference: %%%s; not found\n",
                 name,
             );
         } else {
@@ -6510,7 +6510,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
             xml_warning_msg(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                Some("PEReference: %%%s; not found\n"),
+                "PEReference: %%%s; not found\n",
                 name,
                 null(),
             );
@@ -6526,7 +6526,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
             xml_warning_msg(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                Some("%%%s; is not a parameter entity\n"),
+                "%%%s; is not a parameter entity\n",
                 name,
                 null(),
             );
@@ -6659,7 +6659,7 @@ unsafe extern "C" fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: Xml
         xml_fatal_err_msg_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("xmlLoadEntityContent: invalid char value %d\n"),
+            "xmlLoadEntityContent: invalid char value %d\n",
             c as i32,
         );
         xml_buf_free(buf);
@@ -6912,7 +6912,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                                 xml_warning_msg(
                                     ctxt,
                                     XmlParserErrors::XmlErrEntityProcessing,
-                                    Some("not validating will not read content for PE entity %s\n"),
+                                    "not validating will not read content for PE entity %s\n",
                                     (*ent).name.load(Ordering::Relaxed),
                                     null(),
                                 );
@@ -7769,7 +7769,7 @@ unsafe extern "C" fn xml_parse_attribute2(
         xml_fatal_err_msg_str(
             ctxt,
             XmlParserErrors::XmlErrAttributeWithoutValue,
-            Some("Specification mandates value for attribute %s\n"),
+            "Specification mandates value for attribute %s\n",
             name,
         );
         return name;
@@ -7785,7 +7785,7 @@ unsafe extern "C" fn xml_parse_attribute2(
                 xml_warning_msg(
                     ctxt,
                     XmlParserErrors::XmlWarLangValue,
-                    Some("Malformed value for xml:lang : %s\n"),
+                    "Malformed value for xml:lang : %s\n",
                     internal_val,
                     null(),
                 );
@@ -7803,7 +7803,7 @@ unsafe extern "C" fn xml_parse_attribute2(
                 xml_warning_msg(
                     ctxt,
                     XmlParserErrors::XmlWarSpaceValue,
-                    Some("Invalid value \"%s\" for xml:space : \"default\" or \"preserve\" expected\n"),
+                    "Invalid value \"%s\" for xml:space : \"default\" or \"preserve\" expected\n",
                     internal_val,
                     null(),
                 );
@@ -7823,7 +7823,7 @@ unsafe extern "C" fn xml_parse_attribute2(
 unsafe fn xml_ns_warn(
     ctxt: XmlParserCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     info1: *const XmlChar,
     info2: *const XmlChar,
     info3: *const XmlChar,
@@ -7903,7 +7903,7 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             None,
             0,
             0,
-            Some("Attribute %s redefined\n"),
+            "Attribute %s redefined\n",
             localname
         );
     } else {
@@ -7929,7 +7929,7 @@ pub(crate) unsafe extern "C" fn xml_err_attribute_dup(
             None,
             0,
             0,
-            Some("Attribute %s:%s redefined\n"),
+            "Attribute %s:%s redefined\n",
             prefix,
             localname
         );
@@ -8111,7 +8111,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             xml_ns_err(
                                 ctxt,
                                 XmlParserErrors::XmlWarNsURI,
-                                Some("xmlns: '%s' is not a valid URI\n"),
+                                "xmlns: '%s' is not a valid URI\n",
                                 url,
                                 null(),
                                 null(),
@@ -8121,7 +8121,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                                 xml_ns_warn(
                                     ctxt,
                                     XmlParserErrors::XmlWarNsURIRelative,
-                                    Some("xmlns: URI %s is not absolute\n"),
+                                    "xmlns: URI %s is not absolute\n",
                                     url,
                                     null(),
                                     null(),
@@ -8134,7 +8134,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                                 xml_ns_err(
                                     ctxt,
                                     XmlParserErrors::XmlNsErrXmlNamespace,
-                                    Some("xml namespace URI cannot be the default namespace\n"),
+                                    "xml namespace URI cannot be the default namespace\n",
                                     null(),
                                     null(),
                                     null(),
@@ -8148,7 +8148,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             xml_ns_err(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                Some("reuse of the xmlns namespace name is forbidden\n"),
+                                "reuse of the xmlns namespace name is forbidden\n",
                                 null(),
                                 null(),
                                 null(),
@@ -8178,7 +8178,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             xml_ns_err(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                Some("xml namespace prefix mapped to wrong URI\n"),
+                                "xml namespace prefix mapped to wrong URI\n",
                                 null(),
                                 null(),
                                 null(),
@@ -8192,7 +8192,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             xml_ns_err(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                Some("xml namespace URI mapped to wrong prefix\n"),
+                                "xml namespace URI mapped to wrong prefix\n",
                                 null(),
                                 null(),
                                 null(),
@@ -8204,7 +8204,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         xml_ns_err(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
-                            Some("redefinition of the xmlns prefix is forbidden\n"),
+                            "redefinition of the xmlns prefix is forbidden\n",
                             null(),
                             null(),
                             null(),
@@ -8217,7 +8217,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         xml_ns_err(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
-                            Some("reuse of the xmlns namespace name is forbidden\n"),
+                            "reuse of the xmlns namespace name is forbidden\n",
                             null(),
                             null(),
                             null(),
@@ -8228,7 +8228,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         xml_ns_err(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
-                            Some("xmlns:%s: Empty XML namespace is not allowed\n"),
+                            "xmlns:%s: Empty XML namespace is not allowed\n",
                             attname,
                             null(),
                             null(),
@@ -8240,7 +8240,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         xml_ns_err(
                             ctxt,
                             XmlParserErrors::XmlWarNsURI,
-                            Some("xmlns:%s: '%s' is not a valid URI\n"),
+                            "xmlns:%s: '%s' is not a valid URI\n",
                             attname,
                             url,
                             null(),
@@ -8250,7 +8250,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             xml_ns_warn(
                                 ctxt,
                                 XmlParserErrors::XmlWarNsURIRelative,
-                                Some("xmlns:%s: URI %s is not absolute\n"),
+                                "xmlns:%s: URI %s is not absolute\n",
                                 attname,
                                 url,
                                 null(),
@@ -8465,7 +8465,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             xml_validity_error(
                                 ctxt,
                                 XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                Some("standalone: attribute %s on %s defaulted from external subset\n"),
+                                "standalone: attribute %s on %s defaulted from external subset\n",
                                 attname,
                                 localname,
                             );
@@ -8485,7 +8485,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     xml_ns_err(
                         ctxt,
                         XmlParserErrors::XmlNsErrUndefinedNamespace,
-                        Some("Namespace prefix %s for %s on %s is not defined\n"),
+                        "Namespace prefix %s for %s on %s is not defined\n",
                         *atts.add(i + 1),
                         *atts.add(i),
                         localname,
@@ -8509,7 +8509,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         xml_ns_err(
                             ctxt,
                             XmlParserErrors::XmlNsErrAttributeRedefined,
-                            Some("Namespaced Attribute %s in '%s' redefined\n"),
+                            "Namespaced Attribute %s in '%s' redefined\n",
                             *atts.add(i),
                             nsname,
                             null(),
@@ -8525,7 +8525,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             xml_ns_err(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                Some("Namespace prefix %s on %s is not defined\n"),
+                "Namespace prefix %s on %s is not defined\n",
                 prefix,
                 localname,
                 null(),
@@ -8830,7 +8830,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
                 xml_fatal_err_msg_int(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    Some("Incomplete UTF-8 sequence starting with %02X\n"),
+                    "Incomplete UTF-8 sequence starting with %02X\n",
                     (*ctxt).current_byte() as _,
                 );
                 (*ctxt).advance_with_line_handling(1);
@@ -8840,7 +8840,7 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
             xml_fatal_err_msg_int(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                Some("PCDATA invalid Char value %d\n"),
+                "PCDATA invalid Char value %d\n",
                 cur as _,
             );
             (*ctxt).advance_with_line_handling(l as usize);
@@ -9154,7 +9154,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
         xml_fatal_err_msg_str_int_str(
             ctxt,
             XmlParserErrors::XmlErrTagNameMismatch,
-            Some("Opening and ending tag mismatch: %s line %d and %s\n"),
+            "Opening and ending tag mismatch: %s line %d and %s\n",
             (*ctxt).name,
             tag.line,
             name,
@@ -9227,7 +9227,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
         xml_fatal_err_msg_str_int_str(
             ctxt,
             XmlParserErrors::XmlErrTagNameMismatch,
-            Some("Opening and ending tag mismatch: %s line %d and %s\n"),
+            "Opening and ending tag mismatch: %s line %d and %s\n",
             (*ctxt).name,
             line,
             name,
@@ -9745,7 +9745,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             xml_fatal_err_msg_str(
                                 ctxt,
                                 XmlParserErrors::XmlErrGtRequired,
-                                Some("Couldn't find end of Start Tag %s\n"),
+                                "Couldn't find end of Start Tag %s\n",
                                 name,
                             );
                             (*ctxt).node_pop();
@@ -10153,7 +10153,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
         __xml_err_encoding(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("Input is not proper UTF-8, indicate encoding !\n"),
+            "Input is not proper UTF-8, indicate encoding !\n",
             null(),
             null(),
         );
@@ -10172,7 +10172,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
         __xml_err_encoding(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("Input is not proper UTF-8, indicate encoding !\n%s"),
+            "Input is not proper UTF-8, indicate encoding !\n%s",
             buffer.as_ptr() as _,
             null(),
         );
@@ -10842,7 +10842,7 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
             xml_fatal_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrUnsupportedEncoding,
-                Some("Unsupported encoding %s\n"),
+                "Unsupported encoding %s\n",
                 encoding as _,
             );
         };
@@ -11400,7 +11400,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
             xml_ns_err(
                 ctxt,
                 XmlParserErrors::XmlNsErrColon,
-                Some("colons are forbidden from notation names '%s'\n"),
+                "colons are forbidden from notation names '%s'\n",
                 name,
                 null(),
                 null(),
@@ -11516,7 +11516,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             xml_ns_err(
                 ctxt,
                 XmlParserErrors::XmlNsErrColon,
-                Some("colons are forbidden from entities names '%s'\n"),
+                "colons are forbidden from entities names '%s'\n",
                 name,
                 null(),
                 null(),
@@ -11560,7 +11560,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         xml_err_msg_str(
                             ctxt,
                             XmlParserErrors::XmlErrInvalidURI,
-                            Some("Invalid URI: %s\n"),
+                            "Invalid URI: %s\n",
                             uri as _,
                         );
                     // This really ought to be a well formedness error
@@ -11655,7 +11655,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     xml_err_msg_str(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidURI,
-                        Some("Invalid URI: %s\n"),
+                        "Invalid URI: %s\n",
                         uri as _,
                     );
                 /*
@@ -11775,7 +11775,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             xml_fatal_err_msg_str(
                 ctxt,
                 XmlParserErrors::XmlErrEntityNotFinished,
-                Some("xmlParseEntityDecl: entity %s not terminated\n"),
+                "xmlParseEntityDecl: entity %s not terminated\n",
                 name,
             );
             (*ctxt).halt();
@@ -12039,9 +12039,12 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
 
     if (depth > 128 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0) || depth > 2048
     {
-        xml_fatal_err_msg_int(ctxt, XmlParserErrors::XmlErrElemcontentNotFinished,
-Some("xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::XML_PARSE_HUGE\n"),
-                          depth);
+        xml_fatal_err_msg_int(
+            ctxt,
+            XmlParserErrors::XmlErrElemcontentNotFinished,
+            "xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::XML_PARSE_HUGE\n",
+            depth
+        );
         return null_mut();
     }
     (*ctxt).skip_blanks();
@@ -12109,7 +12112,7 @@ Some("xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOptio
                 xml_fatal_err_msg_int(
                     ctxt,
                     XmlParserErrors::XmlErrSeparatorRequired,
-                    Some("xmlParseElementChildrenContentDecl : '%c' expected\n"),
+                    "xmlParseElementChildrenContentDecl : '%c' expected\n",
                     typ as _,
                 );
                 if !last.is_null() && last != ret {
@@ -12162,7 +12165,7 @@ Some("xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOptio
                 xml_fatal_err_msg_int(
                     ctxt,
                     XmlParserErrors::XmlErrSeparatorRequired,
-                    Some("xmlParseElementChildrenContentDecl : '%c' expected\n"),
+                    "xmlParseElementChildrenContentDecl : '%c' expected\n",
                     typ as _,
                 );
                 if !last.is_null() && last != ret {
@@ -12697,7 +12700,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> i3
         xml_fatal_err_msg_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("xmlParseCharRef: character reference out of bounds\n"),
+            "xmlParseCharRef: character reference out of bounds\n",
             val,
         );
     } else if xml_is_char(val as u32) {
@@ -12706,7 +12709,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> i3
         xml_fatal_err_msg_int(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            Some("xmlParseCharRef: invalid XmlChar value %d\n"),
+            "xmlParseCharRef: invalid XmlChar value %d\n",
             val,
         );
     }
@@ -12826,7 +12829,7 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         xml_fatal_err_msg_str(
             ctxt,
             XmlParserErrors::XmlErrCDATANotFinished,
-            Some("CData section not finished\n%.50s\n"),
+            "CData section not finished\n%.50s\n",
             buf,
         );
         // goto out;
@@ -12877,7 +12880,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
         xml_fatal_err_msg_str_int_str(
             ctxt,
             XmlParserErrors::XmlErrTagNotFinished,
-            Some("Premature end of data in tag %s line %d\n"),
+            "Premature end of data in tag %s line %d\n",
             name,
             line,
             null(),
@@ -13005,14 +13008,14 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrUnknownVersion,
-                    Some("Unsupported version '%s'\n"),
+                    "Unsupported version '%s'\n",
                     ver.as_ptr() as *const u8,
                 );
             } else if version.starts_with("1.") {
                 xml_warning_msg(
                     ctxt,
                     XmlParserErrors::XmlWarUnknownVersion,
-                    Some("Unsupported version '%s'\n"),
+                    "Unsupported version '%s'\n",
                     ver.as_ptr() as *const u8,
                     null(),
                 );
@@ -13020,7 +13023,7 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
                 xml_fatal_err_msg_str(
                     ctxt,
                     XmlParserErrors::XmlErrUnknownVersion,
-                    Some("Unsupported version '%s'\n"),
+                    "Unsupported version '%s'\n",
                     ver.as_ptr() as *const u8,
                 );
             }

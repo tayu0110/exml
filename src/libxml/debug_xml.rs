@@ -198,18 +198,13 @@ unsafe extern "C" fn xml_debug_err(
         None,
         0,
         0,
-        Some("%s"),
+        "%s",
         msg
     );
 }
 
 #[doc(alias = "xmlDebugErr2")]
-unsafe fn xml_debug_err2(
-    ctxt: XmlDebugCtxtPtr,
-    error: XmlParserErrors,
-    msg: Option<&str>,
-    extra: i32,
-) {
+unsafe fn xml_debug_err2(ctxt: XmlDebugCtxtPtr, error: XmlParserErrors, msg: &str, extra: i32) {
     (*ctxt).errors += 1;
     __xml_raise_error!(
         None,
@@ -236,7 +231,7 @@ unsafe fn xml_debug_err2(
 unsafe fn xml_debug_err3(
     ctxt: XmlDebugCtxtPtr,
     error: XmlParserErrors,
-    msg: Option<&str>,
+    msg: &str,
     extra: *const c_char,
 ) {
     (*ctxt).errors += 1;
@@ -346,7 +341,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
             xml_debug_err3(
                 ctxt,
                 XmlParserErrors::XmlCheckNsScope,
-                Some("Reference to namespace '%s' not in scope\n"),
+                "Reference to namespace '%s' not in scope\n",
                 (*ns).prefix as *mut c_char,
             );
         }
@@ -362,7 +357,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
             xml_debug_err3(
                 ctxt,
                 XmlParserErrors::XmlCheckNsAncestor,
-                Some("Reference to namespace '%s' not on ancestor\n"),
+                "Reference to namespace '%s' not on ancestor\n",
                 (*ns).prefix as *mut c_char,
             );
         }
@@ -379,7 +374,7 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
         xml_debug_err3(
             ctxt,
             XmlParserErrors::XmlCheckNotUTF8,
-            Some("String is not UTF-8 %s"),
+            "String is not UTF-8 %s",
             str as *const c_char,
         );
     }
@@ -403,7 +398,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
             xml_debug_err3(
                 ctxt,
                 XmlParserErrors::XmlCheckNotNCName,
-                Some("Name is not an NCName '%s'"),
+                "Name is not an NCName '%s'",
                 name as *const c_char,
             );
         }
@@ -418,7 +413,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
             xml_debug_err3(
                 ctxt,
                 XmlParserErrors::XmlCheckOutsideDict,
-                Some("Name is not from the document dictionary '%s'"),
+                "Name is not from the document dictionary '%s'",
                 name as *const c_char,
             );
         }
@@ -578,7 +573,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                     xml_debug_err3(
                         ctxt,
                         XmlParserErrors::XmlCheckWrongName,
-                        Some("Text node has wrong name '%s'"),
+                        "Text node has wrong name '%s'",
                         (*node).name as *const c_char,
                     );
                 }
@@ -591,7 +586,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 xml_debug_err3(
                     ctxt,
                     XmlParserErrors::XmlCheckWrongName,
-                    Some("Comment node has wrong name '%s'"),
+                    "Comment node has wrong name '%s'",
                     (*node).name as *const c_char,
                 );
             }
@@ -606,7 +601,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 xml_debug_err3(
                     ctxt,
                     XmlParserErrors::XmlCheckNameNotNull,
-                    Some("CData section has non NULL name '%s'"),
+                    "CData section has non NULL name '%s'",
                     (*node).name as *const c_char,
                 );
             }
@@ -984,7 +979,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
             xml_debug_err3(
                 ctxt,
                 XmlParserErrors::XmlCheckNoHref,
-                Some("Incomplete namespace %s href=NULL\n"),
+                "Incomplete namespace %s href=NULL\n",
                 (*ns).prefix as *mut c_char,
             );
         } else {
@@ -1240,7 +1235,7 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             xml_debug_err2(
                 ctxt,
                 XmlParserErrors::XmlCheckUnknownNode,
-                Some("Unknown node type %d\n"),
+                "Unknown node type %d\n",
                 (*node).element_type() as i32,
             );
             return;
@@ -1530,7 +1525,7 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
             xml_debug_err2(
                 ctxt,
                 XmlParserErrors::XmlCheckUnknownNode,
-                Some("Unknown node type %d\n"),
+                "Unknown node type %d\n",
                 (*doc).typ as i32,
             );
         }
@@ -1668,7 +1663,7 @@ extern "C" fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtx
                     xml_debug_err2(
                         ctxt,
                         XmlParserErrors::XmlCheckEntityType,
-                        Some("Unknown entity type %d\n"),
+                        "Unknown entity type %d\n",
                         e as i32,
                     );
                 }

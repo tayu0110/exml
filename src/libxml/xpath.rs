@@ -1782,7 +1782,7 @@ macro_rules! CHECK_CTXT {
                 None,
                 0,
                 0,
-                Some("NULL context pointer\n"),
+                "NULL context pointer\n",
             );
             return null_mut();
         }
@@ -1995,7 +1995,7 @@ macro_rules! CHECK_CTXT_NEG {
                 None,
                 0,
                 0,
-                Some("NULL context pointer\n"),
+                "NULL context pointer\n",
             );
             return -1;
         }

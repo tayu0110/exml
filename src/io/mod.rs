@@ -342,11 +342,7 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
 
 /// Handle a resource access error
 #[doc(alias = "__xmlLoaderErr")]
-pub(crate) unsafe fn __xml_loader_err(
-    ctx: *mut c_void,
-    msg: Option<&str>,
-    filename: *const c_char,
-) {
+pub(crate) unsafe fn __xml_loader_err(ctx: *mut c_void, msg: &str, filename: *const c_char) {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
@@ -419,15 +415,11 @@ pub unsafe extern "C" fn xml_check_http_input(
                             let filename = CString::new(filename).unwrap();
                             __xml_loader_err(
                                 ctxt as _,
-                                Some("failed to load HTTP resource \"%s\"\n"),
+                                "failed to load HTTP resource \"%s\"\n",
                                 filename.as_ptr() as *const c_char,
                             );
                         } else {
-                            __xml_loader_err(
-                                ctxt as _,
-                                Some("failed to load HTTP resource\n"),
-                                null(),
-                            );
+                            __xml_loader_err(ctxt as _, "failed to load HTTP resource\n", null());
                         }
                         xml_free_input_stream(ret);
                         ret = null_mut();
@@ -445,7 +437,7 @@ pub unsafe extern "C" fn xml_check_http_input(
                                     __xml_err_encoding(
                                         ctxt,
                                         XmlParserErrors::XmlErrUnknownEncoding,
-                                        Some("Unknown encoding %s"),
+                                        "Unknown encoding %s",
                                         enc.as_ptr() as *const u8,
                                         null(),
                                     );
@@ -500,11 +492,7 @@ pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
         if id.is_null() {
             id = c"NULL".as_ptr() as _;
         }
-        __xml_loader_err(
-            ctxt as _,
-            Some("failed to load external entity \"%s\"\n"),
-            id,
-        );
+        __xml_loader_err(ctxt as _, "failed to load external entity \"%s\"\n", id);
         return null_mut();
     }
     ret = xml_new_input_from_file(ctxt, resource as _);

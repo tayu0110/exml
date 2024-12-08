@@ -255,7 +255,7 @@ unsafe extern "C" fn xml_writer_err_msg(
             None,
             0,
             0,
-            Some("%s"),
+            "%s",
             msg
         );
     } else {
@@ -275,7 +275,7 @@ unsafe extern "C" fn xml_writer_err_msg(
             None,
             0,
             0,
-            Some("%s"),
+            "%s",
             msg
         );
     }
@@ -408,7 +408,7 @@ unsafe fn xml_writer_err_msg_int(
             None,
             val,
             0,
-            Some(msg),
+            msg,
             val
         );
     } else {
@@ -428,7 +428,7 @@ unsafe fn xml_writer_err_msg_int(
             None,
             val,
             0,
-            Some(msg),
+            msg,
             val
         );
     }

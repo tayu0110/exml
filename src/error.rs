@@ -1422,6 +1422,26 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __xml_raise_error {
+    ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr) => {
+        $crate::__xml_raise_error!(
+            $schannel,
+            $channel,
+            $data,
+            $ctx,
+            $nod,
+            $domain,
+            $code,
+            $level,
+            $file,
+            $line,
+            $str1,
+            $str2,
+            $str3,
+            $int1,
+            $col,
+            "No error message provided",
+        );
+    };
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
         use std::borrow::Cow;
         use std::ffi::{CStr, CString};
@@ -1455,7 +1475,7 @@ macro_rules! __xml_raise_error {
             str3: Option<Cow<'static, str>>,
             int1: c_int,
             mut col: c_int,
-            msg: Option<&str>| {
+            msg: &str| {
                 let mut ctxt: XmlParserCtxtPtr = null_mut();
                 let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
                     let mut node: XmlNodePtr = nod as XmlNodePtr;
@@ -1509,7 +1529,7 @@ macro_rules! __xml_raise_error {
                         }
                     }
                     // Formatting the message
-                    let str = if let Some(msg) = msg {
+                    let str = {
                         let msg = CString::new(msg).unwrap();
                         $crate::XML_GET_VAR_STR!(msg.as_ptr() as _, str, $( $args ),*);
                         assert!(!str.is_null());
@@ -1517,9 +1537,7 @@ macro_rules! __xml_raise_error {
                         let s = s.into_owned();
                         assert!(s.as_ptr() as *const i8 as usize != str as usize);
                         $crate::libxml::globals::xml_free(str as _);
-                        s.into()
-                    } else {
-                        Cow::Borrowed("No error message provided")
+                        Cow::<'static, str>::Owned(s)
                     };
 
                     // specific processing if a parser context is provided
@@ -1692,7 +1710,7 @@ pub(crate) unsafe fn __xml_simple_oom_error(
             None,
             0,
             0,
-            Some(format!("Memory allocation failed : {msg}\n").as_str()),
+            format!("Memory allocation failed : {msg}\n").as_str(),
         );
     } else {
         __xml_raise_error!(
@@ -1711,7 +1729,7 @@ pub(crate) unsafe fn __xml_simple_oom_error(
             None,
             0,
             0,
-            Some("Memory allocation failed\n"),
+            "Memory allocation failed\n",
         );
     }
 }
@@ -1731,24 +1749,44 @@ pub(crate) unsafe fn __xml_simple_error(
         XmlParserErrors::XmlErrNoMemory,
         "Use __xml_simple_oom_error"
     );
-    let e = extra.map(|e| CString::new(e).unwrap());
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        node as _,
-        domain,
-        code,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        extra.map(|e| e.to_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        msg as _,
-        e.as_ref().map_or(null(), |e| e.as_ptr() as *const u8)
-    );
+    if let Some(msg) = msg {
+        let e = extra.map(|e| CString::new(e).unwrap());
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            node as _,
+            domain,
+            code,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            extra.map(|e| e.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            msg,
+            e.as_ref().map_or(null(), |e| e.as_ptr() as *const u8)
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            node as _,
+            domain,
+            code,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            extra.map(|e| e.to_owned().into()),
+            None,
+            None,
+            0,
+            0
+        );
+    }
 }

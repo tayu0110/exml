@@ -85,7 +85,7 @@ unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
             None,
             0,
             0,
-            Some("Memory allocation failed : %s\n"),
+            "Memory allocation failed : %s\n",
             extra
         );
     } else {
@@ -105,7 +105,7 @@ unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
             None,
             0,
             0,
-            Some("Memory allocation failed\n"),
+            "Memory allocation failed\n",
         );
     }
 }

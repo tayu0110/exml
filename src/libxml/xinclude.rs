@@ -222,7 +222,7 @@ unsafe fn xml_xinclude_err(
         None,
         0,
         0,
-        Some(msg),
+        msg,
         extra
     );
 }
@@ -360,7 +360,7 @@ unsafe extern "C" fn xml_xinclude_err_memory(
         None,
         0,
         0,
-        Some("Memory allocation failed : %s\n"),
+        "Memory allocation failed : %s\n",
         extra
     );
 }

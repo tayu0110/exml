@@ -278,7 +278,7 @@ unsafe fn xml_entities_err(code: XmlParserErrors, msg: Option<&str>) {
 
 /// Raise a warning.
 #[doc(alias = "xmlEntitiesWarn")]
-unsafe fn xml_entities_warn(code: XmlParserErrors, msg: Option<&str>, str1: *const XmlChar) {
+unsafe fn xml_entities_warn(code: XmlParserErrors, msg: &str, str1: *const XmlChar) {
     __xml_raise_error!(
         None,
         None,
@@ -418,7 +418,7 @@ unsafe extern "C" fn xml_add_entity(
                 if valid == 0 {
                     xml_entities_warn(
                         XmlParserErrors::XmlErrEntityProcessing,
-                        Some("xmlAddEntity: invalid redeclaration of predefined entity '%s'"),
+                        "xmlAddEntity: invalid redeclaration of predefined entity '%s'",
                         name.as_ptr() as *const u8,
                     );
                     return null_mut();

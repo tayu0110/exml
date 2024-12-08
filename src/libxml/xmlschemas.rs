@@ -1313,7 +1313,7 @@ unsafe fn xml_schema_err4_line(
     error: XmlParserErrors,
     mut node: XmlNodePtr,
     mut line: i32,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
     str3: *const XmlChar,
@@ -1484,7 +1484,7 @@ unsafe fn xml_schema_err3(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
     node: XmlNodePtr,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
     str3: *const XmlChar,
@@ -1519,7 +1519,7 @@ unsafe fn xml_schema_internal_err2(
             actxt,
             XmlParserErrors::XmlSchemavInternal as _,
             null_mut(),
-            Some(msg.as_str()),
+            msg.as_str(),
             func_name as _,
             str1,
             str2,
@@ -1529,7 +1529,7 @@ unsafe fn xml_schema_internal_err2(
             actxt,
             XmlParserErrors::XmlSchemapInternal as _,
             null_mut(),
-            Some(msg.as_str()),
+            msg.as_str(),
             func_name as _,
             str1,
             str2,
@@ -2154,7 +2154,7 @@ unsafe fn xml_schema_err4(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
     node: XmlNodePtr,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
     str3: *const XmlChar,
@@ -2206,16 +2206,7 @@ pub(crate) unsafe fn xml_schema_custom_err4(
     };
     msg.push_str(message);
     msg.push_str(".\n");
-    xml_schema_err4(
-        actxt,
-        error,
-        node,
-        Some(msg.as_str()),
-        str1,
-        str2,
-        str3,
-        str4,
-    );
+    xml_schema_err4(actxt, error, node, msg.as_str(), str1, str2, str3, str4);
 }
 
 pub(crate) unsafe fn xml_schema_custom_err(
@@ -2699,7 +2690,7 @@ unsafe fn xml_schema_err(
     actxt: XmlSchemaAbstractCtxtPtr,
     error: XmlParserErrors,
     node: XmlNodePtr,
-    msg: Option<&str>,
+    msg: &str,
     str1: *const XmlChar,
     str2: *const XmlChar,
 ) {
@@ -2939,7 +2930,7 @@ unsafe fn xml_schema_facet_err(
     .ok();
     if let Some(message) = message {
         writeln!(msg, "{message}.").ok();
-        xml_schema_err(actxt, error, node, Some(msg.as_str()), str1, str2);
+        xml_schema_err(actxt, error, node, msg.as_str(), str1, str2);
     } else {
         // Use a default message.
         if matches!(
@@ -2979,7 +2970,7 @@ unsafe fn xml_schema_facet_err(
                     actxt,
                     error,
                     node,
-                    Some(msg.as_str()),
+                    msg.as_str(),
                     value,
                     act_len.as_ptr() as _,
                     len.as_ptr() as _,
@@ -2989,7 +2980,7 @@ unsafe fn xml_schema_facet_err(
                     actxt,
                     error,
                     node,
-                    Some(msg.as_str()),
+                    msg.as_str(),
                     act_len.as_ptr() as _,
                     len.as_ptr() as _,
                 );
@@ -3000,86 +2991,37 @@ unsafe fn xml_schema_facet_err(
                 actxt,
                 error,
                 node,
-                Some(msg.as_str()),
+                msg.as_str(),
                 value,
                 xml_schema_format_facet_enum_set(actxt, addr_of_mut!(str), typ),
             );
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetPattern {
             msg.push_str("The value '%s' is not accepted by the pattern '%s'.\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMininclusive {
             msg.push_str("The value '%s' is less than the minimum value allowed ('%s').\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxinclusive {
             msg.push_str("The value '%s' is greater than the maximum value allowed ('%s').\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMinexclusive {
             msg.push_str("The value '%s' must be greater than '%s'.\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetMaxexclusive {
             msg.push_str("The value '%s' must be less than '%s'.\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
             msg.push_str("The value '%s' has more digits than are allowed ('%s').\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if facet_type == XmlSchemaTypeType::XmlSchemaFacetFractiondigits {
             msg.push_str("The value '%s' has more fractional digits than are allowed ('%s').\n");
-            xml_schema_err(
-                actxt,
-                error,
-                node,
-                Some(msg.as_str()),
-                value,
-                (*facet).value,
-            );
+            xml_schema_err(actxt, error, node, msg.as_str(), value, (*facet).value);
         } else if node_type == XmlElementType::XmlAttributeNode as i32 {
             msg.push_str("The value '%s' is not facet-valid.\n");
-            xml_schema_err(actxt, error, node, Some(msg.as_str()), value, null());
+            xml_schema_err(actxt, error, node, msg.as_str(), value, null());
         } else {
             msg.push_str("The value is not facet-valid.\n");
-            xml_schema_err(actxt, error, node, Some(msg.as_str()), null_mut(), null());
+            xml_schema_err(actxt, error, node, msg.as_str(), null_mut(), null());
         }
     }
     FREE_AND_NULL!(str);
@@ -3617,16 +3559,9 @@ unsafe extern "C" fn xml_schema_simple_type_err(
     if display_value != 0
         || xml_schema_eval_error_node_type(actxt, node) == XmlElementType::XmlAttributeNode as i32
     {
-        xml_schema_err(actxt, error as _, node, Some(msg.as_str()), value, null());
+        xml_schema_err(actxt, error as _, node, msg.as_str(), value, null());
     } else {
-        xml_schema_err(
-            actxt,
-            error as _,
-            node,
-            Some(msg.as_str()),
-            null_mut(),
-            null(),
-        );
+        xml_schema_err(actxt, error as _, node, msg.as_str(), null_mut(), null());
     }
 }
 
@@ -4619,7 +4554,7 @@ unsafe fn xml_schema_custom_warning(
         error as _,
         node,
         0,
-        Some(msg.as_str()),
+        msg.as_str(),
         str1,
         str2,
         str3,
@@ -4695,7 +4630,7 @@ unsafe fn xml_schema_perr(
         None,
         0,
         0,
-        Some(msg),
+        msg,
         str1,
         str2
     );
@@ -5831,7 +5766,7 @@ unsafe fn xml_schema_perr_ext(
             .into()),
         0,
         0,
-        Some(msg),
+        msg,
         str1,
         str2,
         str3,
@@ -6531,7 +6466,7 @@ unsafe extern "C" fn xml_schema_pillegal_attr_err(
         ctxt as XmlSchemaAbstractCtxtPtr,
         error,
         attr as XmlNodePtr,
-        Some("%sThe attribute '%s' is not allowed.\n"),
+        "%sThe attribute '%s' is not allowed.\n",
         str_a,
         xml_schema_format_qname_ns(addr_of_mut!(str_b), (*attr).ns, (*attr).name),
         null_mut(),
@@ -17387,7 +17322,7 @@ unsafe fn xml_schema_pattr_use_err4(
         ctxt as XmlSchemaAbstractCtxtPtr,
         error as _,
         node,
-        Some(msg.as_str()),
+        msg.as_str(),
         str1,
         str2,
         str3,
@@ -24949,14 +24884,7 @@ unsafe fn xml_schema_complex_type_err(
     } else {
         msg.push('\n');
     }
-    xml_schema_err(
-        actxt,
-        error,
-        node,
-        Some(msg.as_str()),
-        null_mut(),
-        null_mut(),
-    );
+    xml_schema_err(actxt, error, node, msg.as_str(), null_mut(), null_mut());
 }
 
 // 3.4.4 Complex Type Definition Validation Rules
@@ -26658,7 +26586,7 @@ unsafe extern "C" fn xml_schema_illegal_attr_err(
         actxt,
         error,
         node,
-        Some(msg.as_str()),
+        msg.as_str(),
         xml_schema_format_error_node_qname(addr_of_mut!(str), ni as XmlSchemaNodeInfoPtr, node),
         null_mut(),
     );
@@ -28250,7 +28178,7 @@ unsafe fn xml_schema_keyref_err(
         error as _,
         null_mut(),
         (*idc_node).node_line,
-        Some(msg.as_str()),
+        msg.as_str(),
         xml_schema_format_qname(
             addr_of_mut!(qname),
             *(*(*vctxt).node_qnames)
