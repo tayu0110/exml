@@ -234,9 +234,9 @@ const XML_OLD_SCHEMATRON_NS: &CStr = SCT_OLD_NS;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchematronPErrMemory")]
-unsafe extern "C" fn xml_schematron_perr_memory(
+unsafe fn xml_schematron_perr_memory(
     ctxt: XmlSchematronParserCtxtPtr,
-    extra: *const c_char,
+    extra: &str,
     node: XmlNodePtr,
 ) {
     if !ctxt.is_null() {
@@ -247,7 +247,7 @@ unsafe extern "C" fn xml_schematron_perr_memory(
         XmlParserErrors::XmlErrNoMemory,
         node,
         None,
-        extra,
+        Some(extra),
     );
 }
 
@@ -266,11 +266,7 @@ pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            c"allocating schema parser context".as_ptr() as _,
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
@@ -282,7 +278,7 @@ pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
-            c"allocating schema parser XPath context".as_ptr() as _,
+            "allocating schema parser XPath context",
             null_mut(),
         );
         xml_schematron_free_parser_ctxt(ret);
@@ -308,11 +304,7 @@ pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            c"allocating schema parser context".as_ptr() as _,
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
@@ -323,7 +315,7 @@ pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
-            c"allocating schema parser XPath context".as_ptr() as _,
+            "allocating schema parser XPath context",
             null_mut(),
         );
         xml_schematron_free_parser_ctxt(ret);
@@ -347,11 +339,7 @@ pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
     let ret: XmlSchematronParserCtxtPtr =
         xml_malloc(size_of::<XmlSchematronParserCtxt>()) as XmlSchematronParserCtxtPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(
-            null_mut(),
-            c"allocating schema parser context".as_ptr() as _,
-            null_mut(),
-        );
+        xml_schematron_perr_memory(null_mut(), "allocating schema parser context", null_mut());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
@@ -363,7 +351,7 @@ pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
-            c"allocating schema parser XPath context".as_ptr() as _,
+            "allocating schema parser XPath context",
             null_mut(),
         );
         xml_schematron_free_parser_ctxt(ret);
@@ -475,7 +463,7 @@ unsafe extern "C" fn xml_schematron_new_schematron(
 ) -> XmlSchematronPtr {
     let ret: XmlSchematronPtr = xml_malloc(size_of::<XmlSchematron>()) as XmlSchematronPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, c"allocating schema".as_ptr() as _, null_mut());
+        xml_schematron_perr_memory(ctxt, "allocating schema", null_mut());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematron>());
@@ -497,11 +485,7 @@ unsafe extern "C" fn xml_schematron_add_namespace(
         (*ctxt).namespaces =
             xml_malloc((*ctxt).max_namespaces as usize * 2 * size_of::<*const XmlChar>()) as _;
         if (*ctxt).namespaces.is_null() {
-            xml_schematron_perr_memory(
-                null_mut(),
-                c"allocating parser namespaces".as_ptr() as _,
-                null_mut(),
-            );
+            xml_schematron_perr_memory(null_mut(), "allocating parser namespaces", null_mut());
             return;
         }
         (*ctxt).nb_namespaces = 0;
@@ -511,11 +495,7 @@ unsafe extern "C" fn xml_schematron_add_namespace(
             (*ctxt).max_namespaces as usize * 4 * size_of::<*const XmlChar>(),
         ) as _;
         if tmp.is_null() {
-            xml_schematron_perr_memory(
-                null_mut(),
-                c"allocating parser namespaces".as_ptr() as _,
-                null_mut(),
-            );
+            xml_schematron_perr_memory(null_mut(), "allocating parser namespaces", null_mut());
             return;
         }
         (*ctxt).namespaces = tmp;
@@ -550,7 +530,7 @@ unsafe extern "C" fn xml_schematron_add_pattern(
     let ret: XmlSchematronPatternPtr =
         xml_malloc(size_of::<XmlSchematronPattern>()) as XmlSchematronPatternPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, c"allocating schema pattern".as_ptr() as _, node);
+        xml_schematron_perr_memory(ctxt, "allocating schema pattern", node);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronPattern>());
@@ -608,7 +588,7 @@ unsafe extern "C" fn xml_schematron_add_rule(
     let ret: XmlSchematronRulePtr =
         xml_malloc(size_of::<XmlSchematronRule>()) as XmlSchematronRulePtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, c"allocating schema rule".as_ptr() as _, node);
+        xml_schematron_perr_memory(ctxt, "allocating schema rule", node);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronRule>());
@@ -725,7 +705,7 @@ unsafe extern "C" fn xml_schematron_add_test(
     let ret: XmlSchematronTestPtr =
         xml_malloc(size_of::<XmlSchematronTest>()) as XmlSchematronTestPtr;
     if ret.is_null() {
-        xml_schematron_perr_memory(ctxt, c"allocating schema test".as_ptr() as _, node);
+        xml_schematron_perr_memory(ctxt, "allocating schema test", node);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronTest>());
@@ -1387,9 +1367,9 @@ pub unsafe fn xml_schematron_set_valid_structured_errors(
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchematronVTypeErrMemory")]
-unsafe extern "C" fn xml_schematron_verr_memory(
+unsafe fn xml_schematron_verr_memory(
     ctxt: XmlSchematronValidCtxtPtr,
-    extra: *const c_char,
+    extra: &str,
     node: XmlNodePtr,
 ) {
     if !ctxt.is_null() {
@@ -1401,7 +1381,7 @@ unsafe extern "C" fn xml_schematron_verr_memory(
         XmlParserErrors::XmlErrNoMemory,
         node,
         None,
-        extra,
+        Some(extra),
     );
 }
 
@@ -1416,11 +1396,7 @@ pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
     let ret: XmlSchematronValidCtxtPtr =
         xml_malloc(size_of::<XmlSchematronValidCtxt>()) as XmlSchematronValidCtxtPtr;
     if ret.is_null() {
-        xml_schematron_verr_memory(
-            null_mut(),
-            c"allocating validation context".as_ptr() as _,
-            null_mut(),
-        );
+        xml_schematron_verr_memory(null_mut(), "allocating validation context", null_mut());
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchematronValidCtxt>());
@@ -1431,7 +1407,7 @@ pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
     if (*ret).xctxt.is_null() {
         xml_schematron_perr_memory(
             null_mut(),
-            c"allocating schema parser XPath context".as_ptr() as _,
+            "allocating schema parser XPath context",
             null_mut(),
         );
         xml_schematron_free_valid_ctxt(ret);

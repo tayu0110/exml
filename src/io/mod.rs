@@ -72,13 +72,13 @@ pub use output::*;
 
 ///  Handle an out of memory condition
 #[doc(alias = "xmlIOErrMemory")]
-pub(crate) unsafe extern "C" fn xml_ioerr_memory(extra: *const c_char) {
+pub(crate) unsafe fn xml_ioerr_memory(extra: &str) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromIO,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         None,
-        extra as _,
+        Some(extra),
     );
 }
 
@@ -147,7 +147,7 @@ const IOERR: &[&str] = &[
 pub(crate) unsafe fn __xml_ioerr(
     domain: XmlErrorDomain,
     mut code: XmlParserErrors,
-    extra: *const c_char,
+    extra: Option<&str>,
 ) {
     let mut idx: c_uint;
     let errno = *__errno_location();
@@ -268,7 +268,7 @@ pub(crate) unsafe fn __xml_ioerr(
 
 /// Handle an I/O error
 #[doc(alias = "xmlIOErr")]
-unsafe extern "C" fn xml_ioerr(code: XmlParserErrors, extra: *const c_char) {
+unsafe fn xml_ioerr(code: XmlParserErrors, extra: Option<&str>) {
     __xml_ioerr(XmlErrorDomain::XmlFromIO, code, extra);
 }
 
@@ -637,7 +637,14 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
         && (xml_strncasecmp(resource as _, c"ftp://".as_ptr() as _, 6) == 0
             || xml_strncasecmp(resource as _, c"http://".as_ptr() as _, 7) == 0)
     {
-        xml_ioerr(XmlParserErrors::XmlIONetworkAttempt, resource as _);
+        xml_ioerr(
+            XmlParserErrors::XmlIONetworkAttempt,
+            Some(
+                CStr::from_ptr(resource as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+        );
         if resource != url as _ {
             xml_free(resource as _);
         }
@@ -754,8 +761,10 @@ impl XmlInputCallback for DefaultFileIOCallbacks {
 
         File::open(filename.as_ref())
             .inspect_err(|_| unsafe {
-                let path = CString::new(filename.to_string_lossy().as_ref()).unwrap();
-                xml_ioerr(XmlParserErrors::XmlErrOK, path.as_ptr())
+                xml_ioerr(
+                    XmlParserErrors::XmlErrOK,
+                    Some(filename.to_string_lossy().as_ref()),
+                )
             })
             .map(|file| Box::new(file) as Box<dyn Read>)
     }

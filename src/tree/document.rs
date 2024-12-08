@@ -183,7 +183,7 @@ impl XmlDoc {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidHex,
                                 self as *const XmlDoc as _,
-                                null_mut(),
+                                None,
                             );
                             charval = 0;
                             break;
@@ -207,7 +207,7 @@ impl XmlDoc {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidDec,
                                 self as *const XmlDoc as _,
-                                null_mut(),
+                                None,
                             );
                             charval = 0;
                             break;
@@ -227,10 +227,12 @@ impl XmlDoc {
                         cur = cur.add(1);
                     }
                     if *cur == 0 {
+                        let q = (!q.is_null())
+                            .then(|| CStr::from_ptr(q as *const i8).to_string_lossy());
                         xml_tree_err(
                             XmlParserErrors::XmlTreeUnterminatedEntity,
                             self as *const XmlDoc as _,
-                            q as _,
+                            q.as_deref(),
                         );
                         // goto out;
                         xml_buf_free(buf);
@@ -465,7 +467,7 @@ impl XmlDoc {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidHex,
                                 self as *const XmlDoc as _,
-                                null_mut(),
+                                None,
                             );
                             charval = 0;
                             break;
@@ -497,7 +499,7 @@ impl XmlDoc {
                             xml_tree_err(
                                 XmlParserErrors::XmlTreeInvalidDec,
                                 self as *const XmlDoc as _,
-                                null_mut(),
+                                None,
                             );
                             charval = 0;
                             break;
@@ -521,10 +523,12 @@ impl XmlDoc {
                         cur = cur.add(1);
                     }
                     if cur >= end || *cur == 0 {
+                        let q = (!q.is_null())
+                            .then(|| CStr::from_ptr(q as *const i8).to_string_lossy());
                         xml_tree_err(
                             XmlParserErrors::XmlTreeUnterminatedEntity,
                             self as *const XmlDoc as _,
-                            q as _,
+                            q.as_deref(),
                         );
                         // goto out;
                         xml_buf_free(buf);
@@ -717,7 +721,7 @@ impl XmlDoc {
         {
             let ns = xml_malloc(size_of::<XmlNs>()) as XmlNsPtr;
             if ns.is_null() {
-                xml_tree_err_memory(c"allocating the XML namespace".as_ptr() as _);
+                xml_tree_err_memory("allocating the XML namespace");
                 return null_mut();
             }
             memset(ns as _, 0, size_of::<XmlNs>());
@@ -814,12 +818,10 @@ impl Default for XmlDoc {
 pub unsafe fn xml_new_doc(version: Option<&str>) -> XmlDocPtr {
     let version = version.unwrap_or("1.0");
 
-    /*
-     * Allocate a new document and fill the fields.
-     */
+    // Allocate a new document and fill the fields.
     let cur: XmlDocPtr = xml_malloc(size_of::<XmlDoc>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building doc".as_ptr() as _);
+        xml_tree_err_memory("building doc");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDoc>());

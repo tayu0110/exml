@@ -13,7 +13,7 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::{CStr, CString},
+    ffi::CStr,
     io::{ErrorKind, Write},
     mem::take,
     ops::{Deref, DerefMut},
@@ -30,13 +30,12 @@ use crate::{
 };
 
 unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
-    let extra = CString::new(extra).unwrap();
     __xml_simple_error(
         XmlErrorDomain::XmlFromBuffer,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         None,
-        extra.as_ptr(),
+        Some(extra),
     );
     if buf.error.is_ok() {
         buf.error = XmlParserErrors::XmlErrNoMemory;
@@ -47,13 +46,12 @@ unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
 /// To be improved...
 #[doc(alias = "xmlBufOverflowError")]
 pub(crate) unsafe fn xml_buf_overflow_error(buf: &mut XmlBuf, extra: &str) {
-    let extra = CString::new(extra).unwrap();
     __xml_simple_error(
         XmlErrorDomain::XmlFromBuffer,
         XmlParserErrors::XmlBufOverflow,
         null_mut(),
         None,
-        extra.as_ptr(),
+        Some(extra),
     );
     if buf.is_ok() {
         buf.error = XmlParserErrors::XmlBufOverflow;

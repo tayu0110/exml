@@ -136,7 +136,7 @@ pub unsafe fn xml_new_ns(
      */
     let cur: XmlNsPtr = xml_malloc(size_of::<XmlNs>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building namespace".as_ptr() as _);
+        xml_tree_err_memory("building namespace");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNs>());

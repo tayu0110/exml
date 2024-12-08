@@ -184,13 +184,13 @@ pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlEntitiesErrMemory")]
-unsafe extern "C" fn xml_entities_err_memory(extra: *const c_char) {
+unsafe fn xml_entities_err_memory(extra: &str) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromTree,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         None,
-        extra as _,
+        Some(extra),
     );
 }
 
@@ -206,7 +206,7 @@ unsafe extern "C" fn xml_create_entity(
 ) -> XmlEntityPtr {
     let ret: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
     if ret.is_null() {
-        xml_entities_err_memory(c"xmlCreateEntity: malloc failed".as_ptr() as _);
+        xml_entities_err_memory("xmlCreateEntity: malloc failed");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlEntity>());
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn xml_new_entity(
 /// Raise an error.
 #[doc(alias = "xmlEntitiesErr")]
 unsafe fn xml_entities_err(code: XmlParserErrors, msg: Option<&str>) {
-    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, null_mut(), msg, null());
+    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, null_mut(), msg, None);
 }
 
 /// Raise a warning.
@@ -858,7 +858,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
     buffer_size = 1000;
     buffer = xml_malloc(buffer_size) as *mut XmlChar;
     if buffer.is_null() {
-        xml_entities_err_memory(c"xmlEncodeEntities: malloc failed".as_ptr() as _);
+        xml_entities_err_memory("xmlEncodeEntities: malloc failed");
         return null_mut();
     }
     out = buffer;
@@ -1123,7 +1123,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
     }
 
     // mem_error:
-    xml_entities_err_memory(c"xmlEncodeEntities: realloc failed".as_ptr());
+    xml_entities_err_memory("xmlEncodeEntities: realloc failed");
     xml_free(buffer as _);
     null_mut()
 }
@@ -1165,7 +1165,7 @@ pub unsafe extern "C" fn xml_encode_special_chars(
     buffer_size = 1000;
     buffer = xml_malloc(buffer_size) as *mut XmlChar;
     if buffer.is_null() {
-        xml_entities_err_memory(c"xmlEncodeSpecialChars: malloc failed".as_ptr() as _);
+        xml_entities_err_memory("xmlEncodeSpecialChars: malloc failed");
         return null_mut();
     }
     out = buffer;
@@ -1249,7 +1249,7 @@ pub unsafe extern "C" fn xml_encode_special_chars(
     }
 
     // mem_error:
-    xml_entities_err_memory(c"xmlEncodeSpecialChars: realloc failed".as_ptr());
+    xml_entities_err_memory("xmlEncodeSpecialChars: realloc failed");
     xml_free(buffer as _);
     null_mut()
 }
@@ -1272,7 +1272,7 @@ extern "C" fn xml_copy_entity(ent: XmlEntityPtr) -> XmlEntityPtr {
     unsafe {
         let cur: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
         if cur.is_null() {
-            xml_entities_err_memory(c"xmlCopyEntity:: malloc failed".as_ptr() as _);
+            xml_entities_err_memory("xmlCopyEntity:: malloc failed");
             return null_mut();
         }
         memset(cur as _, 0, size_of::<XmlEntity>());

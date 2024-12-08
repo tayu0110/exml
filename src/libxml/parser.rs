@@ -10557,7 +10557,7 @@ pub unsafe extern "C" fn xml_load_external_entity(
     if !url.is_null() && xml_no_net_exists(url) == 0 {
         let canonic_filename: *mut c_char = xml_canonic_path(url as _) as _;
         if canonic_filename.is_null() {
-            xml_ioerr_memory(c"building canonical path\n".as_ptr() as _);
+            xml_ioerr_memory("building canonical path\n");
             return null_mut();
         }
 

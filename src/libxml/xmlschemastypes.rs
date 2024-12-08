@@ -422,7 +422,7 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaTypeErrMemory")]
-unsafe extern "C" fn xml_schema_type_err_memory(node: XmlNodePtr, extra: *const c_char) {
+unsafe fn xml_schema_type_err_memory(node: XmlNodePtr, extra: Option<&str>) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromDatatype,
         XmlParserErrors::XmlErrNoMemory,
@@ -470,10 +470,7 @@ unsafe extern "C" fn xml_schema_init_basic_type(
 ) -> XmlSchemaTypePtr {
     let ret: XmlSchemaTypePtr = xml_malloc(size_of::<XmlSchemaType>()) as XmlSchemaTypePtr;
     if ret.is_null() {
-        xml_schema_type_err_memory(
-            null_mut(),
-            c"could not initialize basic types".as_ptr() as _,
-        );
+        xml_schema_type_err_memory(null_mut(), Some("could not initialize basic types"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaType>());
@@ -539,7 +536,7 @@ unsafe extern "C" fn xml_schema_add_particle() -> XmlSchemaParticlePtr {
     let ret: XmlSchemaParticlePtr =
         xml_malloc(size_of::<XmlSchemaParticle>()) as XmlSchemaParticlePtr;
     if ret.is_null() {
-        xml_schema_type_err_memory(null_mut(), c"allocating particle component".as_ptr() as _);
+        xml_schema_type_err_memory(null_mut(), Some("allocating particle component"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSchemaParticle>());
@@ -561,7 +558,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
     'error: {
         XML_SCHEMA_TYPES_BANK.set(xml_hash_create(40));
         if XML_SCHEMA_TYPES_BANK.get().is_null() {
-            xml_schema_type_err_memory(null_mut(), null());
+            xml_schema_type_err_memory(null_mut(), None);
             break 'error;
         }
 
@@ -595,10 +592,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
             let sequence: XmlSchemaModelGroupPtr =
                 xml_malloc(size_of::<XmlSchemaModelGroup>()) as XmlSchemaModelGroupPtr;
             if sequence.is_null() {
-                xml_schema_type_err_memory(
-                    null_mut(),
-                    c"allocating model group component".as_ptr() as _,
-                );
+                xml_schema_type_err_memory(null_mut(), Some("allocating model group component"));
                 break 'error;
             }
             memset(sequence as _, 0, size_of::<XmlSchemaModelGroup>());
@@ -615,10 +609,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
             /* The wildcard */
             wild = xml_malloc(size_of::<XmlSchemaWildcard>()) as XmlSchemaWildcardPtr;
             if wild.is_null() {
-                xml_schema_type_err_memory(
-                    null_mut(),
-                    c"allocating wildcard component".as_ptr() as _,
-                );
+                xml_schema_type_err_memory(null_mut(), Some("allocating wildcard component"));
                 break 'error;
             }
             memset(wild as _, 0, size_of::<XmlSchemaWildcard>());
@@ -633,7 +624,7 @@ pub unsafe extern "C" fn xml_schema_init_types() -> i32 {
             if wild.is_null() {
                 xml_schema_type_err_memory(
                     null_mut(),
-                    c"could not create an attribute wildcard on anyType".as_ptr() as _,
+                    Some("could not create an attribute wildcard on anyType"),
                 );
                 break 'error;
             }
@@ -3188,7 +3179,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     if cur.is_null() {
                                         xml_schema_type_err_memory(
                                             node,
-                                            c"allocating hexbin data".as_ptr() as _,
+                                            Some("allocating hexbin data"),
                                         );
                                         xml_free(v as _);
                                         break 'return1;
@@ -3334,7 +3325,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     if base.is_null() {
                                         xml_schema_type_err_memory(
                                             node,
-                                            c"allocating base64 data".as_ptr() as _,
+                                            Some("allocating base64 data"),
                                         );
                                         xml_free(v as _);
                                         break 'return1;

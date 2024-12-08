@@ -20,7 +20,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString},
     io::Write,
     mem::size_of,
     os::raw::c_void,
@@ -122,11 +122,7 @@ impl Default for XmlSaveCtxt<'_> {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErr")]
-pub(crate) unsafe extern "C" fn xml_save_err(
-    code: XmlParserErrors,
-    node: XmlNodePtr,
-    extra: *const c_char,
-) {
+pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
     let msg = match code {
         XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n",
         XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n",
@@ -139,13 +135,13 @@ pub(crate) unsafe extern "C" fn xml_save_err(
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErrMemory")]
-pub(crate) unsafe extern "C" fn xml_save_err_memory(extra: *const c_char) {
+pub(crate) unsafe fn xml_save_err_memory(extra: &str) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromOutput,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         None,
-        extra,
+        Some(extra),
     );
 }
 
@@ -234,22 +230,19 @@ unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i3
     if buf.encoder.is_none() && buf.conv.is_none() {
         buf.encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
         if buf.encoder.is_none() {
-            let encoding = CString::new(encoding).unwrap();
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding,
                 null_mut(),
-                encoding.as_ptr(),
+                Some(encoding),
             );
             return -1;
         }
         buf.conv = XmlBufRef::new();
         if buf.conv.is_none() {
-            xml_save_err_memory(c"creating encoding buffer".as_ptr() as _);
+            xml_save_err_memory("creating encoding buffer");
             return -1;
         }
-        /*
-         * initialize the state, e.g. if outputting a BOM
-         */
+        // initialize the state, e.g. if outputting a BOM
         buf.encode(true);
     }
     0
@@ -1683,7 +1676,7 @@ unsafe extern "C" fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
 unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSaveCtxtPtr {
     let ret: XmlSaveCtxtPtr = xml_malloc(size_of::<XmlSaveCtxt>()) as _;
     if ret.is_null() {
-        xml_save_err_memory(c"creating saving context".as_ptr() as _);
+        xml_save_err_memory("creating saving context");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlSaveCtxt>());
@@ -1692,11 +1685,10 @@ unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSave
     if let Some(enc) = encoding {
         (*ret).handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
         if (*ret).handler.is_none() {
-            let encoding = CString::new(enc).unwrap();
             xml_save_err(
                 XmlParserErrors::XmlSaveUnknownEncoding,
                 null_mut(),
-                encoding.as_ptr(),
+                encoding,
             );
             xml_free_save_ctxt(ret);
             return null_mut();
@@ -2020,7 +2012,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
                 xml_buf_add(buf, base, cur.offset_from(base) as _);
             }
             if *cur < 0xC0 {
-                xml_save_err(XmlParserErrors::XmlSaveNotUTF8 as _, attr as _, null_mut());
+                xml_save_err(XmlParserErrors::XmlSaveNotUTF8 as _, attr as _, None);
                 xml_serialize_hex_char_ref(&mut tmp, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);
@@ -2049,11 +2041,7 @@ pub(crate) unsafe extern "C" fn xml_buf_attr_serialize_txt_content(
                 l = 4;
             }
             if l == 1 || !xml_is_char(val as u32) {
-                xml_save_err(
-                    XmlParserErrors::XmlSaveCharInvalid as _,
-                    attr as _,
-                    null_mut(),
-                );
+                xml_save_err(XmlParserErrors::XmlSaveCharInvalid as _, attr as _, None);
                 xml_serialize_hex_char_ref(&mut tmp, *cur as _);
                 xml_buf_add(buf, tmp.as_ptr() as _, -1);
                 cur = cur.add(1);

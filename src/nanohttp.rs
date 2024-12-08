@@ -181,7 +181,7 @@ pub fn xml_nanohttp_scan_proxy(url: &str) {
             __xml_ioerr(
                 XmlErrorDomain::XmlFromHTTP,
                 XmlParserErrors::XmlHTTPUrlSyntax,
-                c"Syntax Error\n".as_ptr() as _,
+                Some("Syntax Error\n"),
             );
         }
         return;
@@ -247,7 +247,7 @@ fn xml_nanohttp_recv(ctxt: &mut XmlNanoHTTPCtxt) -> io::Result<usize> {
                         __xml_ioerr(
                             XmlErrorDomain::XmlFromHTTP,
                             XmlParserErrors::default(),
-                            c"recv failed\n".as_ptr() as _,
+                            Some("recv failed\n"),
                         );
                         return Err(e);
                     },
@@ -482,7 +482,7 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromHTTP,
                     XmlParserErrors::default(),
-                    c"send failed\n".as_ptr() as _,
+                    Some("send failed\n"),
                 );
             }
             if total_sent == 0 {
@@ -504,7 +504,7 @@ fn xml_nanohttp_send(ctxt: &mut XmlNanoHTTPCtxt, mut buf: &[u8]) -> i32 {
                         __xml_ioerr(
                             XmlErrorDomain::XmlFromHTTP,
                             XmlParserErrors::default(),
-                            c"send failed\n".as_ptr() as _,
+                            Some("send failed\n"),
                         );
                         if total_sent == 0 {
                             total_sent = -1;
@@ -687,7 +687,7 @@ pub fn xml_nanohttp_method_redir(
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromHTTP,
                     XmlParserErrors::XmlHTTPUrlSyntax,
-                    c"Not a valid HTTP URI".as_ptr() as _,
+                    Some("Not a valid HTTP URI"),
                 );
                 return Err(io::Error::new(
                     ErrorKind::InvalidInput,
@@ -700,7 +700,7 @@ pub fn xml_nanohttp_method_redir(
                 __xml_ioerr(
                     XmlErrorDomain::XmlFromHTTP,
                     XmlParserErrors::XmlHTTPUnknownHost,
-                    c"Failed to identify host in URI".as_ptr() as _,
+                    Some("Failed to identify host in URI"),
                 );
             }
             return Err(io::Error::new(

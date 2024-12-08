@@ -20,7 +20,6 @@
 
 use std::{
     cell::RefCell,
-    ffi::CString,
     io::Write,
     ptr::{null, null_mut},
     rc::Rc,
@@ -88,11 +87,10 @@ impl XmlDoc {
         );
         let conv_hdlr = if let Some(encoding) = encoding.as_deref() {
             let Some(handler) = find_encoding_handler(encoding) else {
-                let enc = CString::new(encoding).unwrap();
                 xml_save_err(
                     XmlParserErrors::XmlSaveUnknownEncoding,
                     self as *mut XmlDoc as XmlNodePtr,
-                    enc.as_ptr(),
+                    Some(encoding),
                 );
                 return;
             };
@@ -103,7 +101,7 @@ impl XmlDoc {
 
         let Some(out_buff) = XmlOutputBuffer::new(conv_hdlr).map(|buf| Rc::new(RefCell::new(buf)))
         else {
-            xml_save_err_memory(c"creating buffer".as_ptr() as _);
+            xml_save_err_memory("creating buffer");
             return;
         };
 
@@ -138,7 +136,7 @@ impl XmlDoc {
 
         if (*doc_txt_ptr).is_null() && *doc_txt_len > 0 {
             *doc_txt_len = 0;
-            xml_save_err_memory(c"creating output".as_ptr() as _);
+            xml_save_err_memory("creating output");
         }
     }
 

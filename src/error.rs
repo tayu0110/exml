@@ -15,9 +15,9 @@
 
 use std::{
     borrow::Cow,
-    ffi::{c_void, CStr},
+    ffi::{c_void, CStr, CString},
     io::{stderr, Stderr, Stdout, Write},
-    ptr::{null_mut, NonNull},
+    ptr::{null, null_mut, NonNull},
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -1675,10 +1675,10 @@ pub(crate) unsafe fn __xml_simple_error(
     code: XmlParserErrors,
     node: XmlNodePtr,
     msg: Option<&str>,
-    extra: *const i8,
+    extra: Option<&str>,
 ) {
     if code == XmlParserErrors::XmlErrNoMemory {
-        if !extra.is_null() {
+        if let Some(extra) = extra {
             __xml_raise_error!(
                 None,
                 None,
@@ -1690,13 +1690,12 @@ pub(crate) unsafe fn __xml_simple_error(
                 XmlErrorLevel::XmlErrFatal,
                 None,
                 0,
-                Some(CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+                Some(extra.to_owned().into()),
                 None,
                 None,
                 0,
                 0,
-                Some("Memory allocation failed : %s\n"),
-                extra
+                Some(format!("Memory allocation failed : {extra}\n").as_str()),
             );
         } else {
             __xml_raise_error!(
@@ -1719,6 +1718,7 @@ pub(crate) unsafe fn __xml_simple_error(
             );
         }
     } else {
+        let e = extra.map(|e| CString::new(e).unwrap());
         __xml_raise_error!(
             None,
             None,
@@ -1730,13 +1730,13 @@ pub(crate) unsafe fn __xml_simple_error(
             XmlErrorLevel::XmlErrError,
             None,
             0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+            extra.map(|e| e.to_owned().into()),
             None,
             None,
             0,
             0,
             msg as _,
-            extra
+            e.as_ref().map_or(null(), |e| e.as_ptr() as *const u8)
         );
     }
 }

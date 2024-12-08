@@ -18,7 +18,6 @@
 use std::{
     any::{type_name, type_name_of_val},
     io::{self, Cursor, Read},
-    ptr::null,
     str::from_utf8_mut,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -259,13 +258,11 @@ impl XmlParserInputBuffer {
             self.raw
         };
 
-        /*
-         * Call the read method for this I/O type.
-         */
+        // Call the read method for this I/O type.
         if let Some(context) = self.context.as_mut() {
             if buf.map_or(true, |mut buf| buf.grow((len + 1) as usize).is_err()) {
                 unsafe {
-                    xml_ioerr_memory(c"growing input buffer".as_ptr() as _);
+                    xml_ioerr_memory("growing input buffer");
                 }
                 self.error = XmlParserErrors::XmlErrNoMemory;
                 return -1;
@@ -279,21 +276,17 @@ impl XmlParserInputBuffer {
             res = len as i32;
         }
 
-        /*
-         * try to establish compressed status of input if not done already
-         */
+        // try to establish compressed status of input if not done already
         if self.compressed == -1 {
             // TODO: related with LIBXML_LZMA_ENABLED
         }
 
         if self.encoder.is_some() {
-            /*
-             * convert as much as possible to the parser reading buffer.
-             */
+            // convert as much as possible to the parser reading buffer.
             let using = buf.map_or(0, |buf| buf.len());
             let Ok(written) = self.decode(true) else {
                 unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                    xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                 }
                 self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;
@@ -316,9 +309,7 @@ impl XmlParserInputBuffer {
             return -1;
         }
         if self.encoder.is_some() {
-            /*
-             * Store the data in the incoming raw buffer
-             */
+            // Store the data in the incoming raw buffer
             if self.raw.is_none() {
                 self.raw = XmlBufRef::new();
             }
@@ -329,13 +320,11 @@ impl XmlParserInputBuffer {
                 return -1;
             }
 
-            /*
-             * convert as much as possible to the parser reading buffer.
-             */
+            // convert as much as possible to the parser reading buffer.
             let using = self.raw.map_or(0, |raw| raw.len());
             let Ok(written) = self.decode(true) else {
                 unsafe {
-                    xml_ioerr(XmlParserErrors::XmlIOEncoder, null());
+                    xml_ioerr(XmlParserErrors::XmlIOEncoder, None);
                 }
                 self.error = XmlParserErrors::XmlIOEncoder;
                 return -1;

@@ -849,13 +849,13 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32)
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErrMemory")]
-unsafe extern "C" fn xml_tree_err_memory(extra: *const c_char) {
+unsafe fn xml_tree_err_memory(extra: &str) {
     __xml_simple_error(
         XmlErrorDomain::XmlFromTree,
         XmlParserErrors::XmlErrNoMemory,
         null_mut(),
         None,
-        extra,
+        Some(extra),
     );
 }
 
@@ -887,7 +887,7 @@ pub unsafe extern "C" fn xml_build_qname(
     if memory.is_null() || len < lenn + lenp + 2 {
         ret = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
         if ret.is_null() {
-            xml_tree_err_memory(c"building QName".as_ptr() as _);
+            xml_tree_err_memory("building QName");
             return null_mut();
         }
     } else {
@@ -947,12 +947,12 @@ pub unsafe extern "C" fn xml_split_qname2(
 
     *prefix = xml_strndup(name, len) as _;
     if (*prefix).is_null() {
-        xml_tree_err_memory(c"QName split".as_ptr() as _);
+        xml_tree_err_memory("QName split");
         return null_mut();
     }
     let ret: *mut XmlChar = xml_strdup(name.add(len as usize + 1) as _) as _;
     if ret.is_null() {
-        xml_tree_err_memory(c"QName split".as_ptr() as _);
+        xml_tree_err_memory("QName split");
         if !(*prefix).is_null() {
             xml_free(*prefix as _);
             *prefix = null_mut();
@@ -1200,7 +1200,7 @@ unsafe fn xml_new_prop_internal(
         {
             xml_free(name as _);
         }
-        xml_tree_err_memory(c"building attribute".as_ptr() as _);
+        xml_tree_err_memory("building attribute");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlAttr>());
@@ -1442,7 +1442,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     // Allocate a new node and fill the fields.
     let ret: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if ret.is_null() {
-        xml_tree_err_memory(c"copying node".as_ptr() as _);
+        xml_tree_err_memory("copying node");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlNode>());
@@ -2113,7 +2113,7 @@ pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> Xml
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building node".as_ptr() as _);
+        xml_tree_err_memory("building node");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2148,7 +2148,7 @@ pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar)
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building node".as_ptr() as _);
+        xml_tree_err_memory("building node");
         /* we can't check here that name comes from the doc dictionary */
         return null_mut();
     }
@@ -2267,7 +2267,7 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building text".as_ptr() as _);
+        xml_tree_err_memory("building text");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2298,12 +2298,10 @@ pub unsafe extern "C" fn xml_new_doc_pi(
         return null_mut();
     }
 
-    /*
-     * Allocate a new node and fill the fields.
-     */
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building PI".as_ptr() as _);
+        xml_tree_err_memory("building PI");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2364,7 +2362,7 @@ pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> 
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building text".as_ptr() as _);
+        xml_tree_err_memory("building text");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2408,7 +2406,7 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building comment".as_ptr() as _);
+        xml_tree_err_memory("building comment");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2440,7 +2438,7 @@ pub unsafe extern "C" fn xml_new_cdata_block(
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building CDATA".as_ptr() as _);
+        xml_tree_err_memory("building CDATA");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2472,7 +2470,7 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building character reference".as_ptr() as _);
+        xml_tree_err_memory("building character reference");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2515,7 +2513,7 @@ pub unsafe extern "C" fn xml_new_reference(
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building reference".as_ptr() as _);
+        xml_tree_err_memory("building reference");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -2705,7 +2703,7 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
      */
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building fragment".as_ptr() as _);
+        xml_tree_err_memory("building fragment");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNode>());
@@ -3136,7 +3134,7 @@ static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErr")]
-unsafe extern "C" fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: *const c_char) {
+unsafe fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
     let msg = match code {
         XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n",
         XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n",
@@ -3195,7 +3193,7 @@ pub fn set_compress_mode(mode: i32) {
 pub unsafe extern "C" fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
     let ret: XmlDOMWrapCtxtPtr = xml_malloc(size_of::<XmlDOMWrapCtxt>()) as _;
     if ret.is_null() {
-        xml_tree_err_memory(c"allocating DOM-wrapper context".as_ptr() as _);
+        xml_tree_err_memory("allocating DOM-wrapper context");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlDOMWrapCtxt>());
@@ -3357,7 +3355,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
         	*/
         map = xml_malloc(size_of::<XmlNsMap>()) as _;
         if map.is_null() {
-            xml_tree_err_memory(c"allocating namespace map".as_ptr() as _);
+            xml_tree_err_memory("allocating namespace map");
             return null_mut();
         }
         memset(map as _, 0, size_of::<XmlNsMap>());
@@ -3377,7 +3375,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
         	*/
         ret = xml_malloc(size_of::<XmlNsMapItem>()) as _;
         if ret.is_null() {
-            xml_tree_err_memory(c"allocating namespace map item".as_ptr() as _);
+            xml_tree_err_memory("allocating namespace map item");
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlNsMapItem>());
@@ -3491,7 +3489,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_add_ns_map_item2(
     if !(*list).is_null() {
         *list = xml_malloc(6 * size_of::<XmlNsPtr>()) as _;
         if !(*list).is_null() {
-            xml_tree_err_memory(c"alloc ns map item".as_ptr() as _);
+            xml_tree_err_memory("alloc ns map item");
             return -1;
         }
         *size = 3;
@@ -3500,7 +3498,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_add_ns_map_item2(
         *size *= 2;
         *list = xml_realloc(*list as _, (*size) as usize * 2 * size_of::<XmlNsPtr>()) as _;
         if !(*list).is_null() {
-            xml_tree_err_memory(c"realloc ns map item".as_ptr() as _);
+            xml_tree_err_memory("realloc ns map item");
             return -1;
         }
     }
@@ -5456,9 +5454,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         // Nodes of xmlNode structure.
                         clone = xml_malloc(size_of::<XmlNode>()) as _;
                         if clone.is_null() {
-                            xml_tree_err_memory(
-                                c"xmlDOMWrapCloneNode(): allocating a node".as_ptr() as _,
-                            );
+                            xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating a node");
                             break 'internal_error;
                         }
                         memset(clone as _, 0, size_of::<XmlNode>());
@@ -5480,9 +5476,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         // Use xmlRealloc to avoid -Warray-bounds warning
                         clone = xml_realloc(null_mut(), size_of::<XmlAttr>()) as _;
                         if clone.is_null() {
-                            xml_tree_err_memory(
-                                c"xmlDOMWrapCloneNode(): allocating an attr-node".as_ptr() as _,
-                            );
+                            xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating an attr-node");
                             break 'internal_error;
                         }
                         memset(clone as _, 0, size_of::<XmlAttr>());
@@ -5555,8 +5549,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 clone_ns = xml_malloc(size_of::<XmlNs>()) as _;
                                 if clone_ns.is_null() {
                                     xml_tree_err_memory(
-                                        c"xmlDOMWrapCloneNode(): allocating namespace".as_ptr()
-                                            as _,
+                                        "xmlDOMWrapCloneNode(): allocating namespace",
                                     );
                                     return -1;
                                 }

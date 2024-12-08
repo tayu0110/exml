@@ -244,7 +244,7 @@ pub unsafe fn xml_create_int_subset(
      */
     let cur: XmlDtdPtr = xml_malloc(size_of::<XmlDtd>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building internal subset".as_ptr() as _);
+        xml_tree_err_memory("building internal subset");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDtd>());
@@ -254,7 +254,7 @@ pub unsafe fn xml_create_int_subset(
     if !name.is_null() {
         (*cur).name = xml_strdup(name);
         if (*cur).name.is_null() {
-            xml_tree_err_memory(c"building internal subset".as_ptr() as _);
+            xml_tree_err_memory("building internal subset");
             xml_free(cur as _);
             return null_mut();
         }
@@ -323,12 +323,10 @@ pub unsafe fn xml_new_dtd(
         return null_mut();
     }
 
-    /*
-     * Allocate a new DTD and fill the fields.
-     */
+    // Allocate a new DTD and fill the fields.
     let cur: XmlDtdPtr = xml_malloc(size_of::<XmlDtd>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building DTD".as_ptr() as _);
+        xml_tree_err_memory("building DTD");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDtd>());

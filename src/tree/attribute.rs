@@ -153,12 +153,10 @@ pub unsafe extern "C" fn xml_new_doc_prop(
         return null_mut();
     }
 
-    /*
-     * Allocate a new property and fill the fields.
-     */
+    // Allocate a new property and fill the fields.
     let cur: XmlAttrPtr = xml_malloc(size_of::<XmlAttr>()) as _;
     if cur.is_null() {
-        xml_tree_err_memory(c"building attribute".as_ptr() as _);
+        xml_tree_err_memory("building attribute");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlAttr>());

@@ -2759,7 +2759,7 @@ impl XmlNode {
                 // In this case exceptionally create it on the node element.
                 cur = xml_malloc(size_of::<XmlNs>()) as _;
                 if cur.is_null() {
-                    xml_tree_err_memory(c"searching namespace".as_ptr() as _);
+                    xml_tree_err_memory("searching namespace");
                     return null_mut();
                 }
                 memset(cur as _, 0, size_of::<XmlNs>());
@@ -2856,7 +2856,7 @@ impl XmlNode {
                 // In this case exceptionally create it on the node element.
                 cur = xml_malloc(size_of::<XmlNs>()) as _;
                 if cur.is_null() {
-                    xml_tree_err_memory(c"searching namespace".as_ptr() as _);
+                    xml_tree_err_memory("searching namespace");
                     return null_mut();
                 }
                 memset(cur as _, 0, size_of::<XmlNs>());
@@ -2965,12 +2965,12 @@ impl XmlNode {
                     size_cache = 10;
                     old_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
                     if old_ns.is_null() {
-                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                        xml_tree_err_memory("fixing namespaces");
                         return -1;
                     }
                     new_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
                     if new_ns.is_null() {
-                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                        xml_tree_err_memory("fixing namespaces");
                         xml_free(old_ns as _);
                         return -1;
                     }
@@ -2996,7 +2996,7 @@ impl XmlNode {
                                 size_cache as usize * size_of::<XmlNsPtr>(),
                             ) as _;
                             if old_ns.is_null() {
-                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_tree_err_memory("fixing namespaces");
                                 xml_free(new_ns as _);
                                 return -1;
                             }
@@ -3005,7 +3005,7 @@ impl XmlNode {
                                 size_cache as usize * size_of::<XmlNsPtr>(),
                             ) as _;
                             if new_ns.is_null() {
-                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_tree_err_memory("fixing namespaces");
                                 xml_free(old_ns as _);
                                 return -1;
                             }
@@ -3027,12 +3027,12 @@ impl XmlNode {
                             size_cache = 10;
                             old_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
                             if old_ns.is_null() {
-                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_tree_err_memory("fixing namespaces");
                                 return -1;
                             }
                             new_ns = xml_malloc(size_cache as usize * size_of::<XmlNsPtr>()) as _;
                             if new_ns.is_null() {
-                                xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                xml_tree_err_memory("fixing namespaces");
                                 xml_free(old_ns as _);
                                 return -1;
                             }
@@ -3058,7 +3058,7 @@ impl XmlNode {
                                         size_cache as usize * size_of::<XmlNsPtr>(),
                                     ) as _;
                                     if old_ns.is_null() {
-                                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                        xml_tree_err_memory("fixing namespaces");
                                         xml_free(new_ns as _);
                                         return -1;
                                     }
@@ -3067,7 +3067,7 @@ impl XmlNode {
                                         size_cache as usize * size_of::<XmlNsPtr>(),
                                     ) as _;
                                     if new_ns.is_null() {
-                                        xml_tree_err_memory(c"fixing namespaces".as_ptr() as _);
+                                        xml_tree_err_memory("fixing namespaces");
                                         xml_free(old_ns as _);
                                         return -1;
                                     }
