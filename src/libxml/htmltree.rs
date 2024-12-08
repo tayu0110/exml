@@ -709,15 +709,9 @@ pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr)
 #[doc(alias = "htmlSaveErrMemory")]
 #[cfg(feature = "libxml_output")]
 unsafe fn html_save_err_memory(extra: &str) {
-    use crate::error::{XmlErrorDomain, __xml_simple_error};
+    use crate::error::{XmlErrorDomain, __xml_simple_oom_error};
 
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromOutput,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, null_mut(), Some(extra));
 }
 
 /// Dump an HTML node, recursive behaviour,children are printed too.

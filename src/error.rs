@@ -1670,55 +1670,12 @@ macro_rules! __xml_raise_error {
 /// Handle an out of memory condition
 #[doc(alias = "__xmlSimpleError")]
 #[doc(hidden)]
-pub(crate) unsafe fn __xml_simple_error(
+pub(crate) unsafe fn __xml_simple_oom_error(
     domain: XmlErrorDomain,
-    code: XmlParserErrors,
     node: XmlNodePtr,
     msg: Option<&str>,
-    extra: Option<&str>,
 ) {
-    if code == XmlParserErrors::XmlErrNoMemory {
-        if let Some(extra) = extra {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                node as _,
-                domain,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                Some(extra.to_owned().into()),
-                None,
-                None,
-                0,
-                0,
-                Some(format!("Memory allocation failed : {extra}\n").as_str()),
-            );
-        } else {
-            __xml_raise_error!(
-                None,
-                None,
-                None,
-                null_mut(),
-                node as _,
-                domain,
-                XmlParserErrors::XmlErrNoMemory,
-                XmlErrorLevel::XmlErrFatal,
-                None,
-                0,
-                None,
-                None,
-                None,
-                0,
-                0,
-                Some("Memory allocation failed\n"),
-            );
-        }
-    } else {
-        let e = extra.map(|e| CString::new(e).unwrap());
+    if let Some(msg) = msg {
         __xml_raise_error!(
             None,
             None,
@@ -1726,17 +1683,72 @@ pub(crate) unsafe fn __xml_simple_error(
             null_mut(),
             node as _,
             domain,
-            code,
-            XmlErrorLevel::XmlErrError,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
             None,
             0,
-            extra.map(|e| e.to_owned().into()),
+            Some(msg.to_owned().into()),
             None,
             None,
             0,
             0,
-            msg as _,
-            e.as_ref().map_or(null(), |e| e.as_ptr() as *const u8)
+            Some(format!("Memory allocation failed : {msg}\n").as_str()),
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            node as _,
+            domain,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            Some("Memory allocation failed\n"),
         );
     }
+}
+
+/// Handle an out of memory condition
+#[doc(alias = "__xmlSimpleError")]
+#[doc(hidden)]
+pub(crate) unsafe fn __xml_simple_error(
+    domain: XmlErrorDomain,
+    code: XmlParserErrors,
+    node: XmlNodePtr,
+    msg: Option<&str>,
+    extra: Option<&str>,
+) {
+    assert_ne!(
+        code,
+        XmlParserErrors::XmlErrNoMemory,
+        "Use __xml_simple_oom_error"
+    );
+    let e = extra.map(|e| CString::new(e).unwrap());
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        node as _,
+        domain,
+        code,
+        XmlErrorLevel::XmlErrError,
+        None,
+        0,
+        extra.map(|e| e.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        msg as _,
+        e.as_ref().map_or(null(), |e| e.as_ptr() as *const u8)
+    );
 }

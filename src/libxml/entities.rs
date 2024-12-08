@@ -38,7 +38,7 @@ use crate::{
     buf::libxml_api::{
         xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,
     },
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     hash::XmlHashTableRef,
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
@@ -185,13 +185,7 @@ pub type XmlEntitiesTablePtr = *mut XmlEntitiesTable;
 /// Handle an out of memory condition
 #[doc(alias = "xmlEntitiesErrMemory")]
 unsafe fn xml_entities_err_memory(extra: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromTree,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, null_mut(), Some(extra));
 }
 
 /// internal routine doing the entity node structures allocations

@@ -37,7 +37,9 @@ use libc::{memcpy, memset, snprintf, strchr};
 use crate::{
     __xml_raise_error,
     encoding::XmlCharEncoding,
-    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error},
+    error::{
+        XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error,
+    },
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     io::XmlParserInputBuffer,
@@ -4208,13 +4210,7 @@ unsafe fn xml_schema_perr_memory(ctxt: XmlSchemaParserCtxtPtr, extra: &str, node
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
     }
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromSchemasp,
-        XmlParserErrors::XmlErrNoMemory,
-        node,
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
 }
 
 unsafe extern "C" fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
@@ -15603,13 +15599,7 @@ unsafe extern "C" fn xml_schema_model_group_to_model_group_def_fixup(
 }
 
 unsafe fn xml_schema_psimple_err(msg: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromSchemasp,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(msg),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, null_mut(), Some(msg));
 }
 
 unsafe extern "C" fn xml_schema_item_list_remove(list: XmlSchemaItemListPtr, idx: i32) -> i32 {
@@ -23663,13 +23653,7 @@ unsafe fn xml_schema_verr_memory(ctxt: XmlSchemaValidCtxtPtr, extra: &str, node:
         (*ctxt).nberrors += 1;
         (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
     }
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromSchemasv,
-        XmlParserErrors::XmlErrNoMemory,
-        node,
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
 }
 
 /// Create an XML Schemas validation context based on the given schema.

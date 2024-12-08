@@ -35,7 +35,7 @@ use libc::memset;
 use crate::{
     buf::{libxml_api::xml_buf_set_allocation_scheme, XmlBufRef},
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::XmlOutputBuffer,
     libxml::{
@@ -136,13 +136,7 @@ pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: XmlNodePtr, extra
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErrMemory")]
 pub(crate) unsafe fn xml_save_err_memory(extra: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromOutput,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromOutput, null_mut(), Some(extra));
 }
 
 /// # Panics

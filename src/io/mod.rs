@@ -46,7 +46,9 @@ use url::Url;
 use crate::{
     __xml_raise_error,
     encoding::find_encoding_handler,
-    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error},
+    error::{
+        XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error,
+    },
     globals::{GenericError, StructuredError},
     libxml::{
         catalog::{
@@ -73,13 +75,7 @@ pub use output::*;
 ///  Handle an out of memory condition
 #[doc(alias = "xmlIOErrMemory")]
 pub(crate) unsafe fn xml_ioerr_memory(extra: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromIO,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromIO, null_mut(), Some(extra));
 }
 
 const IOERR: &[&str] = &[

@@ -34,7 +34,7 @@ use libc::{
 };
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     io::__xml_ioerr,
     libxml::{
         globals::{xml_free, xml_malloc, xml_mem_strdup},
@@ -172,13 +172,7 @@ pub unsafe extern "C" fn xml_nanoftp_cleanup() {
 /// Handle an out of memory condition
 #[doc(alias = "xmlFTPErrMemory")]
 unsafe fn xml_ftp_err_memory(extra: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromFTP,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromFTP, null_mut(), Some(extra));
 }
 
 /// (Re)Initialize an FTP context by parsing the URL and finding

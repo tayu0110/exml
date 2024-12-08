@@ -30,7 +30,7 @@ use std::{
 use libc::{memcpy, memmove, memset, snprintf, sscanf};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
@@ -423,13 +423,7 @@ unsafe extern "C" fn xml_schema_cleanup_types_internal() {
 /// Handle an out of memory condition
 #[doc(alias = "xmlSchemaTypeErrMemory")]
 unsafe fn xml_schema_type_err_memory(node: XmlNodePtr, extra: Option<&str>) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromDatatype,
-        XmlParserErrors::XmlErrNoMemory,
-        node,
-        None,
-        extra,
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromDatatype, node, extra);
 }
 
 /// Allocate a new simple type value

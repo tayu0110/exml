@@ -46,7 +46,7 @@ use libc::{memcpy, memset, snprintf, strlen};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     libxml::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDictPtr},
@@ -57,10 +57,10 @@ use crate::{
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::{
-            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_notation_table,
-            xml_is_id, XmlElementTablePtr, XmlNotationTablePtr,
+            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_id_table,
+            xml_free_notation_table, xml_free_ref_table, xml_is_id, xml_remove_id,
+            XmlElementTablePtr, XmlNotationTablePtr,
         },
-        valid::{xml_free_id_table, xml_free_ref_table, xml_remove_id},
         xmlstring::{
             xml_str_equal, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new, xml_strndup,
             XmlChar,
@@ -850,13 +850,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32)
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErrMemory")]
 unsafe fn xml_tree_err_memory(extra: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromTree,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromTree, null_mut(), Some(extra));
 }
 
 /// Builds the QName @prefix:@ncname in @memory if there is enough space

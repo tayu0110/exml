@@ -31,7 +31,7 @@ use libc::{malloc, memset, snprintf, sprintf, FILE};
 use crate::{
     __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
@@ -242,13 +242,7 @@ unsafe fn xml_schematron_perr_memory(
     if !ctxt.is_null() {
         (*ctxt).nberrors += 1;
     }
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromSchemasp,
-        XmlParserErrors::XmlErrNoMemory,
-        node,
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
 }
 
 /// Create an XML Schematrons parse context for that file/resource expected
@@ -1376,13 +1370,7 @@ unsafe fn xml_schematron_verr_memory(
         (*ctxt).nberrors += 1;
         (*ctxt).err = XmlParserErrors::XmlSchemavInternal as i32;
     }
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromSchemasv,
-        XmlParserErrors::XmlErrNoMemory,
-        node,
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasv, node, Some(extra));
 }
 
 /// Create an XML Schematrons validation context based on the given schema.

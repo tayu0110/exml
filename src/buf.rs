@@ -23,20 +23,14 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     globals::GLOBAL_STATE,
     libxml::parser_internals::XML_MAX_TEXT_LENGTH,
     tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},
 };
 
 unsafe fn xml_buf_memory_error(buf: &mut XmlBuf, extra: &str) {
-    __xml_simple_error(
-        XmlErrorDomain::XmlFromBuffer,
-        XmlParserErrors::XmlErrNoMemory,
-        null_mut(),
-        None,
-        Some(extra),
-    );
+    __xml_simple_oom_error(XmlErrorDomain::XmlFromBuffer, null_mut(), Some(extra));
     if buf.error.is_ok() {
         buf.error = XmlParserErrors::XmlErrNoMemory;
     }
