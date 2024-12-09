@@ -160,6 +160,48 @@ use super::{
     },
 };
 
+/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[macro_export]
+#[doc(hidden)]
+#[doc(alias = "xmlFatalErrMsgInt")]
+macro_rules! xml_fatal_err_msg_int {
+    ($ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                None,
+                None,
+                $val,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
+        }
+    };
+}
+
 /// The default version of XML used: 1.0
 pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
 
@@ -1139,11 +1181,11 @@ impl XmlParserCtxt {
         if self.node_tab.len() as u32 > XML_PARSER_MAX_DEPTH
             && self.options & XmlParserOption::XmlParseHuge as i32 == 0
         {
-            xml_fatal_err_msg_int(
+            xml_fatal_err_msg_int!(
                 self,
                 XmlParserErrors::XmlErrInternalError,
-                "Excessive depth in document: %d use XML_PARSE_HUGE option\n",
-                XML_PARSER_MAX_DEPTH as i32,
+                format!("Excessive depth in document: {XML_PARSER_MAX_DEPTH} use XML_PARSE_HUGE option\n").as_str(),
+                XML_PARSER_MAX_DEPTH as i32
             );
             self.halt();
             return -1;
@@ -2147,50 +2189,6 @@ macro_rules! xml_fatal_err_msg_str {
             }
         }
     };
-}
-
-/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
-#[doc(alias = "xmlFatalErrMsgInt")]
-pub(crate) unsafe fn xml_fatal_err_msg_int(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    val: i32,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        None,
-        None,
-        None,
-        val,
-        0,
-        msg,
-        val
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
-        }
-    }
 }
 
 /// Handle a warning.
@@ -6034,20 +6032,20 @@ unsafe extern "C" fn xml_parse_string_char_ref(
      * production for Char.
      */
     if val >= 0x110000 {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
             "xmlParseStringCharRef: character reference out of bounds\n",
-            val,
+            val
         );
     } else if xml_is_char(val as u32) {
         return val;
     } else {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "xmlParseStringCharRef: invalid xmlChar value %d\n",
-            val,
+            format!("xmlParseStringCharRef: invalid xmlChar value {val}\n").as_str(),
+            val
         );
     }
     0
@@ -6615,11 +6613,11 @@ unsafe extern "C" fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: Xml
             .saturating_add((*(*ctxt).input).consumed);
         xml_pop_input(ctxt);
     } else if !xml_is_char(c as u32) {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "xmlLoadEntityContent: invalid char value %d\n",
-            c as i32,
+            format!("xmlLoadEntityContent: invalid char value {}\n", c as i32).as_str(),
+            c as i32
         );
         xml_buf_free(buf);
         return -1;
@@ -8772,32 +8770,34 @@ unsafe extern "C" fn xml_parse_char_data_complex(ctxt: XmlParserCtxtPtr, partial
             }
         }
     }
-    /*
-     * cur == 0 can mean
-     *
-     * - xmlParserInputState::XmlParserEOF or memory error. This is checked above.
-     * - An actual 0 character.
-     * - End of buffer.
-     * - An incomplete UTF-8 sequence. This is allowed if partial is set.
-     */
+    // cur == 0 can mean
+    //
+    // - xmlParserInputState::XmlParserEOF or memory error. This is checked above.
+    // - An actual 0 character.
+    // - End of buffer.
+    // - An incomplete UTF-8 sequence. This is allowed if partial is set.
     if (*(*ctxt).input).cur < (*(*ctxt).input).end {
         if cur == '\0' && (*ctxt).current_byte() != 0 {
             if partial == 0 {
-                xml_fatal_err_msg_int(
+                xml_fatal_err_msg_int!(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    "Incomplete UTF-8 sequence starting with %02X\n",
-                    (*ctxt).current_byte() as _,
+                    format!(
+                        "Incomplete UTF-8 sequence starting with {:02X}\n",
+                        (*ctxt).current_byte()
+                    )
+                    .as_str(),
+                    (*ctxt).current_byte() as i32
                 );
                 (*ctxt).advance_with_line_handling(1);
             }
         } else if cur != '<' && cur != '&' {
             /* Generate the error and skip the offending character */
-            xml_fatal_err_msg_int(
+            xml_fatal_err_msg_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "PCDATA invalid Char value %d\n",
-                cur as _,
+                format!("PCDATA invalid Char value {}\n", cur as i32).as_str(),
+                cur as i32
             );
             (*ctxt).advance_with_line_handling(l as usize);
         }
@@ -11985,7 +11985,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
 
     if (depth > 128 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0) || depth > 2048
     {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrElemcontentNotFinished,
             "xmlParseElementChildrenContentDecl : depth %d too deep, use xmlParserOption::XML_PARSE_HUGE\n",
@@ -12051,15 +12051,17 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
             if typ == 0 {
                 typ = (*ctxt).current_byte();
             }
-            /*
-             * Detect "Name | Name , Name" error
-             */
+            // Detect "Name | Name , Name" error
             else if typ != (*ctxt).current_byte() {
-                xml_fatal_err_msg_int(
+                xml_fatal_err_msg_int!(
                     ctxt,
                     XmlParserErrors::XmlErrSeparatorRequired,
-                    "xmlParseElementChildrenContentDecl : '%c' expected\n",
-                    typ as _,
+                    format!(
+                        "xmlParseElementChildrenContentDecl : '{}' expected\n",
+                        typ as char
+                    )
+                    .as_str(),
+                    typ as i32
                 );
                 if !last.is_null() && last != ret {
                     xml_free_doc_element_content((*ctxt).my_doc, last);
@@ -12108,11 +12110,15 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
             }
             // Detect "Name , Name | Name" error
             else if typ != (*ctxt).current_byte() {
-                xml_fatal_err_msg_int(
+                xml_fatal_err_msg_int!(
                     ctxt,
                     XmlParserErrors::XmlErrSeparatorRequired,
-                    "xmlParseElementChildrenContentDecl : '%c' expected\n",
-                    typ as _,
+                    format!(
+                        "xmlParseElementChildrenContentDecl : '{}' expected\n",
+                        typ as char
+                    )
+                    .as_str(),
+                    typ as i32
                 );
                 if !last.is_null() && last != ret {
                     xml_free_doc_element_content((*ctxt).my_doc, last);
@@ -12641,20 +12647,20 @@ pub(crate) unsafe extern "C" fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> i3
     // Characters referred to using character references must match the
     // production for Char.
     if val >= 0x110000 {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
             "xmlParseCharRef: character reference out of bounds\n",
-            val,
+            val
         );
     } else if xml_is_char(val as u32) {
         return val;
     } else {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "xmlParseCharRef: invalid XmlChar value %d\n",
-            val,
+            format!("xmlParseCharRef: invalid XmlChar value {val}\n").as_str(),
+            val
         );
     }
     0

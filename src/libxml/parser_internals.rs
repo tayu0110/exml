@@ -36,7 +36,7 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 use crate::error::XmlParserErrors;
 use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
-use crate::{__xml_loader_err, xml_fatal_err_msg_str};
+use crate::{__xml_loader_err, xml_fatal_err_msg_int, xml_fatal_err_msg_str};
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -59,11 +59,10 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int,
-            xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
-            xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
-            xml_parse_att_value_internal, xml_parse_cdsect, xml_parse_char_data_internal,
-            xml_parse_char_ref, xml_parse_conditional_sections,
+            xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_str_int_str,
+            xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
+            xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal, xml_parse_cdsect,
+            xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_conditional_sections,
             xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
             xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_external_id,
             xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
@@ -1766,11 +1765,15 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_value(
                 xml_free(name as _);
             }
             if name_ok == 0 || *cur != b';' {
-                xml_fatal_err_msg_int(
+                xml_fatal_err_msg_int!(
                     ctxt,
                     XmlParserErrors::XmlErrEntityCharError,
-                    "EntityValue: '%c' forbidden except for entities references\n",
-                    tmp as _,
+                    format!(
+                        "EntityValue: '{}' forbidden except for entities references\n",
+                        tmp as char
+                    )
+                    .as_str(),
+                    tmp as i32
                 );
                 //  goto error;
                 if !buf.is_null() {
@@ -1981,11 +1984,11 @@ unsafe extern "C" fn xml_parse_comment_complex(
             break 'not_terminated;
         }
         if !xml_is_char(q as u32) {
-            xml_fatal_err_msg_int(
+            xml_fatal_err_msg_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "xmlParseComment: invalid xmlChar value %d\n",
-                q as _,
+                format!("xmlParseComment: invalid xmlChar value {}\n", q as i32).as_str(),
+                q as i32
             );
             xml_free(buf as _);
             return;
@@ -1996,11 +1999,11 @@ unsafe extern "C" fn xml_parse_comment_complex(
             break 'not_terminated;
         }
         if !xml_is_char(r as u32) {
-            xml_fatal_err_msg_int(
+            xml_fatal_err_msg_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "xmlParseComment: invalid xmlChar value %d\n",
-                r as _,
+                format!("xmlParseComment: invalid xmlChar value {}\n", r as i32).as_str(),
+                r as i32
             );
             xml_free(buf as _);
             return;
@@ -2058,11 +2061,11 @@ unsafe extern "C" fn xml_parse_comment_complex(
                 buf
             );
         } else if !xml_is_char(cur as u32) {
-            xml_fatal_err_msg_int(
+            xml_fatal_err_msg_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "xmlParseComment: invalid xmlChar value %d\n",
-                cur as _,
+                format!("xmlParseComment: invalid xmlChar value {}\n", cur as i32).as_str(),
+                cur as i32
             );
         } else {
             if inputid != (*(*ctxt).input).id {
@@ -4945,11 +4948,11 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     if (*ctxt).name_tab.len() as u32 > XML_PARSER_MAX_DEPTH
         && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
     {
-        xml_fatal_err_msg_int(
+        xml_fatal_err_msg_int!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            "Excessive depth in document: %d use xmlParserOption::XML_PARSE_HUGE option\n",
-            XML_PARSER_MAX_DEPTH as _,
+            format!("Excessive depth in document: {XML_PARSER_MAX_DEPTH} use xmlParserOption::XML_PARSE_HUGE option\n").as_str(),
+            XML_PARSER_MAX_DEPTH as i32
         );
         (*ctxt).halt();
         return -1;
