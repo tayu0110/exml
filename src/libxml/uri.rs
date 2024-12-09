@@ -67,47 +67,26 @@ pub struct XmlURI {
 const PORT_EMPTY: i32 = 0;
 const PORT_EMPTY_SERVER: i32 = -1;
 
-unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
-    if !extra.is_null() {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromURI,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : %s\n",
-            extra
-        );
-    } else {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromURI,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed\n",
-        );
-    }
+unsafe fn xml_uri_err_memory(extra: &str) {
+    __xml_raise_error!(
+        None,
+        None,
+        None,
+        null_mut(),
+        null_mut(),
+        XmlErrorDomain::XmlFromURI,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrFatal,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Memory allocation failed : {}\n",
+        extra
+    );
 }
 
 /// Simply creates an empty xmlURI
@@ -117,7 +96,7 @@ unsafe extern "C" fn xml_uri_err_memory(extra: *const c_char) {
 pub unsafe extern "C" fn xml_create_uri() -> XmlURIPtr {
     let ret: XmlURIPtr = xml_malloc(size_of::<XmlURI>()) as XmlURIPtr;
     if ret.is_null() {
-        xml_uri_err_memory(c"creating URI structure\n".as_ptr() as _);
+        xml_uri_err_memory("creating URI structure\n");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlURI>());
@@ -346,7 +325,7 @@ pub unsafe extern "C" fn xml_build_uri(uri: *const XmlChar, base: *const XmlChar
             }
             (*res).path = xml_malloc_atomic(len as usize) as *mut c_char;
             if (*res).path.is_null() {
-                xml_uri_err_memory(c"resolving URI against base\n".as_ptr() as _);
+                xml_uri_err_memory("resolving URI against base\n");
                 break 'done;
             }
             *(*res).path.add(0) = 0;
@@ -628,7 +607,7 @@ pub unsafe extern "C" fn xml_build_relative_uri(
          */
         val = xml_malloc(len as usize + 3 * nbslash as usize) as *mut XmlChar;
         if val.is_null() {
-            xml_uri_err_memory(c"building relative URI\n".as_ptr() as _);
+            xml_uri_err_memory("building relative URI\n");
             break 'done;
         }
         vptr = val;
@@ -1751,13 +1730,13 @@ const MAX_URI_LENGTH: usize = 1024 * 1024;
 #[doc(alias = "xmlSaveUriRealloc")]
 unsafe extern "C" fn xml_save_uri_realloc(ret: *mut XmlChar, max: *mut i32) -> *mut XmlChar {
     if *max > MAX_URI_LENGTH as i32 {
-        xml_uri_err_memory(c"reaching arbitrary MAX_URI_LENGTH limit\n".as_ptr() as _);
+        xml_uri_err_memory("reaching arbitrary MAX_URI_LENGTH limit\n");
         return null_mut();
     }
     let tmp: i32 = *max * 2;
     let temp: *mut XmlChar = xml_realloc(ret as _, tmp as usize + 1) as *mut XmlChar;
     if temp.is_null() {
-        xml_uri_err_memory(c"saving URI\n".as_ptr() as _);
+        xml_uri_err_memory("saving URI\n");
         return null_mut();
     }
     *max = tmp;
@@ -1782,7 +1761,7 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
     max = 80;
     ret = xml_malloc_atomic(max as usize + 1) as *mut XmlChar;
     if ret.is_null() {
-        xml_uri_err_memory(c"saving URI\n".as_ptr() as _);
+        xml_uri_err_memory("saving URI\n");
         return null_mut();
     }
     len = 0;
@@ -2204,7 +2183,7 @@ pub unsafe extern "C" fn xml_uri_escape_str(
     len += 20;
     ret = xml_malloc_atomic(len as usize) as *mut XmlChar;
     if ret.is_null() {
-        xml_uri_err_memory(c"escaping URI value\n".as_ptr() as _);
+        xml_uri_err_memory("escaping URI value\n");
         return null_mut();
     }
     input = str as *const XmlChar;
@@ -2213,7 +2192,7 @@ pub unsafe extern "C" fn xml_uri_escape_str(
         if len - out <= 3 {
             temp = xml_save_uri_realloc(ret, &raw mut len);
             if temp.is_null() {
-                xml_uri_err_memory(c"escaping URI value\n".as_ptr() as _);
+                xml_uri_err_memory("escaping URI value\n");
                 xml_free(ret as _);
                 return null_mut();
             }
@@ -2292,7 +2271,7 @@ pub unsafe extern "C" fn xml_uri_unescape_string(
     if target.is_null() {
         ret = xml_malloc_atomic(len as usize + 1) as *mut c_char;
         if ret.is_null() {
-            xml_uri_err_memory(c"unescaping URI value\n".as_ptr() as _);
+            xml_uri_err_memory("unescaping URI value\n");
             return null_mut();
         }
     } else {
@@ -2563,7 +2542,7 @@ pub unsafe extern "C" fn xml_normalize_uri_path(path: *mut c_char) -> i32 {
 macro_rules! NULLCHK {
     ($p:expr, $uri:expr, $ret:expr) => {
         if $p.is_null() {
-            xml_uri_err_memory(c"escaping URI value\n".as_ptr() as _);
+            xml_uri_err_memory("escaping URI value\n");
             xml_free_uri($uri);
             xml_free($ret as _);
             return null_mut();

@@ -109,12 +109,10 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     uri: *const XmlChar,
     external_id: *const XmlChar,
 ) -> HtmlDocPtr {
-    /*
-     * Allocate a new document and fill the fields.
-     */
+    // Allocate a new document and fill the fields.
     let cur: XmlDocPtr = xml_malloc(size_of::<XmlDoc>()) as XmlDocPtr;
     if cur.is_null() {
-        html_err_memory(null_mut(), c"HTML document creation failed\n".as_ptr() as _);
+        html_err_memory(null_mut(), Some("HTML document creation failed\n"));
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlDoc>());

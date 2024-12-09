@@ -196,7 +196,7 @@ static mut XML_CATALOG_DEFAULT_PREFER: XmlCatalogPrefer = XmlCatalogPrefer::Publ
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlCatalogErrMemory")]
-unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
+unsafe fn xml_catalog_err_memory(extra: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -208,12 +208,12 @@ unsafe extern "C" fn xml_catalog_err_memory(extra: *const c_char) {
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         None,
         None,
         0,
         0,
-        "Memory allocation failed : %s\n",
+        "Memory allocation failed : {}\n",
         extra
     );
 }
@@ -229,7 +229,7 @@ unsafe extern "C" fn xml_create_new_catalog(
 ) -> XmlCatalogPtr {
     let ret: XmlCatalogPtr = xml_malloc(size_of::<XmlCatalog>()) as XmlCatalogPtr;
     if ret.is_null() {
-        xml_catalog_err_memory(c"allocating catalog".as_ptr());
+        xml_catalog_err_memory("allocating catalog");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlCatalog>());
@@ -289,7 +289,7 @@ unsafe extern "C" fn xml_load_file_content(filename: *const c_char) -> *mut XmlC
     let size: i64 = info.st_size;
     let content: *mut XmlChar = xml_malloc_atomic(size as usize + 10) as _;
     if content.is_null() {
-        xml_catalog_err_memory(c"allocating catalog data".as_ptr());
+        xml_catalog_err_memory("allocating catalog data");
         close(fd);
         return null_mut();
     }
@@ -414,7 +414,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
     }
     buf = xml_malloc_atomic(size) as _;
     if buf.is_null() {
-        xml_catalog_err_memory(c"allocating public ID".as_ptr() as _);
+        xml_catalog_err_memory("allocating public ID");
         return null_mut();
     }
     while xml_is_pubid_char(*cur as u32) || *cur == b'?' {
@@ -428,7 +428,7 @@ unsafe extern "C" fn xml_parse_sgml_catalog_pubid(
             size *= 2;
             tmp = xml_realloc(buf as _, size) as _;
             if tmp.is_null() {
-                xml_catalog_err_memory(c"allocating public ID".as_ptr() as _);
+                xml_catalog_err_memory("allocating public ID");
                 xml_free(buf as _);
                 return null_mut();
             }
@@ -529,7 +529,7 @@ unsafe extern "C" fn xml_new_catalog_entry(
 
     let ret: XmlCatalogEntryPtr = xml_malloc(size_of::<XmlCatalogEntry>()) as XmlCatalogEntryPtr;
     if ret.is_null() {
-        xml_catalog_err_memory(c"allocating catalog entry".as_ptr() as _);
+        xml_catalog_err_memory("allocating catalog entry");
         return null_mut();
     }
     (*ret).next = null_mut();
@@ -3694,7 +3694,7 @@ pub unsafe extern "C" fn xml_parse_catalog_file(filename: *const c_char) -> XmlD
 
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
-        xml_catalog_err_memory(c"allocating parser context".as_ptr());
+        xml_catalog_err_memory("allocating parser context");
         return null_mut();
     }
 

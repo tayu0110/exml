@@ -22,7 +22,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of, null, null_mut},
+    ptr::{null, null_mut},
     slice::from_raw_parts,
 };
 
@@ -1651,8 +1651,6 @@ unsafe extern "C" fn xml_schematron_report_success(
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
         // TODO
     } else {
-        let mut msg: [c_char; 1000] = [0; 1000];
-
         let mut report: *const XmlChar = null_mut();
 
         if ((*test).typ == XmlSchematronTestType::XmlSchematronReport && success == 0)
@@ -1661,11 +1659,7 @@ unsafe extern "C" fn xml_schematron_report_success(
             return;
         }
         let line: i64 = (*cur).get_line_no();
-        let path = (*cur)
-            .get_node_path()
-            .map_or(CStr::from_ptr((*cur).name as *const i8).to_owned(), |c| {
-                CString::new(c).unwrap()
-            });
+        let path = (*cur).get_node_path().expect("Internal Error");
         if !(*test).node.is_null() {
             report = xml_schematron_format_report(ctxt, (*test).node, cur);
         }
@@ -1676,13 +1670,11 @@ unsafe extern "C" fn xml_schematron_report_success(
                 report = xml_strdup(c"node failed report".as_ptr() as _);
             }
         }
-        snprintf(
-            msg.as_mut_ptr() as _,
-            999,
-            c"%s line %ld: %s\n".as_ptr() as _,
-            path.as_ptr(),
+        let msg = format!(
+            "{} line {}: {}\n",
+            path,
             line,
-            report,
+            CStr::from_ptr(report as *const i8).to_string_lossy()
         );
 
         if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutError as i32 != 0 {
@@ -1724,18 +1716,18 @@ unsafe extern "C" fn xml_schematron_report_success(
                             .into(),
                     )
                 },
-                Some(path.to_string_lossy().into_owned().into()),
+                Some(path.to_owned().into()),
                 (!report.is_null()).then(|| CStr::from_ptr(report as *const i8)
                     .to_string_lossy()
                     .into_owned()
                     .into()),
                 0,
                 0,
-                "%s",
-                msg
+                msg.as_str(),
             );
         } else {
-            xml_schematron_report_output(ctxt, cur, addr_of!(msg[0]));
+            let msg = CString::new(msg).unwrap();
+            xml_schematron_report_output(ctxt, cur, msg.as_ptr());
         }
 
         xml_free(report as _);

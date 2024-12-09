@@ -1002,7 +1002,7 @@ unsafe extern "C" fn xml_relaxng_valid_error_push(
         (*ctxt).err_tab =
             xml_malloc((*ctxt).err_max as usize * size_of::<XmlRelaxNGValidError>()) as _;
         if (*ctxt).err_tab.is_null() {
-            xml_rng_verr_memory(ctxt, c"pushing error\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "pushing error\n");
             return 0;
         }
         (*ctxt).err = null_mut();
@@ -1014,7 +1014,7 @@ unsafe extern "C" fn xml_relaxng_valid_error_push(
             (*ctxt).err_max as usize * size_of::<XmlRelaxNGValidError>(),
         ) as _;
         if (*ctxt).err_tab.is_null() {
-            xml_rng_verr_memory(ctxt, c"pushing error\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "pushing error\n");
             return 0;
         }
         (*ctxt).err = (*ctxt).err_tab.add((*ctxt).err_nr as usize - 1);
@@ -1101,7 +1101,7 @@ unsafe extern "C" fn xml_relaxng_add_valid_error(
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlRngVErrMemory")]
-unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *const c_char) {
+unsafe fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: &str) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
     let mut data = None;
@@ -1115,46 +1115,25 @@ unsafe extern "C" fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: *c
         data = (*ctxt).user_data.clone();
         (*ctxt).nb_errors += 1;
     }
-    if !extra.is_null() {
-        __xml_raise_error!(
-            schannel,
-            channel,
-            data,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromRelaxngv,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : %s\n",
-            extra
-        );
-    } else {
-        __xml_raise_error!(
-            schannel,
-            channel,
-            data,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromRelaxngv,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed\n",
-        );
-    }
+    __xml_raise_error!(
+        schannel,
+        channel,
+        data,
+        null_mut(),
+        null_mut(),
+        XmlErrorDomain::XmlFromRelaxngv,
+        XmlParserErrors::XmlErrNoMemory,
+        XmlErrorLevel::XmlErrFatal,
+        None,
+        0,
+        Some(extra.to_owned().into()),
+        None,
+        None,
+        0,
+        0,
+        "Memory allocation failed : {}\n",
+        extra
+    );
 }
 
 /// Register a new type library
@@ -1188,7 +1167,7 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     }
     let lib: XmlRelaxNGTypeLibraryPtr = xml_malloc(size_of::<XmlRelaxNGTypeLibrary>()) as _;
     if lib.is_null() {
-        xml_rng_verr_memory(null_mut(), c"adding types library\n".as_ptr() as _);
+        xml_rng_verr_memory(null_mut(), "adding types library\n");
         return -1;
     }
     memset(lib as _, 0, size_of::<XmlRelaxNGTypeLibrary>());
@@ -1478,7 +1457,7 @@ unsafe extern "C" fn xml_relaxng_normalize(
 
     let ret: *mut XmlChar = xml_malloc_atomic(len as usize + 1) as _;
     if ret.is_null() {
-        xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+        xml_rng_verr_memory(ctxt, "validating\n");
         return null_mut();
     }
     p = ret;
@@ -1619,7 +1598,7 @@ pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlRngPErrMemory")]
-unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *const c_char) {
+unsafe fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: Option<&str>) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
     let mut data = None;
@@ -1633,7 +1612,7 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
         data = (*ctxt).user_data.clone();
         (*ctxt).nb_errors += 1;
     }
-    if !extra.is_null() {
+    if let Some(extra) = extra {
         __xml_raise_error!(
             schannel,
             channel,
@@ -1645,12 +1624,12 @@ unsafe extern "C" fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             None,
             0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+            Some(extra.to_owned().into()),
             None,
             None,
             0,
             0,
-            "Memory allocation failed : %s\n",
+            "Memory allocation failed : {}\n",
             extra
         );
     } else {
@@ -1689,7 +1668,7 @@ pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
 
     let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), c"building parser\n".as_ptr() as _);
+        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
@@ -1716,7 +1695,7 @@ pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
 
     let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), c"building parser\n".as_ptr() as _);
+        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
@@ -1750,7 +1729,7 @@ pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
 
     let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), c"building parser\n".as_ptr() as _);
+        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
         xml_free_doc(copy);
         return null_mut();
     }
@@ -2075,7 +2054,7 @@ unsafe extern "C" fn xml_relaxng_get_elements(
                 max = 10;
                 ret = xml_malloc((max as usize + 1) * size_of::<XmlRelaxNGDefinePtr>()) as _;
                 if ret.is_null() {
-                    xml_rng_perr_memory(ctxt, c"getting element list\n".as_ptr() as _);
+                    xml_rng_perr_memory(ctxt, Some("getting element list\n"));
                     return null_mut();
                 }
             } else if max <= len {
@@ -2085,7 +2064,7 @@ unsafe extern "C" fn xml_relaxng_get_elements(
                     (max as usize + 1) * size_of::<XmlRelaxNGDefinePtr>(),
                 ) as _;
                 if temp.is_null() {
-                    xml_rng_perr_memory(ctxt, c"getting element list\n".as_ptr() as _);
+                    xml_rng_perr_memory(ctxt, Some("getting element list\n"));
                     xml_free(ret as _);
                     return null_mut();
                 }
@@ -2704,7 +2683,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
         }
 
         //   error:
-        xml_rng_perr_memory(ctxt, c"in interleave computation\n".as_ptr() as _);
+        xml_rng_perr_memory(ctxt, Some("in interleave computation\n"));
         if !groups.is_null() {
             for i in 0..nbgroups {
                 if !(*groups.add(i as usize)).is_null() {
@@ -2882,7 +2861,7 @@ unsafe extern "C" fn xml_relaxng_document_push(
         (*ctxt).doc_tab =
             xml_malloc((*ctxt).doc_max as usize * size_of_val(&*(*ctxt).doc_tab.add(0))) as _;
         if (*ctxt).doc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, c"adding document\n".as_ptr() as _);
+            xml_rng_perr_memory(ctxt, Some("adding document\n"));
             return 0;
         }
     }
@@ -2893,7 +2872,7 @@ unsafe extern "C" fn xml_relaxng_document_push(
             (*ctxt).doc_max as usize * size_of_val(&*(*ctxt).doc_tab.add(0)),
         ) as _;
         if (*ctxt).doc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, c"adding document\n".as_ptr() as _);
+            xml_rng_perr_memory(ctxt, Some("adding document\n"));
             return 0;
         }
     }
@@ -3040,7 +3019,7 @@ unsafe extern "C" fn xml_relaxng_include_push(
         (*ctxt).inc_tab =
             xml_malloc((*ctxt).inc_max as usize * size_of_val(&*(*ctxt).inc_tab.add(0))) as _;
         if (*ctxt).inc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, c"allocating include\n".as_ptr() as _);
+            xml_rng_perr_memory(ctxt, Some("allocating include\n"));
             return 0;
         }
     }
@@ -3051,7 +3030,7 @@ unsafe extern "C" fn xml_relaxng_include_push(
             (*ctxt).inc_max as usize * size_of_val(&*(*ctxt).inc_tab.add(0)),
         ) as _;
         if (*ctxt).inc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, c"allocating include\n".as_ptr() as _);
+            xml_rng_perr_memory(ctxt, Some("allocating include\n"));
             return 0;
         }
     }
@@ -3265,7 +3244,7 @@ unsafe extern "C" fn xml_relaxng_load_include(
      */
     let ret: XmlRelaxNGIncludePtr = xml_malloc(size_of::<XmlRelaxNGInclude>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(ctxt, c"allocating include\n".as_ptr() as _);
+        xml_rng_perr_memory(ctxt, Some("allocating include\n"));
         xml_free_doc(doc);
         return null_mut();
     }
@@ -3932,7 +3911,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
 unsafe extern "C" fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
     let ret: XmlRelaxNGPtr = xml_malloc(size_of::<XmlRelaxNG>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(ctxt, null_mut());
+        xml_rng_perr_memory(ctxt, None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNG>());
@@ -3954,7 +3933,7 @@ unsafe extern "C" fn xml_relaxng_new_define(
         (*ctxt).def_tab =
             xml_malloc((*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>()) as _;
         if (*ctxt).def_tab.is_null() {
-            xml_rng_perr_memory(ctxt, c"allocating define\n".as_ptr() as _);
+            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
             return null_mut();
         }
     } else if (*ctxt).def_max <= (*ctxt).def_nr {
@@ -3964,14 +3943,14 @@ unsafe extern "C" fn xml_relaxng_new_define(
             (*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>(),
         ) as _;
         if tmp.is_null() {
-            xml_rng_perr_memory(ctxt, c"allocating define\n".as_ptr() as _);
+            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
             return null_mut();
         }
         (*ctxt).def_tab = tmp;
     }
     let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(ctxt, c"allocating define\n".as_ptr() as _);
+        xml_rng_perr_memory(ctxt, Some("allocating define\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGDefine>());
@@ -4221,7 +4200,7 @@ unsafe extern "C" fn xml_relaxng_new_grammar(
 ) -> XmlRelaxNGGrammarPtr {
     let ret: XmlRelaxNGGrammarPtr = xml_malloc(size_of::<XmlRelaxNGGrammar>()) as _;
     if ret.is_null() {
-        xml_rng_perr_memory(ctxt, null_mut());
+        xml_rng_perr_memory(ctxt, None);
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGGrammar>());
@@ -5045,7 +5024,7 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
             );
         }
     } else {
-        xml_rng_perr_memory(ctxt, c"create interleaves\n".as_ptr() as _);
+        xml_rng_perr_memory(ctxt, Some("create interleaves\n"));
     }
     child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
     if child.is_null() {
@@ -6794,7 +6773,7 @@ unsafe extern "C" fn xml_relaxng_check_group_attrs(
     let list: *mut *mut XmlRelaxNGDefinePtr =
         xml_malloc(nbchild * size_of::<*mut XmlRelaxNGDefinePtr>()) as _;
     if list.is_null() {
-        xml_rng_perr_memory(ctxt, c"building group\n".as_ptr() as _);
+        xml_rng_perr_memory(ctxt, Some("building group\n"));
         return;
     }
     i = 0;
@@ -6956,10 +6935,7 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
         return;
     }
 
-    /*
-     * Don't run that check in case of error. Infinite recursion
-     * becomes possible.
-     */
+    // Don't run that check in case of error. Infinite recursion becomes possible.
     if (*ctxt).nb_errors != 0 {
         return;
     }
@@ -6975,13 +6951,12 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
     let list: *mut *mut XmlRelaxNGDefinePtr =
         xml_malloc(nbchild as usize * size_of::<*mut XmlRelaxNGDefinePtr>()) as _;
     if list.is_null() {
-        xml_rng_perr_memory(ctxt, c"building choice\n".as_ptr() as _);
+        xml_rng_perr_memory(ctxt, Some("building choice\n"));
         return;
     }
     i = 0;
-    /*
-     * a bit strong but safe
-     */
+
+    // a bit strong but safe
     if is_nullable == 0 {
         triage = xml_hash_create(10);
     } else {
@@ -8148,9 +8123,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
     }
     (*ctxt).document = doc;
 
-    /*
-     * Some preprocessing of the document content
-     */
+    // Some preprocessing of the document content
     doc = xml_relaxng_cleanup_doc(ctxt, doc);
     if doc.is_null() {
         xml_free_doc((*ctxt).document);
@@ -8158,9 +8131,7 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
         return null_mut();
     }
 
-    /*
-     * Then do the parsing for good
-     */
+    // Then do the parsing for good
     let root: XmlNodePtr = (*doc).get_root_element();
     if root.is_null() {
         xml_rng_perr(
@@ -8580,7 +8551,7 @@ unsafe extern "C" fn xml_relaxng_free_states(
         (*ctxt).free_states =
             xml_malloc((*ctxt).free_states_max as usize * size_of::<XmlRelaxNGStatesPtr>()) as _;
         if (*ctxt).free_states.is_null() {
-            xml_rng_verr_memory(ctxt, c"storing states\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "storing states\n");
         }
     } else if !ctxt.is_null() && (*ctxt).free_states_nr >= (*ctxt).free_states_max {
         let tmp: *mut XmlRelaxNGStatesPtr = xml_realloc(
@@ -8588,7 +8559,7 @@ unsafe extern "C" fn xml_relaxng_free_states(
             2 * (*ctxt).free_states_max as usize * size_of::<XmlRelaxNGStatesPtr>(),
         ) as _;
         if tmp.is_null() {
-            xml_rng_verr_memory(ctxt, c"storing states\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "storing states\n");
             xml_free((*states).tab_state as _);
             xml_free(states as _);
             return;
@@ -8614,7 +8585,7 @@ pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
 ) -> XmlRelaxNGValidCtxtPtr {
     let ret: XmlRelaxNGValidCtxtPtr = xml_malloc(size_of::<XmlRelaxNGValidCtxt>()) as _;
     if ret.is_null() {
-        xml_rng_verr_memory(null_mut(), c"building context\n".as_ptr() as _);
+        xml_rng_verr_memory(null_mut(), "building context\n");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGValidCtxt>());
@@ -8661,14 +8632,14 @@ unsafe extern "C" fn xml_relaxng_new_states(
         size_of::<XmlRelaxNGStates>() + (size as usize - 1) * size_of::<XmlRelaxNGValidStatePtr>(),
     ) as _;
     if ret.is_null() {
-        xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+        xml_rng_verr_memory(ctxt, "allocating states\n");
         return null_mut();
     }
     (*ret).nb_state = 0;
     (*ret).max_state = size;
     (*ret).tab_state = xml_malloc(size as usize * size_of::<XmlRelaxNGValidStatePtr>()) as _;
     if (*ret).tab_state.is_null() {
-        xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+        xml_rng_verr_memory(ctxt, "allocating states\n");
         xml_free(ret as _);
         return null_mut();
     }
@@ -8694,7 +8665,7 @@ unsafe extern "C" fn xml_relaxng_add_states_uniq(
             size as usize * size_of::<XmlRelaxNGValidStatePtr>(),
         ) as _;
         if tmp.is_null() {
-            xml_rng_verr_memory(ctxt, c"adding states\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "adding states\n");
             return -1;
         }
         (*states).tab_state = tmp;
@@ -8830,7 +8801,7 @@ unsafe extern "C" fn xml_relaxng_new_valid_state(
     } else {
         ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
         if ret.is_null() {
-            xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "allocating states\n");
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlRelaxNGValidState>());
@@ -8854,14 +8825,14 @@ unsafe extern "C" fn xml_relaxng_new_valid_state(
             }
             (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<XmlAttrPtr>()) as _;
             if (*ret).attrs.is_null() {
-                xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+                xml_rng_verr_memory(ctxt, "allocating states\n");
                 return ret;
             }
         } else if (*ret).max_attrs < nb_attrs as i32 {
             let tmp: *mut XmlAttrPtr =
                 xml_realloc((*ret).attrs as _, nb_attrs * size_of::<XmlAttrPtr>()) as _;
             if tmp.is_null() {
-                xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+                xml_rng_verr_memory(ctxt, "allocating states\n");
                 return ret;
             }
             (*ret).attrs = tmp;
@@ -9877,7 +9848,7 @@ unsafe extern "C" fn xml_relaxng_copy_valid_state(
     } else {
         ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
         if ret.is_null() {
-            xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "allocating states\n");
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlRelaxNGValidState>());
@@ -9892,7 +9863,7 @@ unsafe extern "C" fn xml_relaxng_copy_valid_state(
             (*ret).max_attrs = (*state).max_attrs;
             (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<XmlAttrPtr>()) as _;
             if (*ret).attrs.is_null() {
-                xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+                xml_rng_verr_memory(ctxt, "allocating states\n");
                 (*ret).nb_attrs = 0;
                 return ret;
             }
@@ -9902,7 +9873,7 @@ unsafe extern "C" fn xml_relaxng_copy_valid_state(
                 (*state).max_attrs as usize * size_of::<XmlAttrPtr>(),
             ) as _;
             if tmp.is_null() {
-                xml_rng_verr_memory(ctxt, c"allocating states\n".as_ptr() as _);
+                xml_rng_verr_memory(ctxt, "allocating states\n");
                 (*ret).nb_attrs = 0;
                 return ret;
             }
@@ -9978,7 +9949,7 @@ unsafe extern "C" fn xml_relaxng_add_states(
             size as usize * size_of::<XmlRelaxNGValidStatePtr>(),
         ) as _;
         if tmp.is_null() {
-            xml_rng_verr_memory(ctxt, c"adding states\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "adding states\n");
             return -1;
         }
         (*states).tab_state = tmp;
@@ -10092,27 +10063,21 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
         }
     }
 
-    /*
-     * Build arrays to store the first and last node of the chain
-     * pertaining to each group
-     */
+    // Build arrays to store the first and last node of the chain pertaining to each group
     let list: *mut XmlNodePtr = xml_malloc(nbgroups as usize * size_of::<XmlNodePtr>()) as _;
     if list.is_null() {
-        xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+        xml_rng_verr_memory(ctxt, "validating\n");
         return -1;
     }
     memset(list as _, 0, nbgroups as usize * size_of::<XmlNodePtr>());
     let lasts: *mut XmlNodePtr = xml_malloc(nbgroups as usize * size_of::<XmlNodePtr>()) as _;
     if lasts.is_null() {
-        xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+        xml_rng_verr_memory(ctxt, "validating\n");
         return -1;
     }
     memset(lasts as _, 0, nbgroups as usize * size_of::<XmlNodePtr>());
 
-    /*
-     * Walk the sequence of children finding the right group and
-     * sorting them in sequences.
-     */
+    // Walk the sequence of children finding the right group and sorting them in sequences.
     cur = (*(*ctxt).state).seq;
     cur = xml_relaxng_skip_ignored(ctxt, cur);
     let start: XmlNodePtr = cur;
@@ -11034,7 +10999,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             if content.is_null() {
                 content = xml_strdup(c"".as_ptr() as _);
                 if content.is_null() {
-                    xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+                    xml_rng_verr_memory(ctxt, "validating\n");
                     ret = -1;
                     break 'to_break;
                 }
@@ -11085,7 +11050,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             if content.is_null() {
                 content = xml_strdup(c"".as_ptr() as _);
                 if content.is_null() {
-                    xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+                    xml_rng_verr_memory(ctxt, "validating\n");
                     ret = -1;
                     break 'to_break;
                 }
@@ -11140,7 +11105,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             if content.is_null() {
                 content = xml_strdup(c"".as_ptr() as _);
                 if content.is_null() {
-                    xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+                    xml_rng_verr_memory(ctxt, "validating\n");
                     ret = -1;
                     break 'to_break;
                 }
@@ -11628,7 +11593,7 @@ unsafe extern "C" fn xml_relaxng_elem_push(
         (*ctxt).elem_tab =
             xml_malloc((*ctxt).elem_max as usize * size_of::<XmlRegExecCtxtPtr>()) as _;
         if (*ctxt).elem_tab.is_null() {
-            xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "validating\n");
             return -1;
         }
     }
@@ -11639,7 +11604,7 @@ unsafe extern "C" fn xml_relaxng_elem_push(
             (*ctxt).elem_max as usize * size_of::<XmlRegExecCtxtPtr>(),
         ) as _;
         if (*ctxt).elem_tab.is_null() {
-            xml_rng_verr_memory(ctxt, c"validating\n".as_ptr() as _);
+            xml_rng_verr_memory(ctxt, "validating\n");
             return -1;
         }
     }

@@ -6300,7 +6300,7 @@ const HTML_PARSER_BUFFER_SIZE: usize = 100;
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "htmlErrMemory")]
-pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *const c_char) {
+pub(crate) unsafe fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: Option<&str>) {
     if !ctxt.is_null()
         && (*ctxt).disable_sax != 0
         && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -6312,7 +6312,7 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
         (*ctxt).instate = XmlParserInputState::XmlParserEOF;
         (*ctxt).disable_sax = 1;
     }
-    if !extra.is_null() {
+    if let Some(extra) = extra {
         __xml_raise_error!(
             None,
             None,
@@ -6324,12 +6324,12 @@ pub(crate) unsafe extern "C" fn html_err_memory(ctxt: XmlParserCtxtPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             None,
             0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+            Some(extra.to_owned().into()),
             None,
             None,
             0,
             0,
-            "Memory allocation failed : %s\n",
+            "Memory allocation failed : {}\n",
             extra
         );
     } else {
@@ -6391,7 +6391,7 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
 
     let ret: *const XmlChar = xml_dict_lookup((*ctxt).dict, loc.as_ptr() as _, i as i32);
     if ret.is_null() {
-        html_err_memory(ctxt, null_mut());
+        html_err_memory(ctxt, None);
     }
 
     ret
@@ -6559,7 +6559,7 @@ macro_rules! grow_buffer {
         $buffer_size *= 2;
         let tmp: *mut XmlChar = xml_realloc($buffer as _, $buffer_size as usize) as _;
         if tmp.is_null() {
-            html_err_memory($ctxt, c"growing buffer\n".as_ptr() as _);
+            html_err_memory($ctxt, Some("growing buffer\n"));
             xml_free($buffer as _);
             return null_mut();
         }
@@ -6594,7 +6594,7 @@ unsafe extern "C" fn html_parse_html_attribute(
     buffer_size = HTML_PARSER_BUFFER_SIZE as _;
     buffer = xml_malloc_atomic(buffer_size as usize) as _;
     if buffer.is_null() {
-        html_err_memory(ctxt, c"buffer allocation failed\n".as_ptr() as _);
+        html_err_memory(ctxt, Some("buffer allocation failed\n"));
         return null_mut();
     }
     out = buffer;
@@ -7217,7 +7217,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 maxatts = 22; /* allow for 10 attrs by default */
                 atts = xml_malloc(maxatts as usize * size_of::<*mut XmlChar>()) as _;
                 if atts.is_null() {
-                    html_err_memory(ctxt, null());
+                    html_err_memory(ctxt, None);
                     if !attvalue.is_null() {
                         xml_free(attvalue as _);
                     }
@@ -7232,7 +7232,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
                 let n: *mut *const XmlChar =
                     xml_realloc(atts as _, maxatts as usize * size_of::<*const XmlChar>()) as _;
                 if n.is_null() {
-                    html_err_memory(ctxt, null());
+                    html_err_memory(ctxt, None);
                     if !attvalue.is_null() {
                         xml_free(attvalue as _);
                     }
@@ -8031,7 +8031,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).advance(4);
     buf = xml_malloc_atomic(size as usize) as _;
     if buf.is_null() {
-        html_err_memory(ctxt, c"buffer allocation failed\n".as_ptr() as _);
+        html_err_memory(ctxt, Some("buffer allocation failed\n"));
         (*ctxt).instate = state;
         return;
     }
@@ -8104,7 +8104,7 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                         let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as _;
                         if tmp.is_null() {
                             xml_free(buf as _);
-                            html_err_memory(ctxt, c"growing buffer failed\n".as_ptr() as _);
+                            html_err_memory(ctxt, Some("growing buffer failed\n"));
                             (*ctxt).instate = state;
                             return;
                         }
@@ -8246,7 +8246,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
             }
             buf = xml_malloc_atomic(size as usize) as _;
             if buf.is_null() {
-                html_err_memory(ctxt, null());
+                html_err_memory(ctxt, None);
                 (*ctxt).instate = state;
                 return;
             }
@@ -8267,7 +8267,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     size *= 2;
                     let tmp: *mut XmlChar = xml_realloc(buf as _, size as usize) as _;
                     if tmp.is_null() {
-                        html_err_memory(ctxt, null());
+                        html_err_memory(ctxt, None);
                         xml_free(buf as _);
                         (*ctxt).instate = state;
                         return;
@@ -9083,10 +9083,7 @@ unsafe fn html_init_parser_ctxt(
 
     (*ctxt).dict = xml_dict_create();
     if (*ctxt).dict.is_null() {
-        html_err_memory(
-            null_mut(),
-            c"htmlInitParserCtxt: out of memory\n".as_ptr() as _,
-        );
+        html_err_memory(null_mut(), Some("htmlInitParserCtxt: out of memory\n"));
         return -1;
     }
 
@@ -9094,10 +9091,7 @@ unsafe fn html_init_parser_ctxt(
         (*ctxt).sax = xml_malloc(size_of::<HtmlSaxhandler>()) as _;
     }
     if (*ctxt).sax.is_null() {
-        html_err_memory(
-            null_mut(),
-            c"htmlInitParserCtxt: out of memory\n".as_ptr() as _,
-        );
+        html_err_memory(null_mut(), Some("htmlInitParserCtxt: out of memory\n"));
         return -1;
     }
     if sax.is_null() {
@@ -9161,7 +9155,7 @@ pub unsafe fn html_new_sax_parser_ctxt(
 ) -> HtmlParserCtxtPtr {
     let ctxt: XmlParserCtxtPtr = xml_malloc(size_of::<XmlParserCtxt>()) as XmlParserCtxtPtr;
     if ctxt.is_null() {
-        html_err_memory(null_mut(), c"NewParserCtxt: out of memory\n".as_ptr() as _);
+        html_err_memory(null_mut(), Some("NewParserCtxt: out of memory\n"));
         return null_mut();
     }
     memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
@@ -9242,7 +9236,7 @@ unsafe extern "C" fn html_node_info_push(
             (*ctxt).node_info_max as usize * size_of_val(&*(*ctxt).node_info_tab.add(0)),
         ) as _;
         if (*ctxt).node_info_tab.is_null() {
-            html_err_memory(ctxt, null());
+            html_err_memory(ctxt, None);
             return 0;
         }
     }
@@ -9380,7 +9374,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
     } else {
         current_node = xml_strdup((*ctxt).name);
         if current_node.is_null() {
-            html_err_memory(ctxt, null());
+            html_err_memory(ctxt, None);
             return;
         }
     }
@@ -9408,7 +9402,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 } else {
                     current_node = xml_strdup((*ctxt).name);
                     if current_node.is_null() {
-                        html_err_memory(ctxt, null());
+                        html_err_memory(ctxt, None);
                         break;
                     }
                 }
@@ -9441,7 +9435,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 
                 current_node = xml_strdup((*ctxt).name);
                 if current_node.is_null() {
-                    html_err_memory(ctxt, null());
+                    html_err_memory(ctxt, None);
                     break;
                 }
                 depth = (*ctxt).name_tab.len();
@@ -9469,7 +9463,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 
             current_node = xml_strdup((*ctxt).name);
             if current_node.is_null() {
-                html_err_memory(ctxt, null());
+                html_err_memory(ctxt, None);
                 break;
             }
             depth = (*ctxt).name_tab.len();
@@ -9531,7 +9525,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 
             current_node = xml_strdup((*ctxt).name);
             if current_node.is_null() {
-                html_err_memory(ctxt, null());
+                html_err_memory(ctxt, None);
                 break;
             }
             depth = (*ctxt).name_tab.len();
@@ -10244,10 +10238,7 @@ pub unsafe extern "C" fn html_handle_omitted_elem(val: i32) -> i32 {
 unsafe extern "C" fn html_new_input_stream(ctxt: HtmlParserCtxtPtr) -> HtmlParserInputPtr {
     let input: HtmlParserInputPtr = xml_malloc(size_of::<HtmlParserInput>()) as XmlParserInputPtr;
     if input.is_null() {
-        html_err_memory(
-            ctxt,
-            c"couldn't allocate a new input stream\n".as_ptr() as _,
-        );
+        html_err_memory(ctxt, Some("couldn't allocate a new input stream\n"));
         return null_mut();
     }
     memset(input as _, 0, size_of::<HtmlParserInput>());
@@ -11228,7 +11219,7 @@ pub unsafe extern "C" fn html_parse_chunk(
             .push_bytes(from_raw_parts(chunk as *const u8, size as usize));
         (*(*ctxt).input).set_base_and_cursor(base, cur);
         if res < 0 {
-            html_err_memory(ctxt, null());
+            html_err_memory(ctxt, None);
             return (*ctxt).err_no;
         }
     } else if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)

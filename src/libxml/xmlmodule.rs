@@ -21,7 +21,7 @@
 // http://www.fortran-2000.com/ArnaudRecipes/sharedlib.html
 
 use std::{
-    ffi::c_char,
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
@@ -56,7 +56,7 @@ pub enum XmlModuleOption {
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlModuleErrMemory")]
-unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c_char) {
+unsafe fn xml_module_err_memory(module: XmlModulePtr, extra: &str) {
     let mut name: *const c_char = null();
 
     if !module.is_null() {
@@ -74,12 +74,12 @@ unsafe extern "C" fn xml_module_err_memory(module: XmlModulePtr, extra: *const c
         XmlErrorLevel::XmlErrFatal,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         (!name.is_null()).then(|| CStr::from_ptr(name).to_string_lossy().into_owned().into()),
         None,
         0,
         0,
-        "Memory allocation failed : %s\n",
+        "Memory allocation failed : {}\n",
         extra
     );
 }
@@ -108,16 +108,17 @@ unsafe extern "C" fn xml_module_platform_open(name: *const c_char) -> *mut c_voi
 ///
 /// Returns a handle for the module or NULL in case of error
 #[doc(alias = "xmlModuleOpen")]
-pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: i32) -> XmlModulePtr {
+pub unsafe fn xml_module_open(name: &str, _options: i32) -> XmlModulePtr {
     let module: XmlModulePtr = xml_malloc(size_of::<XmlModule>()) as XmlModulePtr;
     if module.is_null() {
-        xml_module_err_memory(null_mut(), c"creating module".as_ptr() as _);
+        xml_module_err_memory(null_mut(), "creating module");
         return null_mut();
     }
 
     memset(module as _, 0, size_of::<XmlModule>());
 
-    (*module).handle = xml_module_platform_open(name);
+    let cname = CString::new(name).unwrap();
+    (*module).handle = xml_module_platform_open(cname.as_ptr());
 
     if (*module).handle.is_null() {
         xml_free(module as _);
@@ -133,17 +134,17 @@ pub unsafe extern "C" fn xml_module_open(name: *const c_char, _options: i32) -> 
             None,
             0,
             None,
-            (!name.is_null()).then(|| CStr::from_ptr(name).to_string_lossy().into_owned().into()),
+            Some(name.to_owned().into()),
             None,
             0,
             0,
-            "failed to open %s\n",
+            "failed to open {}\n",
             name
         );
         return null_mut();
     }
 
-    (*module).name = xml_strdup(name as _);
+    (*module).name = xml_strdup(cname.as_ptr() as _);
     module
 }
 
@@ -216,6 +217,7 @@ pub unsafe extern "C" fn xml_module_symbol(
 
     rc = xml_module_platform_symbol((*module).handle, name, symbol);
 
+    let name = CStr::from_ptr(name).to_string_lossy().into_owned();
     if rc == -1 {
         __xml_raise_error!(
             None,
@@ -229,16 +231,12 @@ pub unsafe extern "C" fn xml_module_symbol(
             None,
             0,
             None,
-            (!name.is_null()).then(|| CStr::from_ptr(name).to_string_lossy().into_owned().into()),
+            Some(name.clone().into()),
             None,
             0,
             0,
-            "failed to find symbol: %s\n",
-            if name.is_null() {
-                c"NULL".as_ptr()
-            } else {
-                name
-            }
+            "failed to find symbol: {}\n",
+            name
         );
         return rc;
     }
@@ -295,6 +293,9 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
 
     let rc: i32 = xml_module_platform_close((*module).handle);
 
+    let name = CStr::from_ptr((*module).name as *const i8)
+        .to_string_lossy()
+        .into_owned();
     if rc != 0 {
         __xml_raise_error!(
             None,
@@ -308,15 +309,12 @@ pub unsafe extern "C" fn xml_module_close(module: XmlModulePtr) -> i32 {
             None,
             0,
             None,
-            (!(*module).name.is_null()).then(|| CStr::from_ptr((*module).name as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
+            Some(name.clone().into()),
             None,
             0,
             0,
-            "failed to close: %s\n",
-            (*module).name
+            "failed to close: {}\n",
+            name
         );
         return -2;
     }

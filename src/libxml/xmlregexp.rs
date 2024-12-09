@@ -329,7 +329,7 @@ pub(crate) unsafe extern "C" fn xml_reg_new_parser_ctxt(
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlRegexpErrMemory")]
-unsafe extern "C" fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: *const c_char) {
+unsafe fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: &str) {
     let mut regexp: *const c_char = null();
     if !ctxt.is_null() {
         regexp = (*ctxt).string as _;
@@ -346,12 +346,12 @@ unsafe extern "C" fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: *co
         XmlErrorLevel::XmlErrFatal,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         (!regexp.is_null()).then(|| CStr::from_ptr(regexp).to_string_lossy().into_owned().into()),
         None,
         0,
         0,
-        "Memory allocation failed : %s\n",
+        "Memory allocation failed : {}\n",
         extra
     );
 }
@@ -359,7 +359,7 @@ unsafe extern "C" fn xml_regexp_err_memory(ctxt: XmlRegParserCtxtPtr, extra: *co
 unsafe extern "C" fn xml_reg_new_state(ctxt: XmlRegParserCtxtPtr) -> XmlRegStatePtr {
     let ret: XmlRegStatePtr = xml_malloc(size_of::<XmlRegState>()) as XmlRegStatePtr;
     if ret.is_null() {
-        xml_regexp_err_memory(ctxt, c"allocating state".as_ptr());
+        xml_regexp_err_memory(ctxt, "allocating state");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRegState>());
@@ -379,7 +379,7 @@ pub(crate) unsafe extern "C" fn xml_reg_state_push(ctxt: XmlRegParserCtxtPtr) ->
         let tmp: *mut XmlRegStatePtr =
             xml_realloc((*ctxt).states as _, new_size * size_of::<XmlRegStatePtr>()) as _;
         if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding state".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding state");
             return null_mut();
         }
         (*ctxt).states = tmp;
@@ -519,7 +519,7 @@ pub(crate) unsafe fn xml_reg_new_atom(
 ) -> XmlRegAtomPtr {
     let ret: XmlRegAtomPtr = xml_malloc(size_of::<XmlRegAtom>()) as XmlRegAtomPtr;
     if ret.is_null() {
-        xml_regexp_err_memory(ctxt, c"allocating atom".as_ptr());
+        xml_regexp_err_memory(ctxt, "allocating atom");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRegAtom>());
@@ -561,7 +561,7 @@ macro_rules! IS_NILLABLE {
 
 /// Handle a compilation failure
 #[doc(alias = "xmlRegexpErrCompile")]
-unsafe extern "C" fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: *const c_char) {
+unsafe fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: &str) {
     let mut regexp: *const c_char = null();
     let mut idx: i32 = 0;
 
@@ -581,12 +581,12 @@ unsafe extern "C" fn xml_regexp_err_compile(ctxt: XmlRegParserCtxtPtr, extra: *c
         XmlErrorLevel::XmlErrFatal,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         (!regexp.is_null()).then(|| CStr::from_ptr(regexp).to_string_lossy().into_owned().into()),
         None,
         idx,
         0,
-        "failed to compile: %s\n",
+        "failed to compile: {}\n",
         extra
     );
 }
@@ -608,7 +608,7 @@ unsafe extern "C" fn xml_reg_state_add_trans_to(
         (*target).trans_to =
             xml_malloc((*target).max_trans_to as usize * size_of::<i32>()) as *mut i32;
         if (*target).trans_to.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding transition".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding transition");
             (*target).max_trans_to = 0;
             return;
         }
@@ -619,7 +619,7 @@ unsafe extern "C" fn xml_reg_state_add_trans_to(
             (*target).max_trans_to as usize * size_of::<i32>(),
         ) as *mut i32;
         if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding transition".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding transition");
             (*target).max_trans_to /= 2;
             return;
         }
@@ -638,18 +638,16 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
     count: i32,
 ) {
     if state.is_null() {
-        ERROR!(ctxt, c"add state: state is NULL".as_ptr());
+        ERROR!(ctxt, "add state: state is NULL");
         return;
     }
     if target.is_null() {
-        ERROR!(ctxt, c"add state: target is NULL".as_ptr());
+        ERROR!(ctxt, "add state: target is NULL");
         return;
     }
-    /*
-     * Other routines follow the philosophy 'When in doubt, add a transition'
-     * so we check here whether such a transition is already present and, if
-     * so, silently ignore this request.
-     */
+    // Other routines follow the philosophy 'When in doubt, add a transition'
+    // so we check here whether such a transition is already present and, if
+    // so, silently ignore this request.
 
     for nrtrans in (0..(*state).nb_trans).rev() {
         let trans: XmlRegTransPtr = (*state).trans.add(nrtrans as usize);
@@ -667,7 +665,7 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
         (*state).trans =
             xml_malloc((*state).max_trans as usize * size_of::<XmlRegTrans>()) as *mut XmlRegTrans;
         if (*state).trans.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding transition".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding transition");
             (*state).max_trans = 0;
             return;
         }
@@ -678,7 +676,7 @@ pub(crate) unsafe extern "C" fn xml_reg_state_add_trans(
             (*state).max_trans as usize * size_of::<XmlRegTrans>(),
         ) as *mut XmlRegTrans;
         if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding transition".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding transition");
             (*state).max_trans /= 2;
             return;
         }
@@ -724,7 +722,7 @@ unsafe fn xml_reg_new_range(
 ) -> XmlRegRangePtr {
     let ret: XmlRegRangePtr = xml_malloc(size_of::<XmlRegRange>()) as XmlRegRangePtr;
     if ret.is_null() {
-        xml_regexp_err_memory(ctxt, c"allocating range".as_ptr());
+        xml_regexp_err_memory(ctxt, "allocating range");
         return null_mut();
     }
     (*ret).neg = neg;
@@ -744,11 +742,11 @@ unsafe fn xml_reg_atom_add_range(
     block_name: *mut XmlChar,
 ) -> XmlRegRangePtr {
     if atom.is_null() {
-        ERROR!(ctxt, c"add range: atom is NULL".as_ptr());
+        ERROR!(ctxt, "add range: atom is NULL");
         return null_mut();
     }
     if !matches!((*atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-        ERROR!(ctxt, c"add range: atom is not ranges".as_ptr());
+        ERROR!(ctxt, "add range: atom is not ranges");
         return null_mut();
     }
     if (*atom).max_ranges == 0 {
@@ -756,7 +754,7 @@ unsafe fn xml_reg_atom_add_range(
         (*atom).ranges = xml_malloc((*atom).max_ranges as usize * size_of::<XmlRegRangePtr>())
             as *mut XmlRegRangePtr;
         if (*atom).ranges.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding ranges".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding ranges");
             (*atom).max_ranges = 0;
             return null_mut();
         }
@@ -767,7 +765,7 @@ unsafe fn xml_reg_atom_add_range(
             (*atom).max_ranges as usize * size_of::<XmlRegRangePtr>(),
         ) as *mut XmlRegRangePtr;
         if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, c"adding ranges".as_ptr());
+            xml_regexp_err_memory(ctxt, "adding ranges");
             (*atom).max_ranges /= 2;
             return null_mut();
         }
@@ -967,7 +965,7 @@ unsafe extern "C" fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur != b's' as _ {
-            ERROR!(ctxt, c"IsXXXX expected".as_ptr());
+            ERROR!(ctxt, "IsXXXX expected");
             return;
         }
         NEXT!(ctxt);
@@ -992,7 +990,7 @@ unsafe extern "C" fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
         typ = Some(XmlRegAtomType::XmlRegexpBlockName);
         block_name = xml_strndup(start, (*ctxt).cur.offset_from(start) as _);
     } else {
-        ERROR!(ctxt, c"Unknown char property".as_ptr());
+        ERROR!(ctxt, "Unknown char property");
         return;
     }
     if (*ctxt).atom.is_null() {
@@ -1026,7 +1024,7 @@ unsafe extern "C" fn parse_escaped_codeunit(ctxt: XmlRegParserCtxtPtr) -> i32 {
         } else if cur >= b'a' as i32 && cur <= b'f' as i32 {
             val += cur - b'a' as i32 + 10;
         } else {
-            ERROR!(ctxt, c"Expecting hex digit".as_ptr());
+            ERROR!(ctxt, "Expecting hex digit");
             return -1;
         }
     }
@@ -1046,7 +1044,7 @@ unsafe extern "C" fn parse_escaped_codepoint(ctxt: XmlRegParserCtxtPtr) -> i32 {
                 }
             }
         }
-        ERROR!(ctxt, c"Invalid low surrogate pair code unit".as_ptr());
+        ERROR!(ctxt, "Invalid low surrogate pair code unit");
         val = -1;
     }
     val
@@ -1081,7 +1079,7 @@ unsafe extern "C" fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
         return;
     }
     if CUR!(ctxt) != b'\\' {
-        ERROR!(ctxt, c"Escaped sequence: expecting \\".as_ptr());
+        ERROR!(ctxt, "Escaped sequence: expecting \\");
         return;
     }
     NEXT!(ctxt);
@@ -1089,20 +1087,20 @@ unsafe extern "C" fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
     if cur == b'p' as _ {
         NEXT!(ctxt);
         if CUR!(ctxt) != b'{' {
-            ERROR!(ctxt, c"Expecting '{'".as_ptr());
+            ERROR!(ctxt, "Expecting '{'");
             return;
         }
         NEXT!(ctxt);
         xml_fa_parse_char_prop(ctxt);
         if CUR!(ctxt) != b'}' {
-            ERROR!(ctxt, c"Expecting '}'".as_ptr());
+            ERROR!(ctxt, "Expecting '}'");
             return;
         }
         NEXT!(ctxt);
     } else if cur == b'P' as _ {
         NEXT!(ctxt);
         if CUR!(ctxt) != b'{' {
-            ERROR!(ctxt, c"Expecting '{'".as_ptr());
+            ERROR!(ctxt, "Expecting '{'");
             return;
         }
         NEXT!(ctxt);
@@ -1111,7 +1109,7 @@ unsafe extern "C" fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
             (*(*ctxt).atom).neg = 1;
         }
         if CUR!(ctxt) != b'}' {
-            ERROR!(ctxt, c"Expecting '}'".as_ptr());
+            ERROR!(ctxt, "Expecting '}'");
             return;
         }
         NEXT!(ctxt);
@@ -1253,10 +1251,7 @@ unsafe extern "C" fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
             xml_reg_atom_add_range(ctxt, (*ctxt).atom, (*ctxt).neg, Some(typ), 0, 0, null_mut());
         }
     } else {
-        ERROR!(
-            ctxt,
-            c"Wrong escape sequence, misuse of character '\\'".as_ptr()
-        );
+        ERROR!(ctxt, "Wrong escape sequence, misuse of character '\\'");
     }
 }
 
@@ -1289,7 +1284,7 @@ unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
     let mut end: i32;
 
     if CUR!(ctxt) == b'\0' {
-        ERROR!(ctxt, c"Expecting ']'".as_ptr());
+        ERROR!(ctxt, "Expecting ']'");
         return;
     }
 
@@ -1312,7 +1307,7 @@ unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
                 start = cur;
             }
             _ => {
-                ERROR!(ctxt, c"Invalid escape value".as_ptr());
+                ERROR!(ctxt, "Invalid escape value");
                 return;
             }
         }
@@ -1322,7 +1317,7 @@ unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
         start = CUR_SCHAR!((*ctxt).cur, len);
         end = start;
     } else {
-        ERROR!(ctxt, c"Expecting a char range".as_ptr());
+        ERROR!(ctxt, "Expecting a char range");
         return;
     }
     /*
@@ -1367,7 +1362,7 @@ unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
                 end = cur;
             }
             _ => {
-                ERROR!(ctxt, c"Invalid escape value".as_ptr());
+                ERROR!(ctxt, "Invalid escape value");
                 return;
             }
         }
@@ -1375,13 +1370,13 @@ unsafe extern "C" fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
     } else if cur != '\0' as i32 && cur != 0x5B && cur != 0x5D {
         end = CUR_SCHAR!((*ctxt).cur, len);
     } else {
-        ERROR!(ctxt, c"Expecting the end of a char range".as_ptr());
+        ERROR!(ctxt, "Expecting the end of a char range");
         return;
     }
 
     /* TODO check that the values are acceptable character ranges for XML */
     if end < start {
-        ERROR!(ctxt, c"End of range is before start of range".as_ptr());
+        ERROR!(ctxt, "End of range is before start of range");
     } else {
         NEXTL!(ctxt, len);
         xml_reg_atom_add_range(
@@ -1435,7 +1430,7 @@ unsafe extern "C" fn xml_fa_parse_char_group(ctxt: XmlRegParserCtxtPtr) {
             if CUR!(ctxt) == b']' {
                 NEXT!(ctxt);
             } else {
-                ERROR!(ctxt, c"charClassExpr: ']' expected".as_ptr());
+                ERROR!(ctxt, "charClassExpr: ']' expected");
             }
             break;
         } else {
@@ -1460,7 +1455,7 @@ unsafe extern "C" fn xml_fa_parse_char_class(ctxt: XmlRegParserCtxtPtr) {
         if CUR!(ctxt) == b']' {
             NEXT!(ctxt);
         } else {
-            ERROR!(ctxt, c"xmlFAParseCharClass: ']' expected".as_ptr());
+            ERROR!(ctxt, "xmlFAParseCharClass: ']' expected");
         }
     } else {
         xml_fa_parse_char_class_esc(ctxt);
@@ -1488,10 +1483,7 @@ unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
     } else if CUR!(ctxt) == b'(' {
         NEXT!(ctxt);
         if (*ctxt).depth >= 50 {
-            ERROR!(
-                ctxt,
-                c"xmlFAParseAtom: maximum nesting depth exceeded".as_ptr()
-            );
+            ERROR!(ctxt, "xmlFAParseAtom: maximum nesting depth exceeded");
             return -1;
         }
         /*
@@ -1511,7 +1503,7 @@ unsafe extern "C" fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
         if CUR!(ctxt) == b')' {
             NEXT!(ctxt);
         } else {
-            ERROR!(ctxt, c"xmlFAParseAtom: expecting ')'".as_ptr());
+            ERROR!(ctxt, "xmlFAParseAtom: expecting ')'");
         }
         (*ctxt).atom = xml_reg_new_atom(ctxt, Some(XmlRegAtomType::XmlRegexpSubreg));
         if (*ctxt).atom.is_null() {
@@ -1594,7 +1586,7 @@ unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> i32 {
         if cur >= 0 {
             min = cur;
         } else {
-            ERROR!(ctxt, c"Improper quantifier".as_ptr());
+            ERROR!(ctxt, "Improper quantifier");
         }
         if CUR!(ctxt) == b',' {
             NEXT!(ctxt);
@@ -1605,14 +1597,14 @@ unsafe extern "C" fn xml_fa_parse_quantifier(ctxt: XmlRegParserCtxtPtr) -> i32 {
                 if cur >= 0 {
                     max = cur;
                 } else {
-                    ERROR!(ctxt, c"Improper quantifier".as_ptr());
+                    ERROR!(ctxt, "Improper quantifier");
                 }
             }
         }
         if CUR!(ctxt) == b'}' {
             NEXT!(ctxt);
         } else {
-            ERROR!(ctxt, c"Unterminated quantifier".as_ptr());
+            ERROR!(ctxt, "Unterminated quantifier");
         }
         if max == 0 {
             max = min;
@@ -1636,7 +1628,7 @@ unsafe extern "C" fn xml_fa_parse_piece(ctxt: XmlRegParserCtxtPtr) -> i32 {
         return 0;
     }
     if (*ctxt).atom.is_null() {
-        ERROR!(ctxt, c"internal: no atom generated".as_ptr());
+        ERROR!(ctxt, "internal: no atom generated");
     }
     xml_fa_parse_quantifier(ctxt);
     1
@@ -1667,7 +1659,7 @@ unsafe extern "C" fn xml_reg_copy_range(
     if !(*range).block_name.is_null() {
         (*ret).block_name = xml_strdup((*range).block_name);
         if (*ret).block_name.is_null() {
-            xml_regexp_err_memory(ctxt, c"allocating range".as_ptr());
+            xml_regexp_err_memory(ctxt, "allocating range");
             xml_reg_free_range(ret);
             return null_mut();
         }
@@ -1685,7 +1677,7 @@ unsafe extern "C" fn xml_reg_copy_atom(
 ) -> XmlRegAtomPtr {
     let ret: XmlRegAtomPtr = xml_malloc(size_of::<XmlRegAtom>()) as XmlRegAtomPtr;
     if ret.is_null() {
-        xml_regexp_err_memory(ctxt, c"copying atom".as_ptr());
+        xml_regexp_err_memory(ctxt, "copying atom");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRegAtom>());
@@ -1697,7 +1689,7 @@ unsafe extern "C" fn xml_reg_copy_atom(
         (*ret).ranges = xml_malloc(size_of::<XmlRegRangePtr>() * (*atom).nb_ranges as usize)
             as *mut XmlRegRangePtr;
         if (*ret).ranges.is_null() {
-            xml_regexp_err_memory(ctxt, c"copying atom".as_ptr());
+            xml_regexp_err_memory(ctxt, "copying atom");
             // goto error;
             xml_reg_free_atom(ret);
             return null_mut();
@@ -1726,7 +1718,7 @@ pub(crate) unsafe extern "C" fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -
         (*ctxt).counters = xml_malloc((*ctxt).max_counters as usize * size_of::<XmlRegCounter>())
             as *mut XmlRegCounter;
         if (*ctxt).counters.is_null() {
-            xml_regexp_err_memory(ctxt, c"allocating counter".as_ptr());
+            xml_regexp_err_memory(ctxt, "allocating counter");
             (*ctxt).max_counters = 0;
             return -1;
         }
@@ -1737,7 +1729,7 @@ pub(crate) unsafe extern "C" fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -
             (*ctxt).max_counters as usize * size_of::<XmlRegCounter>(),
         ) as *mut XmlRegCounter;
         if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, c"allocating counter".as_ptr());
+            xml_regexp_err_memory(ctxt, "allocating counter");
             (*ctxt).max_counters /= 2;
             return -1;
         }
@@ -1791,7 +1783,7 @@ pub(crate) unsafe extern "C" fn xml_reg_atom_push(
     atom: XmlRegAtomPtr,
 ) -> i32 {
     if atom.is_null() {
-        ERROR!(ctxt, c"atom push: atom is NULL".as_ptr());
+        ERROR!(ctxt, "atom push: atom is NULL");
         return -1;
     }
     if (*ctxt).nb_atoms >= (*ctxt).max_atoms {
@@ -1804,7 +1796,7 @@ pub(crate) unsafe extern "C" fn xml_reg_atom_push(
         let tmp: *mut XmlRegAtomPtr =
             xml_realloc((*ctxt).atoms as _, new_size * size_of::<XmlRegAtomPtr>()) as _;
         if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, c"allocating counter".as_ptr());
+            xml_regexp_err_memory(ctxt, "allocating counter");
             return -1;
         }
         (*ctxt).atoms = tmp;
@@ -1827,7 +1819,7 @@ pub(crate) unsafe extern "C" fn xml_fa_generate_transitions(
     let mut nullable: i32 = 0;
 
     if atom.is_null() {
-        ERROR!(ctxt, c"generate transition: atom == NULL".as_ptr());
+        ERROR!(ctxt, "generate transition: atom == NULL");
         return -1;
     }
     if matches!((*atom).typ, XmlRegAtomType::XmlRegexpSubreg) {
@@ -2468,7 +2460,7 @@ unsafe extern "C" fn xml_reg_calloc2(dim1: usize, dim2: usize, elem_size: usize)
 pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlRegexpPtr {
     let ret: XmlRegexpPtr = xml_malloc(size_of::<XmlRegexp>()) as XmlRegexpPtr;
     if ret.is_null() {
-        xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
+        xml_regexp_err_memory(ctxt, "compiling regexp");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRegexp>());
@@ -2510,7 +2502,7 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
 
         let state_remap: *mut i32 = xml_malloc((*ret).nb_states as usize * size_of::<i32>()) as _;
         if state_remap.is_null() {
-            xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
+            xml_regexp_err_memory(ctxt, "compiling regexp");
             xml_free(ret as _);
             return null_mut();
         }
@@ -2525,14 +2517,14 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
         let string_map: *mut *mut XmlChar =
             xml_malloc((*ret).nb_atoms as usize * size_of::<*mut c_char>()) as _;
         if string_map.is_null() {
-            xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
+            xml_regexp_err_memory(ctxt, "compiling regexp");
             xml_free(state_remap as _);
             xml_free(ret as _);
             return null_mut();
         }
         let string_remap: *mut i32 = xml_malloc((*ret).nb_atoms as usize * size_of::<i32>()) as _;
         if string_remap.is_null() {
-            xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
+            xml_regexp_err_memory(ctxt, "compiling regexp");
             xml_free(string_map as _);
             xml_free(state_remap as _);
             xml_free(ret as _);
@@ -2630,7 +2622,7 @@ pub(crate) unsafe extern "C" fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr
                         size_of::<*mut c_void>(),
                     ) as *mut *mut c_void;
                     if transdata.is_null() {
-                        xml_regexp_err_memory(ctxt, c"compiling regexp".as_ptr());
+                        xml_regexp_err_memory(ctxt, "compiling regexp");
                         break;
                     }
                 }
@@ -2741,7 +2733,7 @@ pub unsafe extern "C" fn xml_regexp_compile(regexp: *const XmlChar) -> XmlRegexp
     /* parse the expression building an automata */
     xml_fa_parse_reg_exp(ctxt, 1);
     if CUR!(ctxt) != 0 {
-        ERROR!(ctxt, c"xmlFAParseRegExp: extra characters".as_ptr());
+        ERROR!(ctxt, "xmlFAParseRegExp: extra characters");
     }
     if (*ctxt).error != 0 {
         // goto error;
@@ -3192,7 +3184,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
             xml_malloc((*exec).max_rollbacks as usize * size_of::<XmlRegExecRollback>())
                 as *mut XmlRegExecRollback;
         if (*exec).rollbacks.is_null() {
-            xml_regexp_err_memory(null_mut(), c"saving regexp".as_ptr());
+            xml_regexp_err_memory(null_mut(), "saving regexp");
             (*exec).max_rollbacks = 0;
             return;
         }
@@ -3211,7 +3203,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
             (*exec).max_rollbacks as usize * size_of::<XmlRegExecRollback>(),
         ) as *mut XmlRegExecRollback;
         if tmp.is_null() {
-            xml_regexp_err_memory(null_mut(), c"saving regexp".as_ptr());
+            xml_regexp_err_memory(null_mut(), "saving regexp");
             (*exec).max_rollbacks /= 2;
             return;
         }
@@ -3237,7 +3229,7 @@ unsafe extern "C" fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
                 .counts
                 .is_null()
             {
-                xml_regexp_err_memory(null_mut(), c"saving regexp".as_ptr());
+                xml_regexp_err_memory(null_mut(), "saving regexp");
                 (*exec).status = -5;
                 return;
             }
@@ -3278,7 +3270,7 @@ unsafe extern "C" fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar
     if (*comp).nb_counters > 0 {
         (*exec).counts = xml_malloc((*comp).nb_counters as usize * size_of::<i32>()) as *mut i32;
         if (*exec).counts.is_null() {
-            xml_regexp_err_memory(null_mut(), c"running regexp".as_ptr());
+            xml_regexp_err_memory(null_mut(), "running regexp");
             return -1;
         }
         memset(
@@ -4888,7 +4880,7 @@ pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
     }
     let exec: XmlRegExecCtxtPtr = xml_malloc(size_of::<XmlRegExecCtxt>()) as XmlRegExecCtxtPtr;
     if exec.is_null() {
-        xml_regexp_err_memory(null_mut(), c"creating execution context".as_ptr());
+        xml_regexp_err_memory(null_mut(), "creating execution context");
         return null_mut();
     }
     memset(exec as _, 0, size_of::<XmlRegExecCtxt>());
@@ -4915,7 +4907,7 @@ pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
         (*exec).counts =
             xml_malloc((*comp).nb_counters as usize * size_of::<i32>() * 2) as *mut i32;
         if (*exec).counts.is_null() {
-            xml_regexp_err_memory(null_mut(), c"creating execution context".as_ptr());
+            xml_regexp_err_memory(null_mut(), "creating execution context");
             xml_free(exec as _);
             return null_mut();
         }
@@ -5074,7 +5066,7 @@ unsafe extern "C" fn xml_fareg_exec_save_input_string(
             xml_malloc((*exec).input_stack_max as usize * size_of::<XmlRegInputToken>())
                 as XmlRegInputTokenPtr;
         if (*exec).input_stack.is_null() {
-            xml_regexp_err_memory(null_mut(), c"pushing input string".as_ptr());
+            xml_regexp_err_memory(null_mut(), "pushing input string");
             (*exec).input_stack_max = 0;
             return;
         }
@@ -5085,7 +5077,7 @@ unsafe extern "C" fn xml_fareg_exec_save_input_string(
             (*exec).input_stack_max as usize * size_of::<XmlRegInputToken>(),
         ) as XmlRegInputTokenPtr;
         if tmp.is_null() {
-            xml_regexp_err_memory(null_mut(), c"pushing input string".as_ptr());
+            xml_regexp_err_memory(null_mut(), "pushing input string");
             (*exec).input_stack_max /= 2;
             return;
         }

@@ -681,7 +681,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
 
     let ret: XmlNodeSetPtr = xml_malloc(size_of::<XmlNodeSet>()) as XmlNodeSetPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating nodeset\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlNodeSet>());
@@ -689,7 +689,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
         (*ret).node_tab =
             xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
         if (*ret).node_tab.is_null() {
-            xml_xpath_err_memory(null_mut(), c"creating nodeset\n".as_ptr() as _);
+            xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
             xml_free(ret as _);
             return null_mut();
         }
@@ -768,7 +768,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
 
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"copying object\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("copying object\n"));
         return null_mut();
     }
     memcpy(ret as _, val as _, size_of::<XmlXPathObject>());
@@ -1487,7 +1487,7 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
 pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContextPtr {
     let ret: XmlXPathContextPtr = xml_malloc(size_of::<XmlXPathContext>()) as XmlXPathContextPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating context\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("creating context\n"));
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlXPathContext::default());
@@ -1608,7 +1608,7 @@ unsafe extern "C" fn xml_xpath_new_cache() -> XmlXpathContextCachePtr {
     let ret: XmlXpathContextCachePtr =
         xml_malloc(size_of::<XmlXpathContextCache>()) as XmlXpathContextCachePtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating object cache\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("creating object cache\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXpathContextCache>());
@@ -2013,7 +2013,7 @@ unsafe extern "C" fn xml_xpath_comp_parser_context(
     let ret: XmlXPathParserContextPtr =
         xml_malloc(size_of::<XmlXPathParserContext>()) as XmlXPathParserContextPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(ctxt, c"creating evaluation context\n".as_ptr() as _);
+        xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathParserContext>());
@@ -2022,7 +2022,7 @@ unsafe extern "C" fn xml_xpath_comp_parser_context(
     (*ret).value_tab = xml_malloc(10 * size_of::<XmlXPathObjectPtr>()) as *mut XmlXPathObjectPtr;
     if (*ret).value_tab.is_null() {
         xml_free(ret as _);
-        xml_xpath_err_memory(ctxt, c"creating evaluation context\n".as_ptr() as _);
+        xml_xpath_err_memory(ctxt, Some("creating evaluation context\n"));
         return null_mut();
     }
     (*ret).value_nr = 0;

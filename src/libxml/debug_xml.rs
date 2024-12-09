@@ -176,11 +176,7 @@ const DUMP_TEXT_TYPE: i32 = 1;
 
 /// Handle a debug error.
 #[doc(alias = "xmlDebugErr")]
-unsafe extern "C" fn xml_debug_err(
-    ctxt: XmlDebugCtxtPtr,
-    error: XmlParserErrors,
-    msg: *const c_char,
-) {
+unsafe fn xml_debug_err(ctxt: XmlDebugCtxtPtr, error: XmlParserErrors, msg: &str) {
     (*ctxt).errors += 1;
     __xml_raise_error!(
         None,
@@ -198,8 +194,7 @@ unsafe extern "C" fn xml_debug_err(
         None,
         0,
         0,
-        "%s",
-        msg
+        msg,
     );
 }
 
@@ -335,7 +330,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNsScope,
-                c"Reference to default namespace not in scope\n".as_ptr(),
+                "Reference to default namespace not in scope\n",
             );
         } else {
             xml_debug_err3(
@@ -351,7 +346,7 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNsAncestor,
-                c"Reference to default namespace not on ancestor\n".as_ptr(),
+                "Reference to default namespace not on ancestor\n",
             );
         } else {
             xml_debug_err3(
@@ -386,11 +381,7 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
 unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const XmlChar) {
     if (*ctxt).check != 0 {
         if name.is_null() {
-            xml_debug_err(
-                ctxt,
-                XmlParserErrors::XmlCheckNoName,
-                c"Name is NULL".as_ptr(),
-            );
+            xml_debug_err(ctxt, XmlParserErrors::XmlCheckNoName, "Name is NULL");
             return;
         }
         #[cfg(any(feature = "libxml_tree", feature = "schema"))]
@@ -429,15 +420,11 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoParent,
-            c"Node has no parent\n".as_ptr(),
+            "Node has no parent\n",
         );
     }
     if (*node).doc.is_null() {
-        xml_debug_err(
-            ctxt,
-            XmlParserErrors::XmlCheckNoDoc,
-            c"Node has no doc\n".as_ptr(),
-        );
+        xml_debug_err(ctxt, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n");
         // dict = null_mut();
     } else {
         dict = (*doc).dict;
@@ -462,7 +449,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckWrongDoc,
-            c"Node doc differs from parent's one\n".as_ptr(),
+            "Node doc differs from parent's one\n",
         );
     }
     if (*node).prev.is_none() {
@@ -475,7 +462,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 xml_debug_err(
                     ctxt,
                     XmlParserErrors::XmlCheckNoPrev,
-                    c"Attr has no prev and not first of attr list\n".as_ptr(),
+                    "Attr has no prev and not first of attr list\n",
                 );
             }
         } else if (*node)
@@ -486,14 +473,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNoPrev,
-                c"Node has no prev and not first of parent list\n".as_ptr(),
+                "Node has no prev and not first of parent list\n",
             );
         }
     } else if (*node).prev.unwrap().next != NodePtr::from_ptr(node) {
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckWrongPrev,
-            c"Node prev->next : back link wrong\n".as_ptr(),
+            "Node prev->next : back link wrong\n",
         );
     }
     if let Some(next) = (*node).next {
@@ -501,14 +488,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongNext,
-                c"Node next->prev : forward link wrong\n".as_ptr(),
+                "Node next->prev : forward link wrong\n",
             );
         }
         if next.parent() != (*node).parent() {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongParent,
-                c"Node next->prev : forward link wrong\n".as_ptr(),
+                "Node next->prev : forward link wrong\n",
             );
         }
     } else if (*node)
@@ -523,7 +510,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoNext,
-            c"Node has no next and not last of parent list\n".as_ptr(),
+            "Node has no next and not last of parent list\n",
         );
     }
     if (*node).element_type() == XmlElementType::XmlElementNode {
@@ -636,11 +623,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
     }
 
     if (*dtd).typ != XmlElementType::XmlDTDNode {
-        xml_debug_err(
-            ctxt,
-            XmlParserErrors::XmlCheckNotDTD,
-            c"Node is not a DTD".as_ptr(),
-        );
+        xml_debug_err(ctxt, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD");
         return;
     }
     if (*ctxt).check == 0 {
@@ -697,7 +680,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNotElemDecl,
-            c"Node is not an element declaration".as_ptr(),
+            "Node is not an element declaration",
         );
         return;
     }
@@ -712,7 +695,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
-            c"Element declaration has no name".as_ptr(),
+            "Element declaration has no name",
         );
     }
     if (*ctxt).check == 0 {
@@ -763,7 +746,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNotAttrDecl,
-            c"Node is not an attribute declaration".as_ptr(),
+            "Node is not an attribute declaration",
         );
         return;
     }
@@ -776,7 +759,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
-            c"Node attribute declaration has no name".as_ptr(),
+            "Node attribute declaration has no name",
         );
     }
     if let Some(elem) = (*attr).elem.as_deref() {
@@ -787,7 +770,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoElem,
-            c"Node attribute declaration has no element name".as_ptr(),
+            "Node attribute declaration has no element name",
         );
     }
     if (*ctxt).check == 0 {
@@ -884,7 +867,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNotEntityDecl,
-            c"Node is not an entity declaration".as_ptr(),
+            "Node is not an entity declaration",
         );
         return;
     }
@@ -898,7 +881,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
-            c"Entity declaration has no name".as_ptr(),
+            "Entity declaration has no name",
         );
     }
     if (*ctxt).check == 0 {
@@ -970,7 +953,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNotNsDecl,
-            c"Node is not a namespace declaration".as_ptr(),
+            "Node is not a namespace declaration",
         );
         return;
     }
@@ -986,7 +969,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckNoHref,
-                c"Incomplete default namespace href=NULL\n".as_ptr(),
+                "Incomplete default namespace href=NULL\n",
             );
         }
     } else if (*ctxt).check == 0 {
@@ -1332,7 +1315,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr)
         xml_debug_err(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
-            c"Attribute has no name".as_ptr(),
+            "Attribute has no name",
         );
     }
 
@@ -1438,56 +1421,56 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundElement,
-                c"Misplaced ELEMENT node\n".as_ptr(),
+                "Misplaced ELEMENT node\n",
             );
         }
         XmlElementType::XmlAttributeNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundAttribute,
-                c"Misplaced ATTRIBUTE node\n".as_ptr(),
+                "Misplaced ATTRIBUTE node\n",
             );
         }
         XmlElementType::XmlTextNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundText,
-                c"Misplaced TEXT node\n".as_ptr(),
+                "Misplaced TEXT node\n",
             );
         }
         XmlElementType::XmlCDATASectionNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundCDATA,
-                c"Misplaced CDATA node\n".as_ptr(),
+                "Misplaced CDATA node\n",
             );
         }
         XmlElementType::XmlEntityRefNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundEntityRef,
-                c"Misplaced ENTITYREF node\n".as_ptr(),
+                "Misplaced ENTITYREF node\n",
             );
         }
         XmlElementType::XmlEntityNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundEntity,
-                c"Misplaced ENTITY node\n".as_ptr(),
+                "Misplaced ENTITY node\n",
             );
         }
         XmlElementType::XmlPINode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundPI,
-                c"Misplaced PI node\n".as_ptr(),
+                "Misplaced PI node\n",
             );
         }
         XmlElementType::XmlCommentNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundComment,
-                c"Misplaced COMMENT node\n".as_ptr(),
+                "Misplaced COMMENT node\n",
             );
         }
         XmlElementType::XmlDocumentNode => {
@@ -1504,21 +1487,21 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundDoctype,
-                c"Misplaced DOCTYPE node\n".as_ptr(),
+                "Misplaced DOCTYPE node\n",
             );
         }
         XmlElementType::XmlDocumentFragNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundFragment,
-                c"Misplaced FRAGMENT node\n".as_ptr(),
+                "Misplaced FRAGMENT node\n",
             );
         }
         XmlElementType::XmlNotationNode => {
             xml_debug_err(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundNotation,
-                c"Misplaced NOTATION node\n".as_ptr(),
+                "Misplaced NOTATION node\n",
             );
         }
         _ => {

@@ -220,7 +220,7 @@ pub unsafe fn xml_c14n_doc_save_to(
 
 /// Handle a redefinition of param error
 #[doc(alias = "xmlC14NErrParam")]
-unsafe extern "C" fn xml_c14n_err_param(extra: *const c_char) {
+unsafe fn xml_c14n_err_param(extra: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -232,19 +232,19 @@ unsafe extern "C" fn xml_c14n_err_param(extra: *const c_char) {
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         None,
         None,
         0,
         0,
-        "Invalid parameter : %s\n",
+        "Invalid parameter : {}\n",
         extra
     );
 }
 
 /// Handle a redefinition of memory error
 #[doc(alias = "xmlC14NErrMemory")]
-unsafe extern "C" fn xml_c14n_err_memory(extra: *const c_char) {
+unsafe fn xml_c14n_err_memory(extra: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -256,19 +256,19 @@ unsafe extern "C" fn xml_c14n_err_memory(extra: *const c_char) {
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         None,
         None,
         0,
         0,
-        "Memory allocation failed : %s\n",
+        "Memory allocation failed : {}\n",
         extra
     );
 }
 
 /// Handle a redefinition of internal error
 #[doc(alias = "xmlC14NErrInternal")]
-unsafe extern "C" fn xml_c14n_err_internal(extra: *const c_char) {
+unsafe fn xml_c14n_err_internal(extra: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -280,12 +280,12 @@ unsafe extern "C" fn xml_c14n_err_internal(extra: *const c_char) {
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         None,
         None,
         0,
         0,
-        "Internal error : %s\n",
+        "Internal error : {}\n",
         extra
     );
 }
@@ -307,7 +307,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     let mut ret: i32;
 
     if doc_txt_ptr.is_null() {
-        xml_c14n_err_param(c"dumping doc to memory".as_ptr() as _);
+        xml_c14n_err_param("dumping doc to memory");
         return -1;
     }
 
@@ -315,7 +315,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
 
     // create memory buffer with UTF8 (default) encoding
     let Some(buf) = XmlOutputBuffer::from_wrapped_encoder(None) else {
-        xml_c14n_err_memory(c"creating output buffer".as_ptr() as _);
+        xml_c14n_err_memory("creating output buffer");
         return -1;
     };
     let buf = Rc::new(RefCell::new(buf));
@@ -330,7 +330,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
         buf.clone(),
     );
     if ret < 0 {
-        xml_c14n_err_internal(c"saving doc to output buffer".as_ptr() as _);
+        xml_c14n_err_internal("saving doc to output buffer");
         buf.borrow_mut().flush();
         return -1;
     }
@@ -346,7 +346,7 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
     }
 
     if (*doc_txt_ptr).is_null() && ret >= 0 {
-        xml_c14n_err_memory(c"copying canonicalized document".as_ptr() as _);
+        xml_c14n_err_memory("copying canonicalized document");
         return -1;
     }
     ret
@@ -368,14 +368,14 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
     compression: i32,
 ) -> i32 {
     if filename.is_null() {
-        xml_c14n_err_param(c"saving doc".as_ptr() as _);
+        xml_c14n_err_param("saving doc");
         return -1;
     }
 
     // save the content to a temp buffer, use default UTF8 encoding.
     let filename = CStr::from_ptr(filename).to_string_lossy();
     let Some(buf) = XmlOutputBuffer::from_uri(filename.as_ref(), None, compression) else {
-        xml_c14n_err_internal(c"creating temporary filename".as_ptr() as _);
+        xml_c14n_err_internal("creating temporary filename");
         return -1;
     };
 
@@ -390,7 +390,7 @@ pub unsafe extern "C" fn xml_c14n_doc_save(
         buf.clone(),
     );
     if ret < 0 {
-        xml_c14n_err_internal(c"canonize document to buffer".as_ptr() as _);
+        xml_c14n_err_internal("canonize document to buffer");
         buf.borrow_mut().flush();
         return -1;
     }
@@ -414,12 +414,7 @@ pub type XmlC14NIsVisibleCallback =
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlC14NErr")]
-unsafe extern "C" fn xml_c14n_err(
-    ctxt: XmlC14NCtxPtr,
-    node: XmlNodePtr,
-    error: XmlParserErrors,
-    msg: *const c_char,
-) {
+unsafe fn xml_c14n_err(ctxt: XmlC14NCtxPtr, node: XmlNodePtr, error: XmlParserErrors, msg: &str) {
     if !ctxt.is_null() {
         (*ctxt).error = error as i32;
     }
@@ -439,15 +434,14 @@ unsafe extern "C" fn xml_c14n_err(
         None,
         0,
         0,
-        "%s",
-        msg
+        msg,
     );
 }
 
 unsafe extern "C" fn xml_c14n_visible_ns_stack_create() -> XmlC14NVisibleNsStackPtr {
     let ret: XmlC14NVisibleNsStackPtr = xml_malloc(size_of::<XmlC14NVisibleNsStack>()) as _;
     if ret.is_null() {
-        xml_c14n_err_memory(c"creating namespaces stack".as_ptr() as _);
+        xml_c14n_err_memory("creating namespaces stack");
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlC14NVisibleNsStack>());
@@ -456,7 +450,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_create() -> XmlC14NVisibleNsStack
 
 unsafe extern "C" fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStackPtr) {
     if cur.is_null() {
-        xml_c14n_err_param(c"destroying namespaces stack".as_ptr() as _);
+        xml_c14n_err_param("destroying namespaces stack");
         return;
     }
     if !(*cur).ns_tab.is_null() {
@@ -483,7 +477,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStac
 #[doc(alias = "xmlC14NFreeCtx")]
 unsafe extern "C" fn xml_c14n_free_ctx(ctx: XmlC14NCtxPtr) {
     if ctx.is_null() {
-        xml_c14n_err_param(c"freeing context".as_ptr() as _);
+        xml_c14n_err_param("freeing context");
         return;
     }
 
@@ -515,7 +509,7 @@ unsafe fn xml_c14n_new_ctx(
     let mut ctx: XmlC14NCtxPtr = null_mut();
 
     if doc.is_null() {
-        xml_c14n_err_param(c"creating new context".as_ptr() as _);
+        xml_c14n_err_param("creating new context");
         return null_mut();
     }
 
@@ -525,8 +519,7 @@ unsafe fn xml_c14n_new_ctx(
             ctx,
             doc as _,
             XmlParserErrors::XmlC14NRequiresUtf8,
-            c"xmlC14NNewCtx: output buffer encoder != NULL but C14N requires UTF8 output\n".as_ptr()
-                as _,
+            "xmlC14NNewCtx: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
         return null_mut();
     }
@@ -534,7 +527,7 @@ unsafe fn xml_c14n_new_ctx(
     // Allocate a new xmlC14NCtxPtr and fill the fields.
     ctx = xml_malloc(size_of::<XmlC14NCtx>()) as _;
     if ctx.is_null() {
-        xml_c14n_err_memory(c"creating context".as_ptr() as _);
+        xml_c14n_err_memory("creating context");
         return null_mut();
     }
     memset(ctx as _, 0, size_of::<XmlC14NCtx>());
@@ -555,7 +548,7 @@ unsafe fn xml_c14n_new_ctx(
             ctx,
             doc as _,
             XmlParserErrors::XmlC14NCreateStack,
-            c"xmlC14NNewCtx: xmlC14NVisibleNsStackCreate failed\n".as_ptr() as _,
+            "xmlC14NNewCtx: xmlC14NVisibleNsStackCreate failed\n",
         );
         xml_c14n_free_ctx(ctx);
         return null_mut();
@@ -585,7 +578,7 @@ macro_rules! xml_c14n_is_visible {
 
 /// Handle a redefinition of relative namespace error
 #[doc(alias = "xmlC14NErrRelativeNamespace")]
-unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
+unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -602,7 +595,7 @@ unsafe extern "C" fn xml_c14n_err_relative_namespace(ns_uri: *const c_char) {
         None,
         0,
         0,
-        "Relative namespace UR is invalid here : %s\n",
+        "Relative namespace UR is invalid here : {}\n",
         ns_uri
     );
 }
@@ -621,7 +614,7 @@ unsafe extern "C" fn xml_c14n_check_for_relative_namespaces(
         || cur.is_null()
         || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
     {
-        xml_c14n_err_param(c"checking for relative namespaces".as_ptr() as _);
+        xml_c14n_err_param("checking for relative namespaces");
         return -1;
     }
 
@@ -630,11 +623,12 @@ unsafe extern "C" fn xml_c14n_check_for_relative_namespaces(
         if xml_strlen((*ns).href as _) > 0 {
             let uri: XmlURIPtr = xml_parse_uri((*ns).href as _);
             if uri.is_null() {
-                xml_c14n_err_internal(c"parsing namespace uri".as_ptr() as _);
+                xml_c14n_err_internal("parsing namespace uri");
                 return -1;
             }
             if xml_strlen((*uri).scheme as _) == 0 {
-                xml_c14n_err_relative_namespace((*uri).scheme);
+                let scheme = CStr::from_ptr((*uri).scheme as *const i8).to_string_lossy();
+                xml_c14n_err_relative_namespace(scheme.as_ref());
                 xml_free_uri(uri);
                 return -1;
             }
@@ -650,7 +644,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_save(
     state: XmlC14NVisibleNsStackPtr,
 ) {
     if cur.is_null() || state.is_null() {
-        xml_c14n_err_param(c"saving namespaces stack".as_ptr() as _);
+        xml_c14n_err_param("saving namespaces stack");
         return;
     }
 
@@ -726,7 +720,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_find(
     ns: Option<&XmlNs>,
 ) -> bool {
     if cur.is_null() {
-        xml_c14n_err_param(c"searching namespaces stack (c14n)".as_ptr() as _);
+        xml_c14n_err_param("searching namespaces stack (c14n)");
         return false;
     }
 
@@ -793,7 +787,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
         || ((*cur).ns_tab.is_null() && !(*cur).node_tab.is_null())
         || (!(*cur).ns_tab.is_null() && (*cur).node_tab.is_null())
     {
-        xml_c14n_err_param(c"adding namespace to stack".as_ptr() as _);
+        xml_c14n_err_param("adding namespace to stack");
         return;
     }
 
@@ -801,7 +795,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
         (*cur).ns_tab = xml_malloc(XML_NAMESPACES_DEFAULT * size_of::<XmlNsPtr>()) as _;
         (*cur).node_tab = xml_malloc(XML_NAMESPACES_DEFAULT * size_of::<XmlNodePtr>()) as _;
         if (*cur).ns_tab.is_null() || (*cur).node_tab.is_null() {
-            xml_c14n_err_memory(c"adding node to stack".as_ptr() as _);
+            xml_c14n_err_memory("adding node to stack");
             return;
         }
         memset(
@@ -824,7 +818,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
             tmp_size as usize * size_of::<XmlNsPtr>(),
         ) as _;
         if tmp.is_null() {
-            xml_c14n_err_memory(c"adding node to stack".as_ptr() as _);
+            xml_c14n_err_memory("adding node to stack");
             return;
         }
         (*cur).ns_tab = tmp as _;
@@ -834,7 +828,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
             tmp_size as usize * size_of::<XmlNodePtr>(),
         );
         if tmp.is_null() {
-            xml_c14n_err_memory(c"adding node to stack".as_ptr() as _);
+            xml_c14n_err_memory("adding node to stack");
             return;
         }
         (*cur).node_tab = tmp as _;
@@ -853,7 +847,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_add(
 #[doc(alias = "xmlC14NPrintNamespaces")]
 unsafe extern "C" fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -> i32 {
     if ctx.is_null() {
-        xml_c14n_err_param(c"writing namespaces".as_ptr() as _);
+        xml_c14n_err_param("writing namespaces");
         return 0;
     }
 
@@ -936,7 +930,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
         || cur.is_null()
         || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
     {
-        xml_c14n_err_param(c"processing namespaces axis (c14n)".as_ptr() as _);
+        xml_c14n_err_param("processing namespaces axis (c14n)");
         return -1;
     }
 
@@ -945,7 +939,7 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
      */
     let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_ns_compare));
     if list.is_null() {
-        xml_c14n_err_internal(c"creating namespaces list (c14n)".as_ptr() as _);
+        xml_c14n_err_internal("creating namespaces list (c14n)");
         return -1;
     }
 
@@ -1006,7 +1000,7 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
     ctx: XmlC14NCtxPtr,
 ) -> i32 {
     if cur.is_null() {
-        xml_c14n_err_param(c"searching namespaces stack (exc c14n)".as_ptr() as _);
+        xml_c14n_err_param("searching namespaces stack (exc c14n)");
         return 0;
     }
 
@@ -1097,12 +1091,12 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
         || cur.is_null()
         || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
     {
-        xml_c14n_err_param(c"processing namespaces axis (exc c14n)".as_ptr() as _);
+        xml_c14n_err_param("processing namespaces axis (exc c14n)");
         return -1;
     }
 
     if !xml_c14n_is_exclusive!(ctx) {
-        xml_c14n_err_param(c"processing namespaces axis (exc c14n)".as_ptr() as _);
+        xml_c14n_err_param("processing namespaces axis (exc c14n)");
         return -1;
     }
 
@@ -1111,7 +1105,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
      */
     let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_ns_compare));
     if list.is_null() {
-        xml_c14n_err_internal(c"creating namespaces list (exc c14n)".as_ptr() as _);
+        xml_c14n_err_internal("creating namespaces list (exc c14n)");
         return -1;
     }
 
@@ -1243,7 +1237,7 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
 
 unsafe extern "C" fn xml_c14n_visible_ns_stack_shift(cur: XmlC14NVisibleNsStackPtr) {
     if cur.is_null() {
-        xml_c14n_err_param(c"shifting namespaces stack".as_ptr() as _);
+        xml_c14n_err_param("shifting namespaces stack");
         return;
     }
     (*cur).ns_prev_start = (*cur).ns_prev_end;
@@ -1352,11 +1346,11 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
     let mut attr: XmlAttrPtr;
 
     if ctx.is_null() || xml_base_attr.is_null() {
-        xml_c14n_err_param(c"processing xml:base attribute".as_ptr() as _);
+        xml_c14n_err_param("processing xml:base attribute");
         return null_mut();
     }
     let Some(parent) = (*xml_base_attr).parent else {
-        xml_c14n_err_param(c"processing xml:base attribute".as_ptr() as _);
+        xml_c14n_err_param("processing xml:base attribute");
         return null_mut();
     };
 
@@ -1365,9 +1359,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
         .children
         .and_then(|c| c.get_string((*ctx).doc, 1))
     else {
-        xml_c14n_err_internal(
-            c"processing xml:base attribute - can't get attr value".as_ptr() as _,
-        );
+        xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
         return null_mut();
     };
 
@@ -1381,9 +1373,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
             /* get attr value */
             let Some(mut tmp_str) = (*attr).children.and_then(|c| c.get_string((*ctx).doc, 1))
             else {
-                xml_c14n_err_internal(
-                    c"processing xml:base attribute - can't get attr value".as_ptr() as _,
-                );
+                xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
                 return null_mut();
             };
 
@@ -1396,9 +1386,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
 
             // build uri
             let Some(tmp_str2) = build_uri(&res, &tmp_str) else {
-                xml_c14n_err_internal(
-                    c"processing xml:base attribute - can't construct uri".as_ptr() as _,
-                );
+                xml_c14n_err_internal("processing xml:base attribute - can't construct uri");
                 return null_mut();
             };
 
@@ -1423,9 +1411,7 @@ unsafe extern "C" fn xml_c14n_fixup_base_attr(
         res.as_ptr() as *const u8,
     );
     if attr.is_null() {
-        xml_c14n_err_internal(
-            c"processing xml:base attribute - can't construct attribute".as_ptr() as _,
-        );
+        xml_c14n_err_internal("processing xml:base attribute - can't construct attribute");
         return null_mut();
     }
 
@@ -1439,7 +1425,7 @@ macro_rules! grow_buffer_reentrant {
         $buffer_size *= 2;
         $buffer = xml_realloc($buffer as _, $buffer_size as usize) as _;
         if $buffer.is_null() {
-            xml_c14n_err_memory(c"growing buffer".as_ptr() as _);
+            xml_c14n_err_memory("growing buffer");
             return null_mut();
         }
     };
@@ -1468,7 +1454,7 @@ unsafe extern "C" fn xml_c11n_normalize_string(
     let mut buffer_size: i32 = 1000;
     let mut buffer: *mut XmlChar = xml_malloc_atomic(buffer_size as usize) as _;
     if buffer.is_null() {
-        xml_c14n_err_memory(c"allocating buffer".as_ptr() as _);
+        xml_c14n_err_memory("allocating buffer");
         return null_mut();
     }
     let mut out: *mut XmlChar = buffer;
@@ -1611,7 +1597,7 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
 
     unsafe {
         if attr.is_null() || ctx.is_null() {
-            xml_c14n_err_param(c"writing attributes".as_ptr() as _);
+            xml_c14n_err_param("writing attributes");
             return 0;
         }
 
@@ -1642,7 +1628,7 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
                     .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                 xml_free(buffer as _);
             } else {
-                xml_c14n_err_internal(c"normalizing attributes axis".as_ptr() as _);
+                xml_c14n_err_internal("normalizing attributes axis");
                 return 0;
             }
         }
@@ -1693,7 +1679,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
         || cur.is_null()
         || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
     {
-        xml_c14n_err_param(c"processing attributes axis".as_ptr() as _);
+        xml_c14n_err_param("processing attributes axis");
         return -1;
     }
 
@@ -1702,7 +1688,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
      */
     let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_attrs_compare));
     if list.is_null() {
-        xml_c14n_err_internal(c"creating attributes list".as_ptr() as _);
+        xml_c14n_err_internal("creating attributes list");
         return -1;
     }
 
@@ -1924,7 +1910,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_restore(
     state: XmlC14NVisibleNsStackPtr,
 ) {
     if cur.is_null() || state.is_null() {
-        xml_c14n_err_param(c"restoring namespaces stack".as_ptr() as _);
+        xml_c14n_err_param("restoring namespaces stack");
         return;
     }
     (*cur).ns_cur_end = (*state).ns_cur_end;
@@ -1961,7 +1947,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
         || cur.is_null()
         || !matches!((*cur).element_type(), XmlElementType::XmlElementNode)
     {
-        xml_c14n_err_param(c"processing element node".as_ptr() as _);
+        xml_c14n_err_param("processing element node");
         return -1;
     }
 
@@ -1971,7 +1957,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
      * failure on documents containing relative namespace URIs.
      */
     if xml_c14n_check_for_relative_namespaces(ctx, cur) < 0 {
-        xml_c14n_err_internal(c"checking for relative namespaces".as_ptr() as _);
+        xml_c14n_err_internal("checking for relative namespaces");
         return -1;
     }
 
@@ -2011,7 +1997,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
         ret = xml_exc_c14n_process_namespaces_axis(ctx, cur, visible);
     }
     if ret < 0 {
-        xml_c14n_err_internal(c"processing namespaces axis".as_ptr() as _);
+        xml_c14n_err_internal("processing namespaces axis");
         return -1;
     }
     /* todo: shouldn't this go to "visible only"? */
@@ -2021,7 +2007,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
 
     ret = xml_c14n_process_attrs_axis(ctx, cur, visible);
     if ret < 0 {
-        xml_c14n_err_internal(c"processing attributes axis".as_ptr() as _);
+        xml_c14n_err_internal("processing attributes axis");
         return -1;
     }
 
@@ -2031,7 +2017,7 @@ unsafe extern "C" fn xml_c14n_process_element_node(
     if let Some(children) = (*cur).children() {
         ret = xml_c14n_process_node_list(ctx, children.as_ptr());
         if ret < 0 {
-            xml_c14n_err_internal(c"processing childrens list".as_ptr() as _);
+            xml_c14n_err_internal("processing childrens list");
             return -1;
         }
     }
@@ -2079,7 +2065,7 @@ unsafe extern "C" fn xml_c11n_normalize_pi(a: *const u8) -> *mut XmlChar {
 
 /// Handle a redefinition of invalid node error
 #[doc(alias = "xmlC14NErrInvalidNode")]
-unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: *const c_char) {
+unsafe fn xml_c14n_err_invalid_node(node_type: &str, extra: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -2091,12 +2077,12 @@ unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: 
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         None,
         None,
         0,
         0,
-        "Node %s is invalid here : %s\n",
+        "Node {} is invalid here : {}\n",
         node_type,
         extra
     );
@@ -2104,7 +2090,7 @@ unsafe extern "C" fn xml_c14n_err_invalid_node(node_type: *const c_char, extra: 
 
 /// Handle a redefinition of unknown node error
 #[doc(alias = "xmlC14NErrUnknownNode")]
-unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: i32, extra: *const c_char) {
+unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
     __xml_raise_error!(
         None,
         None,
@@ -2116,12 +2102,12 @@ unsafe extern "C" fn xml_c14n_err_unknown_node(node_type: i32, extra: *const c_c
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+        Some(extra.to_owned().into()),
         None,
         None,
         0,
         0,
-        "Unknown node type %d found : %s\n",
+        "Unknown node type {} found : {}\n",
         node_type,
         extra
     );
@@ -2135,7 +2121,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
     let mut ret: i32 = 0;
 
     if ctx.is_null() || cur.is_null() {
-        xml_c14n_err_param(c"processing node".as_ptr() as _);
+        xml_c14n_err_param("processing node");
         return -1;
     }
 
@@ -2164,7 +2150,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
                         .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                     xml_free(buffer as _);
                 } else {
-                    xml_c14n_err_internal(c"normalizing text node".as_ptr() as _);
+                    xml_c14n_err_internal("normalizing text node");
                     return -1;
                 }
             }
@@ -2205,7 +2191,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
                             .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                         xml_free(buffer as _);
                     } else {
-                        xml_c14n_err_internal(c"normalizing pi node".as_ptr() as _);
+                        xml_c14n_err_internal("normalizing pi node");
                         return -1;
                     }
                 }
@@ -2250,7 +2236,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
                             .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
                         xml_free(buffer as _);
                     } else {
-                        xml_c14n_err_internal(c"normalizing comment node".as_ptr() as _);
+                        xml_c14n_err_internal("normalizing comment node");
                         return -1;
                     }
                 }
@@ -2281,31 +2267,19 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
         }
 
         XmlElementType::XmlAttributeNode => {
-            xml_c14n_err_invalid_node(
-                c"XML_ATTRIBUTE_NODE".as_ptr() as _,
-                c"processing node".as_ptr() as _,
-            );
+            xml_c14n_err_invalid_node("XML_ATTRIBUTE_NODE", "processing node");
             return -1;
         }
         XmlElementType::XmlNamespaceDecl => {
-            xml_c14n_err_invalid_node(
-                c"XML_NAMESPACE_DECL".as_ptr() as _,
-                c"processing node".as_ptr() as _,
-            );
+            xml_c14n_err_invalid_node("XML_NAMESPACE_DECL", "processing node");
             return -1;
         }
         XmlElementType::XmlEntityRefNode => {
-            xml_c14n_err_invalid_node(
-                c"XML_ENTITY_REF_NODE".as_ptr() as _,
-                c"processing node".as_ptr() as _,
-            );
+            xml_c14n_err_invalid_node("XML_ENTITY_REF_NODE", "processing node");
             return -1;
         }
         XmlElementType::XmlEntityNode => {
-            xml_c14n_err_invalid_node(
-                c"XML_ENTITY_NODE".as_ptr() as _,
-                c"processing node".as_ptr() as _,
-            );
+            xml_c14n_err_invalid_node("XML_ENTITY_NODE", "processing node");
             return -1;
         }
 
@@ -2322,10 +2296,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
             // should be ignored according to "W3C Canonical XML"
         }
         _ => {
-            xml_c14n_err_unknown_node(
-                (*cur).element_type() as i32,
-                c"processing node".as_ptr() as _,
-            );
+            xml_c14n_err_unknown_node((*cur).element_type() as i32, "processing node");
             return -1;
         }
     }
@@ -2341,7 +2312,7 @@ unsafe extern "C" fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: Xml
     let mut ret: i32;
 
     if ctx.is_null() {
-        xml_c14n_err_param(c"processing node list".as_ptr() as _);
+        xml_c14n_err_param("processing node list");
         return -1;
     }
 
@@ -2371,7 +2342,7 @@ pub unsafe fn xml_c14n_execute(
     let mut ret: i32;
 
     if doc.is_null() {
-        xml_c14n_err_param(c"executing c14n".as_ptr() as _);
+        xml_c14n_err_param("executing c14n");
         return -1;
     }
 
@@ -2382,7 +2353,7 @@ pub unsafe fn xml_c14n_execute(
         | Ok(mode @ XmlC14NMode::XmlC14NExclusive1_0)
         | Ok(mode @ XmlC14NMode::XmlC14N1_1) => mode,
         _ => {
-            xml_c14n_err_param(c"invalid mode for executing c14n".as_ptr() as _);
+            xml_c14n_err_param("invalid mode for executing c14n");
             return -1;
         }
     };
@@ -2395,8 +2366,7 @@ pub unsafe fn xml_c14n_execute(
             null_mut(),
             doc as XmlNodePtr,
             XmlParserErrors::XmlC14NRequiresUtf8,
-            c"xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n"
-                .as_ptr() as _,
+            "xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
         return -1;
     }
@@ -2415,7 +2385,7 @@ pub unsafe fn xml_c14n_execute(
             null_mut(),
             doc as XmlNodePtr,
             XmlParserErrors::XmlC14NCreateCtxt,
-            c"xmlC14NExecute: unable to create C14N context\n".as_ptr() as _,
+            "xmlC14NExecute: unable to create C14N context\n",
         );
         return -1;
     }
@@ -2431,7 +2401,7 @@ pub unsafe fn xml_c14n_execute(
     if let Some(children) = (*doc).children {
         ret = xml_c14n_process_node_list(ctx, children.as_ptr());
         if ret < 0 {
-            xml_c14n_err_internal(c"processing docs children list".as_ptr() as _);
+            xml_c14n_err_internal("processing docs children list");
             xml_c14n_free_ctx(ctx);
             return -1;
         }
@@ -2442,7 +2412,7 @@ pub unsafe fn xml_c14n_execute(
      */
     ret = buf.borrow_mut().flush();
     if ret < 0 {
-        xml_c14n_err_internal(c"flushing output buffer".as_ptr() as _);
+        xml_c14n_err_internal("flushing output buffer");
         xml_c14n_free_ctx(ctx);
         return -1;
     }

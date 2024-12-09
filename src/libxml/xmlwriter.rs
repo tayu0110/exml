@@ -233,11 +233,7 @@ extern "C" fn xml_cmp_text_writer_ns_stack_entry(
 
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsg")]
-unsafe extern "C" fn xml_writer_err_msg(
-    ctxt: XmlTextWriterPtr,
-    error: XmlParserErrors,
-    msg: *const c_char,
-) {
+unsafe fn xml_writer_err_msg(ctxt: XmlTextWriterPtr, error: XmlParserErrors, msg: &str) {
     if !ctxt.is_null() {
         __xml_raise_error!(
             None,
@@ -255,8 +251,7 @@ unsafe extern "C" fn xml_writer_err_msg(
             None,
             0,
             0,
-            "%s",
-            msg
+            msg,
         );
     } else {
         __xml_raise_error!(
@@ -275,8 +270,7 @@ unsafe extern "C" fn xml_writer_err_msg(
             None,
             0,
             0,
-            "%s",
-            msg
+            msg,
         );
     }
 }
@@ -295,7 +289,7 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriter : out of memory!\n".as_ptr() as _,
+            "xmlNewTextWriter : out of memory!\n",
         );
         return null_mut();
     }
@@ -310,7 +304,7 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriter : out of memory!\n".as_ptr() as _,
+            "xmlNewTextWriter : out of memory!\n",
         );
         xml_free(ret as _);
         return null_mut();
@@ -324,7 +318,7 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriter : out of memory!\n".as_ptr() as _,
+            "xmlNewTextWriter : out of memory!\n",
         );
         xml_list_delete((*ret).nodes);
         xml_free(ret as _);
@@ -342,7 +336,7 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriter : out of memory!\n".as_ptr() as _,
+            "xmlNewTextWriter : out of memory!\n",
         );
         return null_mut();
     }
@@ -363,7 +357,7 @@ pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTe
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlIOEIO,
-            c"xmlNewTextWriterFilename : cannot open uri\n".as_ptr() as _,
+            "xmlNewTextWriterFilename : cannot open uri\n",
         );
         return null_mut();
     };
@@ -373,7 +367,7 @@ pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTe
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlNewTextWriterFilename : out of memory!\n".as_ptr() as _,
+            "xmlNewTextWriterFilename : out of memory!\n",
         );
         return null_mut();
     }
@@ -527,7 +521,7 @@ pub unsafe extern "C" fn xml_new_text_writer_push_parser(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterPushParser : invalid context!\n".as_ptr() as _,
+            "xmlNewTextWriterPushParser : invalid context!\n",
         );
         return null_mut();
     }
@@ -537,7 +531,7 @@ pub unsafe extern "C" fn xml_new_text_writer_push_parser(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterPushParser : error at xmlOutputBufferCreateIO!\n".as_ptr() as _,
+            "xmlNewTextWriterPushParser : error at xmlOutputBufferCreateIO!\n",
         );
         return null_mut();
     };
@@ -547,7 +541,7 @@ pub unsafe extern "C" fn xml_new_text_writer_push_parser(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterPushParser : error at xmlNewTextWriter!\n".as_ptr() as _,
+            "xmlNewTextWriterPushParser : error at xmlNewTextWriter!\n",
         );
         return null_mut();
     }
@@ -661,7 +655,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n".as_ptr() as _,
+            "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
         );
         return null_mut();
     }
@@ -677,7 +671,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterDoc : error at xmlNewDoc!\n".as_ptr() as _,
+            "xmlNewTextWriterDoc : error at xmlNewDoc!\n",
         );
         return null_mut();
     }
@@ -689,7 +683,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n".as_ptr() as _,
+            "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
         );
         return null_mut();
     }
@@ -719,7 +713,7 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterTree : invalid document tree!\n".as_ptr() as _,
+            "xmlNewTextWriterTree : invalid document tree!\n",
         );
         return null_mut();
     }
@@ -740,14 +734,11 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n".as_ptr() as _,
+            "xmlNewTextWriterDoc : error at xmlCreatePushParserCtxt!\n",
         );
         return null_mut();
     }
-    /*
-     * For some reason this seems to completely break if node names
-     * are interned.
-     */
+    // For some reason this seems to completely break if node names are interned.
     (*ctxt).dict_names = 0;
 
     let ret: XmlTextWriterPtr = xml_new_text_writer_push_parser(ctxt, compression);
@@ -756,7 +747,7 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
         xml_writer_err_msg(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            c"xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n".as_ptr() as _,
+            "xmlNewTextWriterDoc : error at xmlNewTextWriterPushParser!\n",
         );
         return null_mut();
     }
@@ -820,7 +811,7 @@ pub unsafe fn xml_text_writer_start_document(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterStartDocument : invalid writer!\n".as_ptr() as _,
+            "xmlTextWriterStartDocument : invalid writer!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartDocument : invalid writer!",
@@ -832,7 +823,7 @@ pub unsafe fn xml_text_writer_start_document(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterStartDocument : not allowed in this context!\n".as_ptr() as _,
+            "xmlTextWriterStartDocument : not allowed in this context!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartDocument : not allowed in this context!",
@@ -846,7 +837,7 @@ pub unsafe fn xml_text_writer_start_document(
             xml_writer_err_msg(
                 writer,
                 XmlParserErrors::XmlErrUnsupportedEncoding,
-                c"xmlTextWriterStartDocument : unsupported encoding\n".as_ptr() as _,
+                "xmlTextWriterStartDocument : unsupported encoding\n",
             );
             return Err(io::Error::other(
                 "xmlTextWriterStartDocument : unsupported encoding",
@@ -916,7 +907,7 @@ pub unsafe fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> io::Resu
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterEndDocument : invalid writer!\n".as_ptr() as _,
+            "xmlTextWriterEndDocument : invalid writer!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterEndDocument : invalid writer!",
@@ -1039,7 +1030,7 @@ pub unsafe fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> io::Res
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterStartComment : invalid writer!\n".as_ptr() as _,
+            "xmlTextWriterStartComment : invalid writer!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartComment : invalid writer!",
@@ -1074,7 +1065,7 @@ pub unsafe fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> io::Res
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartElement : out of memory!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartElement : out of memory!",
@@ -1103,7 +1094,7 @@ pub unsafe fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> io::Resul
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterEndComment : invalid writer!\n".as_ptr() as _,
+            "xmlTextWriterEndComment : invalid writer!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterEndComment : invalid writer!",
@@ -1115,7 +1106,7 @@ pub unsafe fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> io::Resul
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterEndComment : not allowed in this context!\n".as_ptr() as _,
+            "xmlTextWriterEndComment : not allowed in this context!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterEndComment : not allowed in this context!",
@@ -1208,7 +1199,7 @@ pub unsafe fn xml_text_writer_start_element(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartElement : out of memory!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartElement : out of memory!",
@@ -1220,7 +1211,7 @@ pub unsafe fn xml_text_writer_start_element(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartElement : out of memory!\n",
         );
         xml_free(p as _);
         return Err(io::Error::other(
@@ -1277,7 +1268,7 @@ pub unsafe fn xml_text_writer_start_element_ns(
             xml_writer_err_msg(
                 writer,
                 XmlParserErrors::XmlErrNoMemory,
-                c"xmlTextWriterStartElementNS : out of memory!\n".as_ptr() as _,
+                "xmlTextWriterStartElementNS : out of memory!\n",
             );
             return Err(io::Error::other(
                 "xmlTextWriterStartElementNS : out of memory!",
@@ -1296,7 +1287,7 @@ pub unsafe fn xml_text_writer_start_element_ns(
             xml_writer_err_msg(
                 writer,
                 XmlParserErrors::XmlErrNoMemory,
-                c"xmlTextWriterStartElementNS : out of memory!\n".as_ptr() as _,
+                "xmlTextWriterStartElementNS : out of memory!\n",
             );
             xml_free(p as _);
             return Err(io::Error::other(
@@ -1569,7 +1560,7 @@ pub unsafe fn xml_text_writer_write_raw_len(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterWriteRawLen : invalid writer!\n".as_ptr() as _,
+            "xmlTextWriterWriteRawLen : invalid writer!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterWriteRawLen : invalid writer!",
@@ -1580,7 +1571,7 @@ pub unsafe fn xml_text_writer_write_raw_len(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterWriteRawLen : invalid content!\n".as_ptr() as _,
+            "xmlTextWriterWriteRawLen : invalid content!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterWriteRawLen : invalid content!",
@@ -1944,7 +1935,7 @@ pub unsafe fn xml_text_writer_start_attribute_ns(
                 xml_writer_err_msg(
                     writer,
                     XmlParserErrors::XmlErrNoMemory,
-                    c"xmlTextWriterStartAttributeNS : out of memory!\n".as_ptr() as _,
+                    "xmlTextWriterStartAttributeNS : out of memory!\n",
                 );
                 return Err(io::Error::other(
                     "xmlTextWriterStartAttributeNS : out of memory!",
@@ -1957,7 +1948,7 @@ pub unsafe fn xml_text_writer_start_attribute_ns(
                 xml_writer_err_msg(
                     writer,
                     XmlParserErrors::XmlErrNoMemory,
-                    c"xmlTextWriterStartAttributeNS : out of memory!\n".as_ptr() as _,
+                    "xmlTextWriterStartAttributeNS : out of memory!\n",
                 );
                 xml_free(p as _);
                 return Err(io::Error::other(
@@ -2070,7 +2061,7 @@ pub unsafe fn xml_text_writer_start_pi(
 
     if xml_strcasecmp(target, c"xml".as_ptr() as _) == 0 {
         xml_writer_err_msg(writer, XmlParserErrors::XmlErrInternalError,
-                        c"xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!\n".as_ptr() as _);
+                        "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!\n");
         return Err(io::Error::other(
             "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!",
         ));
@@ -2099,7 +2090,7 @@ pub unsafe fn xml_text_writer_start_pi(
                     xml_writer_err_msg(
                         writer,
                         XmlParserErrors::XmlErrInternalError,
-                        c"xmlTextWriterStartPI : nested PI!\n".as_ptr() as _,
+                        "xmlTextWriterStartPI : nested PI!\n",
                     );
                     return Err(io::Error::other("xmlTextWriterStartPI : nested PI!"));
                 }
@@ -2115,7 +2106,7 @@ pub unsafe fn xml_text_writer_start_pi(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartPI : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartPI : out of memory!\n",
         );
         return Err(io::Error::other("xmlTextWriterStartPI : out of memory!"));
     }
@@ -2125,7 +2116,7 @@ pub unsafe fn xml_text_writer_start_pi(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartPI : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartPI : out of memory!\n",
         );
         xml_free(p as _);
         return Err(io::Error::other("xmlTextWriterStartPI : out of memory!"));
@@ -2232,8 +2223,7 @@ pub unsafe fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -> io::Resul
                     xml_writer_err_msg(
                         writer,
                         XmlParserErrors::XmlErrInternalError,
-                        c"xmlTextWriterStartCDATA : CDATA not allowed in this context!\n".as_ptr()
-                            as _,
+                        "xmlTextWriterStartCDATA : CDATA not allowed in this context!\n",
                     );
                     return Err(io::Error::other(
                         "xmlTextWriterStartCDATA : CDATA not allowed in this context!",
@@ -2251,7 +2241,7 @@ pub unsafe fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -> io::Resul
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartCDATA : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartCDATA : out of memory!\n",
         );
         return Err(io::Error::other("xmlTextWriterStartCDATA : out of memory!"));
     }
@@ -2334,7 +2324,7 @@ pub unsafe fn xml_text_writer_start_dtd(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterStartDTD : DTD allowed only in prolog!\n".as_ptr() as _,
+            "xmlTextWriterStartDTD : DTD allowed only in prolog!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartDTD : DTD allowed only in prolog!",
@@ -2347,7 +2337,7 @@ pub unsafe fn xml_text_writer_start_dtd(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTD : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTD : out of memory!\n",
         );
         return Err(io::Error::other("xmlTextWriterStartDTD : out of memory!"));
     }
@@ -2357,7 +2347,7 @@ pub unsafe fn xml_text_writer_start_dtd(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTD : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTD : out of memory!\n",
         );
         xml_free(p as _);
         return Err(io::Error::other("xmlTextWriterStartDTD : out of memory!"));
@@ -2376,7 +2366,7 @@ pub unsafe fn xml_text_writer_start_dtd(
             xml_writer_err_msg(
                 writer,
                 XmlParserErrors::XmlErrInternalError,
-                c"xmlTextWriterStartDTD : system identifier needed!\n".as_ptr() as _,
+                "xmlTextWriterStartDTD : system identifier needed!\n",
             );
             return Err(io::Error::other(
                 "xmlTextWriterStartDTD : system identifier needed!",
@@ -2544,7 +2534,7 @@ pub unsafe fn xml_text_writer_start_dtdelement(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTDElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTDElement : out of memory!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartDTDElement : out of memory!",
@@ -2556,7 +2546,7 @@ pub unsafe fn xml_text_writer_start_dtdelement(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTDElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTDElement : out of memory!\n",
         );
         xml_free(p as _);
         return Err(io::Error::other(
@@ -2676,7 +2666,7 @@ pub unsafe fn xml_text_writer_start_dtdattlist(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTDAttlist : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTDAttlist : out of memory!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartDTDAttlist : out of memory!",
@@ -2688,7 +2678,7 @@ pub unsafe fn xml_text_writer_start_dtdattlist(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTDAttlist : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTDAttlist : out of memory!\n",
         );
         xml_free(p as _);
         return Err(io::Error::other(
@@ -2808,7 +2798,7 @@ pub unsafe fn xml_text_writer_start_dtd_entity(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTDElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTDElement : out of memory!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterStartDTDElement : out of memory!",
@@ -2820,7 +2810,7 @@ pub unsafe fn xml_text_writer_start_dtd_entity(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrNoMemory,
-            c"xmlTextWriterStartDTDElement : out of memory!\n".as_ptr() as _,
+            "xmlTextWriterStartDTDElement : out of memory!\n",
         );
         xml_free(p as _);
         return Err(io::Error::other(
@@ -2950,8 +2940,7 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
-            c"xmlTextWriterWriteDTDExternalEntityContents: xmlTextWriterPtr invalid!\n".as_ptr()
-                as _,
+            "xmlTextWriterWriteDTDExternalEntityContents: xmlTextWriterPtr invalid!\n",
         );
         return Err(io::Error::other(
             "xmlTextWriterWriteDTDExternalEntityContents: xmlTextWriterPtr invalid!",
@@ -2961,7 +2950,7 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
     let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
     if lk.is_null() {
         xml_writer_err_msg(writer, XmlParserErrors::XmlErrInternalError,
-                        c"xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n".as_ptr() as _);
+                        "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n");
         return Err(io::Error::other(
             "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!",
         ));
@@ -2977,13 +2966,13 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
         XmlTextWriterState::XmlTextwriterDTDPEnt => {
             if !ndataid.is_null() {
                 xml_writer_err_msg(writer, XmlParserErrors::XmlErrInternalError,
-                                c"xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n".as_ptr() as _);
+                                "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n");
                 return Err(io::Error::other("xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!"));
             }
         }
         _ => {
             xml_writer_err_msg(writer, XmlParserErrors::XmlErrInternalError,
-                            c"xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n".as_ptr() as _);
+                            "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n");
             return Err(io::Error::other("xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!"));
         }
     }
@@ -2994,8 +2983,7 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
             xml_writer_err_msg(
                 writer,
                 XmlParserErrors::XmlErrInternalError,
-                c"xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!\n".as_ptr()
-                    as _,
+                "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!\n",
             );
             return Err(io::Error::other(
                 "xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!",

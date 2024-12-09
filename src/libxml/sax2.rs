@@ -2694,7 +2694,7 @@ unsafe extern "C" fn xml_sax2_text_node(
         xml_malloc(size_of::<XmlNode>()) as XmlNodePtr
     };
     if ret.is_null() {
-        xml_err_memory(ctxt, c"xmlSAX2Characters".as_ptr() as _);
+        xml_err_memory(ctxt, Some("xmlSAX2Characters"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlNode>());
@@ -2881,7 +2881,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             ret = xml_new_ns_prop((*ctxt).node, namespace, localname, null_mut());
         }
         if ret.is_null() {
-            xml_err_memory(ctxt, c"xmlSAX2AttributeNs".as_ptr() as _);
+            xml_err_memory(ctxt, Some("xmlSAX2AttributeNs"));
             return;
         }
     }

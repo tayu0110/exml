@@ -336,33 +336,50 @@ unsafe fn xml_xinclude_get_prop(
 
 /// Handle an out of memory condition
 #[doc(alias = "xmlXIncludeErrMemory")]
-unsafe extern "C" fn xml_xinclude_err_memory(
-    ctxt: XmlXincludeCtxtPtr,
-    node: XmlNodePtr,
-    extra: *const c_char,
-) {
+unsafe fn xml_xinclude_err_memory(ctxt: XmlXincludeCtxtPtr, node: XmlNodePtr, extra: Option<&str>) {
     if !ctxt.is_null() {
         (*ctxt).nb_errors += 1;
     }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        node as _,
-        XmlErrorDomain::XmlFromXInclude,
-        XmlParserErrors::XmlErrNoMemory,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        "Memory allocation failed : %s\n",
-        extra
-    );
+    if let Some(extra) = extra {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            node as _,
+            XmlErrorDomain::XmlFromXInclude,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            Some(extra.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed : {}\n",
+            extra
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            node as _,
+            XmlErrorDomain::XmlFromXInclude,
+            XmlParserErrors::XmlErrNoMemory,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            "Memory allocation failed\n",
+        );
+    }
 }
 
 /// Free an XInclude reference
@@ -391,7 +408,7 @@ unsafe extern "C" fn xml_xinclude_new_ref(
 ) -> XmlXincludeRefPtr {
     let ret: XmlXincludeRefPtr = xml_malloc(size_of::<XmlXincludeRef>()) as XmlXincludeRefPtr;
     if ret.is_null() {
-        xml_xinclude_err_memory(ctxt, elem, c"growing XInclude context".as_ptr() as _);
+        xml_xinclude_err_memory(ctxt, elem, Some("growing XInclude context"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXincludeRef>());
@@ -410,7 +427,7 @@ unsafe extern "C" fn xml_xinclude_new_ref(
             xml_malloc((*ctxt).inc_max as usize * size_of_val(&*(*ctxt).inc_tab.add(0)))
                 as *mut XmlXincludeRefPtr;
         if (*ctxt).inc_tab.is_null() {
-            xml_xinclude_err_memory(ctxt, elem, c"growing XInclude context".as_ptr() as _);
+            xml_xinclude_err_memory(ctxt, elem, Some("growing XInclude context"));
             xml_xinclude_free_ref(ret);
             return null_mut();
         }
@@ -423,7 +440,7 @@ unsafe extern "C" fn xml_xinclude_new_ref(
             new_size * size_of_val(&*(*ctxt).inc_tab.add(0)),
         ) as *mut XmlXincludeRefPtr;
         if tmp.is_null() {
-            xml_xinclude_err_memory(ctxt, elem, c"growing XInclude context".as_ptr() as _);
+            xml_xinclude_err_memory(ctxt, elem, Some("growing XInclude context"));
             xml_xinclude_free_ref(ret);
             return null_mut();
         }
@@ -582,11 +599,7 @@ unsafe extern "C" fn xml_xinclude_parse_file(
 
     let pctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if pctxt.is_null() {
-        xml_xinclude_err_memory(
-            ctxt,
-            null_mut(),
-            c"cannot allocate parser context".as_ptr() as _,
-        );
+        xml_xinclude_err_memory(ctxt, null_mut(), Some("cannot allocate parser context"));
         return null_mut();
     }
 
@@ -1506,11 +1519,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 let tmp: *mut XmlXincludeDoc =
                     xml_realloc((*ctxt).url_tab as _, size_of::<XmlXincludeDoc>() * new_size) as _;
                 if tmp.is_null() {
-                    xml_xinclude_err_memory(
-                        ctxt,
-                        (*refe).elem,
-                        c"growing XInclude URL table".as_ptr() as _,
-                    );
+                    xml_xinclude_err_memory(ctxt, (*refe).elem, Some("growing XInclude URL table"));
                     xml_free_doc(doc);
                     break 'error;
                 }
@@ -1985,7 +1994,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     buf.borrow_mut().encoder = get_encoding_handler(enc);
     node = xml_new_doc_text((*ctxt).doc, null_mut());
     if node.is_null() {
-        xml_xinclude_err_memory(ctxt, (*refe).elem, null());
+        xml_xinclude_err_memory(ctxt, (*refe).elem, None);
         // goto error;
         xml_free_node(node);
         xml_free_input_stream(input_stream);
@@ -2044,11 +2053,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         let tmp: *mut XmlXincludeTxt =
             xml_realloc((*ctxt).txt_tab as _, size_of::<XmlXincludeTxt>() * new_size) as _;
         if tmp.is_null() {
-            xml_xinclude_err_memory(
-                ctxt,
-                (*refe).elem,
-                c"growing XInclude text table".as_ptr() as _,
-            );
+            xml_xinclude_err_memory(ctxt, (*refe).elem, Some("growing XInclude text table"));
             // goto error;
             xml_free_node(node);
             xml_free_input_stream(input_stream);
@@ -2588,7 +2593,7 @@ pub unsafe extern "C" fn xml_xinclude_new_context(doc: XmlDocPtr) -> XmlXinclude
         xml_xinclude_err_memory(
             null_mut(),
             doc as XmlNodePtr,
-            c"creating XInclude context".as_ptr() as _,
+            Some("creating XInclude context"),
         );
         return null_mut();
     }

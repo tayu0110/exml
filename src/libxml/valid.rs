@@ -207,7 +207,7 @@ unsafe fn xml_err_valid(
     ctxt: XmlValidCtxtPtr,
     error: XmlParserErrors,
     msg: &str,
-    extra: *const c_char,
+    extra: Option<&str>,
 ) {
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
@@ -229,7 +229,8 @@ unsafe fn xml_err_valid(
                 .unwrap_or(null_mut());
         }
     }
-    if !extra.is_null() {
+    if let Some(extra) = extra {
+        let e = CString::new(extra).unwrap();
         __xml_raise_error!(
             None,
             channel,
@@ -241,13 +242,13 @@ unsafe fn xml_err_valid(
             XmlErrorLevel::XmlErrError,
             None,
             0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+            Some(extra.to_owned().into()),
             None,
             None,
             0,
             0,
             msg,
-            extra
+            e.as_ptr()
         );
     } else {
         __xml_raise_error!(
@@ -266,15 +267,14 @@ unsafe fn xml_err_valid(
             None,
             0,
             0,
-            "%s",
-            msg
+            msg,
         );
     }
 }
 
 /// Handle an out of memory error
 #[doc(alias = "xmlVErrMemory")]
-unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char) {
+unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
     let mut channel: Option<GenericError> = None;
     let mut pctxt: XmlParserCtxtPtr = null_mut();
     let mut data = None;
@@ -294,7 +294,7 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
                 .unwrap_or(null_mut());
         }
     }
-    if !extra.is_null() {
+    if let Some(extra) = extra {
         __xml_raise_error!(
             None,
             channel,
@@ -306,12 +306,12 @@ unsafe extern "C" fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: *const c_char
             XmlErrorLevel::XmlErrFatal,
             None,
             0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+            Some(extra.to_owned().into()),
             None,
             None,
             0,
             0,
-            "Memory allocation failed : %s\n",
+            "Memory allocation failed : {}\n",
             extra
         );
     } else {
@@ -385,16 +385,13 @@ pub unsafe extern "C" fn xml_add_notation_decl(
         table = (*dtd).notations as _;
     }
     if table.is_null() {
-        xml_verr_memory(
-            ctxt,
-            c"xmlAddNotationDecl: Table creation failed!\n".as_ptr() as _,
-        );
+        xml_verr_memory(ctxt, Some("xmlAddNotationDecl: Table creation failed!\n"));
         return null_mut();
     }
 
     let ret: XmlNotationPtr = xml_malloc(size_of::<XmlNotation>()) as XmlNotationPtr;
     if ret.is_null() {
-        xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+        xml_verr_memory(ctxt as _, Some("malloc failed"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlNotation>());
@@ -423,10 +420,8 @@ pub unsafe extern "C" fn xml_add_notation_decl(
         );
     }
 
-    /*
-     * Validity Check:
-     * Check the DTD for previous declarations of the ATTLIST
-     */
+    // Validity Check:
+    // Check the DTD for previous declarations of the ATTLIST
     if xml_hash_add_entry(table, name, ret as _) != 0 {
         #[cfg(feature = "libxml_valid")]
         {
@@ -434,7 +429,7 @@ pub unsafe extern "C" fn xml_add_notation_decl(
                 null_mut(),
                 XmlParserErrors::XmlDTDNotationRedefined,
                 "xmlAddNotationDecl: %s already defined\n",
-                name as *const c_char,
+                (*ret).name.as_deref(),
             );
         }
         xml_free_notation(ret);
@@ -454,7 +449,7 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
     unsafe {
         let cur: XmlNotationPtr = xml_malloc(size_of::<XmlNotation>()) as XmlNotationPtr;
         if cur.is_null() {
-            xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+            xml_verr_memory(null_mut(), Some("malloc failed"));
             return null_mut();
         }
         std::ptr::write(&mut *cur, XmlNotation::default());
@@ -592,7 +587,7 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
                     "xmlNewElementContent : name == NULL !\n",
-                    null_mut(),
+                    None,
                 );
             }
         }
@@ -604,7 +599,7 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
                     "xmlNewElementContent : name != NULL !\n",
-                    null_mut(),
+                    None,
                 );
             }
         } // _ => {
@@ -620,7 +615,7 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
     let ret: XmlElementContentPtr =
         xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
     if ret.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+        xml_verr_memory(null_mut(), Some("malloc failed"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlElementContent>());
@@ -670,7 +665,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
     let ret: XmlElementContentPtr =
         xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
     if ret.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+        xml_verr_memory(null_mut(), Some("malloc failed"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlElementContent>());
@@ -703,7 +698,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
         while !cur.is_null() {
             tmp = xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
             if tmp.is_null() {
-                xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+                xml_verr_memory(null_mut(), Some("malloc failed"));
                 return ret;
             }
             memset(tmp as _, 0, size_of::<XmlElementContent>());
@@ -1073,7 +1068,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content != NULL for EMPTY\n",
-                    null_mut(),
+                    None,
                 );
                 return null_mut();
             }
@@ -1084,7 +1079,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content != NULL for ANY\n",
-                    null_mut(),
+                    None,
                 );
                 return null_mut();
             }
@@ -1095,7 +1090,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content == NULL for MIXED\n",
-                    null_mut(),
+                    None,
                 );
                 return null_mut();
             }
@@ -1106,7 +1101,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddElementDecl: content == NULL for ELEMENT\n",
-                    null_mut(),
+                    None,
                 );
                 return null_mut();
             }
@@ -1116,15 +1111,13 @@ pub unsafe extern "C" fn xml_add_element_decl(
                 ctxt,
                 XmlParserErrors::XmlErrInternalError,
                 "Internal: ELEMENT decl corrupted invalid type\n",
-                null_mut(),
+                None,
             );
             return null_mut();
         }
     }
 
-    /*
-     * check if name is a QName
-     */
+    // check if name is a QName
     let mut ns = null_mut();
     let uqname: *mut XmlChar = xml_split_qname2(name.as_ptr() as *const u8, addr_of_mut!(ns));
     if !uqname.is_null() {
@@ -1136,9 +1129,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         .unwrap();
     }
 
-    /*
-     * Create the Element table if needed.
-     */
+    // Create the Element table if needed.
     table = (*dtd).elements as XmlElementTablePtr;
     if table.is_null() {
         let mut dict: XmlDictPtr = null_mut();
@@ -1150,10 +1141,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         (*dtd).elements = table as *mut c_void;
     }
     if table.is_null() {
-        xml_verr_memory(
-            ctxt,
-            c"xmlAddElementDecl: Table creation failed!\n".as_ptr() as _,
-        );
+        xml_verr_memory(ctxt, Some("xmlAddElementDecl: Table creation failed!\n"));
         if !uqname.is_null() {
             xml_free(uqname as _);
         }
@@ -1223,7 +1211,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
     } else {
         ret = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if ret.is_null() {
-            xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+            xml_verr_memory(ctxt as _, Some("malloc failed"));
             if !uqname.is_null() {
                 xml_free(uqname as _);
             }
@@ -1330,7 +1318,7 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
     unsafe {
         let cur: XmlElementPtr = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if cur.is_null() {
-            xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+            xml_verr_memory(null_mut(), Some("malloc failed"));
             return null_mut();
         }
         memset(cur as _, 0, size_of::<XmlElement>());
@@ -1583,7 +1571,7 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
                 null_mut(),
                 XmlParserErrors::XmlErrInternalError,
                 "Internal: ELEMENT struct corrupted invalid type\n",
-                null_mut(),
+                None,
             );
         }
     }
@@ -1596,7 +1584,7 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
 pub unsafe fn xml_create_enumeration(name: Option<&str>) -> XmlEnumerationPtr {
     let ret: XmlEnumerationPtr = xml_malloc(size_of::<XmlEnumeration>()) as XmlEnumerationPtr;
     if ret.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+        xml_verr_memory(null_mut(), Some("malloc failed"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlEnumeration>());
@@ -2099,7 +2087,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
             (*dtd).elements = table as *mut c_void;
         }
         if table.is_null() {
-            xml_verr_memory(ctxt, c"element table allocation failed".as_ptr() as _);
+            xml_verr_memory(ctxt, Some("element table allocation failed"));
             return null_mut();
         }
     }
@@ -2114,7 +2102,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
     if cur.is_null() && create != 0 {
         cur = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if cur.is_null() {
-            xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+            xml_verr_memory(ctxt as _, Some("malloc failed"));
             //  goto error;
             if !prefix.is_null() {
                 xml_free(prefix as _);
@@ -2140,7 +2128,7 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
         (*cur).etype = XmlElementTypeVal::XmlElementTypeUndefined;
 
         if xml_hash_add_entry2(table, name.as_ptr() as *const u8, prefix, cur as _) < 0 {
-            xml_verr_memory(ctxt, c"adding entry failed".as_ptr() as _);
+            xml_verr_memory(ctxt, Some("adding entry failed"));
             xml_free_element(cur);
             cur = null_mut();
         }
@@ -2299,10 +2287,7 @@ pub unsafe fn xml_add_attribute_decl(
         let dict = XmlDictRef::from_raw(dict);
         let table = XmlHashTable::with_capacity_dict(0, dict);
         let Some(table) = XmlHashTableRef::from_table(table) else {
-            xml_verr_memory(
-                ctxt,
-                c"xmlAddAttributeDecl: Table creation failed!\n".as_ptr() as _,
-            );
+            xml_verr_memory(ctxt, Some("xmlAddAttributeDecl: Table creation failed!\n"));
             xml_free_enumeration(tree as _);
             return null_mut();
         };
@@ -2312,7 +2297,7 @@ pub unsafe fn xml_add_attribute_decl(
 
     ret = xml_malloc(size_of::<XmlAttribute>()) as XmlAttributePtr;
     if ret.is_null() {
-        xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+        xml_verr_memory(ctxt as _, Some("malloc failed"));
         xml_free_enumeration(tree);
         return null_mut();
     }
@@ -2472,7 +2457,7 @@ extern "C" fn xml_copy_attribute(attr: *mut XmlAttribute) -> *mut XmlAttribute {
     unsafe {
         let cur: XmlAttributePtr = xml_malloc(size_of::<XmlAttribute>()) as XmlAttributePtr;
         if cur.is_null() {
-            xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+            xml_verr_memory(null_mut(), Some("malloc failed"));
             return null_mut();
         }
         memset(cur as _, 0, size_of::<XmlAttribute>());
@@ -2732,19 +2717,17 @@ pub unsafe extern "C" fn xml_add_id(
         table = (*doc).ids as _;
     }
     if table.is_null() {
-        xml_verr_memory(ctxt, c"xmlAddID: Table creation failed!\n".as_ptr() as _);
+        xml_verr_memory(ctxt, Some("xmlAddID: Table creation failed!\n"));
         return null_mut();
     }
 
     let ret: XmlIDPtr = xml_malloc(size_of::<XmlID>()) as XmlIDPtr;
     if ret.is_null() {
-        xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+        xml_verr_memory(ctxt as _, Some("malloc failed"));
         return null_mut();
     }
 
-    /*
-     * fill the structure.
-     */
+    // fill the structure.
     (*ret).value = xml_strdup(value);
     (*ret).doc = doc;
     if xml_is_streaming(ctxt) != 0 {
@@ -3038,28 +3021,24 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
         return null_mut();
     }
 
-    /*
-     * Create the Ref table if needed.
-     */
+    // Create the Ref table if needed.
     table = (*doc).refs as XmlRefTablePtr;
     if table.is_null() {
         (*doc).refs = xml_hash_create_dict(0, (*doc).dict) as _;
         table = (*doc).refs as _;
     }
     if table.is_null() {
-        xml_verr_memory(ctxt, c"xmlAddRef: Table creation failed!\n".as_ptr() as _);
+        xml_verr_memory(ctxt, Some("xmlAddRef: Table creation failed!\n"));
         return null_mut();
     }
 
     let ret: XmlRefPtr = xml_malloc(size_of::<XmlRef>()) as XmlRefPtr;
     if ret.is_null() {
-        xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+        xml_verr_memory(ctxt as _, Some("malloc failed"));
         return null_mut();
     }
 
-    /*
-     * fill the structure.
-     */
+    // fill the structure.
     (*ret).value = xml_strdup(value);
     if xml_is_streaming(ctxt) != 0 {
         /*
@@ -3089,7 +3068,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddRef: Reference list creation failed!\n",
-                    null_mut(),
+                    None,
                 );
                 break 'failed;
             }
@@ -3099,7 +3078,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
                     "xmlAddRef: Reference list insertion failed!\n",
-                    null_mut(),
+                    None,
                 );
                 break 'failed;
             }
@@ -3109,7 +3088,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
                 null_mut(),
                 XmlParserErrors::XmlErrInternalError,
                 "xmlAddRef: Reference list insertion failed!\n",
-                null_mut(),
+                None,
             );
             break 'failed;
         }
@@ -3311,7 +3290,7 @@ pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar)
 pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
     let ret: XmlValidCtxtPtr = xml_malloc(size_of::<XmlValidCtxt>()) as _;
     if ret.is_null() {
-        xml_verr_memory(null_mut(), c"malloc failed".as_ptr() as _);
+        xml_verr_memory(null_mut(), Some("malloc failed"));
         return null_mut();
     }
 
@@ -3358,7 +3337,7 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
             ctxt,
             XmlParserErrors::XmlDTDNoRoot,
             "no root element\n",
-            null_mut(),
+            None,
         );
         return 0;
     }
@@ -3382,7 +3361,7 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
                     50,
                 );
                 if fullname.is_null() {
-                    xml_verr_memory(ctxt, null_mut());
+                    xml_verr_memory(ctxt, None);
                     return 0;
                 }
                 ret = xml_str_equal((*(*doc).int_subset).name, fullname) as i32;
@@ -4329,7 +4308,7 @@ extern "C" fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlVal
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
                     "xmlValidateAttributeCallback(%s): internal error\n",
-                    (*cur).name as *const c_char,
+                    (*cur).name().as_deref(),
                 );
                 return;
             };
@@ -4477,12 +4456,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         return 0;
     }
     if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
-        xml_err_valid(
-            ctxt,
-            XmlParserErrors::XmlDTDNoDTD,
-            "no DTD found!\n",
-            null_mut(),
-        );
+        xml_err_valid(ctxt, XmlParserErrors::XmlDTDNoDTD, "no DTD found!\n", None);
         return 0;
     }
     if !(*doc).int_subset.is_null()
@@ -4495,12 +4469,11 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
                 .as_deref()
                 .and_then(|base| build_uri(system_id, base))
             else {
-                let system_id = CString::new(system_id).unwrap();
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     "Could not build URI for external subset \"%s\"\n",
-                    system_id.as_ptr(),
+                    Some(system_id),
                 );
                 return 0;
             };
@@ -4523,19 +4496,18 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         );
         if (*doc).ext_subset.is_null() {
             if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
-                let system_id = CString::new(system_id).unwrap();
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     "Could not load the external subset \"%s\"\n",
-                    system_id.as_ptr(),
+                    Some(system_id),
                 );
             } else {
                 xml_err_valid(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     "Could not load the external subset \"%s\"\n",
-                    external_id.as_ref().map_or(null_mut(), |e| e.as_ptr()),
+                    external_id.as_ref().map(|e| e.to_string_lossy()).as_deref(),
                 );
             }
             return 0;
@@ -4717,7 +4689,7 @@ unsafe extern "C" fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32
             xml_malloc((*ctxt).node_max as usize * size_of_val(&*(*ctxt).node_tab.add(0)))
                 as *mut XmlNodePtr;
         if (*ctxt).node_tab.is_null() {
-            xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+            xml_verr_memory(ctxt as _, Some("malloc failed"));
             (*ctxt).node_max = 0;
             return 0;
         }
@@ -4728,7 +4700,7 @@ unsafe extern "C" fn node_vpush(ctxt: XmlValidCtxtPtr, value: XmlNodePtr) -> i32
             (*ctxt).node_max as usize * 2 * size_of_val(&*(*ctxt).node_tab.add(0)),
         ) as *mut XmlNodePtr;
         if tmp.is_null() {
-            xml_verr_memory(ctxt as _, c"realloc failed".as_ptr() as _);
+            xml_verr_memory(ctxt as _, Some("realloc failed"));
             return 0;
         }
         (*ctxt).node_max *= 2;
@@ -6068,7 +6040,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                                 null_mut(),
                                                 XmlParserErrors::XmlDTDMixedCorrupt,
                                                 "Internal: MIXED struct corrupted\n",
-                                                null_mut(),
+                                                None,
                                             );
                                             break;
                                         }
@@ -6118,7 +6090,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                             ctxt,
                                             XmlParserErrors::XmlDTDMixedCorrupt,
                                             "Internal: MIXED struct corrupted\n",
-                                            null_mut(),
+                                            None,
                                         );
                                         break;
                                     }
@@ -6668,7 +6640,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
 
         let fullname: *mut XmlChar = xml_build_qname((*elem).name, prefix, fname.as_mut_ptr(), 50);
         if fullname.is_null() {
-            xml_verr_memory(ctxt, c"Validating namespace".as_ptr() as _);
+            xml_verr_memory(ctxt, Some("Validating namespace"));
             return 0;
         }
         if !(*ns).prefix.is_null() {
@@ -7055,7 +7027,7 @@ unsafe extern "C" fn xml_validate_ref(
 
         let dup: *mut XmlChar = xml_strdup(name);
         if dup.is_null() {
-            xml_verr_memory(ctxt, c"IDREFS split".as_ptr() as _);
+            xml_verr_memory(ctxt, Some("IDREFS split"));
             (*ctxt).valid = 0;
             return;
         }
@@ -7143,7 +7115,7 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
             ctxt,
             XmlParserErrors::XmlDTDNoDoc,
             "xmlValidateDocumentFinal: doc == NULL\n",
-            null_mut(),
+            None,
         );
         return 0;
     }
@@ -7595,7 +7567,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                 50,
             );
             if fullname.is_null() {
-                xml_verr_memory(ctxt, c"Building content model".as_ptr() as _);
+                xml_verr_memory(ctxt, Some("Building content model"));
                 return 0;
             }
 
@@ -7862,7 +7834,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
                     null_mut(),
                     XmlParserErrors::XmlDTDMixedCorrupt,
                     "Internal: MIXED struct corrupted\n",
-                    null_mut(),
+                    None,
                 );
                 break;
             }
@@ -7901,7 +7873,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
                     ctxt,
                     XmlParserErrors::XmlDTDMixedCorrupt,
                     "Internal: MIXED struct corrupted\n",
-                    null_mut(),
+                    None,
                 );
                 break;
             }
@@ -7923,7 +7895,7 @@ unsafe extern "C" fn vstate_vpush(
             xml_malloc((*ctxt).vstate_max as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)))
                 as *mut XmlValidState;
         if (*ctxt).vstate_tab.is_null() {
-            xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
+            xml_verr_memory(ctxt as _, Some("malloc failed"));
             return -1;
         }
     }
@@ -7934,7 +7906,7 @@ unsafe extern "C" fn vstate_vpush(
             2 * (*ctxt).vstate_max as usize * size_of_val(&*(*ctxt).vstate_tab.add(0)),
         ) as *mut XmlValidState;
         if tmp.is_null() {
-            xml_verr_memory(ctxt as _, c"realloc failed".as_ptr() as _);
+            xml_verr_memory(ctxt as _, Some("realloc failed"));
             return -1;
         }
         (*ctxt).vstate_max *= 2;

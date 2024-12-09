@@ -85,8 +85,7 @@ use crate::{
         xml_buf_content, xml_build_qname, NodeCommon, NodePtr, XmlAttrPtr, XmlBufPtr, XmlDocPtr,
         XmlElementType, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
-    xml_str_printf, xml_xpath_node_set_get_length, xml_xpath_node_set_is_empty,
-    xml_xpath_node_set_item,
+    xml_xpath_node_set_get_length, xml_xpath_node_set_is_empty, xml_xpath_node_set_item,
 };
 
 use super::{
@@ -523,7 +522,7 @@ unsafe extern "C" fn xml_pointer_list_add_size(
             if (*list).size > 50000000 {
                 xml_xpath_err_memory(
                     null_mut(),
-                    c"xmlPointerListAddSize: re-allocating item\n".as_ptr(),
+                    Some("xmlPointerListAddSize: re-allocating item\n"),
                 );
                 return -1;
             }
@@ -535,7 +534,7 @@ unsafe extern "C" fn xml_pointer_list_add_size(
         if tmp.is_null() {
             xml_xpath_err_memory(
                 null_mut(),
-                c"xmlPointerListAddSize: re-allocating item\n".as_ptr(),
+                Some("xmlPointerListAddSize: re-allocating item\n"),
             );
             return -1;
         }
@@ -554,10 +553,7 @@ unsafe extern "C" fn xml_pointer_list_add_size(
 unsafe extern "C" fn xml_pointer_list_create(initial_size: i32) -> XmlPointerListPtr {
     let ret: XmlPointerListPtr = xml_malloc(size_of::<XmlPointerList>()) as _;
     if ret.is_null() {
-        xml_xpath_err_memory(
-            null_mut(),
-            c"xmlPointerListCreate: allocating item\n".as_ptr(),
-        );
+        xml_xpath_err_memory(null_mut(), Some("xmlPointerListCreate: allocating item\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlPointerList>());
@@ -895,35 +891,35 @@ pub unsafe extern "C" fn xml_xpatherror(
 }
 
 // The array xmlXPathErrorMessages corresponds to the enum XmlXPathError
-const XML_XPATH_ERROR_MESSAGES: &[*const c_char] = &[
-    c"Ok\n".as_ptr(),
-    c"Number encoding\n".as_ptr(),
-    c"Unfinished literal\n".as_ptr(),
-    c"Start of literal\n".as_ptr(),
-    c"Expected $ for variable reference\n".as_ptr(),
-    c"Undefined variable\n".as_ptr(),
-    c"Invalid predicate\n".as_ptr(),
-    c"Invalid expression\n".as_ptr(),
-    c"Missing closing curly brace\n".as_ptr(),
-    c"Unregistered function\n".as_ptr(),
-    c"Invalid operand\n".as_ptr(),
-    c"Invalid type\n".as_ptr(),
-    c"Invalid number of arguments\n".as_ptr(),
-    c"Invalid context size\n".as_ptr(),
-    c"Invalid context position\n".as_ptr(),
-    c"Memory allocation error\n".as_ptr(),
-    c"Syntax error\n".as_ptr(),
-    c"Resource error\n".as_ptr(),
-    c"Sub resource error\n".as_ptr(),
-    c"Undefined namespace prefix\n".as_ptr(),
-    c"Encoding error\n".as_ptr(),
-    c"Char out of XML range\n".as_ptr(),
-    c"Invalid or incomplete context\n".as_ptr(),
-    c"Stack usage error\n".as_ptr(),
-    c"Forbidden variable\n".as_ptr(),
-    c"Operation limit exceeded\n".as_ptr(),
-    c"Recursion limit exceeded\n".as_ptr(),
-    c"?? Unknown error ??\n".as_ptr(), /* Must be last in the list! */
+const XML_XPATH_ERROR_MESSAGES: &[&str] = &[
+    "Ok\n",
+    "Number encoding\n",
+    "Unfinished literal\n",
+    "Start of literal\n",
+    "Expected $ for variable reference\n",
+    "Undefined variable\n",
+    "Invalid predicate\n",
+    "Invalid expression\n",
+    "Missing closing curly brace\n",
+    "Unregistered function\n",
+    "Invalid operand\n",
+    "Invalid type\n",
+    "Invalid number of arguments\n",
+    "Invalid context size\n",
+    "Invalid context position\n",
+    "Memory allocation error\n",
+    "Syntax error\n",
+    "Resource error\n",
+    "Sub resource error\n",
+    "Undefined namespace prefix\n",
+    "Encoding error\n",
+    "Char out of XML range\n",
+    "Invalid or incomplete context\n",
+    "Stack usage error\n",
+    "Forbidden variable\n",
+    "Operation limit exceeded\n",
+    "Recursion limit exceeded\n",
+    "?? Unknown error ??\n", /* Must be last in the list! */
 ];
 const MAXERRNO: i32 = XML_XPATH_ERROR_MESSAGES.len() as i32 - 1;
 
@@ -953,8 +949,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             None,
             0,
             0,
-            "%s",
-            XML_XPATH_ERROR_MESSAGES[error as usize]
+            XML_XPATH_ERROR_MESSAGES[error as usize],
         );
         return;
     }
@@ -986,8 +981,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,
-            "%s",
-            XML_XPATH_ERROR_MESSAGES[error as usize]
+            XML_XPATH_ERROR_MESSAGES[error as usize],
         );
         return;
     }
@@ -1039,8 +1033,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
             None,
             (*ctxt).cur.offset_from((*ctxt).base) as _,
             0,
-            "%s",
-            XML_XPATH_ERROR_MESSAGES[error as usize]
+            XML_XPATH_ERROR_MESSAGES[error as usize],
         );
     }
 }
@@ -2292,24 +2285,12 @@ unsafe extern "C" fn xml_xpath_cache_wrap_node_set(
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathErrMemory")]
-pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *const c_char) {
+pub unsafe fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: Option<&str>) {
     if !ctxt.is_null() {
         (*ctxt).last_error.reset();
-        if !extra.is_null() {
-            let mut buf: [XmlChar; 200] = [0; 200];
-
-            xml_str_printf!(
-                buf.as_mut_ptr(),
-                200,
-                c"Memory allocation failed : %s\n".as_ptr(),
-                extra
-            );
-            (*ctxt).last_error.message = Some(
-                CStr::from_ptr(buf.as_ptr() as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-                    .into(),
-            );
+        if let Some(extra) = extra {
+            let buf = format!("Memory allocation failed : {extra}\n",);
+            (*ctxt).last_error.message = Some(buf.into());
             // (*ctxt).last_error.message = xml_strdup(buf.as_ptr()) as *mut c_char;
         } else {
             (*ctxt).last_error.message = Some("Memory allocation failed\n".into());
@@ -2320,7 +2301,7 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
         if let Some(error) = (*ctxt).error {
             error((*ctxt).user_data.clone(), &(*ctxt).last_error);
         }
-    } else if !extra.is_null() {
+    } else if let Some(extra) = extra {
         __xml_raise_error!(
             None,
             None,
@@ -2332,12 +2313,12 @@ pub unsafe extern "C" fn xml_xpath_err_memory(ctxt: XmlXPathContextPtr, extra: *
             XmlErrorLevel::XmlErrFatal,
             None,
             0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra).to_string_lossy().into_owned().into()),
+            Some(extra.to_owned().into()),
             None,
             None,
             0,
             0,
-            "Memory allocation failed : %s\n",
+            "Memory allocation failed : {}\n",
             extra
         );
     } else {
@@ -2380,7 +2361,7 @@ unsafe extern "C" fn xml_xpath_cache_new_string(
             }
             let copy: *mut XmlChar = xml_strdup(val);
             if copy.is_null() {
-                xml_xpath_err_memory(ctxt, null());
+                xml_xpath_err_memory(ctxt, None);
                 return null_mut();
             }
 
@@ -2398,7 +2379,7 @@ unsafe extern "C" fn xml_xpath_cache_new_string(
             }
             let copy: *mut XmlChar = xml_strdup(val);
             if copy.is_null() {
-                xml_xpath_err_memory(ctxt, null());
+                xml_xpath_err_memory(ctxt, None);
                 return null_mut();
             }
 
@@ -2582,7 +2563,7 @@ pub unsafe extern "C" fn xml_xpath_registered_variables_cleanup(ctxt: XmlXPathCo
 unsafe extern "C" fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
     let cur: XmlXPathCompExprPtr = xml_malloc(size_of::<XmlXPathCompExpr>()) as XmlXPathCompExprPtr;
     if cur.is_null() {
-        xml_xpath_err_memory(null_mut(), c"allocating component\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("allocating component\n"));
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlXPathCompExpr>());
@@ -2591,7 +2572,7 @@ unsafe extern "C" fn xml_xpath_new_comp_expr() -> XmlXPathCompExprPtr {
     (*cur).steps =
         xml_malloc((*cur).max_step as usize * size_of::<XmlXPathStepOp>()) as *mut XmlXPathStepOp;
     if (*cur).steps.is_null() {
-        xml_xpath_err_memory(null_mut(), c"allocating steps\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("allocating steps\n"));
         xml_free(cur as _);
         return null_mut();
     }
@@ -2615,7 +2596,7 @@ pub unsafe extern "C" fn xml_xpath_new_parser_context(
     let ret: XmlXPathParserContextPtr =
         xml_malloc(size_of::<XmlXPathParserContext>()) as XmlXPathParserContextPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(ctxt, c"creating parser context\n".as_ptr());
+        xml_xpath_err_memory(ctxt, Some("creating parser context\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathParserContext>());
@@ -2684,7 +2665,7 @@ pub unsafe extern "C" fn value_pop(ctxt: XmlXPathParserContextPtr) -> XmlXPathOb
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPathPErrMemory")]
-unsafe extern "C" fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: *const c_char) {
+unsafe fn xml_xpath_perr_memory(ctxt: XmlXPathParserContextPtr, extra: Option<&str>) {
     if ctxt.is_null() {
         xml_xpath_err_memory(null_mut(), extra);
     } else {
@@ -2717,7 +2698,7 @@ pub unsafe extern "C" fn value_push(
     }
     if (*ctxt).value_nr >= (*ctxt).value_max {
         if (*ctxt).value_max >= XPATH_MAX_STACK_DEPTH as i32 {
-            xml_xpath_perr_memory(ctxt, c"XPath stack depth limit reached\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("XPath stack depth limit reached\n"));
             xml_xpath_free_object(value);
             return -1;
         }
@@ -2726,7 +2707,7 @@ pub unsafe extern "C" fn value_push(
             2 * (*ctxt).value_max as usize * size_of::<XmlXPathObjectPtr>(),
         ) as *mut XmlXPathObjectPtr;
         if tmp.is_null() {
-            xml_xpath_perr_memory(ctxt, c"pushing value\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("pushing value\n"));
             xml_xpath_free_object(value);
             return -1;
         }
@@ -2747,7 +2728,7 @@ pub unsafe extern "C" fn value_push(
 pub unsafe extern "C" fn xml_xpath_new_string(mut val: *const XmlChar) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating string object\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
@@ -2780,7 +2761,7 @@ pub unsafe extern "C" fn xml_xpath_new_cstring(val: *const c_char) -> XmlXPathOb
 pub unsafe extern "C" fn xml_xpath_wrap_string(val: *mut XmlChar) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating string object\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
         xml_free(val as _);
         return null_mut();
     }
@@ -2805,7 +2786,7 @@ pub unsafe extern "C" fn xml_xpath_wrap_cstring(val: *mut c_char) -> XmlXPathObj
 pub unsafe extern "C" fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating float object\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("creating float object\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
@@ -2821,7 +2802,7 @@ pub unsafe extern "C" fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
 pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating boolean object\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("creating boolean object\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
@@ -2838,7 +2819,7 @@ pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
 pub unsafe extern "C" fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating nodeset\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
@@ -2858,7 +2839,7 @@ pub unsafe extern "C" fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObje
 pub unsafe extern "C" fn xml_xpath_new_value_tree(val: XmlNodePtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating result value tree\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("creating result value tree\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
@@ -2890,7 +2871,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_dup_ns(node: XmlNodePtr, ns: XmlNsPt
      */
     let cur: XmlNsPtr = xml_malloc(size_of::<XmlNs>()) as XmlNsPtr;
     if cur.is_null() {
-        xml_xpath_err_memory(null_mut(), c"duplicating namespace\n".as_ptr());
+        xml_xpath_err_memory(null_mut(), Some("duplicating namespace\n"));
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlNs>());
@@ -2931,7 +2912,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add(cur: XmlNodeSetPtr, val: XmlNode
         (*cur).node_tab =
             xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
         if (*cur).node_tab.is_null() {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset\n"));
             return -1;
         }
         memset(
@@ -2942,7 +2923,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add(cur: XmlNodeSetPtr, val: XmlNode
         (*cur).node_max = XML_NODESET_DEFAULT as _;
     } else if (*cur).node_nr == (*cur).node_max {
         if (*cur).node_max >= XPATH_MAX_NODESET_LENGTH as i32 {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset hit limit\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
         let temp: *mut XmlNodePtr = xml_realloc(
@@ -2950,7 +2931,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add(cur: XmlNodeSetPtr, val: XmlNode
             (*cur).node_max as usize * 2 * size_of::<XmlNodePtr>(),
         ) as *mut XmlNodePtr;
         if temp.is_null() {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset\n"));
             return -1;
         }
         (*cur).node_max *= 2;
@@ -2990,7 +2971,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_unique(cur: XmlNodeSetPtr, val: 
         (*cur).node_tab =
             xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
         if (*cur).node_tab.is_null() {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset\n"));
             return -1;
         }
         memset(
@@ -3001,7 +2982,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_unique(cur: XmlNodeSetPtr, val: 
         (*cur).node_max = XML_NODESET_DEFAULT as i32;
     } else if (*cur).node_nr == (*cur).node_max {
         if (*cur).node_max >= XPATH_MAX_NODESET_LENGTH as i32 {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset hit limit\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
         let temp: *mut XmlNodePtr = xml_realloc(
@@ -3009,7 +2990,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_unique(cur: XmlNodeSetPtr, val: 
             (*cur).node_max as usize * 2 * size_of::<XmlNodePtr>(),
         ) as *mut XmlNodePtr;
         if temp.is_null() {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset\n"));
             return -1;
         }
         (*cur).node_tab = temp;
@@ -3076,7 +3057,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
         (*cur).node_tab =
             xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
         if (*cur).node_tab.is_null() {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset\n"));
             return -1;
         }
         memset(
@@ -3087,7 +3068,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
         (*cur).node_max = XML_NODESET_DEFAULT as i32;
     } else if (*cur).node_nr == (*cur).node_max {
         if (*cur).node_max >= XPATH_MAX_NODESET_LENGTH as i32 {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset hit limit\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
         let temp: *mut XmlNodePtr = xml_realloc(
@@ -3095,7 +3076,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
             (*cur).node_max as usize * 2 * size_of::<XmlNodePtr>(),
         ) as *mut XmlNodePtr;
         if temp.is_null() {
-            xml_xpath_err_memory(null_mut(), c"growing nodeset\n".as_ptr());
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset\n"));
             return -1;
         }
         (*cur).node_max *= 2;
@@ -3580,7 +3561,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
                 namespaces =
                     xml_malloc(2 * ((*ctxt).ns_nr as usize + 1) * size_of::<*mut XmlChar>()) as _;
                 if namespaces.is_null() {
-                    xml_xpath_err_memory(ctxt, c"allocating namespaces array\n".as_ptr());
+                    xml_xpath_err_memory(ctxt, Some("allocating namespaces array\n"));
                     return null_mut();
                 }
                 i = 0;
@@ -3609,7 +3590,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
         if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
             comp = xml_xpath_new_comp_expr();
             if comp.is_null() {
-                xml_xpath_err_memory(ctxt, c"allocating streamable expression\n".as_ptr());
+                xml_xpath_err_memory(ctxt, Some("allocating streamable expression\n"));
                 xml_free_pattern(stream);
                 return null_mut();
             }
@@ -3699,7 +3680,7 @@ unsafe extern "C" fn xml_xpath_comp_expr_add(
     let comp: XmlXPathCompExprPtr = (*ctxt).comp;
     if (*comp).nb_step >= (*comp).max_step {
         if (*comp).max_step >= XPATH_MAX_STEPS as i32 {
-            xml_xpath_perr_memory(ctxt, c"adding step\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("adding step\n"));
             return -1;
         }
         (*comp).max_step *= 2;
@@ -3709,7 +3690,7 @@ unsafe extern "C" fn xml_xpath_comp_expr_add(
         ) as *mut XmlXPathStepOp;
         if real.is_null() {
             (*comp).max_step /= 2;
-            xml_xpath_perr_memory(ctxt, c"adding step\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("adding step\n"));
             return -1;
         }
         (*comp).steps = real;
@@ -4887,7 +4868,7 @@ unsafe extern "C" fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
         XP_ERROR!(ctxt, XmlXPathError::XpathStartLiteralError as i32);
     }
     if ret.is_null() {
-        xml_xpath_perr_memory(ctxt, null());
+        xml_xpath_perr_memory(ctxt, None);
         return;
     }
     let lit: XmlXPathObjectPtr = xml_xpath_cache_new_string((*ctxt).context, ret);
@@ -5966,7 +5947,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear(
             (*set1).node_tab =
                 xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
             if (*set1).node_tab.is_null() {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
                 xml_xpath_node_set_clear(set2, 1);
@@ -5980,7 +5961,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear(
             (*set1).node_max = XML_NODESET_DEFAULT as _;
         } else if (*set1).node_nr >= (*set1).node_max {
             if (*set1).node_max >= XPATH_MAX_NODESET_LENGTH as i32 {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset hit limit\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
                 xml_xpath_node_set_clear(set2, 1);
@@ -5991,7 +5972,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear(
                 (*set1).node_max as usize * 2 * size_of::<XmlNodePtr>(),
             ) as *mut XmlNodePtr;
             if temp.is_null() {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
                 xml_xpath_node_set_clear(set2, 1);
@@ -6033,7 +6014,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear_no_dupls(
             (*set1).node_tab =
                 xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
             if (*set1).node_tab.is_null() {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
                 xml_xpath_node_set_clear(set2, 1);
@@ -6047,7 +6028,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear_no_dupls(
             (*set1).node_max = XML_NODESET_DEFAULT as i32;
         } else if (*set1).node_nr >= (*set1).node_max {
             if (*set1).node_max >= XPATH_MAX_NODESET_LENGTH as i32 {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset hit limit\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
                 xml_xpath_node_set_clear(set2, 1);
@@ -6058,7 +6039,7 @@ unsafe extern "C" fn xml_xpath_node_set_merge_and_clear_no_dupls(
                 (*set1).node_max as usize * 2 * size_of::<XmlNodePtr>(),
             ) as *mut XmlNodePtr;
             if temp.is_null() {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
                 xml_xpath_node_set_clear(set2, 1);
@@ -6399,7 +6380,7 @@ unsafe extern "C" fn xml_xpath_node_set_filter(
             node_max as usize * size_of::<XmlNodePtr>(),
         ) as *mut XmlNodePtr;
         if tmp.is_null() {
-            xml_xpath_perr_memory(ctxt, c"shrinking nodeset\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("shrinking nodeset\n"));
         } else {
             (*set).node_tab = tmp;
             (*set).node_max = node_max;
@@ -7350,7 +7331,7 @@ unsafe extern "C" fn xml_xpath_location_set_filter(
             loc_max as usize * size_of::<XmlXPathObjectPtr>(),
         ) as *mut XmlXPathObjectPtr;
         if tmp.is_null() {
-            xml_xpath_perr_memory(ctxt, c"shrinking locset\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("shrinking locset\n"));
         } else {
             (*locset).loc_tab = tmp;
             (*locset).loc_max = loc_max;
@@ -8373,7 +8354,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_run_eval(
         (*ctxt).value_tab =
             xml_malloc(10 * size_of::<XmlXPathObjectPtr>()) as *mut XmlXPathObjectPtr;
         if (*ctxt).value_tab.is_null() {
-            xml_xpath_perr_memory(ctxt, c"creating evaluation context\n".as_ptr());
+            xml_xpath_perr_memory(ctxt, Some("creating evaluation context\n"));
             return -1;
         }
         (*ctxt).value_nr = 0;
@@ -8988,7 +8969,7 @@ unsafe extern "C" fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut
                             xml_strdup((*(*(*(*cur).nodesetval).node_tab.add(i as usize))).name);
                     }
                     if fullname.is_null() {
-                        xml_xpath_perr_memory(ctxt, null());
+                        xml_xpath_perr_memory(ctxt, None);
                     }
                     value_push(ctxt, xml_xpath_cache_wrap_string((*ctxt).context, fullname));
                 }
@@ -9260,7 +9241,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_merge(
             (*val1).node_tab =
                 xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
             if (*val1).node_tab.is_null() {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset\n"));
                 // goto error;
                 xml_xpath_free_node_set(val1);
                 return null_mut();
@@ -9273,7 +9254,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_merge(
             (*val1).node_max = XML_NODESET_DEFAULT as _;
         } else if (*val1).node_nr == (*val1).node_max {
             if (*val1).node_max >= XPATH_MAX_NODESET_LENGTH as i32 {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset hit limit\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
                 xml_xpath_free_node_set(val1);
                 return null_mut();
@@ -9283,7 +9264,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_merge(
                 (*val1).node_max as usize * 2 * size_of::<XmlNodePtr>(),
             ) as *mut XmlNodePtr;
             if temp.is_null() {
-                xml_xpath_err_memory(null_mut(), c"merging nodeset\n".as_ptr() as _);
+                xml_xpath_err_memory(null_mut(), Some("merging nodeset\n"));
                 // goto error;
                 xml_xpath_free_node_set(val1);
                 return null_mut();
@@ -9421,7 +9402,7 @@ pub unsafe extern "C" fn xml_xpath_new_node_set_list(val: XmlNodeSetPtr) -> XmlX
 pub unsafe extern "C" fn xml_xpath_wrap_node_set(val: XmlNodeSetPtr) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating node set object\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("creating node set object\n"));
         xml_xpath_free_node_set(val);
         return null_mut();
     }
@@ -9438,7 +9419,7 @@ pub unsafe extern "C" fn xml_xpath_wrap_node_set(val: XmlNodeSetPtr) -> XmlXPath
 pub unsafe extern "C" fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), c"creating user object\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("creating user object\n"));
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
@@ -9622,9 +9603,7 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
         return 0;
     }
 
-    /*
-     * for equal, check if there is a node pertaining to both sets
-     */
+    // for equal, check if there is a node pertaining to both sets
     if neq == 0 {
         for i in 0..(*ns1).node_nr {
             for j in 0..(*ns2).node_nr {
@@ -9639,14 +9618,14 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
     let hashs1: *mut u32 = xml_malloc((*ns1).node_nr as usize * size_of::<u32>()) as *mut u32;
     if hashs1.is_null() {
         /* TODO: Propagate memory error. */
-        xml_xpath_err_memory(null_mut(), c"comparing nodesets\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
         return 0;
     }
     let mut values2 = vec![None; (*ns2).node_nr as usize];
     let hashs2: *mut u32 = xml_malloc((*ns2).node_nr as usize * size_of::<u32>()) as *mut u32;
     if hashs2.is_null() {
         /* TODO: Propagate memory error. */
-        xml_xpath_err_memory(null_mut(), c"comparing nodesets\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
         xml_free(hashs1 as _);
         return 0;
     }
@@ -10244,7 +10223,7 @@ unsafe extern "C" fn xml_xpath_compare_node_sets(
     let values2: *mut f64 = xml_malloc((*ns2).node_nr as usize * size_of::<f64>()) as *mut f64;
     if values2.is_null() {
         /* TODO: Propagate memory error. */
-        xml_xpath_err_memory(null_mut(), c"comparing nodesets\n".as_ptr() as _);
+        xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
         xml_xpath_free_object(arg1);
         xml_xpath_free_object(arg2);
         return 0;

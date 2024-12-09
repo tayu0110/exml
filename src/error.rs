@@ -1442,6 +1442,26 @@ macro_rules! __xml_raise_error {
             "No error message provided",
         );
     };
+    ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:literal, $( $args:expr ),*) => {
+        $crate::__xml_raise_error!(
+            $schannel,
+            $channel,
+            $data,
+            $ctx,
+            $nod,
+            $domain,
+            $code,
+            $level,
+            $file,
+            $line,
+            $str1,
+            $str2,
+            $str3,
+            $int1,
+            $col,
+            format!($msg, $( $args ),*).as_str(),
+        );
+    };
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
         use std::borrow::Cow;
         use std::ffi::{CStr, CString};
