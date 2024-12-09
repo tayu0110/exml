@@ -62,8 +62,13 @@ use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen,
 
 use crate::{
     __xml_raise_error,
-    buf::libxml_api::{xml_buf_add, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme},
-    buf::{libxml_api::xml_buf_create, xml_buf_overflow_error, XmlBufRef},
+    buf::{
+        libxml_api::{
+            xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free,
+            xml_buf_set_allocation_scheme,
+        },
+        xml_buf_overflow_error, XmlBufRef,
+    },
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{parser_validity_error, parser_validity_warning, XmlError, XmlParserErrors},
     generic_error,
@@ -97,9 +102,9 @@ use crate::{
         parser_internals::{
             xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
             xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
-            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_err_internal,
-            xml_fatal_err, xml_free_input_stream, xml_new_entity_input_stream,
-            xml_new_input_stream, xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
+            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_fatal_err,
+            xml_free_input_stream, xml_new_entity_input_stream, xml_new_input_stream,
+            xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
             xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
             xml_parse_encoding_decl, xml_parse_entity_ref, xml_parse_entity_value,
@@ -133,6 +138,7 @@ use crate::{
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
+    xml_err_internal,
 };
 
 use super::{
@@ -625,7 +631,7 @@ impl XmlParserCtxt {
         if (cur_end > XML_MAX_LOOKUP_LIMIT as isize || cur_base > XML_MAX_LOOKUP_LIMIT as isize)
             && self.options & XmlParserOption::XmlParseHuge as i32 == 0
         {
-            xml_err_internal(self, "Huge input lookup", null());
+            xml_err_internal!(self, "Huge input lookup");
             self.halt();
             return -1;
         }
@@ -637,9 +643,9 @@ impl XmlParserCtxt {
         let ret: i32 = buf.borrow_mut().grow(INPUT_CHUNK as _);
         (*input).set_base_and_cursor(0, cur_base as usize);
 
-        /* TODO: Get error code from xmlParserInputBufferGrow */
+        // TODO: Get error code from xmlParserInputBufferGrow
         if ret < 0 {
-            xml_err_internal(self, "Growing input buffer", null());
+            xml_err_internal!(self, "Growing input buffer");
             self.halt();
         }
 
@@ -777,7 +783,7 @@ impl XmlParserCtxt {
         }
 
         if (*self.input).cur > (*self.input).end {
-            xml_err_internal(self, "Parser input data memory error\n", null());
+            xml_err_internal!(self, "Parser input data memory error\n");
 
             self.err_no = XmlParserErrors::XmlErrInternalError as i32;
             self.stop();
@@ -1503,11 +1509,7 @@ impl XmlParserCtxt {
             return -1;
         }
         let Some(input_buf) = (*input).buf.as_mut() else {
-            xml_err_internal(
-                self,
-                "static memory buffer doesn't support encoding\n",
-                null(),
-            );
+            xml_err_internal!(self, "static memory buffer doesn't support encoding\n");
             return -1;
         };
 
@@ -1593,7 +1595,7 @@ impl XmlParserCtxt {
         (*input).reset_base();
         if res.is_err() {
             /* TODO: This could be an out of memory or an encoding error. */
-            xml_err_internal(self, "switching encoding: encoder error\n", null());
+            xml_err_internal!(self, "switching encoding: encoder error\n");
             self.halt();
             return -1;
         }
@@ -4822,7 +4824,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     let mut input: XmlParserInputPtr;
 
     if ctxt.is_null() {
-        xml_err_internal(null_mut(), "Got NULL parser context\n", null());
+        xml_err_internal!(null_mut(), "Got NULL parser context\n");
         return -1;
     }
 

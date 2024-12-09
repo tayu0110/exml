@@ -195,45 +195,52 @@ pub fn xml_is_letter(c: u32) -> bool {
 }
 
 /// Handle an internal error
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlErrInternal")]
-pub(crate) unsafe fn xml_err_internal(ctxt: XmlParserCtxtPtr, msg: &str, str: *const XmlChar) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = XmlParserErrors::XmlErrInternalError as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        XmlParserErrors::XmlErrInternalError,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        (!str.is_null()).then(|| CStr::from_ptr(str as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        str
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
+macro_rules! xml_err_internal {
+    ($ctxt:expr, $msg:literal) => {
+        $crate::xml_err_internal!(@inner $ctxt, $msg, None);
+    };
+    ($ctxt:expr, $msg:literal, $s:expr) => {
+        let msg = format!($msg, $s);
+        $crate::xml_err_internal!(@inner $ctxt, &msg, Some($s.into()));
+    };
+    (@inner $ctxt:expr, $msg:expr, $s:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = XmlParserErrors::XmlErrInternalError as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                XmlParserErrors::XmlErrInternalError,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                $s,
+                None,
+                None,
+                0,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
         }
-    }
+    };
 }
 
 /// Set after xmlValidateDtdFinal was called.
@@ -724,7 +731,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
     buffer: *const XmlChar,
 ) -> XmlParserInputPtr {
     if buffer.is_null() {
-        xml_err_internal(ctxt, "xmlNewStringInputStream string = NULL\n", null());
+        xml_err_internal!(ctxt, "xmlNewStringInputStream string = NULL\n");
         return null_mut();
     }
     if get_parser_debug_entities() != 0 {
@@ -766,7 +773,7 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
     let input: XmlParserInputPtr;
 
     if entity.is_null() {
-        xml_err_internal(ctxt, "xmlNewEntityInputStream entity = NULL\n", null());
+        xml_err_internal!(ctxt, "xmlNewEntityInputStream entity = NULL\n");
         return null_mut();
     }
     if get_parser_debug_entities() != 0 {
@@ -778,11 +785,9 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
     if (*entity).content.load(Ordering::Relaxed).is_null() {
         match (*entity).etype {
             Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                xml_err_internal(
-                    ctxt,
-                    "Cannot parse entity %s\n",
-                    (*entity).name.load(Ordering::Relaxed) as _,
-                );
+                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                xml_err_internal!(ctxt, "Cannot parse entity {}\n", name);
             }
             Some(XmlEntityType::XmlExternalGeneralParsedEntity)
             | Some(XmlEntityType::XmlExternalParameterEntity) => {
@@ -797,25 +802,23 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
                 return input;
             }
             Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                xml_err_internal(
-                    ctxt,
-                    "Internal entity %s without content !\n",
-                    (*entity).name.load(Ordering::Relaxed) as _,
-                );
+                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                xml_err_internal!(ctxt, "Internal entity {} without content !\n", name);
             }
             Some(XmlEntityType::XmlInternalParameterEntity) => {
-                xml_err_internal(
+                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                xml_err_internal!(
                     ctxt,
-                    "Internal parameter entity %s without content !\n",
-                    (*entity).name.load(Ordering::Relaxed) as _,
+                    "Internal parameter entity {} without content !\n",
+                    name
                 );
             }
             Some(XmlEntityType::XmlInternalPredefinedEntity) => {
-                xml_err_internal(
-                    ctxt,
-                    "Predefined entity %s without content !\n",
-                    (*entity).name.load(Ordering::Relaxed) as _,
-                );
+                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                xml_err_internal!(ctxt, "Predefined entity {} without content !\n", name);
             }
             _ => {
                 unreachable!()
