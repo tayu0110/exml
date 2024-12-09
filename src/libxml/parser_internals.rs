@@ -33,6 +33,7 @@ use std::sync::atomic::Ordering;
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
+use crate::__xml_loader_err;
 use crate::error::XmlParserErrors;
 use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
@@ -45,7 +46,7 @@ use crate::{
     },
     generic_error,
     globals::{get_parser_debug_entities, GenericErrorContext},
-    io::{__xml_loader_err, xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
+    io::{xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
         catalog::{
             xml_catalog_add_local, xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI,
@@ -1064,11 +1065,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     }
 
     if filename.is_null() {
-        __xml_loader_err(
-            ctxt as _,
-            "failed to load external entity: NULL filename \n",
-            null(),
-        );
+        __xml_loader_err!(ctxt, "failed to load external entity: NULL filename \n");
         return null_mut();
     }
     let Some(buf) = XmlParserInputBuffer::from_uri(
@@ -1076,17 +1073,10 @@ pub unsafe extern "C" fn xml_new_input_from_file(
         XmlCharEncoding::None,
     ) else {
         if filename.is_null() {
-            __xml_loader_err(
-                ctxt as _,
-                "failed to load external entity: NULL filename \n",
-                null(),
-            );
+            __xml_loader_err!(ctxt, "failed to load external entity: NULL filename \n");
         } else {
-            __xml_loader_err(
-                ctxt as _,
-                "failed to load external entity \"%s\"\n",
-                filename as *const c_char,
-            );
+            let filename = CStr::from_ptr(filename).to_string_lossy();
+            __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
         }
         return null_mut();
     };

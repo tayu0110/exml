@@ -46,10 +46,7 @@ use url::Url;
 use crate::{
     __xml_raise_error,
     encoding::find_encoding_handler,
-    error::{
-        XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error,
-    },
-    globals::{GenericError, StructuredError},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     libxml::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
@@ -57,10 +54,7 @@ use crate::{
         },
         globals::{xml_free, xml_mem_strdup},
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
-        parser::{
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption,
-            XML_SAX2_MAGIC,
-        },
+        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
         xmlstring::{xml_strdup, xml_strncasecmp, XmlChar},
     },
@@ -342,54 +336,65 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
 
 /// Handle a resource access error
 #[doc(alias = "__xmlLoaderErr")]
-pub(crate) unsafe fn __xml_loader_err(ctx: *mut c_void, msg: &str, filename: *const c_char) {
-    let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
-    let mut schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut data = None;
-    let mut level: XmlErrorLevel = XmlErrorLevel::XmlErrError;
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __xml_loader_err {
+    ($ctx:expr, $msg:literal) => {
+        $crate::__xml_loader_err!(@inner $ctx, $msg, None);
+    };
+    ($ctx:expr, $msg:literal, $filename:expr) => {
+        let msg = format!($msg, $filename);
+        $crate::__xml_loader_err!(@inner $ctx, &msg, Some($filename.into()));
+    };
+    (@inner $ctx:expr, $msg:expr, $filename:expr) => {
+        use $crate::{
+            error::XmlErrorLevel,
+            globals::{GenericError, StructuredError},
+            libxml::parser::XML_SAX2_MAGIC,
+        };
+        let ctxt: XmlParserCtxtPtr = $ctx as XmlParserCtxtPtr;
+        let mut schannel: Option<StructuredError> = None;
+        let mut channel: Option<GenericError> = None;
+        let mut data = None;
+        let mut level = XmlErrorLevel::XmlErrError;
 
-    if !ctxt.is_null()
-        && ((*ctxt).disable_sax != 0)
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() && !(*ctxt).sax.is_null() {
-        if (*ctxt).validate != 0 {
-            channel = (*(*ctxt).sax).error;
-            level = XmlErrorLevel::XmlErrError;
-        } else {
-            channel = (*(*ctxt).sax).warning;
-            level = XmlErrorLevel::XmlErrWarning;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() && !(*ctxt).sax.is_null() {
+                if (*ctxt).validate != 0 {
+                    channel = (*(*ctxt).sax).error;
+                    level = XmlErrorLevel::XmlErrError;
+                } else {
+                    channel = (*(*ctxt).sax).warning;
+                    level = XmlErrorLevel::XmlErrWarning;
+                }
+                if (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
+                    schannel = (*(*ctxt).sax).serror;
+                }
+                data = (*ctxt).user_data.clone();
+            }
+            __xml_raise_error!(
+                schannel,
+                channel,
+                data,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromIO,
+                XmlParserErrors::XmlIOLoadError,
+                level,
+                None,
+                0,
+                $filename,
+                None,
+                None,
+                0,
+                0,
+                $msg,
+            );
         }
-        if (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
-            schannel = (*(*ctxt).sax).serror;
-        }
-        data = (*ctxt).user_data.clone();
-    }
-    __xml_raise_error!(
-        schannel,
-        channel,
-        data,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromIO,
-        XmlParserErrors::XmlIOLoadError,
-        level,
-        None,
-        0,
-        (!filename.is_null()).then(|| CStr::from_ptr(filename)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        filename
-    );
+    };
 }
 
 /// Check an input in case it was created from an HTTP stream,
@@ -410,16 +415,15 @@ pub unsafe extern "C" fn xml_check_http_input(
                 if let Some(context) = buf.borrow_mut().nanohttp_context() {
                     let code = context.return_code();
                     if code >= 400 {
-                        /* fatal error */
+                        // fatal error
                         if let Some(filename) = (*ret).filename.as_deref() {
-                            let filename = CString::new(filename).unwrap();
-                            __xml_loader_err(
-                                ctxt as _,
-                                "failed to load HTTP resource \"%s\"\n",
-                                filename.as_ptr() as *const c_char,
+                            __xml_loader_err!(
+                                ctxt,
+                                "failed to load HTTP resource \"{}\"\n",
+                                filename
                             );
                         } else {
-                            __xml_loader_err(ctxt as _, "failed to load HTTP resource\n", null());
+                            __xml_loader_err!(ctxt, "failed to load HTTP resource\n");
                         }
                         xml_free_input_stream(ret);
                         ret = null_mut();
@@ -490,9 +494,13 @@ pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
 
     if resource.is_null() {
         if id.is_null() {
-            id = c"NULL".as_ptr() as _;
+            id = c"NULL".as_ptr();
         }
-        __xml_loader_err(ctxt as _, "failed to load external entity \"%s\"\n", id);
+        __xml_loader_err!(
+            ctxt,
+            "failed to load external entity \"{}\"\n",
+            CStr::from_ptr(id).to_string_lossy()
+        );
         return null_mut();
     }
     ret = xml_new_input_from_file(ctxt, resource as _);
