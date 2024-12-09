@@ -138,7 +138,7 @@ use crate::{
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
-    xml_err_internal,
+    xml_err_encoding_int, xml_err_internal,
 };
 
 use super::{
@@ -150,8 +150,8 @@ use super::{
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
     parser_internals::{
-        xml_err_encoding_int, xml_err_memory, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT,
-        XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
+        xml_err_memory, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
+        XML_VCTXT_USE_PCTXT,
     },
     sax2::{xml_sax2_end_element, xml_sax2_start_element},
     threads::{
@@ -1088,11 +1088,11 @@ impl XmlParserCtxt {
         if (*len > 1 && !xml_is_char(c as u32))
             || (*len == 1 && c == '\0' && (*self.input).cur < (*self.input).end)
         {
-            xml_err_encoding_int(
+            xml_err_encoding_int!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Char 0x%X out of allowed range\n",
-                c as i32,
+                "Char 0x{:X} out of allowed range\n",
+                c as i32
             );
         }
         if c == '\r' {

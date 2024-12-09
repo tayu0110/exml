@@ -5615,47 +5615,45 @@ pub(crate) unsafe extern "C" fn xml_string_len_decode_entities(
 }
 
 /// n encoding error
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlErrEncodingInt")]
-pub(crate) unsafe fn xml_err_encoding_int(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    val: i32,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        None,
-        None,
-        None,
-        val,
-        0,
-        msg,
-        val
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
+macro_rules! xml_err_encoding_int {
+    ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                None,
+                None,
+                None,
+                $val,
+                0,
+                format!($msg, $val).as_str(),
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
         }
-    }
+    };
 }
 
 /// The current c_char value, if using UTF-8 this may actually span multiple
@@ -5719,11 +5717,11 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
                     val |= *cur.add(1) as u32 & 0x3f;
                 }
                 if !xml_is_char(val) {
-                    xml_err_encoding_int(
+                    xml_err_encoding_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
-                        "Char 0x%X out of allowed range\n",
-                        val as _,
+                        "Char 0x{:X} out of allowed range\n",
+                        val as i32
                     );
                 }
                 return val as _;
@@ -6175,11 +6173,11 @@ pub unsafe extern "C" fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i3
             out = out.add(1);
             bits = 12;
         } else {
-            xml_err_encoding_int(
+            xml_err_encoding_int!(
                 null_mut(),
                 XmlParserErrors::XmlErrInvalidChar,
-                "Internal error, xmlCopyCharMultiByte 0x%X out of bound\n",
-                val,
+                "Internal error, xmlCopyCharMultiByte 0x{:X} out of bound\n",
+                val
             );
             return 0;
         }
