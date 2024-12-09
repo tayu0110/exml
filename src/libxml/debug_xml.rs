@@ -175,80 +175,30 @@ unsafe extern "C" fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, str: *const Xml
 const DUMP_TEXT_TYPE: i32 = 1;
 
 /// Handle a debug error.
-#[doc(alias = "xmlDebugErr")]
-unsafe fn xml_debug_err(ctxt: XmlDebugCtxtPtr, error: XmlParserErrors, msg: &str) {
-    (*ctxt).errors += 1;
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        (*ctxt).node as _,
-        XmlErrorDomain::XmlFromCheck,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        None,
-        None,
-        None,
-        0,
-        0,
-        msg,
-    );
-}
-
-#[doc(alias = "xmlDebugErr2")]
-unsafe fn xml_debug_err2(ctxt: XmlDebugCtxtPtr, error: XmlParserErrors, msg: &str, extra: i32) {
-    (*ctxt).errors += 1;
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        (*ctxt).node as _,
-        XmlErrorDomain::XmlFromCheck,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        None,
-        None,
-        None,
-        0,
-        0,
-        msg,
-        extra
-    );
-}
-
-#[doc(alias = "xmlDebugErr3")]
-unsafe fn xml_debug_err3(
-    ctxt: XmlDebugCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    extra: *const c_char,
-) {
-    (*ctxt).errors += 1;
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        (*ctxt).node as _,
-        XmlErrorDomain::XmlFromCheck,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        None,
-        None,
-        None,
-        0,
-        0,
-        msg,
-        extra
-    );
+#[doc(alias = "xmlDebugErr", alias = "xmlDebugErr2", alias = "xmlDebugErr3")]
+macro_rules! xml_debug_err {
+    ($ctxt:expr, $error:expr, $msg:literal, $( $args:expr ),*) => {
+        (*$ctxt).errors += 1;
+        let msg = format!($msg, $( $args ),*);
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            (*$ctxt).node as _,
+            XmlErrorDomain::XmlFromCheck,
+            $error,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            msg.as_str(),
+        );
+    };
 }
 
 /// Check that a given namespace is in scope on a node.
@@ -327,33 +277,33 @@ unsafe extern "C" fn xml_ctxt_ns_check_scope(
     let ret: i32 = xml_ns_check_scope(node, ns);
     if ret == -2 {
         if (*ns).prefix.is_null() {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNsScope,
                 "Reference to default namespace not in scope\n",
             );
         } else {
-            xml_debug_err3(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNsScope,
-                "Reference to namespace '%s' not in scope\n",
-                (*ns).prefix as *mut c_char,
+                "Reference to namespace '{}' not in scope\n",
+                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
             );
         }
     }
     if ret == -3 {
         if (*ns).prefix.is_null() {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNsAncestor,
                 "Reference to default namespace not on ancestor\n",
             );
         } else {
-            xml_debug_err3(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNsAncestor,
-                "Reference to namespace '%s' not on ancestor\n",
-                (*ns).prefix as *mut c_char,
+                "Reference to namespace '{}' not on ancestor\n",
+                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
             );
         }
     }
@@ -366,11 +316,11 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
         return;
     }
     if (*ctxt).check != 0 && xml_check_utf8(str) == 0 {
-        xml_debug_err3(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotUTF8,
-            "String is not UTF-8 %s",
-            str as *const c_char,
+            "String is not UTF-8 {}",
+            CStr::from_ptr(str as *const i8).to_string_lossy()
         );
     }
 }
@@ -381,16 +331,16 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
 unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const XmlChar) {
     if (*ctxt).check != 0 {
         if name.is_null() {
-            xml_debug_err(ctxt, XmlParserErrors::XmlCheckNoName, "Name is NULL");
+            xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
             return;
         }
         #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         if xml_validate_name(name, 0) != 0 {
-            xml_debug_err3(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNotNCName,
-                "Name is not an NCName '%s'",
-                name as *const c_char,
+                "Name is not an NCName '{}'",
+                CStr::from_ptr(name as *const i8).to_string_lossy()
             );
         }
         if !(*ctxt).dict.is_null()
@@ -401,11 +351,11 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
                         | XmlParserOption::XmlParseNodict as i32)
                     == 0)
         {
-            xml_debug_err3(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckOutsideDict,
-                "Name is not from the document dictionary '%s'",
-                name as *const c_char,
+                "Name is not from the document dictionary '{}'",
+                CStr::from_ptr(name as *const i8).to_string_lossy()
             );
         }
     }
@@ -417,14 +367,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     let doc: XmlDocPtr = (*node).doc;
 
     if (*node).parent().is_none() {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoParent,
             "Node has no parent\n",
         );
     }
     if (*node).doc.is_null() {
-        xml_debug_err(ctxt, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n");
+        xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
         // dict = null_mut();
     } else {
         dict = (*doc).dict;
@@ -446,7 +396,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         })
         .is_some()
     {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckWrongDoc,
             "Node doc differs from parent's one\n",
@@ -459,7 +409,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 .filter(|p| node != p.properties as *mut XmlNode)
                 .is_some()
             {
-                xml_debug_err(
+                xml_debug_err!(
                     ctxt,
                     XmlParserErrors::XmlCheckNoPrev,
                     "Attr has no prev and not first of attr list\n",
@@ -470,14 +420,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             .filter(|p| p.children() != NodePtr::from_ptr(node))
             .is_some()
         {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNoPrev,
                 "Node has no prev and not first of parent list\n",
             );
         }
     } else if (*node).prev.unwrap().next != NodePtr::from_ptr(node) {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckWrongPrev,
             "Node prev->next : back link wrong\n",
@@ -485,14 +435,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
     }
     if let Some(next) = (*node).next {
         if next.prev != NodePtr::from_ptr(node) {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongNext,
                 "Node next->prev : forward link wrong\n",
             );
         }
         if next.parent() != (*node).parent() {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongParent,
                 "Node next->prev : forward link wrong\n",
@@ -507,7 +457,7 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
         })
         .is_some()
     {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoNext,
             "Node has no next and not last of parent list\n",
@@ -557,11 +507,11 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
                 {
                     // break;
                 } else {
-                    xml_debug_err3(
+                    xml_debug_err!(
                         ctxt,
                         XmlParserErrors::XmlCheckWrongName,
-                        "Text node has wrong name '%s'",
-                        (*node).name as *const c_char,
+                        "Text node has wrong name '{}'",
+                        (*node).name().unwrap()
                     );
                 }
             }
@@ -570,11 +520,11 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             if (*node).name == XML_STRING_COMMENT.as_ptr() as _ {
                 // break;
             } else {
-                xml_debug_err3(
+                xml_debug_err!(
                     ctxt,
                     XmlParserErrors::XmlCheckWrongName,
-                    "Comment node has wrong name '%s'",
-                    (*node).name as *const c_char,
+                    "Comment node has wrong name '{}'",
+                    (*node).name().unwrap()
                 );
             }
         }
@@ -585,11 +535,11 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
             if (*node).name.is_null() {
                 // break;
             } else {
-                xml_debug_err3(
+                xml_debug_err!(
                     ctxt,
                     XmlParserErrors::XmlCheckNameNotNull,
-                    "CData section has non NULL name '%s'",
-                    (*node).name as *const c_char,
+                    "CData section has non NULL name '{}'",
+                    (*node).name().unwrap()
                 );
             }
         }
@@ -623,7 +573,7 @@ unsafe extern "C" fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: XmlDtdPt
     }
 
     if (*dtd).typ != XmlElementType::XmlDTDNode {
-        xml_debug_err(ctxt, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD");
+        xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
         return;
     }
     if (*ctxt).check == 0 {
@@ -677,7 +627,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
         return;
     }
     if (*elem).typ != XmlElementType::XmlElementDecl {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotElemDecl,
             "Node is not an element declaration",
@@ -692,7 +642,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
             write!((*ctxt).output, ")");
         }
     } else {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
             "Element declaration has no name",
@@ -743,7 +693,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
         return;
     }
     if (*attr).typ != XmlElementType::XmlAttributeDecl {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotAttrDecl,
             "Node is not an attribute declaration",
@@ -756,7 +706,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
             write!((*ctxt).output, "ATTRDECL({name})");
         }
     } else {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
             "Node attribute declaration has no name",
@@ -767,7 +717,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAtt
             write!((*ctxt).output, " for {elem}");
         }
     } else {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoElem,
             "Node attribute declaration has no element name",
@@ -864,7 +814,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
         return;
     }
     if (*ent).typ != XmlElementType::XmlEntityDecl {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotEntityDecl,
             "Node is not an entity declaration",
@@ -878,7 +828,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
             write!((*ctxt).output, ")");
         }
     } else {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
             "Entity declaration has no name",
@@ -950,7 +900,7 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         return;
     }
     if (*ns).typ != XmlElementType::XmlNamespaceDecl {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotNsDecl,
             "Node is not a namespace declaration",
@@ -959,14 +909,14 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
     }
     if (*ns).href.is_null() {
         if !(*ns).prefix.is_null() {
-            xml_debug_err3(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNoHref,
-                "Incomplete namespace %s href=NULL\n",
-                (*ns).prefix as *mut c_char,
+                "Incomplete namespace {} href=NULL\n",
+                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
             );
         } else {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNoHref,
                 "Incomplete default namespace href=NULL\n",
@@ -1215,11 +1165,11 @@ unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNode
             if (*ctxt).check == 0 {
                 xml_ctxt_dump_spaces(ctxt);
             }
-            xml_debug_err2(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckUnknownNode,
-                "Unknown node type %d\n",
-                (*node).element_type() as i32,
+                "Unknown node type {}\n",
+                (*node).element_type() as i32
             );
             return;
         }
@@ -1312,7 +1262,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr)
         }
     }
     if (*attr).name.is_null() {
-        xml_debug_err(
+        xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNoName,
             "Attribute has no name",
@@ -1418,56 +1368,56 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
 
     match (*doc).typ {
         XmlElementType::XmlElementNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundElement,
                 "Misplaced ELEMENT node\n",
             );
         }
         XmlElementType::XmlAttributeNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundAttribute,
                 "Misplaced ATTRIBUTE node\n",
             );
         }
         XmlElementType::XmlTextNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundText,
                 "Misplaced TEXT node\n",
             );
         }
         XmlElementType::XmlCDATASectionNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundCDATA,
                 "Misplaced CDATA node\n",
             );
         }
         XmlElementType::XmlEntityRefNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundEntityRef,
                 "Misplaced ENTITYREF node\n",
             );
         }
         XmlElementType::XmlEntityNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundEntity,
                 "Misplaced ENTITY node\n",
             );
         }
         XmlElementType::XmlPINode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundPI,
                 "Misplaced PI node\n",
             );
         }
         XmlElementType::XmlCommentNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundComment,
                 "Misplaced COMMENT node\n",
@@ -1484,32 +1434,32 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
             }
         }
         XmlElementType::XmlDocumentTypeNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundDoctype,
                 "Misplaced DOCTYPE node\n",
             );
         }
         XmlElementType::XmlDocumentFragNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundFragment,
                 "Misplaced FRAGMENT node\n",
             );
         }
         XmlElementType::XmlNotationNode => {
-            xml_debug_err(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckFoundNotation,
                 "Misplaced NOTATION node\n",
             );
         }
         _ => {
-            xml_debug_err2(
+            xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckUnknownNode,
-                "Unknown node type %d\n",
-                (*doc).typ as i32,
+                "Unknown node type {}\n",
+                (*doc).typ as i32
             );
         }
     }
@@ -1643,11 +1593,11 @@ extern "C" fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtx
                     write!((*ctxt).output, "EXTERNAL PARAMETER, ");
                 }
                 Some(e) => {
-                    xml_debug_err2(
+                    xml_debug_err!(
                         ctxt,
                         XmlParserErrors::XmlCheckEntityType,
-                        "Unknown entity type %d\n",
-                        e as i32,
+                        "Unknown entity type {}\n",
+                        e as i32
                     );
                 }
                 _ => unreachable!(),
