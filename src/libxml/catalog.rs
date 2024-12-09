@@ -49,7 +49,6 @@ use libc::{close, getenv, memset, open, read, snprintf, stat, O_RDONLY};
 use crate::{
     __xml_raise_error,
     encoding::XmlCharEncoding,
-    error::XmlParserErrors,
     generic_error,
     hash::XmlHashTableRef,
     io::{xml_parser_get_directory, XmlParserInputBuffer},
@@ -1156,45 +1155,86 @@ static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 
 /// Handle a catalog error
 #[doc(alias = "xmlCatalogErr")]
-unsafe fn xml_catalog_err(
-    catal: XmlCatalogEntryPtr,
-    node: XmlNodePtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-    str3: *const XmlChar,
-) {
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        catal as _,
-        node as _,
-        XmlErrorDomain::XmlFromCatalog,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        0,
-        0,
-        msg,
-        str1,
-        str2,
-        str3
-    );
+macro_rules! xml_catalog_err {
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal
+    ) => {
+        xml_catalog_err!(@inner $catal, $node, $error, $msg, None, None, None,);
+    };
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal,
+        $str1:expr,
+    ) => {
+        let msg = format!($msg, $str1);
+        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.into()), None, None,);
+    };
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal,
+        $str1:expr,
+        $str2:expr,
+    ) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.into()), Some($str2.into()), None,);
+    };
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal,
+        $str1:expr,
+        $str2:expr,
+        $str3:expr,
+    ) => {
+        let msg = format!($msg, $str1, $str2, $str3);
+        xml_catalog_err!(
+            @inner
+            $catal,
+            $node,
+            $error,
+            &msg,
+            Some($str1.into()),
+            Some($str2.into()),
+            Some($str3.into()),
+        );
+    };
+    (
+        @inner
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:expr,
+        $str1:expr,
+        $str2:expr,
+        $str3:expr,
+    ) => {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            $catal as _,
+            $node as _,
+            XmlErrorDomain::XmlFromCatalog,
+            $error,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            $str1,
+            $str2,
+            $str3,
+            0,
+            0,
+            $msg,
+        );
+    };
 }
 
 /// Finishes the examination of an XML tree node of a catalog and build
@@ -1223,14 +1263,13 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
                 .as_ref(),
         );
         if name_value.is_none() {
-            xml_catalog_err(
+            xml_catalog_err!(
                 ret,
                 cur,
                 XmlParserErrors::XmlCatalogMissingAttr,
-                "%s entry lacks '%s'\n",
-                name,
-                attr_name,
-                null_mut(),
+                "{} entry lacks '{}'\n",
+                CStr::from_ptr(name as *const i8).to_string_lossy(),
+                CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
             );
             ok = 0;
         }
@@ -1240,14 +1279,13 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             .to_string_lossy()
             .as_ref(),
     ) else {
-        xml_catalog_err(
+        xml_catalog_err!(
             ret,
             cur,
             XmlParserErrors::XmlCatalogMissingAttr,
-            "%s entry lacks '%s'\n",
-            name,
-            uri_attr_name,
-            null_mut(),
+            "{} entry lacks '{}'\n",
+            CStr::from_ptr(name as *const i8).to_string_lossy(),
+            CStr::from_ptr(uri_attr_name as *const i8).to_string_lossy(),
         );
         return null_mut();
     };
@@ -1255,12 +1293,12 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
         return null_mut();
     }
 
-    let uri_value = CString::new(uri_value).unwrap();
+    let curi_value = CString::new(uri_value.as_str()).unwrap();
     let base = (*cur)
         .get_base((*cur).doc)
         .map(|c| CString::new(c).unwrap());
     let url: *mut XmlChar = xml_build_uri(
-        uri_value.as_ptr() as *const u8,
+        curi_value.as_ptr() as *const u8,
         base.as_ref()
             .map_or(null_mut(), |b| b.as_ptr() as *const u8),
     );
@@ -1286,20 +1324,20 @@ unsafe extern "C" fn xml_parse_xml_catalog_one_node(
             name_value
                 .as_ref()
                 .map_or(null_mut(), |n| n.as_ptr() as *const u8),
-            uri_value.as_ptr() as *const u8,
+            curi_value.as_ptr() as *const u8,
             url,
             prefer,
             cgroup,
         );
     } else {
-        xml_catalog_err(
+        xml_catalog_err!(
             ret,
             cur,
             XmlParserErrors::XmlCatalogEntryBroken,
-            "%s entry '%s' broken ?: %s\n",
-            name,
-            uri_attr_name,
-            uri_value.as_ptr() as *const u8,
+            "{} entry '{}' broken ?: {}\n",
+            CStr::from_ptr(name as *const i8).to_string_lossy(),
+            CStr::from_ptr(uri_attr_name as *const i8).to_string_lossy(),
+            uri_value,
         );
     }
     if !url.is_null() {
@@ -1331,15 +1369,12 @@ unsafe extern "C" fn xml_parse_xml_catalog_node(
             } else if prop == "public" {
                 prefer = XmlCatalogPrefer::Public;
             } else {
-                let prop = CString::new(prop).unwrap();
-                xml_catalog_err(
+                xml_catalog_err!(
                     parent,
                     cur,
                     XmlParserErrors::XmlCatalogPreferValue,
-                    "Invalid value for prefer: '%s'\n",
-                    prop.as_ptr() as *const u8,
-                    null_mut(),
-                    null_mut(),
+                    "Invalid value for prefer: '{}'\n",
+                    prop,
                 );
             }
             pref = prefer;
@@ -1560,29 +1595,24 @@ unsafe extern "C" fn xml_parse_xml_catalog_file(
             } else if prop == "public" {
                 prefer = XmlCatalogPrefer::Public;
             } else {
-                let prop = CString::new(prop).unwrap();
-                xml_catalog_err(
+                xml_catalog_err!(
                     null_mut(),
                     cur,
                     XmlParserErrors::XmlCatalogPreferValue,
-                    "Invalid value for prefer: '%s'\n",
-                    prop.as_ptr() as *const u8,
-                    null_mut(),
-                    null_mut(),
+                    "Invalid value for prefer: '{}'\n",
+                    prop,
                 );
             }
         }
         cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
         xml_parse_xml_catalog_node_list(cur, prefer, parent, null_mut());
     } else {
-        xml_catalog_err(
+        xml_catalog_err!(
             null_mut(),
-            doc as _,
+            doc,
             XmlParserErrors::XmlCatalogNotCatalog,
-            "File %s is not an XML Catalog\n",
-            filename,
-            null_mut(),
-            null_mut(),
+            "File {} is not an XML Catalog\n",
+            CStr::from_ptr(filename as *const i8).to_string_lossy(),
         );
         xml_free_doc(doc);
         return null_mut();
@@ -2063,14 +2093,12 @@ unsafe extern "C" fn xml_catalog_xml_resolve(
 
     // protection against loops
     if (*catal).depth > MAX_CATAL_DEPTH as i32 {
-        xml_catalog_err(
+        xml_catalog_err!(
             catal,
             null_mut(),
             XmlParserErrors::XmlCatalogRecursion,
-            "Detected recursion in catalog %s\n",
-            (*catal).name,
-            null_mut(),
-            null_mut(),
+            "Detected recursion in catalog {}\n",
+            CStr::from_ptr((*catal).name as *const i8).to_string_lossy(),
         );
         return null_mut();
     }
@@ -2644,14 +2672,12 @@ unsafe extern "C" fn xml_catalog_xml_resolve_uri(
     }
 
     if (*catal).depth > MAX_CATAL_DEPTH as i32 {
-        xml_catalog_err(
+        xml_catalog_err!(
             catal,
             null_mut(),
             XmlParserErrors::XmlCatalogRecursion,
-            "Detected recursion in catalog %s\n",
-            (*catal).name,
-            null_mut(),
-            null_mut(),
+            "Detected recursion in catalog {}\n",
+            CStr::from_ptr((*catal).name as *const i8).to_string_lossy(),
         );
         return null_mut();
     }
