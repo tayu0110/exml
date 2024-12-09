@@ -30,7 +30,7 @@ use std::{
     fs::{metadata, File},
     io::{self, stdin, ErrorKind, Read},
     path::Path,
-    ptr::{null, null_mut},
+    ptr::null_mut,
     sync::atomic::Ordering,
 };
 
@@ -44,7 +44,7 @@ use libc::{
 use url::Url;
 
 use crate::{
-    __xml_raise_error, __xml_simple_error,
+    __xml_err_encoding, __xml_raise_error, __xml_simple_error,
     encoding::find_encoding_handler,
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     libxml::{
@@ -55,7 +55,7 @@ use crate::{
         globals::{xml_free, xml_mem_strdup},
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
-        parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
+        parser_internals::{xml_free_input_stream, xml_new_input_from_file},
         xmlstring::{xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,
@@ -443,16 +443,14 @@ pub unsafe extern "C" fn xml_check_http_input(
                             .is_some()
                         {
                             if let Some(encoding) = context.encoding() {
-                                let enc = CString::new(encoding).unwrap();
                                 if let Some(handler) = find_encoding_handler(encoding) {
                                     (*ctxt).switch_input_encoding(ret, handler);
                                 } else {
-                                    __xml_err_encoding(
+                                    __xml_err_encoding!(
                                         ctxt,
                                         XmlParserErrors::XmlErrUnknownEncoding,
-                                        "Unknown encoding %s",
-                                        enc.as_ptr() as *const u8,
-                                        null(),
+                                        "Unknown encoding {}",
+                                        encoding
                                     );
                                 }
                                 if (*ret).encoding.is_none() {

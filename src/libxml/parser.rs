@@ -58,10 +58,10 @@ use std::{
 
 #[cfg(feature = "libxml_legacy")]
 use libc::strcmp;
-use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, snprintf, strlen, strncmp, strstr};
+use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, strlen, strncmp, strstr};
 
 use crate::{
-    __xml_raise_error,
+    __xml_err_encoding, __xml_raise_error,
     buf::{
         libxml_api::{
             xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free,
@@ -150,8 +150,8 @@ use super::{
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
     parser_internals::{
-        __xml_err_encoding, xml_err_encoding_int, xml_err_memory, xml_is_letter, LINE_LEN,
-        XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
+        xml_err_encoding_int, xml_err_memory, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT,
+        XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
     },
     sax2::{xml_sax2_end_element, xml_sax2_start_element},
     threads::{
@@ -855,31 +855,24 @@ impl XmlParserCtxt {
          * encoding !)
          */
         if self.input.is_null() || (*self.input).end.offset_from((*self.input).cur) < 4 {
-            __xml_err_encoding(
+            __xml_err_encoding!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Input is not proper UTF-8, indicate encoding !\n",
-                null(),
-                null(),
+                "Input is not proper UTF-8, indicate encoding !\n"
             );
         } else {
-            let mut buffer: [c_char; 150] = [0; 150];
-
-            snprintf(
-                buffer.as_mut_ptr(),
-                149,
-                c"Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr() as _,
-                *(*self.input).cur.add(0) as u32,
-                *(*self.input).cur.add(1) as u32,
-                *(*self.input).cur.add(2) as u32,
-                *(*self.input).cur.add(3) as u32,
+            let buffer = format!(
+                "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                *(*self.input).cur.add(0),
+                *(*self.input).cur.add(1),
+                *(*self.input).cur.add(2),
+                *(*self.input).cur.add(3),
             );
-            __xml_err_encoding(
+            __xml_err_encoding!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Input is not proper UTF-8, indicate encoding !\n%s",
-                buffer.as_ptr() as _,
-                null(),
+                "Input is not proper UTF-8, indicate encoding !\n{}",
+                buffer
             );
         }
         self.charset = XmlCharEncoding::ISO8859_1;
@@ -1064,25 +1057,21 @@ impl XmlParserCtxt {
                          * encoding !)
                          */
                         if (*self.input).end.offset_from((*self.input).cur) < 4 {
-                            __xml_err_encoding(
+                            __xml_err_encoding!(
                                 self,
                                 XmlParserErrors::XmlErrInvalidChar,
-                                "Input is not proper UTF-8, indicate encoding !\n",
-                                null(),
-                                null(),
+                                "Input is not proper UTF-8, indicate encoding !\n"
                             );
                         } else {
                             let buffer = format!(
                                 "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
                                 content[0], content[1], content[2], content[3],
                             );
-                            let cb = CString::new(buffer).unwrap();
-                            __xml_err_encoding(
+                            __xml_err_encoding!(
                                 self,
                                 XmlParserErrors::XmlErrInvalidChar,
-                                "Input is not proper UTF-8, indicate encoding !\n%s",
-                                cb.as_ptr() as _,
-                                null(),
+                                "Input is not proper UTF-8, indicate encoding !\n{}",
+                                buffer
                             );
                         }
                         self.charset = XmlCharEncoding::ISO8859_1;
@@ -10108,31 +10097,24 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
     }
     // encoding_error:
     if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < 4 {
-        __xml_err_encoding(
+        __xml_err_encoding!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "Input is not proper UTF-8, indicate encoding !\n",
-            null(),
-            null(),
+            "Input is not proper UTF-8, indicate encoding !\n"
         );
     } else {
-        let mut buffer: [c_char; 150] = [0; 150];
-
-        snprintf(
-            buffer.as_mut_ptr() as _,
-            149,
-            c"Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr() as _,
-            *(*(*ctxt).input).cur.add(0) as u32,
-            *(*(*ctxt).input).cur.add(1) as u32,
-            *(*(*ctxt).input).cur.add(2) as u32,
-            *(*(*ctxt).input).cur.add(3) as u32,
+        let buffer = format!(
+            "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+            *(*(*ctxt).input).cur.add(0),
+            *(*(*ctxt).input).cur.add(1),
+            *(*(*ctxt).input).cur.add(2),
+            *(*(*ctxt).input).cur.add(3),
         );
-        __xml_err_encoding(
+        __xml_err_encoding!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "Input is not proper UTF-8, indicate encoding !\n%s",
-            buffer.as_ptr() as _,
-            null(),
+            "Input is not proper UTF-8, indicate encoding !\n{}",
+            buffer
         );
     }
     0

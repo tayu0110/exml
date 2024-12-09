@@ -305,55 +305,56 @@ pub(crate) unsafe fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: Option<&str>)
 }
 
 /// Handle an encoding error
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "__xmlErrEncoding")]
-pub(crate) unsafe fn __xml_err_encoding(
-    ctxt: XmlParserCtxtPtr,
-    xmlerr: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-) {
-    if (!ctxt.is_null())
-        && ((*ctxt).disable_sax != 0)
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = xmlerr as _;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        xmlerr,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        0,
-        0,
-        msg,
-        str1,
-        str2
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
+macro_rules! __xml_err_encoding {
+    ($ctxt:expr, $xmlerr:expr, $msg:literal) => {
+        $crate::__xml_err_encoding!(@inner $ctxt, $xmlerr, $msg, None, None);
+    };
+    ($ctxt:expr, $xmlerr:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        $crate::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), None);
+    };
+    ($ctxt:expr, $xmlerr:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        $crate::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $xmlerr:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $xmlerr as _;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $xmlerr,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                0,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
         }
-    }
+    };
 }
 
 /// Create a parser context for a file content.
@@ -649,12 +650,10 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
 
     let Some(handler) = (match enc {
         XmlCharEncoding::Error => {
-            __xml_err_encoding(
+            __xml_err_encoding!(
                 ctxt,
                 XmlParserErrors::XmlErrUnknownEncoding,
-                "encoding unknown\n",
-                null(),
-                null(),
+                "encoding unknown\n"
             );
             return -1;
         }
@@ -693,19 +692,15 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             }
             _ => {
                 let name = enc.get_name().unwrap_or("");
-                let cstr = CString::new(name).unwrap();
-                __xml_err_encoding(
+                __xml_err_encoding!(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
-                    "encoding not supported: %s\n",
-                    cstr.as_ptr() as *const u8,
-                    null(),
+                    "encoding not supported: {}\n",
+                    name
                 );
-                /*
-                 * TODO: We could recover from errors in external entities
-                 * if we didn't stop the parser. But most callers of this
-                 * function don't check the return value.
-                 */
+                // TODO: We could recover from errors in external entities
+                // if we didn't stop the parser. But most callers of this
+                // function don't check the return value.
                 (*ctxt).stop();
                 return -1;
             }
@@ -5768,23 +5763,18 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
      * encoding !)
      */
     {
-        let mut buffer: [c_char; 150] = [0; 150];
-
-        snprintf(
-            buffer.as_mut_ptr() as _,
-            149,
-            c"Bytes: 0x%02X 0x%02X 0x%02X 0x%02X\n".as_ptr() as _,
-            *(*(*ctxt).input).cur.add(0) as u32,
-            *(*(*ctxt).input).cur.add(1) as u32,
-            *(*(*ctxt).input).cur.add(2) as u32,
-            *(*(*ctxt).input).cur.add(3) as u32,
+        let buffer = format!(
+            "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+            *(*(*ctxt).input).cur.add(0),
+            *(*(*ctxt).input).cur.add(1),
+            *(*(*ctxt).input).cur.add(2),
+            *(*(*ctxt).input).cur.add(3),
         );
-        __xml_err_encoding(
+        __xml_err_encoding!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "Input is not proper UTF-8, indicate encoding !\n%s",
-            buffer.as_ptr() as _,
-            null(),
+            "Input is not proper UTF-8, indicate encoding !\n{}",
+            buffer
         );
     }
     *len = 1;
