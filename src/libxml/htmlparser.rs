@@ -5626,38 +5626,38 @@ unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
 #[doc(alias = "htmlParseErrInt")]
-unsafe fn html_parse_err_int(ctxt: XmlParserCtxtPtr, error: XmlParserErrors, msg: &str, val: i32) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromHTML,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        None,
-        None,
-        None,
-        val,
-        0,
-        msg,
-        val
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-    }
+macro_rules! html_parse_err_int {
+    ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
+        if $ctxt.is_null()
+            || (*$ctxt).disable_sax == 0
+            || !matches!((*$ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !$ctxt.is_null() {
+                (*$ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                $ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromHTML,
+                $error,
+                XmlErrorLevel::XmlErrError,
+                None,
+                0,
+                None,
+                None,
+                None,
+                $val,
+                0,
+                format!($msg, $val).as_str(),
+            );
+            if !$ctxt.is_null() {
+                (*$ctxt).well_formed = 0;
+            }
+        }
+    };
 }
 
 /// Ty to find and encoding in the current data available in the input
@@ -5812,11 +5812,11 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
         if *(*(*ctxt).input).cur < 0x80 {
             *len = 1;
             if *(*(*ctxt).input).cur == 0 && (*(*ctxt).input).cur < (*(*ctxt).input).end {
-                html_parse_err_int(
+                html_parse_err_int!(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    "Char 0x%X out of allowed range\n",
-                    0,
+                    "Char 0x{:X} out of allowed range\n",
+                    0
                 );
                 return b' ' as _;
             }
@@ -5919,21 +5919,21 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
             }
 
             if !xml_is_char(val) {
-                html_parse_err_int(
+                html_parse_err_int!(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    "Char 0x%X out of allowed range\n",
-                    val as _,
+                    "Char 0x{:X} out of allowed range\n",
+                    val as i32
                 );
             }
             return val as _;
         } else {
             if *(*(*ctxt).input).cur == 0 && (*(*ctxt).input).cur < (*(*ctxt).input).end {
-                html_parse_err_int(
+                html_parse_err_int!(
                     ctxt,
                     XmlParserErrors::XmlErrInvalidChar,
-                    "Char 0x%X out of allowed range\n",
-                    0,
+                    "Char 0x{:X} out of allowed range\n",
+                    0
                 );
                 *len = 1;
                 return b' ' as _;
@@ -6284,11 +6284,11 @@ pub(crate) unsafe extern "C" fn html_parse_char_ref(ctxt: HtmlParserCtxtPtr) -> 
             null(),
         );
     } else {
-        html_parse_err_int(
+        html_parse_err_int!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
-            "htmlParseCharRef: invalid xmlChar value %d\n",
-            val,
+            "htmlParseCharRef: invalid xmlChar value {}\n",
+            val
         );
     }
     0
@@ -7657,11 +7657,11 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
         if xml_is_char(cur as u32) {
             COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
         } else {
-            html_parse_err_int(
+            html_parse_err_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Invalid char in CDATA 0x%X\n",
-                cur,
+                "Invalid char in CDATA 0x{:X}\n",
+                cur
             );
         }
         NEXTL!(ctxt, l);
@@ -7732,11 +7732,11 @@ unsafe extern "C" fn html_parse_system_literal(ctxt: HtmlParserCtxtPtr) -> *mut 
     while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
         /* TODO: Handle UTF-8 */
         if !xml_is_char((*ctxt).current_byte() as u32) {
-            html_parse_err_int(
+            html_parse_err_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Invalid char in SystemLiteral 0x%X\n",
-                (*ctxt).current_byte() as _,
+                "Invalid char in SystemLiteral 0x{:X}\n",
+                (*ctxt).current_byte() as i32
             );
             err = 1;
         }
@@ -7797,11 +7797,11 @@ unsafe extern "C" fn html_parse_pubid_literal(ctxt: HtmlParserCtxtPtr) -> *mut X
     #[allow(clippy::while_immutable_condition)]
     while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() as i32 != quote {
         if !xml_is_pubid_char((*ctxt).current_byte() as u32) {
-            html_parse_err_int(
+            html_parse_err_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Invalid char in PubidLiteral 0x%X\n",
-                (*ctxt).current_byte() as _,
+                "Invalid char in PubidLiteral 0x{:X}\n",
+                (*ctxt).current_byte() as i32
             );
             err = 1;
         }
@@ -8113,11 +8113,11 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                     if xml_is_char(q as u32) {
                         COPY_BUF!(ctxt, ql, buf, len, q);
                     } else {
-                        html_parse_err_int(
+                        html_parse_err_int!(
                             ctxt,
                             XmlParserErrors::XmlErrInvalidChar,
-                            "Invalid char in comment 0x%X\n",
-                            q,
+                            "Invalid char in comment 0x{:X}\n",
+                            q
                         );
                     }
                     if len > max_length {
@@ -8277,11 +8277,11 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 if xml_is_char(cur as u32) {
                     COPY_BUF!(ctxt, l, buf, len, cur);
                 } else {
-                    html_parse_err_int(
+                    html_parse_err_int!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidChar,
-                        "Invalid char in processing instruction 0x%X\n",
-                        cur,
+                        "Invalid char in processing instruction 0x{:X}\n",
+                        cur
                     );
                 }
                 if len > max_length {
@@ -8672,11 +8672,11 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
         && cur != 0
     {
         if !xml_is_char(cur as u32) {
-            html_parse_err_int(
+            html_parse_err_int!(
                 ctxt,
                 XmlParserErrors::XmlErrInvalidChar,
-                "Invalid char in CDATA 0x%X\n",
-                cur,
+                "Invalid char in CDATA 0x{:X}\n",
+                cur
             );
         } else {
             COPY_BUF!(ctxt, l, buf.as_mut_ptr(), nbchar, cur);
