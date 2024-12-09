@@ -44,9 +44,9 @@ use libc::{
 use url::Url;
 
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, __xml_simple_error,
     encoding::find_encoding_handler,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     libxml::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
@@ -253,7 +253,16 @@ pub(crate) unsafe fn __xml_ioerr(
         idx = 0;
     }
 
-    __xml_simple_error(domain, code, null_mut(), Some(IOERR[idx as usize]), extra);
+    let msg: Cow<'static, str> = match idx {
+        43 => format!(
+            "Attempt to load network entity {}",
+            extra.expect("Internal Error")
+        )
+        .into(), /* XML_IO_NETWORK_ATTEMPT */
+        index => IOERR[index as usize].into(),
+    };
+
+    __xml_simple_error!(domain, code, null_mut(), &msg);
 }
 
 /// Handle an I/O error

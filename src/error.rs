@@ -15,9 +15,9 @@
 
 use std::{
     borrow::Cow,
-    ffi::{c_void, CStr, CString},
+    ffi::{c_void, CStr},
     io::{stderr, Stderr, Stdout, Write},
-    ptr::{null, null_mut, NonNull},
+    ptr::{null_mut, NonNull},
     slice::from_raw_parts,
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -1755,58 +1755,99 @@ pub(crate) unsafe fn __xml_simple_oom_error(
 }
 
 /// Handle an out of memory condition
+#[macro_export]
 #[doc(alias = "__xmlSimpleError")]
 #[doc(hidden)]
-pub(crate) unsafe fn __xml_simple_error(
-    domain: XmlErrorDomain,
-    code: XmlParserErrors,
-    node: XmlNodePtr,
-    msg: Option<&str>,
-    extra: Option<&str>,
-) {
-    assert_ne!(
-        code,
-        XmlParserErrors::XmlErrNoMemory,
-        "Use __xml_simple_oom_error"
-    );
-    if let Some(msg) = msg {
-        let e = extra.map(|e| CString::new(e).unwrap());
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            node as _,
-            domain,
-            code,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            extra.map(|e| e.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            msg,
-            e.as_ref().map_or(null(), |e| e.as_ptr() as *const u8)
+macro_rules! __xml_simple_error {
+    (
+        $domain:expr,
+        $code:expr,
+        $node:expr,
+        None,
+        $extra:expr
+    ) => {
+        assert_ne!(
+            $code,
+            XmlParserErrors::XmlErrNoMemory,
+            "Use __xml_simple_oom_error"
         );
-    } else {
-        __xml_raise_error!(
+        $crate::__xml_raise_error!(
             None,
             None,
             None,
             null_mut(),
-            node as _,
-            domain,
-            code,
+            $node as _,
+            $domain,
+            $code,
             XmlErrorLevel::XmlErrError,
             None,
             0,
-            extra.map(|e| e.to_owned().into()),
+            Some($extra.to_owned().into()),
             None,
             None,
             0,
             0
         );
-    }
+    };
+    (
+        $domain:expr,
+        $code:expr,
+        $node:expr,
+        $msg:expr
+    ) => {
+        assert_ne!(
+            $code,
+            XmlParserErrors::XmlErrNoMemory,
+            "Use __xml_simple_oom_error"
+        );
+        $crate::__xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            $node as _,
+            $domain,
+            $code,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            $msg,
+        );
+    };
+    (
+        $domain:expr,
+        $code:expr,
+        $node:expr,
+        $msg:literal,
+        $extra:expr
+    ) => {
+        assert_ne!(
+            $code,
+            XmlParserErrors::XmlErrNoMemory,
+            "Use __xml_simple_oom_error"
+        );
+        $crate::__xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            $node as _,
+            $domain,
+            $code,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            Some($extra.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            format!($msg, $extra).as_str(),
+        );
+    };
 }

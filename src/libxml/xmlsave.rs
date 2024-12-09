@@ -19,6 +19,7 @@
 // daniel@veillard.com
 
 use std::{
+    borrow::Cow,
     cell::RefCell,
     ffi::{CStr, CString},
     io::Write,
@@ -33,9 +34,10 @@ use std::{
 use libc::memset;
 
 use crate::{
+    __xml_simple_error,
     buf::{libxml_api::xml_buf_set_allocation_scheme, XmlBufRef},
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::XmlOutputBuffer,
     libxml::{
@@ -123,14 +125,16 @@ impl Default for XmlSaveCtxt<'_> {
 /// Handle an out of memory condition
 #[doc(alias = "xmlSaveErr")]
 pub(crate) unsafe fn xml_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
-    let msg = match code {
-        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n",
-        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n",
-        XmlParserErrors::XmlSaveUnknownEncoding => "unknown encoding %s\n",
-        XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n",
-        _ => "unexpected error number\n",
+    let msg: Cow<'static, str> = match code {
+        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
+        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
+        XmlParserErrors::XmlSaveUnknownEncoding => {
+            format!("unknown encoding {}\n", extra.expect("Internal Error")).into()
+        }
+        XmlParserErrors::XmlSaveNoDoctype => "document has no DOCTYPE\n".into(),
+        _ => "unexpected error number\n".into(),
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, Some(msg), extra);
+    __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
 }
 
 /// Handle an out of memory condition

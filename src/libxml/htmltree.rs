@@ -494,16 +494,20 @@ pub unsafe extern "C" fn html_doc_dump_memory(
 #[doc(alias = "htmlSaveErr")]
 #[cfg(feature = "libxml_output")]
 unsafe fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
-    use crate::error::{XmlErrorDomain, __xml_simple_error};
+    use std::borrow::Cow;
 
-    let msg = match code {
-        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n",
-        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n",
-        XmlParserErrors::XmlSaveUnknownEncoding => "unknown encoding %s\n",
-        XmlParserErrors::XmlSaveNoDoctype => "HTML has no DOCTYPE\n",
-        _ => "unexpected error number\n",
+    use crate::__xml_simple_error;
+
+    let msg: Cow<'static, str> = match code {
+        XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),
+        XmlParserErrors::XmlSaveCharInvalid => "invalid character value\n".into(),
+        XmlParserErrors::XmlSaveUnknownEncoding => {
+            format!("unknown encoding {}\n", extra.expect("Internal Error")).into()
+        }
+        XmlParserErrors::XmlSaveNoDoctype => "HTML has no DOCTYPE\n".into(),
+        _ => "unexpected error number\n".into(),
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromOutput, code, node, Some(msg), extra);
+    __xml_simple_error!(XmlErrorDomain::XmlFromOutput, code, node, msg.as_ref());
 }
 
 /// Dump an HTML document in memory and return the xmlChar * and it's size.  

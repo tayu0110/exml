@@ -35,11 +35,9 @@ use std::{
 use libc::{memcpy, memset, snprintf, strchr};
 
 use crate::{
-    __xml_raise_error,
+    __xml_raise_error, __xml_simple_error,
     encoding::XmlCharEncoding,
-    error::{
-        XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error,
-    },
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_oom_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     io::XmlParserInputBuffer,
@@ -4891,13 +4889,12 @@ unsafe extern "C" fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
     xml_free(item as _);
 }
 
-unsafe fn xml_schema_psimple_internal_err(node: XmlNodePtr, msg: &str, extra: Option<&str>) {
-    __xml_simple_error(
+unsafe fn xml_schema_psimple_internal_err(node: XmlNodePtr, msg: &str) {
+    __xml_simple_error!(
         XmlErrorDomain::XmlFromSchemasp,
         XmlParserErrors::XmlSchemapInternal,
         node,
-        Some(msg),
-        extra,
+        msg
     );
 }
 
@@ -4970,8 +4967,7 @@ unsafe extern "C" fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) 
                     /* TODO: This should never be hit. */
                     xml_schema_psimple_internal_err(
                         null_mut(),
-                        "Internal error: xmlSchemaComponentListFree, unexpected component type '%s'\n",
-                        name.as_deref()
+                        format!("Internal error: xmlSchemaComponentListFree, unexpected component type '{}'\n", name.expect("Internal Error")).as_str(),
                     );
                 }
             }

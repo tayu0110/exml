@@ -46,7 +46,8 @@ use libc::{memcpy, memset, snprintf, strlen};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    __xml_simple_error,
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     libxml::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDictPtr},
@@ -3129,14 +3130,18 @@ static XML_CHECK_DTD: AtomicBool = AtomicBool::new(true);
 /// Handle an out of memory condition
 #[doc(alias = "xmlTreeErr")]
 unsafe fn xml_tree_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
-    let msg = match code {
-        XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n",
-        XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n",
-        XmlParserErrors::XmlTreeUnterminatedEntity => "unterminated entity reference %15s\n",
-        XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n",
-        _ => "unexpected error number\n",
+    let msg: Cow<'static, str> = match code {
+        XmlParserErrors::XmlTreeInvalidHex => "invalid hexadecimal character value\n".into(),
+        XmlParserErrors::XmlTreeInvalidDec => "invalid decimal character value\n".into(),
+        XmlParserErrors::XmlTreeUnterminatedEntity => format!(
+            "unterminated entity reference {}\n",
+            extra.expect("Internal Error")
+        )
+        .into(),
+        XmlParserErrors::XmlTreeNotUTF8 => "string is not in UTF-8\n".into(),
+        _ => "unexpected error number\n".into(),
     };
-    __xml_simple_error(XmlErrorDomain::XmlFromTree, code, node, Some(msg), extra);
+    __xml_simple_error!(XmlErrorDomain::XmlFromTree, code, node, &msg);
 }
 
 const XHTML_STRICT_PUBLIC_ID: &str = "-//W3C//DTD XHTML 1.0 Strict//EN";
