@@ -33,10 +33,10 @@ use std::sync::atomic::Ordering;
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
-use crate::__xml_loader_err;
 use crate::error::XmlParserErrors;
 use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
+use crate::{__xml_loader_err, xml_fatal_err_msg_str};
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -59,7 +59,7 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+            xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int,
             xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
             xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
             xml_parse_att_value_internal, xml_parse_cdsect, xml_parse_char_data_internal,
@@ -1277,10 +1277,7 @@ pub unsafe extern "C" fn xml_split_qname(
         }
         len = 0;
 
-        /*
-         * Check that the first character is proper to start
-         * a new name
-         */
+        // Check that the first character is proper to start a new name
         if !((0x61..=0x7A).contains(&c)
             || (0x41..=0x5A).contains(&c)
             || c == b'_' as i32
@@ -1290,11 +1287,12 @@ pub unsafe extern "C" fn xml_split_qname(
             let first: i32 = CUR_SCHAR!(ctxt, cur, l);
 
             if !xml_is_letter(first as u32) && first != b'_' as i32 {
-                xml_fatal_err_msg_str(
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlNsErrQname,
-                    "Name %s is not XML Namespace compliant\n",
-                    name,
+                    "Name {} is not XML Namespace compliant\n",
+                    name
                 );
             }
         }
@@ -2029,11 +2027,10 @@ unsafe extern "C" fn xml_parse_comment_complex(
             }
             COPY_BUF!(ql, buf, len, q);
             if len > max_length {
-                xml_fatal_err_msg_str(
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrCommentNotFinished,
-                    "Comment too big found",
-                    null(),
+                    "Comment too big found"
                 );
                 xml_free(buf as _);
                 return;
@@ -2053,11 +2050,12 @@ unsafe extern "C" fn xml_parse_comment_complex(
             return;
         }
         if cur == '\0' {
-            xml_fatal_err_msg_str(
+            let buf = CStr::from_ptr(buf as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrCommentNotFinished,
-                "Comment not terminated \n<!--%.50s\n",
-                buf,
+                "Comment not terminated \n<!--{}\n",
+                buf
             );
         } else if !xml_is_char(cur as u32) {
             xml_fatal_err_msg_int(
@@ -2086,11 +2084,10 @@ unsafe extern "C" fn xml_parse_comment_complex(
         return;
     }
     // not_terminated:
-    xml_fatal_err_msg_str(
+    xml_fatal_err_msg_str!(
         ctxt,
         XmlParserErrors::XmlErrCommentNotFinished,
-        "Comment not terminated\n",
-        null(),
+        "Comment not terminated\n"
     );
     xml_free(buf as _);
 }
@@ -2202,11 +2199,10 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                 *buf.add(len) = 0;
             }
             if len > max_length {
-                xml_fatal_err_msg_str(
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrCommentNotFinished,
-                    "Comment too big found",
-                    null(),
+                    "Comment too big found"
                 );
                 xml_free(buf as _);
                 return;
@@ -2269,18 +2265,18 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                         return;
                     }
                     if !buf.is_null() {
-                        xml_fatal_err_msg_str(
+                        let buf = CStr::from_ptr(buf as *const i8).to_string_lossy();
+                        xml_fatal_err_msg_str!(
                             ctxt,
                             XmlParserErrors::XmlErrHyphenInComment,
-                            "Double hyphen within comment: <!--%.50s\n",
-                            buf,
+                            "Double hyphen within comment: <!--{}\n",
+                            buf
                         );
                     } else {
-                        xml_fatal_err_msg_str(
+                        xml_fatal_err_msg_str!(
                             ctxt,
                             XmlParserErrors::XmlErrHyphenInComment,
-                            "Double hyphen within comment\n",
-                            null(),
+                            "Double hyphen within comment\n"
                         );
                     }
                     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2510,11 +2506,12 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 return;
             }
             if (*ctxt).skip_blanks() == 0 {
-                xml_fatal_err_msg_str(
+                let target = CStr::from_ptr(target as *const i8).to_string_lossy();
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
-                    "ParsePI: PI %s space expected\n",
-                    target,
+                    "ParsePI: PI {} space expected\n",
+                    target
                 );
             }
             let mut cur = (*ctxt).current_char(&mut l).unwrap_or('\0');
@@ -2533,11 +2530,12 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 }
                 COPY_BUF!(l, buf, len, cur);
                 if len > max_length {
-                    xml_fatal_err_msg_str(
+                    let target = CStr::from_ptr(target as *const i8).to_string_lossy();
+                    xml_fatal_err_msg_str!(
                         ctxt,
                         XmlParserErrors::XmlErrPINotFinished,
-                        "PI %s too big found",
-                        target,
+                        "PI {} too big found",
+                        target
                     );
                     xml_free(buf as _);
                     (*ctxt).instate = state;
@@ -2552,11 +2550,12 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 return;
             }
             if cur != '?' {
-                xml_fatal_err_msg_str(
+                let target = CStr::from_ptr(target as *const i8).to_string_lossy();
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrPINotFinished,
-                    "ParsePI: PI %s never end ...\n",
-                    target,
+                    "ParsePI: PI {} never end ...\n",
+                    target
                 );
             } else {
                 if inputid != (*(*ctxt).input).id {
@@ -3325,11 +3324,12 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
     *result = null_mut();
 
     if (*ctxt).current_byte() != b'(' {
-        xml_fatal_err_msg_str(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrElemcontentNotStarted,
-            "xmlParseElementContentDecl : %s '(' expected\n",
-            name,
+            "xmlParseElementContentDecl : {} '(' expected\n",
+            name
         );
         return -1;
     }
@@ -3464,11 +3464,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
     if ent.is_null() {
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                "Entity '%s' not defined\n",
-                name,
+                "Entity '{}' not defined\n",
+                name
             );
         } else {
             xml_err_msg_str(
@@ -3494,11 +3495,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
     ) {
-        xml_fatal_err_msg_str(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrUnparsedEntity,
-            "Entity reference to unparsed entity %s\n",
-            name,
+            "Entity reference to unparsed entity {}\n",
+            name
         );
     }
     /*
@@ -3513,11 +3515,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralParsedEntity)
     ) {
-        xml_fatal_err_msg_str(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrEntityIsExternal,
-            "Attribute references external entity '%s'\n",
-            name,
+            "Attribute references external entity '{}'\n",
+            name
         );
     }
     /*
@@ -3542,26 +3545,26 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
             (*ent).flags |= XML_ENT_CHECKED_LT as i32;
         }
         if (*ent).flags & XML_ENT_CONTAINS_LT as i32 != 0 {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrLtInAttribute,
-                "'<' in entity '%s' is not allowed in attributes values\n",
-                name,
+                "'<' in entity '{}' is not allowed in attributes values\n",
+                name
             );
         }
     }
-    /*
-     * Internal check, no parameter entities here ...
-     */
+    // Internal check, no parameter entities here ...
     else {
         match (*ent).etype {
             Some(XmlEntityType::XmlInternalParameterEntity)
             | Some(XmlEntityType::XmlExternalParameterEntity) => {
-                xml_fatal_err_msg_str(
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrEntityIsParameter,
-                    "Attempt to reference the parameter entity '%s'\n",
-                    name,
+                    "Attempt to reference the parameter entity '{}'\n",
+                    name
                 );
             }
             _ => {}
@@ -4068,11 +4071,13 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             ret,
             XmlParserErrors::XmlErrOK | XmlParserErrors::XmlWarUndeclaredEntity
         ) {
-            xml_fatal_err_msg_str(
+            let name =
+                CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                "Entity '%s' failed to parse\n",
-                (*ent).name.load(Ordering::Relaxed) as _,
+                "Entity '{}' failed to parse\n",
+                name
             );
             if !(*ent).content.load(Ordering::Relaxed).is_null() {
                 *(*ent).content.load(Ordering::Relaxed).add(0) = 0;
@@ -4426,11 +4431,14 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
          */
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                "PEReference: %%%s; not found\n",
-                name,
+                "PEReference: %%{}; not found\n",
+                name
             );
         } else {
             /*
@@ -4689,11 +4697,12 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
         val = xml_parse_att_value(ctxt);
         (*ctxt).instate = XmlParserInputState::XmlParserContent;
     } else {
-        xml_fatal_err_msg_str(
+        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrAttributeWithoutValue,
-            "Specification mandates value for attribute %s\n",
-            name,
+            "Specification mandates value for attribute {}\n",
+            n
         );
         return name;
     }
@@ -5359,12 +5368,11 @@ pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<S
                     return None;
                 }
             } else {
-                let encoding = CString::new(encoding).unwrap();
-                xml_fatal_err_msg_str(
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrUnsupportedEncoding,
-                    "Unsupported encoding %s\n",
-                    encoding.as_ptr() as *const u8,
+                    "Unsupported encoding {}\n",
+                    encoding
                 );
                 return None;
             }

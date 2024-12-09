@@ -2101,50 +2101,52 @@ pub(crate) unsafe fn xml_fatal_err_msg(ctxt: XmlParserCtxtPtr, error: XmlParserE
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlFatalErrMsgStr")]
-pub(crate) unsafe fn xml_fatal_err_msg_str(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    val: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        (!val.is_null()).then(|| CStr::from_ptr(val as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        val
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
+macro_rules! xml_fatal_err_msg_str {
+    ($ctxt:expr, $error:expr, $msg:literal) =>  {
+        $crate::xml_fatal_err_msg_str!(@inner $ctxt, $error, $msg, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $val:expr) =>  {
+        let msg = format!($msg, $val);
+        $crate::xml_fatal_err_msg_str!(@inner $ctxt, $error, msg.as_str(), Some($val.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                $val,
+                None,
+                None,
+                0,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
         }
-    }
+    };
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
@@ -6259,11 +6261,12 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
     if ent.is_null() {
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                "Entity '%s' not defined\n",
-                name,
+                "Entity '{}' not defined\n",
+                name
             );
         } else {
             xml_err_msg_str(
@@ -6282,11 +6285,12 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
     ) {
-        xml_fatal_err_msg_str(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrUnparsedEntity,
-            "Entity reference to unparsed entity %s\n",
-            name,
+            "Entity reference to unparsed entity {}\n",
+            name
         );
     }
     /*
@@ -6301,11 +6305,12 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralParsedEntity)
     ) {
-        xml_fatal_err_msg_str(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrEntityIsExternal,
-            "Attribute references external entity '%s'\n",
-            name,
+            "Attribute references external entity '{}'\n",
+            name
         );
     }
     // [ WFC: No < in Attribute Values ]
@@ -6328,11 +6333,12 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
             (*ent).flags |= XML_ENT_CHECKED_LT as i32;
         }
         if (*ent).flags & XML_ENT_CONTAINS_LT as i32 != 0 {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrLtInAttribute,
-                "'<' in entity '%s' is not allowed in attributes values\n",
-                name,
+                "'<' in entity '{}' is not allowed in attributes values\n",
+                name
             );
         }
     }
@@ -6341,11 +6347,12 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         match (*ent).etype {
             Some(XmlEntityType::XmlInternalParameterEntity)
             | Some(XmlEntityType::XmlExternalParameterEntity) => {
-                xml_fatal_err_msg_str(
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrEntityIsParameter,
-                    "Attempt to reference the parameter entity '%s'\n",
-                    name,
+                    "Attempt to reference the parameter entity '{}'\n",
+                    name
                 );
             }
             _ => {}
@@ -6446,11 +6453,12 @@ unsafe extern "C" fn xml_parse_string_pereference(
         // any reference to it...
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                "PEReference: %%%s; not found\n",
-                name,
+                "PEReference: %{}; not found\n",
+                name
             );
         } else {
             // [ VC: Entity Declared ]
@@ -7717,11 +7725,12 @@ unsafe extern "C" fn xml_parse_attribute2(
         }
         (*ctxt).instate = XmlParserInputState::XmlParserContent;
     } else {
-        xml_fatal_err_msg_str(
+        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrAttributeWithoutValue,
-            "Specification mandates value for attribute %s\n",
-            name,
+            "Specification mandates value for attribute {}\n",
+            n
         );
         return name;
     }
@@ -9689,11 +9698,12 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         if (*ctxt).current_byte() == b'>' {
                             (*ctxt).skip_char();
                         } else {
-                            xml_fatal_err_msg_str(
+                            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                            xml_fatal_err_msg_str!(
                                 ctxt,
                                 XmlParserErrors::XmlErrGtRequired,
-                                "Couldn't find end of Start Tag %s\n",
-                                name,
+                                "Couldn't find end of Start Tag {}\n",
+                                name
                             );
                             (*ctxt).node_pop();
                             (*ctxt).space_pop();
@@ -10779,11 +10789,12 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
         if let Some(handler) = find_encoding_handler((*ctxt).encoding().unwrap()) {
             (*ctxt).switch_to_encoding(handler);
         } else {
-            xml_fatal_err_msg_str(
+            let encoding = CStr::from_ptr(encoding).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUnsupportedEncoding,
-                "Unsupported encoding %s\n",
-                encoding as _,
+                "Unsupported encoding {}\n",
+                encoding
             );
         };
     } else if !matches!(enc, XmlCharEncoding::None) {
@@ -11707,11 +11718,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
         }
         (*ctxt).skip_blanks();
         if (*ctxt).current_byte() != b'>' {
-            xml_fatal_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrEntityNotFinished,
-                "xmlParseEntityDecl: entity %s not terminated\n",
-                name,
+                "xmlParseEntityDecl: entity {} not terminated\n",
+                name
             );
             (*ctxt).halt();
         } else {
@@ -12758,11 +12770,12 @@ pub(crate) unsafe extern "C" fn xml_parse_cdsect(ctxt: XmlParserCtxtPtr) {
         return;
     }
     if cur != '>' {
-        xml_fatal_err_msg_str(
+        let b = CStr::from_ptr(buf as *const i8).to_string_lossy();
+        xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrCDATANotFinished,
-            "CData section not finished\n%.50s\n",
-            buf,
+            "CData section not finished\n{}\n",
+            b
         );
         // goto out;
         if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -12933,11 +12946,11 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
             // Changed here for XML-1.0 5th edition
             let ver = CString::new(version.as_str()).unwrap();
             if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 != 0 {
-                xml_fatal_err_msg_str(
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrUnknownVersion,
-                    "Unsupported version '%s'\n",
-                    ver.as_ptr() as *const u8,
+                    "Unsupported version '{}'\n",
+                    version
                 );
             } else if version.starts_with("1.") {
                 xml_warning_msg(
@@ -12948,11 +12961,11 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
                     null(),
                 );
             } else {
-                xml_fatal_err_msg_str(
+                xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrUnknownVersion,
-                    "Unsupported version '%s'\n",
-                    ver.as_ptr() as *const u8,
+                    "Unsupported version '{}'\n",
+                    version
                 );
             }
         }

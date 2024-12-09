@@ -1551,7 +1551,7 @@ macro_rules! __xml_raise_error {
                     // Formatting the message
                     let str = {
                         let msg = CString::new(msg).unwrap();
-                        $crate::XML_GET_VAR_STR!(msg.as_ptr() as _, str, $( $args ),*);
+                        $crate::XML_GET_VAR_STR!(msg.as_ptr(), str, $( $args ),*);
                         assert!(!str.is_null());
                         let s = CStr::from_ptr(str).to_string_lossy();
                         let s = s.into_owned();
