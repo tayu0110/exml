@@ -25,7 +25,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     sync::atomic::{AtomicPtr, Ordering},
 };
 
@@ -278,30 +278,34 @@ unsafe fn xml_entities_err(code: XmlParserErrors, msg: &str) {
 
 /// Raise a warning.
 #[doc(alias = "xmlEntitiesWarn")]
-unsafe fn xml_entities_warn(code: XmlParserErrors, msg: &str, str1: *const XmlChar) {
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        null_mut(),
-        XmlErrorDomain::XmlFromTree,
-        code,
-        XmlErrorLevel::XmlErrWarning,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        str1,
-        null::<c_char>()
-    );
+macro_rules! xml_entities_warn {
+    ($code:expr, $msg:literal) => {
+        xml_entities_warn!(@inner $code, $msg, None);
+    };
+    ($code:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        xml_entities_warn!(@inner $code, &msg, Some($str1.into()));
+    };
+    (@inner $code:expr, $msg:expr, $str1:expr) => {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            null_mut(),
+            XmlErrorDomain::XmlFromTree,
+            $code,
+            XmlErrorLevel::XmlErrWarning,
+            None,
+            0,
+            $str1,
+            None,
+            None,
+            0,
+            0,
+            $msg,
+        );
+    };
 }
 
 /// clean-up an entity record.
@@ -416,10 +420,10 @@ unsafe extern "C" fn xml_add_entity(
                     }
                 }
                 if valid == 0 {
-                    xml_entities_warn(
+                    xml_entities_warn!(
                         XmlParserErrors::XmlErrEntityProcessing,
-                        "xmlAddEntity: invalid redeclaration of predefined entity '%s'",
-                        name.as_ptr() as *const u8,
+                        "xmlAddEntity: invalid redeclaration of predefined entity '{}'",
+                        name.to_string_lossy().into_owned()
                     );
                     return null_mut();
                 }
