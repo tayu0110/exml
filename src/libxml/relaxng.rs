@@ -850,14 +850,17 @@ unsafe extern "C" fn xml_relaxng_get_error_string(
 }
 
 /// Handle a Relax NG Validation error
+///
+/// # Note
+/// This method does not format the string.  
 #[doc(alias = "xmlRngVErr")]
 unsafe fn xml_rng_verr(
     ctxt: XmlRelaxNGValidCtxtPtr,
     node: XmlNodePtr,
     error: i32,
     msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
+    str1: Option<&str>,
+    str2: Option<&str>,
 ) {
     let mut schannel: Option<StructuredError> = None;
     let mut channel: Option<GenericError> = None;
@@ -884,20 +887,12 @@ unsafe fn xml_rng_verr(
         XmlErrorLevel::XmlErrError,
         None,
         0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
+        str1.map(|s| s.to_owned().into()),
+        str2.map(|s| s.to_owned().into()),
         None,
         0,
         0,
         msg,
-        str1,
-        str2
     );
 }
 
@@ -932,8 +927,12 @@ unsafe extern "C" fn xml_relaxng_show_valid_error(
         if child.is_null() { node } else { child },
         err as _,
         message.as_str(),
-        arg1,
-        arg2,
+        (!arg1.is_null())
+            .then(|| CStr::from_ptr(arg1 as *const i8).to_string_lossy())
+            .as_deref(),
+        (!arg2.is_null())
+            .then(|| CStr::from_ptr(arg2 as *const i8).to_string_lossy())
+            .as_deref(),
     );
 }
 
