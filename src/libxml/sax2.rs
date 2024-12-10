@@ -747,69 +747,72 @@ pub unsafe fn xml_sax2_entity_decl(
 
 /// Handle a validation error
 #[doc(alias = "xmlValidError")]
-unsafe fn xml_err_valid(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const c_char,
-    str2: *const c_char,
-) {
-    let mut schannel: Option<StructuredError> = None;
+macro_rules! xml_err_valid {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        xml_err_valid!(@inner $ctxt, $error, $msg, None, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        xml_err_valid!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_err_valid!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let mut schannel: Option<StructuredError> = None;
 
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
-            schannel = (*(*ctxt).sax).serror;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+                if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
+                    schannel = (*(*ctxt).sax).serror;
+                }
+                __xml_raise_error!(
+                    schannel,
+                    (*ctxt).vctxt.error,
+                    (*ctxt).vctxt.user_data.clone(),
+                    ctxt as _,
+                    null_mut(),
+                    XmlErrorDomain::XmlFromDTD,
+                    $error,
+                    XmlErrorLevel::XmlErrError,
+                    None,
+                    0,
+                    $str1,
+                    $str2,
+                    None,
+                    0,
+                    0,
+                    $msg,
+                );
+                (*ctxt).valid = 0;
+            } else {
+                __xml_raise_error!(
+                    schannel,
+                    None,
+                    None,
+                    ctxt as _,
+                    null_mut(),
+                    XmlErrorDomain::XmlFromDTD,
+                    $error,
+                    XmlErrorLevel::XmlErrError,
+                    None,
+                    0,
+                    $str1,
+                    $str2,
+                    None,
+                    0,
+                    0,
+                    $msg,
+                );
+            }
         }
-        __xml_raise_error!(
-            schannel,
-            (*ctxt).vctxt.error,
-            (*ctxt).vctxt.user_data.clone(),
-            ctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromDTD,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
-            (!str2.is_null()).then(|| CStr::from_ptr(str2).to_string_lossy().into_owned().into()),
-            None,
-            0,
-            0,
-            msg,
-            str1,
-            str2
-        );
-        (*ctxt).valid = 0;
-    } else {
-        __xml_raise_error!(
-            schannel,
-            None,
-            None,
-            ctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromDTD,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
-            (!str2.is_null()).then(|| CStr::from_ptr(str2).to_string_lossy().into_owned().into()),
-            None,
-            0,
-            0,
-            msg,
-            str1,
-            str2
-        );
-    }
+    };
 }
 
 /// An attribute definition has been parsed
@@ -844,12 +847,10 @@ pub unsafe fn xml_sax2_attribute_decl(
     {
         // Raise the error but keep the validity flag
         let tmp: i32 = (*ctxt).valid;
-        xml_err_valid(
+        xml_err_valid!(
             ctxt,
             XmlParserErrors::XmlDTDXmlidType,
-            "xml:id : attribute type should be ID\n",
-            null(),
-            null(),
+            "xml:id : attribute type should be ID\n"
         );
         (*ctxt).valid = tmp;
     }
@@ -1864,12 +1865,12 @@ unsafe fn xml_sax2_attribute_internal(
             //
             // Open issue: normalization of the value.
             if xml_validate_ncname(content, 1) != 0 {
-                xml_err_valid(
+                let content = CStr::from_ptr(content as *const i8).to_string_lossy();
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDXmlidValue,
-                    "xml:id : attribute value %s is not an NCName\n",
-                    content as _,
-                    null(),
+                    "xml:id : attribute value {} is not an NCName\n",
+                    content
                 );
             }
             xml_add_id(
@@ -1933,10 +1934,8 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
     'process_external_subset: loop {
         if !elem_decl.is_null() {
             let mut attr: XmlAttributePtr = (*elem_decl).attributes;
-            /*
-             * Check against defaulted attributes from the external subset
-             * if the document is stamped as standalone
-             */
+            // Check against defaulted attributes from the external subset
+            // if the document is stamped as standalone
             if (*(*ctxt).my_doc).standalone == 1
                 && !(*(*ctxt).my_doc).ext_subset.is_null()
                 && (*ctxt).validate != 0
@@ -1986,12 +1985,13 @@ unsafe extern "C" fn xml_check_defaulted_attributes(
                             }
                         }
                         if att.is_null() {
-                            xml_err_valid(
+                            let fulln = CStr::from_ptr(fulln as *const i8).to_string_lossy();
+                            xml_err_valid!(
                                 ctxt,
                                 XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                "standalone: attribute %s on %s defaulted from external subset\n",
-                                fulln as _,
-                                elem.as_ref().map_or(null(), |e| e.as_ptr()),
+                                "standalone: attribute {} on {} defaulted from external subset\n",
+                                fulln,
+                                elem.as_deref().unwrap().to_string_lossy().into_owned()
                             );
                         }
                         xml_free(fulln as _);
@@ -2127,12 +2127,10 @@ pub unsafe fn xml_sax2_start_element(
                 && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
     {
-        xml_err_valid(
+        xml_err_valid!(
             ctxt,
             XmlParserErrors::XmlErrNoDTD,
-            "Validation failed: no DTD found !",
-            null(),
-            null(),
+            "Validation failed: no DTD found !"
         );
         (*ctxt).validate = 0;
     }
@@ -2416,12 +2414,10 @@ pub unsafe fn xml_sax2_start_element_ns(
                 && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
     {
-        xml_err_valid(
+        xml_err_valid!(
             ctxt,
             XmlParserErrors::XmlDTDNoDTD,
-            "Validation failed: no DTD found !",
-            null(),
-            null(),
+            "Validation failed: no DTD found !"
         );
         (*ctxt).validate = 0;
     }
@@ -3063,12 +3059,12 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
             {
                 #[cfg(feature = "libxml_valid")]
                 if xml_validate_ncname(content, 1) != 0 {
-                    xml_err_valid(
+                    let content = CStr::from_ptr(content as *const i8).to_string_lossy();
+                    xml_err_valid!(
                         ctxt,
                         XmlParserErrors::XmlDTDXmlidValue,
-                        "xml:id : attribute value %s is not an NCName\n",
-                        content as _,
-                        null(),
+                        "xml:id : attribute value {} is not an NCName\n",
+                        content
                     );
                 }
             }
