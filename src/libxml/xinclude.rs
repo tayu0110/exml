@@ -39,7 +39,6 @@ use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
     __xml_raise_error,
     encoding::{get_encoding_handler, XmlCharEncoding},
-    error::XmlParserErrors,
     io::xml_parser_get_directory,
     libxml::{
         dict::{xml_dict_free, xml_dict_reference},
@@ -74,9 +73,9 @@ pub const XINCLUDE_NS: &CStr = c"http://www.w3.org/2003/XInclude";
 /// Macro defining the draft Xinclude namespace: http://www.w3.org/2001/XInclude
 pub const XINCLUDE_OLD_NS: &CStr = c"http://www.w3.org/2001/XInclude";
 /// Macro defining "include"
-pub const XINCLUDE_NODE: &CStr = c"include";
+pub const XINCLUDE_NODE: &str = "include";
 /// Macro defining "fallback"
-pub const XINCLUDE_FALLBACK: &CStr = c"fallback";
+pub const XINCLUDE_FALLBACK: &str = "fallback";
 /// Macro defining "href"
 pub const XINCLUDE_HREF: &CStr = c"href";
 /// Macro defining "parse"
@@ -193,38 +192,38 @@ pub unsafe extern "C" fn xml_xinclude_process_flags_data(
 
 /// Handle an XInclude error
 #[doc(alias = "xmlXIncludeErr")]
-unsafe fn xml_xinclude_err(
-    ctxt: XmlXincludeCtxtPtr,
-    node: XmlNodePtr,
-    error: XmlParserErrors,
-    msg: &str,
-    extra: *const XmlChar,
-) {
-    if !ctxt.is_null() {
-        (*ctxt).nb_errors += 1;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        node as _,
-        XmlErrorDomain::XmlFromXInclude,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        extra
-    );
+macro_rules! xml_xinclude_err {
+    ($ctxt:expr, $node:expr, $error:expr, $msg:expr) => {
+        xml_xinclude_err!(@inner, $ctxt, $node, $error, $msg, None);
+    };
+    ($ctxt:expr, $node:expr, $error:expr, $msg:expr, $extra:expr) => {
+        let msg = format!($msg, $extra);
+        xml_xinclude_err!(@inner, $ctxt, $node, $error, &msg, Some($extra.to_owned().into()));
+    };
+    (@inner, $ctxt:expr, $node:expr, $error:expr, $msg:expr, $extra:expr) => {
+        let ctxt = $ctxt as *mut XmlXincludeCtxt;
+        if !ctxt.is_null() {
+            (*ctxt).nb_errors += 1;
+        }
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            $node as _,
+            XmlErrorDomain::XmlFromXInclude,
+            $error,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            $extra,
+            None,
+            None,
+            0,
+            0,
+            $msg,
+        );
+    };
 }
 
 /// Test if the node is an XInclude node
@@ -247,7 +246,7 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
         if xml_str_equal((*(*node).ns).href, XINCLUDE_OLD_NS.as_ptr() as _) && (*ctxt).legacy == 0 {
             (*ctxt).legacy = 1;
         }
-        if xml_str_equal((*node).name, XINCLUDE_NODE.as_ptr() as _) {
+        if (*node).name().as_deref() == Some(XINCLUDE_NODE) {
             let mut child: XmlNodePtr = (*node).children().map_or(null_mut(), |c| c.as_ptr());
             let mut nb_fallback: i32 = 0;
 
@@ -257,35 +256,35 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                     && (xml_str_equal((*(*child).ns).href, XINCLUDE_NS.as_ptr() as _)
                         || xml_str_equal((*(*child).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
                 {
-                    if xml_str_equal((*child).name, XINCLUDE_NODE.as_ptr() as _) {
-                        xml_xinclude_err(
+                    if (*child).name().as_deref() == Some(XINCLUDE_NODE) {
+                        xml_xinclude_err!(
                             ctxt,
                             node,
                             XmlParserErrors::XmlXIncludeIncludeInInclude,
-                            "%s has an 'include' child\n",
-                            XINCLUDE_NODE.as_ptr() as _,
+                            "{} has an 'include' child\n",
+                            XINCLUDE_NODE
                         );
                         return 0;
                     }
-                    if xml_str_equal((*child).name, XINCLUDE_FALLBACK.as_ptr() as _) {
+                    if (*child).name().as_deref() == Some(XINCLUDE_FALLBACK) {
                         nb_fallback += 1;
                     }
                 }
                 child = (*child).next.map_or(null_mut(), |n| n.as_ptr());
             }
             if nb_fallback > 1 {
-                xml_xinclude_err(
+                xml_xinclude_err!(
                     ctxt,
                     node,
                     XmlParserErrors::XmlXIncludeFallbacksInInclude,
-                    "%s has multiple fallback children\n",
-                    XINCLUDE_NODE.as_ptr() as _,
+                    "{} has multiple fallback children\n",
+                    XINCLUDE_NODE
                 );
                 return 0;
             }
             return 1;
         }
-        if xml_str_equal((*node).name, XINCLUDE_FALLBACK.as_ptr() as _)
+        if (*node).name().as_deref() == Some(XINCLUDE_FALLBACK)
             && ((*node).parent().is_none()
                 || (*node).parent().unwrap().element_type() != XmlElementType::XmlElementNode
                 || (*node).parent().unwrap().ns.is_null()
@@ -296,14 +295,14 @@ unsafe extern "C" fn xml_xinclude_test_node(ctxt: XmlXincludeCtxtPtr, node: XmlN
                     (*(*node).parent().unwrap().ns).href,
                     XINCLUDE_OLD_NS.as_ptr() as _,
                 ))
-                || !xml_str_equal((*node).parent().unwrap().name, XINCLUDE_NODE.as_ptr() as _))
+                || (*node).parent().unwrap().name().as_deref() != Some(XINCLUDE_NODE))
         {
-            xml_xinclude_err(
+            xml_xinclude_err!(
                 ctxt,
                 node,
                 XmlParserErrors::XmlXIncludeFallbackNotInInclude,
-                "%s is not the child of an 'include'\n",
-                XINCLUDE_FALLBACK.as_ptr() as _,
+                "{} is not the child of an 'include'\n",
+                XINCLUDE_FALLBACK
             );
         }
     }
@@ -478,13 +477,12 @@ unsafe extern "C" fn xml_xinclude_add_node(
         } else if parse == XINCLUDE_PARSE_TEXT {
             xml = 0;
         } else {
-            let parse = CString::new(parse).unwrap();
-            xml_xinclude_err(
+            xml_xinclude_err!(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeParseValue,
-                "invalid value %s for 'parse'\n",
-                parse.as_ptr() as *const u8,
+                "invalid value {} for 'parse'\n",
+                parse
             );
             return null_mut();
         }
@@ -510,12 +508,11 @@ unsafe extern "C" fn xml_xinclude_add_node(
         }
     }
     let Some(uri) = uri else {
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
-            "failed build URL\n",
-            null(),
+            "failed build URL\n"
         );
         return null_mut();
     };
@@ -523,13 +520,12 @@ unsafe extern "C" fn xml_xinclude_add_node(
 
     // Check the URL and remove any fragment identifier
     let Some(mut parsed_uri) = XmlURI::parse(&uri) else {
-        let uri = CString::new(uri).unwrap();
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
-            "invalid value URI %s\n",
-            uri.as_ptr() as *const u8,
+            "invalid value URI {}\n",
+            uri
         );
         return null_mut();
     };
@@ -540,13 +536,12 @@ unsafe extern "C" fn xml_xinclude_add_node(
                 fragment = parsed_uri.fragment.as_deref().map(|f| f.to_owned());
             }
         } else {
-            let uri = CString::new(uri).unwrap();
-            xml_xinclude_err(
+            xml_xinclude_err!(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeFragmentID,
-                "Invalid fragment identifier in URI %s use the xpointer attribute\n",
-                uri.as_ptr() as *const u8,
+                "Invalid fragment identifier in URI {} use the xpointer attribute\n",
+                uri
             );
             return null_mut();
         }
@@ -563,13 +558,12 @@ unsafe extern "C" fn xml_xinclude_add_node(
         && xml == 1
         && (fragment.is_none() || fragment.as_deref().map_or(true, |f| f.is_empty()))
     {
-        let url = CString::new(url).unwrap();
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeRecursion,
-            "detected a local recursion with no xpointer in %s\n",
-            url.as_ptr() as *const u8,
+            "detected a local recursion with no xpointer in {}\n",
+            url
         );
         return null_mut();
     }
@@ -603,15 +597,11 @@ unsafe extern "C" fn xml_xinclude_parse_file(
         return null_mut();
     }
 
-    /*
-     * pass in the application data to the parser context.
-     */
+    // pass in the application data to the parser context.
     (*pctxt)._private = (*ctxt)._private;
 
-    /*
-     * try to ensure that new documents included are actually
-     * built with the same dictionary as the including document.
-     */
+    // try to ensure that new documents included are actually
+    // built with the same dictionary as the including document.
     if !(*ctxt).doc.is_null() && !(*(*ctxt).doc).dict.is_null() {
         if !(*pctxt).dict.is_null() {
             xml_dict_free((*pctxt).dict);
@@ -722,12 +712,12 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
                         Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
                         _ => unreachable!(),
                     }
-                    xml_xinclude_err(
+                    xml_xinclude_err!(
                         ctxt,
                         ent as XmlNodePtr,
                         XmlParserErrors::XmlXIncludeEntityDefMismatch,
-                        "mismatch in redefinition of entity %s\n",
-                        (*ent).name.load(Ordering::Relaxed) as _,
+                        "mismatch in redefinition of entity {}\n",
+                        (*ent).name().unwrap()
                     );
                 };
 
@@ -929,7 +919,7 @@ unsafe extern "C" fn xml_xinclude_copy_node(
         ) {
         } else if (*cur).element_type() == XmlElementType::XmlElementNode
             && !(*cur).ns.is_null()
-            && xml_str_equal((*cur).name, XINCLUDE_NODE.as_ptr() as _)
+            && (*cur).name().as_deref() == Some(XINCLUDE_NODE)
             && (xml_str_equal((*(*cur).ns).href, XINCLUDE_NS.as_ptr() as _)
                 || xml_str_equal((*(*cur).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
         {
@@ -1306,12 +1296,11 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                             .as_ref()
                             .get_root_element();
                         if node.is_null() {
-                            xml_xinclude_err(
+                            xml_xinclude_err!(
                                 ctxt,
                                 *(*set).node_tab.add(i as usize),
                                 XmlParserErrors::XmlErrInternalError,
-                                "document without root\n",
-                                null(),
+                                "document without root\n"
                             );
                             continue;
                         }
@@ -1322,22 +1311,18 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                     | XmlElementType::XmlPINode
                     | XmlElementType::XmlCommentNode => node = *(*set).node_tab.add(i as usize),
                     _ => {
-                        xml_xinclude_err(
+                        xml_xinclude_err!(
                             ctxt,
                             *(*set).node_tab.add(i as usize),
                             XmlParserErrors::XmlXIncludeXPtrResult,
-                            "invalid node type in XPtr result\n",
-                            null(),
+                            "invalid node type in XPtr result\n"
                         );
                         continue; /* for */
                     }
                 }
-                /*
-                 * OPTIMIZE TODO: External documents should already be
-                 * expanded, so xmlDocCopyNode should work as well.
-                 * xmlXIncludeCopyNode is only required for the initial
-                 * document.
-                 */
+                // OPTIMIZE TODO: External documents should already be
+                // expanded, so xmlDocCopyNode should work as well.
+                // xmlXIncludeCopyNode is only required for the initial document.
                 copy = xml_xinclude_copy_node(ctxt, node, 0);
                 if copy.is_null() {
                     xml_free_node_list(list);
@@ -1404,17 +1389,16 @@ unsafe extern "C" fn xml_xinclude_load_doc(
     #[cfg(feature = "xpointer")]
     let save_flags: i32;
 
-    /*
-     * Check the URL and remove any fragment identifier
-     */
+    // Check the URL and remove any fragment identifier
     let uri: XmlURIPtr = xml_parse_uri(url as _);
     if uri.is_null() {
-        xml_xinclude_err(
+        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+        xml_xinclude_err!(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeHrefURI,
-            "invalid value URI %s\n",
-            url,
+            "invalid value URI {}\n",
+            url
         );
         // goto error;
         return ret;
@@ -1433,12 +1417,13 @@ unsafe extern "C" fn xml_xinclude_load_doc(
         let tmp = xml_save_uri(uri);
         xml_free_uri(uri);
         if tmp.is_null() {
-            xml_xinclude_err(
+            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+            xml_xinclude_err!(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeHrefURI,
-                "invalid value URI %s\n",
-                url,
+                "invalid value URI {}\n",
+                url
             );
             // goto error;
             xml_free(fragment as _);
@@ -1448,10 +1433,8 @@ unsafe extern "C" fn xml_xinclude_load_doc(
     };
 
     'error: {
-        /*
-         * Handling of references to the local document are done
-         * directly through (*ctxt).doc.
-         */
+        // Handling of references to the local document are done
+        // directly through (*ctxt).doc.
         'load: {
             if *url.add(0) == 0
                 || *url.add(0) == b'#'
@@ -1462,18 +1445,15 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 doc = (*ctxt).doc;
                 break 'load;
             }
-            /*
-             * Prevent reloading the document twice.
-             */
+            // Prevent reloading the document twice.
             for i in 0..(*ctxt).url_nr {
                 if xml_str_equal(url, (*(*ctxt).url_tab.add(i as usize)).url) {
                     if (*(*ctxt).url_tab.add(i as usize)).expanding != 0 {
-                        xml_xinclude_err(
+                        xml_xinclude_err!(
                             ctxt,
                             (*refe).elem,
                             XmlParserErrors::XmlXIncludeRecursion,
-                            "inclusion loop detected\n",
-                            null(),
+                            "inclusion loop detected\n"
                         );
                         break 'error;
                     }
@@ -1485,16 +1465,12 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 }
             }
 
-            /*
-             * Load it.
-             */
+            // Load it.
             #[cfg(feature = "xpointer")]
             {
-                /*
-                 * If this is an XPointer evaluation, we want to assure that
-                 * all entities have been resolved prior to processing the
-                 * referenced document
-                 */
+                // If this is an XPointer evaluation, we want to assure that
+                // all entities have been resolved prior to processing the
+                // referenced document
                 save_flags = (*ctxt).parse_flags;
                 if !fragment.is_null() {
                     /* if this is an XPointer eval */
@@ -1536,21 +1512,17 @@ unsafe extern "C" fn xml_xinclude_load_doc(
             if doc.is_null() {
                 break 'error;
             }
-            /*
-             * It's possible that the requested URL has been mapped to a
-             * completely different location (e.g. through a catalog entry).
-             * To check for this, we compare the URL with that of the doc
-             * and change it if they disagree (bug 146988).
-             */
+            // It's possible that the requested URL has been mapped to a
+            // completely different location (e.g. through a catalog entry).
+            // To check for this, we compare the URL with that of the doc
+            // and change it if they disagree (bug 146988).
             if (*doc).url.as_deref() != CStr::from_ptr(url as *const i8).to_str().ok() {
                 xml_free(url as _);
                 let new = CString::new((*doc).url.as_deref().unwrap()).unwrap();
                 url = xml_strdup(new.as_ptr() as *const u8);
             }
 
-            /*
-             * Make sure we have all entities fixed up
-             */
+            // Make sure we have all entities fixed up
             xml_xinclude_merge_entities(ctxt, (*ctxt).doc, doc);
 
             /*
@@ -1575,25 +1547,20 @@ unsafe extern "C" fn xml_xinclude_load_doc(
 
         // loaded:
         if fragment.is_null() {
-            /*
-             * Add the top children list as the replacement copy.
-             */
+            // Add the top children list as the replacement copy.
             (*refe).inc = xml_doc_copy_node((*doc).get_root_element(), (*ctxt).doc, 1);
         } else {
             #[cfg(feature = "xpointer")]
             {
-                /*
-                 * Computes the XPointer expression and make a copy used
-                 * as the replacement copy.
-                 */
+                // Computes the XPointer expression and make a copy used
+                // as the replacement copy.
 
                 if (*ctxt).is_stream != 0 && doc == (*ctxt).doc {
-                    xml_xinclude_err(
+                    xml_xinclude_err!(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeXPtrFailed,
-                        "XPointer expressions not allowed in streaming mode\n",
-                        null(),
+                        "XPointer expressions not allowed in streaming mode\n"
                     );
                     break 'error;
                 }
@@ -1601,23 +1568,23 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 let xptrctxt: XmlXPathContextPtr =
                     xml_xptr_new_context(doc, null_mut(), null_mut());
                 if xptrctxt.is_null() {
-                    xml_xinclude_err(
+                    xml_xinclude_err!(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeXPtrFailed,
-                        "could not create XPointer context\n",
-                        null(),
+                        "could not create XPointer context\n"
                     );
                     break 'error;
                 }
                 let xptr: XmlXPathObjectPtr = xml_xptr_eval(fragment, xptrctxt);
                 if xptr.is_null() {
-                    xml_xinclude_err(
+                    let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                    xml_xinclude_err!(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeXPtrFailed,
-                        "XPointer evaluation failed: #%s\n",
-                        fragment,
+                        "XPointer evaluation failed: #{}\n",
+                        fragment
                     );
                     xml_xpath_free_context(xptrctxt);
                     break 'error;
@@ -1629,12 +1596,13 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                     | XmlXPathObjectType::XpathString
                     | XmlXPathObjectType::XpathUsers
                     | XmlXPathObjectType::XpathXsltTree => {
-                        xml_xinclude_err(
+                        let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                        xml_xinclude_err!(
                             ctxt,
                             (*refe).elem,
                             XmlParserErrors::XmlXIncludeXPtrResult,
-                            "XPointer is not a range: #%s\n",
-                            fragment,
+                            "XPointer is not a range: #{}\n",
+                            fragment
                         );
                         xml_xpath_free_object(xptr);
                         xml_xpath_free_context(xptrctxt);
@@ -1642,12 +1610,13 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                     }
                     #[cfg(feature = "libxml_xptr_locs")]
                     XmlXPathObjectType::XpathPoint => {
-                        xml_xinclude_err(
+                        let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                        xml_xinclude_err!(
                             ctxt,
                             (*refe).elem,
                             XmlParserErrors::XmlXIncludeXPtrResult,
-                            "XPointer is not a range: #%s\n",
-                            fragment,
+                            "XPointer is not a range: #{}\n",
+                            fragment
                         );
                         xml_xpath_free_object(xptr);
                         xml_xpath_free_context(xptrctxt);
@@ -1681,23 +1650,27 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             | XmlElementType::XmlHTMLDocumentNode => continue,
 
                             XmlElementType::XmlAttributeNode => {
-                                xml_xinclude_err(
+                                let fragment =
+                                    CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                                xml_xinclude_err!(
                                     ctxt,
                                     (*refe).elem,
                                     XmlParserErrors::XmlXIncludeXPtrResult,
-                                    "XPointer selects an attribute: #%s\n",
-                                    fragment,
+                                    "XPointer selects an attribute: #{}\n",
+                                    fragment
                                 );
                                 *(*set).node_tab.add(i as usize) = null_mut();
                                 continue;
                             }
                             XmlElementType::XmlNamespaceDecl => {
-                                xml_xinclude_err(
+                                let fragment =
+                                    CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                                xml_xinclude_err!(
                                     ctxt,
                                     (*refe).elem,
                                     XmlParserErrors::XmlXIncludeXPtrResult,
-                                    "XPointer selects a namespace: #%s\n",
-                                    fragment,
+                                    "XPointer selects a namespace: #{}\n",
+                                    fragment
                                 );
                                 *(*set).node_tab.add(i as usize) = null_mut();
                                 continue;
@@ -1711,12 +1684,14 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                             | XmlElementType::XmlEntityDecl
                             | XmlElementType::XmlXIncludeStart
                             | XmlElementType::XmlXIncludeEnd => {
-                                xml_xinclude_err(
+                                let fragment =
+                                    CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                                xml_xinclude_err!(
                                     ctxt,
                                     (*refe).elem,
                                     XmlParserErrors::XmlXIncludeXPtrResult,
-                                    "XPointer selects unexpected nodes: #%s\n",
-                                    fragment,
+                                    "XPointer selects unexpected nodes: #{}\n",
+                                    fragment
                                 );
                                 *(*set).node_tab.add(i as usize) = null_mut();
                                 *(*set).node_tab.add(i as usize) = null_mut();
@@ -1753,13 +1728,14 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 // URI base is different than (relative to) the context base
                 let cur_base = xml_build_relative_uri(url, (*ctxt).base);
                 if cur_base.is_null() {
-                    /* Error return */
-                    xml_xinclude_err(
+                    let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                    // Error return
+                    xml_xinclude_err!(
                         ctxt,
                         (*refe).elem,
                         XmlParserErrors::XmlXIncludeHrefURI,
-                        "trying to build relative URI from %s\n",
-                        url,
+                        "trying to build relative URI from {}\n",
+                        url
                     );
                 } else {
                     /* If the URI doesn't contain a slash, it's not relative */
@@ -1796,14 +1772,13 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                                     if let Some(rel_base) = rel_base {
                                         (*node).set_base(Some(&rel_base));
                                     } else {
-                                        let xml_base = CString::new(xml_base).unwrap();
                                         // error
-                                        xml_xinclude_err(
+                                        xml_xinclude_err!(
                                             ctxt,
                                             (*refe).elem,
                                             XmlParserErrors::XmlXIncludeHrefURI,
-                                            "trying to rebuild base from %s\n",
-                                            xml_base.as_ptr() as *const u8,
+                                            "trying to rebuild base from {}\n",
+                                            xml_base
                                         );
                                     }
                                 }
@@ -1853,12 +1828,13 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     // Check the URL and remove any fragment identifier
     let uri: XmlURIPtr = xml_parse_uri(url as _);
     if uri.is_null() {
-        xml_xinclude_err(
+        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+        xml_xinclude_err!(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeHrefURI,
-            "invalid value URI %s\n",
-            url,
+            "invalid value URI {}\n",
+            url
         );
         // goto error;
         xml_free_node(node);
@@ -1868,12 +1844,13 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         return ret;
     }
     if !(*uri).fragment.is_null() {
-        xml_xinclude_err(
+        let fragment = CStr::from_ptr((*uri).fragment as *const i8).to_string_lossy();
+        xml_xinclude_err!(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeTextFragment,
-            "fragment identifier forbidden for text: %s\n",
-            (*uri).fragment as _,
+            "fragment identifier forbidden for text: {}\n",
+            fragment
         );
         // goto error;
         xml_free_node(node);
@@ -1885,12 +1862,13 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     let url = {
         let tmp = xml_save_uri(uri);
         if tmp.is_null() {
-            xml_xinclude_err(
+            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+            xml_xinclude_err!(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeHrefURI,
-                "invalid value URI %s\n",
-                url,
+                "invalid value URI {}\n",
+                url
             );
             // goto error;
             xml_free_node(node);
@@ -1904,12 +1882,11 @@ unsafe extern "C" fn xml_xinclude_load_txt(
 
     // Handling of references to the local document are done directly through (*ctxt).doc.
     if *url.add(0) == 0 {
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             (*refe).elem,
             XmlParserErrors::XmlXIncludeTextDocument,
-            "text serialization of document not available\n",
-            null(),
+            "text serialization of document not available\n"
         );
         // goto error;
         xml_free_node(node);
@@ -1949,13 +1926,12 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         match encoding.parse::<XmlCharEncoding>() {
             Ok(e) => enc = e,
             _ => {
-                let encoding = CString::new(encoding).unwrap();
-                xml_xinclude_err(
+                xml_xinclude_err!(
                     ctxt,
                     (*refe).elem,
                     XmlParserErrors::XmlXIncludeUnknownEncoding,
-                    "encoding %s not supported\n",
-                    encoding.as_ptr() as *const u8,
+                    "encoding {} not supported\n",
+                    encoding
                 );
                 // goto error;
                 xml_free_node(node);
@@ -2022,12 +1998,13 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         let cur: i32 =
             xml_string_current_char(null_mut(), content.add(i as usize), addr_of_mut!(l));
         if !xml_is_char(cur as u32) {
-            xml_xinclude_err(
+            let u = CStr::from_ptr(url as *const i8).to_string_lossy();
+            xml_xinclude_err!(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeInvalidChar,
-                "%s contains invalid char\n",
-                url,
+                "{} contains invalid char\n",
+                u
             );
             // goto error;
             xml_free_node(node);
@@ -2151,13 +2128,12 @@ unsafe extern "C" fn xml_xinclude_load_node(
         } else if parse == XINCLUDE_PARSE_TEXT {
             xml = 0;
         } else {
-            let parse = CString::new(parse).unwrap();
-            xml_xinclude_err(
+            xml_xinclude_err!(
                 ctxt,
                 cur,
                 XmlParserErrors::XmlXIncludeParseValue,
-                "invalid value %s for 'parse'\n",
-                parse.as_ptr() as *const u8,
+                "invalid value {} for 'parse'\n",
+                parse
             );
             return -1;
         }
@@ -2183,12 +2159,11 @@ unsafe extern "C" fn xml_xinclude_load_node(
         }
     }
     let Some(uri) = uri else {
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeHrefURI,
-            "failed build URL\n",
-            null(),
+            "failed build URL\n"
         );
         return -1;
     };
@@ -2214,7 +2189,7 @@ unsafe extern "C" fn xml_xinclude_load_node(
         while !children.is_null() {
             if (*children).element_type() == XmlElementType::XmlElementNode
                 && !(*children).ns.is_null()
-                && xml_str_equal((*children).name, XINCLUDE_FALLBACK.as_ptr() as _)
+                && (*children).name().as_deref() == Some(XINCLUDE_FALLBACK)
                 && (xml_str_equal((*(*children).ns).href, XINCLUDE_NS.as_ptr() as _)
                     || xml_str_equal((*(*children).ns).href, XINCLUDE_OLD_NS.as_ptr() as _))
             {
@@ -2225,12 +2200,12 @@ unsafe extern "C" fn xml_xinclude_load_node(
         }
     }
     if ret < 0 {
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             cur,
             XmlParserErrors::XmlXIncludeNoFallback,
-            "could not load %s, and no fallback was found\n",
-            uri.as_ptr() as *const u8,
+            "could not load {}, and no fallback was found\n",
+            uri.to_string_lossy().into_owned()
         );
     }
 
@@ -2250,12 +2225,11 @@ unsafe extern "C" fn xml_xinclude_expand_node(
         return null_mut();
     }
     if (*ctxt).depth >= XINCLUDE_MAX_DEPTH {
-        xml_xinclude_err(
+        xml_xinclude_err!(
             ctxt,
             node,
             XmlParserErrors::XmlXIncludeRecursion,
-            "maximum recursion depth exceeded\n",
-            null_mut(),
+            "maximum recursion depth exceeded\n"
         );
         (*ctxt).fatal_err = 1;
         return null_mut();
@@ -2264,12 +2238,11 @@ unsafe extern "C" fn xml_xinclude_expand_node(
     for i in 0..(*ctxt).inc_nr {
         if (*(*(*ctxt).inc_tab.add(i as usize))).elem == node {
             if (*(*(*ctxt).inc_tab.add(i as usize))).expanding != 0 {
-                xml_xinclude_err(
+                xml_xinclude_err!(
                     ctxt,
                     node,
                     XmlParserErrors::XmlXIncludeRecursion,
-                    "inclusion loop detected\n",
-                    null_mut(),
+                    "inclusion loop detected\n"
                 );
                 return null_mut();
             }
@@ -2331,12 +2304,11 @@ unsafe extern "C" fn xml_xinclude_include_node(
             tmp = (*tmp).next.map_or(null_mut(), |n| n.as_ptr());
         }
         if nb_elem > 1 {
-            xml_xinclude_err(
+            xml_xinclude_err!(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeMultipleRoot,
-                "XInclude error: would result in multiple root nodes\n",
-                null(),
+                "XInclude error: would result in multiple root nodes\n"
             );
             xml_free_node_list(list);
             return -1;
@@ -2372,12 +2344,11 @@ unsafe extern "C" fn xml_xinclude_include_node(
         }
         end = xml_new_doc_node((*cur).doc, (*cur).ns, (*cur).name, null_mut());
         if end.is_null() {
-            xml_xinclude_err(
+            xml_xinclude_err!(
                 ctxt,
                 (*refe).elem,
                 XmlParserErrors::XmlXIncludeBuildFailed,
-                "failed to build node\n",
-                null(),
+                "failed to build node\n"
             );
             xml_free_node_list(list);
             return -1;
@@ -2385,9 +2356,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
         (*end).typ = XmlElementType::XmlXIncludeEnd;
         (*cur).add_next_sibling(end);
 
-        /*
-         * Add the list of nodes
-         */
+        // Add the list of nodes
         while !list.is_null() {
             cur = list;
             list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
