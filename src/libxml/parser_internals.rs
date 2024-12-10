@@ -38,7 +38,7 @@ use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::{
     __xml_loader_err, xml_err_msg_str, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-    xml_validity_error, xml_warning_msg,
+    xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
 };
 #[cfg(feature = "catalog")]
 use crate::{
@@ -62,18 +62,18 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_fatal_err_msg, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
-            xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
-            xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal, xml_parse_cdsect,
-            xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_conditional_sections,
-            xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
-            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_external_id,
-            xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
-            xml_parse_text_decl, xml_parse_version_num, xml_parser_add_node_info,
-            xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
-            XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
-            XmlParserInputState, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr,
-            XmlParserOption, XmlSAXHandlerPtr, XML_SKIP_IDS,
+            xml_fatal_err_msg, xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity,
+            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal,
+            xml_parse_cdsect, xml_parse_char_data_internal, xml_parse_char_ref,
+            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
+            xml_parse_enc_name, xml_parse_end_tag1, xml_parse_end_tag2,
+            xml_parse_external_entity_private, xml_parse_external_id, xml_parse_markup_decl,
+            xml_parse_start_tag2, xml_parse_string_name, xml_parse_text_decl,
+            xml_parse_version_num, xml_parser_add_node_info, xml_parser_entity_check,
+            xml_parser_find_node_info, xml_string_decode_entities_int, XmlDefAttrs, XmlDefAttrsPtr,
+            XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserInputState,
+            XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption,
+            XmlSAXHandlerPtr, XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
         uri::{xml_build_uri, xml_canonic_path},
@@ -5047,18 +5047,15 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
             xml_parser_add_node_info(ctxt, addr_of_mut!(node_info));
         }
     } else {
-        xml_fatal_err_msg_str_int_str(
+        xml_fatal_err_msg_str_int_str!(
             ctxt,
             XmlParserErrors::XmlErrGtRequired,
-            "Couldn't find end of Start Tag %s line %d\n",
-            name,
-            line,
-            null(),
+            "Couldn't find end of Start Tag {} line {}\n",
+            CStr::from_ptr(name as *const i8).to_string_lossy(),
+            line
         );
 
-        /*
-         * end of parsing of this node.
-         */
+        // end of parsing of this node.
         (*ctxt).node_pop();
         (*ctxt).name_pop();
         (*ctxt).space_pop();
@@ -5191,13 +5188,12 @@ pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
     {
         let name: *const XmlChar = (*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
         let line: i32 = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
-        xml_fatal_err_msg_str_int_str(
+        xml_fatal_err_msg_str_int_str!(
             ctxt,
             XmlParserErrors::XmlErrTagNotFinished,
-            "Premature end of data in tag %s line %d\n",
-            name,
-            line,
-            null(),
+            "Premature end of data in tag {} line {}\n",
+            CStr::from_ptr(name as *const i8).to_string_lossy(),
+            line
         );
     }
 }

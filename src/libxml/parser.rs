@@ -2386,57 +2386,69 @@ macro_rules! xml_validity_error {
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlFatalErrMsgStrIntStr")]
-pub(crate) unsafe fn xml_fatal_err_msg_str_int_str(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    val: i32,
-    str2: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        val,
-        0,
-        msg,
-        str1,
-        val,
-        str2
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
+macro_rules! xml_fatal_err_msg_str_int_str {
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $val:expr) => {
+        let msg = format!($msg, $str1, $val);
+        $crate::xml_fatal_err_msg_str_int_str!(
+            @inner
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            $val,
+            None
+        );
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $val:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $val, $str2);
+        $crate::xml_fatal_err_msg_str_int_str!(
+            @inner
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            $val,
+            Some($str2.to_owned().into())
+        );
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $val:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                $val,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
         }
-    }
+    };
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
@@ -9097,13 +9109,13 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
         if name.is_null() {
             name = c"unparsable".as_ptr() as _;
         }
-        xml_fatal_err_msg_str_int_str(
+        xml_fatal_err_msg_str_int_str!(
             ctxt,
             XmlParserErrors::XmlErrTagNameMismatch,
-            "Opening and ending tag mismatch: %s line %d and %s\n",
-            (*ctxt).name,
+            "Opening and ending tag mismatch: {} line {} and {}\n",
+            CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy(),
             tag.line,
-            name,
+            CStr::from_ptr(name as *const i8).to_string_lossy()
         );
     }
 
@@ -9149,9 +9161,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
 
     name = xml_parse_name_and_compare(ctxt, (*ctxt).name as _);
 
-    /*
-     * We should definitely be at the ending "S? '>'" part
-     */
+    // We should definitely be at the ending "S? '>'" part
     (*ctxt).grow();
     (*ctxt).skip_blanks();
     if !xml_is_char((*ctxt).current_byte() as u32) || (*ctxt).current_byte() != b'>' {
@@ -9160,29 +9170,23 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
         (*ctxt).advance(1);
     }
 
-    /*
-     * [ WFC: Element Type Match ]
-     * The Name in an element's end-tag must match the element type in the
-     * start-tag.
-     *
-     */
+    // [ WFC: Element Type Match ]
+    // The Name in an element's end-tag must match the element type in the start-tag.
     if name != 1 as *mut XmlChar {
         if name.is_null() {
             name = c"unparsable".as_ptr() as _;
         }
-        xml_fatal_err_msg_str_int_str(
+        xml_fatal_err_msg_str_int_str!(
             ctxt,
             XmlParserErrors::XmlErrTagNameMismatch,
-            "Opening and ending tag mismatch: %s line %d and %s\n",
-            (*ctxt).name,
+            "Opening and ending tag mismatch: {} line {} and {}\n",
+            CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy(),
             line,
-            name,
+            CStr::from_ptr(name as *const i8).to_string_lossy()
         );
     }
 
-    /*
-     * SAX: End of Tag
-     */
+    // SAX: End of Tag
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() && (*ctxt).disable_sax == 0 {
         ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
     }
@@ -12818,13 +12822,12 @@ pub(crate) unsafe extern "C" fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
     if (*ctxt).current_byte() == 0 {
         let name: *const XmlChar = (*ctxt).name_tab[(*ctxt).name_tab.len() - 1];
         let line: i32 = (*ctxt).push_tab[(*ctxt).name_tab.len() - 1].line;
-        xml_fatal_err_msg_str_int_str(
+        xml_fatal_err_msg_str_int_str!(
             ctxt,
             XmlParserErrors::XmlErrTagNotFinished,
-            "Premature end of data in tag %s line %d\n",
-            name,
-            line,
-            null(),
+            "Premature end of data in tag {} line {}\n",
+            CStr::from_ptr(name as *const i8).to_string_lossy(),
+            line
         );
         return;
     }
