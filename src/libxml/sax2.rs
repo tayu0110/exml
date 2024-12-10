@@ -613,43 +613,36 @@ pub unsafe fn xml_sax2_resolve_entity(
 
 /// Handle a parser warning
 #[doc(alias = "xmlWarnMsg")]
-unsafe fn xml_warn_msg(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrWarning,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        str1
-    );
+macro_rules! xml_warn_msg {
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrWarning,
+                None,
+                0,
+                Some($str1.to_owned().into()),
+                None,
+                None,
+                0,
+                0,
+                format!($msg, $str1).as_str(),
+            );
+        }
+    };
 }
 
 /// An entity definition has been parsed
@@ -675,11 +668,12 @@ pub unsafe fn xml_sax2_entity_decl(
     if (*ctxt).in_subset == 1 {
         ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
         if ent.is_null() && (*ctxt).pedantic != 0 {
-            xml_warn_msg(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_warn_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarEntityRedefined,
-                "Entity(%s) already defined in the internal subset\n",
-                name,
+                "Entity({}) already defined in the internal subset\n",
+                name
             );
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
