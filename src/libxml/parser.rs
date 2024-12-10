@@ -7775,50 +7775,80 @@ unsafe extern "C" fn xml_parse_attribute2(
 
 /// Handle a namespace warning error
 #[doc(alias = "xmlNsWarn")]
-unsafe fn xml_ns_warn(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    info1: *const XmlChar,
-    info2: *const XmlChar,
-    info3: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromNamespace,
-        error,
-        XmlErrorLevel::XmlErrWarning,
-        None,
-        0,
-        (!info1.is_null()).then(|| CStr::from_ptr(info1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!info2.is_null()).then(|| CStr::from_ptr(info2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!info3.is_null()).then(|| CStr::from_ptr(info3 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        0,
-        0,
-        msg,
-        info1,
-        info2,
-        info3
-    );
+macro_rules! xml_ns_warn {
+    ($ctxt:expr, $error:expr, $msg:expr) => {
+        xml_ns_warn!(
+            @inner
+            $ctxt,
+            $error,
+            $msg,
+            None,
+            None,
+            None
+        )
+    };
+    ($ctxt:expr, $error:expr, $msg:expr, $info1:expr) => {
+        let msg = format!($msg, $info1);
+        xml_ns_warn!(
+            @inner
+            $ctxt,
+            $error,
+            &msg,
+            Some($info1.to_owned().into()),
+            None,
+            None
+        )
+    };
+    ($ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr) => {
+        let msg = format!($msg, $info1, $info2);
+        xml_ns_warn!(
+            @inner
+            $ctxt,
+            $error,
+            &msg,
+            Some($info1.to_owned().into()),
+            Some($info2.to_owned().into()),
+            None
+        )
+    };
+    ($ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr, $info3:expr) => {
+        let msg = format!($msg, $info1, $info2, $info3);
+        xml_ns_warn!(
+            @inner
+            $ctxt,
+            $error,
+            &msg,
+            Some($info1.to_owned().into()),
+            Some($info2.to_owned().into()),
+            Some($info3.to_owned().into())
+        )
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr, $info3:expr) => {
+        let ctxt = $ctxt as *mut XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromNamespace,
+                $error,
+                XmlErrorLevel::XmlErrWarning,
+                None,
+                0,
+                $info1,
+                $info2,
+                $info3,
+                0,
+                0,
+                $msg,
+            );
+        }
+    };
 }
 
 /// Handle a redefinition of attribute error
@@ -8061,13 +8091,12 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             );
                         } else {
                             if (*uri).scheme.is_null() {
-                                xml_ns_warn(
+                                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                                xml_ns_warn!(
                                     ctxt,
                                     XmlParserErrors::XmlWarNsURIRelative,
-                                    "xmlns: URI %s is not absolute\n",
-                                    url,
-                                    null(),
-                                    null(),
+                                    "xmlns: URI {} is not absolute\n",
+                                    url
                                 );
                             }
                             xml_free_uri(uri);
@@ -8173,13 +8202,14 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         );
                     } else {
                         if (*ctxt).pedantic != 0 && (*uri).scheme.is_null() {
-                            xml_ns_warn(
+                            let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+                            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                            xml_ns_warn!(
                                 ctxt,
                                 XmlParserErrors::XmlWarNsURIRelative,
-                                "xmlns:%s: URI %s is not absolute\n",
+                                "xmlns:{}: URI {} is not absolute\n",
                                 attname,
-                                url,
-                                null(),
+                                url
                             );
                         }
                         xml_free_uri(uri);
