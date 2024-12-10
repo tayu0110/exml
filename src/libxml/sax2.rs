@@ -1302,48 +1302,68 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
 
 /// Handle a namespace warning
 #[doc(alias = "xmlNsWarnMsg")]
-unsafe fn xml_ns_warn_msg(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromNamespace,
-        error,
-        XmlErrorLevel::XmlErrWarning,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        0,
-        0,
-        msg,
-        str1,
-        str2
-    );
+macro_rules! xml_ns_warn_msg {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        xml_ns_warn_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            $msg,
+            None,
+            None
+        );
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        xml_ns_warn_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            None
+        );
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_ns_warn_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into())
+        );
+    };
+    (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromNamespace,
+                $error,
+                XmlErrorLevel::XmlErrWarning,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                0,
+                0,
+                $msg,
+            );
+        }
+    };
 }
 
 /// Handle a namespace error
@@ -1446,12 +1466,11 @@ unsafe fn xml_sax2_attribute_internal(
                     null(),
                 );
             } else {
-                xml_ns_warn_msg(
+                xml_ns_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarNsColumn,
-                    "Avoid attribute ending with ':' like '%s'\n",
-                    cfullname.as_ptr() as *const u8,
-                    null(),
+                    "Avoid attribute ending with ':' like '{}'\n",
+                    fullname
                 );
             }
             if !ns.is_null() {
@@ -1643,21 +1662,25 @@ unsafe fn xml_sax2_attribute_internal(
         if (*ctxt).pedantic != 0 && (*val.add(0) != 0) {
             let uri: XmlURIPtr = xml_parse_uri(val as _);
             if uri.is_null() {
-                xml_ns_warn_msg(
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+                xml_ns_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarNsURI,
-                    "xmlns:%s: %s not a valid URI\n",
+                    "xmlns:{}: {} not a valid URI\n",
                     name,
-                    value,
+                    value
                 );
             } else {
                 if (*uri).scheme.is_null() {
-                    xml_ns_warn_msg(
+                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                    let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+                    xml_ns_warn_msg!(
                         ctxt,
                         XmlParserErrors::XmlWarNsURIRelative,
-                        "xmlns:%s: URI %s is not absolute\n",
+                        "xmlns:{}: URI {} is not absolute\n",
                         name,
-                        value,
+                        value
                     );
                 }
                 xml_free_uri(uri);
@@ -2240,12 +2263,12 @@ pub unsafe fn xml_sax2_start_element(
         }
         if !prefix.is_null() && ns.is_null() {
             ns = xml_new_ns(ret, null_mut(), prefix);
-            xml_ns_warn_msg(
+            let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+            xml_ns_warn_msg!(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                "Namespace prefix %s is not defined\n",
-                prefix,
-                null(),
+                "Namespace prefix {} is not defined\n",
+                prefix
             );
         }
 
@@ -2535,18 +2558,14 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
     (*ctxt).nodemem = -1;
 
-    /*
-     * We are parsing a new node.
-     */
+    // We are parsing a new node.
     if (*ctxt).node_push(ret) < 0 {
         (*ret).unlink();
         xml_free_node(ret);
         return;
     }
 
-    /*
-     * Link the child element
-     */
+    // Link the child element
     if !parent.is_null() {
         if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
             (*parent).add_child(ret);
@@ -2555,17 +2574,13 @@ pub unsafe fn xml_sax2_start_element_ns(
         }
     }
 
-    /*
-     * Insert the defaulted attributes from the DTD only if requested:
-     */
+    // Insert the defaulted attributes from the DTD only if requested:
     if nb_defaulted != 0 && (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 == 0 {
         nb_attributes -= nb_defaulted;
     }
 
-    /*
-     * Search the namespace if it wasn't already found
-     * Note that, if prefix is NULL, this searches for the default Ns
-     */
+    // Search the namespace if it wasn't already found
+    // Note that, if prefix is NULL, this searches for the default Ns
     if !orig_uri.is_null() && (*ret).ns.is_null() {
         let pre =
             (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
@@ -2584,33 +2599,27 @@ pub unsafe fn xml_sax2_start_element_ns(
                 return;
             }
             if !prefix.is_null() {
-                xml_ns_warn_msg(
+                let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+                xml_ns_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
-                    "Namespace prefix %s was not found\n",
-                    prefix,
-                    null(),
+                    "Namespace prefix {} was not found\n",
+                    prefix
                 );
             } else {
-                xml_ns_warn_msg(
+                xml_ns_warn_msg!(
                     ctxt,
                     XmlParserErrors::XmlNsErrUndefinedNamespace,
-                    "Namespace default prefix was not found\n",
-                    null(),
-                    null(),
+                    "Namespace default prefix was not found\n"
                 );
             }
         }
     }
 
-    /*
-     * process all the other attributes
-     */
+    // process all the other attributes
     if nb_attributes > 0 {
         for (_, j) in (0..nb_attributes as usize).zip((0..).step_by(5)) {
-            /*
-             * Handle the rare case of an undefined attribute prefix
-             */
+            // Handle the rare case of an undefined attribute prefix
             if !(*attributes.add(j + 1)).is_null() && (*attributes.add(j + 2)).is_null() {
                 if (*ctxt).dict_names != 0 {
                     let fullname: *const XmlChar =
