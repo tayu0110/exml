@@ -1374,48 +1374,68 @@ macro_rules! xml_ns_warn_msg {
     feature = "libxml_writer",
     feature = "libxml_legacy"
 ))]
-unsafe fn xml_ns_err_msg(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromNamespace,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        0,
-        0,
-        msg,
-        str1,
-        str2
-    );
+macro_rules! xml_ns_err_msg {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        xml_ns_err_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            $msg,
+            None,
+            None
+        );
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        xml_ns_err_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            None
+        );
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_ns_err_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into())
+        );
+    };
+    (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromNamespace,
+                $error,
+                XmlErrorLevel::XmlErrError,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                0,
+                0,
+                $msg,
+            );
+        }
+    };
 }
 
 /// Handle an attribute that has been read by the parser.
@@ -1458,12 +1478,11 @@ unsafe fn xml_sax2_attribute_internal(
         name = xml_split_qname(ctxt, cfullname.as_ptr() as *const u8, addr_of_mut!(ns));
         if !name.is_null() && *name.add(0) == 0 {
             if xml_str_equal(ns, c"xmlns".as_ptr() as _) {
-                xml_ns_err_msg(
+                xml_ns_err_msg!(
                     ctxt,
                     XmlParserErrors::XmlErrNsDeclError,
-                    "invalid namespace declaration '%s'\n",
-                    cfullname.as_ptr() as *const u8,
-                    null(),
+                    "invalid namespace declaration '{}'\n",
+                    fullname
                 );
             } else {
                 xml_ns_warn_msg!(
@@ -1651,12 +1670,12 @@ unsafe fn xml_sax2_attribute_internal(
         }
 
         if *val.add(0) == 0 {
-            xml_ns_err_msg(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_ns_err_msg!(
                 ctxt,
                 XmlParserErrors::XmlNsErrEmpty,
-                "Empty namespace name for prefix %s\n",
-                name,
-                null(),
+                "Empty namespace name for prefix {}\n",
+                name
             );
         }
         if (*ctxt).pedantic != 0 && (*val.add(0) != 0) {
@@ -1728,12 +1747,14 @@ unsafe fn xml_sax2_attribute_internal(
         );
 
         if namespace.is_null() {
-            xml_ns_err_msg(
+            let ns = CStr::from_ptr(ns as *const i8).to_string_lossy();
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_ns_err_msg!(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                "Namespace prefix %s of attribute %s is not defined\n",
+                "Namespace prefix {} of attribute {} is not defined\n",
                 ns,
-                name,
+                name
             );
         } else {
             let mut prop: XmlAttrPtr;
@@ -1745,12 +1766,14 @@ unsafe fn xml_sax2_attribute_internal(
                         && (namespace == (*prop).ns
                             || xml_str_equal((*namespace).href as _, (*(*prop).ns).href as _)))
                 {
-                    xml_ns_err_msg(
+                    let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+                    let h = CStr::from_ptr((*namespace).href as *const i8).to_string_lossy();
+                    xml_ns_err_msg!(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
-                        "Attribute %s in %s redefined\n",
-                        name,
-                        (*namespace).href as _,
+                        "Attribute {} in {} redefined\n",
+                        n,
+                        h
                     );
                     (*ctxt).well_formed = 0;
                     if (*ctxt).recovery == 0 {
