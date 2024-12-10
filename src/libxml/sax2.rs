@@ -427,55 +427,65 @@ pub unsafe fn xml_sax2_external_subset(
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
 #[doc(alias = "xmlFatalErrMsg")]
-unsafe fn xml_fatal_err_msg(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && ((*ctxt).disable_sax != 0)
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        0,
-        0,
-        msg,
-        str1,
-        str2
-    );
-    if !ctxt.is_null() {
-        (*ctxt).well_formed = 0;
-        (*ctxt).valid = 0;
-        if (*ctxt).recovery == 0 {
-            (*ctxt).disable_sax = 1;
+macro_rules! xml_fatal_err_msg {
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        xml_fatal_err_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            None
+        );
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_fatal_err_msg!(
+            @inner,
+            $ctxt,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into())
+        );
+    };
+    (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrFatal,
+                None,
+                0,
+                $str1,
+                $str2,
+                None,
+                0,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).well_formed = 0;
+                (*ctxt).valid = 0;
+                if (*ctxt).recovery == 0 {
+                    (*ctxt).disable_sax = 1;
+                }
+            }
         }
-    }
+    };
 }
 
 /// Get an entity by name
@@ -514,12 +524,12 @@ pub unsafe fn xml_sax2_get_entity(
                 (*(*ctxt).my_doc).standalone = 0;
                 ret = xml_get_doc_entity((*ctxt).my_doc, name);
                 if !ret.is_null() {
-                    xml_fatal_err_msg(
+                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                    xml_fatal_err_msg!(
                         ctxt,
                         XmlParserErrors::XmlErrNotStandalone,
-                        "Entity(%s) document marked standalone but requires external subset\n",
-                        name,
-                        null(),
+                        "Entity({}) document marked standalone but requires external subset\n",
+                        name
                     );
                 }
                 (*(*ctxt).my_doc).standalone = 1;
@@ -731,12 +741,12 @@ pub unsafe fn xml_sax2_entity_decl(
             (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else {
-        xml_fatal_err_msg(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrEntityProcessing,
-            "SAX.xmlSAX2EntityDecl(%s) called while not in subset\n",
-            name,
-            null(),
+            "SAX.xmlSAX2EntityDecl({}) called while not in subset\n",
+            name
         );
     }
 }
@@ -877,12 +887,12 @@ pub unsafe fn xml_sax2_attribute_decl(
             tree,
         );
     } else {
-        xml_fatal_err_msg(
+        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            "SAX.xmlSAX2AttributeDecl(%s) called while not in subset\n",
-            name,
-            null(),
+            "SAX.xmlSAX2AttributeDecl({}) called while not in subset\n",
+            n
         );
         xml_free(name as _);
         xml_free_enumeration(tree);
@@ -949,12 +959,12 @@ pub unsafe fn xml_sax2_element_decl(
             content,
         );
     } else {
-        xml_fatal_err_msg(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            "SAX.xmlSAX2ElementDecl(%s) called while not in subset\n",
-            name,
-            null(),
+            "SAX.xmlSAX2ElementDecl({}) called while not in subset\n",
+            name
         );
         return;
     }
@@ -997,12 +1007,12 @@ pub unsafe fn xml_sax2_notation_decl(
     }
 
     if public_id.is_null() && system_id.is_null() {
-        xml_fatal_err_msg(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,
-            "SAX.xmlSAX2NotationDecl(%s) externalID or PublicID missing\n",
-            name,
-            null(),
+            "SAX.xmlSAX2NotationDecl({}) externalID or PublicID missing\n",
+            name
         );
         return;
     } else if (*ctxt).in_subset == 1 {
@@ -1022,12 +1032,12 @@ pub unsafe fn xml_sax2_notation_decl(
             system_id,
         );
     } else {
-        xml_fatal_err_msg(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,
-            "SAX.xmlSAX2NotationDecl(%s) called while not in subset\n",
-            name,
-            null(),
+            "SAX.xmlSAX2NotationDecl({}) called while not in subset\n",
+            name
         );
         return;
     }
@@ -1154,12 +1164,12 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else {
-        xml_fatal_err_msg(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
-            "SAX.xmlSAX2UnparsedEntityDecl(%s) called while not in subset\n",
-            name,
-            null(),
+            "SAX.xmlSAX2UnparsedEntityDecl({}) called while not in subset\n",
+            name
         );
     }
 }
