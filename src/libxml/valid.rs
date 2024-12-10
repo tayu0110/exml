@@ -203,34 +203,36 @@ pub type XmlRefTablePtr = *mut XmlRefTable;
 
 /// Handle a validation error
 #[doc(alias = "xmlErrValid")]
-unsafe fn xml_err_valid(
-    ctxt: XmlValidCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    extra: Option<&str>,
-) {
-    let mut channel: Option<GenericError> = None;
-    let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data = None;
+macro_rules! xml_err_valid {
+    ($ctxt:expr, $error:expr, $msg:expr) => {
+        xml_err_valid!(@inner, $ctxt, $error, $msg, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:expr, $extra:expr) => {
+        let msg = format!($msg, $extra);
+        xml_err_valid!(@inner, $ctxt, $error, &msg, Some($extra.to_owned().into()));
+    };
+    (@inner, $ctxt:expr, $error:expr, $msg:expr, $extra:expr) => {
+        let ctxt = $ctxt as *mut XmlValidCtxt;
+        let mut channel: Option<GenericError> = None;
+        let mut pctxt: XmlParserCtxtPtr = null_mut();
+        let mut data = None;
 
-    if !ctxt.is_null() {
-        channel = (*ctxt).error;
-        data = (*ctxt).user_data.clone();
-        /* Look up flag to detect if it is part of a parsing
-        context */
-        if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt)
-                .user_data
-                .as_ref()
-                .and_then(|d| {
-                    let lock = d.lock();
-                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
-                })
-                .unwrap_or(null_mut());
+        if !ctxt.is_null() {
+            channel = (*ctxt).error;
+            data = (*ctxt).user_data.clone();
+            /* Look up flag to detect if it is part of a parsing
+            context */
+            if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
+                pctxt = (*ctxt)
+                    .user_data
+                    .as_ref()
+                    .and_then(|d| {
+                        let lock = d.lock();
+                        lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                    })
+                    .unwrap_or(null_mut());
+            }
         }
-    }
-    if let Some(extra) = extra {
-        let e = CString::new(extra).unwrap();
         __xml_raise_error!(
             None,
             channel,
@@ -238,38 +240,18 @@ unsafe fn xml_err_valid(
             pctxt as _,
             null_mut(),
             XmlErrorDomain::XmlFromValid,
-            error,
+            $error,
             XmlErrorLevel::XmlErrError,
             None,
             0,
-            Some(extra.to_owned().into()),
+            $extra,
             None,
             None,
             0,
             0,
-            msg,
-            e.as_ptr()
+            $msg,
         );
-    } else {
-        __xml_raise_error!(
-            None,
-            channel,
-            data,
-            pctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromValid,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            msg,
-        );
-    }
+    };
 }
 
 /// Handle an out of memory error
@@ -425,11 +407,11 @@ pub unsafe extern "C" fn xml_add_notation_decl(
     if xml_hash_add_entry(table, name, ret as _) != 0 {
         #[cfg(feature = "libxml_valid")]
         {
-            xml_err_valid(
+            xml_err_valid!(
                 null_mut(),
                 XmlParserErrors::XmlDTDNotationRedefined,
-                "xmlAddNotationDecl: %s already defined\n",
-                (*ret).name.as_deref(),
+                "xmlAddNotationDecl: {} already defined\n",
+                (*ret).name.as_deref().unwrap()
             );
         }
         xml_free_notation(ret);
@@ -583,11 +565,10 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
     match typ {
         XmlElementContentType::XmlElementContentElement => {
             if name.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlNewElementContent : name == NULL !\n",
-                    None,
+                    "xmlNewElementContent : name == NULL !\n"
                 );
             }
         }
@@ -595,15 +576,14 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
         | XmlElementContentType::XmlElementContentSeq
         | XmlElementContentType::XmlElementContentOr => {
             if !name.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlNewElementContent : name != NULL !\n",
-                    None,
+                    "xmlNewElementContent : name != NULL !\n"
                 );
             }
         } // _ => {
-          //     xml_err_valid(
+          //     xml_err_valid!(
           //         null_mut(),
           //         XmlParserErrors::XmlErrInternalError,
           //         c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
@@ -765,7 +745,7 @@ pub unsafe extern "C" fn xml_free_doc_element_content(
             | XmlElementContentType::XmlElementContentElement
             | XmlElementContentType::XmlElementContentSeq
             | XmlElementContentType::XmlElementContentOr => {} // _ => {
-                                                               //     xml_err_valid(
+                                                               //     xml_err_valid!(
                                                                //         null_mut(),
                                                                //         XmlParserErrors::XmlErrInternalError,
                                                                //         c"Internal: ELEMENT content corrupted invalid type\n".as_ptr() as _,
@@ -1064,54 +1044,49 @@ pub unsafe extern "C" fn xml_add_element_decl(
     match typ {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             if !content.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlAddElementDecl: content != NULL for EMPTY\n",
-                    None,
+                    "xmlAddElementDecl: content != NULL for EMPTY\n"
                 );
                 return null_mut();
             }
         }
         XmlElementTypeVal::XmlElementTypeAny => {
             if !content.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlAddElementDecl: content != NULL for ANY\n",
-                    None,
+                    "xmlAddElementDecl: content != NULL for ANY\n"
                 );
                 return null_mut();
             }
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
             if content.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlAddElementDecl: content == NULL for MIXED\n",
-                    None,
+                    "xmlAddElementDecl: content == NULL for MIXED\n"
                 );
                 return null_mut();
             }
         }
         XmlElementTypeVal::XmlElementTypeElement => {
             if content.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlAddElementDecl: content == NULL for ELEMENT\n",
-                    None,
+                    "xmlAddElementDecl: content == NULL for ELEMENT\n"
                 );
                 return null_mut();
             }
         }
         _ => {
-            xml_err_valid(
+            xml_err_valid!(
                 ctxt,
                 XmlParserErrors::XmlErrInternalError,
-                "Internal: ELEMENT decl corrupted invalid type\n",
-                None,
+                "Internal: ELEMENT decl corrupted invalid type\n"
             );
             return null_mut();
         }
@@ -1151,10 +1126,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
         return null_mut();
     }
 
-    /*
-     * lookup old attributes inserted on an undefined element in the
-     * internal subset.
-     */
+    // lookup old attributes inserted on an undefined element in the internal subset.
     if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
         ret = xml_hash_lookup2(
             (*(*(*dtd).doc).int_subset).elements as _,
@@ -1174,18 +1146,13 @@ pub unsafe extern "C" fn xml_add_element_decl(
         }
     }
 
-    /*
-     * The element may already be present if one of its attribute
-     * was registered first
-     */
+    // The element may already be present if one of its attribute was registered first
     ret = xml_hash_lookup2(table, name.as_ptr() as *const u8, ns) as _;
     if !ret.is_null() {
         if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             #[cfg(feature = "libxml_valid")]
             {
-                /*
-                 * The element is already defined in this DTD.
-                 */
+                // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
@@ -1446,7 +1413,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElemen
                     cur = (*cur).c1;
                     break 'to_continue;
                 } // _ => {
-                  //     xml_err_valid(
+                  //     xml_err_valid!(
                   //         null_mut(),
                   //         XmlParserErrors::XmlErrInternalError,
                   //         c"Internal: ELEMENT cur corrupted invalid type\n".as_ptr() as _,
@@ -1567,11 +1534,10 @@ pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementP
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
         _ => {
-            xml_err_valid(
+            xml_err_valid!(
                 null_mut(),
                 XmlParserErrors::XmlErrInternalError,
-                "Internal: ELEMENT struct corrupted invalid type\n",
-                None,
+                "Internal: ELEMENT struct corrupted invalid type\n"
             );
         }
     }
@@ -2227,7 +2193,7 @@ pub unsafe fn xml_add_attribute_decl(
             XmlAttributeType::XmlAttributeNmtokens => {}
             XmlAttributeType::XmlAttributeEnumeration => {}
             XmlAttributeType::XmlAttributeNotation => {} // _ => {
-                                                         //     xml_err_valid(
+                                                         //     xml_err_valid!(
                                                          //         ctxt,
                                                          //         XmlParserErrors::XmlErrInternalError,
                                                          //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
@@ -2602,7 +2568,7 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
             xml_buf_ccat(buf, c" NOTATION (".as_ptr() as _);
             xml_dump_enumeration(buf, (*attr).tree);
         } // _ => {
-          //     xml_err_valid(
+          //     xml_err_valid!(
           //         null_mut(),
           //         XmlParserErrors::XmlErrInternalError,
           //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
@@ -2621,7 +2587,7 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
         XmlAttributeDefault::XmlAttributeFixed => {
             xml_buf_ccat(buf, c" #FIXED".as_ptr() as _);
         } // _ => {
-          //     xml_err_valid(
+          //     xml_err_valid!(
           //         null_mut(),
           //         XmlParserErrors::XmlErrInternalError,
           //         c"Internal: ATTRIBUTE struct corrupted invalid def\n".as_ptr() as _,
@@ -3064,31 +3030,28 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
         if ref_list.is_null() {
             ref_list = xml_list_create(Some(xml_free_ref), Some(xml_dummy_compare));
             if ref_list.is_null() {
-                xml_err_valid(
+                xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlAddRef: Reference list creation failed!\n",
-                    None,
+                    "xmlAddRef: Reference list creation failed!\n"
                 );
                 break 'failed;
             }
             if xml_hash_add_entry(table, value, ref_list as _) < 0 {
                 xml_list_delete(ref_list);
-                xml_err_valid(
+                xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlAddRef: Reference list insertion failed!\n",
-                    None,
+                    "xmlAddRef: Reference list insertion failed!\n"
                 );
                 break 'failed;
             }
         }
         if xml_list_append(ref_list, ret as _) != 0 {
-            xml_err_valid(
+            xml_err_valid!(
                 null_mut(),
                 XmlParserErrors::XmlErrInternalError,
-                "xmlAddRef: Reference list insertion failed!\n",
-                None,
+                "xmlAddRef: Reference list insertion failed!\n"
             );
             break 'failed;
         }
@@ -3333,23 +3296,14 @@ pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr
 
     let root: XmlNodePtr = (*doc).get_root_element();
     if root.is_null() || (*root).name.is_null() {
-        xml_err_valid(
-            ctxt,
-            XmlParserErrors::XmlDTDNoRoot,
-            "no root element\n",
-            None,
-        );
+        xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoRoot, "no root element\n");
         return 0;
     }
 
-    /*
-     * When doing post validation against a separate DTD, those may
-     * no internal subset has been generated
-     */
+    // When doing post validation against a separate DTD, those may
+    // no internal subset has been generated
     if !(*doc).int_subset.is_null() && !(*(*doc).int_subset).name.is_null() {
-        /*
-         * Check first the document root against the NQName
-         */
+        // Check first the document root against the NQName
         if !xml_str_equal((*(*doc).int_subset).name, (*root).name) {
             if !(*root).ns.is_null() && !(*(*root).ns).prefix.is_null() {
                 let mut fname: [XmlChar; 50] = [0; 50];
@@ -4304,11 +4258,11 @@ extern "C" fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlVal
         if matches!((*cur).atype, XmlAttributeType::XmlAttributeNotation) {
             doc = (*cur).doc;
             let Some(cur_elem) = (*cur).elem.as_deref().map(|e| CString::new(e).unwrap()) else {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    "xmlValidateAttributeCallback(%s): internal error\n",
-                    (*cur).name().as_deref(),
+                    "xmlValidateAttributeCallback({}): internal error\n",
+                    (*cur).name().as_deref().unwrap()
                 );
                 return;
             };
@@ -4456,7 +4410,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         return 0;
     }
     if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
-        xml_err_valid(ctxt, XmlParserErrors::XmlDTDNoDTD, "no DTD found!\n", None);
+        xml_err_valid!(ctxt, XmlParserErrors::XmlDTDNoDTD, "no DTD found!\n");
         return 0;
     }
     if !(*doc).int_subset.is_null()
@@ -4469,11 +4423,11 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
                 .as_deref()
                 .and_then(|base| build_uri(system_id, base))
             else {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
-                    "Could not build URI for external subset \"%s\"\n",
-                    Some(system_id),
+                    "Could not build URI for external subset \"{}\"\n",
+                    system_id
                 );
                 return 0;
             };
@@ -4496,18 +4450,22 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         );
         if (*doc).ext_subset.is_null() {
             if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
-                    "Could not load the external subset \"%s\"\n",
-                    Some(system_id),
+                    "Could not load the external subset \"{}\"\n",
+                    system_id
                 );
             } else {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
-                    "Could not load the external subset \"%s\"\n",
-                    external_id.as_ref().map(|e| e.to_string_lossy()).as_deref(),
+                    "Could not load the external subset \"{}\"\n",
+                    external_id
+                        .as_ref()
+                        .map(|e| e.to_string_lossy())
+                        .as_deref()
+                        .unwrap()
                 );
             }
             return 0;
@@ -6036,11 +5994,10 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                                 XmlElementContentType::XmlElementContentPCDATA
                                             )
                                         {
-                                            xml_err_valid(
+                                            xml_err_valid!(
                                                 null_mut(),
                                                 XmlParserErrors::XmlDTDMixedCorrupt,
-                                                "Internal: MIXED struct corrupted\n",
-                                                None,
+                                                "Internal: MIXED struct corrupted\n"
                                             );
                                             break;
                                         }
@@ -6086,11 +6043,10 @@ pub unsafe extern "C" fn xml_validate_one_element(
                                             XmlElementContentType::XmlElementContentPCDATA
                                         )
                                     {
-                                        xml_err_valid(
+                                        xml_err_valid!(
                                             ctxt,
                                             XmlParserErrors::XmlDTDMixedCorrupt,
-                                            "Internal: MIXED struct corrupted\n",
-                                            None,
+                                            "Internal: MIXED struct corrupted\n"
                                         );
                                         break;
                                     }
@@ -7111,11 +7067,10 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
         return 0;
     }
     if doc.is_null() {
-        xml_err_valid(
+        xml_err_valid!(
             ctxt,
             XmlParserErrors::XmlDTDNoDoc,
-            "xmlValidateDocumentFinal: doc == NULL\n",
-            None,
+            "xmlValidateDocumentFinal: doc == NULL\n"
         );
         return 0;
     }
@@ -7124,15 +7079,9 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
     let save: u32 = (*ctxt).flags;
     (*ctxt).flags &= !XML_VCTXT_USE_PCTXT as u32;
 
-    /*
-     * Check all the NOTATION/NOTATIONS attributes
-     */
-    /*
-     * Check all the ENTITY/ENTITIES attributes definition for validity
-     */
-    /*
-     * Check all the IDREF/IDREFS attributes definition for validity
-     */
+    // Check all the NOTATION/NOTATIONS attributes
+    // Check all the ENTITY/ENTITIES attributes definition for validity
+    // Check all the IDREF/IDREFS attributes definition for validity
     let table: XmlRefTablePtr = (*doc).refs as XmlRefTablePtr;
     (*ctxt).doc = doc;
     (*ctxt).valid = 1;
@@ -7705,7 +7654,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                 }
             }
         } // _ => {
-          //     xml_err_valid(
+          //     xml_err_valid!(
           //         ctxt,
           //         XmlParserErrors::XmlErrInternalError,
           //         c"ContentModel broken for element %s\n".as_ptr() as _,
@@ -7830,11 +7779,10 @@ unsafe extern "C" fn xml_validate_check_mixed(
                     XmlElementContentType::XmlElementContentPCDATA
                 )
             {
-                xml_err_valid(
+                xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlDTDMixedCorrupt,
-                    "Internal: MIXED struct corrupted\n",
-                    None,
+                    "Internal: MIXED struct corrupted\n"
                 );
                 break;
             }
@@ -7869,11 +7817,10 @@ unsafe extern "C" fn xml_validate_check_mixed(
                     XmlElementContentType::XmlElementContentPCDATA
                 )
             {
-                xml_err_valid(
+                xml_err_valid!(
                     ctxt,
                     XmlParserErrors::XmlDTDMixedCorrupt,
-                    "Internal: MIXED struct corrupted\n",
-                    None,
+                    "Internal: MIXED struct corrupted\n"
                 );
                 break;
             }
