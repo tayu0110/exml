@@ -202,7 +202,7 @@ pub unsafe fn xml_sax2_has_external_subset(ctx: Option<GenericErrorContext>) -> 
 #[doc(alias = "xmlSAX2ErrMemory")]
 unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
     let mut schannel: Option<StructuredError> = None;
-    let str1: *const c_char = c"out of memory\n".as_ptr() as _;
+    const MSG: &str = "out of memory\n";
 
     if !ctxt.is_null() {
         (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
@@ -220,14 +220,12 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
             XmlErrorLevel::XmlErrError,
             None,
             0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
+            Some(MSG.into()),
             None,
             None,
             0,
             0,
             msg,
-            str1,
-            null::<c_char>()
         );
         (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
         (*ctxt).instate = XmlParserInputState::XmlParserEOF;
@@ -244,14 +242,12 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
             XmlErrorLevel::XmlErrError,
             None,
             0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1).to_string_lossy().into_owned().into()),
+            Some(MSG.into()),
             None,
             None,
             0,
             0,
             msg,
-            str1,
-            null::<c_char>()
         );
     }
 }
