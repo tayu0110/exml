@@ -2269,44 +2269,46 @@ macro_rules! xml_warning_msg {
 }
 
 /// Handle a non fatal parser error
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlErrMsgStr")]
-pub(crate) unsafe fn xml_err_msg_str(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    val: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromParser,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!val.is_null()).then(|| CStr::from_ptr(val as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        val
-    );
+macro_rules! xml_err_msg_str {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        $crate::xml_err_msg_str!(@inner $ctxt, $error, $msg, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
+        let msg = format!($msg, $val);
+        $crate::xml_err_msg_str!(@inner $ctxt, $error, &msg, Some($val.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromParser,
+                $error,
+                XmlErrorLevel::XmlErrError,
+                None,
+                0,
+                $val,
+                None,
+                None,
+                0,
+                0,
+                $msg,
+            );
+        }
+    };
 }
 
 /// Handle a validity error.
@@ -6260,11 +6262,12 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
                 name
             );
         } else {
-            xml_err_msg_str(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "Entity '%s' not defined\n",
-                name,
+                "Entity '{}' not defined\n",
+                name
             );
         }
     /* TODO ? check regressions (*ctxt).valid = 0; */
@@ -11497,11 +11500,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 if !uri.is_null() {
                     let parsed_uri = xml_parse_uri(uri as *const c_char);
                     if parsed_uri.is_null() {
-                        xml_err_msg_str(
+                        let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
+                        xml_err_msg_str!(
                             ctxt,
                             XmlParserErrors::XmlErrInvalidURI,
-                            "Invalid URI: %s\n",
-                            uri as _,
+                            "Invalid URI: {}\n",
+                            uri
                         );
                     // This really ought to be a well formedness error
                     // but the XML Core WG decided otherwise c.f. issue
@@ -11592,17 +11596,16 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             if !uri.is_null() {
                 let parsed_uri = xml_parse_uri(uri as *const c_char);
                 if parsed_uri.is_null() {
-                    xml_err_msg_str(
+                    let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
+                    xml_err_msg_str!(
                         ctxt,
                         XmlParserErrors::XmlErrInvalidURI,
-                        "Invalid URI: %s\n",
-                        uri as _,
+                        "Invalid URI: {}\n",
+                        uri
                     );
-                /*
-                 * This really ought to be a well formedness error
-                 * but the XML Core WG decided otherwise c.f. issue
-                 * E26 of the XML erratas.
-                 */
+                // This really ought to be a well formedness error
+                // but the XML Core WG decided otherwise c.f. issue
+                // E26 of the XML erratas.
                 } else {
                     if !(*parsed_uri).fragment.is_null() {
                         /*

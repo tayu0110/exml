@@ -36,7 +36,10 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 use crate::error::XmlParserErrors;
 use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
-use crate::{__xml_loader_err, xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_warning_msg};
+use crate::{
+    __xml_loader_err, xml_err_msg_str, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+    xml_warning_msg,
+};
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -59,8 +62,8 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_str_int_str,
-            xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
+            xml_fatal_err_msg, xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt,
+            xml_is_name_char, xml_load_external_entity, xml_new_parser_ctxt,
             xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal, xml_parse_cdsect,
             xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_conditional_sections,
             xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
@@ -3471,11 +3474,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
                 name
             );
         } else {
-            xml_err_msg_str(
+            let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "Entity '%s' not defined\n",
-                name,
+                "Entity '{}' not defined\n",
+                n
             );
             if (*ctxt).in_subset == 0 && !(*ctxt).sax.is_null() {
                 if let Some(refe) = (*(*ctxt).sax).reference {
@@ -3485,11 +3489,8 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         }
         (*ctxt).valid = 0;
     }
-    /*
-     * [ WFC: Parsed Entity ]
-     * An entity reference must not contain the name of an
-     * unparsed entity
-     */
+    // [ WFC: Parsed Entity ]
+    // An entity reference must not contain the name of an unparsed entity
     else if matches!(
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
@@ -3502,11 +3503,9 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
             name
         );
     }
-    /*
-     * [ WFC: No External Entity References ]
-     * Attribute values cannot contain direct or indirect
-     * entity references to external entities.
-     */
+    // [ WFC: No External Entity References ]
+    // Attribute values cannot contain direct or indirect
+    // entity references to external entities.
     else if matches!(
         (*ctxt).instate,
         XmlParserInputState::XmlParserAttributeValue
@@ -3522,12 +3521,9 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
             name
         );
     }
-    /*
-     * [ WFC: No < in Attribute Values ]
-     * The replacement text of any entity referred to directly or
-     * indirectly in an attribute value (other than "&lt;") must
-     * not contain a <.
-     */
+    // [ WFC: No < in Attribute Values ]
+    // The replacement text of any entity referred to directly or
+    // indirectly in an attribute value (other than "&lt;") must not contain a <.
     else if matches!(
         (*ctxt).instate,
         XmlParserInputState::XmlParserAttributeValue
@@ -3570,12 +3566,10 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> 
         }
     }
 
-    /*
-     * [ WFC: No Recursion ]
-     * A parsed entity must not contain a recursive reference
-     * to itself, either directly or indirectly.
-     * Done somewhere else
-     */
+    // [ WFC: No Recursion ]
+    // A parsed entity must not contain a recursive reference
+    // to itself, either directly or indirectly.
+    // Done somewhere else
     ent
 }
 
@@ -4005,11 +3999,10 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             (*ctxt).depth -= 1;
         } else {
             ret = XmlParserErrors::XmlErrEntityPEInternal;
-            xml_err_msg_str(
+            xml_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrInternalError,
-                "invalid entity type found\n",
-                null(),
+                "invalid entity type found\n"
             );
         }
 
@@ -4151,11 +4144,10 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (*ctxt).sizeentities = oldsizeentities;
             } else {
                 ret = XmlParserErrors::XmlErrEntityPEInternal;
-                xml_err_msg_str(
+                xml_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrInternalError,
-                    "invalid entity type found\n",
-                    null(),
+                    "invalid entity type found\n"
                 );
             }
             if matches!(ret, XmlParserErrors::XmlErrEntityLoop) {
