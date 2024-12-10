@@ -2452,57 +2452,57 @@ macro_rules! xml_fatal_err_msg_str_int_str {
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlNsErr")]
-pub(crate) unsafe fn xml_ns_err(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    info1: *const XmlChar,
-    info2: *const XmlChar,
-    info3: *const XmlChar,
-) {
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-    }
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        ctxt as _,
-        null_mut(),
-        XmlErrorDomain::XmlFromNamespace,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!info1.is_null()).then(|| CStr::from_ptr(info1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!info2.is_null()).then(|| CStr::from_ptr(info2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!info3.is_null()).then(|| CStr::from_ptr(info3 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        0,
-        0,
-        msg,
-        info1,
-        info2,
-        info3
-    );
-    if !ctxt.is_null() {
-        (*ctxt).ns_well_formed = 0;
-    }
+macro_rules! xml_ns_err {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        $crate::xml_ns_err!(@inner $ctxt, $error, $msg, None, None, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $info1:expr) => {
+        let msg = format!($msg, $info1);
+        $crate::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), None, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $info1:expr, $info2:expr) => {
+        let msg = format!($msg, $info1, $info2);
+        $crate::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $info1:expr, $info2:expr, $info3:expr) => {
+        let msg = format!($msg, $info1, $info2, $info3);
+        $crate::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), Some($info3.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr, $info3:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+            }
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                ctxt as _,
+                null_mut(),
+                XmlErrorDomain::XmlFromNamespace,
+                $error,
+                XmlErrorLevel::XmlErrError,
+                None,
+                0,
+                $info1,
+                $info2,
+                $info3,
+                0,
+                0,
+                $msg,
+            );
+            if !ctxt.is_null() {
+                (*ctxt).ns_well_formed = 0;
+            }
+        }
+    };
 }
 
 pub(crate) unsafe extern "C" fn xml_is_name_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
@@ -5777,13 +5777,11 @@ unsafe extern "C" fn xml_parse_qname(
         if (*ctxt).current_byte() == b':' {
             l = xml_parse_name(ctxt);
             if !l.is_null() {
-                xml_ns_err(
+                xml_ns_err!(
                     ctxt,
                     XmlParserErrors::XmlNsErrQname,
-                    "Failed to parse QName '%s'\n",
-                    l,
-                    null(),
-                    null(),
+                    "Failed to parse QName '{}'\n",
+                    CStr::from_ptr(l as *const i8).to_string_lossy()
                 );
                 *prefix = null_mut();
                 return l;
@@ -5801,13 +5799,11 @@ unsafe extern "C" fn xml_parse_qname(
             if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                 return null_mut();
             }
-            xml_ns_err(
+            xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrQname,
-                "Failed to parse QName '%s:'\n",
-                p,
-                null(),
-                null(),
+                "Failed to parse QName '{}:'\n",
+                CStr::from_ptr(p as *const i8).to_string_lossy()
             );
             l = xml_parse_nmtoken(ctxt);
             if l.is_null() {
@@ -5829,13 +5825,12 @@ unsafe extern "C" fn xml_parse_qname(
         if (*ctxt).current_byte() == b':' {
             let mut tmp: *mut XmlChar;
 
-            xml_ns_err(
+            xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrQname,
-                "Failed to parse QName '%s:%s:'\n",
-                p,
-                l,
-                null(),
+                "Failed to parse QName '{}:{}:'\n",
+                CStr::from_ptr(p as *const i8).to_string_lossy(),
+                CStr::from_ptr(l as *const i8).to_string_lossy()
             );
             (*ctxt).skip_char();
             tmp = xml_parse_name(ctxt) as _;
@@ -8002,11 +7997,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     }
     *tlen = ((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as usize - cur) as _;
 
-    /*
-     * Now parse the attributes, it ends up with the ending
-     *
-     * (S Attribute)* S?
-     */
+    // Now parse the attributes, it ends up with the ending
+    //
+    // (S Attribute)* S?
     (*ctxt).skip_blanks();
     (*ctxt).grow();
 
@@ -8059,13 +8052,12 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     if *url != 0 {
                         uri = xml_parse_uri(url as _);
                         if uri.is_null() {
-                            xml_ns_err(
+                            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                            xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlWarNsURI,
-                                "xmlns: '%s' is not a valid URI\n",
-                                url,
-                                null(),
-                                null(),
+                                "xmlns: '{}' is not a valid URI\n",
+                                url
                             );
                         } else {
                             if (*uri).scheme.is_null() {
@@ -8082,13 +8074,10 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         }
                         if url == (*ctxt).str_xml_ns {
                             if attname != (*ctxt).str_xml {
-                                xml_ns_err(
+                                xml_ns_err!(
                                     ctxt,
                                     XmlParserErrors::XmlNsErrXmlNamespace,
-                                    "xml namespace URI cannot be the default namespace\n",
-                                    null(),
-                                    null(),
-                                    null(),
+                                    "xml namespace URI cannot be the default namespace\n"
                                 );
                             }
                             break 'next_attr;
@@ -8096,13 +8085,10 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         if len == 29
                             && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _)
                         {
-                            xml_ns_err(
+                            xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                "reuse of the xmlns namespace name is forbidden\n",
-                                null(),
-                                null(),
-                                null(),
+                                "reuse of the xmlns namespace name is forbidden\n"
                             );
                             break 'next_attr;
                         }
@@ -8127,13 +8113,10 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
 
                     if attname == (*ctxt).str_xml {
                         if url != (*ctxt).str_xml_ns {
-                            xml_ns_err(
+                            xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                "xml namespace prefix mapped to wrong URI\n",
-                                null(),
-                                null(),
-                                null(),
+                                "xml namespace prefix mapped to wrong URI\n"
                             );
                         }
                         // Do not keep a namespace definition node
@@ -8141,61 +8124,52 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     }
                     if url == (*ctxt).str_xml_ns {
                         if attname != (*ctxt).str_xml {
-                            xml_ns_err(
+                            xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
-                                "xml namespace URI mapped to wrong prefix\n",
-                                null(),
-                                null(),
-                                null(),
+                                "xml namespace URI mapped to wrong prefix\n"
                             );
                         }
                         break 'next_attr;
                     }
                     if attname == (*ctxt).str_xmlns {
-                        xml_ns_err(
+                        xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
-                            "redefinition of the xmlns prefix is forbidden\n",
-                            null(),
-                            null(),
-                            null(),
+                            "redefinition of the xmlns prefix is forbidden\n"
                         );
                         break 'next_attr;
                     }
                     if len == 29
                         && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _)
                     {
-                        xml_ns_err(
+                        xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
-                            "reuse of the xmlns namespace name is forbidden\n",
-                            null(),
-                            null(),
-                            null(),
+                            "reuse of the xmlns namespace name is forbidden\n"
                         );
                         break 'next_attr;
                     }
                     if url.is_null() || *url.add(0) == 0 {
-                        xml_ns_err(
+                        let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+                        xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
-                            "xmlns:%s: Empty XML namespace is not allowed\n",
-                            attname,
-                            null(),
-                            null(),
+                            "xmlns:{}: Empty XML namespace is not allowed\n",
+                            attname
                         );
                         break 'next_attr;
                     }
                     let uri: XmlURIPtr = xml_parse_uri(url as _);
                     if uri.is_null() {
-                        xml_ns_err(
+                        let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+                        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                        xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlWarNsURI,
-                            "xmlns:%s: '%s' is not a valid URI\n",
+                            "xmlns:{}: '{}' is not a valid URI\n",
                             attname,
-                            url,
-                            null(),
+                            url
                         );
                     } else {
                         if (*ctxt).pedantic != 0 && (*uri).scheme.is_null() {
@@ -8433,13 +8407,16 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             if !(*atts.add(i + 1)).is_null() {
                 nsname = xml_get_namespace(ctxt, *atts.add(i + 1));
                 if nsname.is_null() {
-                    xml_ns_err(
+                    let pre = CStr::from_ptr(*atts.add(i + 1) as *const i8).to_string_lossy();
+                    let loc = CStr::from_ptr(*atts.add(i) as *const i8).to_string_lossy();
+                    let localname = CStr::from_ptr(localname as *const i8).to_string_lossy();
+                    xml_ns_err!(
                         ctxt,
                         XmlParserErrors::XmlNsErrUndefinedNamespace,
-                        "Namespace prefix %s for %s on %s is not defined\n",
-                        *atts.add(i + 1),
-                        *atts.add(i),
-                        localname,
+                        "Namespace prefix {} for {} on {} is not defined\n",
+                        pre,
+                        loc,
+                        localname
                     );
                 }
                 *atts.add(i + 2) = nsname;
@@ -8462,13 +8439,14 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         break;
                     }
                     if !nsname.is_null() && *atts.add(j + 2) == nsname {
-                        xml_ns_err(
+                        let loc = CStr::from_ptr(*atts.add(i) as *const i8).to_string_lossy();
+                        let nsname = CStr::from_ptr(nsname as *const i8).to_string_lossy();
+                        xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrAttributeRedefined,
-                            "Namespaced Attribute %s in '%s' redefined\n",
-                            *atts.add(i),
-                            nsname,
-                            null(),
+                            "Namespaced Attribute {} in '{}' redefined\n",
+                            loc,
+                            nsname
                         );
                         break;
                     }
@@ -8478,21 +8456,20 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
 
         nsname = xml_get_namespace(ctxt, prefix);
         if !prefix.is_null() && nsname.is_null() {
-            xml_ns_err(
+            let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
+            let localname = CStr::from_ptr(localname as *const i8).to_string_lossy();
+            xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
-                "Namespace prefix %s on %s is not defined\n",
+                "Namespace prefix {} on {} is not defined\n",
                 prefix,
-                localname,
-                null(),
+                localname
             );
         }
         *pref = prefix;
         *uri = nsname;
 
-        /*
-         * SAX: Start of Element !
-         */
+        // SAX: Start of Element !
         if !(*ctxt).sax.is_null()
             && (*(*ctxt).sax).start_element_ns.is_some()
             && (*ctxt).disable_sax == 0
@@ -11338,13 +11315,12 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
             return;
         }
         if !xml_strchr(name, b':').is_null() {
-            xml_ns_err(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrColon,
-                "colons are forbidden from notation names '%s'\n",
-                name,
-                null(),
-                null(),
+                "colons are forbidden from notation names '{}'\n",
+                name
             );
         }
         if (*ctxt).skip_blanks() == 0 {
@@ -11356,9 +11332,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
             return;
         }
 
-        /*
-         * Parse the IDs.
-         */
+        // Parse the IDs.
         systemid = xml_parse_external_id(ctxt, addr_of_mut!(pubid), 0);
         (*ctxt).skip_blanks();
 
@@ -11453,13 +11427,12 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             return;
         }
         if !xml_strchr(name, b':').is_null() {
-            xml_ns_err(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrColon,
-                "colons are forbidden from entities names '%s'\n",
-                name,
-                null(),
-                null(),
+                "colons are forbidden from entities names '{}'\n",
+                name
             );
         }
         if (*ctxt).skip_blanks() == 0 {

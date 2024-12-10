@@ -38,7 +38,7 @@ use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::{
     __xml_loader_err, xml_err_msg_str, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-    xml_fatal_err_msg_str_int_str, xml_validity_error, xml_warning_msg,
+    xml_fatal_err_msg_str_int_str, xml_ns_err, xml_validity_error, xml_warning_msg,
 };
 #[cfg(feature = "catalog")]
 use crate::{
@@ -63,7 +63,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             xml_fatal_err_msg, xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity,
-            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_parse_att_value_internal,
+            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_att_value_internal,
             xml_parse_cdsect, xml_parse_char_data_internal, xml_parse_char_ref,
             xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
             xml_parse_enc_name, xml_parse_end_tag1, xml_parse_end_tag2,
@@ -2353,13 +2353,12 @@ pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *
         );
     }
     if !name.is_null() && !xml_strchr(name, b':').is_null() {
-        xml_ns_err(
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        xml_ns_err!(
             ctxt,
             XmlParserErrors::XmlNsErrColon,
-            "colons are forbidden from PI names '%s'\n",
-            name,
-            null(),
-            null(),
+            "colons are forbidden from PI names '{}'\n",
+            name
         );
     }
     name
