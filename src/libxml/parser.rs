@@ -2312,84 +2312,77 @@ macro_rules! xml_err_msg_str {
 }
 
 /// Handle a validity error.
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlValidityError")]
-pub(crate) unsafe fn xml_validity_error(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-) {
-    let mut schannel: Option<StructuredError> = None;
+macro_rules! xml_validity_error {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        $crate::xml_validity_error!(@inner $ctxt, $error, $msg, None, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        $crate::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        $crate::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let mut schannel: Option<$crate::globals::StructuredError> = None;
 
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null() {
-        (*ctxt).err_no = error as i32;
-        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
-            schannel = (*(*ctxt).sax).serror;
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null() {
+                (*ctxt).err_no = $error as i32;
+                if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32 {
+                    schannel = (*(*ctxt).sax).serror;
+                }
+            }
+            if !ctxt.is_null() {
+                __xml_raise_error!(
+                    schannel,
+                    (*ctxt).vctxt.error,
+                    (*ctxt).vctxt.user_data.clone(),
+                    ctxt as _,
+                    null_mut(),
+                    XmlErrorDomain::XmlFromDTD,
+                    $error,
+                    XmlErrorLevel::XmlErrError,
+                    None,
+                    0,
+                    $str1,
+                    $str2,
+                    None,
+                    0,
+                    0,
+                    $msg,
+                );
+                (*ctxt).valid = 0;
+            } else {
+                __xml_raise_error!(
+                    schannel,
+                    None,
+                    None,
+                    ctxt as _,
+                    null_mut(),
+                    XmlErrorDomain::XmlFromDTD,
+                    $error,
+                    XmlErrorLevel::XmlErrError,
+                    None,
+                    0,
+                    $str1,
+                    $str2,
+                    None,
+                    0,
+                    0,
+                    $msg,
+                );
+            }
         }
-    }
-    if !ctxt.is_null() {
-        __xml_raise_error!(
-            schannel,
-            (*ctxt).vctxt.error,
-            (*ctxt).vctxt.user_data.clone(),
-            ctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromDTD,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            None,
-            0,
-            0,
-            msg,
-            str1,
-            str2
-        );
-        (*ctxt).valid = 0;
-    } else {
-        __xml_raise_error!(
-            schannel,
-            None,
-            None,
-            ctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromDTD,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            None,
-            0,
-            0,
-            msg,
-            str1,
-            str2
-        );
-    }
+    };
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
@@ -8408,12 +8401,12 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                         if (*ctxt).standalone == 1
                             && !(*(*defaults).values.as_ptr().add(5 * i + 4)).is_null()
                         {
-                            xml_validity_error(
+                            xml_validity_error!(
                                 ctxt,
                                 XmlParserErrors::XmlDTDStandaloneDefaulted,
-                                "standalone: attribute %s on %s defaulted from external subset\n",
-                                attname,
-                                localname,
+                                "standalone: attribute {} on {} defaulted from external subset\n",
+                                CStr::from_ptr(attname as *const i8).to_string_lossy(),
+                                CStr::from_ptr(localname as *const i8).to_string_lossy()
                             );
                         }
                         nbdef += 1;

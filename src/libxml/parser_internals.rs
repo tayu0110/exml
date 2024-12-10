@@ -38,7 +38,7 @@ use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::{
     __xml_loader_err, xml_err_msg_str, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-    xml_warning_msg,
+    xml_validity_error, xml_warning_msg,
 };
 #[cfg(feature = "catalog")]
 use crate::{
@@ -71,9 +71,9 @@ use crate::{
             xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
             xml_parse_text_decl, xml_parse_version_num, xml_parser_add_node_info,
             xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
-            xml_validity_error, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
-            XmlParserInputPtr, XmlParserInputState, XmlParserMode, XmlParserNodeInfo,
-            XmlParserNodeInfoPtr, XmlParserOption, XmlSAXHandlerPtr, XML_SKIP_IDS,
+            XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
+            XmlParserInputState, XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr,
+            XmlParserOption, XmlSAXHandlerPtr, XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
         uri::{xml_build_uri, xml_canonic_path},
@@ -2708,12 +2708,12 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_type(
             if Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref()
                 == (*tmp).name.as_deref()
             {
-                xml_validity_error(
+                let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
-                    "standalone: attribute notation value token %s duplicated\n",
-                    name,
-                    null(),
+                    "standalone: attribute notation value token {} duplicated\n",
+                    n
                 );
                 if xml_dict_owns((*ctxt).dict, name) == 0 {
                     xml_free(name as _);
@@ -2786,12 +2786,12 @@ pub(crate) unsafe extern "C" fn xml_parse_enumeration_type(
             if Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref()
                 == (*tmp).name.as_deref()
             {
-                xml_validity_error(
+                let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
-                    "standalone: attribute enumeration value token %s duplicated\n",
-                    name,
-                    null(),
+                    "standalone: attribute enumeration value token {} duplicated\n",
+                    n
                 );
                 if xml_dict_owns((*ctxt).dict, name) == 0 {
                     xml_free(name as _);
@@ -4335,10 +4335,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (*(*ctxt).node).add_child_list((*ent).children.load(Ordering::Relaxed));
             }
 
-            /*
-             * This is to avoid a nasty side effect, see
-             * characters() in SAX.c
-             */
+            // This is to avoid a nasty side effect, see characters() in SAX.c
             (*ctxt).nodemem = 0;
             (*ctxt).nodelen = 0;
         }
@@ -4400,9 +4397,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
 
     (*ctxt).skip_char();
 
-    /*
-     * Request the entity from SAX
-     */
+    // Request the entity from SAX
     if !(*ctxt).sax.is_null() {
         if let Some(param) = (*(*ctxt).sax).get_parameter_entity {
             entity = param((*ctxt).user_data.clone(), name);
@@ -4412,14 +4407,12 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         return;
     }
     if entity.is_null() {
-        /*
-         * [ WFC: Entity Declared ]
-         * In a document without any DTD, a document with only an
-         * internal DTD subset which contains no parameter entity
-         * references, or a document with "standalone='yes'", ...
-         * ... The declaration of a parameter entity must precede
-         * any reference to it...
-         */
+        // [ WFC: Entity Declared ]
+        // In a document without any DTD, a document with only an
+        // internal DTD subset which contains no parameter entity
+        // references, or a document with "standalone='yes'", ...
+        // ... The declaration of a parameter entity must precede
+        // any reference to it...
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
             let name = CStr::from_ptr(name as *const i8)
@@ -4432,20 +4425,18 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 name
             );
         } else {
-            /*
-             * [ VC: Entity Declared ]
-             * In a document with an external subset or external
-             * parameter entities with "standalone='no'", ...
-             * ... The declaration of a parameter entity must
-             * precede any reference to it...
-             */
+            // [ VC: Entity Declared ]
+            // In a document with an external subset or external
+            // parameter entities with "standalone='no'", ...
+            // ... The declaration of a parameter entity must
+            // precede any reference to it...
             if (*ctxt).validate != 0 && (*ctxt).vctxt.error.is_some() {
-                xml_validity_error(
+                let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlWarUndeclaredEntity,
-                    "PEReference: %%%s; not found\n",
-                    name,
-                    null(),
+                    "PEReference: %%{}; not found\n",
+                    n
                 );
             } else {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
