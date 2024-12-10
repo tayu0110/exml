@@ -45,7 +45,7 @@
 use std::{
     any::type_name,
     cell::RefCell,
-    ffi::{c_char, c_void, CStr, CString},
+    ffi::{c_char, c_void, CStr},
     io::Read,
     mem::{size_of, size_of_val},
     ops::DerefMut,
@@ -2192,87 +2192,80 @@ macro_rules! xml_fatal_err_msg_str {
 }
 
 /// Handle a warning.
+#[macro_export]
+#[doc(hidden)]
 #[doc(alias = "xmlWarningMsg")]
-pub(crate) unsafe fn xml_warning_msg(
-    ctxt: XmlParserCtxtPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-) {
-    let mut schannel: Option<StructuredError> = None;
+macro_rules! xml_warning_msg {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        $crate::xml_warning_msg!(@inner $ctxt, $error, $msg, None, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        $crate::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        $crate::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+    };
+    (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let mut schannel: Option<$crate::globals::StructuredError> = None;
 
-    if !ctxt.is_null()
-        && (*ctxt).disable_sax != 0
-        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        return;
-    }
-    if !ctxt.is_null()
-        && !(*ctxt).sax.is_null()
-        && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32
-    {
-        schannel = (*(*ctxt).sax).serror;
-    }
-    if !ctxt.is_null() {
-        __xml_raise_error!(
-            schannel,
-            if !(*ctxt).sax.is_null() {
-                (*(*ctxt).sax).warning
+        if ctxt.is_null()
+            || (*ctxt).disable_sax == 0
+            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+        {
+            if !ctxt.is_null()
+                && !(*ctxt).sax.is_null()
+                && (*(*ctxt).sax).initialized == $crate::libxml::parser::XML_SAX2_MAGIC as u32
+            {
+                schannel = (*(*ctxt).sax).serror;
+            }
+            if !ctxt.is_null() {
+                __xml_raise_error!(
+                    schannel,
+                    if !(*ctxt).sax.is_null() {
+                        (*(*ctxt).sax).warning
+                    } else {
+                        None
+                    },
+                    (*ctxt).user_data.clone(),
+                    ctxt as _,
+                    null_mut(),
+                    XmlErrorDomain::XmlFromParser,
+                    $error,
+                    XmlErrorLevel::XmlErrWarning,
+                    None,
+                    0,
+                    $str1,
+                    $str2,
+                    None,
+                    0,
+                    0,
+                    $msg,
+                );
             } else {
-                None
-            },
-            (*ctxt).user_data.clone(),
-            ctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromParser,
-            error,
-            XmlErrorLevel::XmlErrWarning,
-            None,
-            0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            None,
-            0,
-            0,
-            msg,
-            str1,
-            str2
-        );
-    } else {
-        __xml_raise_error!(
-            schannel,
-            None,
-            None,
-            ctxt as _,
-            null_mut(),
-            XmlErrorDomain::XmlFromParser,
-            error,
-            XmlErrorLevel::XmlErrWarning,
-            None,
-            0,
-            (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            None,
-            0,
-            0,
-            msg,
-            str1,
-            str2
-        );
-    }
+                __xml_raise_error!(
+                    schannel,
+                    None,
+                    None,
+                    null_mut(),
+                    null_mut(),
+                    XmlErrorDomain::XmlFromParser,
+                    $error,
+                    XmlErrorLevel::XmlErrWarning,
+                    None,
+                    0,
+                    $str1,
+                    $str2,
+                    None,
+                    0,
+                    0,
+                    $msg,
+                );
+            }
+        }
+    };
 }
 
 /// Handle a non fatal parser error
@@ -6464,12 +6457,11 @@ unsafe extern "C" fn xml_parse_string_pereference(
             // parameter entities with "standalone='no'", ...
             // ... The declaration of a parameter entity must
             // precede any reference to it...
-            xml_warning_msg(
+            xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "PEReference: %%%s; not found\n",
-                name,
-                null(),
+                "PEReference: %%{}; not found\n",
+                CStr::from_ptr(name as *const i8).to_string_lossy()
             );
             (*ctxt).valid = 0;
         }
@@ -6480,12 +6472,11 @@ unsafe extern "C" fn xml_parse_string_pereference(
             Some(XmlEntityType::XmlInternalParameterEntity)
                 | Some(XmlEntityType::XmlExternalParameterEntity)
         ) {
-            xml_warning_msg(
+            xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "%%%s; is not a parameter entity\n",
-                name,
-                null(),
+                "%%{}; is not a parameter entity\n",
+                CStr::from_ptr(name as *const i8).to_string_lossy()
             );
         }
     }
@@ -6866,12 +6857,15 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                             {
                                 xml_load_entity_content(ctxt, ent);
                             } else {
-                                xml_warning_msg(
+                                let name = CStr::from_ptr(
+                                    (*ent).name.load(Ordering::Relaxed) as *const i8
+                                )
+                                .to_string_lossy();
+                                xml_warning_msg!(
                                     ctxt,
                                     XmlParserErrors::XmlErrEntityProcessing,
-                                    "not validating will not read content for PE entity %s\n",
-                                    (*ent).name.load(Ordering::Relaxed),
-                                    null(),
+                                    "not validating will not read content for PE entity {}\n",
+                                    name
                                 );
                             }
                         }
@@ -7740,12 +7734,12 @@ unsafe extern "C" fn xml_parse_attribute2(
         if (*ctxt).pedantic != 0 && xml_str_equal(name, c"lang".as_ptr() as _) {
             internal_val = xml_strndup(val, *len);
             if xml_check_language_id(internal_val) == 0 {
-                xml_warning_msg(
+                let internal_val = CStr::from_ptr(internal_val as *const i8).to_string_lossy();
+                xml_warning_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarLangValue,
-                    "Malformed value for xml:lang : %s\n",
-                    internal_val,
-                    null(),
+                    "Malformed value for xml:lang : {}\n",
+                    internal_val
                 );
             }
         }
@@ -7758,12 +7752,12 @@ unsafe extern "C" fn xml_parse_attribute2(
             } else if xml_str_equal(internal_val, c"preserve".as_ptr() as _) {
                 *(*ctxt).space_mut() = 1;
             } else {
-                xml_warning_msg(
+                let internal_val = CStr::from_ptr(internal_val as *const i8).to_string_lossy();
+                xml_warning_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarSpaceValue,
-                    "Invalid value \"%s\" for xml:space : \"default\" or \"preserve\" expected\n",
-                    internal_val,
-                    null(),
+                    "Invalid value \"{}\" for xml:space : \"default\" or \"preserve\" expected\n",
+                    internal_val
                 );
             }
         }
@@ -12950,7 +12944,6 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
     if let Some(version) = version {
         if version != XML_DEFAULT_VERSION {
             // Changed here for XML-1.0 5th edition
-            let ver = CString::new(version.as_str()).unwrap();
             if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 != 0 {
                 xml_fatal_err_msg_str!(
                     ctxt,
@@ -12959,12 +12952,11 @@ pub(crate) unsafe extern "C" fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
                     version
                 );
             } else if version.starts_with("1.") {
-                xml_warning_msg(
+                xml_warning_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarUnknownVersion,
-                    "Unsupported version '%s'\n",
-                    ver.as_ptr() as *const u8,
-                    null(),
+                    "Unsupported version '{}'\n",
+                    version
                 );
             } else {
                 xml_fatal_err_msg_str!(

@@ -36,7 +36,7 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 use crate::error::XmlParserErrors;
 use crate::hash::XmlHashTableRef;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
-use crate::{__xml_loader_err, xml_fatal_err_msg_int, xml_fatal_err_msg_str};
+use crate::{__xml_loader_err, xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_warning_msg};
 #[cfg(feature = "catalog")]
 use crate::{
     __xml_raise_error,
@@ -68,10 +68,9 @@ use crate::{
             xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
             xml_parse_text_decl, xml_parse_version_num, xml_parser_add_node_info,
             xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
-            xml_validity_error, xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr,
-            XmlParserInput, XmlParserInputPtr, XmlParserInputState, XmlParserMode,
-            XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XmlSAXHandlerPtr,
-            XML_SKIP_IDS,
+            xml_validity_error, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
+            XmlParserInputPtr, XmlParserInputState, XmlParserMode, XmlParserNodeInfo,
+            XmlParserNodeInfoPtr, XmlParserOption, XmlSAXHandlerPtr, XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
         uri::{xml_build_uri, xml_canonic_path},
@@ -2344,12 +2343,10 @@ pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *
                 return name;
             }
         }
-        xml_warning_msg(
+        xml_warning_msg!(
             ctxt,
             XmlParserErrors::XmlErrReservedXmlName,
-            "xmlParsePITarget: invalid name prefix 'xml'\n",
-            null(),
-            null(),
+            "xmlParsePITarget: invalid name prefix 'xml'\n"
         );
     }
     if !name.is_null() && !xml_strchr(name, b':').is_null() {
@@ -2428,12 +2425,11 @@ unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *cons
     }
 
     //  error:
-    xml_warning_msg(
+    xml_warning_msg!(
         ctxt,
         XmlParserErrors::XmlWarCatalogPI,
-        "Catalog PI syntax error: %s\n",
-        catalog,
-        null(),
+        "Catalog PI syntax error: {}\n",
+        CStr::from_ptr(catalog as *const i8).to_string_lossy()
     );
     if !url.is_null() {
         xml_free(url as _);
@@ -4460,31 +4456,29 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     null(),
                 );
             } else {
-                xml_warning_msg(
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                xml_warning_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarUndeclaredEntity,
-                    "PEReference: %%%s; not found\n",
-                    name,
-                    null(),
+                    "PEReference: %%{}; not found\n",
+                    name
                 );
             }
             (*ctxt).valid = 0;
         }
     } else {
-        /*
-         * Internal checking in case the entity quest barfed
-         */
+        // Internal checking in case the entity quest barfed
         if !matches!(
             (*entity).etype,
             Some(XmlEntityType::XmlInternalParameterEntity)
                 | Some(XmlEntityType::XmlExternalParameterEntity)
         ) {
-            xml_warning_msg(
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "Internal: %%%s; is not a parameter entity\n",
-                name,
-                null(),
+                "Internal: %%{}; is not a parameter entity\n",
+                name
             );
         } else {
             let mut start: [XmlChar; 4] = [0; 4];
@@ -4710,39 +4704,35 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
         return name;
     }
 
-    /*
-     * Check that xml:lang conforms to the specification
-     * No more registered as an error, just generate a warning now
-     * since this was deprecated in XML second edition
-     */
+    // Check that xml:lang conforms to the specification
+    // No more registered as an error, just generate a warning now
+    // since this was deprecated in XML second edition
     if (*ctxt).pedantic != 0
         && xml_str_equal(name, c"xml:lang".as_ptr() as _)
         && xml_check_language_id(val) == 0
     {
-        xml_warning_msg(
+        let val = CStr::from_ptr(val as *const i8).to_string_lossy();
+        xml_warning_msg!(
             ctxt,
             XmlParserErrors::XmlWarLangValue,
-            "Malformed value for xml:lang : %s\n",
-            val,
-            null(),
+            "Malformed value for xml:lang : {}\n",
+            val
         );
     }
 
-    /*
-     * Check that xml:space conforms to the specification
-     */
+    // Check that xml:space conforms to the specification
     if xml_str_equal(name, c"xml:space".as_ptr() as _) {
         if xml_str_equal(val, c"default".as_ptr() as _) {
             *(*ctxt).space_mut() = 0;
         } else if xml_str_equal(val, c"preserve".as_ptr() as _) {
             *(*ctxt).space_mut() = 1;
         } else {
-            xml_warning_msg(
+            let val = CStr::from_ptr(val as *const i8).to_string_lossy();
+            xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarSpaceValue,
-                "Invalid value \"%s\" for xml:space : \"default\" or \"preserve\" expected\n",
-                val,
-                null(),
+                "Invalid value \"{}\" for xml:space : \"default\" or \"preserve\" expected\n",
+                val
             );
         }
     }
