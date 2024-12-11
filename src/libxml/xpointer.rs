@@ -36,7 +36,7 @@
 use std::{
     ffi::CStr,
     mem::size_of,
-    ptr::{null, null_mut, NonNull},
+    ptr::{null_mut, NonNull},
 };
 
 #[cfg(feature = "libxml_xptr_locs")]
@@ -2137,88 +2137,84 @@ macro_rules! NEXT {
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlXPtrErr")]
-unsafe fn xml_xptr_err(
-    ctxt: XmlXPathParserContextPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    extra: *const XmlChar,
-) {
-    if !ctxt.is_null() {
-        (*ctxt).error = error as i32;
-    }
-    if ctxt.is_null() || (*ctxt).context.is_null() {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromXPointer,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            None,
-            None,
-            0,
-            0,
-            msg,
-            extra
-        );
-        return;
-    }
+macro_rules! xml_xptr_err {
+    ($ctxt:expr, $error:expr, $msg:literal) => {
+        xml_xptr_err!(@inner, $ctxt, $error, $msg, None);
+    };
+    ($ctxt:expr, $error:expr, $msg:literal, $extra:expr) => {
+        let msg = format!($msg, $extra);
+        xml_xptr_err!(@inner, $ctxt, $error, &msg, Some($extra.to_owned().into()));
+    };
+    (@inner, $ctxt:expr, $error:expr, $msg:expr, $extra:expr) => {
+        let ctxt = $ctxt as *mut $crate::libxml::xpath::XmlXPathParserContext;
+        let error: XmlParserErrors = $error;
+        if !ctxt.is_null() {
+            (*ctxt).error = error as i32;
+        }
+        if ctxt.is_null() || (*ctxt).context.is_null() {
+            __xml_raise_error!(
+                None,
+                None,
+                None,
+                null_mut(),
+                null_mut(),
+                XmlErrorDomain::XmlFromXPointer,
+                error,
+                XmlErrorLevel::XmlErrError,
+                None,
+                0,
+                $extra,
+                None,
+                None,
+                0,
+                0,
+                $msg,
+            );
+        } else {
+            // cleanup current last error
+            (*(*ctxt).context).last_error.reset();
 
-    /* cleanup current last error */
-    (*(*ctxt).context).last_error.reset();
-
-    (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXPointer;
-    (*(*ctxt).context).last_error.code = error;
-    (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
-    (*(*ctxt).context).last_error.str1 = (!(*ctxt).base.is_null()).then(|| {
-        CStr::from_ptr((*ctxt).base as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()
-    });
-    // (*(*ctxt).context).last_error.str1 = xml_strdup((*ctxt).base) as _;
-    (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
-    (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node as _);
-    if let Some(error) = (*(*ctxt).context).error {
-        error(
-            (*(*ctxt).context).user_data.clone(),
-            &(*(*ctxt).context).last_error,
-        );
-    } else {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            (*(*ctxt).context).debug_node as _,
-            XmlErrorDomain::XmlFromXPointer,
-            error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            (!extra.is_null()).then(|| CStr::from_ptr(extra as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
-                .to_string_lossy()
-                .into_owned()
-                .into()),
-            None,
-            (*ctxt).cur.offset_from((*ctxt).base) as _,
-            0,
-            msg,
-            extra
-        );
-    }
+            (*(*ctxt).context).last_error.domain = XmlErrorDomain::XmlFromXPointer;
+            (*(*ctxt).context).last_error.code = error;
+            (*(*ctxt).context).last_error.level = XmlErrorLevel::XmlErrError;
+            (*(*ctxt).context).last_error.str1 = (!(*ctxt).base.is_null()).then(|| {
+                CStr::from_ptr((*ctxt).base as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+                    .into()
+            });
+            (*(*ctxt).context).last_error.int1 = (*ctxt).cur.offset_from((*ctxt).base) as _;
+            (*(*ctxt).context).last_error.node = NonNull::new((*(*ctxt).context).debug_node as _);
+            if let Some(error) = (*(*ctxt).context).error {
+                error(
+                    (*(*ctxt).context).user_data.clone(),
+                    &(*(*ctxt).context).last_error,
+                );
+            } else {
+                __xml_raise_error!(
+                    None,
+                    None,
+                    None,
+                    null_mut(),
+                    (*(*ctxt).context).debug_node as _,
+                    XmlErrorDomain::XmlFromXPointer,
+                    error,
+                    XmlErrorLevel::XmlErrError,
+                    None,
+                    0,
+                    $extra,
+                    (!(*ctxt).base.is_null()).then(|| CStr::from_ptr((*ctxt).base as *const i8)
+                        .to_string_lossy()
+                        .into_owned()
+                        .into()),
+                    None,
+                    (*ctxt).cur.offset_from((*ctxt).base) as _,
+                    0,
+                    $msg,
+                );
+            }
+        }
+    };
 }
 
 /// Move the current node of the nodeset on the stack to the given child if found
@@ -2248,16 +2244,13 @@ unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx:
 /// case of a Bare Name used to get a document ID.
 #[doc(alias = "xmlXPtrEvalChildSeq")]
 unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: *mut XmlChar) {
-    /*
-     * XPointer don't allow by syntax to address in multirooted trees
-     * this might prove useful in some cases, warn about it.
-     */
+    // XPointer don't allow by syntax to address in multirooted trees
+    // this might prove useful in some cases, warn about it.
     if name.is_null() && CUR!(ctxt) == b'/' && NXT!(ctxt, 1) != b'1' {
-        xml_xptr_err(
+        xml_xptr_err!(
             ctxt,
             XmlParserErrors::XmlXPtrChildseqStart,
-            "warning: ChildSeq not starting by /1\n",
-            null_mut(),
+            "warning: ChildSeq not starting by /1\n"
         );
     }
 
@@ -2460,11 +2453,11 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         (*ctxt).cur = old_cur;
         xml_free(prefix as _);
     } else {
-        xml_xptr_err(
+        xml_xptr_err!(
             ctxt,
             XmlParserErrors::XmlXPtrUnknownScheme,
-            "unsupported scheme '%s'\n",
-            name,
+            "unsupported scheme '{}'\n",
+            CStr::from_ptr(name as *const i8).to_string_lossy()
         );
     }
     xml_free(buffer as _);
@@ -2636,11 +2629,10 @@ pub unsafe extern "C" fn xml_xptr_eval(
     #[cfg(not(feature = "libxml_xptr_locs"))]
     let f = !(*ctxt).value.is_null() && (*(*ctxt).value).typ != XmlXPathObjectType::XpathNodeset;
     if f {
-        xml_xptr_err(
+        xml_xptr_err!(
             ctxt,
             XmlParserErrors::XmlXPtrEvalFailed,
-            "xmlXPtrEval: evaluation failed to return a node set\n",
-            null(),
+            "xmlXPtrEval: evaluation failed to return a node set\n"
         );
     } else {
         res = value_pop(ctxt);
@@ -2669,11 +2661,10 @@ pub unsafe extern "C" fn xml_xptr_eval(
         !tmp.is_null()
     } {}
     if stack != 0 {
-        xml_xptr_err(
+        xml_xptr_err!(
             ctxt,
             XmlParserErrors::XmlXPtrExtraObjects,
-            "xmlXPtrEval: object(s) left on the eval stack\n",
-            null(),
+            "xmlXPtrEval: object(s) left on the eval stack\n"
         );
     }
     if (*ctxt).error != XmlXPathError::XpathExpressionOk as i32 {
