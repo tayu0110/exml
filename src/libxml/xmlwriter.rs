@@ -379,53 +379,32 @@ pub unsafe fn xml_new_text_writer_filename(uri: &str, compression: i32) -> XmlTe
 
 /// Handle a writer error
 #[doc(alias = "xmlWriterErrMsgInt")]
-unsafe fn xml_writer_err_msg_int(
-    ctxt: XmlTextWriterPtr,
-    error: XmlParserErrors,
-    msg: &str,
-    val: i32,
-) {
-    if !ctxt.is_null() {
+macro_rules! xml_writer_err_msg_int {
+    ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
+        let ctxt = $ctxt as *mut XmlTextWriter;
         __xml_raise_error!(
             None,
             None,
             None,
-            (*ctxt).ctxt as _,
+            if !ctxt.is_null() {
+                (*ctxt).ctxt as _
+            } else {
+                null_mut()
+            },
             null_mut(),
             XmlErrorDomain::XmlFromWriter,
-            error,
+            $error,
             XmlErrorLevel::XmlErrFatal,
             None,
             0,
             None,
             None,
             None,
-            val,
+            $val,
             0,
-            msg,
-            val
+            format!($msg, $val).as_str(),
         );
-    } else {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromWriter,
-            error,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            val,
-            0,
-            msg,
-            val
-        );
-    }
+    };
 }
 
 /// Write callback for the xmlOutputBuffer with target xmlBuffer
@@ -441,11 +420,11 @@ unsafe extern "C" fn xml_text_writer_write_doc_callback(
 
     let rc = xml_parse_chunk(ctxt, str, len, 0);
     if rc != 0 {
-        xml_writer_err_msg_int(
+        xml_writer_err_msg_int!(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            "xmlTextWriterWriteDocCallback : XML error %d !\n",
-            rc,
+            "xmlTextWriterWriteDocCallback : XML error {} !\n",
+            rc
         );
         return -1;
     }
@@ -466,11 +445,11 @@ unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) ->
         rc != 0
     };
     if res {
-        xml_writer_err_msg_int(
+        xml_writer_err_msg_int!(
             null_mut(),
             XmlParserErrors::XmlErrInternalError,
-            "xmlTextWriterCloseDocCallback : XML error %d !\n",
-            rc,
+            "xmlTextWriterCloseDocCallback : XML error {} !\n",
+            rc
         );
         return -1;
     }
