@@ -3747,63 +3747,48 @@ extern "C" fn xml_validate_attribute_id_callback(attr: XmlAttributePtr, count: *
 
 /// Handle a validation error, provide contextual information
 #[doc(alias = "xmlErrValidNodeNr")]
-unsafe fn xml_err_valid_node_nr(
-    ctxt: XmlValidCtxtPtr,
-    node: XmlNodePtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    int2: i32,
-    str3: *const XmlChar,
-) {
-    let schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data = None;
+macro_rules! xml_err_valid_node_nr {
+    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr, $int2:expr, $str3:expr) => {
+        let ctxt = $ctxt as *mut XmlValidCtxt;
+        let schannel: Option<StructuredError> = None;
+        let mut channel: Option<GenericError> = None;
+        let mut pctxt: XmlParserCtxtPtr = null_mut();
+        let mut data = None;
 
-    if !ctxt.is_null() {
-        channel = (*ctxt).error;
-        data = (*ctxt).user_data.clone();
-        /* Look up flag to detect if it is part of a parsing
-        context */
-        if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt)
-                .user_data
-                .as_ref()
-                .and_then(|d| {
-                    let lock = d.lock();
-                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
-                })
-                .unwrap_or(null_mut());
+        if !ctxt.is_null() {
+            channel = (*ctxt).error;
+            data = (*ctxt).user_data.clone();
+            // Look up flag to detect if it is part of a parsing context
+            if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
+                pctxt = (*ctxt)
+                    .user_data
+                    .as_ref()
+                    .and_then(|d| {
+                        let lock = d.lock();
+                        lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                    })
+                    .unwrap_or(null_mut());
+            }
         }
-    }
-    __xml_raise_error!(
-        schannel,
-        channel,
-        data,
-        pctxt as _,
-        node as _,
-        XmlErrorDomain::XmlFromValid,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        None,
-        int2,
-        0,
-        msg,
-        str1,
-        int2,
-        str3
-    );
+        __xml_raise_error!(
+            schannel,
+            channel,
+            data,
+            pctxt as _,
+            $node as _,
+            XmlErrorDomain::XmlFromValid,
+            $error,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            Some($str1.to_owned().into()),
+            Some($str3.to_owned().into()),
+            None,
+            $int2,
+            0,
+            format!($msg, $str1, $int2, $str3).as_str(),
+        );
+    };
 }
 
 /// Try to validate a single attribute definition
@@ -3901,16 +3886,14 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             }
         }
         if nb_id > 1 {
-            xml_err_valid_node_nr(
+            xml_err_valid_node_nr!(
                 ctxt,
                 attr as XmlNodePtr,
                 XmlParserErrors::XmlDTDIDSubset,
-                "Element %s has %d ID attribute defined in the internal subset : %s\n",
-                attr_elem
-                    .as_ref()
-                    .map_or(null(), |e| e.as_ptr() as *const u8),
+                "Element {} has {} ID attribute defined in the internal subset : {}\n",
+                attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
                 nb_id,
-                (*attr).name,
+                (*attr).name().unwrap()
             );
         } else if !(*doc).ext_subset.is_null() {
             let mut ext_id: i32 = 0;
@@ -3924,16 +3907,14 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
                 ext_id = xml_scan_id_attribute_decl(null_mut(), elem, 0);
             }
             if ext_id > 1 {
-                xml_err_valid_node_nr(
+                xml_err_valid_node_nr!(
                     ctxt,
                     attr as XmlNodePtr,
                     XmlParserErrors::XmlDTDIDSubset,
-                    "Element %s has %d ID attribute defined in the external subset : %s\n",
-                    attr_elem
-                        .as_ref()
-                        .map_or(null(), |e| e.as_ptr() as *const u8),
+                    "Element {} has {} ID attribute defined in the external subset : {}\n",
+                    attr_elem.as_deref().unwrap().to_string_lossy().into_owned(),
                     ext_id,
-                    (*attr).name,
+                    (*attr).name().unwrap()
                 );
             } else if ext_id + nb_id > 1 {
                 let attr_elem = attr_elem.as_deref().unwrap().to_string_lossy();
@@ -7121,14 +7102,14 @@ unsafe extern "C" fn xml_validate_ref(
             save = *cur;
             *cur = 0;
             if xml_get_id((*ctxt).doc, str).is_none() {
-                xml_err_valid_node_nr(
+                xml_err_valid_node_nr!(
                     ctxt,
                     null_mut(),
                     XmlParserErrors::XmlDTDUnknownID,
-                    "attribute %s line %d references an unknown ID \"%s\"\n",
-                    (*refe).name,
+                    "attribute {} line {} references an unknown ID \"{}\"\n",
+                    CStr::from_ptr((*refe).name as *const i8).to_string_lossy(),
                     (*refe).lineno,
-                    str,
+                    CStr::from_ptr(str as *const i8).to_string_lossy()
                 );
                 (*ctxt).valid = 0;
             }
