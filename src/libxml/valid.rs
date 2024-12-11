@@ -975,8 +975,7 @@ unsafe fn xml_err_valid_node(
     if !ctxt.is_null() {
         channel = (*ctxt).error;
         data = (*ctxt).user_data.clone();
-        /* Look up flag to detect if it is part of a parsing
-        context */
+        // Look up flag to detect if it is part of a parsing context
         if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
             pctxt = (*ctxt)
                 .user_data
@@ -1896,66 +1895,99 @@ unsafe extern "C" fn xml_validate_attribute_value_internal(
 
 /// Handle a validation error, provide contextual information
 #[doc(alias = "xmlErrValidWarning")]
-unsafe fn xml_err_valid_warning(
-    ctxt: XmlValidCtxtPtr,
-    node: XmlNodePtr,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: *const XmlChar,
-    str2: *const XmlChar,
-    str3: *const XmlChar,
-) {
-    let schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut pctxt: XmlParserCtxtPtr = null_mut();
-    let mut data = None;
+macro_rules! xml_err_valid_warning {
+    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr) => {
+        xml_err_valid_warning!(
+            @inner,
+            $ctxt,
+            $node,
+            $error,
+            $msg,
+            None,
+            None,
+            None
+        )
+    };
+    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr) => {
+        let msg = format!($msg, $str1);
+        xml_err_valid_warning!(
+            @inner,
+            $ctxt,
+            $node,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            None,
+            None
+        )
+    };
+    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_err_valid_warning!(
+            @inner,
+            $ctxt,
+            $node,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into()),
+            None
+        )
+    };
+    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr, $str3:expr) => {
+        let msg = format!($msg, $str1, $str2, $str3);
+        xml_err_valid_warning!(
+            @inner,
+            $ctxt,
+            $node,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into()),
+            Some($str3.to_owned().into())
+        )
+    };
+    (@inner, $ctxt:expr, $node:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr, $str3:expr) => {
+        let ctxt = $ctxt as *mut XmlValidCtxt;
+        let schannel: Option<StructuredError> = None;
+        let mut channel: Option<GenericError> = None;
+        let mut pctxt: XmlParserCtxtPtr = null_mut();
+        let mut data = None;
 
-    if !ctxt.is_null() {
-        channel = (*ctxt).warning;
-        data = (*ctxt).user_data.clone();
-        /* Look up flag to detect if it is part of a parsing
-        context */
-        if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
-            pctxt = (*ctxt)
-                .user_data
-                .as_ref()
-                .and_then(|d| {
-                    let lock = d.lock();
-                    lock.downcast_ref::<XmlParserCtxtPtr>().copied()
-                })
-                .unwrap_or(null_mut());
+        if !ctxt.is_null() {
+            channel = (*ctxt).warning;
+            data = (*ctxt).user_data.clone();
+            // Look up flag to detect if it is part of a parsing context
+            if (*ctxt).flags & XML_VCTXT_USE_PCTXT as u32 != 0 {
+                pctxt = (*ctxt)
+                    .user_data
+                    .as_ref()
+                    .and_then(|d| {
+                        let lock = d.lock();
+                        lock.downcast_ref::<XmlParserCtxtPtr>().copied()
+                    })
+                    .unwrap_or(null_mut());
+            }
         }
-    }
-    __xml_raise_error!(
-        schannel,
-        channel,
-        data,
-        pctxt as _,
-        node as _,
-        XmlErrorDomain::XmlFromValid,
-        error,
-        XmlErrorLevel::XmlErrWarning,
-        None,
-        0,
-        (!str1.is_null()).then(|| CStr::from_ptr(str1 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str2.is_null()).then(|| CStr::from_ptr(str2 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        (!str3.is_null()).then(|| CStr::from_ptr(str3 as *const i8)
-            .to_string_lossy()
-            .into_owned()
-            .into()),
-        0,
-        0,
-        msg,
-        str1,
-        str2,
-        str3
-    );
+        __xml_raise_error!(
+            schannel,
+            channel,
+            data,
+            pctxt as _,
+            $node as _,
+            XmlErrorDomain::XmlFromValid,
+            $error,
+            XmlErrorLevel::XmlErrWarning,
+            None,
+            0,
+            $str1,
+            $str2,
+            $str3,
+            0,
+            0,
+            $msg,
+        );
+    };
 }
 
 /// Deallocate the memory used by an attribute definition
@@ -2311,17 +2343,14 @@ pub unsafe fn xml_add_attribute_decl(
     {
         #[cfg(feature = "libxml_valid")]
         {
-            let elem = CString::new(elem).unwrap();
-            let name = CString::new(name).unwrap();
             // The attribute is already defined in this DTD.
-            xml_err_valid_warning(
+            xml_err_valid_warning!(
                 ctxt,
                 dtd as XmlNodePtr,
                 XmlParserErrors::XmlDTDAttributeRedefined,
-                "Attribute %s of element %s: already defined\n",
-                name.as_ptr() as *const u8,
-                elem.as_ptr() as *const u8,
-                null_mut(),
+                "Attribute {} of element {}: already defined\n",
+                name,
+                elem
             );
         }
         xml_free_attribute(ret);
@@ -6251,34 +6280,30 @@ pub unsafe extern "C" fn xml_validate_one_element(
                         ret = 0;
                     }
                 } else if qualified == 0 {
-                    let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
-                    xml_err_valid_warning(
+                    xml_err_valid_warning!(
                         ctxt,
                         elem,
                         XmlParserErrors::XmlDTDNoPrefix,
-                        "Element %s required attribute %s:%s has no prefix\n",
-                        (*elem).name,
-                        prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
-                        (*attr).name,
+                        "Element {} required attribute {}:{} has no prefix\n",
+                        (*elem).name().unwrap(),
+                        (*attr).prefix.as_deref().unwrap(),
+                        (*attr).name().unwrap()
                     );
                 } else if qualified == 1 {
-                    let prefix = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
-                    xml_err_valid_warning(
+                    xml_err_valid_warning!(
                         ctxt,
                         elem,
                         XmlParserErrors::XmlDTDDifferentPrefix,
-                        "Element %s required attribute %s:%s has different prefix\n",
-                        (*elem).name,
-                        prefix.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
-                        (*attr).name,
+                        "Element {} required attribute {}:{} has different prefix\n",
+                        (*elem).name().unwrap(),
+                        (*attr).prefix.as_deref().unwrap(),
+                        (*attr).name().unwrap()
                     );
                 }
             } else if matches!((*attr).def, XmlAttributeDefault::XmlAttributeFixed) {
-                /*
-                 * Special tests checking #FIXED namespace declarations
-                 * have the right value since this is not done as an
-                 * attribute checking
-                 */
+                // Special tests checking #FIXED namespace declarations
+                // have the right value since this is not done as an
+                // attribute checking
                 if (*attr).prefix.is_none() && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _) {
                     let mut ns: XmlNsPtr;
 
