@@ -5842,7 +5842,7 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 if base.is_null() {
                     PERROR_INT!(
                         pctxt,
-                        c"xmlSchemaCheckFacet".as_ptr() as _,
+                        "xmlSchemaCheckFacet",
                         "a type user derived type has no base type"
                     );
                     return -1;
@@ -5881,15 +5881,20 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 if ret < 0 {
                     /* No error message for RelaxNG. */
                     if ctxt_given != 0 {
+                        let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                        let facet_type = CStr::from_ptr(xml_schema_facet_type_to_string(
+                            (*facet).typ,
+                        ) as *const i8)
+                        .to_string_lossy();
                         xml_schema_custom_err(
                             pctxt as XmlSchemaAbstractCtxtPtr,
                             XmlParserErrors::XmlSchemapInternal,
                             (*facet).node,
                             null_mut(),
-                            "Internal error: xmlSchemaCheckFacet, failed to validate the value '%s' of the facet '%s' against the base type",
-                            (*facet).value,
-                            xml_schema_facet_type_to_string((*facet).typ)
-                        );
+                            format!("Internal error: xmlSchemaCheckFacet, failed to validate the value '{value}' of the facet '{facet_type}' against the base type").as_str(),
+                            Some(&value),
+                            Some(&facet_type),
+                            );
                     }
                     // goto internal_error;
                     if ctxt_given == 0 && !pctxt.is_null() {
@@ -5901,19 +5906,22 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 /* No error message for RelaxNG. */
                 if ctxt_given != 0 {
                     let mut str: *mut XmlChar = null_mut();
+                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                    let qname = CStr::from_ptr(xml_schema_format_qname(
+                        addr_of_mut!(str),
+                        (*base).target_namespace,
+                        (*base).name,
+                    ) as *const i8)
+                    .to_string_lossy();
 
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node,
                         facet as XmlSchemaBasicItemPtr,
-                        "The value '%s' of the facet does not validate against the base type '%s'",
-                        (*facet).value,
-                        xml_schema_format_qname(
-                            addr_of_mut!(str),
-                            (*base).target_namespace,
-                            (*base).name,
-                        ),
+                        format!("The value '{value}' of the facet does not validate against the base type '{qname}'").as_str(),
+                        Some(&value),
+                        Some(&qname),
                     );
                     FREE_AND_NULL!(str);
                 }
@@ -5923,11 +5931,7 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 }
                 return ret;
             } else if (*facet).val.is_null() && ctxt_given != 0 {
-                PERROR_INT!(
-                    pctxt,
-                    c"xmlSchemaCheckFacet".as_ptr() as _,
-                    "value was not computed"
-                );
+                PERROR_INT!(pctxt, "xmlSchemaCheckFacet", "value was not computed");
             }
         }
         XmlSchemaTypeType::XmlSchemaFacetPattern => {
@@ -5936,14 +5940,15 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 ret = XmlParserErrors::XmlSchemapRegexpInvalid as i32;
                 /* No error message for RelaxNG. */
                 if ctxt_given != 0 {
+                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node,
                         type_decl as XmlSchemaBasicItemPtr,
-                        "The value '%s' of the facet 'pattern' is not a valid regular expression",
-                        (*facet).value,
-                        null(),
+                        format!("The value '{value}' of the facet 'pattern' is not a valid regular expression").as_str(),
+                        Some(&value),
+                        None,
                     );
                 }
             }
@@ -5970,11 +5975,7 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 if ret < 0 {
                     /* No error message for RelaxNG. */
                     if ctxt_given != 0 {
-                        PERROR_INT!(
-                            pctxt,
-                            c"xmlSchemaCheckFacet".as_ptr() as _,
-                            "validating facet value"
-                        );
+                        PERROR_INT!(pctxt, "xmlSchemaCheckFacet", "validating facet value");
                     }
                     // goto internal_error;
                     if ctxt_given == 0 && !pctxt.is_null() {
@@ -5985,21 +5986,29 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
                 /* No error message for RelaxNG. */
                 if ctxt_given != 0 {
-                    /* error code */
+                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
+                    let facet_type =
+                        CStr::from_ptr(xml_schema_facet_type_to_string((*facet).typ) as *const i8)
+                            .to_string_lossy();
+                    let typename = if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
+                        "nonNegativeInteger"
+                    } else {
+                        "positiveInteger"
+                    };
+                    // error code
                     xml_schema_custom_err4(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node,
                         type_decl as XmlSchemaBasicItemPtr,
-                        "The value '%s' of the facet '%s' is not a valid '%s'",
-                        (*facet).value,
-                        xml_schema_facet_type_to_string((*facet).typ),
-                        if (*facet).typ != XmlSchemaTypeType::XmlSchemaFacetTotaldigits {
-                            c"nonNegativeInteger".as_ptr() as _
-                        } else {
-                            c"positiveInteger".as_ptr() as _
-                        },
-                        null_mut(),
+                        format!(
+                            "The value '{value}' of the facet '{facet_type}' is not a valid '{typename}'"
+                        )
+                        .as_str(),
+                        Some(&value),
+                        Some(&facet_type),
+                        Some(typename),
+                        None,
                     );
                 }
             }
@@ -6015,15 +6024,17 @@ pub unsafe extern "C" fn xml_schema_check_facet(
                 ret = XmlParserErrors::XmlSchemapInvalidFacetValue as i32;
                 /* No error message for RelaxNG. */
                 if ctxt_given != 0 {
+                    let value = CStr::from_ptr((*facet).value as *const i8).to_string_lossy();
                     /* error was previously: XML_SCHEMAP_INVALID_WHITE_SPACE */
                     xml_schema_custom_err(
                         pctxt as XmlSchemaAbstractCtxtPtr,
                         ret.try_into().unwrap(),
                         (*facet).node,
                         type_decl as XmlSchemaBasicItemPtr,
-                        "The value '%s' of the facet 'whitespace' is not valid",
-                        (*facet).value,
-                        null_mut(),
+                        format!("The value '{value}' of the facet 'whitespace' is not valid")
+                            .as_str(),
+                        Some(&value),
+                        None,
                     );
                 }
             }
