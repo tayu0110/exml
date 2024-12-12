@@ -54,8 +54,6 @@ use encoding_rs::{
     ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, SHIFT_JIS, WINDOWS_1254,
 };
 
-use crate::{__xml_raise_error, error::XmlParserErrors};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlCharEncoding {
     Error = -1,
@@ -412,36 +410,38 @@ pub(crate) fn cleanup_encoding_handlers() {
     handlers.clear();
 }
 
-pub(crate) unsafe fn xml_encoding_err(error: XmlParserErrors, msg: &str, val: &str) {
-    __xml_raise_error!(
-        None,
-        None,
-        None,
-        null_mut(),
-        null_mut(),
-        XmlErrorDomain::XmlFromI18N,
-        error,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        Some(val.to_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        msg,
-        val
-    );
+macro_rules! xml_encoding_err {
+    ($error:expr, $msg:literal, $val:expr) => {
+        $crate::__xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            null_mut(),
+            XmlErrorDomain::XmlFromI18N,
+            $error,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some($val.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            format!($msg, $val).as_str(),
+        );
+    };
 }
+pub(crate) use xml_encoding_err;
 
 pub fn register_encoding_handler(handler: CustomEncodingHandler) -> Result<(), EncodingError> {
     let mut handlers = HANDLERS.lock().unwrap();
     if handlers.len() >= MAX_ENCODING_HANDLERS {
         unsafe {
-            xml_encoding_err(
+            xml_encoding_err!(
                 XmlParserErrors::XmlI18NExcessHandler,
-                "xmlRegisterCharEncodingHandler: Too many handler registered, see MAX_ENCODING_HANDLERS\n",
-                "MAX_ENCODING_HANDLERS",
+                "xmlRegisterCharEncodingHandler: Too many handler registered, see {}\n",
+                "MAX_ENCODING_HANDLERS"
             );
             return Err(EncodingError::Other {
                 msg: "Too many CustomEncodingHandlers are registerd.".into(),

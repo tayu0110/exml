@@ -200,11 +200,10 @@ impl XmlParserInputBuffer {
                 );
 
                 unsafe {
-                    xml_encoding_err(
+                    xml_encoding_err!(
                         XmlParserErrors::XmlI18NConvFailed,
-                        format!("input conversion failed due to input error, bytes {buf}\n")
-                            .as_str(),
-                        &buf,
+                        "input conversion failed due to input error, bytes {}\n",
+                        buf.as_str()
                     );
                 }
                 Err(e)
