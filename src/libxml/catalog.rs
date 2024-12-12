@@ -2915,7 +2915,7 @@ fn xml_catalog_dump_entry(payload: *mut c_void, out: &mut impl Write) {
                 write!(out, "ENTITY ");
             }
             XmlCatalogEntryType::SgmlCataPentity => {
-                write!(out, "ENTITY %%");
+                write!(out, "ENTITY %");
             }
             XmlCatalogEntryType::SgmlCataDoctype => {
                 write!(out, "DOCTYPE ");

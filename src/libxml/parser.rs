@@ -6463,7 +6463,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
             xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "PEReference: %%{}; not found\n",
+                "PEReference: %{}; not found\n",
                 CStr::from_ptr(name as *const i8).to_string_lossy()
             );
             (*ctxt).valid = 0;
@@ -6478,7 +6478,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
             xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "%%{}; is not a parameter entity\n",
+                "%{}; is not a parameter entity\n",
                 CStr::from_ptr(name as *const i8).to_string_lossy()
             );
         }
@@ -11441,7 +11441,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
-                    "Space required after '%%'\n",
+                    "Space required after '%'\n",
                 );
             }
             is_parameter = 1;

@@ -4420,7 +4420,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
-                "PEReference: %%{}; not found\n",
+                "PEReference: %{}; not found\n",
                 name
             );
         } else {
@@ -4434,7 +4434,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlWarUndeclaredEntity,
-                    "PEReference: %%{}; not found\n",
+                    "PEReference: %{}; not found\n",
                     n
                 );
             } else {
@@ -4442,7 +4442,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 xml_warning_msg!(
                     ctxt,
                     XmlParserErrors::XmlWarUndeclaredEntity,
-                    "PEReference: %%{}; not found\n",
+                    "PEReference: %{}; not found\n",
                     name
                 );
             }
@@ -4459,7 +4459,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
             xml_warning_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
-                "Internal: %%{}; is not a parameter entity\n",
+                "Internal: %{}; is not a parameter entity\n",
                 name
             );
         } else {

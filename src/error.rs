@@ -816,45 +816,6 @@ impl XmlParserErrors {
 
 pub const XML_MAX_ERRORS: usize = 100;
 
-#[doc(hidden)]
-#[macro_export]
-macro_rules! XML_GET_VAR_STR {
-    ( $msg:expr, $str:expr, $( $args:expr ),* ) => {
-        let mut size: libc::c_int;
-        let mut prev_size: libc::c_int = -1;
-        let mut chars: libc::c_int;
-        let mut larger: *mut libc::c_char;
-
-        $str = $crate::libxml::globals::xml_malloc(150) as *mut libc::c_char;
-        if !$str.is_null() {
-            size = 150;
-
-            while size < 64000 {
-    	        chars = libc::snprintf($str, size as usize, $msg, $( $args ),*);
-    	        if chars > -1 && chars < size {
-    	            if prev_size == chars {
-    	        	    break;
-    	            } else {
-    	        	    prev_size = chars;
-    	            }
-    	        }
-    	        if chars > -1 {
-    	            size += chars + 1;
-                } else {
-    	            size += 100;
-                }
-    	        if {
-                    larger = $crate::libxml::globals::xml_realloc($str as _, size as usize) as *mut libc::c_char;
-                    larger.is_null()
-                 } {
-    	            break;
-    	        }
-    	        $str = larger;
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlErrorLevel {
     #[default]
@@ -1462,12 +1423,11 @@ macro_rules! __xml_raise_error {
             format!($msg, $( $args ),*).as_str(),
         );
     };
-    ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr, $( $args:expr ),*) => {{
+    ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:expr,) => {{
         use std::borrow::Cow;
-        use std::ffi::{CStr, CString};
         use std::ptr::{null_mut, NonNull};
 
-        use libc::{c_char, c_int, c_void};
+        use libc::c_void;
 
         use $crate::{
             globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
@@ -1489,17 +1449,16 @@ macro_rules! __xml_raise_error {
             code: XmlParserErrors,
             level: XmlErrorLevel,
             mut file: Option<Cow<'static, str>>,
-            mut line: c_int,
+            mut line: i32,
             str1: Option<Cow<'static, str>>,
             str2: Option<Cow<'static, str>>,
             str3: Option<Cow<'static, str>>,
-            int1: c_int,
-            mut col: c_int,
+            int1: i32,
+            mut col: i32,
             msg: &str| {
                 let mut ctxt: XmlParserCtxtPtr = null_mut();
                 let Some((channel, error, s, data)) = GLOBAL_STATE.with_borrow_mut(|state| {
                     let mut node: XmlNodePtr = nod as XmlNodePtr;
-                    let mut str: *mut c_char;
                     let mut input: XmlParserInputPtr;
                     let mut to = &mut state.last_error;
                     let mut baseptr: XmlNodePtr = null_mut();
@@ -1548,17 +1507,6 @@ macro_rules! __xml_raise_error {
                             data = state.structured_error_context.clone();
                         }
                     }
-                    // Formatting the message
-                    let str = {
-                        let msg = CString::new(msg).unwrap();
-                        $crate::XML_GET_VAR_STR!(msg.as_ptr(), str, $( $args ),*);
-                        assert!(!str.is_null());
-                        let s = CStr::from_ptr(str).to_string_lossy();
-                        let s = s.into_owned();
-                        assert!(s.as_ptr() as *const i8 as usize != str as usize);
-                        $crate::libxml::globals::xml_free(str as _);
-                        Cow::<'static, str>::Owned(s)
-                    };
 
                     // specific processing if a parser context is provided
                     if !ctxt.is_null() {
@@ -1601,7 +1549,7 @@ macro_rules! __xml_raise_error {
                     to.reset();
                     to.domain = domain;
                     to.code = code;
-                    to.message = Some(str.clone());
+                    to.message = Some(msg.to_owned().into());
                     to.level = level;
                     if let Some(file) = file {
                         to.file = Some(file.to_owned().into());
@@ -1613,7 +1561,7 @@ macro_rules! __xml_raise_error {
                             // of the usual "base" (doc->URL) for the node (bug 152623).
                             let mut prev: XmlNodePtr = baseptr;
                             let mut href = None;
-                            let mut inclcount: c_int = 0;
+                            let mut inclcount = 0;
                             while !prev.is_null() {
                                 if let Some(p) = (*prev).prev {
                                     prev = p.as_ptr();
@@ -1675,17 +1623,17 @@ macro_rules! __xml_raise_error {
                         } else {
                             channel = (*(*ctxt).sax).error;
                         }
-                        channel.map(|c| (c, error, str, (*ctxt).user_data.clone()))
+                        channel.map(|c| (c, error, Cow::<'static, str>::Owned(msg.to_owned()), (*ctxt).user_data.clone()))
                     } else if channel.is_none() {
                         channel = Some(state.generic_error);
                         if !ctxt.is_null() {
                             let context = GenericErrorContext::new(Box::new(ctxt));
-                            channel.map(|c| (c, error, str, Some(context)))
+                            channel.map(|c| (c, error, Cow::<'static, str>::Owned(msg.to_owned()), Some(context)))
                         } else {
-                            channel.map(|c| (c, error, str, state.generic_error_context.clone()))
+                            channel.map(|c| (c, error, Cow::<'static, str>::Owned(msg.to_owned()), state.generic_error_context.clone()))
                         }
                     } else {
-                        channel.map(|c| (c, error, str, None))
+                        channel.map(|c| (c, error, Cow::<'static, str>::Owned(msg.to_owned()), None))
                     }
                 }) else {
                     return;
