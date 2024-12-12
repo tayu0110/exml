@@ -34,11 +34,13 @@ use libc::{memset, size_t, snprintf, strchr};
 #[cfg(feature = "libxml_legacy")]
 use crate::generic_error;
 use crate::{
-    __xml_raise_error, __xml_simple_error,
     buf::libxml_api::{
         xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,
     },
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{
+        XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
+        __xml_simple_oom_error,
+    },
     hash::XmlHashTableRef,
     libxml::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},

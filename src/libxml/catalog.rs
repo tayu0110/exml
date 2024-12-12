@@ -47,8 +47,8 @@ use const_format::concatcp;
 use libc::{close, getenv, memset, open, read, snprintf, stat, O_RDONLY};
 
 use crate::{
-    __xml_raise_error,
     encoding::XmlCharEncoding,
+    error::__xml_raise_error,
     generic_error,
     hash::XmlHashTableRef,
     io::{xml_parser_get_directory, XmlParserInputBuffer},

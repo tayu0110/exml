@@ -46,8 +46,7 @@ use libc::{memcpy, memset, snprintf, strlen};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
-    __xml_simple_error,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     libxml::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDictPtr},

@@ -30,7 +30,7 @@ use std::{
 
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
 
-use crate::{__xml_raise_error, libxml::xmlstring::xml_strcat};
+use crate::{error::__xml_raise_error, libxml::xmlstring::xml_strcat};
 
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},

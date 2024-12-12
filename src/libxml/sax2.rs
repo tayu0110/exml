@@ -30,9 +30,8 @@ use std::{
 use libc::{memcpy, memset, INT_MAX};
 
 use crate::{
-    __xml_raise_error,
     encoding::{detect_encoding, XmlCharEncoding},
-    error::{parser_error, parser_warning, XmlParserErrors},
+    error::{__xml_raise_error, parser_error, parser_warning, XmlParserErrors},
     globals::{GenericErrorContext, StructuredError},
     libxml::{
         entities::XmlEntityPtr,

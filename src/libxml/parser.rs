@@ -61,7 +61,6 @@ use libc::strcmp;
 use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, strlen, strncmp, strstr};
 
 use crate::{
-    __xml_err_encoding, __xml_raise_error,
     buf::{
         libxml_api::{
             xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free,
@@ -70,7 +69,10 @@ use crate::{
         xml_buf_overflow_error, XmlBufRef,
     },
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::{parser_validity_error, parser_validity_warning, XmlError, XmlParserErrors},
+    error::{
+        __xml_raise_error, parser_validity_error, parser_validity_warning, XmlError,
+        XmlParserErrors,
+    },
     generic_error,
     globals::{
         get_do_validity_checking_default_value, get_get_warnings_default_value,
@@ -100,11 +102,11 @@ use crate::{
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
-            xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
-            xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
-            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_fatal_err,
-            xml_free_input_stream, xml_new_entity_input_stream, xml_new_input_stream,
-            xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
+            __xml_err_encoding, xml_add_def_attrs, xml_add_special_attr, xml_check_language_id,
+            xml_copy_char, xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
+            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_err_encoding_int,
+            xml_err_internal, xml_fatal_err, xml_free_input_stream, xml_new_entity_input_stream,
+            xml_new_input_stream, xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
             xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
             xml_parse_encoding_decl, xml_parse_entity_ref, xml_parse_entity_value,
@@ -138,7 +140,6 @@ use crate::{
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
-    xml_err_encoding_int, xml_err_internal,
 };
 
 use super::{
@@ -161,8 +162,6 @@ use super::{
 };
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlFatalErrMsgInt")]
 macro_rules! xml_fatal_err_msg_int {
     ($ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
@@ -201,6 +200,7 @@ macro_rules! xml_fatal_err_msg_int {
         }
     };
 }
+pub(crate) use xml_fatal_err_msg_int;
 
 /// The default version of XML used: 1.0
 pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
@@ -2143,16 +2143,14 @@ pub(crate) unsafe fn xml_fatal_err_msg(ctxt: XmlParserCtxtPtr, error: XmlParserE
 }
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlFatalErrMsgStr")]
 macro_rules! xml_fatal_err_msg_str {
     ($ctxt:expr, $error:expr, $msg:literal) =>  {
-        $crate::xml_fatal_err_msg_str!(@inner $ctxt, $error, $msg, None);
+        $crate::libxml::parser::xml_fatal_err_msg_str!(@inner $ctxt, $error, $msg, None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) =>  {
         let msg = format!($msg, $val);
-        $crate::xml_fatal_err_msg_str!(@inner $ctxt, $error, msg.as_str(), Some($val.to_owned().into()));
+        $crate::libxml::parser::xml_fatal_err_msg_str!(@inner $ctxt, $error, msg.as_str(), Some($val.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -2190,22 +2188,21 @@ macro_rules! xml_fatal_err_msg_str {
         }
     };
 }
+pub(crate) use xml_fatal_err_msg_str;
 
 /// Handle a warning.
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlWarningMsg")]
 macro_rules! xml_warning_msg {
     ($ctxt:expr, $error:expr, $msg:literal) => {
-        $crate::xml_warning_msg!(@inner $ctxt, $error, $msg, None, None);
+        $crate::libxml::parser::xml_warning_msg!(@inner $ctxt, $error, $msg, None, None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
         let msg = format!($msg, $str1);
-        $crate::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
+        $crate::libxml::parser::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
         let msg = format!($msg, $str1, $str2);
-        $crate::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+        $crate::libxml::parser::xml_warning_msg!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -2267,18 +2264,17 @@ macro_rules! xml_warning_msg {
         }
     };
 }
+pub(crate) use xml_warning_msg;
 
 /// Handle a non fatal parser error
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlErrMsgStr")]
 macro_rules! xml_err_msg_str {
     ($ctxt:expr, $error:expr, $msg:literal) => {
-        $crate::xml_err_msg_str!(@inner $ctxt, $error, $msg, None);
+        $crate::libxml::parser::xml_err_msg_str!(@inner $ctxt, $error, $msg, None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
         let msg = format!($msg, $val);
-        $crate::xml_err_msg_str!(@inner $ctxt, $error, &msg, Some($val.to_owned().into()));
+        $crate::libxml::parser::xml_err_msg_str!(@inner $ctxt, $error, &msg, Some($val.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $val:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -2310,22 +2306,21 @@ macro_rules! xml_err_msg_str {
         }
     };
 }
+pub(crate) use xml_err_msg_str;
 
 /// Handle a validity error.
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlValidityError")]
 macro_rules! xml_validity_error {
     ($ctxt:expr, $error:expr, $msg:literal) => {
-        $crate::xml_validity_error!(@inner $ctxt, $error, $msg, None, None);
+        $crate::libxml::parser::xml_validity_error!(@inner $ctxt, $error, $msg, None, None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
         let msg = format!($msg, $str1);
-        $crate::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
+        $crate::libxml::parser::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
         let msg = format!($msg, $str1, $str2);
-        $crate::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+        $crate::libxml::parser::xml_validity_error!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -2384,15 +2379,14 @@ macro_rules! xml_validity_error {
         }
     };
 }
+pub(crate) use xml_validity_error;
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlFatalErrMsgStrIntStr")]
 macro_rules! xml_fatal_err_msg_str_int_str {
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $val:expr) => {
         let msg = format!($msg, $str1, $val);
-        $crate::xml_fatal_err_msg_str_int_str!(
+        $crate::libxml::parser::xml_fatal_err_msg_str_int_str!(
             @inner
             $ctxt,
             $error,
@@ -2404,7 +2398,7 @@ macro_rules! xml_fatal_err_msg_str_int_str {
     };
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr, $val:expr, $str2:expr) => {
         let msg = format!($msg, $str1, $val, $str2);
-        $crate::xml_fatal_err_msg_str_int_str!(
+        $crate::libxml::parser::xml_fatal_err_msg_str_int_str!(
             @inner
             $ctxt,
             $error,
@@ -2450,26 +2444,25 @@ macro_rules! xml_fatal_err_msg_str_int_str {
         }
     };
 }
+pub(crate) use xml_fatal_err_msg_str_int_str;
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlNsErr")]
 macro_rules! xml_ns_err {
     ($ctxt:expr, $error:expr, $msg:literal) => {
-        $crate::xml_ns_err!(@inner $ctxt, $error, $msg, None, None, None);
+        $crate::libxml::parser::xml_ns_err!(@inner $ctxt, $error, $msg, None, None, None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $info1:expr) => {
         let msg = format!($msg, $info1);
-        $crate::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), None, None);
+        $crate::libxml::parser::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), None, None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $info1:expr, $info2:expr) => {
         let msg = format!($msg, $info1, $info2);
-        $crate::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), None);
+        $crate::libxml::parser::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), None);
     };
     ($ctxt:expr, $error:expr, $msg:literal, $info1:expr, $info2:expr, $info3:expr) => {
         let msg = format!($msg, $info1, $info2, $info3);
-        $crate::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), Some($info3.to_owned().into()));
+        $crate::libxml::parser::xml_ns_err!(@inner $ctxt, $error, &msg, Some($info1.to_owned().into()), Some($info2.to_owned().into()), Some($info3.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $info1:expr, $info2:expr, $info3:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -2504,6 +2497,7 @@ macro_rules! xml_ns_err {
         }
     };
 }
+pub(crate) use xml_ns_err;
 
 pub(crate) unsafe extern "C" fn xml_is_name_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
     if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {

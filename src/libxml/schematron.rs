@@ -29,9 +29,8 @@ use std::{
 use libc::{malloc, memset, snprintf, sprintf, FILE};
 
 use crate::{
-    __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_oom_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},

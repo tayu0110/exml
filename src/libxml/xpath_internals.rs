@@ -43,9 +43,8 @@ use crate::libxml::xpointer::{
     XmlLocationSetPtr,
 };
 use crate::{
-    __xml_raise_error,
     buf::libxml_api::{xml_buf_add, xml_buf_create, xml_buf_free},
-    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_raise_error},
     generic_error,
     hash::XmlHashTableRef,
     libxml::{

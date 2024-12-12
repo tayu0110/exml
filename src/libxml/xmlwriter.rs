@@ -38,10 +38,9 @@ use std::{
 use libc::memset;
 
 use crate::{
-    __xml_raise_error,
     buf::XmlBufRef,
     encoding::find_encoding_handler,
-    error::XmlParserErrors,
+    error::{XmlParserErrors, __xml_raise_error},
     globals::GenericErrorContext,
     io::XmlOutputBuffer,
     libxml::{

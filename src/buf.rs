@@ -23,8 +23,7 @@ use std::{
 use anyhow::{bail, ensure};
 
 use crate::{
-    __xml_simple_error,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     globals::GLOBAL_STATE,
     libxml::parser_internals::XML_MAX_TEXT_LENGTH,
     tree::{XmlBufferAllocationScheme, BASE_BUFFER_SIZE},

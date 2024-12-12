@@ -38,9 +38,8 @@ use std::{
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
 
 use crate::{
-    __xml_raise_error,
     buf::libxml_api::{xml_buf_cat, xml_buf_ccat, XmlBufPtr},
-    error::XmlParserErrors,
+    error::{XmlParserErrors, __xml_raise_error},
     libxml::{
         dict::{xml_dict_lookup, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},

@@ -43,9 +43,8 @@ use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
 use crate::tree::xml_free_node_list;
 use crate::{
-    __xml_raise_error,
     buf::libxml_api::XmlBufPtr,
-    error::XmlParserErrors,
+    error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{

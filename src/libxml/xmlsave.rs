@@ -34,10 +34,9 @@ use std::{
 use libc::memset;
 
 use crate::{
-    __xml_simple_error,
     buf::{libxml_api::xml_buf_set_allocation_scheme, XmlBufRef},
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::XmlOutputBuffer,
     libxml::{

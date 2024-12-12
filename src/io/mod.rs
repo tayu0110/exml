@@ -44,9 +44,11 @@ use libc::{
 use url::Url;
 
 use crate::{
-    __xml_err_encoding, __xml_raise_error, __xml_simple_error,
     encoding::find_encoding_handler,
-    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
+    error::{
+        XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
+        __xml_simple_oom_error,
+    },
     libxml::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_local_resolve_uri,
@@ -55,7 +57,7 @@ use crate::{
         globals::{xml_free, xml_mem_strdup},
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
-        parser_internals::{xml_free_input_stream, xml_new_input_from_file},
+        parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
         xmlstring::{xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,
@@ -345,15 +347,13 @@ fn xml_escape_content(input: &str, output: &mut String) -> i32 {
 
 /// Handle a resource access error
 #[doc(alias = "__xmlLoaderErr")]
-#[macro_export]
-#[doc(hidden)]
 macro_rules! __xml_loader_err {
     ($ctx:expr, $msg:literal) => {
-        $crate::__xml_loader_err!(@inner $ctx, $msg, None);
+        $crate::io::__xml_loader_err!(@inner $ctx, $msg, None);
     };
     ($ctx:expr, $msg:literal, $filename:expr) => {
         let msg = format!($msg, $filename);
-        $crate::__xml_loader_err!(@inner $ctx, &msg, Some($filename.into()));
+        $crate::io::__xml_loader_err!(@inner $ctx, &msg, Some($filename.into()));
     };
     (@inner $ctx:expr, $msg:expr, $filename:expr) => {
         use $crate::{
@@ -405,6 +405,7 @@ macro_rules! __xml_loader_err {
         }
     };
 }
+pub(crate) use __xml_loader_err;
 
 /// Check an input in case it was created from an HTTP stream,
 /// in that case it will handle encoding and update of the base URL in case of redirection.  

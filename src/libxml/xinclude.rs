@@ -37,8 +37,8 @@ use libc::{memset, strcmp};
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSetPtr;
 use crate::{
-    __xml_raise_error,
     encoding::{get_encoding_handler, XmlCharEncoding},
+    error::__xml_raise_error,
     io::xml_parser_get_directory,
     libxml::{
         dict::{xml_dict_free, xml_dict_reference},

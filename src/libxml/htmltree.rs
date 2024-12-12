@@ -496,7 +496,7 @@ pub unsafe extern "C" fn html_doc_dump_memory(
 unsafe fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&str>) {
     use std::borrow::Cow;
 
-    use crate::__xml_simple_error;
+    use crate::error::__xml_simple_error;
 
     let msg: Cow<'static, str> = match code {
         XmlParserErrors::XmlSaveNotUTF8 => "string is not in UTF-8\n".into(),

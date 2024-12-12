@@ -37,9 +37,8 @@ use libc::{
 };
 
 use crate::{
-    __xml_raise_error,
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
-    error::{parser_validity_error, parser_validity_warning, XmlParserErrors},
+    error::{__xml_raise_error, parser_validity_error, parser_validity_warning, XmlParserErrors},
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{

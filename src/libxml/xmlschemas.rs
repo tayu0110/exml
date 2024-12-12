@@ -35,9 +35,11 @@ use std::{
 use libc::{memcpy, memset, snprintf, strchr};
 
 use crate::{
-    __xml_raise_error, __xml_simple_error,
     encoding::XmlCharEncoding,
-    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_simple_oom_error},
+    error::{
+        XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_raise_error, __xml_simple_error,
+        __xml_simple_oom_error,
+    },
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     io::XmlParserInputBuffer,

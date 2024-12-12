@@ -33,16 +33,12 @@ use std::sync::atomic::Ordering;
 pub use __parser_internal_for_legacy::*;
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
-use crate::error::XmlParserErrors;
+use crate::error::{XmlParserErrors, __xml_raise_error};
 use crate::hash::XmlHashTableRef;
+use crate::io::__xml_loader_err;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
-use crate::{
-    __xml_loader_err, xml_err_msg_str, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-    xml_fatal_err_msg_str_int_str, xml_ns_err, xml_validity_error, xml_warning_msg,
-};
 #[cfg(feature = "catalog")]
 use crate::{
-    __xml_raise_error,
     encoding::{
         detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding,
         XmlCharEncodingHandler,
@@ -62,18 +58,20 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_fatal_err_msg, xml_free_parser_ctxt, xml_is_name_char, xml_load_external_entity,
-            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_att_value_internal,
-            xml_parse_cdsect, xml_parse_char_data_internal, xml_parse_char_ref,
-            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
-            xml_parse_enc_name, xml_parse_end_tag1, xml_parse_end_tag2,
-            xml_parse_external_entity_private, xml_parse_external_id, xml_parse_markup_decl,
-            xml_parse_start_tag2, xml_parse_string_name, xml_parse_text_decl,
-            xml_parse_version_num, xml_parser_add_node_info, xml_parser_entity_check,
-            xml_parser_find_node_info, xml_string_decode_entities_int, XmlDefAttrs, XmlDefAttrsPtr,
-            XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserInputState,
-            XmlParserMode, XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption,
-            XmlSAXHandlerPtr, XML_SKIP_IDS,
+            xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+            xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_is_name_char,
+            xml_load_external_entity, xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+            xml_parse_att_value_internal, xml_parse_cdsect, xml_parse_char_data_internal,
+            xml_parse_char_ref, xml_parse_conditional_sections,
+            xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
+            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_external_id,
+            xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
+            xml_parse_text_decl, xml_parse_version_num, xml_parser_add_node_info,
+            xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
+            xml_validity_error, xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr,
+            XmlParserInput, XmlParserInputPtr, XmlParserInputState, XmlParserMode,
+            XmlParserNodeInfo, XmlParserNodeInfoPtr, XmlParserOption, XmlSAXHandlerPtr,
+            XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
         uri::{xml_build_uri, xml_canonic_path},
@@ -196,16 +194,14 @@ pub fn xml_is_letter(c: u32) -> bool {
 }
 
 /// Handle an internal error
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlErrInternal")]
 macro_rules! xml_err_internal {
     ($ctxt:expr, $msg:literal) => {
-        $crate::xml_err_internal!(@inner $ctxt, $msg, None);
+        $crate::libxml::parser_internals::xml_err_internal!(@inner $ctxt, $msg, None);
     };
     ($ctxt:expr, $msg:literal, $s:expr) => {
         let msg = format!($msg, $s);
-        $crate::xml_err_internal!(@inner $ctxt, &msg, Some($s.into()));
+        $crate::libxml::parser_internals::xml_err_internal!(@inner $ctxt, &msg, Some($s.into()));
     };
     (@inner $ctxt:expr, $msg:expr, $s:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -243,6 +239,7 @@ macro_rules! xml_err_internal {
         }
     };
 }
+pub(crate) use xml_err_internal;
 
 /// Set after xmlValidateDtdFinal was called.
 pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
@@ -306,20 +303,18 @@ pub(crate) unsafe fn xml_err_memory(ctxt: XmlParserCtxtPtr, extra: Option<&str>)
 }
 
 /// Handle an encoding error
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "__xmlErrEncoding")]
 macro_rules! __xml_err_encoding {
     ($ctxt:expr, $xmlerr:expr, $msg:literal) => {
-        $crate::__xml_err_encoding!(@inner $ctxt, $xmlerr, $msg, None, None);
+        $crate::libxml::parser_internals::__xml_err_encoding!(@inner $ctxt, $xmlerr, $msg, None, None);
     };
     ($ctxt:expr, $xmlerr:expr, $msg:literal, $str1:expr) => {
         let msg = format!($msg, $str1);
-        $crate::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), None);
+        $crate::libxml::parser_internals::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), None);
     };
     ($ctxt:expr, $xmlerr:expr, $msg:literal, $str1:expr, $str2:expr) => {
         let msg = format!($msg, $str1, $str2);
-        $crate::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
+        $crate::libxml::parser_internals::__xml_err_encoding!(@inner $ctxt, $xmlerr, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $xmlerr:expr, $msg:expr, $str1:expr, $str2:expr) => {
         let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
@@ -357,6 +352,7 @@ macro_rules! __xml_err_encoding {
         }
     };
 }
+pub(crate) use __xml_err_encoding;
 
 /// Create a parser context for a file content.
 ///
@@ -5594,8 +5590,6 @@ pub(crate) unsafe extern "C" fn xml_string_len_decode_entities(
 }
 
 /// n encoding error
-#[macro_export]
-#[doc(hidden)]
 #[doc(alias = "xmlErrEncodingInt")]
 macro_rules! xml_err_encoding_int {
     ($ctxt:expr, $error:expr, $msg:literal, $val:expr) => {
@@ -5634,6 +5628,7 @@ macro_rules! xml_err_encoding_int {
         }
     };
 }
+pub(crate) use xml_err_encoding_int;
 
 /// The current c_char value, if using UTF-8 this may actually span multiple
 /// bytes in the input buffer.

@@ -31,8 +31,7 @@ use std::{
 use libc::strlen;
 
 use crate::{
-    __xml_raise_error,
-    error::XmlParserErrors,
+    error::{XmlParserErrors, __xml_raise_error},
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{

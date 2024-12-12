@@ -43,8 +43,7 @@ use std::{
 use libc::{c_void, memset};
 
 use crate::{
-    __xml_raise_error,
-    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors},
+    error::{XmlErrorDomain, XmlErrorLevel, XmlParserErrors, __xml_raise_error},
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         parser::xml_init_parser,

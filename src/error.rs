@@ -988,12 +988,12 @@ pub unsafe fn parser_print_file_context_internal(
 
     cur = (*input).cur;
     let base: *const u8 = (*input).base;
-    /* skip backwards over any end-of-lines */
+    // skip backwards over any end-of-lines
     while cur > base && (*cur == b'\n' || *cur == b'\r') {
         cur = cur.sub(1);
     }
     let mut n = 0;
-    /* search backwards for beginning-of-line (to max buff size) */
+    // search backwards for beginning-of-line (to max buff size)
     while n < SIZE && cur > base && *cur != b'\n' && *cur != b'\r' {
         cur = cur.sub(1);
         n += 1;
@@ -1001,7 +1001,7 @@ pub unsafe fn parser_print_file_context_internal(
     if n > 0 && (*cur == b'\n' || *cur == b'\r') {
         cur = cur.add(1);
     } else {
-        /* skip over continuation bytes */
+        // skip over continuation bytes
         while cur < (*input).cur && *cur & 0xC0 == 0x80 {
             cur = cur.add(1);
         }
@@ -1009,7 +1009,7 @@ pub unsafe fn parser_print_file_context_internal(
     let col = (*input).cur.offset_from(cur) as usize;
     let mut content = String::with_capacity(SIZE);
 
-    /* search forward for end-of-line (to max buff size) */
+    // search forward for end-of-line (to max buff size)
     let mut n = 0;
     let chunk = {
         let mut i = 0;
@@ -1033,9 +1033,9 @@ pub unsafe fn parser_print_file_context_internal(
             content.push(c);
         }
     }
-    /* print out the selected text */
+    // print out the selected text
     channel(data.clone(), format!("{content}\n").as_str());
-    /* create blank line with problem pointer */
+    // create blank line with problem pointer
     let mut ptr = content
         .bytes()
         .take(col)
@@ -1101,9 +1101,7 @@ pub unsafe fn report_error(
         name = (*node).name;
     }
 
-    /*
-     * Maintain the compatibility with the legacy error handling
-     */
+    // Maintain the compatibility with the legacy error handling
     if !ctxt.is_null() {
         input = (*ctxt).input;
         if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
@@ -1380,11 +1378,9 @@ pub(crate) fn parser_validity_warning(ctx: Option<GenericErrorContext>, msg: &st
 /// then forward the error message down the parser or generic
 /// error callback handler
 #[doc(alias = "__xmlRaiseError")]
-#[doc(hidden)]
-#[macro_export]
 macro_rules! __xml_raise_error {
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr) => {
-        $crate::__xml_raise_error!(
+        $crate::error::__xml_raise_error!(
             $schannel,
             $channel,
             $data,
@@ -1404,7 +1400,7 @@ macro_rules! __xml_raise_error {
         );
     };
     ($schannel:expr, $channel:expr, $data:expr, $ctx:expr, $nod:expr, $domain:expr, $code:expr, $level:expr, $file:expr, $line:expr, $str1:expr, $str2:expr, $str3:expr, $int1:expr, $col:expr, $msg:literal, $( $args:expr ),*) => {
-        $crate::__xml_raise_error!(
+        $crate::error::__xml_raise_error!(
             $schannel,
             $channel,
             $data,
@@ -1652,6 +1648,7 @@ macro_rules! __xml_raise_error {
         })($schannel, $channel, $data, $ctx, $nod, $domain, $code, $level, $file, $line, $str1, $str2, $str3, $int1, $col, $msg);
     }};
 }
+pub(crate) use __xml_raise_error;
 
 /// Handle an out of memory condition
 #[doc(alias = "__xmlSimpleError")]
@@ -1703,9 +1700,7 @@ pub(crate) unsafe fn __xml_simple_oom_error(
 }
 
 /// Handle an out of memory condition
-#[macro_export]
 #[doc(alias = "__xmlSimpleError")]
-#[doc(hidden)]
 macro_rules! __xml_simple_error {
     (
         $domain:expr,
@@ -1719,7 +1714,7 @@ macro_rules! __xml_simple_error {
             XmlParserErrors::XmlErrNoMemory,
             "Use __xml_simple_oom_error"
         );
-        $crate::__xml_raise_error!(
+        $crate::error::__xml_raise_error!(
             None,
             None,
             None,
@@ -1748,7 +1743,7 @@ macro_rules! __xml_simple_error {
             XmlParserErrors::XmlErrNoMemory,
             "Use __xml_simple_oom_error"
         );
-        $crate::__xml_raise_error!(
+        $crate::error::__xml_raise_error!(
             None,
             None,
             None,
@@ -1799,3 +1794,4 @@ macro_rules! __xml_simple_error {
         );
     };
 }
+pub(crate) use __xml_simple_error;

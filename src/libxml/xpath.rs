@@ -1766,7 +1766,7 @@ pub unsafe extern "C" fn xml_xpath_node_eval(
 macro_rules! CHECK_CTXT {
     ($ctxt:expr) => {
         if $ctxt.is_null() {
-            $crate::__xml_raise_error!(
+            $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,
@@ -1979,7 +1979,7 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
 macro_rules! CHECK_CTXT_NEG {
     ($ctxt:expr) => {
         if $ctxt.is_null() {
-            $crate::__xml_raise_error!(
+            $crate::error::__xml_raise_error!(
                 None,
                 None,
                 None,

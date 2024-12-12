@@ -43,9 +43,8 @@ use std::{
 use libc::{memcpy, memset};
 
 use crate::{
-    __xml_raise_error,
     buf::libxml_api::xml_buf_write_quoted_string,
-    error::XmlParserErrors,
+    error::{XmlParserErrors, __xml_raise_error},
     io::XmlOutputBuffer,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType,

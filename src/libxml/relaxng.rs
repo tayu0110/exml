@@ -33,8 +33,7 @@ use std::{
 use libc::{memcpy, memset, snprintf};
 
 use crate::{
-    __xml_raise_error,
-    error::XmlParserErrors,
+    error::{XmlParserErrors, __xml_raise_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     hash::XmlHashTableRef,

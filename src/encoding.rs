@@ -412,7 +412,7 @@ pub(crate) fn cleanup_encoding_handlers() {
 
 macro_rules! xml_encoding_err {
     ($error:expr, $msg:literal, $val:expr) => {
-        $crate::__xml_raise_error!(
+        $crate::error::__xml_raise_error!(
             None,
             None,
             None,
