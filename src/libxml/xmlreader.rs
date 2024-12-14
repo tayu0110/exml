@@ -2808,7 +2808,7 @@ impl XmlTextReader {
     pub unsafe fn preserve_pattern(
         &mut self,
         pattern: &str,
-        namespaces: *mut *const XmlChar,
+        namespaces: Option<Vec<*const u8>>,
     ) -> i32 {
         use std::ffi::CString;
 

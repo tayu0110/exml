@@ -40,7 +40,7 @@ use crate::{
 
 use super::{
     dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
-    globals::{xml_free, xml_malloc, xml_realloc},
+    globals::{xml_free, xml_malloc},
     parser::{xml_read_file, xml_read_memory, XmlParserOption},
     pattern::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
@@ -149,12 +149,33 @@ pub struct XmlSchematron {
 
     nb_ns: i32, /* the number of namespaces */
 
-    nb_pattern: i32,                   /* the number of patterns */
-    patterns: XmlSchematronPatternPtr, /* the patterns found */
-    rules: XmlSchematronRulePtr,       /* the rules gathered */
-    nb_namespaces: i32,                /* number of namespaces in the array */
-    max_namespaces: i32,               /* size of the array */
-    namespaces: *mut *const XmlChar,   /* the array of namespaces */
+    nb_pattern: i32,                    /* the number of patterns */
+    patterns: XmlSchematronPatternPtr,  /* the patterns found */
+    rules: XmlSchematronRulePtr,        /* the rules gathered */
+    nb_namespaces: i32,                 /* number of namespaces in the array */
+    max_namespaces: i32,                /* size of the array */
+    namespaces: Option<Vec<*const u8>>, /* the array of namespaces */
+}
+
+impl Default for XmlSchematron {
+    fn default() -> Self {
+        Self {
+            name: null_mut(),
+            preserve: 0,
+            doc: null_mut(),
+            flags: 0,
+            _private: null_mut(),
+            dict: null_mut(),
+            title: null_mut(),
+            nb_ns: 0,
+            nb_pattern: 0,
+            patterns: null_mut(),
+            rules: null_mut(),
+            nb_namespaces: 0,
+            max_namespaces: 0,
+            namespaces: None,
+        }
+    }
 }
 
 pub type XmlSchematronValidCtxtPtr = *mut XmlSchematronValidCtxt;
@@ -205,9 +226,9 @@ pub struct XmlSchematronParserCtxt {
     xctxt: XmlXPathContextPtr, /* the XPath context used for compilation */
     schema: XmlSchematronPtr,
 
-    nb_namespaces: i32,              /* number of namespaces in the array */
-    max_namespaces: i32,             /* size of the array */
-    namespaces: *mut *const XmlChar, /* the array of namespaces */
+    nb_namespaces: i32,                 /* number of namespaces in the array */
+    max_namespaces: i32,                /* size of the array */
+    namespaces: Option<Vec<*const u8>>, /* the array of namespaces */
 
     nb_includes: i32,          /* number of includes in the array */
     max_includes: i32,         /* size of the array */
@@ -218,6 +239,34 @@ pub struct XmlSchematronParserCtxt {
     error: Option<GenericError>,            /* the callback in case of errors */
     warning: Option<XmlSchematronValidityWarningFunc>, /* callback in case of warning */
     serror: Option<StructuredError>,        /* the structured function */
+}
+
+impl Default for XmlSchematronParserCtxt {
+    fn default() -> Self {
+        Self {
+            typ: 0,
+            url: null_mut(),
+            doc: null_mut(),
+            preserve: 0,
+            buffer: null_mut(),
+            size: 0,
+            dict: null_mut(),
+            nberrors: 0,
+            err: 0,
+            xctxt: null_mut(),
+            schema: null_mut(),
+            nb_namespaces: 0,
+            max_namespaces: 0,
+            namespaces: None,
+            nb_includes: 0,
+            max_includes: 0,
+            includes: null_mut(),
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+        }
+    }
 }
 
 const XML_STRON_CTXT_PARSER: i32 = 1;
@@ -366,9 +415,7 @@ pub unsafe extern "C" fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronPars
     if !(*ctxt).xctxt.is_null() {
         xml_xpath_free_context((*ctxt).xctxt);
     }
-    if !(*ctxt).namespaces.is_null() {
-        xml_free((*ctxt).namespaces as _);
-    }
+    (*ctxt).namespaces = None;
     xml_dict_free((*ctxt).dict);
     xml_free(ctxt as _);
 }
@@ -482,7 +529,7 @@ unsafe extern "C" fn xml_schematron_new_schematron(
         xml_schematron_perr_memory(ctxt, "allocating schema", null_mut());
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchematron>());
+    std::ptr::write(&mut *ret, XmlSchematron::default());
     (*ret).dict = (*ctxt).dict;
     xml_dict_reference((*ret).dict);
 
@@ -496,37 +543,10 @@ unsafe extern "C" fn xml_schematron_add_namespace(
     prefix: *const XmlChar,
     ns: *const XmlChar,
 ) {
-    if (*ctxt).namespaces.is_null() {
-        (*ctxt).max_namespaces = 10;
-        (*ctxt).namespaces =
-            xml_malloc((*ctxt).max_namespaces as usize * 2 * size_of::<*const XmlChar>()) as _;
-        if (*ctxt).namespaces.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating parser namespaces", null_mut());
-            return;
-        }
-        (*ctxt).nb_namespaces = 0;
-    } else if (*ctxt).nb_namespaces + 2 >= (*ctxt).max_namespaces {
-        let tmp: *mut *const XmlChar = xml_realloc(
-            (*ctxt).namespaces as _,
-            (*ctxt).max_namespaces as usize * 4 * size_of::<*const XmlChar>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_schematron_perr_memory(null_mut(), "allocating parser namespaces", null_mut());
-            return;
-        }
-        (*ctxt).namespaces = tmp;
-        (*ctxt).max_namespaces *= 2;
-    }
-    *(*ctxt).namespaces.add(2 * (*ctxt).nb_namespaces as usize) =
-        xml_dict_lookup((*ctxt).dict, ns, -1);
-    *(*ctxt)
-        .namespaces
-        .add(2 * (*ctxt).nb_namespaces as usize + 1) = xml_dict_lookup((*ctxt).dict, prefix, -1);
+    let namespaces = (*ctxt).namespaces.get_or_insert_with(Vec::new);
+    namespaces.push(xml_dict_lookup((*ctxt).dict, ns, -1));
+    namespaces.push(xml_dict_lookup((*ctxt).dict, prefix, -1));
     (*ctxt).nb_namespaces += 1;
-    *(*ctxt).namespaces.add(2 * (*ctxt).nb_namespaces as usize) = null_mut();
-    *(*ctxt)
-        .namespaces
-        .add(2 * (*ctxt).nb_namespaces as usize + 1) = null_mut();
 }
 
 /// Add a pattern to a schematron
@@ -586,7 +606,7 @@ unsafe extern "C" fn xml_schematron_add_rule(
         context,
         (*ctxt).dict,
         XmlPatternFlags::XmlPatternXpath as i32,
-        (*ctxt).namespaces,
+        (*ctxt).namespaces.clone(),
     );
     if pattern.is_null() {
         let context = CStr::from_ptr(context as *const i8).to_string_lossy();
@@ -1206,9 +1226,8 @@ pub unsafe extern "C" fn xml_schematron_parse(
             xml_schematron_free(ret);
             ret = null_mut();
         } else {
-            (*ret).namespaces = (*ctxt).namespaces;
+            (*ret).namespaces = (*ctxt).namespaces.take();
             (*ret).nb_namespaces = (*ctxt).nb_namespaces;
-            (*ctxt).namespaces = null_mut();
         }
     }
     ret
@@ -1306,9 +1325,7 @@ pub unsafe extern "C" fn xml_schematron_free(schema: XmlSchematronPtr) {
         xml_free_doc((*schema).doc);
     }
 
-    if !(*schema).namespaces.is_null() {
-        xml_free((*schema).namespaces as _);
-    }
+    (*schema).namespaces = None;
 
     xml_schematron_free_rules((*schema).rules);
     xml_schematron_free_patterns((*schema).patterns);
@@ -1374,17 +1391,13 @@ pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
         xml_schematron_free_valid_ctxt(ret);
         return null_mut();
     }
-    for i in 0..(*schema).nb_namespaces {
-        if (*(*schema).namespaces.add(2 * i as usize)).is_null()
-            || (*(*schema).namespaces.add(2 * i as usize + 1)).is_null()
-        {
-            break;
+    if let Some(namespaces) = (*schema).namespaces.as_deref() {
+        for ns in namespaces.chunks_exact(2) {
+            if ns[0].is_null() || ns[1].is_null() {
+                break;
+            }
+            xml_xpath_register_ns((*ret).xctxt, ns[1], ns[0]);
         }
-        xml_xpath_register_ns(
-            (*ret).xctxt,
-            *(*schema).namespaces.add(2 * i as usize + 1),
-            *(*schema).namespaces.add(2 * i as usize),
-        );
     }
     ret
 }

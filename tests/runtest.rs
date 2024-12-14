@@ -4553,12 +4553,13 @@ unsafe fn pattern_test(
                         j += 1;
                         ns = (*ns).next;
                     }
-                    namespaces[j] = null();
-                    j += 1;
-                    namespaces[j] = null();
 
-                    patternc =
-                        xml_patterncompile(str.as_ptr(), (*doc).dict, 0, namespaces.as_mut_ptr());
+                    patternc = xml_patterncompile(
+                        str.as_ptr(),
+                        (*doc).dict,
+                        0,
+                        Some(namespaces[..=j].to_vec()),
+                    );
                     if patternc.is_null() {
                         let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
                         test_error_handler(

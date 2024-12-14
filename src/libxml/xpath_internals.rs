@@ -3421,8 +3421,6 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
     let stream: XmlPatternPtr;
     let comp: XmlXPathCompExprPtr;
     let mut dict: XmlDictPtr = null_mut();
-    let mut namespaces: *mut *const XmlChar = null_mut();
-    let mut i: i32;
 
     if xml_strchr(str, b'[').is_null()
         && xml_strchr(str, b'(').is_null()
@@ -3440,25 +3438,18 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
             return null_mut();
         }
 
+        let mut namespaces = None;
         if !ctxt.is_null() {
             dict = (*ctxt).dict;
             if let Some(table) = (*ctxt).namespaces.as_deref().filter(|t| !t.is_empty()) {
-                namespaces =
-                    xml_malloc(2 * ((*ctxt).ns_nr as usize + 1) * size_of::<*mut XmlChar>()) as _;
-                if namespaces.is_null() {
-                    xml_xpath_err_memory(ctxt, Some("allocating namespaces array\n"));
-                    return null_mut();
-                }
-                i = 0;
+                let namespaces = namespaces.get_or_insert_with(|| vec![null(); 2 * table.len()]);
+                let mut i = 0;
                 for &ns in table {
-                    *namespaces.add(i as usize) = (*ns).href;
+                    namespaces[i] = (*ns).href;
                     i += 1;
-                    *namespaces.add(i as usize) = (*ns).prefix;
+                    namespaces[i] = (*ns).prefix;
                     i += 1;
                 }
-                *namespaces.add(i as usize) = null_mut();
-                i += 1;
-                *namespaces.add(i as usize) = null_mut();
             }
         }
 
@@ -3468,9 +3459,6 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
             XmlPatternFlags::XmlPatternXpath as i32,
             namespaces,
         );
-        if !namespaces.is_null() {
-            xml_free(namespaces as _);
-        }
         if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
             comp = xml_xpath_new_comp_expr();
             if comp.is_null() {

@@ -2161,9 +2161,6 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
             i += 1;
             ns = (*ns).next;
         }
-        namespaces[i] = null();
-        i += 1;
-        namespaces[i] = null();
 
         if PATTERN.lock().unwrap().is_some() {
             PATTERNC.store(
@@ -2171,7 +2168,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
                     PATTERN.lock().unwrap().as_ref().unwrap().as_ptr() as _,
                     (*doc).dict,
                     0,
-                    addr_of_mut!(namespaces[0]),
+                    Some(namespaces[..=i].to_vec()),
                 ),
                 Ordering::Relaxed,
             );
@@ -4122,7 +4119,7 @@ fn main() {
             let mut pattern = PATTERN.lock().unwrap();
             if let Some(p) = pattern.as_ref() {
                 PATTERNC.store(
-                    xml_patterncompile(p.as_ptr() as _, null_mut(), 0, null_mut()),
+                    xml_patterncompile(p.as_ptr() as _, null_mut(), 0, None),
                     Ordering::Relaxed,
                 );
                 if PATTERNC.load(Ordering::Relaxed).is_null() {

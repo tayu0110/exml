@@ -203,24 +203,39 @@ pub unsafe extern "C" fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
 pub type XmlPatParserContextPtr = *mut XmlPatParserContext;
 #[repr(C)]
 pub struct XmlPatParserContext {
-    cur: *const XmlChar,             /* the current char being parsed */
-    base: *const XmlChar,            /* the full expression */
-    error: i32,                      /* error code */
-    dict: XmlDictPtr,                /* the dictionary if any */
-    comp: XmlPatternPtr,             /* the result */
-    elem: XmlNodePtr,                /* the current node if any */
-    namespaces: *mut *const XmlChar, /* the namespaces definitions */
-    nb_namespaces: i32,              /* the number of namespaces */
+    cur: *const XmlChar,                /* the current char being parsed */
+    base: *const XmlChar,               /* the full expression */
+    error: i32,                         /* error code */
+    dict: XmlDictPtr,                   /* the dictionary if any */
+    comp: XmlPatternPtr,                /* the result */
+    elem: XmlNodePtr,                   /* the current node if any */
+    namespaces: Option<Vec<*const u8>>, /* the namespaces definitions */
+    nb_namespaces: i32,                 /* the number of namespaces */
+}
+
+impl Default for XmlPatParserContext {
+    fn default() -> Self {
+        Self {
+            cur: null(),
+            base: null(),
+            error: 0,
+            dict: null_mut(),
+            comp: null_mut(),
+            elem: null_mut(),
+            namespaces: None,
+            nb_namespaces: 0,
+        }
+    }
 }
 
 /// Create a new XML pattern parser context
 ///
 /// Returns the newly allocated xmlPatParserContextPtr or NULL in case of error
 #[doc(alias = "xmlNewPatParserContext")]
-unsafe extern "C" fn xml_new_pat_parser_context(
+unsafe fn xml_new_pat_parser_context(
     pattern: *const XmlChar,
     dict: XmlDictPtr,
-    namespaces: *mut *const XmlChar,
+    namespaces: Option<Vec<*const XmlChar>>,
 ) -> XmlPatParserContextPtr {
     if pattern.is_null() {
         return null_mut();
@@ -229,20 +244,14 @@ unsafe extern "C" fn xml_new_pat_parser_context(
     let cur: XmlPatParserContextPtr =
         xml_malloc(size_of::<XmlPatParserContext>()) as XmlPatParserContextPtr;
     if cur.is_null() {
-        // ERROR(NULL, NULL, NULL,
-        // 	"xmlNewPatParserContext : malloc failed\n");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlPatParserContext>());
+    std::ptr::write(&mut *cur, XmlPatParserContext::default());
     (*cur).dict = dict;
     (*cur).cur = pattern;
     (*cur).base = pattern;
-    if !namespaces.is_null() {
-        let mut i: i32 = 0;
-        while !(*namespaces.add(2 * i as usize)).is_null() {
-            i += 1;
-        }
-        (*cur).nb_namespaces = i;
+    if let Some(namespaces) = namespaces.as_deref() {
+        (*cur).nb_namespaces = namespaces.len() as i32 / 2;
     } else {
         (*cur).nb_namespaces = 0;
     }
@@ -256,7 +265,8 @@ unsafe extern "C" fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
     if ctxt.is_null() {
         return;
     }
-    memset(ctxt as _, -1, size_of::<XmlPatParserContext>());
+    (*ctxt).namespaces = None;
+    std::ptr::write(&mut *ctxt, XmlPatParserContext::default());
     xml_free(ctxt as _);
 }
 
@@ -497,7 +507,6 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
             return;
         }
         if CUR!(ctxt) == b':' {
-            let mut i: i32;
             let prefix: *mut XmlChar = name;
 
             NEXT!(ctxt);
@@ -508,9 +517,7 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                 (*ctxt).error = 1;
                 break 'error;
             }
-            /*
-             * This is a namespace is_match
-             */
+            // This is a namespace is_match
             token = xml_pat_scan_name(ctxt);
             if *prefix.add(0) == b'x'
                 && *prefix.add(1) == b'm'
@@ -518,16 +525,16 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                 && *prefix.add(3) == 0
             {
                 XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
-            } else {
-                i = 0;
-                while i < (*ctxt).nb_namespaces {
-                    if xml_str_equal(*(*ctxt).namespaces.add(2 * i as usize + 1), prefix) {
-                        XML_PAT_COPY_NSNAME!(ctxt, url, *(*ctxt).namespaces.add(2 * i as usize));
+            } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
+                let mut found = false;
+                for ns in namespaces.chunks_exact(2) {
+                    if xml_str_equal(ns[1], prefix) {
+                        XML_PAT_COPY_NSNAME!(ctxt, url, ns[0]);
+                        found = true;
                         break;
                     }
-                    i += 1;
                 }
-                if i >= (*ctxt).nb_namespaces {
+                if !found {
                     // ERROR5(NULL, NULL, NULL,
                     //     "xmlCompileAttributeTest : no namespace bound to prefix %s\n",
                     //     prefix);
@@ -579,17 +586,13 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     'error: {
         if CUR!(ctxt) == b'.' {
-            /*
-             * Context node.
-             */
+            // Context node.
             NEXT!(ctxt);
             PUSH!(ctxt, XmlPatOp::XmlOpElem, null_mut(), null_mut(), 'error);
             return;
         }
         if CUR!(ctxt) == b'@' {
-            /*
-             * Attribute test.
-             */
+            // Attribute test.
             if XML_STREAM_XS_IDC_SEL!((*ctxt).comp) {
                 //  ERROR5(NULL, NULL, NULL,
                 //  "Unexpected attribute axis in '%s'.\n", (*ctxt).base);
@@ -624,16 +627,13 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
             NEXT!(ctxt);
             if CUR!(ctxt) != b':' {
                 let prefix: *mut XmlChar = name;
-                let mut i: i32;
 
                 if has_blanks != 0 || xml_is_blank_char(CUR!(ctxt) as u32) {
                     //  ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                     (*ctxt).error = 1;
                     break 'error;
                 }
-                /*
-                 * This is a namespace is_match
-                 */
+                // This is a namespace is_match
                 token = xml_pat_scan_name(ctxt);
                 if *prefix.add(0) == b'x'
                     && *prefix.add(1) == b'm'
@@ -641,20 +641,16 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     && *prefix.add(3) == 0
                 {
                     XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
-                } else {
-                    i = 0;
-                    while i < (*ctxt).nb_namespaces {
-                        if xml_str_equal(*(*ctxt).namespaces.add(2 * i as usize + 1), prefix) {
-                            XML_PAT_COPY_NSNAME!(
-                                ctxt,
-                                url,
-                                *(*ctxt).namespaces.add(2 * i as usize)
-                            );
+                } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
+                    let mut found = false;
+                    for ns in namespaces.chunks_exact(2) {
+                        if xml_str_equal(ns[1], prefix) {
+                            XML_PAT_COPY_NSNAME!(ctxt, url, ns[0]);
+                            found = true;
                             break;
                         }
-                        i += 1;
                     }
-                    if i >= (*ctxt).nb_namespaces {
+                    if !found {
                         //  ERROR5(NULL, NULL, NULL,
                         //  "xmlCompileStepPattern : no namespace bound to prefix %s\n",
                         //  prefix);
@@ -696,7 +692,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     }
                     if CUR!(ctxt) == b':' {
                         let prefix: *mut XmlChar = name;
-                        let mut i: i32;
 
                         NEXT!(ctxt);
                         if xml_is_blank_char(CUR!(ctxt) as u32) {
@@ -704,9 +699,7 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                             (*ctxt).error = 1;
                             break 'error;
                         }
-                        /*
-                         * This is a namespace is_match
-                         */
+                        // This is a namespace is_match
                         token = xml_pat_scan_name(ctxt);
                         if *prefix.add(0) == b'x'
                             && *prefix.add(1) == b'm'
@@ -714,23 +707,16 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                             && *prefix.add(3) == 0
                         {
                             XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
-                        } else {
-                            i = 0;
-                            while i < (*ctxt).nb_namespaces {
-                                if xml_str_equal(
-                                    *(*ctxt).namespaces.add(2 * i as usize + 1),
-                                    prefix,
-                                ) {
-                                    XML_PAT_COPY_NSNAME!(
-                                        ctxt,
-                                        url,
-                                        *(*ctxt).namespaces.add(2 * i as usize)
-                                    );
+                        } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
+                            let mut found = false;
+                            for ns in namespaces.chunks_exact(2) {
+                                if xml_str_equal(ns[1], prefix) {
+                                    XML_PAT_COPY_NSNAME!(ctxt, url, ns[0]);
+                                    found = true;
                                     break;
                                 }
-                                i += 1;
                             }
-                            if i >= (*ctxt).nb_namespaces {
+                            if !found {
                                 //  ERROR5(NULL, NULL, NULL,
                                 //  "xmlCompileStepPattern : no namespace bound "
                                 //  "to prefix %s\n", prefix);
@@ -1360,11 +1346,11 @@ unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
 ///
 /// Returns the compiled form of the pattern or NULL in case of error
 #[doc(alias = "xmlPatterncompile")]
-pub unsafe extern "C" fn xml_patterncompile(
+pub unsafe fn xml_patterncompile(
     pattern: *const XmlChar,
     dict: *mut XmlDict,
     flags: i32,
-    namespaces: *mut *const XmlChar,
+    namespaces: Option<Vec<*const u8>>,
 ) -> XmlPatternPtr {
     let mut ret: XmlPatternPtr = null_mut();
     let mut cur: XmlPatternPtr;
@@ -1388,11 +1374,11 @@ pub unsafe extern "C" fn xml_patterncompile(
                 or = or.add(1);
             }
             if *or == 0 {
-                ctxt = xml_new_pat_parser_context(start, dict, namespaces);
+                ctxt = xml_new_pat_parser_context(start, dict, namespaces.clone());
             } else {
                 tmp = xml_strndup(start, or.offset_from(start) as _);
                 if !tmp.is_null() {
-                    ctxt = xml_new_pat_parser_context(tmp, dict, namespaces);
+                    ctxt = xml_new_pat_parser_context(tmp, dict, namespaces.clone());
                 }
                 or = or.add(1);
             }
@@ -1403,9 +1389,7 @@ pub unsafe extern "C" fn xml_patterncompile(
             if cur.is_null() {
                 break 'error;
             }
-            /*
-             * Assign string dict.
-             */
+            // Assign string dict.
             if !dict.is_null() {
                 (*cur).dict = dict;
                 xml_dict_reference(dict);

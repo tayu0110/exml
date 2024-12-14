@@ -10232,8 +10232,6 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
         );
         return XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
     } else {
-        let mut ns_array: *mut *const XmlChar = null_mut();
-
         // Compile the XPath expression.
         // TODO: We need the array of in-scope namespaces for compilation.
         // TODO: Call xmlPatterncompile with different options for selector/field.
@@ -10243,19 +10241,14 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
             (*attr).parent.unwrap().get_ns_list((*attr).doc)
         };
         // Build an array of prefixes and namespaces.
+        let mut ns_array = None;
         if let Some(ns_list) = ns_list {
             let count: usize = ns_list.len();
-            ns_array =
-                xml_malloc((count * 2 + 1) * size_of::<*const XmlChar>()) as *mut *const XmlChar;
-            if ns_array.is_null() {
-                xml_schema_perr_memory(ctxt, "allocating a namespace array", null_mut());
-                return -1;
-            }
+            let ns_array = ns_array.get_or_insert_with(|| vec![null(); count * 2]);
             for (i, cur) in ns_list.into_iter().enumerate() {
-                *ns_array.add(2 * i) = (*cur).href;
-                *ns_array.add(2 * i + 1) = (*cur).prefix;
+                ns_array[2 * i] = (*cur).href;
+                ns_array[2 * i + 1] = (*cur).prefix;
             }
-            *ns_array.add(count * 2) = null_mut();
         }
         // TODO: Differentiate between "selector" and "field".
         if is_field != 0 {
@@ -10272,9 +10265,6 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
                 XmlPatternFlags::XmlPatternXssel as i32,
                 ns_array,
             ) as _;
-        }
-        if !ns_array.is_null() {
-            xml_free(ns_array as _);
         }
 
         if (*selector).xpath_comp.is_null() {
