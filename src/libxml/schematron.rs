@@ -152,8 +152,6 @@ pub struct XmlSchematron {
     nb_pattern: i32,                    /* the number of patterns */
     patterns: XmlSchematronPatternPtr,  /* the patterns found */
     rules: XmlSchematronRulePtr,        /* the rules gathered */
-    nb_namespaces: i32,                 /* number of namespaces in the array */
-    max_namespaces: i32,                /* size of the array */
     namespaces: Option<Vec<*const u8>>, /* the array of namespaces */
 }
 
@@ -171,8 +169,6 @@ impl Default for XmlSchematron {
             nb_pattern: 0,
             patterns: null_mut(),
             rules: null_mut(),
-            nb_namespaces: 0,
-            max_namespaces: 0,
             namespaces: None,
         }
     }
@@ -226,8 +222,6 @@ pub struct XmlSchematronParserCtxt {
     xctxt: XmlXPathContextPtr, /* the XPath context used for compilation */
     schema: XmlSchematronPtr,
 
-    nb_namespaces: i32,                 /* number of namespaces in the array */
-    max_namespaces: i32,                /* size of the array */
     namespaces: Option<Vec<*const u8>>, /* the array of namespaces */
 
     nb_includes: i32,          /* number of includes in the array */
@@ -255,8 +249,6 @@ impl Default for XmlSchematronParserCtxt {
             err: 0,
             xctxt: null_mut(),
             schema: null_mut(),
-            nb_namespaces: 0,
-            max_namespaces: 0,
             namespaces: None,
             nb_includes: 0,
             max_includes: 0,
@@ -546,7 +538,6 @@ unsafe extern "C" fn xml_schematron_add_namespace(
     let namespaces = (*ctxt).namespaces.get_or_insert_with(Vec::new);
     namespaces.push(xml_dict_lookup((*ctxt).dict, ns, -1));
     namespaces.push(xml_dict_lookup((*ctxt).dict, prefix, -1));
-    (*ctxt).nb_namespaces += 1;
 }
 
 /// Add a pattern to a schematron
@@ -1227,7 +1218,6 @@ pub unsafe extern "C" fn xml_schematron_parse(
             ret = null_mut();
         } else {
             (*ret).namespaces = (*ctxt).namespaces.take();
-            (*ret).nb_namespaces = (*ctxt).nb_namespaces;
         }
     }
     ret

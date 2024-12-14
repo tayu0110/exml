@@ -370,7 +370,6 @@ pub struct XmlXPathContext {
 
     // the namespace nodes of the context node
     pub(crate) namespaces: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
-    pub(crate) ns_nr: i32,                        /* number of namespace in scope */
     pub(crate) user: *mut c_void,                 /* function to free */
 
     // extra variables
@@ -440,7 +439,6 @@ impl Default for XmlXPathContext {
             max_axis: 0,
             axis: null_mut(),
             namespaces: None,
-            ns_nr: 0,
             user: null_mut(),
             context_size: 0,
             proximity_position: 0,

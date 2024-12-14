@@ -210,7 +210,6 @@ pub struct XmlPatParserContext {
     comp: XmlPatternPtr,                /* the result */
     elem: XmlNodePtr,                   /* the current node if any */
     namespaces: Option<Vec<*const u8>>, /* the namespaces definitions */
-    nb_namespaces: i32,                 /* the number of namespaces */
 }
 
 impl Default for XmlPatParserContext {
@@ -223,7 +222,6 @@ impl Default for XmlPatParserContext {
             comp: null_mut(),
             elem: null_mut(),
             namespaces: None,
-            nb_namespaces: 0,
         }
     }
 }
@@ -250,11 +248,6 @@ unsafe fn xml_new_pat_parser_context(
     (*cur).dict = dict;
     (*cur).cur = pattern;
     (*cur).base = pattern;
-    if let Some(namespaces) = namespaces.as_deref() {
-        (*cur).nb_namespaces = namespaces.len() as i32 / 2;
-    } else {
-        (*cur).nb_namespaces = 0;
-    }
     (*cur).namespaces = namespaces;
     cur
 }

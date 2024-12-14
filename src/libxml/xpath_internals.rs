@@ -3434,7 +3434,11 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
         //  to have a list of namespaces at compilation time in order to
         //  compile prefixed name tests.
         let tmp: *const XmlChar = xml_strchr(str, b':');
-        if !tmp.is_null() && (ctxt.is_null() || (*ctxt).ns_nr == 0 || *tmp.add(1) == b':') {
+        if !tmp.is_null()
+            && (ctxt.is_null()
+                || (*ctxt).namespaces.as_ref().map_or(0, |t| t.len()) == 0
+                || *tmp.add(1) == b':')
+        {
             return null_mut();
         }
 
