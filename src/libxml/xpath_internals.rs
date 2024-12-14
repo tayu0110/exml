@@ -3296,14 +3296,13 @@ unsafe fn xml_xpath_cmp_nodes_ext(
         }
         cur = now.next;
     }
-    Some(std::cmp::Ordering::Greater) /* assume there is no sibling list corruption */
+    // assume there is no sibling list corruption
+    Some(std::cmp::Ordering::Greater)
 }
 
 /// Sort the node set in document order
 #[doc(alias = "xmlXPathNodeSetSort")]
 pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
-    let mut tmp: XmlNodePtr;
-
     if set.is_null() {
         return;
     }
@@ -3311,6 +3310,9 @@ pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
     // Use the old Shell's sort implementation to sort the node-set
     // Timsort ought to be quite faster
     if let Some(table) = (*set).node_tab.as_mut() {
+        // TODO: Use `sort_unstable` of Rust standard library.
+        //       When I tried to rewirte, it did not work fine
+        //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
         let len = table.len();
         let mut incr = len;
         while {
@@ -3323,9 +3325,7 @@ pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
                     if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
                         .map_or(false, |f| f.is_gt())
                     {
-                        tmp = table[j as usize];
-                        table[j as usize] = table[j as usize + incr];
-                        table[j as usize + incr] = tmp;
+                        table.swap(j as usize, j as usize + incr);
                         j -= incr as i32;
                     } else {
                         break;
