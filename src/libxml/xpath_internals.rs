@@ -2005,12 +2005,10 @@ pub unsafe extern "C" fn xml_xpath_ns_lookup(
         return XML_XML_NAMESPACE.as_ptr() as _;
     }
 
-    if !(*ctxt).namespaces.is_null() {
-        for i in 0..(*ctxt).ns_nr {
-            if (*(*ctxt).namespaces.add(i as usize)).is_null()
-                && xml_str_equal((*(*(*ctxt).namespaces.add(i as usize))).prefix as _, prefix)
-            {
-                return (*(*(*ctxt).namespaces.add(i as usize))).href;
+    if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
+        for &ns in namespaces {
+            if ns.is_null() && xml_str_equal((*ns).prefix as _, prefix) {
+                return (*ns).href;
             }
         }
     }
@@ -3418,30 +3416,25 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
     ctxt: XmlXPathContextPtr,
     str: *const XmlChar,
 ) -> XmlXPathCompExprPtr {
-    /*
-     * Optimization: use streaming patterns when the XPath expression can
-     * be compiled to a stream lookup
-     */
+    // Optimization: use streaming patterns when the XPath expression can
+    // be compiled to a stream lookup
     let stream: XmlPatternPtr;
     let comp: XmlXPathCompExprPtr;
     let mut dict: XmlDictPtr = null_mut();
     let mut namespaces: *mut *const XmlChar = null_mut();
-    let mut ns: XmlNsPtr;
     let mut i: i32;
 
     if xml_strchr(str, b'[').is_null()
         && xml_strchr(str, b'(').is_null()
         && xml_strchr(str, b'@').is_null()
     {
-        /*
-         * We don't try to handle expressions using the verbose axis
-         * specifiers ("::"), just the simplified form at this point.
-         * Additionally, if there is no list of namespaces available and
-         *  there's a ":" in the expression, indicating a prefixed QName,
-         *  then we won't try to compile either. xmlPatterncompile() needs
-         *  to have a list of namespaces at compilation time in order to
-         *  compile prefixed name tests.
-         */
+        // We don't try to handle expressions using the verbose axis
+        // specifiers ("::"), just the simplified form at this point.
+        // Additionally, if there is no list of namespaces available and
+        //  there's a ":" in the expression, indicating a prefixed QName,
+        //  then we won't try to compile either. xmlPatterncompile() needs
+        //  to have a list of namespaces at compilation time in order to
+        //  compile prefixed name tests.
         let tmp: *const XmlChar = xml_strchr(str, b':');
         if !tmp.is_null() && (ctxt.is_null() || (*ctxt).ns_nr == 0 || *tmp.add(1) == b':') {
             return null_mut();
@@ -3449,7 +3442,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
 
         if !ctxt.is_null() {
             dict = (*ctxt).dict;
-            if (*ctxt).ns_nr > 0 {
+            if let Some(table) = (*ctxt).namespaces.as_deref().filter(|t| !t.is_empty()) {
                 namespaces =
                     xml_malloc(2 * ((*ctxt).ns_nr as usize + 1) * size_of::<*mut XmlChar>()) as _;
                 if namespaces.is_null() {
@@ -3457,8 +3450,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
                     return null_mut();
                 }
                 i = 0;
-                for j in 0..(*ctxt).ns_nr {
-                    ns = *(*ctxt).namespaces.add(j as usize);
+                for &ns in table {
                     *namespaces.add(i as usize) = (*ns).href;
                     i += 1;
                     *namespaces.add(i as usize) = (*ns).prefix;

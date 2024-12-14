@@ -369,9 +369,9 @@ pub struct XmlXPathContext {
     pub(crate) axis: XmlXPathAxisPtr, /* Array of defined axis */
 
     // the namespace nodes of the context node
-    pub(crate) namespaces: *mut XmlNsPtr, /* Array of namespaces */
-    pub(crate) ns_nr: i32,                /* number of namespace in scope */
-    pub(crate) user: *mut c_void,         /* function to free */
+    pub(crate) namespaces: Option<Vec<XmlNsPtr>>, /* Array of namespaces */
+    pub(crate) ns_nr: i32,                        /* number of namespace in scope */
+    pub(crate) user: *mut c_void,                 /* function to free */
 
     // extra variables
     pub(crate) context_size: i32,       /* the context size */
@@ -439,7 +439,7 @@ impl Default for XmlXPathContext {
             nb_axis: 0,
             max_axis: 0,
             axis: null_mut(),
-            namespaces: null_mut(),
+            namespaces: None,
             ns_nr: 0,
             user: null_mut(),
             context_size: 0,
