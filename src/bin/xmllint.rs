@@ -2254,23 +2254,28 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             let mut node: XmlNodePtr;
             #[cfg(feature = "libxml_output")]
             {
-                if (*cur).nodesetval.is_null() || (*(*cur).nodesetval).node_nr <= 0 {
+                if (*cur).nodesetval.is_null() {
                     if QUIET == 0 {
                         eprintln!("XPath set is empty");
                     }
-                } else {
+                } else if let Some(table) = (*(*cur).nodesetval)
+                    .node_tab
+                    .as_deref()
+                    .filter(|t| !t.is_empty())
+                {
                     let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                         eprintln!("Out of memory for XPath");
                         PROGRESULT = XmllintReturnCode::ErrMem;
                         return;
                     };
                     let buf = Rc::new(RefCell::new(buf));
-                    for i in 0..(*(*cur).nodesetval).node_nr {
-                        node = *(*(*cur).nodesetval).node_tab.add(i as usize);
+                    for &node in table {
                         (*node).dump_output(buf.clone(), null_mut(), 0, 0, None);
                         buf.borrow_mut().write_bytes(b"\n");
                     }
                     buf.borrow_mut().flush();
+                } else if QUIET == 0 {
+                    eprintln!("XPath set is empty");
                 }
             }
             #[cfg(not(feature = "libxml_output"))]

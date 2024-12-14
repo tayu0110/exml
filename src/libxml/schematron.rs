@@ -1451,11 +1451,14 @@ unsafe extern "C" fn xml_schematron_get_node(
         return null_mut();
     }
 
-    if (*ret).typ == XmlXPathObjectType::XpathNodeset
-        && !(*ret).nodesetval.is_null()
-        && (*(*ret).nodesetval).node_nr > 0
-    {
-        node = *(*(*ret).nodesetval).node_tab.add(0);
+    if (*ret).typ == XmlXPathObjectType::XpathNodeset && !(*ret).nodesetval.is_null() {
+        if let Some(table) = (*(*ret).nodesetval)
+            .node_tab
+            .as_deref()
+            .filter(|t| !t.is_empty())
+        {
+            node = table[0];
+        }
     }
 
     xml_xpath_free_object(ret);
@@ -1519,14 +1522,13 @@ unsafe extern "C" fn xml_schematron_format_report(
                     let spacer: *mut XmlChar = c" ".as_ptr() as _;
 
                     if !(*eval).nodesetval.is_null() {
-                        for indx in 0..(*(*eval).nodesetval).node_nr {
-                            if indx > 0 {
-                                ret = xml_strcat(ret, spacer);
+                        if let Some(table) = (*(*eval).nodesetval).node_tab.as_deref() {
+                            for (indx, &node) in table.iter().enumerate() {
+                                if indx > 0 {
+                                    ret = xml_strcat(ret, spacer);
+                                }
+                                ret = xml_strcat(ret, (*node).name);
                             }
-                            ret = xml_strcat(
-                                ret,
-                                (*(*(*(*eval).nodesetval).node_tab.add(indx as usize))).name,
-                            );
                         }
                     } else {
                         generic_error!("Empty node set\n");
@@ -1729,7 +1731,12 @@ unsafe extern "C" fn xml_schematron_run_test(
     } else {
         match (*ret).typ {
             XmlXPathObjectType::XpathXsltTree | XmlXPathObjectType::XpathNodeset => {
-                if (*ret).nodesetval.is_null() || (*(*ret).nodesetval).node_nr == 0 {
+                if (*ret).nodesetval.is_null()
+                    || (*(*ret).nodesetval)
+                        .node_tab
+                        .as_ref()
+                        .map_or(true, |t| t.is_empty())
+                {
                     failed = 1;
                 }
             }

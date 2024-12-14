@@ -2222,18 +2222,23 @@ unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx:
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathNodeset);
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     let oldset: XmlNodeSetPtr = (*obj).nodesetval;
-    if indx <= 0 || oldset.is_null() || (*oldset).node_nr != 1 {
+    if indx <= 0 || oldset.is_null() {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     }
-    let cur: XmlNodePtr = xml_xptr_get_nth_child(*(*oldset).node_tab.add(0), indx);
+    let Some(table) = (*oldset).node_tab.as_mut().filter(|t| t.len() == 1) else {
+        xml_xpath_free_object(obj);
+        value_push(ctxt, xml_xpath_new_node_set(null_mut()));
+        return;
+    };
+    let cur: XmlNodePtr = xml_xptr_get_nth_child(table[0], indx);
     if cur.is_null() {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     }
-    *(*oldset).node_tab.add(0) = cur;
+    table[0] = cur;
     value_push(ctxt, obj);
 }
 
@@ -2506,10 +2511,7 @@ unsafe extern "C" fn xml_xptr_eval_full_xptr(
             return;
         }
 
-        /*
-         * If the returned value is a non-empty nodeset
-         * or location set, return here.
-         */
+        // If the returned value is a non-empty nodeset or location set, return here.
         if !(*ctxt).value.is_null() {
             let mut obj: XmlXPathObjectPtr = (*ctxt).value;
 
@@ -2523,17 +2525,15 @@ unsafe extern "C" fn xml_xptr_eval_full_xptr(
                 }
                 XmlXPathObjectType::XpathNodeset => {
                     let loc: XmlNodeSetPtr = (*(*ctxt).value).nodesetval;
-                    if !loc.is_null() && (*loc).node_nr > 0 {
+                    if !loc.is_null() && (*loc).node_tab.as_ref().map_or(false, |t| !t.is_empty()) {
                         return;
                     }
                 }
                 _ => {}
             }
 
-            /*
-             * Evaluating to improper values is equivalent to
-             * a sub-resource error, clean-up the stack
-             */
+            // Evaluating to improper values is equivalent to
+            // a sub-resource error, clean-up the stack
             while {
                 obj = value_pop(ctxt);
                 if !obj.is_null() {
@@ -2645,8 +2645,10 @@ pub unsafe extern "C" fn xml_xptr_eval(
                     // Evaluation may push a root nodeset which is unused
                     let set: XmlNodeSetPtr = (*tmp).nodesetval;
                     if set.is_null()
-                        || (*set).node_nr != 1
-                        || *(*set).node_tab.add(0) != (*ctx).doc as XmlNodePtr
+                        || (*set)
+                            .node_tab
+                            .as_ref()
+                            .map_or(true, |t| t.len() != 1 || t[0] != (*ctx).doc as XmlNodePtr)
                     {
                         stack += 1;
                     }

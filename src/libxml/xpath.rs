@@ -69,7 +69,6 @@ use crate::{
             xml_xpath_registered_variables_cleanup, xml_xpath_release_object, xml_xpath_run_eval,
             xml_xpath_string_eval_number, xml_xpath_try_stream_compile, xml_xpath_wrap_string,
             xml_xpatherror, XmlPointerListPtr, XmlXpathContextCache, XmlXpathContextCachePtr,
-            XML_NODESET_DEFAULT,
         },
     },
     tree::{xml_free_node_list, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
@@ -132,11 +131,10 @@ pub enum XmlXPathError {
 pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[cfg(feature = "xpath")]
 #[repr(C)]
+#[derive(Debug, Default)]
 pub struct XmlNodeSet {
-    pub node_nr: i32,  /* number of nodes in the set */
-    pub node_max: i32, /* size of the array as allocated */
-    pub node_tab: *mut XmlNodePtr, /* array of nodes in no particular order */
-                       /* @@ with_ns to check whether namespace nodes should be looked at @@ */
+    pub node_tab: Option<Vec<XmlNodePtr>>, /* array of nodes in no particular order */
+                                           /* @@ with_ns to check whether namespace nodes should be looked at @@ */
 }
 
 // An expression is evaluated to yield an object, which
@@ -575,7 +573,7 @@ pub static mut XML_XPATH_NINF: f64 = 0.0;
 macro_rules! xml_xpath_node_set_get_length {
     ($ns:expr) => {
         if !$ns.is_null() {
-            (*$ns).node_nr
+            (*$ns).node_tab.as_ref().map_or(0, |t| t.len() as i32)
         } else {
             0
         }
@@ -592,8 +590,11 @@ macro_rules! xml_xpath_node_set_get_length {
 #[macro_export]
 macro_rules! xml_xpath_node_set_item {
     ($ns:expr, $index:expr) => {
-        if !$ns.is_null() && $index >= 0 && ($index) < (*$ns).node_nr {
-            *(*$ns).node_tab.add($index as usize)
+        if !$ns.is_null()
+            && $index >= 0
+            && ($index as usize) < (*$ns).node_tab.as_ref().map_or(0, |t| t.len())
+        {
+            (*$ns).node_tab.as_ref().unwrap()[$index as usize]
         } else {
             null_mut()
         }
@@ -609,7 +610,7 @@ macro_rules! xml_xpath_node_set_item {
 #[macro_export]
 macro_rules! xml_xpath_node_set_is_empty {
     ($ns:expr) => {
-        $ns.is_null() || (*$ns).node_nr == 0 || (*$ns).node_tab.is_null()
+        $ns.is_null() || (*$ns).node_tab.as_ref().map_or(true, |t| t.is_empty())
     };
 }
 
@@ -623,20 +624,16 @@ pub unsafe extern "C" fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
         return;
     }
 
-    if !(*obj).node_tab.is_null() {
-        for i in 0..(*obj).node_nr {
-            if !(*(*obj).node_tab.add(i as usize)).is_null() {
-                if matches!(
-                    (*(*(*obj).node_tab.add(i as usize))).element_type(),
-                    XmlElementType::XmlNamespaceDecl
-                ) {
-                    xml_xpath_node_set_free_ns(*(*obj).node_tab.add(i as usize) as XmlNsPtr);
+    if let Some(mut table) = (*obj).node_tab.take() {
+        while let Some(node) = table.pop() {
+            if !node.is_null() {
+                if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
                 } else {
-                    xml_free_node_list(*(*obj).node_tab.add(i as usize));
+                    xml_free_node_list(node);
                 }
             }
         }
-        xml_free((*obj).node_tab as _);
     }
     xml_free(obj as _);
 }
@@ -684,21 +681,9 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
         xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlNodeSet>());
+    std::ptr::write(&mut *ret, XmlNodeSet::default());
     if !val.is_null() {
-        (*ret).node_tab =
-            xml_malloc(XML_NODESET_DEFAULT * size_of::<XmlNodePtr>()) as *mut XmlNodePtr;
-        if (*ret).node_tab.is_null() {
-            xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
-            xml_free(ret as _);
-            return null_mut();
-        }
-        memset(
-            (*ret).node_tab as _,
-            0,
-            XML_NODESET_DEFAULT * size_of::<XmlNodePtr>(),
-        );
-        (*ret).node_max = XML_NODESET_DEFAULT as _;
+        (*ret).node_tab = Some(vec![]);
         if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
             let ns: XmlNsPtr = val as XmlNsPtr;
             let ns_node: XmlNodePtr = xml_xpath_node_set_dup_ns((*ns).next as XmlNodePtr, ns);
@@ -707,11 +692,9 @@ pub unsafe extern "C" fn xml_xpath_node_set_create(val: XmlNodePtr) -> XmlNodeSe
                 xml_xpath_free_node_set(ret);
                 return null_mut();
             }
-            *(*ret).node_tab.add((*ret).node_nr as usize) = ns_node;
-            (*ret).node_nr += 1;
+            (*ret).node_tab.as_mut().unwrap().push(ns_node);
         } else {
-            *(*ret).node_tab.add((*ret).node_nr as usize) = val;
-            (*ret).node_nr += 1;
+            (*ret).node_tab.as_mut().unwrap().push(val);
         }
     }
     ret
@@ -737,19 +720,14 @@ pub unsafe extern "C" fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
     if obj.is_null() {
         return;
     }
-    if !(*obj).node_tab.is_null() {
-        /* @@ with_ns to check whether namespace nodes should be looked at @@ */
-        for i in 0..(*obj).node_nr {
-            if !(*(*obj).node_tab.add(i as usize)).is_null()
-                && matches!(
-                    (*(*(*obj).node_tab.add(i as usize))).element_type(),
-                    XmlElementType::XmlNamespaceDecl
-                )
+    if let Some(mut table) = (*obj).node_tab.take() {
+        // @@ with_ns to check whether namespace nodes should be looked at @@
+        while let Some(node) = table.pop() {
+            if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
             {
-                xml_xpath_node_set_free_ns(*(*obj).node_tab.add(i as usize) as XmlNsPtr);
+                xml_xpath_node_set_free_ns(node as XmlNsPtr);
             }
         }
-        xml_free((*obj).node_tab as _);
     }
     xml_free(obj as _);
 }
@@ -1001,7 +979,7 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -
 #[doc(alias = "xmlXPathCastNodeSetToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> i32 {
-    if ns.is_null() || (*ns).node_nr == 0 {
+    if ns.is_null() || (*ns).node_tab.as_ref().map_or(true, |t| t.is_empty()) {
         return 0;
     }
     1
@@ -1349,14 +1327,17 @@ pub unsafe fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> String {
 #[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> Option<String> {
-    if ns.is_null() || (*ns).node_nr == 0 || (*ns).node_tab.is_null() {
+    if ns.is_null() || (*ns).node_tab.as_ref().map_or(true, |t| t.is_empty()) {
         return Some("".to_owned());
     }
 
-    if (*ns).node_nr > 1 {
+    let table = (*ns).node_tab.as_ref()?;
+    if table.len() > 1 {
         xml_xpath_node_set_sort(ns);
     }
-    Some(xml_xpath_cast_node_to_string(*(*ns).node_tab.add(0)))
+
+    let table = (*ns).node_tab.as_ref()?;
+    Some(xml_xpath_cast_node_to_string(table[0]))
 }
 
 /// Converts an existing object to its string() equivalent
@@ -1545,14 +1526,10 @@ unsafe extern "C" fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
 
     for i in 0..(*list).number {
         obj = *(*list).items.add(i as usize) as _;
-        /*
-         * Note that it is already assured that we don't need to
-         * look out for namespace nodes in the node-set.
-         */
+        // Note that it is already assured that we don't need to
+        // look out for namespace nodes in the node-set.
         if !(*obj).nodesetval.is_null() {
-            if !(*(*obj).nodesetval).node_tab.is_null() {
-                xml_free((*(*obj).nodesetval).node_tab as _);
-            }
+            let _ = (*(*obj).nodesetval).node_tab.take();
             xml_free((*obj).nodesetval as _);
         }
         xml_free(obj as _);
@@ -1876,7 +1853,10 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
             if (*res).nodesetval.is_null() {
                 return 0;
             }
-            return ((*(*res).nodesetval).node_nr != 0) as i32;
+            return ((*(*res).nodesetval)
+                .node_tab
+                .as_ref()
+                .map_or(false, |s| !s.is_empty())) as i32;
         }
         XmlXPathObjectType::XpathString => {
             return (!(*res).stringval.is_null() && xml_strlen((*res).stringval) != 0) as i32;
