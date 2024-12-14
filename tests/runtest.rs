@@ -4540,16 +4540,14 @@ unsafe fn pattern_test(
                     );
                     // ret = 1;
                 } else {
-                    let mut namespaces: [*const XmlChar; 22] = [null(); 22];
+                    let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
                     let mut ns: XmlNsPtr;
 
                     let root: XmlNodePtr = (*doc).get_root_element();
                     ns = (*root).ns_def;
                     let mut j = 0;
-                    while j < 20 && !ns.is_null() {
-                        namespaces[j] = (*ns).href;
-                        j += 1;
-                        namespaces[j] = (*ns).prefix;
+                    while j < 10 && !ns.is_null() {
+                        namespaces[j] = ((*ns).href, (*ns).prefix);
                         j += 1;
                         ns = (*ns).next;
                     }

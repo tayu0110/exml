@@ -3446,13 +3446,10 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
         if !ctxt.is_null() {
             dict = (*ctxt).dict;
             if let Some(table) = (*ctxt).namespaces.as_deref().filter(|t| !t.is_empty()) {
-                let namespaces = namespaces.get_or_insert_with(|| vec![null(); 2 * table.len()]);
-                let mut i = 0;
-                for &ns in table {
-                    namespaces[i] = (*ns).href;
-                    i += 1;
-                    namespaces[i] = (*ns).prefix;
-                    i += 1;
+                let namespaces =
+                    namespaces.get_or_insert_with(|| vec![(null(), null()); table.len()]);
+                for (i, &ns) in table.iter().enumerate() {
+                    namespaces[i] = ((*ns).href, (*ns).prefix);
                 }
             }
         }

@@ -203,13 +203,13 @@ pub unsafe extern "C" fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
 pub type XmlPatParserContextPtr = *mut XmlPatParserContext;
 #[repr(C)]
 pub struct XmlPatParserContext {
-    cur: *const XmlChar,                /* the current char being parsed */
-    base: *const XmlChar,               /* the full expression */
-    error: i32,                         /* error code */
-    dict: XmlDictPtr,                   /* the dictionary if any */
-    comp: XmlPatternPtr,                /* the result */
-    elem: XmlNodePtr,                   /* the current node if any */
-    namespaces: Option<Vec<*const u8>>, /* the namespaces definitions */
+    cur: *const XmlChar,  /* the current char being parsed */
+    base: *const XmlChar, /* the full expression */
+    error: i32,           /* error code */
+    dict: XmlDictPtr,     /* the dictionary if any */
+    comp: XmlPatternPtr,  /* the result */
+    elem: XmlNodePtr,     /* the current node if any */
+    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
 }
 
 impl Default for XmlPatParserContext {
@@ -233,7 +233,7 @@ impl Default for XmlPatParserContext {
 unsafe fn xml_new_pat_parser_context(
     pattern: *const XmlChar,
     dict: XmlDictPtr,
-    namespaces: Option<Vec<*const XmlChar>>,
+    namespaces: Option<Vec<(*const u8, *const u8)>>,
 ) -> XmlPatParserContextPtr {
     if pattern.is_null() {
         return null_mut();
@@ -520,9 +520,9 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                 XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
             } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
                 let mut found = false;
-                for ns in namespaces.chunks_exact(2) {
-                    if xml_str_equal(ns[1], prefix) {
-                        XML_PAT_COPY_NSNAME!(ctxt, url, ns[0]);
+                for &(href, pref) in namespaces {
+                    if xml_str_equal(pref, prefix) {
+                        XML_PAT_COPY_NSNAME!(ctxt, url, href);
                         found = true;
                         break;
                     }
@@ -636,9 +636,9 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
                 } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
                     let mut found = false;
-                    for ns in namespaces.chunks_exact(2) {
-                        if xml_str_equal(ns[1], prefix) {
-                            XML_PAT_COPY_NSNAME!(ctxt, url, ns[0]);
+                    for &(href, pref) in namespaces {
+                        if xml_str_equal(pref, prefix) {
+                            XML_PAT_COPY_NSNAME!(ctxt, url, href);
                             found = true;
                             break;
                         }
@@ -702,9 +702,9 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                             XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
                         } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
                             let mut found = false;
-                            for ns in namespaces.chunks_exact(2) {
-                                if xml_str_equal(ns[1], prefix) {
-                                    XML_PAT_COPY_NSNAME!(ctxt, url, ns[0]);
+                            for &(href, pref) in namespaces {
+                                if xml_str_equal(pref, prefix) {
+                                    XML_PAT_COPY_NSNAME!(ctxt, url, href);
                                     found = true;
                                     break;
                                 }
@@ -1343,7 +1343,7 @@ pub unsafe fn xml_patterncompile(
     pattern: *const XmlChar,
     dict: *mut XmlDict,
     flags: i32,
-    namespaces: Option<Vec<*const u8>>,
+    namespaces: Option<Vec<(*const u8, *const u8)>>,
 ) -> XmlPatternPtr {
     let mut ret: XmlPatternPtr = null_mut();
     let mut cur: XmlPatternPtr;

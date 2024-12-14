@@ -2140,7 +2140,7 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
 
     #[cfg(feature = "libxml_pattern")]
     {
-        let mut namespaces: [*const XmlChar; 22] = [null(); 22];
+        let mut namespaces: [(*const u8, *const u8); 22] = [(null(), null()); 22];
 
         let root: XmlNodePtr = if doc.is_null() {
             null_mut()
@@ -2154,10 +2154,8 @@ unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
         }
         let mut i = 0;
         let mut ns = (*root).ns_def;
-        while !ns.is_null() && i < 20 {
-            namespaces[i] = (*ns).href;
-            i += 1;
-            namespaces[i] = (*ns).prefix;
+        while !ns.is_null() && i < 10 {
+            namespaces[i] = ((*ns).href, (*ns).prefix);
             i += 1;
             ns = (*ns).next;
         }

@@ -149,10 +149,10 @@ pub struct XmlSchematron {
 
     nb_ns: i32, /* the number of namespaces */
 
-    nb_pattern: i32,                    /* the number of patterns */
-    patterns: XmlSchematronPatternPtr,  /* the patterns found */
-    rules: XmlSchematronRulePtr,        /* the rules gathered */
-    namespaces: Option<Vec<*const u8>>, /* the array of namespaces */
+    nb_pattern: i32,                                 /* the number of patterns */
+    patterns: XmlSchematronPatternPtr,               /* the patterns found */
+    rules: XmlSchematronRulePtr,                     /* the rules gathered */
+    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the array of namespaces */
 }
 
 impl Default for XmlSchematron {
@@ -222,7 +222,7 @@ pub struct XmlSchematronParserCtxt {
     xctxt: XmlXPathContextPtr, /* the XPath context used for compilation */
     schema: XmlSchematronPtr,
 
-    namespaces: Option<Vec<*const u8>>, /* the array of namespaces */
+    namespaces: Option<Vec<(*const u8, *const u8)>>, /* the array of namespaces */
 
     nb_includes: i32,          /* number of includes in the array */
     max_includes: i32,         /* size of the array */
@@ -536,8 +536,10 @@ unsafe extern "C" fn xml_schematron_add_namespace(
     ns: *const XmlChar,
 ) {
     let namespaces = (*ctxt).namespaces.get_or_insert_with(Vec::new);
-    namespaces.push(xml_dict_lookup((*ctxt).dict, ns, -1));
-    namespaces.push(xml_dict_lookup((*ctxt).dict, prefix, -1));
+    namespaces.push((
+        xml_dict_lookup((*ctxt).dict, ns, -1),
+        xml_dict_lookup((*ctxt).dict, prefix, -1),
+    ));
 }
 
 /// Add a pattern to a schematron
@@ -1382,11 +1384,11 @@ pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
         return null_mut();
     }
     if let Some(namespaces) = (*schema).namespaces.as_deref() {
-        for ns in namespaces.chunks_exact(2) {
-            if ns[0].is_null() || ns[1].is_null() {
+        for &(href, pref) in namespaces {
+            if href.is_null() || pref.is_null() {
                 break;
             }
-            xml_xpath_register_ns((*ret).xctxt, ns[1], ns[0]);
+            xml_xpath_register_ns((*ret).xctxt, pref, href);
         }
     }
     ret

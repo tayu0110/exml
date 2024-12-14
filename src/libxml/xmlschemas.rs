@@ -10244,10 +10244,9 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
         let mut ns_array = None;
         if let Some(ns_list) = ns_list {
             let count: usize = ns_list.len();
-            let ns_array = ns_array.get_or_insert_with(|| vec![null(); count * 2]);
+            let ns_array = ns_array.get_or_insert_with(|| vec![(null(), null()); count]);
             for (i, cur) in ns_list.into_iter().enumerate() {
-                ns_array[2 * i] = (*cur).href;
-                ns_array[2 * i + 1] = (*cur).prefix;
+                ns_array[i] = ((*cur).href, (*cur).prefix);
             }
         }
         // TODO: Differentiate between "selector" and "field".
