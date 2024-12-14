@@ -300,7 +300,7 @@ pub struct XmlXPathAxis {
 /// and the result is pushed on the stack.
 #[doc(alias = "xmlXPathFunction")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathFunction = unsafe extern "C" fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
+pub type XmlXPathFunction = unsafe fn(ctxt: XmlXPathParserContextPtr, nargs: i32);
 
 /// Prototype for callbacks used to plug variable lookup in the XPath engine.
 ///
@@ -318,7 +318,7 @@ pub type XmlXPathVariableLookupFunc = unsafe extern "C" fn(
 /// Returns the XPath function or NULL if not found.
 #[doc(alias = "xmlXPathFuncLookupFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathFuncLookupFunc = unsafe extern "C" fn(
+pub type XmlXPathFuncLookupFunc = unsafe fn(
     ctxt: *mut c_void,
     name: *const XmlChar,
     ns_uri: *const XmlChar,

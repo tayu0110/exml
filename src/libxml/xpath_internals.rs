@@ -854,7 +854,7 @@ pub unsafe extern "C" fn xml_xpath_register_variable_lookup(
 
 /// Registers an external mechanism to do function lookup.
 #[doc(alias = "xmlXPathRegisterFuncLookup")]
-pub unsafe extern "C" fn xml_xpath_register_func_lookup(
+pub unsafe fn xml_xpath_register_func_lookup(
     ctxt: XmlXPathContextPtr,
     f: XmlXPathFuncLookupFunc,
     func_ctxt: *mut c_void,
@@ -2039,7 +2039,7 @@ pub unsafe extern "C" fn xml_xpath_registered_ns_cleanup(ctxt: XmlXPathContextPt
 ///
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlXPathRegisterFunc")]
-pub unsafe extern "C" fn xml_xpath_register_func(
+pub unsafe fn xml_xpath_register_func(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
     f: XmlXPathFunction,
@@ -2051,7 +2051,7 @@ pub unsafe extern "C" fn xml_xpath_register_func(
 ///
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlXPathRegisterFuncNS")]
-pub unsafe extern "C" fn xml_xpath_register_func_ns(
+pub unsafe fn xml_xpath_register_func_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
     ns_uri: *const XmlChar,
@@ -2167,7 +2167,7 @@ pub unsafe extern "C" fn xml_xpath_register_variable_ns(
 ///
 /// Returns the xmlXPathFunction or NULL if not found
 #[doc(alias = "xmlXPathFunctionLookup")]
-pub unsafe extern "C" fn xml_xpath_function_lookup(
+pub unsafe fn xml_xpath_function_lookup(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
 ) -> Option<XmlXPathFunction> {
@@ -2187,7 +2187,7 @@ pub unsafe extern "C" fn xml_xpath_function_lookup(
 ///
 /// Returns the xmlXPathFunction or NULL if not found
 #[doc(alias = "xmlXPathFunctionLookupNS")]
-pub unsafe extern "C" fn xml_xpath_function_lookup_ns(
+pub unsafe fn xml_xpath_function_lookup_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
     ns_uri: *const XmlChar,
@@ -8754,7 +8754,7 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
 /// defaults to the context node.
 /// Libxml keep the original prefix so the "real qualified name" used is returned.
 #[doc(alias = "xmlXPathNameFunction")]
-unsafe extern "C" fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
+unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     if nargs == 0 {
         value_push(
             ctxt,
@@ -8870,7 +8870,7 @@ unsafe extern "C" fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut
 ///  xf:escape-uri ("gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles#ocean"), false())
 ///  returns "gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles%23ocean"
 #[doc(alias = "xmlXPathEscapeUriFunction")]
-unsafe extern "C" fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut cptr: *mut XmlChar;
     let mut escape: [XmlChar; 4] = [0; 4];
 
@@ -11259,7 +11259,7 @@ pub unsafe extern "C" fn xml_xpath_next_preceding_sibling(
 ///    number last()
 /// The last function returns the number of nodes in the context node list.
 #[doc(alias = "xmlXPathLastFunction")]
-pub unsafe extern "C" fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     if (*(*ctxt).context).context_size >= 0 {
         value_push(
@@ -11277,7 +11277,7 @@ pub unsafe extern "C" fn xml_xpath_last_function(ctxt: XmlXPathParserContextPtr,
 /// context node list. The first position is 1, and so the last position
 /// will be equal to last().
 #[doc(alias = "xmlXPathPositionFunction")]
-pub unsafe extern "C" fn xml_xpath_position_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_position_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     if (*(*ctxt).context).proximity_position >= 0 {
         value_push(
@@ -11295,7 +11295,7 @@ pub unsafe extern "C" fn xml_xpath_position_function(ctxt: XmlXPathParserContext
 /// Implement the count() XPath function
 ///    number count(node-set)
 #[doc(alias = "xmlXPathCountFunction")]
-pub unsafe extern "C" fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_count_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     if (*ctxt).value.is_null()
         || !matches!(
@@ -11448,7 +11448,7 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
 /// containing the elements in the same document as the context node that
 /// have a unique ID equal to any of the tokens in the list.
 #[doc(alias = "xmlXPathIdFunction")]
-pub unsafe extern "C" fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut ret: XmlNodeSetPtr;
     let mut obj: XmlXPathObjectPtr;
 
@@ -11502,10 +11502,7 @@ pub unsafe extern "C" fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, n
 /// name, an empty string is returned. If the argument is omitted it
 /// defaults to the context node.
 #[doc(alias = "xmlXPathLocalNameFunction")]
-pub unsafe extern "C" fn xml_xpath_local_name_function(
-    ctxt: XmlXPathParserContextPtr,
-    mut nargs: i32,
-) {
+pub unsafe fn xml_xpath_local_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     if ctxt.is_null() {
         return;
     }
@@ -11587,10 +11584,7 @@ pub unsafe extern "C" fn xml_xpath_local_name_function(
 /// URI, an empty string is returned. If the argument is omitted it
 /// defaults to the context node.
 #[doc(alias = "xmlXPathNamespaceURIFunction")]
-pub unsafe extern "C" fn xml_xpath_namespace_uri_function(
-    ctxt: XmlXPathParserContextPtr,
-    mut nargs: i32,
-) {
+pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     if ctxt.is_null() {
         return;
     }
@@ -11685,7 +11679,7 @@ pub unsafe extern "C" fn xml_xpath_namespace_uri_function(
 /// If the argument is omitted, it defaults to a node-set with the
 /// context node as its only member.
 #[doc(alias = "xmlXPathStringFunction")]
-pub unsafe extern "C" fn xml_xpath_string_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_string_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     if ctxt.is_null() {
         return;
     }
@@ -11712,10 +11706,7 @@ pub unsafe extern "C" fn xml_xpath_string_function(ctxt: XmlXPathParserContextPt
 /// the context node converted to a string, in other words the value
 /// of the context node.
 #[doc(alias = "xmlXPathStringLengthFunction")]
-pub unsafe extern "C" fn xml_xpath_string_length_function(
-    ctxt: XmlXPathParserContextPtr,
-    nargs: i32,
-) {
+pub unsafe fn xml_xpath_string_length_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     if nargs == 0 {
         if ctxt.is_null() || (*ctxt).context.is_null() {
             return;
@@ -11750,7 +11741,7 @@ pub unsafe extern "C" fn xml_xpath_string_length_function(
 ///    string concat(string, string, string*)
 /// The concat function returns the concatenation of its arguments.
 #[doc(alias = "xmlXPathConcatFunction")]
-pub unsafe extern "C" fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
+pub unsafe fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     let mut newobj: XmlXPathObjectPtr;
     let mut tmp: *mut XmlChar;
 
@@ -11791,7 +11782,7 @@ pub unsafe extern "C" fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPt
 /// The contains function returns true if the first argument string
 /// contains the second argument string, and otherwise returns false.
 #[doc(alias = "xmlXPathContainsFunction")]
-pub unsafe extern "C" fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 2);
     CAST_TO_STRING!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathString);
@@ -11818,10 +11809,7 @@ pub unsafe extern "C" fn xml_xpath_contains_function(ctxt: XmlXPathParserContext
 /// The starts-with function returns true if the first argument string
 /// starts with the second argument string, and otherwise returns false.
 #[doc(alias = "xmlXPathStartsWithFunction")]
-pub unsafe extern "C" fn xml_xpath_starts_with_function(
-    ctxt: XmlXPathParserContextPtr,
-    nargs: i32,
-) {
+pub unsafe fn xml_xpath_starts_with_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 2);
     CAST_TO_STRING!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathString);
@@ -11867,7 +11855,7 @@ pub unsafe extern "C" fn xml_xpath_starts_with_function(
 ///  - substring("12345", -42, 1 div 0) returns "12345"
 ///  - substring("12345", -1 div 0, 1 div 0) returns ""
 #[doc(alias = "xmlXPathSubstringFunction")]
-pub unsafe extern "C" fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let len: XmlXPathObjectPtr;
     let mut le: f64 = 0.0;
     let mut i: i32 = 1;
@@ -11960,10 +11948,7 @@ pub unsafe extern "C" fn xml_xpath_substring_function(ctxt: XmlXPathParserContex
 /// if the first argument string does not contain the second argument
 /// string. For example, substring-before("1999/04/01","/") returns 1999.
 #[doc(alias = "xmlXPathSubstringBeforeFunction")]
-pub unsafe extern "C" fn xml_xpath_substring_before_function(
-    ctxt: XmlXPathParserContextPtr,
-    nargs: i32,
-) {
+pub unsafe fn xml_xpath_substring_before_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let point: *const XmlChar;
     let offset: i32;
 
@@ -11999,10 +11984,7 @@ pub unsafe extern "C" fn xml_xpath_substring_before_function(
 /// string. For example, substring-after("1999/04/01","/") returns 04/01,
 /// and substring-after("1999/04/01","19") returns 99/04/01.
 #[doc(alias = "xmlXPathSubstringAfterFunction")]
-pub unsafe extern "C" fn xml_xpath_substring_after_function(
-    ctxt: XmlXPathParserContextPtr,
-    nargs: i32,
-) {
+pub unsafe fn xml_xpath_substring_after_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let point: *const XmlChar;
     let offset: i32;
 
@@ -12043,10 +12025,7 @@ pub unsafe extern "C" fn xml_xpath_substring_after_function(
 /// in XML. If the argument is omitted, it defaults to the context
 /// node converted to a string, in other words the value of the context node.
 #[doc(alias = "xmlXPathNormalizeFunction")]
-pub unsafe extern "C" fn xml_xpath_normalize_function(
-    ctxt: XmlXPathParserContextPtr,
-    mut nargs: i32,
-) {
+pub unsafe fn xml_xpath_normalize_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     let mut source: *mut XmlChar;
     let mut target: *mut XmlChar;
     let mut blank: i32;
@@ -12112,7 +12091,7 @@ pub unsafe extern "C" fn xml_xpath_normalize_function(
 /// character. If the third argument string is longer than the second
 /// argument string, then excess characters are ignored.
 #[doc(alias = "xmlXPathTranslateFunction")]
-pub unsafe extern "C" fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut offset: i32;
     let max: i32;
     let mut ch: i32;
@@ -12192,7 +12171,7 @@ pub unsafe extern "C" fn xml_xpath_translate_function(ctxt: XmlXPathParserContex
 /// The not function returns true if its argument is false,
 /// and false otherwise.
 #[doc(alias = "xmlXPathNotFunction")]
-pub unsafe extern "C" fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_BOOLEAN!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathBoolean);
@@ -12202,7 +12181,7 @@ pub unsafe extern "C" fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, 
 /// Implement the true() XPath function
 ///    boolean true()
 #[doc(alias = "xmlXPathTrueFunction")]
-pub unsafe extern "C" fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
 }
@@ -12210,7 +12189,7 @@ pub unsafe extern "C" fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr,
 /// Implement the false() XPath function
 ///    boolean false()
 #[doc(alias = "xmlXPathFalseFunction")]
-pub unsafe extern "C" fn xml_xpath_false_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_false_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
     value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
 }
@@ -12231,7 +12210,7 @@ pub unsafe extern "C" fn xml_xpath_false_function(ctxt: XmlXPathParserContextPtr
 /// value is equal to the argument ignoring that suffix of the attribute
 /// value and ignoring case.
 #[doc(alias = "xmlXPathLangFunction")]
-pub unsafe extern "C" fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut ret: i32 = 0;
 
     CHECK_ARITY!(ctxt, nargs, 1);
@@ -12287,7 +12266,7 @@ unsafe extern "C" fn xml_xpath_cache_convert_number(
 /// Implement the number() XPath function
 ///    number number(object?)
 #[doc(alias = "xmlXPathNumberFunction")]
-pub unsafe extern "C" fn xml_xpath_number_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_number_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let res: f64;
 
     if ctxt.is_null() {
@@ -12319,7 +12298,7 @@ pub unsafe extern "C" fn xml_xpath_number_function(ctxt: XmlXPathParserContextPt
 /// The sum function returns the sum of the values of the nodes in
 /// the argument node-set.
 #[doc(alias = "xmlXPathSumFunction")]
-pub unsafe extern "C" fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut res: f64 = 0.0;
 
     CHECK_ARITY!(ctxt, nargs, 1);
@@ -12358,7 +12337,7 @@ pub unsafe extern "C" fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, 
 /// The floor function returns the largest (closest to positive infinity)
 /// number that is not greater than the argument and that is an integer.
 #[doc(alias = "xmlXPathFloorFunction")]
-pub unsafe extern "C" fn xml_xpath_floor_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_floor_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_NUMBER!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathNumber);
@@ -12371,7 +12350,7 @@ pub unsafe extern "C" fn xml_xpath_floor_function(ctxt: XmlXPathParserContextPtr
 /// The ceiling function returns the smallest (closest to negative infinity)
 /// number that is not less than the argument and that is an integer.
 #[doc(alias = "xmlXPathCeilingFunction")]
-pub unsafe extern "C" fn xml_xpath_ceiling_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_ceiling_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_NUMBER!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathNumber);
@@ -12385,7 +12364,7 @@ pub unsafe extern "C" fn xml_xpath_ceiling_function(ctxt: XmlXPathParserContextP
 /// argument and that is an integer. If there are two such numbers,
 /// then the one that is closest to positive infinity is returned.
 #[doc(alias = "xmlXPathRoundFunction")]
-pub unsafe extern "C" fn xml_xpath_round_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_round_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_NUMBER!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XpathNumber);
@@ -12433,7 +12412,7 @@ unsafe extern "C" fn xml_xpath_cache_convert_boolean(
 ///    - a node-set is true if and only if it is non-empty
 ///    - a string is true if and only if its length is non-zero
 #[doc(alias = "xmlXPathBooleanFunction")]
-pub unsafe extern "C" fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+pub unsafe fn xml_xpath_boolean_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut cur: XmlXPathObjectPtr;
 
     CHECK_ARITY!(ctxt, nargs, 1);
