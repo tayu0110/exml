@@ -3004,7 +3004,10 @@ pub unsafe extern "C" fn xml_xpath_node_set_add_ns(
 /// Returns -2 in case of error 1 if first point < second point, 0
 /// if it's the same node, -1 otherwise
 #[doc(alias = "xmlXPathCmpNodesExt")]
-unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: XmlNodePtr) -> i32 {
+unsafe fn xml_xpath_cmp_nodes_ext(
+    mut node1: XmlNodePtr,
+    mut node2: XmlNodePtr,
+) -> Option<std::cmp::Ordering> {
     let mut depth1: i32;
     let mut depth2: i32;
     let mut misc: i32 = 0;
@@ -3018,11 +3021,11 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     let mut l2: isize;
 
     if node1.is_null() || node2.is_null() {
-        return -2;
+        return None;
     }
 
     if node1 == node2 {
-        return 0;
+        return Some(std::cmp::Ordering::Equal);
     }
 
     // a couple of optimizations which will avoid computations in most cases
@@ -3037,10 +3040,10 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                         l1 = -((*node1).content as isize);
                         l2 = -((*node2).content as isize);
                         if l1 < l2 {
-                            return 1;
+                            return Some(std::cmp::Ordering::Less);
                         }
                         if l1 > l2 {
-                            return -1;
+                            return Some(std::cmp::Ordering::Greater);
                         }
                     } else {
                         break 'turtle_comparison;
@@ -3091,7 +3094,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
             }
             XmlElementType::XmlNamespaceDecl => {
                 // TODO: why do we return 1 for namespace nodes?
-                return 1;
+                return Some(std::cmp::Ordering::Less);
             }
             _ => {}
         }
@@ -3137,7 +3140,7 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                 }
             }
             XmlElementType::XmlNamespaceDecl => {
-                return 1;
+                return Some(std::cmp::Ordering::Less);
             }
             _ => {}
         }
@@ -3149,41 +3152,37 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                     cur = (*misc_node2).prev.map_or(null_mut(), |p| p.as_ptr());
                     while !cur.is_null() {
                         if cur == misc_node1 {
-                            return 1;
+                            return Some(std::cmp::Ordering::Less);
                         }
                         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                            return -1;
+                            return Some(std::cmp::Ordering::Greater);
                         }
                         cur = (*cur).prev.map_or(null_mut(), |p| p.as_ptr());
                     }
-                    return -1;
+                    return Some(std::cmp::Ordering::Greater);
                 } else {
-                    /*
-                     * Evaluate based on higher precedence wrt to the element.
-                     * TODO: This assumes attributes are sorted before content.
-                     *   Is this 100% correct?
-                     */
+                    // Evaluate based on higher precedence wrt to the element.
+                    // TODO: This assumes attributes are sorted before content.
+                    //   Is this 100% correct?
                     if precedence1 < precedence2 {
-                        return 1;
+                        return Some(std::cmp::Ordering::Less);
                     } else {
-                        return -1;
+                        return Some(std::cmp::Ordering::Greater);
                     }
                 }
             }
-            /*
-             * Special case: One of the helper-elements is contained by the other.
-             * <foo>
-             *   <node2>
-             *     <node1>Text-1(precedence1 == 2)</node1>
-             *   </node2>
-             *   Text-6(precedence2 == 3)
-             * </foo>
-             */
+            // Special case: One of the helper-elements is contained by the other.
+            // <foo>
+            //   <node2>
+            //     <node1>Text-1(precedence1 == 2)</node1>
+            //   </node2>
+            //   Text-6(precedence2 == 3)
+            // </foo>
             if precedence2 == 3 && precedence1 > 1 {
                 cur = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
                 while !cur.is_null() {
                     if cur == node2 {
-                        return 1;
+                        return Some(std::cmp::Ordering::Less);
                     }
                     cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                 }
@@ -3192,16 +3191,14 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
                 cur = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
                 while !cur.is_null() {
                     if cur == node1 {
-                        return -1;
+                        return Some(std::cmp::Ordering::Greater);
                     }
                     cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                 }
             }
         }
 
-        /*
-         * Speedup using document order if available.
-         */
+        // Speedup using document order if available.
         if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
             && matches!((*node2).element_type(), XmlElementType::XmlElementNode)
             && 0 > (*node1).content as isize
@@ -3211,10 +3208,10 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
             l1 = -((*node1).content as isize);
             l2 = -((*node2).content as isize);
             if l1 < l2 {
-                return 1;
+                return Some(std::cmp::Ordering::Less);
             }
             if l1 > l2 {
-                return -1;
+                return Some(std::cmp::Ordering::Greater);
             }
         }
     }
@@ -3222,17 +3219,17 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     // turtle_comparison:
 
     if NodePtr::from_ptr(node1) == (*node2).prev {
-        return 1;
+        return Some(std::cmp::Ordering::Less);
     }
     if NodePtr::from_ptr(node1) == (*node2).next {
-        return -1;
+        return Some(std::cmp::Ordering::Greater);
     }
     // compute depth to root
     depth2 = 0;
     cur = node2;
     while let Some(parent) = (*cur).parent() {
         if parent.as_ptr() == node1 {
-            return 1;
+            return Some(std::cmp::Ordering::Less);
         }
         depth2 += 1;
         cur = parent.as_ptr();
@@ -3242,14 +3239,14 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
     cur = node1;
     while let Some(parent) = (*cur).parent() {
         if parent.as_ptr() == node2 {
-            return -1;
+            return Some(std::cmp::Ordering::Greater);
         }
         depth1 += 1;
         cur = parent.as_ptr();
     }
     // Distinct document (or distinct entities :-( ) case.
     if root != cur {
-        return -2;
+        return None;
     }
     // get the nearest common ancestor.
     while depth1 > depth2 {
@@ -3265,15 +3262,15 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
         node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
         /* should not happen but just in case ... */
         if node1.is_null() || node2.is_null() {
-            return -2;
+            return None;
         }
     }
     // Find who's first.
     if NodePtr::from_ptr(node1) == (*node2).prev {
-        return 1;
+        return Some(std::cmp::Ordering::Less);
     }
     if NodePtr::from_ptr(node1) == (*node2).next {
-        return -1;
+        return Some(std::cmp::Ordering::Greater);
     }
     // Speedup using document order if available.
     if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
@@ -3285,21 +3282,21 @@ unsafe extern "C" fn xml_xpath_cmp_nodes_ext(mut node1: XmlNodePtr, mut node2: X
         l1 = -((*node1).content as isize);
         l2 = -((*node2).content as isize);
         if l1 < l2 {
-            return 1;
+            return Some(std::cmp::Ordering::Less);
         }
         if l1 > l2 {
-            return -1;
+            return Some(std::cmp::Ordering::Greater);
         }
     }
 
     let mut cur = (*node1).next;
     while let Some(now) = cur {
         if Some(now) == NodePtr::from_ptr(node2) {
-            return 1;
+            return Some(std::cmp::Ordering::Less);
         }
         cur = now.next;
     }
-    -1 /* assume there is no sibling list corruption */
+    Some(std::cmp::Ordering::Greater) /* assume there is no sibling list corruption */
 }
 
 /// Sort the node set in document order
@@ -3323,7 +3320,9 @@ pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
             for i in incr..len {
                 let mut j = i as i32 - incr as i32;
                 while j >= 0 {
-                    if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr]) == -1 {
+                    if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
+                        .map_or(false, |f| f.is_gt())
+                    {
                         tmp = table[j as usize];
                         table[j as usize] = table[j as usize + incr];
                         table[j as usize + incr] = tmp;
@@ -6584,7 +6583,9 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                     if *first == cur {
                         break;
                     }
-                    if total % 256 == 0 && xml_xpath_cmp_nodes_ext(*first, cur) >= 0 {
+                    if total % 256 == 0
+                        && xml_xpath_cmp_nodes_ext(*first, cur).map_or(false, |f| f.is_le())
+                    {
                         break;
                     }
                 }
@@ -6592,7 +6593,9 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                     if *last == cur {
                         break;
                     }
-                    if total % 256 == 0 && xml_xpath_cmp_nodes_ext(cur, *last) >= 0 {
+                    if total % 256 == 0
+                        && xml_xpath_cmp_nodes_ext(cur, *last).map_or(false, |f| f.is_le())
+                    {
                         break;
                     }
                 }
