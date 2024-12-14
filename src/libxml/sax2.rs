@@ -2483,7 +2483,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         ret = (*ctxt).free_elems;
         (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
-        memset(ret as _, 0, size_of::<XmlNode>());
+        std::ptr::write(&mut *ret, XmlNode::default());
         (*ret).doc = (*ctxt).my_doc;
         (*ret).typ = XmlElementType::XmlElementNode;
 
@@ -2724,11 +2724,8 @@ unsafe extern "C" fn xml_sax2_text_node(
         xml_err_memory(ctxt, Some("xmlSAX2Characters"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlNode>());
-    /*
-     * intern the formatting blanks found between tags, or the
-     * very short strings
-     */
+    std::ptr::write(&mut *ret, XmlNode::default());
+    // intern the formatting blanks found between tags, or the very short strings
     if (*ctxt).dict_names != 0 {
         let cur: XmlChar = *str.add(len as usize);
 
@@ -2863,9 +2860,7 @@ unsafe extern "C" fn xml_sax2_attribute_ns(
         );
     }
 
-    /*
-     * allocate the node
-     */
+    // allocate the node
     if !(*ctxt).free_attrs.is_null() {
         ret = (*ctxt).free_attrs;
         (*ctxt).free_attrs = (*ret).next;

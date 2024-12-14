@@ -1439,7 +1439,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         xml_tree_err_memory("copying node");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *ret, XmlNode::default());
     (*ret).typ = (*node).element_type();
 
     (*ret).doc = doc;
@@ -2110,7 +2110,7 @@ pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> Xml
         xml_tree_err_memory("building node");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlElementNode;
 
     (*cur).name = xml_strdup(name);
@@ -2146,7 +2146,7 @@ pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar)
         /* we can't check here that name comes from the doc dictionary */
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlElementNode;
 
     (*cur).name = name;
@@ -2264,7 +2264,7 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
         xml_tree_err_memory("building text");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlTextNode;
 
     (*cur).name = XML_STRING_TEXT.as_ptr() as _;
@@ -2298,7 +2298,7 @@ pub unsafe extern "C" fn xml_new_doc_pi(
         xml_tree_err_memory("building PI");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlPINode;
 
     if !doc.is_null() && !(*doc).dict.is_null() {
@@ -2359,7 +2359,7 @@ pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> 
         xml_tree_err_memory("building text");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlTextNode;
 
     (*cur).name = XML_STRING_TEXT.as_ptr() as _;
@@ -2403,7 +2403,7 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
         xml_tree_err_memory("building comment");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlCommentNode;
 
     (*cur).name = XML_STRING_COMMENT.as_ptr() as _;
@@ -2435,7 +2435,7 @@ pub unsafe extern "C" fn xml_new_cdata_block(
         xml_tree_err_memory("building CDATA");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlCDATASectionNode;
     (*cur).doc = doc;
 
@@ -2467,7 +2467,7 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
         xml_tree_err_memory("building character reference");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlEntityRefNode;
 
     (*cur).doc = doc;
@@ -2510,7 +2510,7 @@ pub unsafe extern "C" fn xml_new_reference(
         xml_tree_err_memory("building reference");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlEntityRefNode;
 
     (*cur).doc = doc as _;
@@ -2692,15 +2692,13 @@ pub unsafe extern "C" fn xml_new_doc_raw_node(
 #[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
-    /*
-     * Allocate a new DocumentFragment node and fill the fields.
-     */
+    // Allocate a new DocumentFragment node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building fragment");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlNode>());
+    std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlDocumentFragNode;
 
     (*cur).doc = doc;
@@ -5455,7 +5453,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                             xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating a node");
                             break 'internal_error;
                         }
-                        memset(clone as _, 0, size_of::<XmlNode>());
+                        std::ptr::write(&mut *clone, XmlNode::default());
                         // Set hierarchical links.
                         if !result_clone.is_null() {
                             (*clone).set_parent(NodePtr::from_ptr(parent_clone));

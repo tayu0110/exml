@@ -3126,6 +3126,29 @@ impl XmlNode {
     }
 }
 
+impl Default for XmlNode {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::default(),
+            name: null(),
+            children: None,
+            last: None,
+            parent: None,
+            next: None,
+            prev: None,
+            doc: null_mut(),
+            ns: null_mut(),
+            content: null_mut(),
+            properties: null_mut(),
+            ns_def: null_mut(),
+            psvi: null_mut(),
+            line: 0,
+            extra: 0,
+        }
+    }
+}
+
 impl NodeCommon for XmlNode {
     fn document(&self) -> *mut XmlDoc {
         self.doc
