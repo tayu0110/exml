@@ -952,11 +952,8 @@ pub fn xml_xpath_cast_number_to_boolean(val: f64) -> bool {
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastStringToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -> i32 {
-    if val.is_null() || xml_strlen(val) == 0 {
-        return 0;
-    }
-    1
+pub fn xml_xpath_cast_string_to_boolean(val: Option<&str>) -> bool {
+    val.map_or(false, |v| !v.is_empty())
 }
 
 /// Converts a node-set to its boolean value
@@ -974,6 +971,8 @@ pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> bool {
 #[doc(alias = "xmlXPathCastToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i32 {
+    use std::ffi::CStr;
+
     if val.is_null() {
         return 0;
     }
@@ -982,7 +981,14 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i3
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             xml_xpath_cast_node_set_to_boolean((*val).nodesetval) as i32
         }
-        XmlXPathObjectType::XPathString => xml_xpath_cast_string_to_boolean((*val).stringval),
+        XmlXPathObjectType::XPathString => {
+            let val = (*val).stringval;
+            xml_xpath_cast_string_to_boolean(
+                (!val.is_null())
+                    .then(|| CStr::from_ptr(val as *const i8).to_string_lossy())
+                    .as_deref(),
+            ) as i32
+        }
         XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval) as i32,
         XmlXPathObjectType::XPathBoolean => (*val).boolval,
         XmlXPathObjectType::XPathUsers => {
@@ -2434,36 +2440,6 @@ mod tests {
                     assert!(
                         leaks == 0,
                         "{leaks} Leaks are found in xmlXPathCastNumberToString()"
-                    );
-                    eprintln!(" {}", n_val);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_cast_string_to_boolean() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_const_xml_char_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_cast_string_to_boolean(val as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathCastStringToBoolean",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathCastStringToBoolean()"
                     );
                     eprintln!(" {}", n_val);
                 }
