@@ -27,6 +27,7 @@
 // Author: daniel@veillard.com
 
 use std::{
+    borrow::Cow,
     ffi::{c_char, CStr, CString},
     io::Write,
     iter::repeat,
@@ -769,19 +770,19 @@ pub unsafe extern "C" fn xml_xpath_pop_number(ctxt: XmlXPathParserContextPtr) ->
 ///
 /// Returns the string
 #[doc(alias = "xmlXPathPopString")]
-pub unsafe extern "C" fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) -> *mut XmlChar {
+pub unsafe fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) -> Option<Cow<'static, str>> {
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     if obj.is_null() {
         xml_xpath_set_error!(ctxt, XmlXPathError::XpathInvalidOperand as i32);
-        return null_mut();
+        return None;
     }
-    let ret: *mut XmlChar = xml_xpath_cast_to_string(obj); /* this does required strdup */
+    let ret = xml_xpath_cast_to_string(obj); /* this does required strdup */
     /* TODO: needs refactoring somewhere else */
     // if (*obj).stringval == ret {
     //     (*obj).stringval = null_mut();
     // }
     xml_xpath_release_object((*ctxt).context, obj);
-    ret
+    Some(ret)
 }
 
 /// Pops a node-set from the stack, handling conversion if needed.
@@ -14936,8 +14937,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ctxt = gen_xml_xpath_parser_context_ptr(n_ctxt, 0);
 
-                let ret_val = xml_xpath_pop_string(ctxt);
-                desret_xml_char_ptr(ret_val);
+                let _ = xml_xpath_pop_string(ctxt);
                 des_xml_xpath_parser_context_ptr(n_ctxt, ctxt, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {

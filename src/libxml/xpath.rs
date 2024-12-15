@@ -1114,11 +1114,11 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastBooleanToString")]
 #[cfg(feature = "xpath")]
-pub fn xml_xpath_cast_boolean_to_string(val: bool) -> String {
+pub fn xml_xpath_cast_boolean_to_string(val: bool) -> &'static str {
     if val {
-        "true".to_owned()
+        "true"
     } else {
-        "false".to_owned()
+        "false"
     }
 }
 
@@ -1271,54 +1271,31 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> Cow<'stati
 
 /// Converts an existing object to its string() equivalent
 ///
-/// Returns the allocated string value of the object, NULL in case of error.
-/// It's up to the caller to free the string memory with xmlFree( as _).
+/// Returns the allocated string value of the object, `None` in case of error.
 #[doc(alias = "xmlXPathCastToString")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mut XmlChar {
-    use std::ffi::CString;
-
+pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, str> {
     if val.is_null() {
-        return xml_strdup(c"".as_ptr() as *const XmlChar);
+        return "".into();
     }
     match (*val).typ {
-        XmlXPathObjectType::XPathUndefined => xml_strdup(c"".as_ptr() as *const XmlChar),
+        XmlXPathObjectType::XPathUndefined => "".into(),
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let res = CString::new(xml_xpath_cast_node_set_to_string((*val).nodesetval).as_ref())
-                .unwrap();
-            xml_strdup(res.as_ptr() as *const u8)
+            xml_xpath_cast_node_set_to_string((*val).nodesetval)
         }
-        XmlXPathObjectType::XPathString => {
-            let strval = (*val)
-                .stringval
-                .as_deref()
-                .map(|s| CString::new(s).unwrap());
-            xml_strdup(
-                strval
-                    .as_deref()
-                    .map_or(null_mut(), |s| s.as_ptr() as *const u8),
-            )
-        }
-        XmlXPathObjectType::XPathBoolean => {
-            let res = xml_xpath_cast_boolean_to_string((*val).boolval);
-            let res = CString::new(res).unwrap();
-            xml_strdup(res.as_ptr() as *const u8)
-        }
-        XmlXPathObjectType::XPathNumber => {
-            let res = xml_xpath_cast_number_to_string((*val).floatval);
-            let res = CString::new(res.as_ref()).unwrap();
-            xml_strdup(res.as_ptr() as *const u8)
-        }
+        XmlXPathObjectType::XPathString => (*val).stringval.clone().unwrap().into(),
+        XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_string((*val).boolval).into(),
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_string((*val).floatval),
         XmlXPathObjectType::XPathUsers => {
             // todo!();
-            xml_strdup(c"".as_ptr() as *const XmlChar)
+            "".into()
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint
         | XmlXPathObjectType::XPathRange
         | XmlXPathObjectType::XPathLocationset => {
             // todo!();
-            xml_strdup(c"".as_ptr() as *const XmlChar)
+            "".into()
         }
     }
 }
@@ -2504,8 +2481,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_xml_xpath_object_ptr(n_val, 0);
 
-                let ret_val = xml_xpath_cast_to_string(val);
-                desret_xml_char_ptr(ret_val);
+                let _ = xml_xpath_cast_to_string(val);
+                // desret_xml_char_ptr(ret_val);
                 des_xml_xpath_object_ptr(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
