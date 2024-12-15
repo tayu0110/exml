@@ -300,7 +300,7 @@ pub(crate) unsafe extern "C" fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> X
     };
 
     if no == 0 {
-        return xml_xpath_new_string(c"string object".as_ptr() as _);
+        return xml_xpath_new_string(Some("string object"));
     }
     if no == 1 {
         return xml_xpath_new_float(1.1);

@@ -2247,10 +2247,10 @@ unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx:
 /// Parse and evaluate a Child Sequence. This routine also handle the
 /// case of a Bare Name used to get a document ID.
 #[doc(alias = "xmlXPtrEvalChildSeq")]
-unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: *mut XmlChar) {
+unsafe fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, name: Option<&str>) {
     // XPointer don't allow by syntax to address in multirooted trees
     // this might prove useful in some cases, warn about it.
-    if name.is_null() && CUR!(ctxt) == b'/' && NXT!(ctxt, 1) != b'1' {
+    if name.is_none() && CUR!(ctxt) == b'/' && NXT!(ctxt, 1) != b'1' {
         xml_xptr_err!(
             ctxt,
             XmlParserErrors::XmlXPtrChildseqStart,
@@ -2258,9 +2258,8 @@ unsafe extern "C" fn xml_xptr_eval_child_seq(ctxt: XmlXPathParserContextPtr, nam
         );
     }
 
-    if !name.is_null() {
-        value_push(ctxt, xml_xpath_new_string(name));
-        xml_free(name as _);
+    if let Some(name) = name {
+        value_push(ctxt, xml_xpath_new_string(Some(name)));
         xml_xpath_id_function(ctxt, 1);
         CHECK_ERROR!(ctxt);
     }
@@ -2387,12 +2386,10 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
 
         (*ctxt).cur = buffer;
         (*ctxt).base = buffer;
-        /*
-         * To evaluate an xpointer scheme element (4.3) we need:
-         *   context initialized to the root
-         *   context position initialized to 1
-         *   context size initialized to 1
-         */
+        // To evaluate an xpointer scheme element (4.3) we need:
+        //   context initialized to the root
+        //   context position initialized to 1
+        //   context size initialized to 1
         (*(*ctxt).context).node = (*(*ctxt).context).doc as XmlNodePtr;
         (*(*ctxt).context).proximity_position = 1;
         (*(*ctxt).context).context_size = 1;
@@ -2412,7 +2409,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         (*ctxt).base = buffer;
         if *buffer.add(0) == b'/' {
             xml_xpath_root(ctxt);
-            xml_xptr_eval_child_seq(ctxt, null_mut());
+            xml_xptr_eval_child_seq(ctxt, None);
         } else {
             name2 = xml_xpath_parse_name(ctxt);
             if name2.is_null() {
@@ -2422,7 +2419,15 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
                 xml_free(name as _);
                 XP_ERROR!(ctxt, XmlXPathError::XpathExprError as i32);
             }
-            xml_xptr_eval_child_seq(ctxt, name2);
+            xml_xptr_eval_child_seq(
+                ctxt,
+                Some(
+                    CStr::from_ptr(name2 as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+            );
+            xml_free(name2 as _);
         }
         (*ctxt).base = old_base;
         (*ctxt).cur = old_cur;
@@ -2571,7 +2576,7 @@ unsafe extern "C" fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'/' {
         xml_xpath_root(ctxt);
-        xml_xptr_eval_child_seq(ctxt, null_mut());
+        xml_xptr_eval_child_seq(ctxt, None);
     } else {
         let name: *mut XmlChar = xml_xpath_parse_name(ctxt);
         if name.is_null() {
@@ -2583,7 +2588,11 @@ unsafe extern "C" fn xml_xptr_eval_xpointer(ctxt: XmlXPathParserContextPtr) {
             return;
         } else {
             // this handle both Bare Names and Child Sequences
-            xml_xptr_eval_child_seq(ctxt, name);
+            xml_xptr_eval_child_seq(
+                ctxt,
+                Some(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()),
+            );
+            xml_free(name as _);
         }
     }
     SKIP_BLANKS!(ctxt);

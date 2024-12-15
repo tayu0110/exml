@@ -61,8 +61,8 @@ use crate::{
         xmlstring::{xml_strdup, XmlChar},
         xpath_internals::{
             value_pop, xml_xpath_compile_expr, xml_xpath_err_memory, xml_xpath_eval_expr,
-            xml_xpath_free_parser_context, xml_xpath_new_boolean, xml_xpath_new_cstring,
-            xml_xpath_new_float, xml_xpath_new_parser_context, xml_xpath_node_set_dup_ns,
+            xml_xpath_free_parser_context, xml_xpath_new_boolean, xml_xpath_new_float,
+            xml_xpath_new_parser_context, xml_xpath_new_string, xml_xpath_node_set_dup_ns,
             xml_xpath_node_set_free_ns, xml_xpath_node_set_merge, xml_xpath_node_set_sort,
             xml_xpath_optimize_expression, xml_xpath_register_all_functions,
             xml_xpath_registered_funcs_cleanup, xml_xpath_registered_ns_cleanup,
@@ -1339,13 +1339,13 @@ pub unsafe extern "C" fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> Xml
 /// Returns the new object, the old one is freed (or the operation is done directly on @val)
 #[doc(alias = "xmlXPathConvertString")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     use std::ffi::CString;
 
     let mut res: *mut XmlChar = null_mut();
 
     if val.is_null() {
-        return xml_xpath_new_cstring(c"".as_ptr() as _);
+        return xml_xpath_new_string(Some(""));
     }
 
     match (*val).typ {
@@ -1380,7 +1380,7 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
     }
     xml_xpath_free_object(val);
     if res.is_null() {
-        return xml_xpath_new_cstring(c"".as_ptr() as _);
+        return xml_xpath_new_string(Some(""));
     }
     xml_xpath_wrap_string(res)
 }
