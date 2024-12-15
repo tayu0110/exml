@@ -740,7 +740,7 @@ pub unsafe extern "C" fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -
         return 0;
     }
     let ret = if (*obj).typ != XmlXPathObjectType::XPathBoolean {
-        xml_xpath_cast_to_boolean(obj)
+        xml_xpath_cast_to_boolean(obj) as i32
     } else {
         (*obj).boolval
     };
@@ -8093,12 +8093,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_to_boolean(
                 if is_predicate != 0 {
                     return xml_xpath_evaluate_predicate_result(ctxt, res_obj);
                 }
-                return xml_xpath_cast_to_boolean(res_obj);
+                return xml_xpath_cast_to_boolean(res_obj) as i32;
             }
             XmlXPathOp::XpathOpSort => {
-                /*
-                 * We don't need sorting for boolean results. Skip this one.
-                 */
+                // We don't need sorting for boolean results. Skip this one.
                 if (*op).ch1 != -1 {
                     op = (*(*ctxt).comp).steps.add((*op).ch1 as usize);
                     // goto start;
@@ -8150,17 +8148,15 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_to_boolean(
         if (*res_obj).typ == XmlXPathObjectType::XPathBoolean {
             res = (*res_obj).boolval;
         } else if is_predicate != 0 {
-            /*
-             * For predicates a result of type "number" is handled
-             * differently:
-             * SPEC XPath 1.0:
-             * "If the result is a number, the result will be converted
-             *  to true if the number is equal to the context position
-             *  and will be converted to false otherwise;"
-             */
+            // For predicates a result of type "number" is handled
+            // differently:
+            // SPEC XPath 1.0:
+            // "If the result is a number, the result will be converted
+            //  to true if the number is equal to the context position
+            //  and will be converted to false otherwise;"
             res = xml_xpath_evaluate_predicate_result(ctxt, res_obj);
         } else {
-            res = xml_xpath_cast_to_boolean(res_obj);
+            res = xml_xpath_cast_to_boolean(res_obj) as i32;
         }
         xml_xpath_release_object((*ctxt).context, res_obj);
         return res;
@@ -12376,7 +12372,8 @@ unsafe extern "C" fn xml_xpath_cache_convert_boolean(
     if matches!((*val).typ, XmlXPathObjectType::XPathBoolean) {
         return val;
     }
-    let ret: XmlXPathObjectPtr = xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(val));
+    let ret: XmlXPathObjectPtr =
+        xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(val) as i32);
     xml_xpath_release_object(ctxt, val);
     ret
 }

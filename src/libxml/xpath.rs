@@ -970,16 +970,16 @@ pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> bool {
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i32 {
+pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
     use std::ffi::CStr;
 
     if val.is_null() {
-        return 0;
+        return false;
     }
     match (*val).typ {
-        XmlXPathObjectType::XPathUndefined => 0,
+        XmlXPathObjectType::XPathUndefined => false,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_boolean((*val).nodesetval) as i32
+            xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
         }
         XmlXPathObjectType::XPathString => {
             let val = (*val).stringval;
@@ -987,20 +987,20 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i3
                 (!val.is_null())
                     .then(|| CStr::from_ptr(val as *const i8).to_string_lossy())
                     .as_deref(),
-            ) as i32
+            )
         }
-        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval) as i32,
-        XmlXPathObjectType::XPathBoolean => (*val).boolval,
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
+        XmlXPathObjectType::XPathBoolean => (*val).boolval != 0,
         XmlXPathObjectType::XPathUsers => {
             // todo!();
-            0
+            false
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint
         | XmlXPathObjectType::XPathRange
         | XmlXPathObjectType::XPathLocationset => {
             // todo!();
-            0
+            false
         }
     }
 }
@@ -1378,7 +1378,7 @@ pub unsafe extern "C" fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> Xm
     if (*val).typ == XmlXPathObjectType::XPathBoolean {
         return val;
     }
-    let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(val));
+    let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(val) as i32);
     xml_xpath_free_object(val);
     ret
 }
@@ -2487,8 +2487,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_xml_xpath_object_ptr(n_val, 0);
 
-                let ret_val = xml_xpath_cast_to_boolean(val);
-                desret_int(ret_val);
+                let _ = xml_xpath_cast_to_boolean(val);
+                // desret_int(ret_val);
                 des_xml_xpath_object_ptr(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
