@@ -840,7 +840,7 @@ pub unsafe extern "C" fn xml_xpath_pop_external(ctxt: XmlXPathParserContextPtr) 
 
 /// Register an external mechanism to do variable lookup
 #[doc(alias = "xmlXPathRegisterVariableLookup")]
-pub unsafe extern "C" fn xml_xpath_register_variable_lookup(
+pub unsafe fn xml_xpath_register_variable_lookup(
     ctxt: XmlXPathContextPtr,
     f: XmlXPathVariableLookupFunc,
     data: *mut c_void,

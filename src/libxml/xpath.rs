@@ -280,10 +280,8 @@ pub struct XmlXPathFunct {
 /// Returns the next node in that axis or NULL if at the end of the axis.
 #[doc(alias = "xmlXPathAxisFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathAxisFunc = unsafe extern "C" fn(
-    ctxt: XmlXPathParserContextPtr,
-    cur: XmlXPathObjectPtr,
-) -> XmlXPathObjectPtr;
+pub type XmlXPathAxisFunc =
+    unsafe fn(ctxt: XmlXPathParserContextPtr, cur: XmlXPathObjectPtr) -> XmlXPathObjectPtr;
 
 // Extra axis: a name and an axis function.
 #[cfg(feature = "xpath")]
@@ -307,11 +305,8 @@ pub type XmlXPathFunction = unsafe fn(ctxt: XmlXPathParserContextPtr, nargs: i32
 /// Returns the XPath object value or NULL if not found.
 #[doc(alias = "xmlXPathVariableLookupFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathVariableLookupFunc = unsafe extern "C" fn(
-    ctxt: *mut c_void,
-    name: *const XmlChar,
-    ns_uri: *const XmlChar,
-) -> XmlXPathObjectPtr;
+pub type XmlXPathVariableLookupFunc =
+    unsafe fn(ctxt: *mut c_void, name: *const XmlChar, ns_uri: *const XmlChar) -> XmlXPathObjectPtr;
 
 /// Prototype for callbacks used to plug function lookup in the XPath engine.
 ///
@@ -803,10 +798,8 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     if node1.is_null() || node2.is_null() {
         return -2;
     }
-    /*
-     * a couple of optimizations which will avoid computations in most cases
-     */
-    /* trivial case */
+    // a couple of optimizations which will avoid computations in most cases
+    // trivial case
     if node1 == node2 {
         return 0;
     }
@@ -822,7 +815,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     }
     if node1 == node2 {
         if attr1 == attr2 {
-            /* not required, but we keep attributes in order */
+            // not required, but we keep attributes in order
             if attr1 != 0 {
                 cur = (*attr_node2).prev.map_or(null_mut(), |p| p.as_ptr());
                 while !cur.is_null() {
@@ -852,9 +845,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
         return -1;
     }
 
-    /*
-     * Speedup using document order if available.
-     */
+    // Speedup using document order if available.
     if matches!((*node1).element_type(), XmlElementType::XmlElementNode)
         && matches!((*node2).element_type(), XmlElementType::XmlElementNode)
         && 0 > (*node1).content as isize
@@ -908,7 +899,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
     while (*node1).parent() != (*node2).parent() {
         node1 = (*node1).parent().map_or(null_mut(), |p| p.as_ptr());
         node2 = (*node2).parent().map_or(null_mut(), |p| p.as_ptr());
-        /* should not happen but just in case ... */
+        // should not happen but just in case ...
         if node1.is_null() || node2.is_null() {
             return -2;
         }
@@ -964,7 +955,7 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> i32 {
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastStringToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -> i32 {
+pub unsafe fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -> i32 {
     if val.is_null() || xml_strlen(val) == 0 {
         return 0;
     }
@@ -976,11 +967,8 @@ pub unsafe extern "C" fn xml_xpath_cast_string_to_boolean(val: *const XmlChar) -
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastNodeSetToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> i32 {
-    if ns.is_null() || (*ns).node_tab.as_ref().map_or(true, |t| t.is_empty()) {
-        return 0;
-    }
-    1
+pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> bool {
+    !ns.is_null() && (*ns).node_tab.as_deref().map_or(false, |t| !t.is_empty())
 }
 
 /// Converts an XPath object to its boolean value
@@ -995,7 +983,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i3
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => 0,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
+            xml_xpath_cast_node_set_to_boolean((*val).nodesetval) as i32
         }
         XmlXPathObjectType::XPathString => xml_xpath_cast_string_to_boolean((*val).stringval),
         XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
@@ -2256,8 +2244,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ns = gen_xml_node_set_ptr(n_ns, 0);
 
-                let ret_val = xml_xpath_cast_node_set_to_boolean(ns);
-                desret_int(ret_val);
+                let _ = xml_xpath_cast_node_set_to_boolean(ns);
+                // desret_int(ret_val);
                 des_xml_node_set_ptr(n_ns, ns, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
