@@ -36,13 +36,12 @@
 
 use std::{
     any::type_name,
-    ffi::c_char,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
 };
 
-use libc::{memmove, memset, snprintf, strlen, INT_MAX, INT_MIN};
+use libc::memset;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{
@@ -1132,54 +1131,28 @@ const LOWER_DOUBLE: f64 = 1E-5;
 
 /// Convert the number into a string representation.
 #[doc(alias = "xmlXPathFormatNumber")]
-unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, buffersize: i32) {
+fn xml_xpath_format_number(number: f64, buffer: &mut String) {
+    use std::fmt::Write as _;
+
     match xml_xpath_is_inf(number) {
         1 => {
-            if buffersize > "Infinity".len() as i32 + 1 {
-                snprintf(buffer, buffersize as usize, c"Infinity".as_ptr() as _);
-            }
+            write!(buffer, "Infinity").ok();
         }
         -1 => {
-            if buffersize > "-Infinity".len() as i32 + 1 {
-                snprintf(buffer, buffersize as usize, c"-Infinity".as_ptr() as _);
-            }
+            write!(buffer, "-Infinity").ok();
         }
         _ => {
             if xml_xpath_is_nan(number) {
-                if buffersize > "NaN".len() as i32 + 1 {
-                    snprintf(buffer, buffersize as usize, c"NaN".as_ptr() as _);
-                }
+                write!(buffer, "NaN").ok();
             } else if number == 0.0 {
                 // Omit sign for negative zero.
-                snprintf(buffer, buffersize as usize, c"0".as_ptr() as _);
-            } else if number > INT_MIN as f64
-                && number < INT_MAX as f64
+                write!(buffer, "0").ok();
+            } else if number > i32::MIN as f64
+                && number < i32::MAX as f64
                 && number == number as i32 as f64
             {
-                let mut work: [c_char; 30] = [0; 30];
-                let mut ptr: *mut c_char;
-                let mut cur: *mut c_char;
-                let value: i32 = number as i32;
-
-                ptr = buffer.add(0);
-                if value == 0 {
-                    *ptr = b'0' as _;
-                    ptr = ptr.add(1);
-                } else {
-                    snprintf(work.as_mut_ptr() as _, 29, c"%d".as_ptr(), value);
-                    cur = work.as_mut_ptr();
-                    while *cur != 0 && ptr.offset_from(buffer) < buffersize as isize {
-                        *ptr = *cur;
-                        ptr = ptr.add(1);
-                        cur = cur.add(1);
-                    }
-                }
-                if ptr.offset_from(buffer) < buffersize as isize {
-                    *ptr = 0;
-                } else if buffersize > 0 {
-                    ptr = ptr.sub(1);
-                    *ptr = 0;
-                }
+                let value = number as i32;
+                write!(buffer, "{value}").ok();
             } else {
                 // For the dimension of work,
                 //     DBL_DIG is number of significant digits
@@ -1188,13 +1161,6 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                 // LOWER_DOUBLE_EXP is max number of leading zeroes in fraction
                 // Note that this dimension is slightly (a few characters)
                 // larger than actually necessary.
-                let mut work: [c_char; DBL_DIG + EXPONENT_DIGITS + 3 + LOWER_DOUBLE_EXP] =
-                    [0; DBL_DIG + EXPONENT_DIGITS + 3 + LOWER_DOUBLE_EXP];
-                let integer_place: i32;
-                let fraction_place: i32;
-                let mut ptr: *mut c_char;
-                let mut after_fraction: *mut c_char;
-                let mut size: i32;
                 let absolute_value: f64 = number.abs();
 
                 // First choose format - scientific or regular floating point.
@@ -1203,77 +1169,45 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                 if !(LOWER_DOUBLE..=UPPER_DOUBLE).contains(&absolute_value) && absolute_value != 0.0
                 {
                     // Use scientific notation
-                    integer_place = (DBL_DIG + EXPONENT_DIGITS + 1) as i32;
-                    fraction_place = DBL_DIG as i32 - 1;
-                    size = snprintf(
-                        work.as_mut_ptr() as _,
-                        work.len(),
-                        c"%*.*e".as_ptr() as _,
-                        integer_place,
-                        fraction_place,
-                        number,
-                    );
-                    while size > 0 && work[size as usize] != b'e' as _ {
-                        size -= 1;
+                    let integer_place = DBL_DIG + EXPONENT_DIGITS + 1;
+                    let fraction_place = DBL_DIG - 1;
+                    write!(buffer, "{number:integer_place$.fraction_place$e}").ok();
+
+                    // Remove trailing zeros
+                    let epos = buffer.find('e').unwrap_or(0);
+                    if let Some(mut start_trailing_zeros) = buffer[..epos].rfind(|c| c != '0') {
+                        if buffer.as_bytes()[start_trailing_zeros] != b'.' {
+                            start_trailing_zeros += 1;
+                        }
+                        buffer.replace_range(start_trailing_zeros..epos, "");
                     }
                 } else {
                     // Use regular notation
-                    if absolute_value > 0.0 {
-                        integer_place = absolute_value.log10() as i32;
+                    let fraction_place = if absolute_value > 0.0 {
+                        let integer_place = absolute_value.log10() as usize;
                         if integer_place > 0 {
-                            fraction_place = DBL_DIG as i32 - integer_place - 1;
+                            DBL_DIG - integer_place - 1
                         } else {
-                            fraction_place = DBL_DIG as i32 - integer_place;
+                            DBL_DIG - integer_place
                         }
                     } else {
-                        fraction_place = 1;
+                        1
+                    };
+                    write!(buffer, "{number:0.fraction_place$}").ok();
+
+                    // Remove trailing zeros
+                    while buffer.ends_with('0') {
+                        buffer.pop();
                     }
-                    size = snprintf(
-                        work.as_mut_ptr() as _,
-                        work.len(),
-                        c"%0.*f".as_ptr() as _,
-                        fraction_place,
-                        number,
-                    );
+                    if buffer.ends_with('.') {
+                        buffer.pop();
+                    }
                 }
 
                 // Remove leading spaces sometimes inserted by snprintf
-                while work[0] == b' ' as _ {
-                    ptr = work.as_mut_ptr();
-                    while {
-                        *ptr.add(0) = *ptr.add(1);
-                        *ptr.add(0) != 0
-                    } {
-                        ptr = ptr.add(1);
-                    }
-                    size -= 1;
-                }
-
-                // Remove fractional trailing zeroes
-                after_fraction = work.as_mut_ptr().add(size as usize);
-                ptr = after_fraction;
-                while {
-                    ptr = ptr.sub(1);
-                    *ptr == b'0' as _
-                } {}
-                if *ptr != b'.' as _ {
-                    ptr = ptr.add(1);
-                }
-                while {
-                    *ptr = *after_fraction;
-                    let res = *ptr;
-                    ptr = ptr.add(1);
-                    after_fraction = after_fraction.add(1);
-                    res != 0
-                } {}
-
-                // Finally copy result back to caller
-                size = strlen(work.as_ptr() as _) as i32 + 1;
-                if size > buffersize {
-                    work[buffersize as usize - 1] = 0;
-                    size = buffersize;
-                }
-                memmove(buffer as _, work.as_ptr() as _, size as usize);
+                let trimed = buffer.trim_start();
+                let trimed_length = buffer.len() - trimed.len();
+                buffer.drain(..trimed_length);
             }
         }
     }
@@ -1285,6 +1219,8 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
 #[doc(alias = "xmlXPathCastNumberToString")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlChar {
+    use std::ffi::CString;
+
     let ret: *mut XmlChar;
     match xml_xpath_is_inf(val) {
         1 => {
@@ -1301,10 +1237,10 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
                 ret = xml_strdup(c"0".as_ptr() as *const XmlChar);
             } else {
                 // could be improved
-                let mut buf: [c_char; 100] = [0; 100];
-                xml_xpath_format_number(val, buf.as_mut_ptr(), 99);
-                buf[99] = 0;
-                ret = xml_strdup(buf.as_ptr() as *const XmlChar);
+                let mut buf = String::new();
+                xml_xpath_format_number(val, &mut buf);
+                let buf = CString::new(buf).unwrap();
+                ret = xml_strdup(buf.as_ptr() as *const u8);
             }
         }
     }
