@@ -11424,7 +11424,9 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
             res = xml_strdup(s.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XPathNumber => {
-            res = xml_xpath_cast_number_to_string((*val).floatval);
+            let s = xml_xpath_cast_number_to_string((*val).floatval);
+            let s = CString::new(s.as_ref()).unwrap();
+            res = xml_strdup(s.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XPathUsers => {
             todo!();

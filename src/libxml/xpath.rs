@@ -36,6 +36,7 @@
 
 use std::{
     any::type_name,
+    borrow::Cow,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
@@ -1218,33 +1219,24 @@ fn xml_xpath_format_number(number: f64, buffer: &mut String) {
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNumberToString")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlChar {
-    use std::ffi::CString;
-
-    let ret: *mut XmlChar;
+pub fn xml_xpath_cast_number_to_string(val: f64) -> Cow<'static, str> {
     match xml_xpath_is_inf(val) {
-        1 => {
-            ret = xml_strdup(c"Infinity".as_ptr() as *const XmlChar);
-        }
-        -1 => {
-            ret = xml_strdup(c"-Infinity".as_ptr() as *const XmlChar);
-        }
+        1 => "Infinity".into(),
+        -1 => "-Infinity".into(),
         _ => {
             if xml_xpath_is_nan(val) {
-                ret = xml_strdup(c"NaN".as_ptr() as *const XmlChar);
+                "NaN".into()
             } else if val == 0.0 {
                 // Omit sign for negative zero.
-                ret = xml_strdup(c"0".as_ptr() as *const XmlChar);
+                "0".into()
             } else {
                 // could be improved
                 let mut buf = String::new();
                 xml_xpath_format_number(val, &mut buf);
-                let buf = CString::new(buf).unwrap();
-                ret = xml_strdup(buf.as_ptr() as *const u8);
+                buf.into()
             }
         }
     }
-    ret
 }
 
 /// Converts a node to its string value.
@@ -1315,7 +1307,11 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
             let res = CString::new(res).unwrap();
             xml_strdup(res.as_ptr() as *const u8)
         }
-        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_string((*val).floatval),
+        XmlXPathObjectType::XPathNumber => {
+            let res = xml_xpath_cast_number_to_string((*val).floatval);
+            let res = CString::new(res.as_ref()).unwrap();
+            xml_strdup(res.as_ptr() as *const u8)
+        }
         XmlXPathObjectType::XPathUsers => {
             // todo!();
             xml_strdup(c"".as_ptr() as *const XmlChar)
@@ -1396,7 +1392,9 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
             res = xml_strdup(s.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XPathNumber => {
-            res = xml_xpath_cast_number_to_string((*val).floatval);
+            let s = xml_xpath_cast_number_to_string((*val).floatval);
+            let s = CString::new(s.as_ref()).unwrap();
+            res = xml_strdup(s.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XPathUsers => {
             // todo!()
@@ -2391,8 +2389,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_double(n_val, 0);
 
-                let ret_val = xml_xpath_cast_number_to_string(val);
-                desret_xml_char_ptr(ret_val);
+                let _ = xml_xpath_cast_number_to_string(val);
+                // desret_xml_char_ptr(ret_val);
                 des_double(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
