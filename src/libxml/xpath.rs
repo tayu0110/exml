@@ -555,11 +555,11 @@ pub struct XmlXPathParserContext {
 }
 
 #[cfg(feature = "xpath")]
-pub static mut XML_XPATH_NAN: f64 = 0.0;
+pub const XML_XPATH_NAN: f64 = f64::NAN;
 #[cfg(feature = "xpath")]
-pub static mut XML_XPATH_PINF: f64 = 0.0;
+pub const XML_XPATH_PINF: f64 = f64::INFINITY;
 #[cfg(feature = "xpath")]
-pub static mut XML_XPATH_NINF: f64 = 0.0;
+pub const XML_XPATH_NINF: f64 = f64::NEG_INFINITY;
 
 /// Implement a functionality similar to the DOM NodeList.length.
 ///
@@ -2156,7 +2156,7 @@ pub unsafe extern "C" fn xml_xpath_init() {
 /// Returns 1 if the value is a NaN, 0 otherwise
 #[doc(alias = "xmlXPathIsNaN")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
-pub unsafe extern "C" fn xml_xpath_is_nan(val: f64) -> i32 {
+pub unsafe fn xml_xpath_is_nan(val: f64) -> i32 {
     val.is_nan() as i32
 }
 
@@ -2177,10 +2177,9 @@ pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> i32 {
 
 /// Initialize the XPath environment
 #[doc(alias = "xmlInitXPathInternal")]
-pub(crate) unsafe extern "C" fn xml_init_xpath_internal() {
-    XML_XPATH_NAN = f64::NAN;
-    XML_XPATH_PINF = f64::INFINITY;
-    XML_XPATH_NINF = f64::NEG_INFINITY;
+pub(crate) fn xml_init_xpath_internal() {
+    // In original libxml, NAN, PINF and NINF is initialized at here.
+    // They are defined as constants on this crate.
 }
 
 #[cfg(test)]
