@@ -1065,7 +1065,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
     if ctxt.is_null() || range.is_null() {
         return null_mut();
     }
-    if (*range).typ != XmlXPathObjectType::XpathRange {
+    if (*range).typ != XmlXPathObjectType::XPathRange {
         return null_mut();
     }
     let start: XmlNodePtr = (*range).user as XmlNodePtr;
@@ -1277,7 +1277,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
         return null_mut();
     }
     match (*obj).typ {
-        XmlXPathObjectType::XpathNodeset => {
+        XmlXPathObjectType::XPathNodeset => {
             let set: XmlNodeSetPtr = (*obj).nodesetval;
             if set.is_null() {
                 return null_mut();
@@ -1342,7 +1342,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathLocationset => {
+        XmlXPathObjectType::XPathLocationset => {
             let set: XmlLocationSetPtr = (*obj).user as XmlLocationSetPtr;
             if set.is_null() {
                 return null_mut();
@@ -1365,9 +1365,9 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathRange => return xml_xinclude_copy_range(ctxt, obj),
+        XmlXPathObjectType::XPathRange => return xml_xinclude_copy_range(ctxt, obj),
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathPoint => { /* points are ignored in XInclude */ }
+        XmlXPathObjectType::XPathPoint => { /* points are ignored in XInclude */ }
         _ => {}
     }
     list
@@ -1591,12 +1591,12 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                     break 'error;
                 }
                 match (*xptr).typ {
-                    XmlXPathObjectType::XpathUndefined
-                    | XmlXPathObjectType::XpathBoolean
-                    | XmlXPathObjectType::XpathNumber
-                    | XmlXPathObjectType::XpathString
-                    | XmlXPathObjectType::XpathUsers
-                    | XmlXPathObjectType::XpathXsltTree => {
+                    XmlXPathObjectType::XPathUndefined
+                    | XmlXPathObjectType::XPathBoolean
+                    | XmlXPathObjectType::XPathNumber
+                    | XmlXPathObjectType::XPathString
+                    | XmlXPathObjectType::XPathUsers
+                    | XmlXPathObjectType::XPathXSLTTree => {
                         let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
                         xml_xinclude_err!(
                             ctxt,
@@ -1610,7 +1610,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         break 'error;
                     }
                     #[cfg(feature = "libxml_xptr_locs")]
-                    XmlXPathObjectType::XpathPoint => {
+                    XmlXPathObjectType::XPathPoint => {
                         let fragment = CStr::from_ptr(fragment as *const i8).to_string_lossy();
                         xml_xinclude_err!(
                             ctxt,
@@ -1623,7 +1623,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         xml_xpath_free_context(xptrctxt);
                         break 'error;
                     }
-                    XmlXPathObjectType::XpathNodeset => {
+                    XmlXPathObjectType::XPathNodeset => {
                         if (*xptr).nodesetval.is_null()
                             || (*(*xptr).nodesetval)
                                 .node_tab
@@ -1636,7 +1636,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         }
                     }
                     #[cfg(feature = "libxml_xptr_locs")]
-                    XmlXPathObjectType::XpathRange | XmlXPathObjectType::XpathLocationset => {} // _ => {}
+                    XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
                 }
                 let set: XmlNodeSetPtr = (*xptr).nodesetval;
                 if !set.is_null() {

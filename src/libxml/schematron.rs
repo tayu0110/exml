@@ -1456,7 +1456,7 @@ unsafe extern "C" fn xml_schematron_get_node(
         return null_mut();
     }
 
-    if (*ret).typ == XmlXPathObjectType::XpathNodeset && !(*ret).nodesetval.is_null() {
+    if (*ret).typ == XmlXPathObjectType::XPathNodeset && !(*ret).nodesetval.is_null() {
         if let Some(table) = (*(*ret).nodesetval)
             .node_tab
             .as_deref()
@@ -1523,7 +1523,7 @@ unsafe extern "C" fn xml_schematron_format_report(
             let eval: XmlXPathObjectPtr = xml_xpath_compiled_eval(comp, (*ctxt).xctxt);
 
             match (*eval).typ {
-                XmlXPathObjectType::XpathNodeset => {
+                XmlXPathObjectType::XPathNodeset => {
                     let spacer: *mut XmlChar = c" ".as_ptr() as _;
 
                     if !(*eval).nodesetval.is_null() {
@@ -1539,7 +1539,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                         generic_error!("Empty node set\n");
                     }
                 }
-                XmlXPathObjectType::XpathBoolean => {
+                XmlXPathObjectType::XPathBoolean => {
                     let str: *const c_char = if (*eval).boolval != 0 {
                         c"True".as_ptr()
                     } else {
@@ -1547,7 +1547,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                     };
                     ret = xml_strcat(ret, str as _);
                 }
-                XmlXPathObjectType::XpathNumber => {
+                XmlXPathObjectType::XPathNumber => {
                     let size: i32 = snprintf(null_mut(), 0, c"%0g".as_ptr() as _, (*eval).floatval);
                     let buf: *mut XmlChar = malloc(size as usize) as _;
                     /* xmlStrPrintf(buf, size, c"%0g".as_ptr() as _, (*eval).floatval); // doesn't work */
@@ -1555,7 +1555,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                     ret = xml_strcat(ret, buf);
                     xml_free(buf as _);
                 }
-                XmlXPathObjectType::XpathString => {
+                XmlXPathObjectType::XPathString => {
                     ret = xml_strcat(ret, (*eval).stringval);
                 }
                 _ => {
@@ -1735,7 +1735,7 @@ unsafe extern "C" fn xml_schematron_run_test(
         failed = 1;
     } else {
         match (*ret).typ {
-            XmlXPathObjectType::XpathXsltTree | XmlXPathObjectType::XpathNodeset => {
+            XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
                 if (*ret).nodesetval.is_null()
                     || (*(*ret).nodesetval)
                         .node_tab
@@ -1745,26 +1745,26 @@ unsafe extern "C" fn xml_schematron_run_test(
                     failed = 1;
                 }
             }
-            XmlXPathObjectType::XpathBoolean => {
+            XmlXPathObjectType::XPathBoolean => {
                 failed = !(*ret).boolval;
             }
-            XmlXPathObjectType::XpathNumber => {
+            XmlXPathObjectType::XPathNumber => {
                 if xml_xpath_is_nan((*ret).floatval) || (*ret).floatval == 0.0 {
                     failed = 1;
                 }
             }
-            XmlXPathObjectType::XpathString => {
+            XmlXPathObjectType::XPathString => {
                 if (*ret).stringval.is_null() || *(*ret).stringval.add(0) == 0 {
                     failed = 1;
                 }
             }
-            XmlXPathObjectType::XpathUndefined | XmlXPathObjectType::XpathUsers => {
+            XmlXPathObjectType::XPathUndefined | XmlXPathObjectType::XPathUsers => {
                 failed = 1;
             }
             #[cfg(feature = "libxml_xptr_locs")]
-            XmlXPathObjectType::XpathPoint
-            | XmlXPathObjectType::XpathRange
-            | XmlXPathObjectType::XpathLocationset => {
+            XmlXPathObjectType::XPathPoint
+            | XmlXPathObjectType::XPathRange
+            | XmlXPathObjectType::XPathLocationset => {
                 failed = 1;
             }
         }

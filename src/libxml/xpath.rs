@@ -149,38 +149,38 @@ pub struct XmlNodeSet {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum XmlXPathObjectType {
-    XpathUndefined = 0,
-    XpathNodeset = 1,
-    XpathBoolean = 2,
-    XpathNumber = 3,
-    XpathString = 4,
+    XPathUndefined = 0,
+    XPathNodeset = 1,
+    XPathBoolean = 2,
+    XPathNumber = 3,
+    XPathString = 4,
     #[cfg(feature = "libxml_xptr_locs")]
-    XpathPoint = 5,
+    XPathPoint = 5,
     #[cfg(feature = "libxml_xptr_locs")]
-    XpathRange = 6,
+    XPathRange = 6,
     #[cfg(feature = "libxml_xptr_locs")]
-    XpathLocationset = 7,
-    XpathUsers = 8,
-    XpathXsltTree = 9, /* An XSLT value tree, non modifiable */
+    XPathLocationset = 7,
+    XPathUsers = 8,
+    XPathXSLTTree = 9, /* An XSLT value tree, non modifiable */
 }
 
 impl TryFrom<i32> for XmlXPathObjectType {
     type Error = anyhow::Error;
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value == Self::XpathUndefined as i32 {
-            return Ok(Self::XpathUndefined);
+        if value == Self::XPathUndefined as i32 {
+            return Ok(Self::XPathUndefined);
         }
-        if value == Self::XpathNodeset as i32 {
-            return Ok(Self::XpathNodeset);
+        if value == Self::XPathNodeset as i32 {
+            return Ok(Self::XPathNodeset);
         }
-        if value == Self::XpathBoolean as i32 {
-            return Ok(Self::XpathBoolean);
+        if value == Self::XPathBoolean as i32 {
+            return Ok(Self::XPathBoolean);
         }
-        if value == Self::XpathNumber as i32 {
-            return Ok(Self::XpathNumber);
+        if value == Self::XPathNumber as i32 {
+            return Ok(Self::XPathNumber);
         }
-        if value == Self::XpathString as i32 {
-            return Ok(Self::XpathString);
+        if value == Self::XPathString as i32 {
+            return Ok(Self::XPathString);
         }
         #[cfg(feature = "libxml_xptr_locs")]
         if value == Self::XpathPoint as i32 {
@@ -194,11 +194,11 @@ impl TryFrom<i32> for XmlXPathObjectType {
         if value == Self::XpathLocationset as i32 {
             return Ok(Self::XpathLocationset);
         }
-        if value == Self::XpathUsers as i32 {
-            return Ok(Self::XpathUsers);
+        if value == Self::XPathUsers as i32 {
+            return Ok(Self::XPathUsers);
         }
-        if value == Self::XpathXsltTree as i32 {
-            return Ok(Self::XpathXsltTree);
+        if value == Self::XPathXSLTTree as i32 {
+            return Ok(Self::XPathXSLTTree);
         }
         Err(anyhow::anyhow!(
             "Invalid convert from value '{value}' to {}",
@@ -645,17 +645,17 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
     }
     if matches!(
         (*obj).typ,
-        XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
     ) {
         if (*obj).boolval != 0 {
-            (*obj).typ = XmlXPathObjectType::XpathXsltTree; /* TODO: Just for debugging. */
+            (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* TODO: Just for debugging. */
             if !(*obj).nodesetval.is_null() {
                 xml_xpath_free_value_tree((*obj).nodesetval);
             }
         } else if !(*obj).nodesetval.is_null() {
             xml_xpath_free_node_set((*obj).nodesetval);
         }
-    } else if matches!((*obj).typ, XmlXPathObjectType::XpathString) && !(*obj).stringval.is_null() {
+    } else if matches!((*obj).typ, XmlXPathObjectType::XPathString) && !(*obj).stringval.is_null() {
         xml_free((*obj).stringval as _);
     } else {
         #[cfg(feature = "libxml_xptr_locs")]
@@ -749,31 +749,31 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
     }
     memcpy(ret as _, val as _, size_of::<XmlXPathObject>());
     match (*val).typ {
-        XmlXPathObjectType::XpathBoolean | XmlXPathObjectType::XpathNumber => {}
+        XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathPoint | XmlXPathObjectType::XpathRange => {}
-        XmlXPathObjectType::XpathString => {
+        XmlXPathObjectType::XPathPoint | XmlXPathObjectType::XPathRange => {}
+        XmlXPathObjectType::XPathString => {
             (*ret).stringval = xml_strdup((*val).stringval);
             if (*ret).stringval.is_null() {
                 xml_free(ret as _);
                 return null_mut();
             }
         }
-        XmlXPathObjectType::XpathXsltTree | XmlXPathObjectType::XpathNodeset => {
+        XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
             /* TODO: Check memory error. */
             (*ret).nodesetval = xml_xpath_node_set_merge(null_mut(), (*val).nodesetval);
             /* Do not deallocate the copied tree value */
             (*ret).boolval = 0;
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathLocationset => {
+        XmlXPathObjectType::XPathLocationset => {
             let loc: XmlLocationSetPtr = (*val).user as _;
             (*ret).user = xml_xptr_location_set_merge(null_mut(), loc) as *mut c_void;
         }
-        XmlXPathObjectType::XpathUsers => {
+        XmlXPathObjectType::XPathUsers => {
             (*ret).user = (*val).user;
         }
-        XmlXPathObjectType::XpathUndefined => {
+        XmlXPathObjectType::XPathUndefined => {
             generic_error!(
                 "xmlXPathObjectCopy: unsupported type {}\n",
                 (*val).typ as i32
@@ -993,21 +993,21 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i3
         return 0;
     }
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => 0,
-        XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
+        XmlXPathObjectType::XPathUndefined => 0,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
         }
-        XmlXPathObjectType::XpathString => xml_xpath_cast_string_to_boolean((*val).stringval),
-        XmlXPathObjectType::XpathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
-        XmlXPathObjectType::XpathBoolean => (*val).boolval,
-        XmlXPathObjectType::XpathUsers => {
+        XmlXPathObjectType::XPathString => xml_xpath_cast_string_to_boolean((*val).stringval),
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
+        XmlXPathObjectType::XPathBoolean => (*val).boolval,
+        XmlXPathObjectType::XPathUsers => {
             // todo!();
             0
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathPoint
-        | XmlXPathObjectType::XpathRange
-        | XmlXPathObjectType::XpathLocationset => {
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
             // todo!();
             0
         }
@@ -1081,21 +1081,21 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
         return XML_XPATH_NAN;
     }
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => XML_XPATH_NAN,
-        XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
+        XmlXPathObjectType::XPathUndefined => XML_XPATH_NAN,
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             xml_xpath_cast_node_set_to_number((*val).nodesetval)
         }
-        XmlXPathObjectType::XpathString => xml_xpath_cast_string_to_number((*val).stringval),
-        XmlXPathObjectType::XpathNumber => (*val).floatval,
-        XmlXPathObjectType::XpathBoolean => xml_xpath_cast_boolean_to_number((*val).boolval),
-        XmlXPathObjectType::XpathUsers => {
+        XmlXPathObjectType::XPathString => xml_xpath_cast_string_to_number((*val).stringval),
+        XmlXPathObjectType::XPathNumber => (*val).floatval,
+        XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_number((*val).boolval),
+        XmlXPathObjectType::XPathUsers => {
             // todo!();
             XML_XPATH_NAN
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathPoint
-        | XmlXPathObjectType::XpathRange
-        | XmlXPathObjectType::XpathLocationset => {
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
             // todo!();
             XML_XPATH_NAN
         }
@@ -1347,28 +1347,28 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
         return xml_strdup(c"".as_ptr() as *const XmlChar);
     }
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => xml_strdup(c"".as_ptr() as *const XmlChar),
-        XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
+        XmlXPathObjectType::XPathUndefined => xml_strdup(c"".as_ptr() as *const XmlChar),
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             let res = xml_xpath_cast_node_set_to_string((*val).nodesetval)
                 .map(|c| CString::new(c).unwrap());
             res.as_ref()
                 .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8))
         }
-        XmlXPathObjectType::XpathString => xml_strdup((*val).stringval),
-        XmlXPathObjectType::XpathBoolean => {
+        XmlXPathObjectType::XPathString => xml_strdup((*val).stringval),
+        XmlXPathObjectType::XPathBoolean => {
             let res = xml_xpath_cast_boolean_to_string((*val).boolval);
             let res = CString::new(res).unwrap();
             xml_strdup(res.as_ptr() as *const u8)
         }
-        XmlXPathObjectType::XpathNumber => xml_xpath_cast_number_to_string((*val).floatval),
-        XmlXPathObjectType::XpathUsers => {
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_string((*val).floatval),
+        XmlXPathObjectType::XPathUsers => {
             // todo!();
             xml_strdup(c"".as_ptr() as *const XmlChar)
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathPoint
-        | XmlXPathObjectType::XpathRange
-        | XmlXPathObjectType::XpathLocationset => {
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
             // todo!();
             xml_strdup(c"".as_ptr() as *const XmlChar)
         }
@@ -1384,7 +1384,7 @@ pub unsafe extern "C" fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> Xm
     if val.is_null() {
         return xml_xpath_new_boolean(0);
     }
-    if (*val).typ == XmlXPathObjectType::XpathBoolean {
+    if (*val).typ == XmlXPathObjectType::XPathBoolean {
         return val;
     }
     let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(val));
@@ -1401,7 +1401,7 @@ pub unsafe extern "C" fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> Xml
     if val.is_null() {
         return xml_xpath_new_float(0.0);
     }
-    if (*val).typ == XmlXPathObjectType::XpathNumber {
+    if (*val).typ == XmlXPathObjectType::XPathNumber {
         return val;
     }
     let ret: XmlXPathObjectPtr = xml_xpath_new_float(xml_xpath_cast_to_number(val));
@@ -1424,32 +1424,32 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
     }
 
     match (*val).typ {
-        XmlXPathObjectType::XpathUndefined => {}
-        XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
+        XmlXPathObjectType::XPathUndefined => {}
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             let tmp = xml_xpath_cast_node_set_to_string((*val).nodesetval)
                 .map(|c| CString::new(c).unwrap());
             res = tmp
                 .as_ref()
                 .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
         }
-        XmlXPathObjectType::XpathString => {
+        XmlXPathObjectType::XPathString => {
             return val;
         }
-        XmlXPathObjectType::XpathBoolean => {
+        XmlXPathObjectType::XPathBoolean => {
             let s = xml_xpath_cast_boolean_to_string((*val).boolval);
             let s = CString::new(s).unwrap();
             res = xml_strdup(s.as_ptr() as *const u8);
         }
-        XmlXPathObjectType::XpathNumber => {
+        XmlXPathObjectType::XPathNumber => {
             res = xml_xpath_cast_number_to_string((*val).floatval);
         }
-        XmlXPathObjectType::XpathUsers => {
+        XmlXPathObjectType::XPathUsers => {
             // todo!()
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        XmlXPathObjectType::XpathPoint
-        | XmlXPathObjectType::XpathRange
-        | XmlXPathObjectType::XpathLocationset => {
+        XmlXPathObjectType::XPathPoint
+        | XmlXPathObjectType::XPathRange
+        | XmlXPathObjectType::XPathLocationset => {
             // todo!()
         }
     }
@@ -1841,13 +1841,13 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
         return 0;
     }
     match (*res).typ {
-        XmlXPathObjectType::XpathBoolean => {
+        XmlXPathObjectType::XPathBoolean => {
             return (*res).boolval;
         }
-        XmlXPathObjectType::XpathNumber => {
+        XmlXPathObjectType::XPathNumber => {
             return ((*res).floatval == (*ctxt).proximity_position as _) as i32;
         }
-        XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree => {
+        XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             if (*res).nodesetval.is_null() {
                 return 0;
             }
@@ -1856,7 +1856,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
                 .as_ref()
                 .map_or(false, |s| !s.is_empty())) as i32;
         }
-        XmlXPathObjectType::XpathString => {
+        XmlXPathObjectType::XPathString => {
             return (!(*res).stringval.is_null() && xml_strlen((*res).stringval) != 0) as i32;
         }
         _ => {

@@ -2245,7 +2245,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     };
 
     match (*cur).typ {
-        XmlXPathObjectType::XpathNodeset => {
+        XmlXPathObjectType::XPathNodeset => {
             let mut node: XmlNodePtr;
             #[cfg(feature = "libxml_output")]
             {
@@ -2278,14 +2278,14 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                 println!("xpath returned {} nodes", (*(*cur).nodesetval).node_nr);
             }
         }
-        XmlXPathObjectType::XpathBoolean => {
+        XmlXPathObjectType::XPathBoolean => {
             if (*cur).boolval != 0 {
                 println!("true");
             } else {
                 println!("false");
             }
         }
-        XmlXPathObjectType::XpathNumber => match xml_xpath_is_inf((*cur).floatval) {
+        XmlXPathObjectType::XPathNumber => match xml_xpath_is_inf((*cur).floatval) {
             1 => {
                 println!("Infinity");
             }
@@ -2300,13 +2300,13 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                 }
             }
         },
-        XmlXPathObjectType::XpathString => {
+        XmlXPathObjectType::XPathString => {
             println!(
                 "{}",
                 CStr::from_ptr((*cur).stringval as _).to_string_lossy()
             );
         }
-        XmlXPathObjectType::XpathUndefined => {
+        XmlXPathObjectType::XPathUndefined => {
             eprintln!("XPath Object is uninitialized");
             PROGRESULT = XmllintReturnCode::ErrXpath;
         }

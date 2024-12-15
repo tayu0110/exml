@@ -1957,37 +1957,37 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *
     }
 
     match XmlXPathObjectType::try_from(error_type) {
-        Ok(XmlXPathObjectType::XpathUndefined) => {
+        Ok(XmlXPathObjectType::XPathUndefined) => {
             generic_error!("{}: no such node\n", CStr::from_ptr(arg).to_string_lossy());
         }
-        Ok(XmlXPathObjectType::XpathBoolean) => {
+        Ok(XmlXPathObjectType::XPathBoolean) => {
             generic_error!("{} is a Boolean\n", CStr::from_ptr(arg).to_string_lossy());
         }
-        Ok(XmlXPathObjectType::XpathNumber) => {
+        Ok(XmlXPathObjectType::XPathNumber) => {
             generic_error!("{} is a number\n", CStr::from_ptr(arg).to_string_lossy());
         }
-        Ok(XmlXPathObjectType::XpathString) => {
+        Ok(XmlXPathObjectType::XPathString) => {
             generic_error!("{} is a string\n", CStr::from_ptr(arg).to_string_lossy());
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        Ok(XmlXPathObjectType::XpathPoint) => {
+        Ok(XmlXPathObjectType::XPathPoint) => {
             generic_error!("{} is a point\n", CStr::from_ptr(arg).to_string_lossy());
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        Ok(XmlXPathObjectType::XpathRange) => {
+        Ok(XmlXPathObjectType::XPathRange) => {
             generic_error!("{} is a range\n", CStr::from_ptr(arg).to_string_lossy());
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        Ok(XmlXPathObjectType::XpathLocationset) => {
+        Ok(XmlXPathObjectType::XPathLocationset) => {
             generic_error!("{} is a range\n", CStr::from_ptr(arg).to_string_lossy());
         }
-        Ok(XmlXPathObjectType::XpathUsers) => {
+        Ok(XmlXPathObjectType::XPathUsers) => {
             generic_error!(
                 "{} is user-defined\n",
                 CStr::from_ptr(arg).to_string_lossy()
             );
         }
-        Ok(XmlXPathObjectType::XpathXsltTree) => {
+        Ok(XmlXPathObjectType::XPathXSLTTree) => {
             generic_error!(
                 "{} is an XSLT value tree\n",
                 CStr::from_ptr(arg).to_string_lossy()
@@ -2039,7 +2039,7 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
 
     if !list.is_null() {
         match (*list).typ {
-            XmlXPathObjectType::XpathNodeset => {
+            XmlXPathObjectType::XPathNodeset => {
                 #[cfg(feature = "libxml_output")]
                 if !(*list).nodesetval.is_null() {
                     if let Some(table) = (*(*list).nodesetval).node_tab.as_deref() {
@@ -2055,16 +2055,16 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
                     generic_error!("Node set\n");
                 }
             }
-            XmlXPathObjectType::XpathBoolean => {
+            XmlXPathObjectType::XPathBoolean => {
                 generic_error!(
                     "Is a Boolean:{}\n",
                     CStr::from_ptr(xml_bool_to_text((*list).boolval)).to_string_lossy()
                 );
             }
-            XmlXPathObjectType::XpathNumber => {
+            XmlXPathObjectType::XPathNumber => {
                 generic_error!("Is a number:{}\n", (*list).floatval);
             }
-            XmlXPathObjectType::XpathString => {
+            XmlXPathObjectType::XPathString => {
                 generic_error!(
                     "Is a string:{}\n",
                     CStr::from_ptr((*list).stringval as *const i8).to_string_lossy()
@@ -3295,13 +3295,13 @@ pub unsafe fn xml_shell<'a>(
                 }
                 if !list.is_null() {
                     match (*list).typ {
-                        XmlXPathObjectType::XpathUndefined => {
+                        XmlXPathObjectType::XPathUndefined => {
                             generic_error!(
                                 "{}: no such node\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNodeset => {
+                        XmlXPathObjectType::XPathNodeset => {
                             if !(*list).nodesetval.is_null() {
                                 if let Some(table) = (*(*list).nodesetval).node_tab.as_deref() {
                                     for &node in table {
@@ -3310,52 +3310,52 @@ pub unsafe fn xml_shell<'a>(
                                 }
                             }
                         }
-                        XmlXPathObjectType::XpathBoolean => {
+                        XmlXPathObjectType::XPathBoolean => {
                             generic_error!(
                                 "{} is a Boolean\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNumber => {
+                        XmlXPathObjectType::XPathNumber => {
                             generic_error!(
                                 "{} is a number\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathString => {
+                        XmlXPathObjectType::XPathString => {
                             generic_error!(
                                 "{} is a string\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathPoint => {
+                        XmlXPathObjectType::XPathPoint => {
                             generic_error!(
                                 "{} is a point\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathRange => {
+                        XmlXPathObjectType::XPathRange => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathLocationset => {
+                        XmlXPathObjectType::XPathLocationset => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathUsers => {
+                        XmlXPathObjectType::XPathUsers => {
                             generic_error!(
                                 "{} is user-defined\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathXsltTree => {
+                        XmlXPathObjectType::XPathXSLTTree => {
                             generic_error!(
                                 "{} is an XSLT value tree\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
@@ -3466,13 +3466,13 @@ pub unsafe fn xml_shell<'a>(
                 }
                 if !list.is_null() {
                     match (*list).typ {
-                        XmlXPathObjectType::XpathUndefined => {
+                        XmlXPathObjectType::XPathUndefined => {
                             generic_error!(
                                 "{}: no such node\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNodeset => {
+                        XmlXPathObjectType::XPathNodeset => {
                             if (*list).nodesetval.is_null() {
                                 break;
                             }
@@ -3487,52 +3487,52 @@ pub unsafe fn xml_shell<'a>(
                                 }
                             }
                         }
-                        XmlXPathObjectType::XpathBoolean => {
+                        XmlXPathObjectType::XPathBoolean => {
                             generic_error!(
                                 "{} is a Boolean\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNumber => {
+                        XmlXPathObjectType::XPathNumber => {
                             generic_error!(
                                 "{} is a number\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathString => {
+                        XmlXPathObjectType::XPathString => {
                             generic_error!(
                                 "{} is a string\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathPoint => {
+                        XmlXPathObjectType::XPathPoint => {
                             generic_error!(
                                 "{} is a point\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathRange => {
+                        XmlXPathObjectType::XPathRange => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathLocationset => {
+                        XmlXPathObjectType::XPathLocationset => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathUsers => {
+                        XmlXPathObjectType::XPathUsers => {
                             generic_error!(
                                 "{} is user-defined\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathXsltTree => {
+                        XmlXPathObjectType::XPathXSLTTree => {
                             generic_error!(
                                 "{} is an XSLT value tree\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
@@ -3571,13 +3571,13 @@ pub unsafe fn xml_shell<'a>(
                 }
                 if !list.is_null() {
                     match (*list).typ {
-                        XmlXPathObjectType::XpathUndefined => {
+                        XmlXPathObjectType::XPathUndefined => {
                             generic_error!(
                                 "{}: no such node\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNodeset => {
+                        XmlXPathObjectType::XPathNodeset => {
                             if !(*list).nodesetval.is_null() {
                                 if let Some(table) = (*(*list).nodesetval).node_tab.as_deref() {
                                     for &node in table {
@@ -3592,52 +3592,52 @@ pub unsafe fn xml_shell<'a>(
                                 }
                             }
                         }
-                        XmlXPathObjectType::XpathBoolean => {
+                        XmlXPathObjectType::XPathBoolean => {
                             generic_error!(
                                 "{} is a Boolean\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNumber => {
+                        XmlXPathObjectType::XPathNumber => {
                             generic_error!(
                                 "{} is a number\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathString => {
+                        XmlXPathObjectType::XPathString => {
                             generic_error!(
                                 "{} is a string\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathPoint => {
+                        XmlXPathObjectType::XPathPoint => {
                             generic_error!(
                                 "{} is a point\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathRange => {
+                        XmlXPathObjectType::XPathRange => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathLocationset => {
+                        XmlXPathObjectType::XPathLocationset => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathUsers => {
+                        XmlXPathObjectType::XPathUsers => {
                             generic_error!(
                                 "{} is user-defined\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathXsltTree => {
+                        XmlXPathObjectType::XPathXSLTTree => {
                             generic_error!(
                                 "{} is an XSLT value tree\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
@@ -3675,13 +3675,13 @@ pub unsafe fn xml_shell<'a>(
                 }
                 if !list.is_null() {
                     match (*list).typ {
-                        XmlXPathObjectType::XpathUndefined => {
+                        XmlXPathObjectType::XPathUndefined => {
                             generic_error!(
                                 "{}: no such node\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNodeset => {
+                        XmlXPathObjectType::XPathNodeset => {
                             if !(*list).nodesetval.is_null() {
                                 if let Some(table) = (*(*list).nodesetval)
                                     .node_tab
@@ -3713,52 +3713,52 @@ pub unsafe fn xml_shell<'a>(
                                 );
                             }
                         }
-                        XmlXPathObjectType::XpathBoolean => {
+                        XmlXPathObjectType::XPathBoolean => {
                             generic_error!(
                                 "{} is a Boolean\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNumber => {
+                        XmlXPathObjectType::XPathNumber => {
                             generic_error!(
                                 "{} is a number\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathString => {
+                        XmlXPathObjectType::XPathString => {
                             generic_error!(
                                 "{} is a string\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathPoint => {
+                        XmlXPathObjectType::XPathPoint => {
                             generic_error!(
                                 "{} is a point\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathRange => {
+                        XmlXPathObjectType::XPathRange => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathLocationset => {
+                        XmlXPathObjectType::XPathLocationset => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathUsers => {
+                        XmlXPathObjectType::XPathUsers => {
                             generic_error!(
                                 "{} is user-defined\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathXsltTree => {
+                        XmlXPathObjectType::XPathXSLTTree => {
                             generic_error!(
                                 "{} is an XSLT value tree\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
@@ -3804,13 +3804,13 @@ pub unsafe fn xml_shell<'a>(
                 }
                 if !list.is_null() {
                     match (*list).typ {
-                        XmlXPathObjectType::XpathUndefined => {
+                        XmlXPathObjectType::XPathUndefined => {
                             generic_error!(
                                 "{}: no such node\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNodeset => {
+                        XmlXPathObjectType::XPathNodeset => {
                             if !(*list).nodesetval.is_null() {
                                 if let Some(table) = (*(*list).nodesetval).node_tab.as_deref() {
                                     for &node in table {
@@ -3822,52 +3822,52 @@ pub unsafe fn xml_shell<'a>(
                                 }
                             }
                         }
-                        XmlXPathObjectType::XpathBoolean => {
+                        XmlXPathObjectType::XPathBoolean => {
                             generic_error!(
                                 "{} is a Boolean\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathNumber => {
+                        XmlXPathObjectType::XPathNumber => {
                             generic_error!(
                                 "{} is a number\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathString => {
+                        XmlXPathObjectType::XPathString => {
                             generic_error!(
                                 "{} is a string\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathPoint => {
+                        XmlXPathObjectType::XPathPoint => {
                             generic_error!(
                                 "{} is a point\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathRange => {
+                        XmlXPathObjectType::XPathRange => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
                         #[cfg(feature = "libxml_xptr_locs")]
-                        XmlXPathObjectType::XpathLocationset => {
+                        XmlXPathObjectType::XPathLocationset => {
                             generic_error!(
                                 "{} is a range\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathUsers => {
+                        XmlXPathObjectType::XPathUsers => {
                             generic_error!(
                                 "{} is user-defined\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()
                             );
                         }
-                        XmlXPathObjectType::XpathXsltTree => {
+                        XmlXPathObjectType::XPathXSLTTree => {
                             generic_error!(
                                 "{} is an XSLT value tree\n",
                                 CStr::from_ptr(arg.as_ptr()).to_string_lossy()

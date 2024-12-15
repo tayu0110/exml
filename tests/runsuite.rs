@@ -275,7 +275,7 @@ unsafe extern "C" fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodeP
     if res.is_null() {
         return null_mut();
     }
-    if (*res).typ == XmlXPathObjectType::XpathNodeset && !(*res).nodesetval.is_null() {
+    if (*res).typ == XmlXPathObjectType::XPathNodeset && !(*res).nodesetval.is_null() {
         if let Some(table) = (*(*res).nodesetval)
             .node_tab
             .as_deref()
@@ -309,7 +309,7 @@ unsafe extern "C" fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut X
     if res.is_null() {
         return null_mut();
     }
-    if (*res).typ == XmlXPathObjectType::XpathString {
+    if (*res).typ == XmlXPathObjectType::XPathString {
         ret = (*res).stringval;
         (*res).stringval = null_mut();
     }
