@@ -943,11 +943,8 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastNumberToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> i32 {
-    if xml_xpath_is_nan(val) || val == 0.0 {
-        return 0;
-    }
-    1
+pub fn xml_xpath_cast_number_to_boolean(val: f64) -> bool {
+    !xml_xpath_is_nan(val) && val != 0.0
 }
 
 /// Converts a string to its boolean value
@@ -986,7 +983,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> i3
             xml_xpath_cast_node_set_to_boolean((*val).nodesetval) as i32
         }
         XmlXPathObjectType::XPathString => xml_xpath_cast_string_to_boolean((*val).stringval),
-        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
+        XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval) as i32,
         XmlXPathObjectType::XPathBoolean => (*val).boolval,
         XmlXPathObjectType::XPathUsers => {
             // todo!();
@@ -2394,8 +2391,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_double(n_val, 0);
 
-                let ret_val = xml_xpath_cast_number_to_boolean(val);
-                desret_int(ret_val);
+                let _ = xml_xpath_cast_number_to_boolean(val);
+                // desret_int(ret_val);
                 des_double(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {

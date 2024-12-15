@@ -9574,8 +9574,8 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                 ret = ((*arg1).boolval == (*arg2).boolval) as i32;
             }
             XmlXPathObjectType::XPathNumber => {
-                ret =
-                    ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval)) as i32;
+                ret = ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval) as i32)
+                    as i32;
             }
             XmlXPathObjectType::XPathString => {
                 if (*arg2).stringval.is_null() || *(*arg2).stringval.add(0) == 0 {
@@ -9600,7 +9600,8 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
             match (*arg2).typ {
                 XmlXPathObjectType::XPathUndefined => {}
                 XmlXPathObjectType::XPathBoolean => {
-                    ret = ((*arg2).boolval == xml_xpath_cast_number_to_boolean((*arg1).floatval))
+                    ret = ((*arg2).boolval
+                        == xml_xpath_cast_number_to_boolean((*arg1).floatval) as i32)
                         as i32;
                 }
 
