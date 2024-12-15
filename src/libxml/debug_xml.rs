@@ -2065,10 +2065,7 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
                 generic_error!("Is a number:{}\n", (*list).floatval);
             }
             XmlXPathObjectType::XPathString => {
-                generic_error!(
-                    "Is a string:{}\n",
-                    CStr::from_ptr((*list).stringval as *const i8).to_string_lossy()
-                );
+                generic_error!("Is a string:{}\n", (*list).stringval.as_deref().unwrap());
             }
             _ => {
                 xml_shell_print_xpath_error((*list).typ as i32, null_mut());

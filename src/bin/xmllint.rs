@@ -2301,10 +2301,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             }
         },
         XmlXPathObjectType::XPathString => {
-            println!(
-                "{}",
-                CStr::from_ptr((*cur).stringval as _).to_string_lossy()
-            );
+            println!("{}", (*cur).stringval.as_deref().unwrap());
         }
         XmlXPathObjectType::XPathUndefined => {
             eprintln!("XPath Object is uninitialized");

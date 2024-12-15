@@ -310,8 +310,10 @@ unsafe extern "C" fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut X
         return null_mut();
     }
     if (*res).typ == XmlXPathObjectType::XPathString {
-        ret = (*res).stringval;
-        (*res).stringval = null_mut();
+        let res = (*res).stringval.take().map(|s| CString::new(s).unwrap());
+        ret = res
+            .as_deref()
+            .map_or(null_mut(), |s| xml_strdup(s.as_ptr() as *const u8));
     }
     xml_xpath_free_object(res);
     ret

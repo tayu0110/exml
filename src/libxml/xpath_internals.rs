@@ -29,6 +29,7 @@
 use std::{
     ffi::{c_char, CStr, CString},
     io::Write,
+    iter::repeat,
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut, NonNull},
@@ -61,9 +62,8 @@ use crate::{
         },
         valid::xml_get_id,
         xmlstring::{
-            xml_str_equal, xml_strcat, xml_strchr, xml_strdup, xml_strlen, xml_strncmp,
-            xml_strndup, xml_strstr, xml_utf8_strlen, xml_utf8_strloc, xml_utf8_strpos,
-            xml_utf8_strsize, xml_utf8_strsub, XmlChar,
+            xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup, xml_strstr,
+            xml_utf8_strlen, XmlChar,
         },
         xpath::{
             xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
@@ -640,9 +640,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                         }
                     }
                     XmlXPathObjectType::XPathString => {
-                        if !(*obj).stringval.is_null() {
-                            xml_free((*obj).stringval as _);
-                        }
+                        let _ = (*obj).stringval.take();
 
                         if XP_CACHE_WANTS!((*cache).string_objs, (*cache).max_string) {
                             XP_CACHE_ADD!((*cache).string_objs, obj);
@@ -779,9 +777,9 @@ pub unsafe extern "C" fn xml_xpath_pop_string(ctxt: XmlXPathParserContextPtr) ->
     }
     let ret: *mut XmlChar = xml_xpath_cast_to_string(obj); /* this does required strdup */
     /* TODO: needs refactoring somewhere else */
-    if (*obj).stringval == ret {
-        (*obj).stringval = null_mut();
-    }
+    // if (*obj).stringval == ret {
+    //     (*obj).stringval = null_mut();
+    // }
     xml_xpath_release_object((*ctxt).context, obj);
     ret
 }
@@ -1225,7 +1223,16 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_object<'a>(
         }
         XmlXPathObjectType::XPathString => {
             write!(output, "Object is a string : ");
-            xml_debug_dump_string(Some(output), (*cur).stringval);
+            let strval = (*cur)
+                .stringval
+                .as_deref()
+                .map(|s| CString::new(s).unwrap());
+            xml_debug_dump_string(
+                Some(output),
+                strval
+                    .as_deref()
+                    .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+            );
             writeln!(output);
         }
         #[cfg(feature = "libxml_xptr_locs")]
@@ -2363,7 +2370,12 @@ unsafe extern "C" fn xml_xpath_cache_new_string(
                 .add((*(*cache).string_objs).number as usize)
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XPathString;
-            (*ret).stringval = copy;
+            (*ret).stringval = Some(
+                CStr::from_ptr(copy as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(copy as _);
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             if val.is_null() {
@@ -2382,7 +2394,12 @@ unsafe extern "C" fn xml_xpath_cache_new_string(
                 as XmlXPathObjectPtr;
 
             (*ret).typ = XmlXPathObjectType::XPathString;
-            (*ret).stringval = copy;
+            (*ret).stringval = Some(
+                CStr::from_ptr(copy as *const i8)
+                    .to_string_lossy()
+                    .into_owned(),
+            );
+            xml_free(copy as _);
             return ret;
         }
     }
@@ -2483,7 +2500,16 @@ unsafe extern "C" fn xml_xpath_cache_object_copy(
                 );
             }
             XmlXPathObjectType::XPathString => {
-                return xml_xpath_cache_new_string(ctxt, (*val).stringval);
+                let strval = (*val)
+                    .stringval
+                    .as_deref()
+                    .map(|s| CString::new(s).unwrap());
+                return xml_xpath_cache_new_string(
+                    ctxt,
+                    strval
+                        .as_deref()
+                        .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+                );
             }
             XmlXPathObjectType::XPathBoolean => {
                 return xml_xpath_cache_new_boolean(ctxt, (*val).boolval as i32);
@@ -2728,11 +2754,12 @@ pub unsafe extern "C" fn xml_xpath_new_string(mut val: *const XmlChar) -> XmlXPa
     if val.is_null() {
         val = c"".as_ptr() as _;
     }
-    (*ret).stringval = xml_strdup(val);
-    if (*ret).stringval.is_null() {
-        xml_free(ret as _);
-        return null_mut();
-    }
+    assert!(!val.is_null());
+    (*ret).stringval = Some(
+        CStr::from_ptr(val as *const i8)
+            .to_string_lossy()
+            .into_owned(),
+    );
     ret
 }
 
@@ -2759,7 +2786,12 @@ pub unsafe extern "C" fn xml_xpath_wrap_string(val: *mut XmlChar) -> XmlXPathObj
     }
     std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathString;
-    (*ret).stringval = val;
+    (*ret).stringval = (!val.is_null()).then(|| {
+        CStr::from_ptr(val as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    });
+    xml_free(val as _);
     ret
 }
 
@@ -8643,7 +8675,7 @@ pub unsafe extern "C" fn xml_xpath_evaluate_predicate_result(
                 .map_or(false, |t| !t.is_empty()) as i32;
         }
         XmlXPathObjectType::XPathString => {
-            return (!(*res).stringval.is_null() && *(*res).stringval.add(0) != 0) as i32;
+            return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty()) as i32;
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathLocationset => {
@@ -8691,12 +8723,17 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
                 .add((*(*cache).string_objs).number as usize)
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XPathString;
-            (*ret).stringval = val;
+            (*ret).stringval = (!val.is_null()).then(|| {
+                CStr::from_ptr(val as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            });
+            if !val.is_null() {
+                xml_free(val as _);
+            }
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
-            /*
-             * Fallback to misc-cache.
-             */
+            // Fallback to misc-cache.
             (*(*cache).misc_objs).number -= 1;
             let ret: XmlXPathObjectPtr = *(*(*cache).misc_objs)
                 .items
@@ -8704,7 +8741,14 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
                 as XmlXPathObjectPtr;
 
             (*ret).typ = XmlXPathObjectType::XPathString;
-            (*ret).stringval = val;
+            (*ret).stringval = (!val.is_null()).then(|| {
+                CStr::from_ptr(val as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            });
+            if !val.is_null() {
+                xml_free(val as _);
+            }
             return ret;
         }
     }
@@ -8844,7 +8888,6 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
 ///  returns "gopher://spinaltap.micro.umn.edu/00/Weather/California/Los%20Angeles%23ocean"
 #[doc(alias = "xmlXPathEscapeUriFunction")]
 unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
-    let mut cptr: *mut XmlChar;
     let mut escape: [XmlChar; 4] = [0; 4];
 
     CHECK_ARITY!(ctxt, nargs, 2);
@@ -8860,55 +8903,60 @@ unsafe fn xml_xpath_escape_uri_function(ctxt: XmlXPathParserContextPtr, nargs: i
     escape[3] = 0;
 
     if !target.is_null() {
-        cptr = (*str).stringval;
-        while *cptr != 0 {
-            if (*cptr >= b'A' && *cptr <= b'Z')
-                || (*cptr >= b'a' && *cptr <= b'z')
-                || (*cptr >= b'0' && *cptr <= b'9')
-                || *cptr == b'-'
-                || *cptr == b'_'
-                || *cptr == b'.'
-                || *cptr == b'!'
-                || *cptr == b'~'
-                || *cptr == b'*'
-                || *cptr == b'\''
-                || *cptr == b'('
-                || *cptr == b')'
-                || (*cptr == b'%'
-                    && ((*cptr.add(1) >= b'A' && *cptr.add(1) <= b'F')
-                        || (*cptr.add(1) >= b'a' && *cptr.add(1) <= b'f')
-                        || (*cptr.add(1) >= b'0' && *cptr.add(1) <= b'9'))
-                    && ((*cptr.add(2) >= b'A' && *cptr.add(2) <= b'F')
-                        || (*cptr.add(2) >= b'a' && *cptr.add(2) <= b'f')
-                        || (*cptr.add(2) >= b'0' && *cptr.add(2) <= b'9')))
+        let cptr = (*str)
+            .stringval
+            .as_deref()
+            .expect("Internal Error")
+            .as_bytes();
+        for (i, &c) in cptr.iter().enumerate() {
+            if c.is_ascii_uppercase()
+                || c.is_ascii_lowercase()
+                || c.is_ascii_digit()
+                || c == b'-'
+                || c == b'_'
+                || c == b'.'
+                || c == b'!'
+                || c == b'~'
+                || c == b'*'
+                || c == b'\''
+                || c == b'('
+                || c == b')'
+                || (c == b'%'
+                    && (i + 1 < cptr.len()
+                        && ((cptr[i + 1] >= b'A' && cptr[i + 1] <= b'F')
+                            || (cptr[i + 1] >= b'a' && cptr[i + 1] <= b'f')
+                            || (cptr[i + 1] >= b'0' && cptr[i + 1] <= b'9')))
+                    && (i + 2 < cptr.len()
+                        && ((cptr[i + 2] >= b'A' && cptr[i + 2] <= b'F')
+                            || (cptr[i + 2] >= b'a' && cptr[i + 2] <= b'f')
+                            || (cptr[i + 2] >= b'0' && cptr[i + 2] <= b'9'))))
                 || (escape_reserved == 0
-                    && (*cptr == b';'
-                        || *cptr == b'/'
-                        || *cptr == b'?'
-                        || *cptr == b':'
-                        || *cptr == b'@'
-                        || *cptr == b'&'
-                        || *cptr == b'='
-                        || *cptr == b'+'
-                        || *cptr == b'$'
-                        || *cptr == b','))
+                    && (c == b';'
+                        || c == b'/'
+                        || c == b'?'
+                        || c == b':'
+                        || c == b'@'
+                        || c == b'&'
+                        || c == b'='
+                        || c == b'+'
+                        || c == b'$'
+                        || c == b','))
             {
-                xml_buf_add(target, cptr, 1);
+                xml_buf_add(target, cptr.as_ptr(), 1);
             } else {
-                if *cptr >> 4 < 10 {
-                    escape[1] = b'0' + (*cptr >> 4);
+                if c >> 4 < 10 {
+                    escape[1] = b'0' + (c >> 4);
                 } else {
-                    escape[1] = b'A' - 10 + (*cptr >> 4);
+                    escape[1] = b'A' - 10 + (c >> 4);
                 }
-                if *cptr & 0xF < 10 {
-                    escape[2] = b'0' + (*cptr & 0xF);
+                if c & 0xF < 10 {
+                    escape[2] = b'0' + (c & 0xF);
                 } else {
-                    escape[2] = b'A' - 10 + (*cptr & 0xF);
+                    escape[2] = b'A' - 10 + (c & 0xF);
                 }
 
                 xml_buf_add(target, &escape[0], 3);
             }
-            cptr = cptr.add(1);
         }
     }
     value_push(
@@ -9570,12 +9618,11 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                     ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval)) as i32;
             }
             XmlXPathObjectType::XPathString => {
-                if (*arg2).stringval.is_null() || *(*arg2).stringval.add(0) == 0 {
-                    ret = 0;
-                } else {
-                    ret = 1;
-                }
-                ret = ((*arg1).boolval == (ret != 0)) as i32;
+                let f = (*arg2)
+                    .stringval
+                    .as_deref()
+                    .map_or(false, |s| !s.is_empty());
+                ret = ((*arg1).boolval == f) as i32;
             }
             XmlXPathObjectType::XPathUsers => {
                 todo!()
@@ -9655,15 +9702,14 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
             match (*arg2).typ {
                 XmlXPathObjectType::XPathUndefined => {}
                 XmlXPathObjectType::XPathBoolean => {
-                    if (*arg1).stringval.is_null() || *(*arg1).stringval.add(0) == 0 {
-                        ret = 0;
-                    } else {
-                        ret = 1;
-                    }
-                    ret = ((*arg2).boolval == (ret != 0)) as i32;
+                    let f = (*arg1)
+                        .stringval
+                        .as_deref()
+                        .map_or(false, |s| !s.is_empty());
+                    ret = ((*arg2).boolval == f) as i32;
                 }
                 XmlXPathObjectType::XPathString => {
-                    ret = xml_str_equal((*arg1).stringval, (*arg2).stringval) as i32;
+                    ret = ((*arg1).stringval == (*arg2).stringval) as i32;
                 }
                 XmlXPathObjectType::XPathNumber => {
                     value_push(ctxt, arg1);
@@ -9807,9 +9853,7 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
             XmlXPathObjectType::XPathString => {
                 ret = xml_xpath_equal_node_set_string(
                     arg1,
-                    CStr::from_ptr((*arg2).stringval as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
+                    (*arg2).stringval.as_deref().expect("Internal Error"),
                     0,
                 );
             }
@@ -9902,9 +9946,7 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
             XmlXPathObjectType::XPathString => {
                 ret = xml_xpath_equal_node_set_string(
                     arg1,
-                    CStr::from_ptr((*arg2).stringval as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
+                    (*arg2).stringval.as_deref().expect("Internal Error"),
                     1,
                 );
             }
@@ -11455,7 +11497,16 @@ pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) 
     if obj.is_null() {
         return;
     }
-    ret = xml_xpath_get_elements_by_ids((*(*ctxt).context).doc, (*obj).stringval);
+    let strval = (*obj)
+        .stringval
+        .as_deref()
+        .map(|s| CString::new(s).unwrap());
+    ret = xml_xpath_get_elements_by_ids(
+        (*(*ctxt).context).doc,
+        strval
+            .as_deref()
+            .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+    );
     value_push(ctxt, xml_xpath_cache_wrap_node_set((*ctxt).context, ret));
     xml_xpath_release_object((*ctxt).context, obj);
 }
@@ -11698,7 +11749,10 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: XmlXPathParserContextPtr, n
     let cur: XmlXPathObjectPtr = value_pop(ctxt);
     value_push(
         ctxt,
-        xml_xpath_cache_new_float((*ctxt).context, xml_utf8_strlen((*cur).stringval) as _),
+        xml_xpath_cache_new_float(
+            (*ctxt).context,
+            (*cur).stringval.as_deref().map_or(0, |s| s.chars().count()) as _,
+        ),
     );
     xml_xpath_release_object((*ctxt).context, cur);
 }
@@ -11709,7 +11763,6 @@ pub unsafe fn xml_xpath_string_length_function(ctxt: XmlXPathParserContextPtr, n
 #[doc(alias = "xmlXPathConcatFunction")]
 pub unsafe fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
     let mut newobj: XmlXPathObjectPtr;
-    let mut tmp: *mut XmlChar;
 
     if ctxt.is_null() {
         return;
@@ -11734,8 +11787,11 @@ pub unsafe fn xml_xpath_concat_function(ctxt: XmlXPathParserContextPtr, mut narg
             xml_xpath_release_object((*ctxt).context, cur);
             XP_ERROR!(ctxt, XmlXPathError::XpathInvalidType as i32);
         }
-        tmp = xml_strcat((*newobj).stringval, (*cur).stringval);
-        (*newobj).stringval = (*cur).stringval;
+        let mut tmp = (*newobj).stringval.take();
+        if let Some(curstr) = (*cur).stringval.take() {
+            tmp.get_or_insert_with(String::new).push_str(&curstr);
+            (*newobj).stringval = Some(curstr);
+        }
         (*cur).stringval = tmp;
         xml_xpath_release_object((*ctxt).context, newobj);
         nargs -= 1;
@@ -11761,7 +11817,18 @@ pub unsafe fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs:
         xml_xpath_release_object((*ctxt).context, needle);
         XP_ERROR!(ctxt, XmlXPathError::XpathInvalidType as i32);
     }
-    if !xml_strstr((*hay).stringval, (*needle).stringval).is_null() {
+    if (*needle)
+        .stringval
+        .as_deref()
+        .filter(|&s| {
+            (*hay)
+                .stringval
+                .as_deref()
+                .expect("Internal Error")
+                .contains(s)
+        })
+        .is_some()
+    {
         value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
     } else {
         value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
@@ -11788,8 +11855,11 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: XmlXPathParserContextPtr, nar
         xml_xpath_release_object((*ctxt).context, needle);
         XP_ERROR!(ctxt, XmlXPathError::XpathInvalidType as i32);
     }
-    let n: i32 = xml_strlen((*needle).stringval);
-    if xml_strncmp((*hay).stringval, (*needle).stringval, n) != 0 {
+    let m = (*hay).stringval.as_deref().map_or(0, |s| s.len());
+    let n = (*needle).stringval.as_deref().map_or(0, |s| s.len());
+    if &(*hay).stringval.as_deref().unwrap()[..n.min(m)]
+        != (*needle).stringval.as_deref().expect("Internal Error")
+    {
         value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
     } else {
         value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
@@ -11885,7 +11955,7 @@ pub unsafe fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs
             end.partial_cmp(&1.0),
             Some(std::cmp::Ordering::Equal) | Some(std::cmp::Ordering::Greater)
         ) {
-            /* Logical NOT to handle NaNs */
+            // Logical NOT to handle NaNs
             j = 1;
         } else if end < INT_MAX as f64 {
             j = end as _;
@@ -11893,9 +11963,19 @@ pub unsafe fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs
     }
 
     if i < j {
-        let ret: *mut XmlChar = xml_utf8_strsub((*str).stringval, i - 1, j - i);
-        value_push(ctxt, xml_xpath_cache_new_string((*ctxt).context, ret));
-        xml_free(ret as _);
+        let ret = (*str)
+            .stringval
+            .as_deref()
+            .expect("Internal Error")
+            .chars()
+            .skip(i as usize - 1)
+            .take((j - i) as usize)
+            .collect::<String>();
+        let ret = CString::new(ret).unwrap();
+        value_push(
+            ctxt,
+            xml_xpath_cache_new_string((*ctxt).context, ret.as_ptr() as *const u8),
+        );
     } else {
         value_push(
             ctxt,
@@ -11915,9 +11995,6 @@ pub unsafe fn xml_xpath_substring_function(ctxt: XmlXPathParserContextPtr, nargs
 /// string. For example, substring-before("1999/04/01","/") returns 1999.
 #[doc(alias = "xmlXPathSubstringBeforeFunction")]
 pub unsafe fn xml_xpath_substring_before_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
-    let point: *const XmlChar;
-    let offset: i32;
-
     CHECK_ARITY!(ctxt, nargs, 2);
     CAST_TO_STRING!(ctxt);
     let find: XmlXPathObjectPtr = value_pop(ctxt);
@@ -11926,10 +12003,10 @@ pub unsafe fn xml_xpath_substring_before_function(ctxt: XmlXPathParserContextPtr
 
     let target: XmlBufPtr = xml_buf_create();
     if !target.is_null() {
-        point = xml_strstr((*str).stringval, (*find).stringval);
-        if !point.is_null() {
-            offset = point.offset_from((*str).stringval) as _;
-            xml_buf_add(target, (*str).stringval, offset);
+        let ss = (*str).stringval.as_deref().unwrap();
+        let fs = (*find).stringval.as_deref().unwrap();
+        if let Some(pos) = ss.find(fs) {
+            xml_buf_add(target, ss.as_ptr(), pos as i32);
         }
         value_push(
             ctxt,
@@ -11951,9 +12028,6 @@ pub unsafe fn xml_xpath_substring_before_function(ctxt: XmlXPathParserContextPtr
 /// and substring-after("1999/04/01","19") returns 99/04/01.
 #[doc(alias = "xmlXPathSubstringAfterFunction")]
 pub unsafe fn xml_xpath_substring_after_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
-    let point: *const XmlChar;
-    let offset: i32;
-
     CHECK_ARITY!(ctxt, nargs, 2);
     CAST_TO_STRING!(ctxt);
     let find: XmlXPathObjectPtr = value_pop(ctxt);
@@ -11962,15 +12036,11 @@ pub unsafe fn xml_xpath_substring_after_function(ctxt: XmlXPathParserContextPtr,
 
     let target: XmlBufPtr = xml_buf_create();
     if !target.is_null() {
-        point = xml_strstr((*str).stringval, (*find).stringval);
-        if !point.is_null() {
-            offset = (point.offset_from((*str).stringval) + xml_strlen((*find).stringval) as isize)
-                as i32;
-            xml_buf_add(
-                target,
-                (*str).stringval.add(offset as usize),
-                xml_strlen((*str).stringval) - offset,
-            );
+        let ss = (*str).stringval.as_deref().unwrap();
+        let fs = (*find).stringval.as_deref().unwrap();
+        if let Some(pos) = ss.find(fs) {
+            let len = ss.len() - pos;
+            xml_buf_add(target, ss[pos..].as_ptr(), len as i32);
         }
         value_push(
             ctxt,
@@ -11992,10 +12062,6 @@ pub unsafe fn xml_xpath_substring_after_function(ctxt: XmlXPathParserContextPtr,
 /// node converted to a string, in other words the value of the context node.
 #[doc(alias = "xmlXPathNormalizeFunction")]
 pub unsafe fn xml_xpath_normalize_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32) {
-    let mut source: *mut XmlChar;
-    let mut target: *mut XmlChar;
-    let mut blank: i32;
-
     if ctxt.is_null() {
         return;
     }
@@ -12011,34 +12077,39 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: XmlXPathParserContextPtr, mut n
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_STRING!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
-    source = (*(*ctxt).value).stringval;
-    if source.is_null() {
+    let Some(source) = (*(*ctxt).value).stringval.as_deref_mut() else {
         return;
-    }
-    target = source;
+    };
+    let oldlen = source.len();
+    // Skip leading whitespaces
+    let Some(start) = source.find(|c| !xml_is_blank_char(c as u32)) else {
+        (*(*ctxt).value).stringval.as_mut().unwrap().clear();
+        return;
+    };
+    let target = source.as_bytes_mut();
 
-    /* Skip leading whitespaces */
-    while xml_is_blank_char(*source as u32) {
-        source = source.add(1);
-    }
-
-    /* Collapse intermediate whitespaces, and skip trailing whitespaces */
-    blank = 0;
-    while *source != 0 {
-        if xml_is_blank_char(*source as u32) {
-            blank = 1;
+    // Collapse intermediate whitespaces, and skip trailing whitespaces
+    let mut written = 0;
+    let mut blank = false;
+    for i in start..oldlen {
+        let c = target[i];
+        if xml_is_blank_char(c as u32) {
+            blank = true;
         } else {
-            if blank != 0 {
-                *target = 0x20;
-                target = target.add(1);
-                blank = 0;
+            if blank {
+                target[written] = 0x20;
+                written += 1;
+                blank = false;
             }
-            *target = *source;
-            target = target.add(1);
+            target[written] = c;
+            written += 1;
         }
-        source = source.add(1);
     }
-    *target = 0;
+    (*(*ctxt).value)
+        .stringval
+        .as_mut()
+        .unwrap()
+        .truncate(written);
 }
 
 /// Implement the translate() XPath function
@@ -12051,19 +12122,13 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: XmlXPathParserContextPtr, mut n
 /// character at a corresponding position in the third argument string
 /// (because the second argument string is longer than the third argument
 /// string), then occurrences of that character in the first argument
-/// string are removed. For example, translate("-=1aaa-=1","abc-","ABC")
+/// string are removed. For example, translate("--aaa--","abc-","ABC")
 /// returns "AAA". If a character occurs more than once in second
 /// argument string, then the first occurrence determines the replacement
 /// character. If the third argument string is longer than the second
 /// argument string, then excess characters are ignored.
 #[doc(alias = "xmlXPathTranslateFunction")]
 pub unsafe fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
-    let mut offset: i32;
-    let max: i32;
-    let mut ch: i32;
-    let mut point: *const XmlChar;
-    let mut cptr: *mut XmlChar;
-
     CHECK_ARITY!(ctxt, nargs, 3);
 
     CAST_TO_STRING!(ctxt);
@@ -12075,50 +12140,23 @@ pub unsafe fn xml_xpath_translate_function(ctxt: XmlXPathParserContextPtr, nargs
 
     let target: XmlBufPtr = xml_buf_create();
     if !target.is_null() {
-        max = xml_utf8_strlen((*to).stringval);
-        cptr = (*str).stringval;
-        while {
-            ch = *cptr as i32;
-            ch != 0
-        } {
-            offset = xml_utf8_strloc((*from).stringval, cptr);
-            if offset >= 0 {
-                if offset < max {
-                    point = xml_utf8_strpos((*to).stringval, offset);
-                    if !point.is_null() {
-                        xml_buf_add(target, point, xml_utf8_strsize(point, 1));
-                    }
+        let to_str = (*to).stringval.as_deref().unwrap();
+        let from_str = (*from).stringval.as_deref().unwrap();
+        let arg = (*str).stringval.as_deref().unwrap();
+        let mut buf = [0u8; 6];
+        for c in arg.chars() {
+            if let Some((_, replace)) = from_str
+                .chars()
+                .zip(to_str.chars().map(Ok).chain(repeat(Err(()))))
+                .find(|e| e.0 == c)
+            {
+                if let Ok(c) = replace {
+                    let buf = c.encode_utf8(&mut buf[..]);
+                    xml_buf_add(target, buf.as_ptr(), buf.len() as i32);
                 }
             } else {
-                xml_buf_add(target, cptr, xml_utf8_strsize(cptr, 1));
-            }
-
-            /* Step to next character in input */
-            cptr = cptr.add(1);
-            if ch & 0x80 != 0 {
-                /* if not simple ascii, verify proper format */
-                if ch & 0xc0 != 0xc0 {
-                    generic_error!("xmlXPathTranslateFunction: Invalid UTF8 string\n");
-                    /* not asserting an XPath error is probably better */
-                    break;
-                }
-                /* then skip over remaining bytes for this c_char */
-                while {
-                    ch <<= 1;
-                    ch & 0x80 != 0
-                } {
-                    let f = *cptr & 0xc0 != 0x80;
-                    cptr = cptr.add(1);
-                    if f {
-                        generic_error!("xmlXPathTranslateFunction: Invalid UTF8 string\n");
-                        /* not asserting an XPath error is probably better */
-                        break;
-                    }
-                }
-                /* must have had error encountered */
-                if ch & 0x80 != 0 {
-                    break;
-                }
+                let buf = c.encode_utf8(&mut buf[..]);
+                xml_buf_add(target, buf.as_ptr(), buf.len() as i32);
             }
         }
     }
@@ -12183,14 +12221,15 @@ pub unsafe fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32
     CAST_TO_STRING!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathString);
     let val = value_pop(ctxt);
-    let lang: *const XmlChar = (*val).stringval;
+    let lang = (*val).stringval.as_deref();
     let the_lang = (*(*(*ctxt).context).node).get_lang();
     'not_equal: {
-        if let Some(the_lang) = the_lang.filter(|_| !lang.is_null()) {
+        if let (Some(the_lang), Some(lang)) = (the_lang, lang) {
             let the_lang = the_lang.as_bytes();
+            let lang = lang.as_bytes();
             let mut i = 0;
-            while *lang.add(i) != 0 {
-                if (*lang.add(i)).to_ascii_uppercase()
+            while i < lang.len() {
+                if lang[i].to_ascii_uppercase()
                     != the_lang.get(i).unwrap_or(&0).to_ascii_uppercase()
                 {
                     break 'not_equal;

@@ -58,7 +58,7 @@ use crate::{
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
-        xmlstring::{xml_strdup, xml_strlen, XmlChar},
+        xmlstring::{xml_strdup, XmlChar},
         xpath_internals::{
             value_pop, xml_xpath_compile_expr, xml_xpath_err_memory, xml_xpath_eval_expr,
             xml_xpath_free_parser_context, xml_xpath_new_boolean, xml_xpath_new_cstring,
@@ -225,7 +225,7 @@ pub struct XmlXPathObject {
     pub nodesetval: XmlNodeSetPtr,
     pub boolval: bool,
     pub floatval: f64,
-    pub stringval: *mut XmlChar,
+    pub stringval: Option<String>,
     pub(crate) user: *mut c_void,
     pub(crate) index: i32,
     pub(crate) user2: *mut c_void,
@@ -239,7 +239,7 @@ impl Default for XmlXPathObject {
             nodesetval: null_mut(),
             boolval: false,
             floatval: 0.0,
-            stringval: null_mut(),
+            stringval: None,
             user: null_mut(),
             index: 0,
             user2: null_mut(),
@@ -668,8 +668,8 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
         } else if !(*obj).nodesetval.is_null() {
             xml_xpath_free_node_set((*obj).nodesetval);
         }
-    } else if matches!((*obj).typ, XmlXPathObjectType::XPathString) && !(*obj).stringval.is_null() {
-        xml_free((*obj).stringval as _);
+    } else if matches!((*obj).typ, XmlXPathObjectType::XPathString) && (*obj).stringval.is_some() {
+        let _ = (*obj).stringval.take();
     } else {
         #[cfg(feature = "libxml_xptr_locs")]
         if (*obj).typ as usize == XPATH_LOCATIONSET && !(*obj).user.is_null() {
@@ -765,13 +765,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
         XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint | XmlXPathObjectType::XPathRange => {}
-        XmlXPathObjectType::XPathString => {
-            (*ret).stringval = xml_strdup((*val).stringval);
-            if (*ret).stringval.is_null() {
-                xml_free(ret as _);
-                return null_mut();
-            }
-        }
+        XmlXPathObjectType::XPathString => {}
         XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
             /* TODO: Check memory error. */
             (*ret).nodesetval = xml_xpath_node_set_merge(null_mut(), (*val).nodesetval);
@@ -989,8 +983,6 @@ pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: XmlNodeSetPtr) -> bool {
 #[doc(alias = "xmlXPathCastToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
-    use std::ffi::CStr;
-
     if val.is_null() {
         return false;
     }
@@ -1000,12 +992,7 @@ pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
             xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
         }
         XmlXPathObjectType::XPathString => {
-            let val = (*val).stringval;
-            xml_xpath_cast_string_to_boolean(
-                (!val.is_null())
-                    .then(|| CStr::from_ptr(val as *const i8).to_string_lossy())
-                    .as_deref(),
-            )
+            xml_xpath_cast_string_to_boolean((*val).stringval.as_deref())
         }
         XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
         XmlXPathObjectType::XPathBoolean => (*val).boolval,
@@ -1087,6 +1074,8 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_number(ns: XmlNodeSetPtr) ->
 #[doc(alias = "xmlXPathCastToNumber")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
+    use std::ffi::CString;
+
     if val.is_null() {
         return XML_XPATH_NAN;
     }
@@ -1095,7 +1084,17 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             xml_xpath_cast_node_set_to_number((*val).nodesetval)
         }
-        XmlXPathObjectType::XPathString => xml_xpath_cast_string_to_number((*val).stringval),
+        XmlXPathObjectType::XPathString => {
+            let strval = (*val)
+                .stringval
+                .as_deref()
+                .map(|s| CString::new(s).unwrap());
+            xml_xpath_cast_string_to_number(
+                strval
+                    .as_deref()
+                    .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+            )
+        }
         XmlXPathObjectType::XPathNumber => (*val).floatval,
         XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_number((*val).boolval),
         XmlXPathObjectType::XPathUsers => {
@@ -1364,7 +1363,17 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
             res.as_ref()
                 .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8))
         }
-        XmlXPathObjectType::XPathString => xml_strdup((*val).stringval),
+        XmlXPathObjectType::XPathString => {
+            let strval = (*val)
+                .stringval
+                .as_deref()
+                .map(|s| CString::new(s).unwrap());
+            xml_strdup(
+                strval
+                    .as_deref()
+                    .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+            )
+        }
         XmlXPathObjectType::XPathBoolean => {
             let res = xml_xpath_cast_boolean_to_string((*val).boolval);
             let res = CString::new(res).unwrap();
@@ -1867,7 +1876,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
                 .map_or(false, |s| !s.is_empty())) as i32;
         }
         XmlXPathObjectType::XPathString => {
-            return (!(*res).stringval.is_null() && xml_strlen((*res).stringval) != 0) as i32;
+            return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty()) as i32;
         }
         _ => {
             generic_error!("Internal error at {}:{}\n", file!(), line!());

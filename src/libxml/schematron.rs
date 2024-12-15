@@ -1556,7 +1556,16 @@ unsafe extern "C" fn xml_schematron_format_report(
                     xml_free(buf as _);
                 }
                 XmlXPathObjectType::XPathString => {
-                    ret = xml_strcat(ret, (*eval).stringval);
+                    let strval = (*eval)
+                        .stringval
+                        .as_deref()
+                        .map(|s| CString::new(s).unwrap());
+                    ret = xml_strcat(
+                        ret,
+                        strval
+                            .as_deref()
+                            .map_or(null_mut(), |s| s.as_ptr() as *const u8),
+                    );
                 }
                 _ => {
                     generic_error!("Unsupported XPATH Type: {:?}\n", (*eval).typ);
@@ -1754,7 +1763,7 @@ unsafe extern "C" fn xml_schematron_run_test(
                 }
             }
             XmlXPathObjectType::XPathString => {
-                if (*ret).stringval.is_null() || *(*ret).stringval.add(0) == 0 {
+                if (*ret).stringval.as_deref().map_or(true, |s| s.is_empty()) {
                     failed = 1;
                 }
             }
