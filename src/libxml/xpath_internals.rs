@@ -11387,7 +11387,9 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
             return val;
         }
         XmlXPathObjectType::XpathBoolean => {
-            res = xml_xpath_cast_boolean_to_string((*val).boolval);
+            let s = xml_xpath_cast_boolean_to_string((*val).boolval);
+            let s = CString::new(s).unwrap();
+            res = xml_strdup(s.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XpathNumber => {
             res = xml_xpath_cast_number_to_string((*val).floatval);

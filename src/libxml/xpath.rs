@@ -1107,11 +1107,11 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastBooleanToString")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_boolean_to_string(val: i32) -> *mut XmlChar {
+pub unsafe fn xml_xpath_cast_boolean_to_string(val: i32) -> String {
     if val != 0 {
-        xml_strdup(c"true".as_ptr() as *const XmlChar)
+        "true".to_owned()
     } else {
-        xml_strdup(c"false".as_ptr() as *const XmlChar)
+        "false".to_owned()
     }
 }
 
@@ -1141,7 +1141,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                     snprintf(buffer, buffersize as usize, c"NaN".as_ptr() as _);
                 }
             } else if number == 0.0 {
-                /* Omit sign for negative zero. */
+                // Omit sign for negative zero.
                 snprintf(buffer, buffersize as usize, c"0".as_ptr() as _);
             } else if number > INT_MIN as f64
                 && number < INT_MAX as f64
@@ -1172,15 +1172,13 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                     *ptr = 0;
                 }
             } else {
-                /*
-                  For the dimension of work,
-                      DBL_DIG is number of significant digits
-                  EXPONENT is only needed for "scientific notation"
-                      3 is sign, decimal point, and terminating zero
-                  LOWER_DOUBLE_EXP is max number of leading zeroes in fraction
-                  Note that this dimension is slightly (a few characters)
-                  larger than actually necessary.
-                */
+                // For the dimension of work,
+                //     DBL_DIG is number of significant digits
+                // EXPONENT is only needed for "scientific notation"
+                //     3 is sign, decimal point, and terminating zero
+                // LOWER_DOUBLE_EXP is max number of leading zeroes in fraction
+                // Note that this dimension is slightly (a few characters)
+                // larger than actually necessary.
                 let mut work: [c_char; DBL_DIG + EXPONENT_DIGITS + 3 + LOWER_DOUBLE_EXP] =
                     [0; DBL_DIG + EXPONENT_DIGITS + 3 + LOWER_DOUBLE_EXP];
                 let integer_place: i32;
@@ -1190,14 +1188,12 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                 let mut size: i32;
                 let absolute_value: f64 = number.abs();
 
-                /*
-                 * First choose format - scientific or regular floating point.
-                 * In either case, result is in work, and after_fraction points
-                 * just past the fractional part.
-                 */
+                // First choose format - scientific or regular floating point.
+                // In either case, result is in work, and after_fraction points
+                // just past the fractional part.
                 if !(LOWER_DOUBLE..=UPPER_DOUBLE).contains(&absolute_value) && absolute_value != 0.0
                 {
-                    /* Use scientific notation */
+                    // Use scientific notation
                     integer_place = (DBL_DIG + EXPONENT_DIGITS + 1) as i32;
                     fraction_place = DBL_DIG as i32 - 1;
                     size = snprintf(
@@ -1212,7 +1208,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                         size -= 1;
                     }
                 } else {
-                    /* Use regular notation */
+                    // Use regular notation
                     if absolute_value > 0.0 {
                         integer_place = absolute_value.log10() as i32;
                         if integer_place > 0 {
@@ -1232,7 +1228,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                     );
                 }
 
-                /* Remove leading spaces sometimes inserted by snprintf */
+                // Remove leading spaces sometimes inserted by snprintf
                 while work[0] == b' ' as _ {
                     ptr = work.as_mut_ptr();
                     while {
@@ -1244,7 +1240,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                     size -= 1;
                 }
 
-                /* Remove fractional trailing zeroes */
+                // Remove fractional trailing zeroes
                 after_fraction = work.as_mut_ptr().add(size as usize);
                 ptr = after_fraction;
                 while {
@@ -1262,7 +1258,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
                     res != 0
                 } {}
 
-                /* Finally copy result back to caller */
+                // Finally copy result back to caller
                 size = strlen(work.as_ptr() as _) as i32 + 1;
                 if size > buffersize {
                     work[buffersize as usize - 1] = 0;
@@ -1292,10 +1288,10 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
             if xml_xpath_is_nan(val) {
                 ret = xml_strdup(c"NaN".as_ptr() as *const XmlChar);
             } else if val == 0.0 {
-                /* Omit sign for negative zero. */
+                // Omit sign for negative zero.
                 ret = xml_strdup(c"0".as_ptr() as *const XmlChar);
             } else {
-                /* could be improved */
+                // could be improved
                 let mut buf: [c_char; 100] = [0; 100];
                 xml_xpath_format_number(val, buf.as_mut_ptr(), 99);
                 buf[99] = 0;
@@ -1359,7 +1355,11 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
                 .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8))
         }
         XmlXPathObjectType::XpathString => xml_strdup((*val).stringval),
-        XmlXPathObjectType::XpathBoolean => xml_xpath_cast_boolean_to_string((*val).boolval),
+        XmlXPathObjectType::XpathBoolean => {
+            let res = xml_xpath_cast_boolean_to_string((*val).boolval);
+            let res = CString::new(res).unwrap();
+            xml_strdup(res.as_ptr() as *const u8)
+        }
         XmlXPathObjectType::XpathNumber => xml_xpath_cast_number_to_string((*val).floatval),
         XmlXPathObjectType::XpathUsers => {
             // todo!();
@@ -1436,7 +1436,9 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
             return val;
         }
         XmlXPathObjectType::XpathBoolean => {
-            res = xml_xpath_cast_boolean_to_string((*val).boolval);
+            let s = xml_xpath_cast_boolean_to_string((*val).boolval);
+            let s = CString::new(s).unwrap();
+            res = xml_strdup(s.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XpathNumber => {
             res = xml_xpath_cast_number_to_string((*val).floatval);
@@ -1491,12 +1493,10 @@ pub unsafe extern "C" fn xml_xpath_new_context(doc: XmlDocPtr) -> XmlXPathContex
     (*ret).context_size = -1;
     (*ret).proximity_position = -1;
 
-    // #ifdef XP_DEFAULT_CACHE_ON
     if xml_xpath_context_set_cache(ret, 1, -1, 0) == -1 {
         xml_xpath_free_context(ret);
         return null_mut();
     }
-    // #endif
 
     xml_xpath_register_all_functions(ret);
 
@@ -1919,12 +1919,10 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
     }
 
     if *(*pctxt).cur != 0 {
-        /*
-         * aleksey: in some cases this line prints *second* error message
-         * (see bug #78858) and probably this should be fixed.
-         * However, we are not sure that all error messages are printed
-         * out in other places. It's not critical so we leave it as-is for now
-         */
+        // aleksey: in some cases this line prints *second* error message
+        // (see bug #78858) and probably this should be fixed.
+        // However, we are not sure that all error messages are printed
+        // out in other places. It's not critical so we leave it as-is for now
         let file = CString::new(file!()).unwrap();
         xml_xpatherror(
             pctxt,
@@ -1996,7 +1994,7 @@ unsafe extern "C" fn xml_xpath_comp_parser_context(
     }
     memset(ret as _, 0, size_of::<XmlXPathParserContext>());
 
-    /* Allocate the value stack */
+    // Allocate the value stack
     (*ret).value_tab = xml_malloc(10 * size_of::<XmlXPathObjectPtr>()) as *mut XmlXPathObjectPtr;
     if (*ret).value_tab.is_null() {
         xml_free(ret as _);
@@ -2149,7 +2147,7 @@ pub unsafe extern "C" fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
 #[doc(alias = "xmlXPathInit")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
 #[deprecated = "Alias for xmlInitParser"]
-pub unsafe extern "C" fn xml_xpath_init() {
+pub unsafe fn xml_xpath_init() {
     xml_init_parser();
 }
 
@@ -2163,7 +2161,7 @@ pub fn xml_xpath_is_nan(val: f64) -> bool {
 /// Returns 1 if the value is +Infinite, -1 if -Infinite, 0 otherwise
 #[doc(alias = "xmlXPathIsInf")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
-pub unsafe extern "C" fn xml_xpath_is_inf(val: f64) -> i32 {
+pub fn xml_xpath_is_inf(val: f64) -> i32 {
     if val.is_infinite() {
         if val > 0.0 {
             1
@@ -2228,8 +2226,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_int(n_val, 0);
 
-                let ret_val = xml_xpath_cast_boolean_to_string(val);
-                desret_xml_char_ptr(ret_val);
+                let _ = xml_xpath_cast_boolean_to_string(val);
+                // desret_xml_char_ptr(ret_val);
                 des_int(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
