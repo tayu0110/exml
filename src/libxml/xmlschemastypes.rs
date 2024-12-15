@@ -4902,9 +4902,7 @@ unsafe extern "C" fn xml_schema_compare_floats(x: XmlSchemaValPtr, y: XmlSchemaV
         return -2;
     }
 
-    /*
-     * Cast everything to doubles.
-     */
+    // Cast everything to doubles.
     if (*x).typ == XmlSchemaValType::XmlSchemasDouble {
         d1 = (*x).value.d;
     } else if (*x).typ == XmlSchemaValType::XmlSchemasFloat {
@@ -4921,16 +4919,14 @@ unsafe extern "C" fn xml_schema_compare_floats(x: XmlSchemaValPtr, y: XmlSchemaV
         return -2;
     }
 
-    /*
-     * Check for special cases.
-     */
-    if xml_xpath_is_nan(d1) != 0 {
-        if xml_xpath_is_nan(d2) != 0 {
+    // Check for special cases.
+    if xml_xpath_is_nan(d1) {
+        if xml_xpath_is_nan(d2) {
             return 0;
         }
         return 1;
     }
-    if xml_xpath_is_nan(d2) != 0 {
+    if xml_xpath_is_nan(d2) {
         return -1;
     }
     if d1 == XML_XPATH_PINF {
@@ -4952,11 +4948,9 @@ unsafe extern "C" fn xml_schema_compare_floats(x: XmlSchemaValPtr, y: XmlSchemaV
         return 1;
     }
 
-    /*
-     * basic tests, the last one we should have equality, but
-     * portability is more important than speed and handling
-     * NaN or Inf in a portable way is always a challenge, so ...
-     */
+    // basic tests, the last one we should have equality, but
+    // portability is more important than speed and handling
+    // NaN or Inf in a portable way is always a challenge, so ...
     if d1 < d2 {
         return -1;
     }

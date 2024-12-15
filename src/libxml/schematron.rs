@@ -1749,7 +1749,7 @@ unsafe extern "C" fn xml_schematron_run_test(
                 failed = !(*ret).boolval;
             }
             XmlXPathObjectType::XpathNumber => {
-                if xml_xpath_is_nan((*ret).floatval) != 0 || (*ret).floatval == 0.0 {
+                if xml_xpath_is_nan((*ret).floatval) || (*ret).floatval == 0.0 {
                     failed = 1;
                 }
             }

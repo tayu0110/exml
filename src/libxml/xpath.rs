@@ -953,7 +953,7 @@ pub unsafe extern "C" fn xml_xpath_cmp_nodes(mut node1: XmlNodePtr, mut node2: X
 #[doc(alias = "xmlXPathCastNumberToBoolean")]
 #[cfg(feature = "xpath")]
 pub unsafe extern "C" fn xml_xpath_cast_number_to_boolean(val: f64) -> i32 {
-    if xml_xpath_is_nan(val) != 0 || val == 0.0 {
+    if xml_xpath_is_nan(val) || val == 0.0 {
         return 0;
     }
     1
@@ -1136,7 +1136,7 @@ unsafe extern "C" fn xml_xpath_format_number(number: f64, buffer: *mut c_char, b
             }
         }
         _ => {
-            if xml_xpath_is_nan(number) != 0 {
+            if xml_xpath_is_nan(number) {
                 if buffersize > "NaN".len() as i32 + 1 {
                     snprintf(buffer, buffersize as usize, c"NaN".as_ptr() as _);
                 }
@@ -1289,7 +1289,7 @@ pub unsafe extern "C" fn xml_xpath_cast_number_to_string(val: f64) -> *mut XmlCh
             ret = xml_strdup(c"-Infinity".as_ptr() as *const XmlChar);
         }
         _ => {
-            if xml_xpath_is_nan(val) != 0 {
+            if xml_xpath_is_nan(val) {
                 ret = xml_strdup(c"NaN".as_ptr() as *const XmlChar);
             } else if val == 0.0 {
                 /* Omit sign for negative zero. */
@@ -2156,8 +2156,8 @@ pub unsafe extern "C" fn xml_xpath_init() {
 /// Returns 1 if the value is a NaN, 0 otherwise
 #[doc(alias = "xmlXPathIsNaN")]
 #[cfg(any(feature = "xpath", feature = "schema"))]
-pub unsafe fn xml_xpath_is_nan(val: f64) -> i32 {
-    val.is_nan() as i32
+pub fn xml_xpath_is_nan(val: f64) -> bool {
+    val.is_nan()
 }
 
 /// Returns 1 if the value is +Infinite, -1 if -Infinite, 0 otherwise
@@ -3020,8 +3020,8 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_double(n_val, 0);
 
-                let ret_val = xml_xpath_is_nan(val);
-                desret_int(ret_val);
+                let _ = xml_xpath_is_nan(val);
+                // desret_int(ret_val);
                 des_double(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {

@@ -2293,7 +2293,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                 println!("-Infinity");
             }
             _ => {
-                if xml_xpath_is_nan((*cur).floatval) != 0 {
+                if xml_xpath_is_nan((*cur).floatval) {
                     println!("NaN");
                 } else {
                     println!("{}", (*cur).floatval);

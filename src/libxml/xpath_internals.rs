@@ -1214,7 +1214,7 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_object<'a>(
                     writeln!(output, "Object is a number : -Infinity");
                 }
                 _ => {
-                    if xml_xpath_is_nan((*cur).floatval) != 0 {
+                    if xml_xpath_is_nan((*cur).floatval) {
                         writeln!(output, "Object is a number : NaN");
                     } else if (*cur).floatval == 0.0 {
                         /* Omit sign for negative zero. */
@@ -9476,7 +9476,7 @@ unsafe extern "C" fn xml_xpath_equal_node_set_float(
                 val = value_pop(ctxt);
                 v = (*val).floatval;
                 xml_xpath_release_object((*ctxt).context, val);
-                if xml_xpath_is_nan(v) == 0 {
+                if !xml_xpath_is_nan(v) {
                     if (neq == 0 && v == f) || (neq != 0 && v != f) {
                         ret = 1;
                         break;
@@ -9617,9 +9617,7 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                     }
 
                     /* Hand check NaN and Infinity equalities */
-                    if xml_xpath_is_nan((*arg1).floatval) != 0
-                        || xml_xpath_is_nan((*arg2).floatval) != 0
-                    {
+                    if xml_xpath_is_nan((*arg1).floatval) || xml_xpath_is_nan((*arg2).floatval) {
                         ret = 0;
                     } else if xml_xpath_is_inf((*arg1).floatval) == 1 {
                         if xml_xpath_is_inf((*arg2).floatval) == 1 {
@@ -9682,9 +9680,8 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                     if (*ctxt).error != 0 {
                         // break;
                     } else {
-                        /* Hand check NaN and Infinity equalities */
-                        if xml_xpath_is_nan((*arg1).floatval) != 0
-                            || xml_xpath_is_nan((*arg2).floatval) != 0
+                        // Hand check NaN and Infinity equalities
+                        if xml_xpath_is_nan((*arg1).floatval) || xml_xpath_is_nan((*arg2).floatval)
                         {
                             ret = 0;
                         } else if xml_xpath_is_inf((*arg1).floatval) == 1 {
@@ -10016,7 +10013,7 @@ unsafe extern "C" fn xml_xpath_compare_node_sets(
 
     let values2: *mut f64 = xml_malloc(ns2_table.len() * size_of::<f64>()) as *mut f64;
     if values2.is_null() {
-        /* TODO: Propagate memory error. */
+        // TODO: Propagate memory error.
         xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
         xml_xpath_free_object(arg1);
         xml_xpath_free_object(arg2);
@@ -10024,14 +10021,14 @@ unsafe extern "C" fn xml_xpath_compare_node_sets(
     }
     for &node1 in ns1_table {
         val1 = xml_xpath_cast_node_to_number(node1);
-        if xml_xpath_is_nan(val1) != 0 {
+        if xml_xpath_is_nan(val1) {
             continue;
         }
         for (j, &node2) in ns2_table.iter().enumerate() {
             if init == 0 {
                 *values2.add(j) = xml_xpath_cast_node_to_number(node2);
             }
-            if xml_xpath_is_nan(*values2.add(j)) != 0 {
+            if xml_xpath_is_nan(*values2.add(j)) {
                 continue;
             }
             if inf != 0 && strict != 0 {
@@ -10280,11 +10277,9 @@ pub unsafe extern "C" fn xml_xpath_compare_values(
         (*arg1).typ,
         XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree
     ) {
-        /*
-         * If either argument is a XpathNodeset or XpathXsltTree the two arguments
-         * are not freed from within this routine; they will be freed from the
-         * called routine, e.g. xmlXPathCompareNodeSets or xmlXPathCompareNodeSetValue
-         */
+        // If either argument is a XpathNodeset or XpathXsltTree the two arguments
+        // are not freed from within this routine; they will be freed from the
+        // called routine, e.g. xmlXPathCompareNodeSets or xmlXPathCompareNodeSetValue
         if matches!(
             (*arg2).typ,
             XmlXPathObjectType::XpathNodeset | XmlXPathObjectType::XpathXsltTree
@@ -10320,12 +10315,10 @@ pub unsafe extern "C" fn xml_xpath_compare_values(
         xml_xpath_release_object((*ctxt).context, arg2);
         return ret;
     }
-    /*
-     * Add tests for infinity and nan
-     * => feedback on 3.4 for Inf and NaN
-     */
+    // Add tests for infinity and nan
+    // => feedback on 3.4 for Inf and NaN
     /* Hand check NaN and Infinity comparisons */
-    if xml_xpath_is_nan((*arg1).floatval) != 0 || xml_xpath_is_nan((*arg2).floatval) != 0 {
+    if xml_xpath_is_nan((*arg1).floatval) || xml_xpath_is_nan((*arg2).floatval) {
         ret = 0;
     } else {
         arg1i = xml_xpath_is_inf((*arg1).floatval);
