@@ -11411,9 +11411,9 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let tmp = xml_xpath_cast_node_set_to_string((*val).nodesetval)
-                .map(|c| CString::new(c).unwrap());
-            res = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
+            let tmp = CString::new(xml_xpath_cast_node_set_to_string((*val).nodesetval).as_ref())
+                .unwrap();
+            res = xml_strdup(tmp.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XPathString => {
             return val;

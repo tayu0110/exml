@@ -1061,10 +1061,8 @@ pub unsafe extern "C" fn xml_xpath_cast_node_set_to_number(ns: XmlNodeSetPtr) ->
     if ns.is_null() {
         return XML_XPATH_NAN;
     }
-    let str = xml_xpath_cast_node_set_to_string(ns).map(|c| CString::new(c).unwrap());
-    let ret: f64 = xml_xpath_cast_string_to_number(
-        str.as_ref().map_or(null_mut(), |c| c.as_ptr() as *const u8),
-    );
+    let str = CString::new(xml_xpath_cast_node_set_to_string(ns).as_ref()).unwrap();
+    let ret: f64 = xml_xpath_cast_string_to_number(str.as_ptr() as *const u8);
     ret
 }
 
@@ -1257,18 +1255,18 @@ pub unsafe fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> String {
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> Option<String> {
+pub unsafe fn xml_xpath_cast_node_set_to_string(ns: XmlNodeSetPtr) -> Cow<'static, str> {
     if ns.is_null() || (*ns).node_tab.as_ref().map_or(true, |t| t.is_empty()) {
-        return Some("".to_owned());
+        return "".into();
     }
 
-    let table = (*ns).node_tab.as_ref()?;
+    let table = (*ns).node_tab.as_ref().unwrap();
     if table.len() > 1 {
         xml_xpath_node_set_sort(ns);
     }
 
-    let table = (*ns).node_tab.as_ref()?;
-    Some(xml_xpath_cast_node_to_string(table[0]))
+    let table = (*ns).node_tab.as_ref().unwrap();
+    xml_xpath_cast_node_to_string(table[0]).into()
 }
 
 /// Converts an existing object to its string() equivalent
@@ -1286,10 +1284,9 @@ pub unsafe extern "C" fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> *mu
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => xml_strdup(c"".as_ptr() as *const XmlChar),
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let res = xml_xpath_cast_node_set_to_string((*val).nodesetval)
-                .map(|c| CString::new(c).unwrap());
-            res.as_ref()
-                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8))
+            let res = CString::new(xml_xpath_cast_node_set_to_string((*val).nodesetval).as_ref())
+                .unwrap();
+            xml_strdup(res.as_ptr() as *const u8)
         }
         XmlXPathObjectType::XPathString => {
             let strval = (*val)
@@ -1377,11 +1374,9 @@ pub unsafe extern "C" fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> Xml
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let tmp = xml_xpath_cast_node_set_to_string((*val).nodesetval)
-                .map(|c| CString::new(c).unwrap());
-            res = tmp
-                .as_ref()
-                .map_or(null_mut(), |c| xml_strdup(c.as_ptr() as *const u8));
+            let tmp = CString::new(xml_xpath_cast_node_set_to_string((*val).nodesetval).as_ref())
+                .unwrap();
+            res = xml_strdup(tmp.as_ptr() as *const u8);
         }
         XmlXPathObjectType::XPathString => {
             return val;
