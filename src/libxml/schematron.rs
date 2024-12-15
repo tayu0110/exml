@@ -1540,7 +1540,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                     }
                 }
                 XmlXPathObjectType::XPathBoolean => {
-                    let str: *const c_char = if (*eval).boolval != 0 {
+                    let str: *const c_char = if (*eval).boolval {
                         c"True".as_ptr()
                     } else {
                         c"False".as_ptr()
@@ -1746,7 +1746,7 @@ unsafe extern "C" fn xml_schematron_run_test(
                 }
             }
             XmlXPathObjectType::XPathBoolean => {
-                failed = !(*ret).boolval;
+                failed = (!(*ret).boolval) as i32;
             }
             XmlXPathObjectType::XPathNumber => {
                 if xml_xpath_is_nan((*ret).floatval) || (*ret).floatval == 0.0 {

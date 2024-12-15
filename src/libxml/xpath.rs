@@ -221,7 +221,7 @@ pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
     pub nodesetval: XmlNodeSetPtr,
-    pub boolval: i32,
+    pub boolval: bool,
     pub floatval: f64,
     pub stringval: *mut XmlChar,
     pub(crate) user: *mut c_void,
@@ -642,7 +642,7 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
         (*obj).typ,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
     ) {
-        if (*obj).boolval != 0 {
+        if (*obj).boolval {
             (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* TODO: Just for debugging. */
             if !(*obj).nodesetval.is_null() {
                 xml_xpath_free_value_tree((*obj).nodesetval);
@@ -758,7 +758,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
             /* TODO: Check memory error. */
             (*ret).nodesetval = xml_xpath_node_set_merge(null_mut(), (*val).nodesetval);
             /* Do not deallocate the copied tree value */
-            (*ret).boolval = 0;
+            (*ret).boolval = false;
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathLocationset => {
@@ -990,7 +990,7 @@ pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
             )
         }
         XmlXPathObjectType::XPathNumber => xml_xpath_cast_number_to_boolean((*val).floatval),
-        XmlXPathObjectType::XPathBoolean => (*val).boolval != 0,
+        XmlXPathObjectType::XPathBoolean => (*val).boolval,
         XmlXPathObjectType::XPathUsers => {
             // todo!();
             false
@@ -1010,11 +1010,12 @@ pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
 /// Returns the number value
 #[doc(alias = "xmlXPathCastBooleanToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_boolean_to_number(val: i32) -> f64 {
-    if val != 0 {
-        return 1.0;
+pub fn xml_xpath_cast_boolean_to_number(val: bool) -> f64 {
+    if val {
+        1.0
+    } else {
+        0.0
     }
-    0.0
 }
 
 /// Converts a string to its number value
@@ -1098,8 +1099,8 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastBooleanToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_boolean_to_string(val: i32) -> String {
-    if val != 0 {
+pub fn xml_xpath_cast_boolean_to_string(val: bool) -> String {
+    if val {
         "true".to_owned()
     } else {
         "false".to_owned()
@@ -1833,7 +1834,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
     }
     match (*res).typ {
         XmlXPathObjectType::XPathBoolean => {
-            return (*res).boolval;
+            return (*res).boolval as i32;
         }
         XmlXPathObjectType::XPathNumber => {
             return ((*res).floatval == (*ctxt).proximity_position as _) as i32;
@@ -2187,7 +2188,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_int(n_val, 0);
 
-                let ret_val = xml_xpath_cast_boolean_to_number(val);
+                let ret_val = xml_xpath_cast_boolean_to_number(val != 0);
                 desret_double(ret_val);
                 des_int(n_val, val, 0);
                 reset_last_error();
@@ -2217,7 +2218,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_int(n_val, 0);
 
-                let _ = xml_xpath_cast_boolean_to_string(val);
+                let _ = xml_xpath_cast_boolean_to_string(val != 0);
                 // desret_xml_char_ptr(ret_val);
                 des_int(n_val, val, 0);
                 reset_last_error();

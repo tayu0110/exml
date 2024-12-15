@@ -2279,7 +2279,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             }
         }
         XmlXPathObjectType::XPathBoolean => {
-            if (*cur).boolval != 0 {
+            if (*cur).boolval {
                 println!("true");
             } else {
                 println!("false");

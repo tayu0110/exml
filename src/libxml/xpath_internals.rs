@@ -617,12 +617,10 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                 match (*obj).typ {
                     XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
                         if !(*obj).nodesetval.is_null() {
-                            if (*obj).boolval != 0 {
-                                /*
-                                 * It looks like the @boolval is used for
-                                 * evaluation if this an XSLT Result Tree Fragment.
-                                 * TODO: Check if this assumption is correct.
-                                 */
+                            if (*obj).boolval {
+                                // It looks like the @boolval is used for
+                                // evaluation if this an XSLT Result Tree Fragment.
+                                // TODO: Check if this assumption is correct.
                                 (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* just for debugging */
                                 xml_xpath_free_value_tree((*obj).nodesetval);
                                 (*obj).nodesetval = null_mut();
@@ -740,12 +738,12 @@ pub unsafe extern "C" fn xml_xpath_pop_boolean(ctxt: XmlXPathParserContextPtr) -
         return 0;
     }
     let ret = if (*obj).typ != XmlXPathObjectType::XPathBoolean {
-        xml_xpath_cast_to_boolean(obj) as i32
+        xml_xpath_cast_to_boolean(obj)
     } else {
         (*obj).boolval
     };
     xml_xpath_release_object((*ctxt).context, obj);
-    ret
+    ret as i32
 }
 
 /// Pops a number from the stack, handling conversion if needed.
@@ -1199,7 +1197,7 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_object<'a>(
         }
         XmlXPathObjectType::XPathBoolean => {
             write!(output, "Object is a Boolean : ");
-            if (*cur).boolval != 0 {
+            if (*cur).boolval {
                 writeln!(output, "true");
             } else {
                 writeln!(output, "false");
@@ -2410,7 +2408,7 @@ unsafe extern "C" fn xml_xpath_cache_new_boolean(
                 .add((*(*cache).boolean_objs).number as usize)
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XPathBoolean;
-            (*ret).boolval = (val != 0) as i32;
+            (*ret).boolval = val != 0;
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             (*(*cache).misc_objs).number -= 1;
@@ -2420,7 +2418,7 @@ unsafe extern "C" fn xml_xpath_cache_new_boolean(
                 as XmlXPathObjectPtr;
 
             (*ret).typ = XmlXPathObjectType::XPathBoolean;
-            (*ret).boolval = (val != 0) as i32;
+            (*ret).boolval = val != 0;
             return ret;
         }
     }
@@ -2488,7 +2486,7 @@ unsafe extern "C" fn xml_xpath_cache_object_copy(
                 return xml_xpath_cache_new_string(ctxt, (*val).stringval);
             }
             XmlXPathObjectType::XPathBoolean => {
-                return xml_xpath_cache_new_boolean(ctxt, (*val).boolval);
+                return xml_xpath_cache_new_boolean(ctxt, (*val).boolval as i32);
             }
             XmlXPathObjectType::XPathNumber => {
                 return xml_xpath_cache_new_float(ctxt, (*val).floatval);
@@ -2801,7 +2799,7 @@ pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
     (*ret).typ = XmlXPathObjectType::XPathBoolean;
-    (*ret).boolval = (val != 0) as i32;
+    (*ret).boolval = val != 0;
     ret
 }
 
@@ -2818,7 +2816,7 @@ pub unsafe extern "C" fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObje
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
     (*ret).typ = XmlXPathObjectType::XPathNodeset;
-    (*ret).boolval = 0;
+    (*ret).boolval = false;
     /* TODO: Check memory error. */
     (*ret).nodesetval = xml_xpath_node_set_create(val);
     /* @@ with_ns to check whether namespace nodes should be looked at @@ */
@@ -2838,7 +2836,7 @@ pub unsafe extern "C" fn xml_xpath_new_value_tree(val: XmlNodePtr) -> XmlXPathOb
     }
     memset(ret as _, 0, size_of::<XmlXPathObject>());
     (*ret).typ = XmlXPathObjectType::XPathXSLTTree;
-    (*ret).boolval = 1;
+    (*ret).boolval = true;
     (*ret).user = val as *mut c_void;
     (*ret).nodesetval = xml_xpath_node_set_create(val);
     ret
@@ -3355,7 +3353,7 @@ unsafe extern "C" fn xml_xpath_cache_new_node_set(
                 .add((*(*cache).nodeset_objs).number as usize)
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XPathNodeset;
-            (*ret).boolval = 0;
+            (*ret).boolval = false;
             if !val.is_null() {
                 if let Some(table) = (*(*ret).nodesetval)
                     .node_tab
@@ -3387,7 +3385,7 @@ unsafe extern "C" fn xml_xpath_cache_new_node_set(
                 as XmlXPathObjectPtr;
 
             (*ret).typ = XmlXPathObjectType::XPathNodeset;
-            (*ret).boolval = 0;
+            (*ret).boolval = false;
             (*ret).nodesetval = set;
             return ret;
         }
@@ -6796,14 +6794,14 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     }
 
     // error:
-    if (*obj).boolval != 0 && !(*obj).user.is_null() {
+    if (*obj).boolval && !(*obj).user.is_null() {
         // QUESTION TODO: What does this do and why?
         // TODO: Do we have to do this also for the "error"
         // cleanup further down?
-        (*(*ctxt).value).boolval = 1;
+        (*(*ctxt).value).boolval = true;
         (*(*ctxt).value).user = (*obj).user;
         (*obj).user = null_mut();
-        (*obj).boolval = 0;
+        (*obj).boolval = false;
     }
     xml_xpath_release_object(xpctxt, obj);
 
@@ -7441,7 +7439,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             total += xml_xpath_comp_op_eval(ctxt, (*comp).steps.add((*op).ch1 as usize));
             CHECK_ERROR0!(ctxt);
             xml_xpath_boolean_function(ctxt, 1);
-            if (*ctxt).value.is_null() || (*(*ctxt).value).boolval == 0 {
+            if (*ctxt).value.is_null() || !(*(*ctxt).value).boolval {
                 break 'to_break;
             }
             arg2 = value_pop(ctxt);
@@ -7460,7 +7458,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             total += xml_xpath_comp_op_eval(ctxt, (*comp).steps.add((*op).ch1 as usize));
             CHECK_ERROR0!(ctxt);
             xml_xpath_boolean_function(ctxt, 1);
-            if (*ctxt).value.is_null() || (*(*ctxt).value).boolval == 1 {
+            if (*ctxt).value.is_null() || (*(*ctxt).value).boolval {
                 break 'to_break;
             }
             arg2 = value_pop(ctxt);
@@ -8143,10 +8141,8 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_to_boolean(
     }
 
     if !res_obj.is_null() {
-        let res: i32;
-
-        if (*res_obj).typ == XmlXPathObjectType::XPathBoolean {
-            res = (*res_obj).boolval;
+        let res = if (*res_obj).typ == XmlXPathObjectType::XPathBoolean {
+            (*res_obj).boolval as i32
         } else if is_predicate != 0 {
             // For predicates a result of type "number" is handled
             // differently:
@@ -8154,10 +8150,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_to_boolean(
             // "If the result is a number, the result will be converted
             //  to true if the number is equal to the context position
             //  and will be converted to false otherwise;"
-            res = xml_xpath_evaluate_predicate_result(ctxt, res_obj);
+            xml_xpath_evaluate_predicate_result(ctxt, res_obj)
         } else {
-            res = xml_xpath_cast_to_boolean(res_obj) as i32;
-        }
+            xml_xpath_cast_to_boolean(res_obj) as i32
+        };
         xml_xpath_release_object((*ctxt).context, res_obj);
         return res;
     }
@@ -8632,7 +8628,7 @@ pub unsafe extern "C" fn xml_xpath_evaluate_predicate_result(
     }
     match (*res).typ {
         XmlXPathObjectType::XPathBoolean => {
-            return (*res).boolval;
+            return (*res).boolval as i32;
         }
         XmlXPathObjectType::XPathNumber => {
             return ((*res).floatval == (*(*ctxt).context).proximity_position as f64) as i32;
@@ -9570,8 +9566,8 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                 ret = ((*arg1).boolval == (*arg2).boolval) as i32;
             }
             XmlXPathObjectType::XPathNumber => {
-                ret = ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval) as i32)
-                    as i32;
+                ret =
+                    ((*arg1).boolval == xml_xpath_cast_number_to_boolean((*arg2).floatval)) as i32;
             }
             XmlXPathObjectType::XPathString => {
                 if (*arg2).stringval.is_null() || *(*arg2).stringval.add(0) == 0 {
@@ -9579,7 +9575,7 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                 } else {
                     ret = 1;
                 }
-                ret = ((*arg1).boolval == ret) as i32;
+                ret = ((*arg1).boolval == (ret != 0)) as i32;
             }
             XmlXPathObjectType::XPathUsers => {
                 todo!()
@@ -9596,8 +9592,7 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
             match (*arg2).typ {
                 XmlXPathObjectType::XPathUndefined => {}
                 XmlXPathObjectType::XPathBoolean => {
-                    ret = ((*arg2).boolval
-                        == xml_xpath_cast_number_to_boolean((*arg1).floatval) as i32)
+                    ret = ((*arg2).boolval == xml_xpath_cast_number_to_boolean((*arg1).floatval))
                         as i32;
                 }
 
@@ -9665,7 +9660,7 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
                     } else {
                         ret = 1;
                     }
-                    ret = ((*arg2).boolval == ret) as i32;
+                    ret = ((*arg2).boolval == (ret != 0)) as i32;
                 }
                 XmlXPathObjectType::XPathString => {
                     ret = xml_str_equal((*arg1).stringval, (*arg2).stringval) as i32;
@@ -9804,7 +9799,7 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
                 } else {
                     ret = 1;
                 }
-                ret = (ret == (*arg2).boolval) as i32;
+                ret = (ret == (*arg2).boolval as i32) as i32;
             }
             XmlXPathObjectType::XPathNumber => {
                 ret = xml_xpath_equal_node_set_float(ctxt, arg1, (*arg2).floatval, 0);
@@ -9874,9 +9869,7 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
         (*arg1).typ,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
     ) {
-        /*
-         *Hack it to assure arg1 is the nodeset
-         */
+        // Hack it to assure arg1 is the nodeset
         if !matches!(
             (*arg1).typ,
             XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
@@ -9901,7 +9894,7 @@ pub unsafe extern "C" fn xml_xpath_not_equal_values(ctxt: XmlXPathParserContextP
                 } else {
                     ret = 1;
                 }
-                ret = (ret != (*arg2).boolval) as i32;
+                ret = (ret != (*arg2).boolval as i32) as i32;
             }
             XmlXPathObjectType::XPathNumber => {
                 ret = xml_xpath_equal_node_set_float(ctxt, arg1, (*arg2).floatval, 1);
@@ -12148,7 +12141,7 @@ pub unsafe fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, nargs: i32)
     CHECK_ARITY!(ctxt, nargs, 1);
     CAST_TO_BOOLEAN!(ctxt);
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathBoolean);
-    (*(*ctxt).value).boolval = ((*(*ctxt).value).boolval == 0) as i32;
+    (*(*ctxt).value).boolval = !(*(*ctxt).value).boolval;
 }
 
 /// Implement the true() XPath function

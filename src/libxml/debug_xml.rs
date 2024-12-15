@@ -2058,7 +2058,7 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
             XmlXPathObjectType::XPathBoolean => {
                 generic_error!(
                     "Is a Boolean:{}\n",
-                    CStr::from_ptr(xml_bool_to_text((*list).boolval)).to_string_lossy()
+                    CStr::from_ptr(xml_bool_to_text((*list).boolval as i32)).to_string_lossy()
                 );
             }
             XmlXPathObjectType::XPathNumber => {
