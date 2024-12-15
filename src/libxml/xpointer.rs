@@ -144,7 +144,7 @@ unsafe extern "C" fn xml_xptr_new_location_set_nodes(
         xml_xptr_err_memory("allocating locationset");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathLocationset;
     if end.is_null() {
         (*ret).user = xml_xptr_location_set_create(xml_xptr_new_collapsed_range(start)) as _;
@@ -258,7 +258,7 @@ unsafe extern "C" fn xml_xptr_new_range_internal(
         xml_xptr_err_memory("allocating range");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathRange;
     (*ret).user = start as _;
     (*ret).index = startindex;
@@ -474,7 +474,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_new_location_set_node_set(
         xml_xptr_err_memory("allocating locationset");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathLocationset;
     if !set.is_null() {
         let newset: XmlLocationSetPtr = xml_xptr_location_set_create(null_mut());
@@ -663,7 +663,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_wrap_location_set(
         xml_xptr_err_memory("allocating locationset");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathLocationset;
     (*ret).user = val as _;
     ret
@@ -1770,7 +1770,7 @@ unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPath
         xml_xptr_err_memory("allocating point");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathPoint;
     (*ret).user = node as *mut c_void;
     (*ret).index = indx;

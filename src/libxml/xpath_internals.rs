@@ -708,10 +708,10 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                 if let Some(table) = (*tmpset).node_tab.as_mut() {
                     table.clear();
                 }
-                memset(obj as _, 0, size_of::<XmlXPathObject>());
+                std::ptr::write(&mut *obj, XmlXPathObject::default());
                 (*obj).nodesetval = tmpset;
             } else {
-                memset(obj as _, 0, size_of::<XmlXPathObject>());
+                std::ptr::write(&mut *obj, XmlXPathObject::default());
             }
 
             return;
@@ -2723,7 +2723,7 @@ pub unsafe extern "C" fn xml_xpath_new_string(mut val: *const XmlChar) -> XmlXPa
         xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathString;
     if val.is_null() {
         val = c"".as_ptr() as _;
@@ -2757,7 +2757,7 @@ pub unsafe extern "C" fn xml_xpath_wrap_string(val: *mut XmlChar) -> XmlXPathObj
         xml_free(val as _);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathString;
     (*ret).stringval = val;
     ret
@@ -2781,7 +2781,7 @@ pub unsafe extern "C" fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
         xml_xpath_err_memory(null_mut(), Some("creating float object\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathNumber;
     (*ret).floatval = val;
     ret
@@ -2797,7 +2797,7 @@ pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
         xml_xpath_err_memory(null_mut(), Some("creating boolean object\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathBoolean;
     (*ret).boolval = val != 0;
     ret
@@ -2814,7 +2814,7 @@ pub unsafe extern "C" fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObje
         xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathNodeset;
     (*ret).boolval = false;
     /* TODO: Check memory error. */
@@ -2834,7 +2834,7 @@ pub unsafe extern "C" fn xml_xpath_new_value_tree(val: XmlNodePtr) -> XmlXPathOb
         xml_xpath_err_memory(null_mut(), Some("creating result value tree\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathXSLTTree;
     (*ret).boolval = true;
     (*ret).user = val as *mut c_void;
@@ -9162,7 +9162,7 @@ pub unsafe extern "C" fn xml_xpath_wrap_node_set(val: XmlNodeSetPtr) -> XmlXPath
         xml_xpath_free_node_set(val);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathNodeset;
     (*ret).nodesetval = val;
     ret
@@ -9178,7 +9178,7 @@ pub unsafe extern "C" fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathOb
         xml_xpath_err_memory(null_mut(), Some("creating user object\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathUsers;
     (*ret).user = val;
     ret

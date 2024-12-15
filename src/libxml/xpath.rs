@@ -42,7 +42,7 @@ use std::{
     ptr::{addr_of_mut, null_mut},
 };
 
-use libc::{memcpy, memmove, memset, snprintf, strlen, INT_MAX, INT_MIN};
+use libc::{memmove, memset, snprintf, strlen, INT_MAX, INT_MIN};
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::{
@@ -147,8 +147,9 @@ pub struct XmlNodeSet {
 // @@ XPointer will add more types !
 #[cfg(feature = "xpath")]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlXPathObjectType {
+    #[default]
     XPathUndefined = 0,
     XPathNodeset = 1,
     XPathBoolean = 2,
@@ -218,6 +219,7 @@ const XPATH_LOCATIONSET: usize = 7;
 pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[cfg(feature = "xpath")]
 #[repr(C)]
+#[derive(Debug, Clone)]
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
     pub nodesetval: XmlNodeSetPtr,
@@ -230,13 +232,29 @@ pub struct XmlXPathObject {
     pub(crate) index2: i32,
 }
 
+impl Default for XmlXPathObject {
+    fn default() -> Self {
+        Self {
+            typ: XmlXPathObjectType::default(),
+            nodesetval: null_mut(),
+            boolval: false,
+            floatval: 0.0,
+            stringval: null_mut(),
+            user: null_mut(),
+            index: 0,
+            user2: null_mut(),
+            index2: 0,
+        }
+    }
+}
+
 /// A conversion function is associated to a type and used to cast
 /// the new type to primitive values.
 ///
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlXPathConvertFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlXPathConvertFunc = unsafe extern "C" fn(obj: XmlXPathObjectPtr, typ: i32) -> i32;
+pub type XmlXPathConvertFunc = unsafe fn(obj: XmlXPathObjectPtr, typ: i32) -> i32;
 
 // Extra type: a name and a conversion function.
 #[cfg(feature = "xpath")]
@@ -742,7 +760,7 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
         xml_xpath_err_memory(null_mut(), Some("copying object\n"));
         return null_mut();
     }
-    memcpy(ret as _, val as _, size_of::<XmlXPathObject>());
+    std::ptr::write(&mut *ret, (*val).clone());
     match (*val).typ {
         XmlXPathObjectType::XPathBoolean | XmlXPathObjectType::XPathNumber => {}
         #[cfg(feature = "libxml_xptr_locs")]
