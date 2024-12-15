@@ -1340,33 +1340,24 @@ pub unsafe extern "C" fn xml_xpath_convert_number(val: XmlXPathObjectPtr) -> Xml
 #[doc(alias = "xmlXPathConvertString")]
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
-    use std::ffi::CString;
-
-    let mut res: *mut XmlChar = null_mut();
-
     if val.is_null() {
         return xml_xpath_new_string(Some(""));
     }
 
+    let mut res = None::<Cow<'_, str>>;
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let tmp = CString::new(xml_xpath_cast_node_set_to_string((*val).nodesetval).as_ref())
-                .unwrap();
-            res = xml_strdup(tmp.as_ptr() as *const u8);
+            res = Some(xml_xpath_cast_node_set_to_string((*val).nodesetval));
         }
         XmlXPathObjectType::XPathString => {
             return val;
         }
         XmlXPathObjectType::XPathBoolean => {
-            let s = xml_xpath_cast_boolean_to_string((*val).boolval);
-            let s = CString::new(s).unwrap();
-            res = xml_strdup(s.as_ptr() as *const u8);
+            res = Some(xml_xpath_cast_boolean_to_string((*val).boolval).into());
         }
         XmlXPathObjectType::XPathNumber => {
-            let s = xml_xpath_cast_number_to_string((*val).floatval);
-            let s = CString::new(s.as_ref()).unwrap();
-            res = xml_strdup(s.as_ptr() as *const u8);
+            res = Some(xml_xpath_cast_number_to_string((*val).floatval));
         }
         XmlXPathObjectType::XPathUsers => {
             // todo!()
@@ -1379,10 +1370,10 @@ pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObject
         }
     }
     xml_xpath_free_object(val);
-    if res.is_null() {
+    let Some(res) = res else {
         return xml_xpath_new_string(Some(""));
-    }
-    xml_xpath_wrap_string(res)
+    };
+    xml_xpath_wrap_string(Some(&res))
 }
 
 /// Create a new xmlXPathContext

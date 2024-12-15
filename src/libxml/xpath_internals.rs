@@ -2724,31 +2724,17 @@ pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
 /// Returns the newly created object.
 ///
 /// Frees @val in case of error.
-#[doc(alias = "xmlXPathWrapString")]
-pub unsafe extern "C" fn xml_xpath_wrap_string(val: *mut XmlChar) -> XmlXPathObjectPtr {
+#[doc(alias = "xmlXPathWrapString", alias = "xmlXPathWrapCString")]
+pub unsafe fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
-        xml_free(val as _);
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlXPathObject::default());
     (*ret).typ = XmlXPathObjectType::XPathString;
-    (*ret).stringval = (!val.is_null()).then(|| {
-        CStr::from_ptr(val as *const i8)
-            .to_string_lossy()
-            .into_owned()
-    });
-    xml_free(val as _);
+    (*ret).stringval = val.map(|s| s.to_owned());
     ret
-}
-
-/// Wraps a string into an XPath object.
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathWrapCString")]
-pub unsafe extern "C" fn xml_xpath_wrap_cstring(val: *mut c_char) -> XmlXPathObjectPtr {
-    xml_xpath_wrap_string(val as *mut XmlChar)
 }
 
 /// Create a new xmlXPathObjectPtr of type f64 and of value @val
@@ -8648,9 +8634,9 @@ pub unsafe extern "C" fn xml_xpath_evaluate_predicate_result(
 ///
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheWrapString")]
-unsafe extern "C" fn xml_xpath_cache_wrap_string(
+unsafe fn xml_xpath_cache_wrap_string(
     ctxt: XmlXPathContextPtr,
-    val: *mut XmlChar,
+    val: Option<&str>,
 ) -> XmlXPathObjectPtr {
     if !ctxt.is_null() && !(*ctxt).cache.is_null() {
         let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
@@ -8662,14 +8648,7 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
                 .add((*(*cache).string_objs).number as usize)
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XPathString;
-            (*ret).stringval = (!val.is_null()).then(|| {
-                CStr::from_ptr(val as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            });
-            if !val.is_null() {
-                xml_free(val as _);
-            }
+            (*ret).stringval = val.map(|s| s.to_owned());
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             // Fallback to misc-cache.
@@ -8680,14 +8659,7 @@ unsafe extern "C" fn xml_xpath_cache_wrap_string(
                 as XmlXPathObjectPtr;
 
             (*ret).typ = XmlXPathObjectType::XPathString;
-            (*ret).stringval = (!val.is_null()).then(|| {
-                CStr::from_ptr(val as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            });
-            if !val.is_null() {
-                xml_free(val as _);
-            }
+            (*ret).stringval = val.map(|s| s.to_owned());
             return ret;
         }
     }
@@ -8749,9 +8721,7 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                         xml_xpath_cache_new_string((*ctxt).context, (*table[i]).name().as_deref()),
                     );
                 } else {
-                    let mut fullname: *mut XmlChar;
-
-                    fullname =
+                    let mut fullname =
                         xml_build_qname((*table[i]).name, (*(*table[i]).ns).prefix, null_mut(), 0);
                     if fullname == (*table[i]).name as _ {
                         fullname = xml_strdup((*table[i]).name);
@@ -8759,7 +8729,16 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
                     if fullname.is_null() {
                         xml_xpath_perr_memory(ctxt, None);
                     }
-                    value_push(ctxt, xml_xpath_cache_wrap_string((*ctxt).context, fullname));
+                    value_push(
+                        ctxt,
+                        xml_xpath_cache_wrap_string(
+                            (*ctxt).context,
+                            (!fullname.is_null())
+                                .then(|| CStr::from_ptr(fullname as *const i8).to_string_lossy())
+                                .as_deref(),
+                        ),
+                    );
+                    xml_free(fullname as _);
                 }
             }
             _ => {
@@ -11328,35 +11307,28 @@ unsafe extern "C" fn xml_xpath_get_elements_by_ids(
 /// Returns a created or reused object, the old one is freed (cached)
 ///         (or the operation is done directly on @val)
 #[doc(alias = "xmlXPathCacheConvertString")]
-unsafe extern "C" fn xml_xpath_cache_convert_string(
+unsafe fn xml_xpath_cache_convert_string(
     ctxt: XmlXPathContextPtr,
     val: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
-    let mut res: *mut XmlChar = null_mut();
-
     if val.is_null() {
         return xml_xpath_cache_new_string(ctxt, Some(""));
     }
 
+    let mut res = None;
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let tmp = CString::new(xml_xpath_cast_node_set_to_string((*val).nodesetval).as_ref())
-                .unwrap();
-            res = xml_strdup(tmp.as_ptr() as *const u8);
+            res = Some(xml_xpath_cast_node_set_to_string((*val).nodesetval));
         }
         XmlXPathObjectType::XPathString => {
             return val;
         }
         XmlXPathObjectType::XPathBoolean => {
-            let s = xml_xpath_cast_boolean_to_string((*val).boolval);
-            let s = CString::new(s).unwrap();
-            res = xml_strdup(s.as_ptr() as *const u8);
+            res = Some(xml_xpath_cast_boolean_to_string((*val).boolval).into());
         }
         XmlXPathObjectType::XPathNumber => {
-            let s = xml_xpath_cast_number_to_string((*val).floatval);
-            let s = CString::new(s.as_ref()).unwrap();
-            res = xml_strdup(s.as_ptr() as *const u8);
+            res = Some(xml_xpath_cast_number_to_string((*val).floatval));
         }
         XmlXPathObjectType::XPathUsers => {
             todo!();
@@ -11369,10 +11341,10 @@ unsafe extern "C" fn xml_xpath_cache_convert_string(
         }
     }
     xml_xpath_release_object(ctxt, val);
-    if res.is_null() {
+    let Some(res) = res else {
         return xml_xpath_cache_new_string(ctxt, Some(""));
-    }
-    xml_xpath_cache_wrap_string(ctxt, res)
+    };
+    xml_xpath_cache_wrap_string(ctxt, Some(&res))
 }
 
 /// Implement the id() XPath function
@@ -11622,10 +11594,11 @@ pub unsafe fn xml_xpath_string_function(ctxt: XmlXPathParserContextPtr, nargs: i
         return;
     }
     if nargs == 0 {
-        let s = xml_xpath_cast_node_to_string((*(*ctxt).context).node);
-        let s = CString::new(s).unwrap();
-        let val = xml_strdup(s.as_ptr() as *const u8);
-        value_push(ctxt, xml_xpath_cache_wrap_string((*ctxt).context, val));
+        let val = xml_xpath_cast_node_to_string((*(*ctxt).context).node);
+        value_push(
+            ctxt,
+            xml_xpath_cache_wrap_string((*ctxt).context, Some(&val)),
+        );
         return;
     }
 
@@ -11971,10 +11944,11 @@ pub unsafe fn xml_xpath_normalize_function(ctxt: XmlXPathParserContextPtr, mut n
     }
     if nargs == 0 {
         // Use current context node
-        let s = xml_xpath_cast_node_to_string((*(*ctxt).context).node);
-        let s = CString::new(s).unwrap();
-        let val = xml_strdup(s.as_ptr() as *const u8);
-        value_push(ctxt, xml_xpath_cache_wrap_string((*ctxt).context, val));
+        let val = xml_xpath_cast_node_to_string((*(*ctxt).context).node);
+        value_push(
+            ctxt,
+            xml_xpath_cache_wrap_string((*ctxt).context, Some(&val)),
+        );
         nargs = 1;
     }
 
@@ -15678,36 +15652,6 @@ mod tests {
                             eprintln!(" {}", n_ns_uri);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_wrap_cstring() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_val in 0..GEN_NB_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let val = gen_char_ptr(n_val, 0);
-
-                let ret_val = xml_xpath_wrap_cstring(val);
-                desret_xml_xpath_object_ptr(ret_val);
-                des_char_ptr(n_val, val, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathWrapCString",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathWrapCString()"
-                    );
-                    eprintln!(" {}", n_val);
                 }
             }
         }
