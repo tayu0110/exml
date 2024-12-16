@@ -166,6 +166,25 @@ impl XmlNodeSet {
             }
         }
     }
+
+    /// Removes an entry from an existing NodeSet list.
+    #[doc(alias = "xmlXPathNodeSetRemove")]
+    pub unsafe fn remove(&mut self, val: i32) {
+        if let Some(table) = self.node_tab.as_mut() {
+            if val >= table.len() as i32 {
+                return;
+            }
+            if !table[val as usize].is_null()
+                && matches!(
+                    (*(table[val as usize])).element_type(),
+                    XmlElementType::XmlNamespaceDecl
+                )
+            {
+                xml_xpath_node_set_free_ns(table[val as usize] as XmlNsPtr);
+            }
+            table.remove(val as usize);
+        }
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -877,28 +896,6 @@ pub unsafe fn xml_xpath_node_set_del(cur: Option<NonNull<XmlNodeSet>>, val: *mut
             xml_xpath_node_set_free_ns(table[pos] as XmlNsPtr);
         }
         table.remove(pos);
-    }
-}
-
-/// Removes an entry from an existing NodeSet list.
-#[doc(alias = "xmlXPathNodeSetRemove")]
-pub unsafe fn xml_xpath_node_set_remove(cur: Option<NonNull<XmlNodeSet>>, val: i32) {
-    let Some(mut cur) = cur else {
-        return;
-    };
-    if let Some(table) = cur.as_mut().node_tab.as_mut() {
-        if val >= table.len() as i32 {
-            return;
-        }
-        if !table[val as usize].is_null()
-            && matches!(
-                (*(table[val as usize])).element_type(),
-                XmlElementType::XmlNamespaceDecl
-            )
-        {
-            xml_xpath_node_set_free_ns(table[val as usize] as XmlNsPtr);
-        }
-        table.remove(val as usize);
     }
 }
 
