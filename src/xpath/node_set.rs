@@ -134,6 +134,38 @@ impl XmlNodeSet {
             }
         }
     }
+
+    /// Sort the node set in document order
+    #[doc(alias = "xmlXPathNodeSetSort")]
+    pub unsafe fn sort(&mut self) {
+        // Use the old Shell's sort implementation to sort the node-set
+        // Timsort ought to be quite faster
+        if let Some(table) = self.node_tab.as_mut() {
+            // TODO: Use `sort_unstable` of Rust standard library.
+            //       When I tried to rewirte, it did not work fine
+            //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
+            let len = table.len();
+            let mut incr = len;
+            while {
+                incr /= 2;
+                incr > 0
+            } {
+                for i in incr..len {
+                    let mut j = i as i32 - incr as i32;
+                    while j >= 0 {
+                        if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
+                            .map_or(false, |f| f.is_gt())
+                        {
+                            table.swap(j as usize, j as usize + incr);
+                            j -= incr as i32;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -283,7 +315,7 @@ pub unsafe fn xml_xpath_distinct(
         return Some(nodes);
     }
 
-    xml_xpath_node_set_sort(nodes.as_mut());
+    nodes.as_mut().sort();
     xml_xpath_distinct_sorted(Some(nodes))
 }
 
@@ -375,7 +407,7 @@ pub unsafe fn xml_xpath_node_leading(
     node: *mut XmlNode,
 ) -> Option<NonNull<XmlNodeSet>> {
     if let Some(mut nodes) = nodes {
-        xml_xpath_node_set_sort(nodes.as_mut());
+        nodes.as_mut().sort();
     }
     xml_xpath_node_leading_sorted(nodes, node)
 }
@@ -399,8 +431,8 @@ pub unsafe extern "C" fn xml_xpath_leading(
     let Some(mut nodes1) = nodes1.filter(|n| !n.as_ref().is_empty()) else {
         return xml_xpath_node_set_create(null_mut());
     };
-    xml_xpath_node_set_sort(nodes1.as_mut());
-    xml_xpath_node_set_sort(nodes2.as_mut());
+    nodes1.as_mut().sort();
+    nodes2.as_mut().sort();
     xml_xpath_node_leading_sorted(Some(nodes1), nodes2.as_ref().get(1))
 }
 
@@ -434,7 +466,7 @@ pub unsafe fn xml_xpath_node_trailing_sorted(
             break;
         }
     }
-    xml_xpath_node_set_sort(ret.as_mut()); /* bug 413451 */
+    ret.as_mut().sort(); /* bug 413451 */
     Some(ret)
 }
 
@@ -468,7 +500,7 @@ pub unsafe fn xml_xpath_node_trailing(
     node: *mut XmlNode,
 ) -> Option<NonNull<XmlNodeSet>> {
     if let Some(mut nodes) = nodes {
-        xml_xpath_node_set_sort(nodes.as_mut());
+        nodes.as_mut().sort();
     }
     xml_xpath_node_trailing_sorted(nodes, node)
 }
@@ -492,8 +524,8 @@ pub unsafe fn xml_xpath_trailing(
     let Some(mut nodes1) = nodes1.filter(|n| !n.as_ref().is_empty()) else {
         return xml_xpath_node_set_create(null_mut());
     };
-    xml_xpath_node_set_sort(nodes1.as_mut());
-    xml_xpath_node_set_sort(nodes2.as_mut());
+    nodes1.as_mut().sort();
+    nodes2.as_mut().sort();
     xml_xpath_node_trailing_sorted(Some(nodes1), nodes2.as_ref().get(0))
 }
 
@@ -893,37 +925,5 @@ pub unsafe fn xml_xpath_new_node_set_list(val: Option<NonNull<XmlNodeSet>>) -> X
         }
     } else {
         null_mut()
-    }
-}
-
-/// Sort the node set in document order
-#[doc(alias = "xmlXPathNodeSetSort")]
-pub unsafe fn xml_xpath_node_set_sort(set: &mut XmlNodeSet) {
-    // Use the old Shell's sort implementation to sort the node-set
-    // Timsort ought to be quite faster
-    if let Some(table) = set.node_tab.as_mut() {
-        // TODO: Use `sort_unstable` of Rust standard library.
-        //       When I tried to rewirte, it did not work fine
-        //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
-        let len = table.len();
-        let mut incr = len;
-        while {
-            incr /= 2;
-            incr > 0
-        } {
-            for i in incr..len {
-                let mut j = i as i32 - incr as i32;
-                while j >= 0 {
-                    if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
-                        .map_or(false, |f| f.is_gt())
-                    {
-                        table.swap(j as usize, j as usize + incr);
-                        j -= incr as i32;
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
     }
 }

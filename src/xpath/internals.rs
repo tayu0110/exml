@@ -81,11 +81,11 @@ use crate::{
         xml_xpath_free_object, xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan,
         xml_xpath_node_set_clear_from_pos, xml_xpath_node_set_create,
         xml_xpath_node_set_merge_and_clear, xml_xpath_node_set_merge_and_clear_no_dupls,
-        xml_xpath_node_set_sort, xml_xpath_object_copy, XmlXPathCompExpr, XmlXPathCompExprPtr,
-        XmlXPathContextPtr, XmlXPathError, XmlXPathFuncLookupFunc, XmlXPathFunction,
-        XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp, XmlXPathParserContext,
-        XmlXPathParserContextPtr, XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
-        XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
+        xml_xpath_object_copy, XmlXPathCompExpr, XmlXPathCompExprPtr, XmlXPathContextPtr,
+        XmlXPathError, XmlXPathFuncLookupFunc, XmlXPathFunction, XmlXPathObject, XmlXPathObjectPtr,
+        XmlXPathObjectType, XmlXPathOp, XmlXPathParserContext, XmlXPathParserContextPtr,
+        XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc, XML_XPATH_CHECKNS,
+        XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
     },
 };
 
@@ -5886,7 +5886,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_last(
                             .as_ref()
                             .map_or(false, |t| t.len() > 1)
                         {
-                            xml_xpath_node_set_sort(nodeset.as_mut());
+                            nodeset.as_mut().sort();
                         }
                         *last = *table.last().unwrap();
                     }
@@ -5986,7 +5986,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_last(
                 if let Some(mut nodeset) =
                     (*(*ctxt).value).nodesetval.filter(|n| n.as_ref().len() > 1)
                 {
-                    xml_xpath_node_set_sort(nodeset.as_mut());
+                    nodeset.as_mut().sort();
                 }
             }
         }
@@ -6283,7 +6283,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_first(
                     // OPTIMIZE TODO: How do we know if the node-list wasn't
                     //  already sorted?
                     if nodeset.as_ref().node_tab.as_ref().map_or(0, |t| t.len()) > 1 {
-                        xml_xpath_node_set_sort(nodeset.as_mut());
+                        nodeset.as_mut().sort();
                     }
                     *first = nodeset.as_ref().node_tab.as_ref().unwrap()[0];
                 }
@@ -6376,7 +6376,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_first(
                 if let Some(mut nodeset) =
                     (*(*ctxt).value).nodesetval.filter(|n| n.as_ref().len() > 1)
                 {
-                    xml_xpath_node_set_sort(nodeset.as_mut());
+                    nodeset.as_mut().sort();
                 }
             }
         }
@@ -6847,7 +6847,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                 if let Some(mut nodeset) =
                     (*(*ctxt).value).nodesetval.filter(|n| n.as_ref().len() > 1)
                 {
-                    xml_xpath_node_set_sort(nodeset.as_mut());
+                    nodeset.as_mut().sort();
                 }
             }
         }

@@ -1115,7 +1115,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(
 
     let table = ns.as_ref().node_tab.as_ref().unwrap();
     if table.len() > 1 {
-        xml_xpath_node_set_sort(ns.as_mut());
+        ns.as_mut().sort();
     }
 
     let table = ns.as_ref().node_tab.as_ref().unwrap();
