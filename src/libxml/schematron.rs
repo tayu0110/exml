@@ -37,6 +37,7 @@ use crate::{
     libxml::xmlstring::xml_str_equal,
     tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
+        internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
         xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
         xml_xpath_free_context, xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context,
         XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType,
@@ -52,7 +53,6 @@ use super::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
     },
     xmlstring::{xml_strcat, xml_strdup, xml_strlen, XmlChar},
-    xpath_internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
 };
 
 #[repr(C)]

@@ -55,7 +55,5 @@ pub mod xmlstring;
 pub mod xmlunicode;
 #[cfg(feature = "libxml_writer")]
 pub mod xmlwriter;
-#[cfg(feature = "xpath")]
-pub mod xpath_internals;
 #[cfg(feature = "xpointer")]
 pub mod xpointer;

@@ -49,10 +49,13 @@ use crate::{
     generic_error,
     hash::XmlHashTableRef,
     libxml::{
-        chvalid::{xml_is_blank_char, xml_is_char},
+        chvalid::{
+            xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
+        },
         dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
-        parser_internals::{xml_copy_char, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
+        hash::XmlHashTable,
+        parser_internals::{xml_copy_char, xml_is_letter, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
             xml_free_pattern, xml_free_pattern_list, xml_free_stream_ctxt, xml_pattern_from_root,
             xml_pattern_get_stream_ctxt, xml_pattern_max_depth, xml_pattern_min_depth,
@@ -85,12 +88,6 @@ use crate::{
         XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_NODESET_LENGTH,
         XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
     },
-};
-
-use super::{
-    chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
-    hash::XmlHashTable,
-    parser_internals::xml_is_letter,
 };
 
 // Many of these macros may later turn into functions.
@@ -362,7 +359,7 @@ macro_rules! CHECK_ERROR0 {
 #[macro_export]
 macro_rules! XP_ERROR {
     ($ctxt:expr, $x:expr) => {{
-        $crate::libxml::xpath_internals::xml_xpath_err($ctxt, $x);
+        $crate::xpath::internals::xml_xpath_err($ctxt, $x);
         return;
     }};
 }
@@ -1052,7 +1049,7 @@ unsafe extern "C" fn xml_xpath_debug_dump_node_list<'a>(
     mut cur: XmlNodePtr,
     depth: i32,
 ) {
-    use super::debug_xml::xml_debug_dump_one_node;
+    use crate::libxml::debug_xml::xml_debug_dump_one_node;
 
     let mut tmp: XmlNodePtr;
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
@@ -1165,7 +1162,7 @@ pub unsafe extern "C" fn xml_xpath_debug_dump_object<'a>(
     cur: XmlXPathObjectPtr,
     depth: i32,
 ) {
-    use super::debug_xml::xml_debug_dump_string;
+    use crate::libxml::debug_xml::xml_debug_dump_string;
 
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 

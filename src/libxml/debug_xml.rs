@@ -2827,7 +2827,7 @@ unsafe extern "C" fn xml_shell_register_namespace(
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use crate::libxml::{xmlstring::xml_strdup, xpath_internals::xml_xpath_register_ns};
+    use crate::{libxml::xmlstring::xml_strdup, xpath::internals::xml_xpath_register_ns};
 
     use super::globals::xml_free;
 
@@ -2892,7 +2892,7 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
     root: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use super::xpath_internals::xml_xpath_register_ns;
+    use crate::xpath::internals::xml_xpath_register_ns;
 
     let mut ns: XmlNsPtr;
 
@@ -2961,11 +2961,11 @@ pub unsafe fn xml_shell<'a>(
             globals::{xml_free, xml_malloc},
             xmlmemory::xml_mem_show,
             xmlstring::xml_strdup,
-            xpath_internals::xml_xpath_debug_dump_object,
         },
         tree::xml_free_doc,
         xpath::{
-            xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
+            internals::xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
+            xml_xpath_free_object, xml_xpath_new_context,
         },
     };
 

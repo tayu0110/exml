@@ -2875,14 +2875,12 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     use exml::{
-        libxml::{
-            xpath_internals::xml_xpath_debug_dump_object,
-            xpointer::{xml_xptr_eval, xml_xptr_new_context},
-        },
+        libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
         xpath::{
-            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
-            xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
-            xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
+            internals::xml_xpath_debug_dump_object, xml_xpath_compile, xml_xpath_compiled_eval,
+            xml_xpath_eval_expression, xml_xpath_free_comp_expr, xml_xpath_free_context,
+            xml_xpath_free_object, xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr,
+            XmlXPathObjectPtr,
         },
     };
 
@@ -4624,12 +4622,11 @@ unsafe extern "C" fn load_xpath_expr(
         libxml::{
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
-            xpath_internals::xml_xpath_register_ns,
         },
         tree::XmlNsPtr,
         xpath::{
-            xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
-            XmlXPathContextPtr,
+            internals::xml_xpath_register_ns, xml_xpath_eval_expression, xml_xpath_free_context,
+            xml_xpath_new_context, XmlXPathContextPtr,
         },
     };
 

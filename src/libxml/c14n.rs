@@ -51,7 +51,7 @@ use crate::{
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
-    xpath::XmlNodeSetPtr,
+    xpath::{internals::xml_xpath_node_set_contains, XmlNodeSetPtr},
 };
 
 use super::{
@@ -62,7 +62,6 @@ use super::{
     },
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
-    xpath_internals::xml_xpath_node_set_contains,
 };
 
 // Predefined values for C14N modes

@@ -34,6 +34,9 @@
 //
 // Author: daniel@veillard.com
 
+#[cfg(feature = "xpath")]
+pub mod internals;
+
 use std::{
     any::type_name,
     borrow::Cow,
@@ -59,20 +62,11 @@ use crate::{
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
         xmlstring::{xml_strdup, XmlChar},
-        xpath_internals::{
-            value_pop, xml_xpath_compile_expr, xml_xpath_err_memory, xml_xpath_eval_expr,
-            xml_xpath_free_parser_context, xml_xpath_new_boolean, xml_xpath_new_float,
-            xml_xpath_new_parser_context, xml_xpath_new_string, xml_xpath_node_set_dup_ns,
-            xml_xpath_node_set_free_ns, xml_xpath_node_set_merge, xml_xpath_node_set_sort,
-            xml_xpath_optimize_expression, xml_xpath_register_all_functions,
-            xml_xpath_registered_funcs_cleanup, xml_xpath_registered_ns_cleanup,
-            xml_xpath_registered_variables_cleanup, xml_xpath_release_object, xml_xpath_run_eval,
-            xml_xpath_string_eval_number, xml_xpath_try_stream_compile, xml_xpath_wrap_string,
-            xml_xpatherror, XmlPointerListPtr, XmlXpathContextCache, XmlXpathContextCachePtr,
-        },
     },
     tree::{xml_free_node_list, XmlDocPtr, XmlElementType, XmlNodePtr, XmlNsPtr},
 };
+
+pub use internals::*;
 
 // when compiling an XPath expression we arbitrary limit the maximum
 // number of step operation in the compiled expression. 1000000 is
