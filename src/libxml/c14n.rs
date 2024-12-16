@@ -51,7 +51,7 @@ use crate::{
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
-    xpath::{xml_xpath_node_set_contains, XmlNodeSetPtr},
+    xpath::XmlNodeSetPtr,
 };
 
 use super::{
@@ -168,7 +168,7 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
     let nodes: XmlNodeSetPtr = user_data as XmlNodeSetPtr;
     if !nodes.is_null() && !node.is_null() {
         if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-            return xml_xpath_node_set_contains(nodes, node);
+            return (*nodes).contains(node) as i32;
         } else {
             let mut ns: XmlNs = unsafe { zeroed() };
 
@@ -185,7 +185,7 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 
             // If the input is an XPath node-set, then the node-set must explicitly
             // contain every node to be rendered to the canonical form.
-            return xml_xpath_node_set_contains(nodes, addr_of_mut!(ns) as XmlNodePtr);
+            return (*nodes).contains(addr_of_mut!(ns) as XmlNodePtr) as i32;
         }
     }
     1

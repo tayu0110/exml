@@ -27,8 +27,47 @@ pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct XmlNodeSet {
-    pub node_tab: Option<Vec<*mut XmlNode>>, /* array of nodes in no particular order */
-                                             /* @@ with_ns to check whether namespace nodes should be looked at @@ */
+    // array of nodes in no particular order
+    pub node_tab: Option<Vec<*mut XmlNode>>,
+    // @@ with_ns to check whether namespace nodes should be looked at @@
+}
+
+impl XmlNodeSet {
+    /// checks whether @cur contains @val
+    ///
+    /// Returns true (1) if @cur contains @val, false (0) otherwise
+    #[doc(alias = "xmlXPathNodeSetContains")]
+    pub unsafe fn contains(&self, val: *mut XmlNode) -> bool {
+        if val.is_null() {
+            return false;
+        }
+        if let Some(table) = self.node_tab.as_ref() {
+            if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
+                for &node in table {
+                    if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                        let ns1: XmlNsPtr = val as XmlNsPtr;
+                        let ns2: XmlNsPtr = node as XmlNsPtr;
+                        if ns1 == ns2 {
+                            return true;
+                        }
+                        if !(*ns1).next.is_null()
+                            && (*ns2).next == (*ns1).next
+                            && xml_str_equal((*ns1).prefix as _, (*ns2).prefix as _)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            } else {
+                for &node in table {
+                    if node == val {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -99,42 +138,6 @@ pub unsafe fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
     xml_free(obj as _);
 }
 
-/// checks whether @cur contains @val
-///
-/// Returns true (1) if @cur contains @val, false (0) otherwise
-#[doc(alias = "xmlXPathNodeSetContains")]
-pub unsafe fn xml_xpath_node_set_contains(cur: XmlNodeSetPtr, val: *mut XmlNode) -> i32 {
-    if cur.is_null() || val.is_null() {
-        return 0;
-    }
-    if let Some(table) = (*cur).node_tab.as_ref() {
-        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-            for &node in table {
-                if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                    let ns1: XmlNsPtr = val as XmlNsPtr;
-                    let ns2: XmlNsPtr = node as XmlNsPtr;
-                    if ns1 == ns2 {
-                        return 1;
-                    }
-                    if !(*ns1).next.is_null()
-                        && (*ns2).next == (*ns1).next
-                        && xml_str_equal((*ns1).prefix as _, (*ns2).prefix as _)
-                    {
-                        return 1;
-                    }
-                }
-            }
-        } else {
-            for &node in table {
-                if node == val {
-                    return 1;
-                }
-            }
-        }
-    }
-    0
-}
-
 /// Checks whether @ns is empty or not.
 ///
 /// Returns %TRUE if @ns is an empty node-set.
@@ -192,7 +195,7 @@ pub unsafe extern "C" fn xml_xpath_difference(
         return nodes1;
     }
 
-    /* TODO: Check memory error. */
+    // TODO: Check memory error.
     let ret: XmlNodeSetPtr = xml_xpath_node_set_create(null_mut());
     if xml_xpath_node_set_is_empty!(nodes1) {
         return ret;
@@ -202,8 +205,8 @@ pub unsafe extern "C" fn xml_xpath_difference(
 
     for i in 0..l1 {
         cur = xml_xpath_node_set_item!(nodes1, i);
-        if xml_xpath_node_set_contains(nodes2, cur) == 0 {
-            /* TODO: Propagate memory error. */
+        if !(*nodes2).contains(cur) {
+            // TODO: Propagate memory error.
             if xml_xpath_node_set_add_unique(ret, cur) < 0 {
                 break;
             }
@@ -239,7 +242,7 @@ pub unsafe fn xml_xpath_intersection(
 
     for i in 0..l1 {
         cur = xml_xpath_node_set_item!(nodes1, i);
-        if xml_xpath_node_set_contains(nodes2, cur) != 0 {
+        if (*nodes2).contains(cur) {
             /* TODO: Propagate memory error. */
             if xml_xpath_node_set_add_unique(ret, cur) < 0 {
                 break;
@@ -316,7 +319,7 @@ pub unsafe fn xml_xpath_has_same_nodes(nodes1: XmlNodeSetPtr, nodes2: XmlNodeSet
     let l: i32 = xml_xpath_node_set_get_length!(nodes1);
     for i in 0..l {
         cur = xml_xpath_node_set_item!(nodes1, i);
-        if xml_xpath_node_set_contains(nodes2, cur) != 0 {
+        if (*nodes2).contains(cur) {
             return 1;
         }
     }
@@ -343,7 +346,7 @@ pub unsafe extern "C" fn xml_xpath_node_leading_sorted(
     if ret.is_null() {
         return ret;
     }
-    if xml_xpath_node_set_is_empty!(nodes) || xml_xpath_node_set_contains(nodes, node) == 0 {
+    if xml_xpath_node_set_is_empty!(nodes) || !(*nodes).contains(node) {
         return ret;
     }
 
@@ -437,7 +440,7 @@ pub unsafe extern "C" fn xml_xpath_node_trailing_sorted(
     if ret.is_null() {
         return ret;
     }
-    if xml_xpath_node_set_is_empty!(nodes) || xml_xpath_node_set_contains(nodes, node) == 0 {
+    if xml_xpath_node_set_is_empty!(nodes) || !(*nodes).contains(node) {
         return ret;
     }
 
