@@ -121,7 +121,7 @@ impl XmlNodeSet {
     ///
     /// If `free_actual_tree` is `true`, free the actual tree also.
     #[doc(alias = "xmlXPathFreeNodeSet", alias = "xmlXPathFreeValueTree")]
-    pub unsafe fn clear(&mut self, free_actual_tree: bool) {
+    pub unsafe fn cleanup(&mut self, free_actual_tree: bool) {
         if let Some(table) = self.node_tab.as_mut() {
             while let Some(node) = table.pop() {
                 if !node.is_null() {
@@ -209,6 +209,33 @@ impl XmlNodeSet {
             table.remove(pos);
         }
     }
+
+    /// Clears the list from temporary XPath objects (e.g. namespace nodes
+    /// are feed) starting with the entry at @pos, but does *not* free the list
+    /// itself. Sets the length of the list to @pos.
+    #[doc(alias = "xmlXPathNodeSetClearFromPos")]
+    pub(super) unsafe fn truncate(&mut self, new_len: usize, has_ns_nodes: bool) {
+        let Some(table) = self.node_tab.as_mut().filter(|t| new_len >= t.len()) else {
+            return;
+        };
+        if has_ns_nodes {
+            for &node in &table[new_len..] {
+                if !node.is_null()
+                    && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
+                {
+                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                }
+            }
+        }
+        table.truncate(new_len);
+    }
+
+    /// Clears the list from all temporary XPath objects (e.g. namespace nodes are feed),
+    /// but does *not* free the list itself. Sets the length of the list to 0.
+    #[doc(alias = "xmlXPathNodeSetClear")]
+    pub(super) unsafe fn clear(&mut self, has_ns_nodes: bool) {
+        self.truncate(0, has_ns_nodes);
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -224,7 +251,7 @@ pub unsafe fn xml_xpath_node_set_create(val: *mut XmlNode) -> Option<NonNull<Xml
 #[doc(alias = "xmlXPathFreeNodeSet")]
 pub unsafe fn xml_xpath_free_node_set(obj: Option<NonNull<XmlNodeSet>>) {
     if let Some(mut obj) = obj {
-        obj.as_mut().clear(false);
+        obj.as_mut().cleanup(false);
         let _ = *Box::from_raw(obj.as_ptr());
     }
 }
@@ -233,7 +260,7 @@ pub unsafe fn xml_xpath_free_node_set(obj: Option<NonNull<XmlNodeSet>>) {
 #[doc(alias = "xmlXPathFreeValueTree")]
 pub unsafe fn xml_xpath_free_value_tree(obj: Option<NonNull<XmlNodeSet>>) {
     if let Some(mut obj) = obj {
-        obj.as_mut().clear(true);
+        obj.as_mut().cleanup(true);
         let _ = *Box::from_raw(obj.as_ptr());
     }
 }
@@ -699,44 +726,6 @@ pub unsafe fn xml_xpath_node_set_add_ns(
     0
 }
 
-/// Clears the list from temporary XPath objects (e.g. namespace nodes
-/// are feed) starting with the entry at @pos, but does *not* free the list
-/// itself. Sets the length of the list to @pos.
-#[doc(alias = "xmlXPathNodeSetClearFromPos")]
-pub(super) unsafe fn xml_xpath_node_set_clear_from_pos(
-    set: Option<NonNull<XmlNodeSet>>,
-    pos: i32,
-    has_ns_nodes: i32,
-) {
-    let Some(mut set) = set else {
-        return;
-    };
-    if pos >= set.as_ref().node_tab.as_ref().map_or(0, |t| t.len() as i32) {
-        return;
-    }
-    if has_ns_nodes != 0 {
-        if let Some(table) = set.as_ref().node_tab.as_ref() {
-            for &node in &table[pos as usize..] {
-                if !node.is_null()
-                    && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                {
-                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
-                }
-            }
-        }
-    }
-    if let Some(table) = set.as_mut().node_tab.as_mut() {
-        table.truncate(pos as usize);
-    }
-}
-
-/// Clears the list from all temporary XPath objects (e.g. namespace nodes
-/// are feed), but does *not* free the list itself. Sets the length of the list to 0.
-#[doc(alias = "xmlXPathNodeSetClear")]
-pub(super) unsafe fn xml_xpath_node_set_clear(set: Option<NonNull<XmlNodeSet>>, has_ns_nodes: i32) {
-    xml_xpath_node_set_clear_from_pos(set, 0, has_ns_nodes);
-}
-
 /// Merges two nodesets, all nodes from @set2 are added to @set1.
 /// Checks for duplicate nodes. Clears set2.
 ///
@@ -749,7 +738,8 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
     set2: Option<NonNull<XmlNodeSet>>,
 ) -> Option<NonNull<XmlNodeSet>> {
     let init_nb_set1 = set1?.as_ref().node_tab.as_ref().map_or(0, |t| t.len());
-    if let Some(table) = set2?.as_mut().node_tab.as_mut() {
+    let mut set2 = set2?;
+    if let Some(table) = set2.as_mut().node_tab.as_mut() {
         'b: for n2 in table.drain(..) {
             // Skip duplicates.
             if let Some(set1_table) = set1?.as_mut().node_tab.as_mut() {
@@ -775,7 +765,7 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
                 xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
-                xml_xpath_node_set_clear(set2, 1);
+                set2.as_mut().clear(true);
                 return None;
             }
             set1_table.push(n2);
@@ -800,14 +790,15 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear_no_dupls(
     set1: Option<NonNull<XmlNodeSet>>,
     set2: Option<NonNull<XmlNodeSet>>,
 ) -> Option<NonNull<XmlNodeSet>> {
-    if let Some(table) = set2?.as_mut().node_tab.as_mut() {
+    let mut set2 = set2?;
+    if let Some(table) = set2.as_mut().node_tab.as_mut() {
         for n2 in table.drain(..) {
             let set1_table = set1?.as_mut().node_tab.get_or_insert_with(Vec::new);
             if set1_table.len() >= XPATH_MAX_NODESET_LENGTH {
                 xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
                 xml_xpath_free_node_set(set1);
-                xml_xpath_node_set_clear(set2, 1);
+                set2.as_mut().clear(true);
                 return None;
             }
             set1_table.push(n2);
