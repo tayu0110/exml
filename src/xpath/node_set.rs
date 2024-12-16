@@ -68,6 +68,24 @@ impl XmlNodeSet {
         }
         false
     }
+
+    /// Free the NodeSet compound.
+    ///
+    /// If `free_actual_tree` is `true`, free the actual tree also.
+    #[doc(alias = "xmlXPathFreeNodeSet", alias = "xmlXPathFreeValueTree")]
+    pub unsafe fn clear(&mut self, free_actual_tree: bool) {
+        if let Some(table) = self.node_tab.as_mut() {
+            while let Some(node) = table.pop() {
+                if !node.is_null() {
+                    if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                        xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                    } else if free_actual_tree {
+                        xml_free_node_list(node);
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -105,15 +123,8 @@ pub unsafe fn xml_xpath_free_node_set(obj: XmlNodeSetPtr) {
     if obj.is_null() {
         return;
     }
-    if let Some(mut table) = (*obj).node_tab.take() {
-        // @@ with_ns to check whether namespace nodes should be looked at @@
-        while let Some(node) = table.pop() {
-            if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-            {
-                xml_xpath_node_set_free_ns(node as XmlNsPtr);
-            }
-        }
-    }
+    (*obj).clear(false);
+    let _ = (*obj).node_tab.take();
     xml_free(obj as _);
 }
 
@@ -124,17 +135,8 @@ pub unsafe fn xml_xpath_free_value_tree(obj: XmlNodeSetPtr) {
         return;
     }
 
-    if let Some(mut table) = (*obj).node_tab.take() {
-        while let Some(node) = table.pop() {
-            if !node.is_null() {
-                if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
-                } else {
-                    xml_free_node_list(node);
-                }
-            }
-        }
-    }
+    (*obj).clear(true);
+    let _ = (*obj).node_tab.take();
     xml_free(obj as _);
 }
 
