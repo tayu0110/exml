@@ -61,8 +61,8 @@ use crate::{
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{
-        xml_xpath_free_context, xml_xpath_free_object, XmlNodeSetPtr, XmlXPathContextPtr,
-        XmlXPathObjectPtr, XmlXPathObjectType,
+        xml_xpath_free_context, xml_xpath_free_object, XmlXPathContextPtr, XmlXPathObjectPtr,
+        XmlXPathObjectType,
     },
 };
 
@@ -1276,11 +1276,10 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
     }
     match (*obj).typ {
         XmlXPathObjectType::XPathNodeset => {
-            let set: XmlNodeSetPtr = (*obj).nodesetval;
-            if set.is_null() {
+            let Some(set) = (*obj).nodesetval else {
                 return null_mut();
-            }
-            if let Some(table) = (*set).node_tab.as_deref() {
+            };
+            if let Some(table) = set.as_ref().node_tab.as_deref() {
                 for &now in table {
                     if now.is_null() {
                         continue;
@@ -1622,12 +1621,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         break 'error;
                     }
                     XmlXPathObjectType::XPathNodeset => {
-                        if (*xptr).nodesetval.is_null()
-                            || (*(*xptr).nodesetval)
-                                .node_tab
-                                .as_ref()
-                                .map_or(true, |t| t.is_empty())
-                        {
+                        if (*xptr).nodesetval.map_or(true, |n| n.as_ref().is_empty()) {
                             xml_xpath_free_object(xptr);
                             xml_xpath_free_context(xptrctxt);
                             break 'error;
@@ -1636,9 +1630,8 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                     #[cfg(feature = "libxml_xptr_locs")]
                     XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
                 }
-                let set: XmlNodeSetPtr = (*xptr).nodesetval;
-                if !set.is_null() {
-                    if let Some(table) = (*set).node_tab.as_deref_mut() {
+                if let Some(mut set) = (*xptr).nodesetval {
+                    if let Some(table) = set.as_mut().node_tab.as_deref_mut() {
                         for node in table.iter_mut() {
                             if node.is_null() {
                                 continue;

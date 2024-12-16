@@ -4879,14 +4879,15 @@ unsafe extern "C" fn c14n_run_test(
         inclusive_namespaces = parse_list(nslist as *mut XmlChar);
     }
 
-    /*
-     * Canonical form
-     */
-    /* fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename); */
+    // Canonical form
+    // fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename);
     ret = xml_c14n_doc_dump_memory(
         doc,
         if !xpath.is_null() {
-            (*xpath).nodesetval
+            (*xpath)
+                .nodesetval
+                .as_ref()
+                .map_or(null_mut(), |n| n.as_ptr())
         } else {
             null_mut()
         },

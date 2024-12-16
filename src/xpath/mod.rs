@@ -203,7 +203,7 @@ pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[derive(Debug, Clone)]
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
-    pub nodesetval: XmlNodeSetPtr,
+    pub nodesetval: Option<NonNull<XmlNodeSet>>,
     pub boolval: bool,
     pub floatval: f64,
     pub stringval: Option<String>,
@@ -217,7 +217,7 @@ impl Default for XmlXPathObject {
     fn default() -> Self {
         Self {
             typ: XmlXPathObjectType::default(),
-            nodesetval: null_mut(),
+            nodesetval: None,
             boolval: false,
             floatval: 0.0,
             stringval: None,
@@ -558,9 +558,7 @@ pub const XML_XPATH_NINF: f64 = f64::NEG_INFINITY;
 /// Free up an object: xmlXPathObjectPtr.
 #[doc(alias = "xmlXPathFreeObject")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
-    use std::ptr::NonNull;
-
+pub unsafe fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
     if obj.is_null() {
         return;
     }
@@ -570,11 +568,9 @@ pub unsafe extern "C" fn xml_xpath_free_object(obj: XmlXPathObjectPtr) {
     ) {
         if (*obj).boolval {
             (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* TODO: Just for debugging. */
-            if !(*obj).nodesetval.is_null() {
-                xml_xpath_free_value_tree(NonNull::new((*obj).nodesetval));
-            }
-        } else if !(*obj).nodesetval.is_null() {
-            xml_xpath_free_node_set(NonNull::new((*obj).nodesetval));
+            xml_xpath_free_value_tree((*obj).nodesetval.take());
+        } else if let Some(set) = (*obj).nodesetval.take() {
+            xml_xpath_free_node_set(Some(set));
         }
     } else if matches!((*obj).typ, XmlXPathObjectType::XPathString) && (*obj).stringval.is_some() {
         let _ = (*obj).stringval.take();
@@ -603,9 +599,7 @@ pub unsafe extern "C" fn xml_xpath_free_node_set_list(obj: XmlXPathObjectPtr) {
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathObjectCopy")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
-    use std::ptr::NonNull;
-
+pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     use crate::generic_error;
 
     if val.is_null() {
@@ -624,10 +618,9 @@ pub unsafe extern "C" fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPa
         XmlXPathObjectType::XPathPoint | XmlXPathObjectType::XPathRange => {}
         XmlXPathObjectType::XPathString => {}
         XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
-            /* TODO: Check memory error. */
-            (*ret).nodesetval = xml_xpath_node_set_merge(None, NonNull::new((*val).nodesetval))
-                .map_or(null_mut(), |n| n.as_ptr());
-            /* Do not deallocate the copied tree value */
+            // TODO: Check memory error.
+            (*ret).nodesetval = xml_xpath_node_set_merge(None, (*val).nodesetval);
+            // Do not deallocate the copied tree value
             (*ret).boolval = false;
         }
         #[cfg(feature = "libxml_xptr_locs")]
@@ -847,7 +840,7 @@ pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => false,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_boolean(NonNull::new((*val).nodesetval))
+            xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
         }
         XmlXPathObjectType::XPathString => {
             xml_xpath_cast_string_to_boolean((*val).stringval.as_deref())
@@ -938,7 +931,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => XML_XPATH_NAN,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_number(NonNull::new((*val).nodesetval))
+            xml_xpath_cast_node_set_to_number((*val).nodesetval)
         }
         XmlXPathObjectType::XPathString => {
             let strval = (*val)
@@ -1141,7 +1134,7 @@ pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, s
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => "".into(),
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_string(NonNull::new((*val).nodesetval))
+            xml_xpath_cast_node_set_to_string((*val).nodesetval)
         }
         XmlXPathObjectType::XPathString => (*val).stringval.clone().unwrap().into(),
         XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_string((*val).boolval).into(),
@@ -1208,9 +1201,7 @@ pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObject
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            res = Some(xml_xpath_cast_node_set_to_string(NonNull::new(
-                (*val).nodesetval,
-            )));
+            res = Some(xml_xpath_cast_node_set_to_string((*val).nodesetval));
         }
         XmlXPathObjectType::XPathString => {
             return val;
@@ -1293,7 +1284,7 @@ unsafe extern "C" fn xml_pointer_list_free(list: XmlPointerListPtr) {
     xml_free(list as _);
 }
 
-unsafe extern "C" fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
+unsafe fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
     let mut obj: XmlXPathObjectPtr;
 
     if list.is_null() {
@@ -1304,9 +1295,9 @@ unsafe extern "C" fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
         obj = *(*list).items.add(i as usize) as _;
         // Note that it is already assured that we don't need to
         // look out for namespace nodes in the node-set.
-        if !(*obj).nodesetval.is_null() {
-            let _ = (*(*obj).nodesetval).node_tab.take();
-            xml_free((*obj).nodesetval as _);
+        if let Some(mut nodeset) = (*obj).nodesetval.take() {
+            let _ = nodeset.as_mut().node_tab.take();
+            let _ = *Box::from_raw(nodeset.as_ptr());
         }
         xml_free(obj as _);
     }
@@ -1626,13 +1617,14 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
             return ((*res).floatval == (*ctxt).proximity_position as _) as i32;
         }
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            if (*res).nodesetval.is_null() {
+            let Some(nodeset) = (*res).nodesetval else {
                 return 0;
-            }
-            return ((*(*res).nodesetval)
+            };
+            return nodeset
+                .as_ref()
                 .node_tab
                 .as_ref()
-                .map_or(false, |s| !s.is_empty())) as i32;
+                .map_or(false, |s| !s.is_empty()) as i32;
         }
         XmlXPathObjectType::XPathString => {
             return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty()) as i32;

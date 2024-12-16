@@ -1457,13 +1457,16 @@ unsafe extern "C" fn xml_schematron_get_node(
         return null_mut();
     }
 
-    if (*ret).typ == XmlXPathObjectType::XPathNodeset && !(*ret).nodesetval.is_null() {
-        if let Some(table) = (*(*ret).nodesetval)
-            .node_tab
-            .as_deref()
-            .filter(|t| !t.is_empty())
-        {
-            node = table[0];
+    if (*ret).typ == XmlXPathObjectType::XPathNodeset {
+        if let Some(nodeset) = (*ret).nodesetval {
+            if let Some(table) = nodeset
+                .as_ref()
+                .node_tab
+                .as_deref()
+                .filter(|t| !t.is_empty())
+            {
+                node = table[0];
+            }
         }
     }
 
@@ -1527,8 +1530,8 @@ unsafe extern "C" fn xml_schematron_format_report(
                 XmlXPathObjectType::XPathNodeset => {
                     let spacer: *mut XmlChar = c" ".as_ptr() as _;
 
-                    if !(*eval).nodesetval.is_null() {
-                        if let Some(table) = (*(*eval).nodesetval).node_tab.as_deref() {
+                    if let Some(nodeset) = (*eval).nodesetval {
+                        if let Some(table) = nodeset.as_ref().node_tab.as_deref() {
                             for (indx, &node) in table.iter().enumerate() {
                                 if indx > 0 {
                                     ret = xml_strcat(ret, spacer);
@@ -1746,12 +1749,7 @@ unsafe extern "C" fn xml_schematron_run_test(
     } else {
         match (*ret).typ {
             XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
-                if (*ret).nodesetval.is_null()
-                    || (*(*ret).nodesetval)
-                        .node_tab
-                        .as_ref()
-                        .map_or(true, |t| t.is_empty())
-                {
+                if (*ret).nodesetval.map_or(true, |n| n.as_ref().is_empty()) {
                     failed = 1;
                 }
             }

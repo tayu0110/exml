@@ -56,7 +56,7 @@ impl XmlNodeSet {
     ///
     /// Returns %TRUE if @ns is an empty node-set.
     #[doc(alias = "xmlXPathNodeSetIsEmpty")]
-    pub(super) fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.node_tab.as_ref().map_or(true, |t| t.is_empty())
     }
 
@@ -64,7 +64,7 @@ impl XmlNodeSet {
     ///
     /// Returns the number of nodes in the node-set.
     #[doc(alias = "xmlXPathNodeSetGetLength")]
-    fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.node_tab.as_ref().map_or(0, |t| t.len())
     }
 
@@ -73,7 +73,7 @@ impl XmlNodeSet {
     /// Returns the xmlNodePtr at the given @index in @ns or NULL if
     /// @index is out of range (0 to length-1)
     #[doc(alias = "xmlXPathNodeSetItem")]
-    fn get(&self, index: usize) -> *mut XmlNode {
+    pub(crate) fn get(&self, index: usize) -> *mut XmlNode {
         *self
             .node_tab
             .as_deref()
@@ -882,7 +882,7 @@ pub unsafe fn xml_xpath_new_node_set_list(val: Option<NonNull<XmlNodeSet>>) -> X
             if !ret.is_null() {
                 for &node in &table[1..] {
                     // TODO: Propagate memory error.
-                    if xml_xpath_node_set_add_unique(NonNull::new((*ret).nodesetval), node) < 0 {
+                    if xml_xpath_node_set_add_unique((*ret).nodesetval, node) < 0 {
                         break;
                     }
                 }

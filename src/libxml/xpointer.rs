@@ -57,8 +57,8 @@ use crate::{
             xml_xpath_new_string, xml_xpath_parse_name, xml_xpath_parse_ncname,
             xml_xpath_register_ns, xml_xpath_root,
         },
-        xml_xpath_free_object, xml_xpath_new_context, XmlNodeSetPtr, XmlXPathContextPtr,
-        XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContextPtr,
+        xml_xpath_free_object, xml_xpath_new_context, XmlXPathContextPtr, XmlXPathError,
+        XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContextPtr,
     },
     CHECK_ERROR, CHECK_TYPE, XP_ERROR,
 };
@@ -2199,13 +2199,14 @@ macro_rules! xml_xptr_err {
 unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx: i32) {
     CHECK_TYPE!(ctxt, XmlXPathObjectType::XPathNodeset);
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
-    let oldset: XmlNodeSetPtr = (*obj).nodesetval;
-    if indx <= 0 || oldset.is_null() {
+    let oldset = (*obj).nodesetval;
+    if indx <= 0 || oldset.is_none() {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     }
-    let Some(table) = (*oldset).node_tab.as_mut().filter(|t| t.len() == 1) else {
+    let mut oldset = (*obj).nodesetval.unwrap();
+    let Some(table) = oldset.as_mut().node_tab.as_mut().filter(|t| t.len() == 1) else {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
@@ -2507,8 +2508,8 @@ unsafe extern "C" fn xml_xptr_eval_full_xptr(
                     }
                 }
                 XmlXPathObjectType::XPathNodeset => {
-                    let loc: XmlNodeSetPtr = (*(*ctxt).value).nodesetval;
-                    if !loc.is_null() && (*loc).node_tab.as_ref().map_or(false, |t| !t.is_empty()) {
+                    let loc = (*(*ctxt).value).nodesetval;
+                    if loc.map_or(false, |l| !l.as_ref().is_empty()) {
                         return;
                     }
                 }
@@ -2630,13 +2631,10 @@ pub unsafe extern "C" fn xml_xptr_eval(
             if tmp != init {
                 if (*tmp).typ == XmlXPathObjectType::XPathNodeset {
                     // Evaluation may push a root nodeset which is unused
-                    let set: XmlNodeSetPtr = (*tmp).nodesetval;
-                    if set.is_null()
-                        || (*set)
-                            .node_tab
-                            .as_ref()
-                            .map_or(true, |t| t.len() != 1 || t[0] != (*ctx).doc as XmlNodePtr)
-                    {
+                    let set = (*tmp).nodesetval;
+                    if set.map_or(true, |s| {
+                        s.as_ref().len() != 1 || s.as_ref().get(0) != (*ctx).doc as XmlNodePtr
+                    }) {
                         stack += 1;
                     }
                 } else {
