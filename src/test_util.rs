@@ -48,10 +48,6 @@ use crate::{
         xmlschemastypes::{XmlSchemaValPtr, XmlSchemaWhitespaceValueType},
         xmlstring::{xml_strdup, XmlChar},
         xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
-        xpath::{
-            XmlNodeSetPtr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
-            XmlXPathParserContextPtr,
-        },
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
@@ -59,6 +55,10 @@ use crate::{
         XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
         XmlNotationPtr, XmlNs, XmlNsPtr,
+    },
+    xpath::{
+        XmlNodeSetPtr, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
+        XmlXPathParserContextPtr,
     },
 };
 
@@ -262,14 +262,14 @@ pub(crate) fn des_xml_xpath_parser_context_ptr(_no: i32, _val: XmlXPathParserCon
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe extern "C" fn desret_xml_xpath_object_ptr(val: XmlXPathObjectPtr) {
-    use crate::libxml::xpath::xml_xpath_free_object;
+    use crate::xpath::xml_xpath_free_object;
 
     xml_xpath_free_object(val);
 }
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe extern "C" fn desret_xml_node_set_ptr(val: XmlNodeSetPtr) {
-    use crate::libxml::xpath::xml_xpath_free_node_set;
+    use crate::xpath::xml_xpath_free_node_set;
 
     xml_xpath_free_node_set(val);
 }
@@ -284,7 +284,7 @@ pub(crate) unsafe extern "C" fn gen_double(no: i32, _nr: i32) -> f64 {
     }
     #[cfg(feature = "xpath")]
     if no == 2 {
-        use crate::libxml::xpath::XML_XPATH_NAN;
+        use crate::xpath::XML_XPATH_NAN;
         return XML_XPATH_NAN;
     }
     -1.0
@@ -320,7 +320,7 @@ pub(crate) unsafe extern "C" fn des_xml_xpath_object_ptr(
     val: XmlXPathObjectPtr,
     _nr: i32,
 ) {
-    use crate::libxml::xpath::xml_xpath_free_object;
+    use crate::xpath::xml_xpath_free_object;
 
     if !val.is_null() {
         xml_xpath_free_object(val);

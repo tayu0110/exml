@@ -62,13 +62,13 @@ use exml::{
         xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{xml_strlen, XmlChar},
-        xpath::XmlXPathObjectPtr,
     },
     tree::{
         xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
         XmlEnumerationPtr, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
+    xpath::XmlXPathObjectPtr,
     SYSCONFDIR,
 };
 use libc::{free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
@@ -2874,14 +2874,16 @@ fn ignore_generic_error(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
-    use exml::libxml::{
+    use exml::{
+        libxml::{
+            xpath_internals::xml_xpath_debug_dump_object,
+            xpointer::{xml_xptr_eval, xml_xptr_new_context},
+        },
         xpath::{
             xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_eval_expression,
             xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
             xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
         },
-        xpath_internals::xml_xpath_debug_dump_object,
-        xpointer::{xml_xptr_eval, xml_xptr_new_context},
     };
 
     let res: XmlXPathObjectPtr;
@@ -4622,13 +4624,13 @@ unsafe extern "C" fn load_xpath_expr(
         libxml::{
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
             xmlstring::xml_str_equal,
-            xpath::{
-                xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
-                XmlXPathContextPtr,
-            },
             xpath_internals::xml_xpath_register_ns,
         },
         tree::XmlNsPtr,
+        xpath::{
+            xml_xpath_eval_expression, xml_xpath_free_context, xml_xpath_new_context,
+            XmlXPathContextPtr,
+        },
     };
 
     let mut node: XmlNodePtr;
@@ -4808,8 +4810,8 @@ unsafe extern "C" fn c14n_run_test(
         libxml::{
             c14n::xml_c14n_doc_dump_memory,
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
-            xpath::xml_xpath_free_object,
         },
+        xpath::xml_xpath_free_object,
     };
 
     let mut xpath: XmlXPathObjectPtr = null_mut();

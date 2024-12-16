@@ -65,33 +65,32 @@ use crate::{
             xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup, xml_strstr,
             xml_utf8_strlen, XmlChar,
         },
-        xpath::{
-            xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
-            xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
-            xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
-            xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
-            xml_xpath_free_comp_expr, xml_xpath_free_node_set, xml_xpath_free_object,
-            xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan,
-            xml_xpath_node_set_create, xml_xpath_object_copy, XmlNodeSetPtr, XmlXPathCompExpr,
-            XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathError, XmlXPathFuncLookupFunc,
-            XmlXPathFunction, XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp,
-            XmlXPathParserContext, XmlXPathParserContextPtr, XmlXPathStepOp, XmlXPathStepOpPtr,
-            XmlXPathVariableLookupFunc, XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR,
-            XPATH_MAX_NODESET_LENGTH, XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
-        },
     },
     tree::{
         xml_build_qname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNodePtr,
         XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     xml_xpath_node_set_get_length, xml_xpath_node_set_is_empty, xml_xpath_node_set_item,
+    xpath::{
+        xml_xpath_cast_boolean_to_string, xml_xpath_cast_node_set_to_string,
+        xml_xpath_cast_node_to_number, xml_xpath_cast_node_to_string,
+        xml_xpath_cast_number_to_boolean, xml_xpath_cast_number_to_string,
+        xml_xpath_cast_to_boolean, xml_xpath_cast_to_number, xml_xpath_cast_to_string,
+        xml_xpath_free_comp_expr, xml_xpath_free_node_set, xml_xpath_free_object,
+        xml_xpath_free_value_tree, xml_xpath_is_inf, xml_xpath_is_nan, xml_xpath_node_set_create,
+        xml_xpath_object_copy, XmlNodeSet, XmlNodeSetPtr, XmlXPathCompExpr, XmlXPathCompExprPtr,
+        XmlXPathContextPtr, XmlXPathError, XmlXPathFuncLookupFunc, XmlXPathFunction,
+        XmlXPathObject, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathOp, XmlXPathParserContext,
+        XmlXPathParserContextPtr, XmlXPathStepOp, XmlXPathStepOpPtr, XmlXPathVariableLookupFunc,
+        XML_XPATH_CHECKNS, XML_XPATH_NAN, XML_XPATH_NOVAR, XPATH_MAX_NODESET_LENGTH,
+        XPATH_MAX_STACK_DEPTH, XPATH_MAX_STEPS,
+    },
 };
 
 use super::{
     chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
     hash::XmlHashTable,
     parser_internals::xml_is_letter,
-    xpath::XmlNodeSet,
 };
 
 // Many of these macros may later turn into functions.
@@ -343,7 +342,7 @@ macro_rules! xml_xpath_stack_is_node_set {
 #[macro_export]
 macro_rules! CHECK_ERROR {
     ($ctxt:expr) => {
-        if (*$ctxt).error != $crate::libxml::xpath::XmlXPathError::XpathExpressionOk as i32 {
+        if (*$ctxt).error != $crate::xpath::XmlXPathError::XpathExpressionOk as i32 {
             return;
         }
     };
@@ -382,10 +381,7 @@ macro_rules! XP_ERROR0 {
 macro_rules! CHECK_TYPE {
     ($ctxt:expr, $typeval:expr) => {
         if (*$ctxt).value.is_null() || (*(*$ctxt).value).typ != $typeval {
-            $crate::XP_ERROR!(
-                $ctxt,
-                $crate::libxml::xpath::XmlXPathError::XpathInvalidType as i32
-            )
+            $crate::XP_ERROR!($ctxt, $crate::xpath::XmlXPathError::XpathInvalidType as i32)
         }
     };
 }
@@ -411,14 +407,11 @@ macro_rules! CHECK_ARITY {
         if $nargs != $x {
             $crate::XP_ERROR!(
                 $ctxt,
-                $crate::libxml::xpath::XmlXPathError::XpathInvalidArity as i32
+                $crate::xpath::XmlXPathError::XpathInvalidArity as i32
             );
         }
         if (*$ctxt).value_nr < (*$ctxt).value_frame + $x {
-            $crate::XP_ERROR!(
-                $ctxt,
-                $crate::libxml::xpath::XmlXPathError::XpathStackError as i32
-            );
+            $crate::XP_ERROR!($ctxt, $crate::xpath::XmlXPathError::XpathStackError as i32);
         }
     };
 }

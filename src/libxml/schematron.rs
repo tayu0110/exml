@@ -34,8 +34,14 @@ use crate::{
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
-    libxml::{xmlstring::xml_str_equal, xpath::xml_xpath_ctxt_compile},
+    libxml::xmlstring::xml_str_equal,
     tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
+    xpath::{
+        xml_xpath_compiled_eval, xml_xpath_ctxt_compile, xml_xpath_eval, xml_xpath_free_comp_expr,
+        xml_xpath_free_context, xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context,
+        XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType,
+        XML_XPATH_CHECKNS,
+    },
 };
 
 use super::{
@@ -46,11 +52,6 @@ use super::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
     },
     xmlstring::{xml_strcat, xml_strdup, xml_strlen, XmlChar},
-    xpath::{
-        xml_xpath_compiled_eval, xml_xpath_eval, xml_xpath_free_comp_expr, xml_xpath_free_context,
-        xml_xpath_free_object, xml_xpath_is_nan, xml_xpath_new_context, XmlXPathCompExprPtr,
-        XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType, XML_XPATH_CHECKNS,
-    },
     xpath_internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
 };
 

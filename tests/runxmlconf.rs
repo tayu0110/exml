@@ -28,12 +28,11 @@ use exml::{
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
         xmlstring::xml_str_equal,
-        xpath::{
-            xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context,
-            XmlXPathContext,
-        },
     },
     tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
+    xpath::{
+        xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
+    },
 };
 use libc::{fdopen, snprintf};
 

@@ -52,10 +52,6 @@ use crate::{
         parser_internals::{xml_free_input_stream, xml_string_current_char},
         uri::{xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, XmlURIPtr},
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
-        xpath::{
-            xml_xpath_free_context, xml_xpath_free_object, XmlNodeSetPtr, XmlXPathContextPtr,
-            XmlXPathObjectPtr, XmlXPathObjectType,
-        },
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
     tree::{
@@ -64,6 +60,10 @@ use crate::{
         NodeCommon, NodePtr, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
+    xpath::{
+        xml_xpath_free_context, xml_xpath_free_object, XmlNodeSetPtr, XmlXPathContextPtr,
+        XmlXPathObjectPtr, XmlXPathObjectType,
+    },
 };
 
 use super::chvalid::xml_is_char;

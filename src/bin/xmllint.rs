@@ -90,12 +90,12 @@ use exml::{
             XmlSchemaParserCtxtPtr, XmlSchemaValidCtxtPtr,
         },
         xmlstring::XmlChar,
-        xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     },
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
         NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
     },
+    xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     SYSCONFDIR,
 };
 use libc::{
@@ -2240,8 +2240,8 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 
     use exml::{
         io::XmlOutputBuffer,
-        libxml::xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
         tree::XmlNodePtr,
+        xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
     };
 
     match (*cur).typ {
@@ -2317,11 +2317,11 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 #[cfg(feature = "xpath")]
 unsafe extern "C" fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
     use exml::{
-        libxml::xpath::{
+        tree::XmlNodePtr,
+        xpath::{
             xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
             XmlXPathContextPtr,
         },
-        tree::XmlNodePtr,
     };
 
     let ctxt: XmlXPathContextPtr = xml_xpath_new_context(doc);

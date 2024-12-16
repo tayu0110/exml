@@ -130,7 +130,6 @@ use crate::{
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
-        xpath::xml_init_xpath_internal,
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
@@ -140,6 +139,7 @@ use crate::{
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
+    xpath::xml_init_xpath_internal,
 };
 
 use super::{

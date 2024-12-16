@@ -51,6 +51,7 @@ use crate::{
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
+    xpath::XmlNodeSetPtr,
 };
 
 use super::{
@@ -61,7 +62,6 @@ use super::{
     },
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
-    xpath::XmlNodeSetPtr,
     xpath_internals::xml_xpath_node_set_contains,
 };
 
@@ -933,16 +933,14 @@ unsafe extern "C" fn xml_c14n_process_namespaces_axis(
         return -1;
     }
 
-    /*
-     * Create a sorted list to store element namespaces
-     */
+    // Create a sorted list to store element namespaces
     let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_ns_compare));
     if list.is_null() {
         xml_c14n_err_internal("creating namespaces list (c14n)");
         return -1;
     }
 
-    /* check all namespaces */
+    // check all namespaces
     n = cur;
     while !n.is_null() {
         ns = (*n).ns_def;

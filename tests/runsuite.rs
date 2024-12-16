@@ -47,15 +47,15 @@ use exml::{
         },
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},
-        xpath::{
-            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_context_set_cache,
-            xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
-            xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr,
-            XmlXPathObjectType,
-        },
         xpath_internals::xml_xpath_register_ns,
     },
     tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
+    xpath::{
+        xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_context_set_cache,
+        xml_xpath_free_comp_expr, xml_xpath_free_context, xml_xpath_free_object,
+        xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContext, XmlXPathObjectPtr,
+        XmlXPathObjectType,
+    },
 };
 use libc::{snprintf, strcmp, strstr};
 

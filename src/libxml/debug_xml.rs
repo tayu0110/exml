@@ -30,6 +30,8 @@ use std::{
 
 use libc::strlen;
 
+#[cfg(feature = "xpath")]
+use crate::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType};
 use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     generic_error,
@@ -42,8 +44,6 @@ use crate::{
     },
 };
 
-#[cfg(feature = "xpath")]
-use super::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr};
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
     entities::{xml_get_doc_entity, XmlEntityType},
@@ -51,7 +51,6 @@ use super::{
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
     xmlstring::{xml_check_utf8, xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
-    xpath::XmlXPathObjectType,
 };
 
 pub type XmlDebugCtxtPtr<'a> = *mut XmlDebugCtxt<'a>;
@@ -2206,11 +2205,11 @@ pub unsafe extern "C" fn xml_shell_load(
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
-    use crate::libxml::{
-        globals::xml_free,
-        htmlparser::html_parse_file,
-        parser::xml_read_file,
-        uri::xml_canonic_path,
+    use crate::{
+        libxml::{
+            globals::xml_free, htmlparser::html_parse_file, parser::xml_read_file,
+            uri::xml_canonic_path,
+        },
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };
 
@@ -2962,13 +2961,12 @@ pub unsafe fn xml_shell<'a>(
             globals::{xml_free, xml_malloc},
             xmlmemory::xml_mem_show,
             xmlstring::xml_strdup,
-            xpath::{
-                xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object,
-                xml_xpath_new_context,
-            },
             xpath_internals::xml_xpath_debug_dump_object,
         },
         tree::xml_free_doc,
+        xpath::{
+            xml_xpath_eval, xml_xpath_free_context, xml_xpath_free_object, xml_xpath_new_context,
+        },
     };
 
     let mut prompt: [u8; 500] = [0; 500];

@@ -48,10 +48,6 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         parser::xml_init_parser,
         xmlstring::{xml_str_equal, xml_strlen, XmlChar},
-        xpath::{
-            xml_xpath_free_object, xml_xpath_new_context, XmlNodeSetPtr, XmlXPathContextPtr,
-            XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContextPtr,
-        },
         xpath_internals::{
             value_pop, value_push, xml_xpath_eval_expr, xml_xpath_free_parser_context,
             xml_xpath_id_function, xml_xpath_new_node_set, xml_xpath_new_parser_context,
@@ -60,6 +56,10 @@ use crate::{
         },
     },
     tree::{NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
+    xpath::{
+        xml_xpath_free_object, xml_xpath_new_context, XmlNodeSetPtr, XmlXPathContextPtr,
+        XmlXPathError, XmlXPathObjectPtr, XmlXPathObjectType, XmlXPathParserContextPtr,
+    },
     CHECK_ERROR, CHECK_TYPE, XP_ERROR,
 };
 #[cfg(feature = "libxml_xptr_locs")]
@@ -2145,7 +2145,7 @@ macro_rules! xml_xptr_err {
         xml_xptr_err!(@inner, $ctxt, $error, &msg, Some($extra.to_owned().into()));
     };
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $extra:expr) => {
-        let ctxt = $ctxt as *mut $crate::libxml::xpath::XmlXPathParserContext;
+        let ctxt = $ctxt as *mut $crate::xpath::XmlXPathParserContext;
         let error: XmlParserErrors = $error;
         if !ctxt.is_null() {
             (*ctxt).error = error as i32;

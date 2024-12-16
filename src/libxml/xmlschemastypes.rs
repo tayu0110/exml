@@ -60,13 +60,13 @@ use crate::{
             xml_str_equal, xml_strcat, xml_strcmp, xml_strdup, xml_strndup, xml_utf8_strlen,
             XmlChar,
         },
-        xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
     },
     tree::{
         xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
         xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlElementType, XmlIDPtr,
         XmlNodePtr, XmlNsPtr,
     },
+    xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
 
 use super::{
