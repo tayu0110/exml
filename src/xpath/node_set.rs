@@ -33,6 +33,25 @@ pub struct XmlNodeSet {
 }
 
 impl XmlNodeSet {
+    pub unsafe fn with_value(val: *mut XmlNode) -> Option<Self> {
+        let mut ret = Self::default();
+        if !val.is_null() {
+            ret.node_tab = Some(vec![]);
+            if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
+                let ns = val as XmlNsPtr;
+                let ns_node = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
+
+                if ns_node.is_null() {
+                    return None;
+                }
+                ret.node_tab.as_mut().unwrap().push(ns_node);
+            } else {
+                ret.node_tab.as_mut().unwrap().push(val);
+            }
+        }
+        Some(ret)
+    }
+
     /// checks whether @cur contains @val
     ///
     /// Returns true (1) if @cur contains @val, false (0) otherwise
@@ -93,27 +112,15 @@ impl XmlNodeSet {
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetCreate")]
 pub unsafe fn xml_xpath_node_set_create(val: *mut XmlNode) -> XmlNodeSetPtr {
+    let Some(set) = XmlNodeSet::with_value(val) else {
+        return null_mut();
+    };
     let ret: XmlNodeSetPtr = xml_malloc(size_of::<XmlNodeSet>()) as XmlNodeSetPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
         return null_mut();
     }
-    std::ptr::write(&mut *ret, XmlNodeSet::default());
-    if !val.is_null() {
-        (*ret).node_tab = Some(vec![]);
-        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-            let ns = val as XmlNsPtr;
-            let ns_node = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
-
-            if ns_node.is_null() {
-                xml_xpath_free_node_set(ret);
-                return null_mut();
-            }
-            (*ret).node_tab.as_mut().unwrap().push(ns_node);
-        } else {
-            (*ret).node_tab.as_mut().unwrap().push(val);
-        }
-    }
+    std::ptr::write(&mut *ret, set);
     ret
 }
 
