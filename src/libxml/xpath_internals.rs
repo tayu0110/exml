@@ -91,6 +91,7 @@ use super::{
     chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
     hash::XmlHashTable,
     parser_internals::xml_is_letter,
+    xpath::XmlNodeSet,
 };
 
 // Many of these macros may later turn into functions.
@@ -1718,7 +1719,7 @@ pub unsafe extern "C" fn xml_xpath_distinct(nodes: XmlNodeSetPtr) -> XmlNodeSetP
         return nodes;
     }
 
-    xml_xpath_node_set_sort(nodes);
+    xml_xpath_node_set_sort(&mut *nodes);
     xml_xpath_distinct_sorted(nodes)
 }
 
@@ -1810,11 +1811,10 @@ pub unsafe extern "C" fn xml_xpath_leading_sorted(
 /// Returns the nodes in @nodes that precede @node in document order,
 /// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
 #[doc(alias = "xmlXPathNodeLeading")]
-pub unsafe extern "C" fn xml_xpath_node_leading(
-    nodes: XmlNodeSetPtr,
-    node: XmlNodePtr,
-) -> XmlNodeSetPtr {
-    xml_xpath_node_set_sort(nodes);
+pub unsafe fn xml_xpath_node_leading(nodes: XmlNodeSetPtr, node: XmlNodePtr) -> XmlNodeSetPtr {
+    if !nodes.is_null() {
+        xml_xpath_node_set_sort(&mut *nodes);
+    }
     xml_xpath_node_leading_sorted(nodes, node)
 }
 
@@ -1837,8 +1837,8 @@ pub unsafe extern "C" fn xml_xpath_leading(
     if xml_xpath_node_set_is_empty!(nodes1) {
         return xml_xpath_node_set_create(null_mut());
     }
-    xml_xpath_node_set_sort(nodes1);
-    xml_xpath_node_set_sort(nodes2);
+    xml_xpath_node_set_sort(&mut *nodes1);
+    xml_xpath_node_set_sort(&mut *nodes2);
     xml_xpath_node_leading_sorted(nodes1, xml_xpath_node_set_item!(nodes2, 1))
 }
 
@@ -1877,7 +1877,7 @@ pub unsafe extern "C" fn xml_xpath_node_trailing_sorted(
             break;
         }
     }
-    xml_xpath_node_set_sort(ret); /* bug 413451 */
+    xml_xpath_node_set_sort(&mut *ret); /* bug 413451 */
     ret
 }
 
@@ -1906,11 +1906,10 @@ pub unsafe extern "C" fn xml_xpath_trailing_sorted(
 /// Returns the nodes in @nodes that follow @node in document order,
 /// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
 #[doc(alias = "xmlXPathNodeTrailing")]
-pub unsafe extern "C" fn xml_xpath_node_trailing(
-    nodes: XmlNodeSetPtr,
-    node: XmlNodePtr,
-) -> XmlNodeSetPtr {
-    xml_xpath_node_set_sort(nodes);
+pub unsafe fn xml_xpath_node_trailing(nodes: XmlNodeSetPtr, node: XmlNodePtr) -> XmlNodeSetPtr {
+    if !nodes.is_null() {
+        xml_xpath_node_set_sort(&mut *nodes);
+    }
     xml_xpath_node_trailing_sorted(nodes, node)
 }
 
@@ -1933,8 +1932,8 @@ pub unsafe extern "C" fn xml_xpath_trailing(
     if xml_xpath_node_set_is_empty!(nodes1) {
         return xml_xpath_node_set_create(null_mut());
     }
-    xml_xpath_node_set_sort(nodes1);
-    xml_xpath_node_set_sort(nodes2);
+    xml_xpath_node_set_sort(&mut *nodes1);
+    xml_xpath_node_set_sort(&mut *nodes2);
     xml_xpath_node_trailing_sorted(nodes1, xml_xpath_node_set_item!(nodes2, 0))
 }
 
@@ -3264,14 +3263,10 @@ unsafe fn xml_xpath_cmp_nodes_ext(
 
 /// Sort the node set in document order
 #[doc(alias = "xmlXPathNodeSetSort")]
-pub unsafe extern "C" fn xml_xpath_node_set_sort(set: XmlNodeSetPtr) {
-    if set.is_null() {
-        return;
-    }
-
+pub unsafe fn xml_xpath_node_set_sort(set: &mut XmlNodeSet) {
     // Use the old Shell's sort implementation to sort the node-set
     // Timsort ought to be quite faster
-    if let Some(table) = (*set).node_tab.as_mut() {
+    if let Some(table) = set.node_tab.as_mut() {
         // TODO: Use `sort_unstable` of Rust standard library.
         //       When I tried to rewirte, it did not work fine
         //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
@@ -6847,7 +6842,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_last(
                         .as_ref()
                         .map_or(false, |t| t.len() > 1)
                     {
-                        xml_xpath_node_set_sort((*(*ctxt).value).nodesetval);
+                        xml_xpath_node_set_sort(&mut *(*(*ctxt).value).nodesetval);
                     }
                     *last = *table.last().unwrap();
                 }
@@ -6955,7 +6950,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_last(
                     .map_or(0, |t| t.len())
                     > 1
             {
-                xml_xpath_node_set_sort((*(*ctxt).value).nodesetval);
+                xml_xpath_node_set_sort(&mut *(*(*ctxt).value).nodesetval);
             }
         }
         _ => {
@@ -7264,7 +7259,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_first(
                     .map_or(0, |t| t.len())
                     > 1
                 {
-                    xml_xpath_node_set_sort((*(*ctxt).value).nodesetval);
+                    xml_xpath_node_set_sort(&mut *(*(*ctxt).value).nodesetval);
                 }
                 *first = (*(*(*ctxt).value).nodesetval).node_tab.as_ref().unwrap()[0];
             }
@@ -7365,7 +7360,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_first(
                     .map_or(0, |t| t.len())
                     > 1
             {
-                xml_xpath_node_set_sort((*(*ctxt).value).nodesetval);
+                xml_xpath_node_set_sort(&mut *(*(*ctxt).value).nodesetval);
             }
         }
         XmlXPathOp::XpathOpFilter => {
@@ -7850,7 +7845,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                     .map_or(0, |t| t.len())
                     > 1
             {
-                xml_xpath_node_set_sort((*(*ctxt).value).nodesetval);
+                xml_xpath_node_set_sort(&mut *(*(*ctxt).value).nodesetval);
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
@@ -14297,35 +14292,6 @@ mod tests {
                         eprint!(" {}", n_cur);
                         eprintln!(" {}", n_val);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_node_set_sort() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_set in 0..GEN_NB_XML_NODE_SET_PTR {
-                let mem_base = xml_mem_blocks();
-                let set = gen_xml_node_set_ptr(n_set, 0);
-
-                xml_xpath_node_set_sort(set);
-                des_xml_node_set_ptr(n_set, set, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlXPathNodeSetSort",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlXPathNodeSetSort()"
-                    );
-                    eprintln!(" {}", n_set);
                 }
             }
         }
