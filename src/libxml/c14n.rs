@@ -51,7 +51,7 @@ use crate::{
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
-    xpath::{internals::xml_xpath_node_set_contains, XmlNodeSetPtr},
+    xpath::{xml_xpath_node_set_contains, XmlNodeSetPtr},
 };
 
 use super::{
