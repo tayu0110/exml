@@ -178,16 +178,16 @@ impl TryFrom<i32> for XmlXPathObjectType {
             return Ok(Self::XPathString);
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        if value == Self::XpathPoint as i32 {
-            return Ok(Self::XpathPoint);
+        if value == Self::XPathPoint as i32 {
+            return Ok(Self::XPathPoint);
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        if value == Self::XpathRange as i32 {
-            return Ok(Self::XpathRange);
+        if value == Self::XPathRange as i32 {
+            return Ok(Self::XPathRange);
         }
         #[cfg(feature = "libxml_xptr_locs")]
-        if value == Self::XpathLocationset as i32 {
-            return Ok(Self::XpathLocationset);
+        if value == Self::XPathLocationset as i32 {
+            return Ok(Self::XPathLocationset);
         }
         if value == Self::XPathUsers as i32 {
             return Ok(Self::XPathUsers);

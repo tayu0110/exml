@@ -4267,7 +4267,7 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
             #[cfg(feature = "libxml_xptr_locs")]
             if (*ctxt).xptr != 0 {
                 name = xml_xpath_parse_ncname(ctxt);
-                if !name.is_null() && xml_str_equal(name, c"range-to".as_ptr() as _) != 0 {
+                if !name.is_null() && xml_str_equal(name, c"range-to".as_ptr() as _) {
                     op2 = (*(*ctxt).comp).last;
                     xml_free(name as _);
                     SKIP_BLANKS!(ctxt);
@@ -4922,8 +4922,7 @@ unsafe extern "C" fn xml_xpath_comp_path_expr(ctxt: XmlXPathParserContextPtr) {
                         lc = 1;
                     } else {
                         #[cfg(feature = "libxml_xptr_locs")]
-                        if (*ctxt).xptr != 0 && xml_str_equal(name, c"range-to".as_ptr() as _) != 0
-                        {
+                        if (*ctxt).xptr != 0 && xml_str_equal(name, c"range-to".as_ptr() as _) {
                             lc = 1;
                         } else {
                             lc = 0;

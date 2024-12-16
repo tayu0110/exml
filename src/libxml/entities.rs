@@ -31,8 +31,6 @@ use std::{
 
 use libc::{memset, size_t, snprintf, strchr};
 
-#[cfg(feature = "libxml_legacy")]
-use crate::generic_error;
 use crate::{
     buf::libxml_api::{
         xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,

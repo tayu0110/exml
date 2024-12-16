@@ -66,14 +66,11 @@ use crate::{
 use crate::{
     libxml::{
         globals::xml_realloc,
-        tree::{
-            xml_add_child, xml_add_next_sibling, xml_copy_node, xml_new_text, xml_new_text_len,
-        },
         xmlstring::{xml_strchr, xml_strncmp},
-        xpath::{xml_xpath_cmp_nodes, xml_xpath_object_copy, XmlXPathObject},
-        xpath_internals::{
-            xml_xpath_err, xml_xpath_evaluate_predicate_result, xml_xpath_register_func,
-        },
+    },
+    xpath::{
+        internals::{xml_xpath_err, xml_xpath_evaluate_predicate_result, xml_xpath_register_func},
+        xml_xpath_cmp_nodes, xml_xpath_object_copy, XmlXPathObject,
     },
     CHECK_ARITY,
 };
@@ -95,13 +92,7 @@ const XML_RANGESET_DEFAULT: usize = 10;
 #[cfg(feature = "libxml_xptr_locs")]
 macro_rules! STRANGE {
     () => {
-        let file = std::ffi::CString::new(file!()).unwrap();
-        $crate::xml_generic_error!(
-            $crate::libxml::globals::xmlGenericErrorContext(),
-            c"Internal error at %s:%d\n".as_ptr(),
-            file.as_ptr(),
-            line!()
-        );
+        $crate::generic_error!("Internal error at {}:{}\n", file!(), line!());
     };
 }
 
@@ -625,7 +616,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_add(
         (*cur).loc_tab = xml_malloc(XML_RANGESET_DEFAULT * size_of::<XmlXPathObjectPtr>())
             as *mut XmlXPathObjectPtr;
         if (*cur).loc_tab.is_null() {
-            xml_xptr_err_memory(c"adding location to set");
+            xml_xptr_err_memory("adding location to set");
             return;
         }
         memset(
@@ -641,7 +632,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_location_set_add(
             (*cur).loc_max as usize * size_of::<XmlXPathObjectPtr>(),
         ) as *mut XmlXPathObjectPtr;
         if temp.is_null() {
-            xml_xptr_err_memory(c"adding location to set");
+            xml_xptr_err_memory("adding location to set");
             return;
         }
         (*cur).loc_tab = temp;
@@ -848,7 +839,7 @@ unsafe extern "C" fn xml_xptr_covering_range(
 ///  x is added to the result location-set.
 #[doc(alias = "xmlXPtrRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut set: XmlXPathObjectPtr;
 
     CHECK_ARITY!(ctxt, nargs, 1);
@@ -991,7 +982,7 @@ unsafe extern "C" fn xml_xptr_inside_range(
 ///  location children of x.
 #[doc(alias = "xmlXPtrRangeInsideFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_range_inside_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut set: XmlXPathObjectPtr;
 
     CHECK_ARITY!(ctxt, nargs, 1);
@@ -1163,7 +1154,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_advance_node(
         if cur.is_null() || (*cur).typ == XmlElementType::XmlNamespaceDecl {
             return null_mut();
         }
-        if !(*cur).children.is_null() {
+        if !(*cur).children().is_none() {
             cur = (*cur).children;
             if !level.is_null() {
                 *level += 1;
@@ -1431,7 +1422,7 @@ unsafe extern "C" fn xml_xptr_match_string(
                     return 0;
                 }
             } else {
-                let sub: c_int = len - pos;
+                let sub = len - pos;
                 is_match = (xml_strncmp((*cur).content.add(pos as usize), string, sub) == 0) as i32;
                 if is_match != 0 {
                     string = string.add(sub as usize);
@@ -1563,7 +1554,7 @@ unsafe extern "C" fn xml_xptr_search_string(
 /// ------------------------------
 #[doc(alias = "xmlXPtrStringRangeFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut startindex: i32 = 0;
     let mut endindex: i32 = 0;
     let mut fendindex: i32;
@@ -1639,9 +1630,7 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
             break 'goto_error;
         }
         if (*set).typ == XmlXPathObjectType::XPathNodeset {
-            /*
-             * First convert to a location set
-             */
+            // First convert to a location set
             let tmp: XmlXPathObjectPtr = xml_xptr_new_location_set_node_set((*set).nodesetval);
             xml_xpath_free_object(set);
             set = null_mut();
@@ -1654,37 +1643,31 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
         }
         oldset = (*set).user as XmlLocationSetPtr;
 
-        /*
-         * The loop is to search for each element in the location set
-         * the list of location set corresponding to that search
-         */
+        // The loop is to search for each element in the location set
+        // the list of location set corresponding to that search
         for i in 0..(*oldset).loc_nr {
-            // #ifdef DEBUG_RANGES
-            // 	xmlXPathDebugDumpObject(stdout, *(*oldset).locTab.add(i as usize), 0);
-            // #endif
-
             xml_xptr_get_start_point(
                 *(*oldset).loc_tab.add(i as usize),
-                addr_of_mut!(start),
-                addr_of_mut!(startindex),
+                &raw mut start,
+                &raw mut startindex,
             );
             xml_xptr_get_end_point(
                 *(*oldset).loc_tab.add(i as usize),
-                addr_of_mut!(end),
-                addr_of_mut!(endindex),
+                &raw mut end,
+                &raw mut endindex,
             );
-            xml_xptr_advance_char(addr_of_mut!(start), addr_of_mut!(startindex), 0);
-            xml_xptr_get_last_char(addr_of_mut!(end), addr_of_mut!(endindex));
+            xml_xptr_advance_char(&raw mut start, &raw mut startindex, 0);
+            xml_xptr_get_last_char(&raw mut end, &raw mut endindex);
 
             while {
                 fend = end;
                 fendindex = endindex;
                 found = xml_xptr_search_string(
                     (*string).stringval,
-                    addr_of_mut!(start),
-                    addr_of_mut!(startindex),
-                    addr_of_mut!(fend),
-                    addr_of_mut!(fendindex),
+                    &raw mut start,
+                    &raw mut startindex,
+                    &raw mut fend,
+                    &raw mut fendindex,
                 );
                 if found == 1 {
                     if position.is_null() {
@@ -1692,20 +1675,15 @@ unsafe extern "C" fn xml_xptr_string_range_function(ctxt: XmlXPathParserContextP
                             newset,
                             xml_xptr_new_range(start, startindex, fend, fendindex),
                         );
-                    } else if xml_xptr_advance_char(
-                        addr_of_mut!(start),
-                        addr_of_mut!(startindex),
-                        pos - 1,
-                    ) == 0
+                    } else if xml_xptr_advance_char(&raw mut start, &raw mut startindex, pos - 1)
+                        == 0
                     {
                         if !number.is_null() && num > 0 {
                             let mut rindx: i32;
                             let mut rend: XmlNodePtr;
                             rend = start;
                             rindx = startindex - 1;
-                            if xml_xptr_advance_char(addr_of_mut!(rend), addr_of_mut!(rindx), num)
-                                == 0
-                            {
+                            if xml_xptr_advance_char(&raw mut rend, &raw mut rindx, num) == 0 {
                                 xml_xptr_location_set_add(
                                     newset,
                                     xml_xptr_new_range(start, startindex, rend, rindx),
@@ -1795,7 +1773,7 @@ unsafe extern "C" fn xml_xptr_new_point(node: XmlNodePtr, indx: i32) -> XmlXPath
 /// ----------------
 #[doc(alias = "xmlXPtrStartPointFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_start_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tmp: XmlXPathObjectPtr;
     let mut obj: XmlXPathObjectPtr;
     let mut point: XmlXPathObjectPtr;
@@ -1926,7 +1904,7 @@ unsafe extern "C" fn xml_xptr_nb_loc_children(mut node: XmlNodePtr) -> i32 {
 /// ----------------------------
 #[doc(alias = "xmlXPtrEndPointFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     let mut tmp: XmlXPathObjectPtr;
     let mut obj: XmlXPathObjectPtr;
     let mut point: XmlXPathObjectPtr;
@@ -2007,7 +1985,7 @@ unsafe extern "C" fn xml_xptr_end_point_function(ctxt: XmlXPathParserContextPtr,
 /// Function implementing here() operation as described in 5.4.3
 #[doc(alias = "xmlXPtrHereFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
 
     if (*(*ctxt).context).here.is_null() {
@@ -2024,7 +2002,7 @@ unsafe extern "C" fn xml_xptr_here_function(ctxt: XmlXPathParserContextPtr, narg
 /// as described in 5.4.3
 #[doc(alias = "xmlXPtrOriginFunction")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
+unsafe fn xml_xptr_origin_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
 
     if (*(*ctxt).context).origin.is_null() {
@@ -2395,7 +2373,7 @@ unsafe extern "C" fn xml_xptr_eval_xptr_part(
         (*(*ctxt).context).context_size = 1;
         #[cfg(feature = "libxml_xptr_locs")]
         {
-            (*ctxt).xptr = xml_str_equal(name, c"xpointer".as_ptr() as _);
+            (*ctxt).xptr = xml_str_equal(name, c"xpointer".as_ptr() as _) as i32;
         }
         xml_xpath_eval_expr(ctxt);
         (*ctxt).base = old_base;
@@ -2706,6 +2684,8 @@ pub(crate) unsafe extern "C" fn xml_xptr_range_to_function(
 #[cfg(feature = "libxml_xptr_locs")]
 unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) -> XmlNodePtr {
     /* pointers to generated nodes */
+
+    use crate::tree::{xml_copy_node, xml_new_text_len};
     let mut list: XmlNodePtr = null_mut();
     let mut last: XmlNodePtr = null_mut();
     let mut parent: XmlNodePtr = null_mut();
@@ -2729,7 +2709,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
     }
     end = (*range).user2 as _;
     if end.is_null() {
-        return xmlCopyNode(start, 1);
+        return xml_copy_node(start, 1);
     }
     if (*end).typ == XmlElementType::XmlNamespaceDecl {
         return null_mut();
@@ -2745,7 +2725,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                 let mut len: i32;
 
                 if content.is_null() {
-                    tmp = xmlNewTextLen(null_mut(), 0);
+                    tmp = xml_new_text_len(null_mut(), 0);
                 } else {
                     len = index2;
                     if cur == start && index1 > 1 {
@@ -2755,7 +2735,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                     } else {
                         len = index2;
                     }
-                    tmp = xmlNewTextLen(content, len);
+                    tmp = xml_new_text_len(content, len);
                 }
                 // single sub text node selection
                 if list.is_null() {
@@ -2769,7 +2749,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                 }
                 return list;
             } else {
-                tmp = xmlCopyNode(cur, 0);
+                tmp = xml_copy_node(cur, 0);
                 if list.is_null() {
                     list = tmp;
                     parent = tmp;
@@ -2802,7 +2782,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                 let mut content: *const XmlChar = (*cur).content;
 
                 if content.is_null() {
-                    tmp = xmlNewTextLen(null_mut(), 0);
+                    tmp = xml_new_text_len(null_mut(), 0);
                 } else {
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);
@@ -2813,7 +2793,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                 list = tmp;
             } else {
                 if cur == start && index1 > 1 {
-                    tmp = xmlCopyNode(cur, 0);
+                    tmp = xml_copy_node(cur, 0);
                     list = tmp;
                     parent = tmp;
                     last = null_mut();
@@ -2822,7 +2802,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                     // Now gather the remaining nodes from cur to end
                     continue; /* while */
                 }
-                tmp = xmlCopyNode(cur, 1);
+                tmp = xml_copy_node(cur, 1);
                 list = tmp;
                 parent = null_mut();
                 last = tmp;
@@ -2845,7 +2825,7 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
                     STRANGE!();
                 }
                 _ => {
-                    tmp = xmlCopyNode(cur, 1);
+                    tmp = xml_copy_node(cur, 1);
                 }
             }
             if !tmp.is_null() {
@@ -2877,6 +2857,8 @@ unsafe extern "C" fn xml_xptr_build_range_node_list(range: XmlXPathObjectPtr) ->
 #[doc(alias = "xmlXPtrBuildNodeList")]
 #[cfg(feature = "libxml_xptr_locs")]
 pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr) -> XmlNodePtr {
+    use crate::tree::xml_copy_node;
+
     let mut list: XmlNodePtr = null_mut();
     let mut last: XmlNodePtr = null_mut();
 
@@ -2917,10 +2899,10 @@ pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr)
                     _ => unreachable!(),
                 }
                 if last.is_null() {
-                    list = xmlCopyNode(*(*set).node_tab.add(i as usize), 1);
+                    list = xml_copy_node(*(*set).node_tab.add(i as usize), 1);
                     last = list;
                 } else {
-                    xml_add_next_sibling(last, xmlCopyNode(*(*set).node_tab.add(i as usize), 1));
+                    (*last).add_next_sibling(xml_copy_node(*(*set).node_tab.add(i as usize), 1));
                     if !(*last).next.is_null() {
                         last = (*last).next;
                     }
@@ -2937,10 +2919,9 @@ pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr)
                     list = xml_xptr_build_node_list(*(*set).loc_tab.add(i as usize));
                     last = list;
                 } else {
-                    xml_add_next_sibling(
-                        last,
-                        xml_xptr_build_node_list(*(*set).loc_tab.add(i as usize)),
-                    );
+                    (*last).add_next_sibling(xml_xptr_build_node_list(
+                        *(*set).loc_tab.add(i as usize),
+                    ));
                 }
                 if !last.is_null() {
                     while !(*last).next.is_null() {
@@ -2950,7 +2931,7 @@ pub(crate) unsafe extern "C" fn xml_xptr_build_node_list(obj: XmlXPathObjectPtr)
             }
         }
         XmlXPathObjectType::XPathRange => return xml_xptr_build_range_node_list(obj),
-        XmlXPathObjectType::XPathPoint => return xmlCopyNode((*obj).user as _, 0),
+        XmlXPathObjectType::XPathPoint => return xml_copy_node((*obj).user as _, 0),
         _ => {}
     }
     list

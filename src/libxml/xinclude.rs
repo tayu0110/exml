@@ -1098,9 +1098,9 @@ unsafe extern "C" fn xml_xinclude_copy_range(
          */
         if level < 0 {
             while level < 0 {
-                /* copy must include namespaces and properties */
+                // copy must include namespaces and properties
                 tmp2 = xml_doc_copy_node(list_parent, (*ctxt).doc, 2);
-                xmlAddChild(tmp2, list);
+                xml_add_child(tmp2, list);
                 list = tmp2;
                 list_parent = (*list_parent).parent;
                 level += 1;
@@ -1108,9 +1108,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
             last = list;
             last_level = 0;
         }
-        /*
-         * Check whether we need to change our insertion point
-         */
+        // Check whether we need to change our insertion point
         while level < last_level {
             last = (*last).parent;
             last_level -= 1;
@@ -1141,7 +1139,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 if level == last_level {
                     xml_add_next_sibling(last, tmp);
                 } else {
-                    xmlAddChild(last, tmp);
+                    xml_add_child(last, tmp);
                 }
                 return list;
             } else {
@@ -1157,7 +1155,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 } else if level == last_level {
                     last = xml_add_next_sibling(last, tmp);
                 } else {
-                    last = xmlAddChild(last, tmp);
+                    last = xml_add_child(last, tmp);
                     last_level = level;
                 }
 
@@ -1243,7 +1241,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 if level == last_level {
                     last = xml_add_next_sibling(last, tmp);
                 } else {
-                    last = xmlAddChild(last, tmp);
+                    last = xml_add_child(last, tmp);
                     last_level = level;
                 }
             }

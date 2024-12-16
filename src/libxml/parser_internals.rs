@@ -6244,24 +6244,19 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     (*input).end = buf.as_ref().as_ptr().add(buf.len());
 }
 
-/*
- * Specific function to keep track of entities references
- * and used by the XSLT debugger.
- */
+// Specific function to keep track of entities references
+// and used by the XSLT debugger.
 #[cfg(feature = "libxml_legacy")]
 mod __parser_internal_for_legacy {
     use std::{
-        ffi::i32,
         ptr::null_mut,
         sync::atomic::{AtomicBool, Ordering},
     };
 
     use crate::{
-        libxml::{
-            entities::XmlEntityPtr, globals::xml_generic_error_context, parser::XmlParserCtxtPtr,
-            tree::XmlNodePtr, xmlstring::XmlChar,
-        },
-        xml_generic_error,
+        generic_error,
+        libxml::{entities::XmlEntityPtr, parser::XmlParserCtxtPtr, xmlstring::XmlChar},
+        tree::XmlNodePtr,
     };
 
     pub(crate) static mut XML_ENTITY_REF_FUNC: Option<XmlEntityReferenceFunc> = None;
