@@ -2449,7 +2449,7 @@ mod tests {
 
                                     let ret_val = xml_c14n_doc_dump_memory(
                                         doc,
-                                        nodes,
+                                        nodes.map_or(null_mut(), |n| n.as_ptr()),
                                         mode,
                                         inclusive_ns_prefixes,
                                         with_comments,
@@ -2518,7 +2518,7 @@ mod tests {
 
                                         let ret_val = xml_c14n_doc_save(
                                             doc,
-                                            nodes,
+                                            nodes.map_or(null_mut(), |n| n.as_ptr()),
                                             mode,
                                             inclusive_ns_prefixes,
                                             with_comments,
