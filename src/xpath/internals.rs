@@ -90,8 +90,7 @@ use crate::{
 };
 
 use super::{
-    xml_xpath_node_set_add, xml_xpath_node_set_add_ns, xml_xpath_node_set_add_unique,
-    xml_xpath_node_set_merge, XmlNodeSet,
+    xml_xpath_node_set_add, xml_xpath_node_set_add_ns, xml_xpath_node_set_merge, XmlNodeSet,
 };
 
 // Many of these macros may later turn into functions.
@@ -2497,9 +2496,9 @@ unsafe fn xml_xpath_cache_new_node_set(
                 }) {
                     table.clear();
                     table.push(val);
-                } else {
+                } else if let Some(mut nodeset) = (*ret).nodesetval {
                     // TODO: Check memory error.
-                    xml_xpath_node_set_add_unique((*ret).nodesetval, val);
+                    nodeset.as_mut().add_unique(val);
                 }
             }
             return ret;
@@ -4598,14 +4597,18 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                 return 1;
             }
             // TODO: Check memory error.
-            xml_xpath_node_set_add_unique((*(*result_seq)).nodesetval, (*ctxt).doc as XmlNodePtr);
+            if let Some(mut nodeset) = (*(*result_seq)).nodesetval {
+                nodeset.as_mut().add_unique((*ctxt).doc as XmlNodePtr);
+            }
         } else {
             // Select "self::node()"
             if to_bool != 0 {
                 return 1;
             }
             // TODO: Check memory error.
-            xml_xpath_node_set_add_unique((*(*result_seq)).nodesetval, (*ctxt).node);
+            if let Some(mut nodeset) = (*(*result_seq)).nodesetval {
+                nodeset.as_mut().add_unique((*ctxt).node);
+            }
         }
     }
     if max_depth == 0 {
@@ -4666,7 +4669,9 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                 return 1;
             }
             // TODO: Check memory error.
-            xml_xpath_node_set_add_unique((*(*result_seq)).nodesetval, cur);
+            if let Some(mut nodeset) = (*(*result_seq)).nodesetval {
+                nodeset.as_mut().add_unique(cur);
+            }
         }
     }
     depth = 0;
@@ -4723,11 +4728,11 @@ unsafe extern "C" fn xml_xpath_run_stream_eval(
                                     }
                                     return 1;
                                 }
-                                if xml_xpath_node_set_add_unique((*(*result_seq)).nodesetval, cur)
-                                    < 0
-                                {
-                                    (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
-                                    (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
+                                if let Some(mut nodeset) = (*(*result_seq)).nodesetval {
+                                    if nodeset.as_mut().add_unique(cur) < 0 {
+                                        (*ctxt).last_error.domain = XmlErrorDomain::XmlFromXPath;
+                                        (*ctxt).last_error.code = XmlParserErrors::XmlErrNoMemory;
+                                    }
                                 }
                             }
                             if (*cur).children().is_none() || depth >= max_depth {
@@ -5267,7 +5272,6 @@ macro_rules! xp_test_hit {
         $has_axis_range:expr,
         $pos:expr,
         $max_pos:expr,
-        $add_node:ident,
         $seq:expr,
         $cur:expr,
         $ctxt:expr,
@@ -5280,13 +5284,13 @@ macro_rules! xp_test_hit {
         if $has_axis_range != 0 {
             $pos += 1;
             if $pos == $max_pos {
-                if $add_node($seq, $cur) < 0 {
+                if $seq.map_or(-1, |mut seq| seq.as_mut().add_unique($cur)) < 0 {
                     (*$ctxt).error = XmlXPathError::XpathMemoryError as i32;
                 }
                 axis_range_end!($out_seq, $seq, $merge_and_clear, $to_bool, $label);
             }
         } else {
-            if $add_node($seq, $cur) < 0 {
+            if $seq.map_or(-1, |mut seq| seq.as_mut().add_unique($cur)) < 0 {
                 (*$ctxt).error = XmlXPathError::XpathMemoryError as i32;
             }
             if $break_on_first_hit != 0 {
@@ -5512,8 +5516,6 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     // principal node type. For example, child::* will
     // select all element children of the context node
     let old_context_node: XmlNodePtr = (*xpctxt).node;
-    let add_node: unsafe fn(Option<NonNull<XmlNodeSet>>, XmlNodePtr) -> i32 =
-        xml_xpath_node_set_add_unique;
     // The final resulting node set wrt to all context nodes
     let mut out_seq = None;
     // Used to feed predicate evaluation.
@@ -5592,14 +5594,14 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                                 | XmlElementType::XmlCommentNode
                                 | XmlElementType::XmlCDATASectionNode
                                 | XmlElementType::XmlTextNode => {
-                                    xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
                                 XmlElementType::XmlNamespaceDecl => {
                                     if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
                                         xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     } else {
                                         has_ns_nodes = true;
-                                        xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
                                 }
                                 _ => {}
@@ -5608,19 +5610,19 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                             if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
                                 xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             } else {
-                                xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
                         } else if matches!(typ, XmlXPathTypeVal::NodeTypeText)
                             && matches!((*cur).element_type(), XmlElementType::XmlCDATASectionNode)
                         {
-                            xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
                     }
                     XmlXPathTestVal::NodeTestPI => {
                         if matches!((*cur).element_type(), XmlElementType::XmlPINode)
                             && (name.is_null() || xml_str_equal(name, (*cur).name))
                         {
-                            xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
                     }
                     XmlXPathTestVal::NodeTestAll => {
@@ -5630,7 +5632,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                                     || (!(*cur).ns.is_null()
                                         && xml_str_equal(uri, (*(*cur).ns).href)))
                             {
-                                xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                             }
                         } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
                             if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -5640,7 +5642,7 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                             && (prefix.is_null()
                                 || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
                         {
-                            xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
                     }
                     XmlXPathTestVal::NodeTestNs => {
@@ -5663,12 +5665,12 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                                 if xml_str_equal(name, (*cur).name) {
                                     if prefix.is_null() {
                                         if (*cur).ns.is_null() {
-                                            xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                         }
                                     } else if !(*cur).ns.is_null()
                                         && xml_str_equal(uri, (*(*cur).ns).href)
                                     {
-                                        xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
                                 }
                             }
@@ -5678,12 +5680,12 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
                                 if xml_str_equal(name, (*attr).name) {
                                     if prefix.is_null() {
                                         if (*attr).ns.is_null() || (*(*attr).ns).prefix.is_null() {
-                                            xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                         }
                                     } else if !(*attr).ns.is_null()
                                         && xml_str_equal(uri, (*(*attr).ns).href)
                                     {
-                                        xp_test_hit!(has_axis_range, pos, max_pos, add_node, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                     }
                                 }
                             }

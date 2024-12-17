@@ -236,6 +236,37 @@ impl XmlNodeSet {
     pub(super) unsafe fn clear(&mut self, has_ns_nodes: bool) {
         self.truncate(0, has_ns_nodes);
     }
+
+    /// Add a new xmlNodePtr to an existing NodeSet, optimized version
+    /// when we are sure the node is not already in the set.
+    ///
+    /// Returns 0 in case of success and -1 in case of failure
+    #[doc(alias = "xmlXPathNodeSetAddUnique")]
+    pub unsafe fn add_unique(&mut self, val: *mut XmlNode) -> i32 {
+        if val.is_null() {
+            return -1;
+        }
+
+        // @@ with_ns to check whether namespace nodes should be looked at @@
+        // grow the nodeTab if needed
+        let table = self.node_tab.get_or_insert_with(Vec::new);
+        if table.len() >= XPATH_MAX_NODESET_LENGTH {
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
+            return -1;
+        }
+        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
+            let ns: XmlNsPtr = val as XmlNsPtr;
+            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
+
+            if ns_node.is_null() {
+                return -1;
+            }
+            table.push(ns_node);
+        } else {
+            table.push(val);
+        }
+        0
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -289,12 +320,14 @@ pub unsafe fn xml_xpath_difference(
 
     let l1 = nodes1.as_ref().len();
 
-    for i in 0..l1 {
-        let cur = nodes1.as_ref().get(i);
-        if !nodes2.as_ref().contains(cur) {
-            // TODO: Propagate memory error.
-            if xml_xpath_node_set_add_unique(ret, cur) < 0 {
-                break;
+    if let Some(mut ret) = ret {
+        for i in 0..l1 {
+            let cur = nodes1.as_ref().get(i);
+            if !nodes2.as_ref().contains(cur) {
+                // TODO: Propagate memory error.
+                if ret.as_mut().add_unique(cur) < 0 {
+                    break;
+                }
             }
         }
     }
@@ -311,7 +344,7 @@ pub unsafe fn xml_xpath_intersection(
     nodes1: Option<NonNull<XmlNodeSet>>,
     nodes2: Option<NonNull<XmlNodeSet>>,
 ) -> Option<NonNull<XmlNodeSet>> {
-    let ret = xml_xpath_node_set_create(null_mut())?;
+    let mut ret = xml_xpath_node_set_create(null_mut())?;
 
     let (Some(nodes1), Some(nodes2)) = (nodes1, nodes2) else {
         return Some(ret);
@@ -325,8 +358,8 @@ pub unsafe fn xml_xpath_intersection(
     for i in 0..l1 {
         let cur = nodes1.as_ref().get(i);
         if nodes2.as_ref().contains(cur) {
-            /* TODO: Propagate memory error. */
-            if xml_xpath_node_set_add_unique(Some(ret), cur) < 0 {
+            // TODO: Propagate memory error.
+            if ret.as_mut().add_unique(cur) < 0 {
                 break;
             }
         }
@@ -349,7 +382,7 @@ pub unsafe fn xml_xpath_distinct_sorted(
         return Some(nodes);
     }
 
-    let ret = xml_xpath_node_set_create(null_mut())?;
+    let mut ret = xml_xpath_node_set_create(null_mut())?;
     let l = nodes.as_ref().len();
     let mut hash = XmlHashTable::with_capacity(l);
     for i in 0..l {
@@ -361,7 +394,7 @@ pub unsafe fn xml_xpath_distinct_sorted(
                 xml_xpath_free_node_set(Some(ret));
                 return None;
             }
-            if xml_xpath_node_set_add_unique(Some(ret), cur) < 0 {
+            if ret.as_mut().add_unique(cur) < 0 {
                 xml_xpath_free_node_set(Some(ret));
                 return None;
             }
@@ -428,7 +461,7 @@ pub unsafe fn xml_xpath_node_leading_sorted(
     if node.is_null() {
         return nodes;
     }
-    let ret = xml_xpath_node_set_create(null_mut())?;
+    let mut ret = xml_xpath_node_set_create(null_mut())?;
     let Some(nodes) = nodes.filter(|n| !n.as_ref().is_empty() && n.as_ref().contains(node)) else {
         return Some(ret);
     };
@@ -440,7 +473,7 @@ pub unsafe fn xml_xpath_node_leading_sorted(
             break;
         }
         // TODO: Propagate memory error.
-        if xml_xpath_node_set_add_unique(Some(ret), cur) < 0 {
+        if ret.as_mut().add_unique(cur) < 0 {
             break;
         }
     }
@@ -532,7 +565,7 @@ pub unsafe fn xml_xpath_node_trailing_sorted(
             break;
         }
         // TODO: Propagate memory error.
-        if xml_xpath_node_set_add_unique(Some(ret), cur) < 0 {
+        if ret.as_mut().add_unique(cur) < 0 {
             break;
         }
     }
@@ -595,43 +628,6 @@ pub unsafe fn xml_xpath_trailing(
     nodes1.as_mut().sort();
     nodes2.as_mut().sort();
     xml_xpath_node_trailing_sorted(nodes1, nodes2.as_ref().get(0))
-}
-
-/// Add a new xmlNodePtr to an existing NodeSet, optimized version
-/// when we are sure the node is not already in the set.
-///
-/// Returns 0 in case of success and -1 in case of failure
-#[doc(alias = "xmlXPathNodeSetAddUnique")]
-pub unsafe fn xml_xpath_node_set_add_unique(
-    cur: Option<NonNull<XmlNodeSet>>,
-    val: *mut XmlNode,
-) -> i32 {
-    let Some(mut cur) = cur else {
-        return -1;
-    };
-    if val.is_null() {
-        return -1;
-    }
-
-    // @@ with_ns to check whether namespace nodes should be looked at @@
-    // grow the nodeTab if needed
-    let table = cur.as_mut().node_tab.get_or_insert_with(Vec::new);
-    if table.len() >= XPATH_MAX_NODESET_LENGTH {
-        xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
-        return -1;
-    }
-    if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-        let ns: XmlNsPtr = val as XmlNsPtr;
-        let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
-
-        if ns_node.is_null() {
-            return -1;
-        }
-        table.push(ns_node);
-    } else {
-        table.push(val);
-    }
-    0
 }
 
 /// Add a new xmlNodePtr to an existing NodeSet
@@ -895,10 +891,12 @@ pub unsafe fn xml_xpath_new_node_set_list(val: Option<NonNull<XmlNodeSet>>) -> X
         if let Some(table) = val.as_ref().node_tab.as_ref() {
             let ret = xml_xpath_new_node_set(table[0]);
             if !ret.is_null() {
-                for &node in &table[1..] {
-                    // TODO: Propagate memory error.
-                    if xml_xpath_node_set_add_unique((*ret).nodesetval, node) < 0 {
-                        break;
+                if let Some(mut nodeset) = (*ret).nodesetval {
+                    for &node in &table[1..] {
+                        // TODO: Propagate memory error.
+                        if nodeset.as_mut().add_unique(node) < 0 {
+                            break;
+                        }
                     }
                 }
             }
