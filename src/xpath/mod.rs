@@ -4971,41 +4971,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_node_set_add() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_val in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let cur = gen_xml_node_set_ptr(n_cur, 0);
-                    let val = gen_xml_node_ptr(n_val, 1);
-
-                    let ret_val = xml_xpath_node_set_add(cur, val);
-                    desret_int(ret_val);
-                    des_xml_node_set_ptr(n_cur, cur, 0);
-                    des_xml_node_ptr(n_val, val, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNodeSetAdd",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathNodeSetAdd()"
-                        );
-                        eprint!(" {}", n_cur);
-                        eprintln!(" {}", n_val);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_node_set_merge() {
         #[cfg(feature = "xpath")]
         unsafe {

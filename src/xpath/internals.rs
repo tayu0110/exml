@@ -89,7 +89,7 @@ use crate::{
     },
 };
 
-use super::{xml_xpath_node_set_add, xml_xpath_node_set_merge, XmlNodeSet};
+use super::{xml_xpath_node_set_merge, XmlNodeSet};
 
 // Many of these macros may later turn into functions.
 // They shouldn't be used in #ifdef's preprocessor instructions.
@@ -10050,7 +10050,7 @@ unsafe fn xml_xpath_get_elements_by_ids(
         return None;
     }
 
-    let ret = xml_xpath_node_set_create(null_mut())?;
+    let mut ret = xml_xpath_node_set_create(null_mut())?;
 
     while xml_is_blank_char(*cur as u32) {
         cur = cur.add(1);
@@ -10075,9 +10075,9 @@ unsafe fn xml_xpath_get_elements_by_ids(
                 } else {
                     elem = null_mut();
                 }
-                /* TODO: Check memory error. */
+                // TODO: Check memory error.
                 if !elem.is_null() {
-                    xml_xpath_node_set_add(Some(ret), elem);
+                    ret.as_mut().add(elem);
                 }
             }
             xml_free(id as _);

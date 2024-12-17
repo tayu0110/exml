@@ -237,6 +237,45 @@ impl XmlNodeSet {
         self.truncate(0, has_ns_nodes);
     }
 
+    /// Add a new xmlNodePtr to an existing NodeSet
+    ///
+    /// Returns 0 in case of success, and -1 in case of error
+    #[doc(alias = "xmlXPathNodeSetAdd")]
+    pub unsafe fn add(&mut self, val: *mut XmlNode) -> i32 {
+        if val.is_null() {
+            return -1;
+        }
+
+        // @@ with_ns to check whether namespace nodes should be looked at @@
+        // prevent duplicates
+        if let Some(table) = self.node_tab.as_ref() {
+            for &node in table {
+                if node == val {
+                    return 0;
+                }
+            }
+        }
+
+        // grow the nodeTab if needed
+        let table = self.node_tab.get_or_insert_with(Vec::new);
+        if table.len() >= XPATH_MAX_NODESET_LENGTH {
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
+            return -1;
+        }
+        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
+            let ns: XmlNsPtr = val as XmlNsPtr;
+            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
+
+            if ns_node.is_null() {
+                return -1;
+            }
+            table.push(ns_node);
+        } else {
+            table.push(val);
+        }
+        0
+    }
+
     /// Add a new xmlNodePtr to an existing NodeSet, optimized version
     /// when we are sure the node is not already in the set.
     ///
@@ -669,48 +708,6 @@ pub unsafe fn xml_xpath_trailing(
     nodes1.as_mut().sort();
     nodes2.as_mut().sort();
     xml_xpath_node_trailing_sorted(nodes1, nodes2.as_ref().get(0))
-}
-
-/// Add a new xmlNodePtr to an existing NodeSet
-///
-/// Returns 0 in case of success, and -1 in case of error
-#[doc(alias = "xmlXPathNodeSetAdd")]
-pub unsafe fn xml_xpath_node_set_add(cur: Option<NonNull<XmlNodeSet>>, val: *mut XmlNode) -> i32 {
-    let Some(mut cur) = cur else {
-        return -1;
-    };
-    if val.is_null() {
-        return -1;
-    }
-
-    // @@ with_ns to check whether namespace nodes should be looked at @@
-    // prevent duplicates
-    if let Some(table) = cur.as_ref().node_tab.as_ref() {
-        for &node in table {
-            if node == val {
-                return 0;
-            }
-        }
-    }
-
-    // grow the nodeTab if needed
-    let table = cur.as_mut().node_tab.get_or_insert_with(Vec::new);
-    if table.len() >= XPATH_MAX_NODESET_LENGTH {
-        xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
-        return -1;
-    }
-    if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-        let ns: XmlNsPtr = val as XmlNsPtr;
-        let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
-
-        if ns_node.is_null() {
-            return -1;
-        }
-        table.push(ns_node);
-    } else {
-        table.push(val);
-    }
-    0
 }
 
 /// Merges two nodesets, all nodes from @set2 are added to @set1.
