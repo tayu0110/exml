@@ -88,34 +88,36 @@ pub(crate) const XPATH_MAX_STACK_DEPTH: usize = 1000000;
 /// The set of XPath error codes.
 #[cfg(feature = "xpath")]
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum XmlXPathError {
-    XpathExpressionOk = 0,
-    XpathNumberError,
-    XpathUnfinishedLiteralError,
-    XpathStartLiteralError,
-    XpathVariableRefError,
-    XpathUndefVariableError,
-    XpathInvalidPredicateError,
-    XpathExprError,
-    XpathUnclosedError,
-    XpathUnknownFuncError,
-    XpathInvalidOperand,
-    XpathInvalidType,
-    XpathInvalidArity,
-    XpathInvalidCtxtSize,
-    XpathInvalidCtxtPosition,
-    XpathMemoryError,
-    XptrSyntaxError,
-    XptrResourceError,
-    XptrSubResourceError,
-    XpathUndefPrefixError,
-    XpathEncodingError,
-    XpathInvalidCharError,
-    XpathInvalidCtxt,
-    XpathStackError,
-    XpathForbidVariableError,
-    XpathOpLimitExceeded,
-    XpathRecursionLimitExceeded,
+    #[default]
+    XPathExpressionOK = 0,
+    XPathNumberError,
+    XPathUnfinishedLiteralError,
+    XPathStartLiteralError,
+    XPathVariableRefError,
+    XPathUndefVariableError,
+    XPathInvalidPredicateError,
+    XPathExprError,
+    XPathUnclosedError,
+    XPathUnknownFuncError,
+    XPathInvalidOperand,
+    XPathInvalidType,
+    XPathInvalidArity,
+    XPathInvalidCtxtSize,
+    XPathInvalidCtxtPosition,
+    XPathMemoryError,
+    XPtrSyntaxError,
+    XPtrResourceError,
+    XPtrSubResourceError,
+    XPathUndefPrefixError,
+    XPathEncodingError,
+    XPathInvalidCharError,
+    XPathInvalidCtxt,
+    XPathStackError,
+    XPathForbidVariableError,
+    XPathOpLimitExceeded,
+    XPathRecursionLimitExceeded,
 }
 
 // An expression is evaluated to yield an object, which
@@ -1557,7 +1559,7 @@ pub unsafe extern "C" fn xml_xpath_eval(
     }
     xml_xpath_eval_expr(ctxt);
 
-    if (*ctxt).error != XmlXPathError::XpathExpressionOk as i32 {
+    if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
         res = null_mut();
     } else {
         res = value_pop(ctxt);
@@ -1683,7 +1685,7 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
         (*ctxt).depth = old_depth;
     }
 
-    if (*pctxt).error != XmlXPathError::XpathExpressionOk as i32 {
+    if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
         xml_xpath_free_parser_context(pctxt);
         return null_mut();
     }
@@ -1698,7 +1700,7 @@ pub unsafe extern "C" fn xml_xpath_ctxt_compile(
             pctxt,
             file.as_ptr(),
             line!() as i32,
-            XmlXPathError::XpathExprError as i32,
+            XmlXPathError::XPathExprError as i32,
         );
         comp = null_mut();
     } else {
@@ -1808,7 +1810,7 @@ unsafe extern "C" fn xml_xpath_compiled_eval_internal(
     }
     let res: i32 = xml_xpath_run_eval(pctxt, to_bool);
 
-    if (*pctxt).error != XmlXPathError::XpathExpressionOk as i32 {
+    if (*pctxt).error != XmlXPathError::XPathExpressionOK as i32 {
         res_obj = null_mut();
     } else {
         res_obj = value_pop(pctxt);
