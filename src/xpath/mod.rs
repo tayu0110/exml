@@ -5116,76 +5116,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_node_trailing() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let nodes = gen_xml_node_set_ptr(n_nodes, 0);
-                    let node = gen_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_xpath_node_trailing(nodes, node);
-                    desret_xml_node_set_ptr(ret_val);
-                    des_xml_node_set_ptr(n_nodes, nodes, 0);
-                    des_xml_node_ptr(n_node, node, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNodeTrailing",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathNodeTrailing()"
-                        );
-                        eprint!(" {}", n_nodes);
-                        eprintln!(" {}", n_node);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_node_trailing_sorted() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let nodes = gen_xml_node_set_ptr(n_nodes, 0);
-                    let node = gen_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_xpath_node_trailing_sorted(nodes, node);
-                    desret_xml_node_set_ptr(ret_val);
-                    des_xml_node_set_ptr(n_nodes, nodes, 0);
-                    des_xml_node_ptr(n_node, node, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathNodeTrailingSorted",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathNodeTrailingSorted()"
-                        );
-                        eprint!(" {}", n_nodes);
-                        eprintln!(" {}", n_node);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_normalize_function() {
         #[cfg(feature = "xpath")]
         unsafe {
@@ -6226,41 +6156,6 @@ mod tests {
                             xml_mem_blocks() - mem_base
                         );
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlXPathTrailing()");
-                        eprint!(" {}", n_nodes1);
-                        eprintln!(" {}", n_nodes2);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_xpath_trailing_sorted() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_nodes1 in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_nodes2 in 0..GEN_NB_XML_NODE_SET_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
-                    let nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
-
-                    let ret_val = xml_xpath_trailing_sorted(nodes1, nodes2);
-                    desret_xml_node_set_ptr(ret_val);
-                    des_xml_node_set_ptr(n_nodes1, nodes1, 0);
-                    des_xml_node_set_ptr(n_nodes2, nodes2, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlXPathTrailingSorted",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlXPathTrailingSorted()"
-                        );
                         eprint!(" {}", n_nodes1);
                         eprintln!(" {}", n_nodes2);
                     }

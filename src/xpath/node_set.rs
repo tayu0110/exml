@@ -513,17 +513,17 @@ pub unsafe extern "C" fn xml_xpath_leading(
 /// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
 #[doc(alias = "xmlXPathNodeTrailingSorted")]
 pub unsafe fn xml_xpath_node_trailing_sorted(
-    nodes: Option<NonNull<XmlNodeSet>>,
+    nodes: NonNull<XmlNodeSet>,
     node: *mut XmlNode,
 ) -> Option<NonNull<XmlNodeSet>> {
     if node.is_null() {
-        return nodes;
+        return Some(nodes);
     }
 
     let mut ret = xml_xpath_node_set_create(null_mut())?;
-    let Some(nodes) = nodes.filter(|n| !n.as_ref().is_empty() && n.as_ref().contains(node)) else {
+    if nodes.as_ref().is_empty() || !nodes.as_ref().contains(node) {
         return Some(ret);
-    };
+    }
 
     let l = nodes.as_ref().len();
     for i in (0..l).rev() {
@@ -548,11 +548,11 @@ pub unsafe fn xml_xpath_node_trailing_sorted(
 /// an empty node-set if @nodes1 doesn't contain @nodes2
 #[doc(alias = "xmlXPathTrailingSorted")]
 pub unsafe fn xml_xpath_trailing_sorted(
-    nodes1: Option<NonNull<XmlNodeSet>>,
+    nodes1: NonNull<XmlNodeSet>,
     nodes2: Option<NonNull<XmlNodeSet>>,
 ) -> Option<NonNull<XmlNodeSet>> {
     let Some(nodes2) = nodes2.filter(|n| !n.as_ref().is_empty()) else {
-        return nodes1;
+        return Some(nodes1);
     };
     xml_xpath_node_trailing_sorted(nodes1, nodes2.as_ref().get(0))
 }
@@ -566,12 +566,10 @@ pub unsafe fn xml_xpath_trailing_sorted(
 /// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
 #[doc(alias = "xmlXPathNodeTrailing")]
 pub unsafe fn xml_xpath_node_trailing(
-    nodes: Option<NonNull<XmlNodeSet>>,
+    mut nodes: NonNull<XmlNodeSet>,
     node: *mut XmlNode,
 ) -> Option<NonNull<XmlNodeSet>> {
-    if let Some(mut nodes) = nodes {
-        nodes.as_mut().sort();
-    }
+    nodes.as_mut().sort();
     xml_xpath_node_trailing_sorted(nodes, node)
 }
 
@@ -596,7 +594,7 @@ pub unsafe fn xml_xpath_trailing(
     };
     nodes1.as_mut().sort();
     nodes2.as_mut().sort();
-    xml_xpath_node_trailing_sorted(Some(nodes1), nodes2.as_ref().get(0))
+    xml_xpath_node_trailing_sorted(nodes1, nodes2.as_ref().get(0))
 }
 
 /// Add a new xmlNodePtr to an existing NodeSet, optimized version
