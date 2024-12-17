@@ -89,9 +89,7 @@ use crate::{
     },
 };
 
-use super::{
-    xml_xpath_node_set_add, xml_xpath_node_set_add_ns, xml_xpath_node_set_merge, XmlNodeSet,
-};
+use super::{xml_xpath_node_set_add, xml_xpath_node_set_merge, XmlNodeSet};
 
 // Many of these macros may later turn into functions.
 // They shouldn't be used in #ifdef's preprocessor instructions.
@@ -5321,14 +5319,20 @@ macro_rules! xp_test_hit_ns {
             $pos += 1;
             if $pos == $max_pos {
                 $has_ns_nodes = true;
-                if xml_xpath_node_set_add_ns($seq, (*$xpctxt).node, $cur as XmlNsPtr) < 0 {
+                if $seq.map_or(-1, |mut seq| {
+                    seq.as_mut().add_ns((*$xpctxt).node, $cur as XmlNsPtr)
+                }) < 0
+                {
                     (*$ctxt).error = XmlXPathError::XpathMemoryError as i32;
                 }
                 axis_range_end!($out_seq, $seq, $merge_and_clear, $to_bool, $label);
             }
         } else {
             $has_ns_nodes = true;
-            if xml_xpath_node_set_add_ns($seq, (*$xpctxt).node, $cur as XmlNsPtr) < 0 {
+            if $seq.map_or(-1, |mut seq| {
+                seq.as_mut().add_ns((*$xpctxt).node, $cur as XmlNsPtr)
+            }) < 0
+            {
                 (*$ctxt).error = XmlXPathError::XpathMemoryError as i32;
             }
             if $break_on_first_hit != 0 {

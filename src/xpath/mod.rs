@@ -5006,46 +5006,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_xpath_node_set_add_ns() {
-        #[cfg(feature = "xpath")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_XML_NODE_SET_PTR {
-                for n_node in 0..GEN_NB_XML_NODE_PTR {
-                    for n_ns in 0..GEN_NB_XML_NS_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let cur = gen_xml_node_set_ptr(n_cur, 0);
-                        let node = gen_xml_node_ptr(n_node, 1);
-                        let ns = gen_xml_ns_ptr(n_ns, 2);
-
-                        let ret_val = xml_xpath_node_set_add_ns(cur, node, ns);
-                        desret_int(ret_val);
-                        des_xml_node_set_ptr(n_cur, cur, 0);
-                        des_xml_node_ptr(n_node, node, 1);
-                        des_xml_ns_ptr(n_ns, ns, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlXPathNodeSetAddNs",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlXPathNodeSetAddNs()"
-                            );
-                            eprint!(" {}", n_cur);
-                            eprint!(" {}", n_node);
-                            eprintln!(" {}", n_ns);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_xpath_node_set_merge() {
         #[cfg(feature = "xpath")]
         unsafe {

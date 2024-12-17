@@ -267,6 +267,47 @@ impl XmlNodeSet {
         }
         0
     }
+
+    /// Add a new namespace node to an existing NodeSet
+    ///
+    /// Returns 0 in case of success and -1 in case of error
+    #[doc(alias = "xmlXPathNodeSetAddNs")]
+    pub unsafe fn add_ns(&mut self, node: *mut XmlNode, ns: XmlNsPtr) -> i32 {
+        if ns.is_null()
+            || node.is_null()
+            || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl)
+            || !matches!((*node).element_type(), XmlElementType::XmlElementNode)
+        {
+            return -1;
+        }
+
+        // @@ with_ns to check whether namespace nodes should be looked at @@
+        // prevent duplicates
+        if let Some(table) = self.node_tab.as_ref() {
+            for &node in table {
+                if node.is_null()
+                    && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
+                    && (*node).next == NodePtr::from_ptr(node)
+                    && xml_str_equal((*ns).prefix as _, (*(node as XmlNsPtr)).prefix)
+                {
+                    return 0;
+                }
+            }
+        }
+
+        // grow the nodeTab if needed
+        let table = self.node_tab.get_or_insert_with(Vec::new);
+        if table.len() >= XPATH_MAX_NODESET_LENGTH {
+            xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
+            return -1;
+        }
+        let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(node, ns);
+        if ns_node.is_null() {
+            return -1;
+        }
+        table.push(ns_node);
+        0
+    }
 }
 
 /// Create a new xmlNodeSetPtr of type f64 and of value @val
@@ -669,54 +710,6 @@ pub unsafe fn xml_xpath_node_set_add(cur: Option<NonNull<XmlNodeSet>>, val: *mut
     } else {
         table.push(val);
     }
-    0
-}
-
-/// Add a new namespace node to an existing NodeSet
-///
-/// Returns 0 in case of success and -1 in case of error
-#[doc(alias = "xmlXPathNodeSetAddNs")]
-pub unsafe fn xml_xpath_node_set_add_ns(
-    cur: Option<NonNull<XmlNodeSet>>,
-    node: *mut XmlNode,
-    ns: XmlNsPtr,
-) -> i32 {
-    let Some(mut cur) = cur else {
-        return -1;
-    };
-    if ns.is_null()
-        || node.is_null()
-        || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl)
-        || !matches!((*node).element_type(), XmlElementType::XmlElementNode)
-    {
-        return -1;
-    }
-
-    // @@ with_ns to check whether namespace nodes should be looked at @@
-    // prevent duplicates
-    if let Some(table) = cur.as_ref().node_tab.as_ref() {
-        for &node in table {
-            if node.is_null()
-                && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                && (*node).next == NodePtr::from_ptr(node)
-                && xml_str_equal((*ns).prefix as _, (*(node as XmlNsPtr)).prefix)
-            {
-                return 0;
-            }
-        }
-    }
-
-    // grow the nodeTab if needed
-    let table = cur.as_mut().node_tab.get_or_insert_with(Vec::new);
-    if table.len() >= XPATH_MAX_NODESET_LENGTH {
-        xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
-        return -1;
-    }
-    let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns(node, ns);
-    if ns_node.is_null() {
-        return -1;
-    }
-    table.push(ns_node);
     0
 }
 
