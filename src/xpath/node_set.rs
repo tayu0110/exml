@@ -117,6 +117,21 @@ impl XmlNodeSet {
         false
     }
 
+    /// Implements the EXSLT - Sets has-same-nodes function:
+    ///    boolean set:has-same-node(node-set, node-set)
+    ///
+    /// Returns true (1) if @nodes1 shares any node with @nodes2, false (0) otherwise
+    #[doc(alias = "xmlXPathHasSameNodes")]
+    pub unsafe fn has_same_nodes(&self, other: &XmlNodeSet) -> bool {
+        let Some(t1) = self.node_tab.as_deref().filter(|t| !t.is_empty()) else {
+            return false;
+        };
+        let Some(t2) = other.node_tab.as_deref().filter(|t| !t.is_empty()) else {
+            return false;
+        };
+        t1.iter().any(|node| t2.contains(node))
+    }
+
     /// Free the NodeSet compound.
     ///
     /// If `free_actual_tree` is `true`, free the actual tree also.
@@ -502,32 +517,6 @@ pub unsafe fn xml_xpath_distinct(
     xml_xpath_distinct_sorted(Some(nodes))
 }
 
-/// Implements the EXSLT - Sets has-same-nodes function:
-///    boolean set:has-same-node(node-set, node-set)
-///
-/// Returns true (1) if @nodes1 shares any node with @nodes2, false (0) otherwise
-#[doc(alias = "xmlXPathHasSameNodes")]
-pub unsafe fn xml_xpath_has_same_nodes(
-    nodes1: Option<NonNull<XmlNodeSet>>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> i32 {
-    let (Some(nodes1), Some(nodes2)) = (
-        nodes1.filter(|n| !n.as_ref().is_empty()),
-        nodes2.filter(|n| !n.as_ref().is_empty()),
-    ) else {
-        return 0;
-    };
-
-    let l = nodes1.as_ref().len();
-    for i in 0..l {
-        let cur = nodes1.as_ref().get(i);
-        if nodes2.as_ref().contains(cur) {
-            return 1;
-        }
-    }
-    0
-}
-
 /// Implements the EXSLT - Sets leading() function:
 ///    node-set set:leading (node-set, node-set)
 ///
@@ -604,7 +593,7 @@ pub unsafe fn xml_xpath_node_leading(
 /// in document order, @nodes1 if @nodes2 is NULL or empty or
 /// an empty node-set if @nodes1 doesn't contain @nodes2
 #[doc(alias = "xmlXPathLeading")]
-pub unsafe extern "C" fn xml_xpath_leading(
+pub unsafe fn xml_xpath_leading(
     nodes1: Option<NonNull<XmlNodeSet>>,
     nodes2: Option<NonNull<XmlNodeSet>>,
 ) -> Option<NonNull<XmlNodeSet>> {
