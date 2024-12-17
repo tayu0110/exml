@@ -132,6 +132,32 @@ impl XmlNodeSet {
         t1.iter().any(|node| t2.contains(node))
     }
 
+    /// Implements the EXSLT - Sets intersection() function:
+    ///    node-set set:intersection (node-set, node-set)
+    ///
+    /// Returns a node set comprising the nodes that are within both the
+    /// node sets passed as arguments
+    #[doc(alias = "xmlXPathIntersection")]
+    pub unsafe fn intersection(&self, other: &XmlNodeSet) -> Option<NonNull<XmlNodeSet>> {
+        let mut ret = xml_xpath_node_set_create(null_mut())?;
+        let Some(t1) = self.node_tab.as_deref().filter(|t| !t.is_empty()) else {
+            return Some(ret);
+        };
+        let Some(t2) = other.node_tab.as_deref().filter(|t| !t.is_empty()) else {
+            return Some(ret);
+        };
+
+        for node in t1 {
+            if t2.contains(node) {
+                // TODO: Propagate memory error.
+                if ret.as_mut().add_unique(*node) < 0 {
+                    break;
+                }
+            }
+        }
+        Some(ret)
+    }
+
     /// Free the NodeSet compound.
     ///
     /// If `free_actual_tree` is `true`, free the actual tree also.
@@ -427,39 +453,6 @@ pub unsafe fn xml_xpath_difference(
         }
     }
     ret
-}
-
-/// Implements the EXSLT - Sets intersection() function:
-///    node-set set:intersection (node-set, node-set)
-///
-/// Returns a node set comprising the nodes that are within both the
-/// node sets passed as arguments
-#[doc(alias = "xmlXPathIntersection")]
-pub unsafe fn xml_xpath_intersection(
-    nodes1: Option<NonNull<XmlNodeSet>>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let mut ret = xml_xpath_node_set_create(null_mut())?;
-
-    let (Some(nodes1), Some(nodes2)) = (nodes1, nodes2) else {
-        return Some(ret);
-    };
-    if nodes1.as_ref().is_empty() || nodes2.as_ref().is_empty() {
-        return Some(ret);
-    }
-
-    let l1 = nodes1.as_ref().len();
-
-    for i in 0..l1 {
-        let cur = nodes1.as_ref().get(i);
-        if nodes2.as_ref().contains(cur) {
-            // TODO: Propagate memory error.
-            if ret.as_mut().add_unique(cur) < 0 {
-                break;
-            }
-        }
-    }
-    Some(ret)
 }
 
 /// Implements the EXSLT - Sets distinct() function:
