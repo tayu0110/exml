@@ -295,7 +295,7 @@ pub(crate) fn des_double(_no: i32, _val: f64, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
 pub(crate) unsafe extern "C" fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> XmlXPathObjectPtr {
-    use crate::xpath::internals::{
+    use crate::xpath::object::{
         xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
     };
 

@@ -89,7 +89,10 @@ use crate::{
     },
 };
 
-use super::{xml_xpath_node_set_merge, XmlNodeSet};
+use super::{
+    xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
+    xml_xpath_node_set_merge, xml_xpath_wrap_string, XmlNodeSet,
+};
 
 // Many of these macros may later turn into functions.
 // They shouldn't be used in #ifdef's preprocessor instructions.
@@ -2283,10 +2286,8 @@ pub unsafe extern "C" fn value_push(
         return -1;
     }
     if value.is_null() {
-        /*
-         * A NULL value typically indicates that a memory allocation failed,
-         * so we set (*ctxt).error here to propagate the error.
-         */
+        // A NULL value typically indicates that a memory allocation failed,
+        // so we set (*ctxt).error here to propagate the error.
         (*ctxt).error = XmlXPathError::XPathMemoryError as i32;
         return -1;
     }
@@ -2313,112 +2314,6 @@ pub unsafe extern "C" fn value_push(
     let res = (*ctxt).value_nr;
     (*ctxt).value_nr += 1;
     res
-}
-
-/// Create a new xmlXPathObjectPtr of type string and of value @val
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathNewCString", alias = "xmlXPathNewString")]
-pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathString;
-    let val = val.unwrap_or("");
-    (*ret).stringval = Some(val.to_owned());
-    ret
-}
-
-/// Wraps the @val string into an XPath object.
-///
-/// Returns the newly created object.
-///
-/// Frees @val in case of error.
-#[doc(alias = "xmlXPathWrapString", alias = "xmlXPathWrapCString")]
-pub unsafe fn xml_xpath_wrap_string(val: Option<&str>) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathString;
-    (*ret).stringval = val.map(|s| s.to_owned());
-    ret
-}
-
-/// Create a new xmlXPathObjectPtr of type f64 and of value @val
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathNewFloat")]
-pub unsafe extern "C" fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating float object\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathNumber;
-    (*ret).floatval = val;
-    ret
-}
-
-/// Create a new xmlXPathObjectPtr of type boolean and of value @val
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathNewBoolean")]
-pub unsafe extern "C" fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating boolean object\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathBoolean;
-    (*ret).boolval = val != 0;
-    ret
-}
-
-/// Create a new xmlXPathObjectPtr of type NodeSet and initialize
-/// it with the single Node @val
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathNewNodeSet")]
-pub unsafe fn xml_xpath_new_node_set(val: XmlNodePtr) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating nodeset\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathNodeset;
-    (*ret).boolval = false;
-    /* TODO: Check memory error. */
-    (*ret).nodesetval = xml_xpath_node_set_create(val);
-    /* @@ with_ns to check whether namespace nodes should be looked at @@ */
-    ret
-}
-
-/// Create a new xmlXPathObjectPtr of type Value Tree (XSLT) and initialize
-/// it with the tree root @val
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathNewValueTree")]
-pub unsafe extern "C" fn xml_xpath_new_value_tree(val: XmlNodePtr) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating result value tree\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathXSLTTree;
-    (*ret).boolval = true;
-    (*ret).user = val as *mut c_void;
-    (*ret).nodesetval = xml_xpath_node_set_create(val);
-    ret
 }
 
 pub const XML_NODESET_DEFAULT: usize = 10;
@@ -7923,22 +7818,6 @@ pub unsafe extern "C" fn xml_xpath_register_all_functions(ctxt: XmlXPathContextP
     );
 }
 
-/// Wraps the @val data into an XPath object.
-///
-/// Returns the newly created object.
-#[doc(alias = "xmlXPathWrapExternal")]
-pub unsafe extern "C" fn xml_xpath_wrap_external(val: *mut c_void) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating user object\n"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathUsers;
-    (*ret).user = val;
-    ret
-}
-
 /// Function computing the beginning of the string value of the node,
 /// used to speed up comparisons
 ///
@@ -8297,10 +8176,8 @@ unsafe extern "C" fn xml_xpath_equal_values_common(
     mut arg2: XmlXPathObjectPtr,
 ) -> i32 {
     let mut ret: i32 = 0;
-    /*
-     *At this point we are assured neither arg1 nor arg2
-     *is a nodeset, so we can just pick the appropriate routine.
-     */
+    // At this point we are assured neither arg1 nor arg2
+    // is a nodeset, so we can just pick the appropriate routine.
     match (*arg1).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathBoolean => match (*arg2).typ {
@@ -8503,9 +8380,7 @@ pub unsafe extern "C" fn xml_xpath_equal_values(ctxt: XmlXPathParserContextPtr) 
         return 1;
     }
 
-    /*
-     *If either argument is a nodeset, it's a 'special case'
-     */
+    // If either argument is a nodeset, it's a 'special case'
     if matches!(
         (*arg2).typ,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree
