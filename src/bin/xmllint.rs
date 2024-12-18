@@ -2249,13 +2249,8 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             let mut node: XmlNodePtr;
             #[cfg(feature = "libxml_output")]
             {
-                if let Some(nodeset) = (*cur).nodesetval {
-                    if let Some(table) = nodeset
-                        .as_ref()
-                        .node_tab
-                        .as_deref()
-                        .filter(|t| !t.is_empty())
-                    {
+                if let Some(nodeset) = (*cur).nodesetval.as_deref() {
+                    if let Some(table) = nodeset.node_tab.as_deref().filter(|t| !t.is_empty()) {
                         let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                             eprintln!("Out of memory for XPath");
                             PROGRESULT = XmllintReturnCode::ErrMem;
@@ -2799,9 +2794,9 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 {
                     let mut result: *mut XmlChar = null_mut();
 
-                    let size: c_int = xml_c14n_doc_dump_memory(
+                    let size = xml_c14n_doc_dump_memory(
                         doc,
-                        null_mut(),
+                        None,
                         XmlC14NMode::XmlC14N1_0 as i32,
                         null_mut(),
                         1,
@@ -2824,7 +2819,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                     let size: c_int = xml_c14n_doc_dump_memory(
                         doc,
-                        null_mut(),
+                        None,
                         XmlC14NMode::XmlC14N1_1 as i32,
                         null_mut(),
                         1,
@@ -2847,7 +2842,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                     let size: c_int = xml_c14n_doc_dump_memory(
                         doc,
-                        null_mut(),
+                        None,
                         XmlC14NMode::XmlC14NExclusive1_0 as i32,
                         null_mut(),
                         1,

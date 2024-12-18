@@ -51,7 +51,7 @@ use crate::{
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
-    xpath::XmlNodeSetPtr,
+    xpath::{XmlNodeSet, XmlNodeSetPtr},
 };
 
 use super::{
@@ -199,7 +199,7 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 #[doc(alias = "xmlC14NDocSaveTo")]
 pub unsafe fn xml_c14n_doc_save_to(
     doc: XmlDocPtr,
-    nodes: XmlNodeSetPtr,
+    nodes: Option<&mut XmlNodeSet>,
     mode: i32,
     /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
@@ -208,7 +208,9 @@ pub unsafe fn xml_c14n_doc_save_to(
     xml_c14n_execute(
         doc,
         xml_c14n_is_node_in_nodeset,
-        nodes as _,
+        // temporary workaround.
+        // I want to improve this...
+        nodes.map_or(null_mut(), |n| n as *mut XmlNodeSet as _),
         mode,
         inclusive_ns_prefixes,
         with_comments,
@@ -294,9 +296,9 @@ unsafe fn xml_c14n_err_internal(extra: &str) {
 ///
 /// Returns the number of bytes written on success or a negative value on fail
 #[doc(alias = "xmlC14NDocDumpMemory")]
-pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
+pub unsafe fn xml_c14n_doc_dump_memory(
     doc: XmlDocPtr,
-    nodes: XmlNodeSetPtr,
+    nodes: Option<&mut XmlNodeSet>,
     mode: i32,
     /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
@@ -356,9 +358,9 @@ pub unsafe extern "C" fn xml_c14n_doc_dump_memory(
 ///
 /// Returns the number of bytes written success or a negative value on fail
 #[doc(alias = "xmlC14NDocSave")]
-pub unsafe extern "C" fn xml_c14n_doc_save(
+pub unsafe fn xml_c14n_doc_save(
     doc: XmlDocPtr,
-    nodes: XmlNodeSetPtr,
+    nodes: Option<&mut XmlNodeSet>,
     mode: i32,
     /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
@@ -2113,7 +2115,7 @@ unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
 ///
 /// Returns non-negative value on success or negative value on fail
 #[doc(alias = "xmlC14NProcessNode")]
-unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) -> i32 {
+unsafe fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
 
     if ctx.is_null() || cur.is_null() {
@@ -2304,7 +2306,7 @@ unsafe extern "C" fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) 
 ///
 /// Returns non-negative value on success or negative value on fail
 #[doc(alias = "xmlC14NProcessNodeList")]
-unsafe extern "C" fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: XmlNodePtr) -> i32 {
+unsafe fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: XmlNodePtr) -> i32 {
     let mut ret: i32;
 
     if ctx.is_null() {
@@ -2342,8 +2344,8 @@ pub unsafe fn xml_c14n_execute(
         return -1;
     }
 
-    /* for backward compatibility, we have to have "mode" as "int"
-    and here we check that user gives valid value */
+    // for backward compatibility, we have to have "mode" as "int"
+    // and here we check that user gives valid value
     let c14n_mode = match XmlC14NMode::try_from(mode) {
         Ok(mode @ XmlC14NMode::XmlC14N1_0)
         | Ok(mode @ XmlC14NMode::XmlC14NExclusive1_0)
@@ -2354,9 +2356,7 @@ pub unsafe fn xml_c14n_execute(
         }
     };
 
-    /*
-     *  Validate the encoding output buffer encoding
-     */
+    //  Validate the encoding output buffer encoding
     if buf.borrow().encoder.is_some() {
         xml_c14n_err(
             null_mut(),
@@ -2386,14 +2386,12 @@ pub unsafe fn xml_c14n_execute(
         return -1;
     }
 
-    /*
-     * Root Node
-     * The root node is the parent of the top-level document element. The
-     * result of processing each of its child nodes that is in the node-set
-     * in document order. The root node does not generate a byte order mark,
-     * XML declaration, nor anything from within the document type
-     * declaration.
-     */
+    // Root Node
+    // The root node is the parent of the top-level document element. The
+    // result of processing each of its child nodes that is in the node-set
+    // in document order. The root node does not generate a byte order mark,
+    // XML declaration, nor anything from within the document type
+    // declaration.
     if let Some(children) = (*doc).children {
         ret = xml_c14n_process_node_list(ctx, children.as_ptr());
         if ret < 0 {
@@ -2403,9 +2401,7 @@ pub unsafe fn xml_c14n_execute(
         }
     }
 
-    /*
-     * Flush buffer to get number of bytes written
-     */
+    // Flush buffer to get number of bytes written
     ret = buf.borrow_mut().flush();
     if ret < 0 {
         xml_c14n_err_internal("flushing output buffer");
@@ -2413,9 +2409,7 @@ pub unsafe fn xml_c14n_execute(
         return -1;
     }
 
-    /*
-     * Cleanup
-     */
+    // Cleanup
     xml_c14n_free_ctx(ctx);
     ret
 }
@@ -2440,7 +2434,7 @@ mod tests {
                                 for n_doc_txt_ptr in 0..GEN_NB_XML_CHAR_PTR_PTR {
                                     let mem_base = xml_mem_blocks();
                                     let doc = gen_xml_doc_ptr(n_doc, 0);
-                                    let nodes = gen_xml_node_set_ptr(n_nodes, 1);
+                                    let mut nodes = gen_xml_node_set_ptr(n_nodes, 1);
                                     let mode = gen_int(n_mode, 2);
                                     let inclusive_ns_prefixes =
                                         gen_xml_char_ptr_ptr(n_inclusive_ns_prefixes, 3);
@@ -2449,7 +2443,7 @@ mod tests {
 
                                     let ret_val = xml_c14n_doc_dump_memory(
                                         doc,
-                                        nodes.map_or(null_mut(), |n| n.as_ptr()),
+                                        nodes.as_deref_mut(),
                                         mode,
                                         inclusive_ns_prefixes,
                                         with_comments,
@@ -2508,7 +2502,7 @@ mod tests {
                                     for n_compression in 0..GEN_NB_INT {
                                         let mem_base = xml_mem_blocks();
                                         let doc = gen_xml_doc_ptr(n_doc, 0);
-                                        let nodes = gen_xml_node_set_ptr(n_nodes, 1);
+                                        let mut nodes = gen_xml_node_set_ptr(n_nodes, 1);
                                         let mode = gen_int(n_mode, 2);
                                         let inclusive_ns_prefixes =
                                             gen_xml_char_ptr_ptr(n_inclusive_ns_prefixes, 3);
@@ -2518,7 +2512,7 @@ mod tests {
 
                                         let ret_val = xml_c14n_doc_save(
                                             doc,
-                                            nodes.map_or(null_mut(), |n| n.as_ptr()),
+                                            nodes.as_deref_mut(),
                                             mode,
                                             inclusive_ns_prefixes,
                                             with_comments,

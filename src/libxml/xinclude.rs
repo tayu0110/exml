@@ -1276,10 +1276,10 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
     }
     match (*obj).typ {
         XmlXPathObjectType::XPathNodeset => {
-            let Some(set) = (*obj).nodesetval else {
+            let Some(set) = (*obj).nodesetval.as_deref() else {
                 return null_mut();
             };
-            if let Some(table) = set.as_ref().node_tab.as_deref() {
+            if let Some(table) = set.node_tab.as_deref() {
                 for &now in table {
                     if now.is_null() {
                         continue;
@@ -1621,7 +1621,7 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                         break 'error;
                     }
                     XmlXPathObjectType::XPathNodeset => {
-                        if (*xptr).nodesetval.map_or(true, |n| n.as_ref().is_empty()) {
+                        if (*xptr).nodesetval.as_deref().map_or(true, |n| n.is_empty()) {
                             xml_xpath_free_object(xptr);
                             xml_xpath_free_context(xptrctxt);
                             break 'error;
@@ -1630,8 +1630,8 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                     #[cfg(feature = "libxml_xptr_locs")]
                     XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
                 }
-                if let Some(mut set) = (*xptr).nodesetval {
-                    if let Some(table) = set.as_mut().node_tab.as_deref_mut() {
+                if let Some(set) = (*xptr).nodesetval.as_deref_mut() {
+                    if let Some(table) = set.node_tab.as_deref_mut() {
                         for node in table.iter_mut() {
                             if node.is_null() {
                                 continue;

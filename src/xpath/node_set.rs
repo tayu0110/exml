@@ -1,7 +1,4 @@
-use std::{
-    ffi::CString,
-    ptr::{null_mut, NonNull},
-};
+use std::{ffi::CString, ptr::null_mut};
 
 use crate::{
     hash::XmlHashTable,
@@ -25,7 +22,7 @@ const XPATH_MAX_NODESET_LENGTH: usize = 10000000;
 // A node-set (an unordered collection of nodes without duplicates).
 pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[repr(C)]
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct XmlNodeSet {
     // array of nodes in no particular order
     pub node_tab: Option<Vec<*mut XmlNode>>,
@@ -138,7 +135,7 @@ impl XmlNodeSet {
     /// Returns a node set comprising the nodes that are within both the
     /// node sets passed as arguments
     #[doc(alias = "xmlXPathIntersection")]
-    pub unsafe fn intersection(&self, other: &XmlNodeSet) -> Option<NonNull<XmlNodeSet>> {
+    pub unsafe fn intersection(&self, other: &XmlNodeSet) -> Option<Box<XmlNodeSet>> {
         let mut ret = xml_xpath_node_set_create(null_mut())?;
         let Some(t1) = self.node_tab.as_deref().filter(|t| !t.is_empty()) else {
             return Some(ret);
@@ -162,7 +159,7 @@ impl XmlNodeSet {
     ///
     /// If `free_actual_tree` is `true`, free the actual tree also.
     #[doc(alias = "xmlXPathFreeNodeSet", alias = "xmlXPathFreeValueTree")]
-    pub unsafe fn cleanup(&mut self, free_actual_tree: bool) {
+    pub(crate) unsafe fn cleanup(&mut self, free_actual_tree: bool) {
         if let Some(table) = self.node_tab.as_mut() {
             while let Some(node) = table.pop() {
                 if !node.is_null() {
@@ -394,59 +391,61 @@ impl XmlNodeSet {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNodeSetCreate")]
-pub unsafe fn xml_xpath_node_set_create(val: *mut XmlNode) -> Option<NonNull<XmlNodeSet>> {
+pub unsafe fn xml_xpath_node_set_create(val: *mut XmlNode) -> Option<Box<XmlNodeSet>> {
     let set = XmlNodeSet::with_value(val)?;
-    NonNull::new(Box::leak(Box::new(set)))
+    Some(Box::new(set))
 }
 
 /// Free the NodeSet compound (not the actual nodes !).
 #[doc(alias = "xmlXPathFreeNodeSet")]
-pub unsafe fn xml_xpath_free_node_set(obj: Option<NonNull<XmlNodeSet>>) {
+pub unsafe fn xml_xpath_free_node_set(obj: Option<Box<XmlNodeSet>>) {
     if let Some(mut obj) = obj {
         obj.as_mut().cleanup(false);
-        let _ = *Box::from_raw(obj.as_ptr());
     }
 }
 
 /// Free the NodeSet compound and the actual tree, this is different from xmlXPathFreeNodeSet()
 #[doc(alias = "xmlXPathFreeValueTree")]
-pub unsafe fn xml_xpath_free_value_tree(obj: Option<NonNull<XmlNodeSet>>) {
+pub unsafe fn xml_xpath_free_value_tree(obj: Option<Box<XmlNodeSet>>) {
     if let Some(mut obj) = obj {
         obj.as_mut().cleanup(true);
-        let _ = *Box::from_raw(obj.as_ptr());
     }
 }
 
 /// Implements the EXSLT - Sets difference() function:
 ///    node-set set:difference (node-set, node-set)
 ///
-/// Returns the difference between the two node sets, or nodes1 if nodes2 is empty
+/// Returns the difference between the two node sets.
+///
+/// # Note
+/// In original libxml, if `node2` is empty, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathDifference")]
 pub unsafe fn xml_xpath_difference(
-    nodes1: Option<NonNull<XmlNodeSet>>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let Some(nodes2) = nodes2.filter(|n| !n.as_ref().is_empty()) else {
-        return nodes1;
+    nodes1: Option<&XmlNodeSet>,
+    nodes2: Option<&XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let Some(nodes2) = nodes2.filter(|n| !n.is_empty()) else {
+        return nodes1.cloned().map(Box::new);
     };
 
     // TODO: Check memory error.
-    let ret = xml_xpath_node_set_create(null_mut());
+    let mut ret = xml_xpath_node_set_create(null_mut());
     let Some(nodes1) = nodes1 else {
         return ret;
     };
-    if nodes1.as_ref().is_empty() {
+    if nodes1.is_empty() {
         return ret;
     }
 
-    let l1 = nodes1.as_ref().len();
+    let l1 = nodes1.len();
 
-    if let Some(mut ret) = ret {
+    if let Some(ret) = ret.as_mut() {
         for i in 0..l1 {
-            let cur = nodes1.as_ref().get(i);
-            if !nodes2.as_ref().contains(cur) {
+            let cur = nodes1.get(i);
+            if !nodes2.contains(cur) {
                 // TODO: Propagate memory error.
-                if ret.as_mut().add_unique(cur) < 0 {
+                if ret.add_unique(cur) < 0 {
                     break;
                 }
             }
@@ -458,23 +457,25 @@ pub unsafe fn xml_xpath_difference(
 /// Implements the EXSLT - Sets distinct() function:
 ///    node-set set:distinct (node-set)
 ///
-/// Returns a subset of the nodes contained in @nodes, or @nodes if it is empty
+/// Returns a subset of the nodes contained in @nodes.
+///
+/// # Note
+/// In original libxml, if `nodes` is empty, return `nodes`.  
+/// However, this function returns the clone of `nodes`.
 #[doc(alias = "xmlXPathDistinctSorted")]
-pub unsafe fn xml_xpath_distinct_sorted(
-    nodes: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
+pub unsafe fn xml_xpath_distinct_sorted(nodes: Option<&XmlNodeSet>) -> Option<Box<XmlNodeSet>> {
     let mut cur: *mut XmlNode;
 
     let nodes = nodes?;
-    if nodes.as_ref().is_empty() {
-        return Some(nodes);
+    let mut ret = xml_xpath_node_set_create(null_mut())?;
+    if nodes.is_empty() {
+        return Some(ret);
     }
 
-    let mut ret = xml_xpath_node_set_create(null_mut())?;
-    let l = nodes.as_ref().len();
+    let l = nodes.len();
     let mut hash = XmlHashTable::with_capacity(l);
     for i in 0..l {
-        cur = nodes.as_ref().get(i);
+        cur = nodes.get(i);
         let strval = xml_xpath_cast_node_to_string(cur);
         let strval = CString::new(strval).unwrap();
         if hash.lookup(&strval).is_none() {
@@ -496,17 +497,19 @@ pub unsafe fn xml_xpath_distinct_sorted(
 /// @nodes is sorted by document order, then #exslSetsDistinctSorted
 /// is called with the sorted node-set
 ///
-/// Returns a subset of the nodes contained in @nodes, or @nodes if it is empty
+/// Returns a subset of the nodes contained in @nodes.
+///
+/// # Note
+/// In original libxml, if `nodes` is empty, return `nodes`.  
+/// However, this function returns the clone of `nodes`.
 #[doc(alias = "xmlXPathDistinct")]
-pub unsafe fn xml_xpath_distinct(
-    nodes: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let mut nodes = nodes?;
-    if nodes.as_ref().is_empty() {
-        return Some(nodes);
+pub unsafe fn xml_xpath_distinct(nodes: Option<&mut XmlNodeSet>) -> Option<Box<XmlNodeSet>> {
+    let nodes = nodes?;
+    if nodes.is_empty() {
+        return Some(Box::new(nodes.clone()));
     }
 
-    nodes.as_mut().sort();
+    nodes.sort();
     xml_xpath_distinct_sorted(Some(nodes))
 }
 
@@ -514,28 +517,32 @@ pub unsafe fn xml_xpath_distinct(
 ///    node-set set:leading (node-set, node-set)
 ///
 /// Returns the nodes in @nodes that precede @node in document order,
-/// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+/// an empty node-set if @nodes doesn't contain @node
+///
+/// # Note
+/// In original libxml, if `node` is NULL, return `nodes`.  
+/// However, this function returns the clone of `nodes`.
 #[doc(alias = "xmlXPathNodeLeadingSorted")]
 pub unsafe fn xml_xpath_node_leading_sorted(
-    nodes: Option<NonNull<XmlNodeSet>>,
+    nodes: Option<&XmlNodeSet>,
     node: *mut XmlNode,
-) -> Option<NonNull<XmlNodeSet>> {
+) -> Option<Box<XmlNodeSet>> {
     if node.is_null() {
-        return nodes;
+        return nodes.cloned().map(Box::new);
     }
     let mut ret = xml_xpath_node_set_create(null_mut())?;
-    let Some(nodes) = nodes.filter(|n| !n.as_ref().is_empty() && n.as_ref().contains(node)) else {
+    let Some(nodes) = nodes.filter(|n| !n.is_empty() && n.contains(node)) else {
         return Some(ret);
     };
 
-    let l = nodes.as_ref().len();
+    let l = nodes.len();
     for i in 0..l {
-        let cur = nodes.as_ref().get(i);
+        let cur = nodes.get(i);
         if cur == node {
             break;
         }
         // TODO: Propagate memory error.
-        if ret.as_mut().add_unique(cur) < 0 {
+        if ret.add_unique(cur) < 0 {
             break;
         }
     }
@@ -545,18 +552,21 @@ pub unsafe fn xml_xpath_node_leading_sorted(
 /// Implements the EXSLT - Sets leading() function:
 ///    node-set set:leading (node-set, node-set)
 ///
-/// Returns the nodes in @nodes1 that precede the first node in @nodes2
-///         in document order, @nodes1 if @nodes2 is NULL or empty or
-///         an empty node-set if @nodes1 doesn't contain @nodes2
+/// Returns the nodes in @nodes1 that precede the first node in @nodes2 in document order,
+/// an empty node-set if @nodes1 doesn't contain @nodes2
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathLeadingSorted")]
 pub unsafe fn xml_xpath_leading_sorted(
-    nodes1: Option<NonNull<XmlNodeSet>>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let Some(nodes2) = nodes2.filter(|n| !n.as_ref().is_empty()) else {
-        return nodes1;
+    nodes1: Option<&XmlNodeSet>,
+    nodes2: Option<&XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let Some(nodes2) = nodes2.filter(|n| !n.is_empty()) else {
+        return nodes1.cloned().map(Box::new);
     };
-    xml_xpath_node_leading_sorted(nodes1, nodes2.as_ref().get(1))
+    xml_xpath_node_leading_sorted(nodes1, nodes2.get(1))
 }
 
 /// Implements the EXSLT - Sets leading() function:
@@ -565,16 +575,20 @@ pub unsafe fn xml_xpath_leading_sorted(
 /// is called.
 ///
 /// Returns the nodes in @nodes that precede @node in document order,
-/// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+/// an empty node-set if @nodes doesn't contain @node
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathNodeLeading")]
 pub unsafe fn xml_xpath_node_leading(
-    nodes: Option<NonNull<XmlNodeSet>>,
+    mut nodes: Option<&mut XmlNodeSet>,
     node: *mut XmlNode,
-) -> Option<NonNull<XmlNodeSet>> {
-    if let Some(mut nodes) = nodes {
-        nodes.as_mut().sort();
+) -> Option<Box<XmlNodeSet>> {
+    if let Some(nodes) = nodes.as_deref_mut() {
+        nodes.sort();
     }
-    xml_xpath_node_leading_sorted(nodes, node)
+    xml_xpath_node_leading_sorted(nodes.map(|n| &*n), node)
 }
 
 /// Implements the EXSLT - Sets leading() function:
@@ -583,22 +597,25 @@ pub unsafe fn xml_xpath_node_leading(
 /// #exslSetsLeadingSorted is called.
 ///
 /// Returns the nodes in @nodes1 that precede the first node in @nodes2
-/// in document order, @nodes1 if @nodes2 is NULL or empty or
-/// an empty node-set if @nodes1 doesn't contain @nodes2
+/// in document order, or an empty node-set if @nodes1 doesn't contain @nodes2
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL or empty, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathLeading")]
 pub unsafe fn xml_xpath_leading(
-    nodes1: Option<NonNull<XmlNodeSet>>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let Some(mut nodes2) = nodes2.filter(|n| !n.as_ref().is_empty()) else {
-        return nodes1;
+    nodes1: Option<&mut XmlNodeSet>,
+    nodes2: Option<&mut XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let Some(nodes2) = nodes2.filter(|n| !n.is_empty()) else {
+        return nodes1.cloned().map(Box::new);
     };
-    let Some(mut nodes1) = nodes1.filter(|n| !n.as_ref().is_empty()) else {
+    let Some(nodes1) = nodes1.filter(|n| !n.is_empty()) else {
         return xml_xpath_node_set_create(null_mut());
     };
-    nodes1.as_mut().sort();
-    nodes2.as_mut().sort();
-    xml_xpath_node_leading_sorted(Some(nodes1), nodes2.as_ref().get(1))
+    nodes1.sort();
+    nodes2.sort();
+    xml_xpath_node_leading_sorted(Some(nodes1), nodes2.get(1))
 }
 
 /// Implements the EXSLT - Sets trailing() function:
@@ -606,23 +623,27 @@ pub unsafe fn xml_xpath_leading(
 ///
 /// Returns the nodes in @nodes that follow @node in document order,
 /// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+///
+/// # Note
+/// In original libxml, if `node` is NULL, return `nodes`.  
+/// However, this function returns the clone of `nodes`.
 #[doc(alias = "xmlXPathNodeTrailingSorted")]
 pub unsafe fn xml_xpath_node_trailing_sorted(
-    nodes: NonNull<XmlNodeSet>,
+    nodes: &XmlNodeSet,
     node: *mut XmlNode,
-) -> Option<NonNull<XmlNodeSet>> {
+) -> Option<Box<XmlNodeSet>> {
     if node.is_null() {
-        return Some(nodes);
+        return Some(Box::new(nodes.clone()));
     }
 
     let mut ret = xml_xpath_node_set_create(null_mut())?;
-    if nodes.as_ref().is_empty() || !nodes.as_ref().contains(node) {
+    if nodes.is_empty() || !nodes.contains(node) {
         return Some(ret);
     }
 
-    let l = nodes.as_ref().len();
+    let l = nodes.len();
     for i in (0..l).rev() {
-        let cur = nodes.as_ref().get(i);
+        let cur = nodes.get(i);
         if cur == node {
             break;
         }
@@ -641,15 +662,19 @@ pub unsafe fn xml_xpath_node_trailing_sorted(
 /// Returns the nodes in @nodes1 that follow the first node in @nodes2
 /// in document order, @nodes1 if @nodes2 is NULL or empty or
 /// an empty node-set if @nodes1 doesn't contain @nodes2
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL or empty, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathTrailingSorted")]
 pub unsafe fn xml_xpath_trailing_sorted(
-    nodes1: NonNull<XmlNodeSet>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let Some(nodes2) = nodes2.filter(|n| !n.as_ref().is_empty()) else {
-        return Some(nodes1);
+    nodes1: &XmlNodeSet,
+    nodes2: Option<&XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let Some(nodes2) = nodes2.filter(|n| !n.is_empty()) else {
+        return Some(Box::new(nodes1.clone()));
     };
-    xml_xpath_node_trailing_sorted(nodes1, nodes2.as_ref().get(0))
+    xml_xpath_node_trailing_sorted(nodes1, nodes2.get(0))
 }
 
 /// Implements the EXSLT - Sets trailing() function:
@@ -659,12 +684,16 @@ pub unsafe fn xml_xpath_trailing_sorted(
 ///
 /// Returns the nodes in @nodes that follow @node in document order,
 /// @nodes if @node is NULL or an empty node-set if @nodes doesn't contain @node
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL or empty, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathNodeTrailing")]
 pub unsafe fn xml_xpath_node_trailing(
-    mut nodes: NonNull<XmlNodeSet>,
+    nodes: &mut XmlNodeSet,
     node: *mut XmlNode,
-) -> Option<NonNull<XmlNodeSet>> {
-    nodes.as_mut().sort();
+) -> Option<Box<XmlNodeSet>> {
+    nodes.sort();
     xml_xpath_node_trailing_sorted(nodes, node)
 }
 
@@ -676,20 +705,24 @@ pub unsafe fn xml_xpath_node_trailing(
 /// Returns the nodes in @nodes1 that follow the first node in @nodes2
 /// in document order, @nodes1 if @nodes2 is NULL or empty or
 /// an empty node-set if @nodes1 doesn't contain @nodes2
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL or empty, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathTrailing")]
 pub unsafe fn xml_xpath_trailing(
-    nodes1: Option<NonNull<XmlNodeSet>>,
-    nodes2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let Some(mut nodes2) = nodes2.filter(|n| !n.as_ref().is_empty()) else {
-        return nodes1;
+    nodes1: Option<&mut XmlNodeSet>,
+    nodes2: Option<&mut XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let Some(nodes2) = nodes2.filter(|n| !n.is_empty()) else {
+        return nodes1.cloned().map(Box::new);
     };
-    let Some(mut nodes1) = nodes1.filter(|n| !n.as_ref().is_empty()) else {
+    let Some(nodes1) = nodes1.filter(|n| !n.is_empty()) else {
         return xml_xpath_node_set_create(null_mut());
     };
-    nodes1.as_mut().sort();
-    nodes2.as_mut().sort();
-    xml_xpath_node_trailing_sorted(nodes1, nodes2.as_ref().get(0))
+    nodes1.sort();
+    nodes2.sort();
+    xml_xpath_node_trailing_sorted(nodes1, nodes2.get(0))
 }
 
 /// Merges two nodesets, all nodes from @set2 are added to @set1.
@@ -698,17 +731,23 @@ pub unsafe fn xml_xpath_trailing(
 /// Returns @set1 once extended or NULL in case of error.
 ///
 /// Frees @set1 in case of error.
+///
+/// # Note
+/// In original libxml, if `nodes2` is NULL or empty, return `nodes1`.  
+/// However, this function returns the clone of `nodes1`.
 #[doc(alias = "xmlXPathNodeSetMergeAndClear")]
 pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
-    set1: Option<NonNull<XmlNodeSet>>,
-    set2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let init_nb_set1 = set1?.as_ref().node_tab.as_ref().map_or(0, |t| t.len());
-    let mut set2 = set2?;
-    if let Some(table) = set2.as_mut().node_tab.as_mut() {
-        'b: for n2 in table.drain(..) {
+    set1: Option<Box<XmlNodeSet>>,
+    set2: Option<&mut XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let mut set1 = set1?;
+    let init_nb_set1 = set1.node_tab.as_ref().map_or(0, |t| t.len());
+    let set2 = set2?;
+    if let Some(table) = set2.node_tab.as_mut() {
+        table.reverse();
+        'b: while let Some(n2) = table.pop() {
             // Skip duplicates.
-            if let Some(set1_table) = set1?.as_mut().node_tab.as_mut() {
+            if let Some(set1_table) = set1.as_mut().node_tab.as_mut() {
                 for &n1 in &set1_table[..init_nb_set1] {
                     if n1 == n2 {
                         // goto skip_node;
@@ -726,18 +765,18 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
                 }
             }
             // grow the nodeTab if needed
-            let set1_table = set1?.as_mut().node_tab.get_or_insert_with(Vec::new);
+            let set1_table = set1.node_tab.get_or_insert_with(Vec::new);
             if set1_table.len() >= XPATH_MAX_NODESET_LENGTH {
                 xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
-                xml_xpath_free_node_set(set1);
-                set2.as_mut().clear(true);
+                xml_xpath_free_node_set(Some(set1));
+                set2.clear(true);
                 return None;
             }
             set1_table.push(n2);
         }
     }
-    set1
+    Some(set1)
 
     // error:
     // xmlXPathFreeNodeSet(set1);
@@ -753,24 +792,26 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
 /// Frees @set1 in case of error.
 #[doc(alias = "xmlXPathNodeSetMergeAndClearNoDupls")]
 pub(super) unsafe fn xml_xpath_node_set_merge_and_clear_no_dupls(
-    set1: Option<NonNull<XmlNodeSet>>,
-    set2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
-    let mut set2 = set2?;
-    if let Some(table) = set2.as_mut().node_tab.as_mut() {
-        for n2 in table.drain(..) {
-            let set1_table = set1?.as_mut().node_tab.get_or_insert_with(Vec::new);
+    set1: Option<Box<XmlNodeSet>>,
+    set2: Option<&mut XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
+    let mut set1 = set1?;
+    let set2 = set2?;
+    if let Some(table) = set2.node_tab.as_mut() {
+        table.reverse();
+        while let Some(n2) = table.pop() {
+            let set1_table = set1.node_tab.get_or_insert_with(Vec::new);
             if set1_table.len() >= XPATH_MAX_NODESET_LENGTH {
                 xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
                 // goto error;
-                xml_xpath_free_node_set(set1);
-                set2.as_mut().clear(true);
+                xml_xpath_free_node_set(Some(set1));
+                set2.clear(true);
                 return None;
             }
             set1_table.push(n2);
         }
     }
-    set1
+    Some(set1)
 
     // error:
     //     xmlXPathFreeNodeSet(set1);
@@ -786,9 +827,9 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear_no_dupls(
 /// Frees @val1 in case of error.
 #[doc(alias = "xmlXPathNodeSetMerge")]
 pub unsafe fn xml_xpath_node_set_merge(
-    val1: Option<NonNull<XmlNodeSet>>,
-    val2: Option<NonNull<XmlNodeSet>>,
-) -> Option<NonNull<XmlNodeSet>> {
+    val1: Option<Box<XmlNodeSet>>,
+    val2: Option<&XmlNodeSet>,
+) -> Option<Box<XmlNodeSet>> {
     let mut skip: i32;
 
     let Some(val2) = val2 else {
@@ -799,7 +840,7 @@ pub unsafe fn xml_xpath_node_set_merge(
     // @@ with_ns to check whether namespace nodes should be looked at @@
     let init_nr = val1.as_ref().node_tab.as_ref().map_or(0, |t| t.len());
 
-    if let Some(table) = val2.as_ref().node_tab.as_ref() {
+    if let Some(table) = val2.node_tab.as_ref() {
         for &n2 in table {
             // check against duplicates
             skip = 0;
@@ -858,15 +899,15 @@ pub unsafe fn xml_xpath_node_set_merge(
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewNodeSetList")]
-pub unsafe fn xml_xpath_new_node_set_list(val: Option<NonNull<XmlNodeSet>>) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_new_node_set_list(val: Option<&mut XmlNodeSet>) -> XmlXPathObjectPtr {
     if let Some(val) = val {
-        if let Some(table) = val.as_ref().node_tab.as_ref() {
+        if let Some(table) = val.node_tab.as_ref() {
             let ret = xml_xpath_new_node_set(table[0]);
             if !ret.is_null() {
-                if let Some(mut nodeset) = (*ret).nodesetval {
+                if let Some(nodeset) = (*ret).nodesetval.as_deref_mut() {
                     for &node in &table[1..] {
                         // TODO: Propagate memory error.
-                        if nodeset.as_mut().add_unique(node) < 0 {
+                        if nodeset.add_unique(node) < 0 {
                             break;
                         }
                     }

@@ -3,7 +3,7 @@ use std::{
     ffi::{c_char, CStr},
     fs::File,
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut},
     sync::Mutex,
 };
 
@@ -268,9 +268,7 @@ pub(crate) unsafe extern "C" fn desret_xml_xpath_object_ptr(val: XmlXPathObjectP
 }
 
 #[cfg(feature = "xpath")]
-pub(crate) unsafe extern "C" fn desret_xml_node_set_ptr(
-    val: Option<std::ptr::NonNull<crate::xpath::XmlNodeSet>>,
-) {
+pub(crate) unsafe fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNodeSet>>) {
     use crate::xpath::xml_xpath_free_node_set;
 
     xml_xpath_free_node_set(val);
@@ -1228,11 +1226,11 @@ pub(crate) fn gen_xml_catalog_ptr(_no: i32, _nr: i32) -> XmlCatalogPtr {
 pub(crate) fn des_xml_catalog_ptr(_no: i32, _val: XmlCatalogPtr, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
-pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<NonNull<XmlNodeSet>> {
+pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>> {
     None
 }
 #[cfg(feature = "xpath")]
-pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<NonNull<XmlNodeSet>>, _nr: i32) {}
+pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr: i32) {}
 
 pub(crate) unsafe extern "C" fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
     xml_free_input_stream(val);

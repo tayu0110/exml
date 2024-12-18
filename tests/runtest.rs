@@ -4884,12 +4884,9 @@ unsafe extern "C" fn c14n_run_test(
     ret = xml_c14n_doc_dump_memory(
         doc,
         if !xpath.is_null() {
-            (*xpath)
-                .nodesetval
-                .as_ref()
-                .map_or(null_mut(), |n| n.as_ptr())
+            (*xpath).nodesetval.as_deref_mut()
         } else {
-            null_mut()
+            None
         },
         mode,
         inclusive_namespaces,

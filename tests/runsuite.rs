@@ -275,13 +275,8 @@ unsafe extern "C" fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodeP
         return null_mut();
     }
     if (*res).typ == XmlXPathObjectType::XPathNodeset {
-        if let Some(nodeset) = (*res).nodesetval {
-            if let Some(table) = nodeset
-                .as_ref()
-                .node_tab
-                .as_deref()
-                .filter(|t| !t.is_empty())
-            {
+        if let Some(nodeset) = (*res).nodesetval.as_deref() {
+            if let Some(table) = nodeset.node_tab.as_deref().filter(|t| !t.is_empty()) {
                 ret = table[0];
             }
         }

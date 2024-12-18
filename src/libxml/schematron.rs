@@ -1458,13 +1458,8 @@ unsafe extern "C" fn xml_schematron_get_node(
     }
 
     if (*ret).typ == XmlXPathObjectType::XPathNodeset {
-        if let Some(nodeset) = (*ret).nodesetval {
-            if let Some(table) = nodeset
-                .as_ref()
-                .node_tab
-                .as_deref()
-                .filter(|t| !t.is_empty())
-            {
+        if let Some(nodeset) = (*ret).nodesetval.as_deref() {
+            if let Some(table) = nodeset.node_tab.as_deref().filter(|t| !t.is_empty()) {
                 node = table[0];
             }
         }
@@ -1530,8 +1525,8 @@ unsafe extern "C" fn xml_schematron_format_report(
                 XmlXPathObjectType::XPathNodeset => {
                     let spacer: *mut XmlChar = c" ".as_ptr() as _;
 
-                    if let Some(nodeset) = (*eval).nodesetval {
-                        if let Some(table) = nodeset.as_ref().node_tab.as_deref() {
+                    if let Some(nodeset) = (*eval).nodesetval.as_deref() {
+                        if let Some(table) = nodeset.node_tab.as_deref() {
                             for (indx, &node) in table.iter().enumerate() {
                                 if indx > 0 {
                                     ret = xml_strcat(ret, spacer);
@@ -1749,7 +1744,7 @@ unsafe extern "C" fn xml_schematron_run_test(
     } else {
         match (*ret).typ {
             XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
-                if (*ret).nodesetval.map_or(true, |n| n.as_ref().is_empty()) {
+                if (*ret).nodesetval.as_deref().map_or(true, |n| n.is_empty()) {
                     failed = 1;
                 }
             }

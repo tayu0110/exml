@@ -44,7 +44,7 @@ use std::{
     borrow::Cow,
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut, NonNull},
+    ptr::{addr_of_mut, null_mut},
 };
 
 use libc::memset;
@@ -205,7 +205,7 @@ pub type XmlXPathObjectPtr = *mut XmlXPathObject;
 #[derive(Debug, Clone)]
 pub struct XmlXPathObject {
     pub typ: XmlXPathObjectType,
-    pub nodesetval: Option<NonNull<XmlNodeSet>>,
+    pub nodesetval: Option<Box<XmlNodeSet>>,
     pub boolval: bool,
     pub floatval: f64,
     pub stringval: Option<String>,
@@ -621,7 +621,7 @@ pub unsafe fn xml_xpath_object_copy(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr
         XmlXPathObjectType::XPathString => {}
         XmlXPathObjectType::XPathXSLTTree | XmlXPathObjectType::XPathNodeset => {
             // TODO: Check memory error.
-            (*ret).nodesetval = xml_xpath_node_set_merge(None, (*val).nodesetval);
+            (*ret).nodesetval = xml_xpath_node_set_merge(None, (*val).nodesetval.as_deref());
             // Do not deallocate the copied tree value
             (*ret).boolval = false;
         }
@@ -826,8 +826,8 @@ pub fn xml_xpath_cast_string_to_boolean(val: Option<&str>) -> bool {
 /// Returns the boolean value
 #[doc(alias = "xmlXPathCastNodeSetToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: Option<NonNull<XmlNodeSet>>) -> bool {
-    ns.map_or(false, |n| !n.as_ref().is_empty())
+pub unsafe fn xml_xpath_cast_node_set_to_boolean(ns: Option<&XmlNodeSet>) -> bool {
+    ns.map_or(false, |n| !n.is_empty())
 }
 
 /// Converts an XPath object to its boolean value
@@ -842,7 +842,7 @@ pub unsafe fn xml_xpath_cast_to_boolean(val: XmlXPathObjectPtr) -> bool {
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => false,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_boolean((*val).nodesetval)
+            xml_xpath_cast_node_set_to_boolean((*val).nodesetval.as_deref())
         }
         XmlXPathObjectType::XPathString => {
             xml_xpath_cast_string_to_boolean((*val).stringval.as_deref())
@@ -908,7 +908,7 @@ pub unsafe extern "C" fn xml_xpath_cast_node_to_number(node: XmlNodePtr) -> f64 
 /// Returns the number value
 #[doc(alias = "xmlXPathCastNodeSetToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<NonNull<XmlNodeSet>>) -> f64 {
+pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<&mut XmlNodeSet>) -> f64 {
     use std::ffi::CString;
 
     let Some(ns) = ns else {
@@ -924,7 +924,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_number(ns: Option<NonNull<XmlNodeSet>>)
 /// Returns the number value
 #[doc(alias = "xmlXPathCastToNumber")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
+pub unsafe fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64 {
     use std::ffi::CString;
 
     if val.is_null() {
@@ -933,7 +933,7 @@ pub unsafe extern "C" fn xml_xpath_cast_to_number(val: XmlXPathObjectPtr) -> f64
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => XML_XPATH_NAN,
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_number((*val).nodesetval)
+            xml_xpath_cast_node_set_to_number((*val).nodesetval.as_deref_mut())
         }
         XmlXPathObjectType::XPathString => {
             let strval = (*val)
@@ -1108,19 +1108,16 @@ pub unsafe fn xml_xpath_cast_node_to_string(node: XmlNodePtr) -> String {
 /// Returns a newly allocated string.
 #[doc(alias = "xmlXPathCastNodeSetToString")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_cast_node_set_to_string(
-    ns: Option<NonNull<XmlNodeSet>>,
-) -> Cow<'static, str> {
-    let Some(mut ns) = ns.filter(|n| !n.as_ref().is_empty()) else {
+pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> Cow<'static, str> {
+    let Some(ns) = ns.filter(|n| !n.is_empty()) else {
         return "".into();
     };
 
-    let table = ns.as_ref().node_tab.as_ref().unwrap();
-    if table.len() > 1 {
-        ns.as_mut().sort();
+    if ns.len() > 1 {
+        ns.sort();
     }
 
-    let table = ns.as_ref().node_tab.as_ref().unwrap();
+    let table = ns.node_tab.as_ref().unwrap();
     xml_xpath_cast_node_to_string(table[0]).into()
 }
 
@@ -1136,7 +1133,7 @@ pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, s
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => "".into(),
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            xml_xpath_cast_node_set_to_string((*val).nodesetval)
+            xml_xpath_cast_node_set_to_string((*val).nodesetval.as_deref_mut())
         }
         XmlXPathObjectType::XPathString => (*val).stringval.clone().unwrap().into(),
         XmlXPathObjectType::XPathBoolean => xml_xpath_cast_boolean_to_string((*val).boolval).into(),
@@ -1203,7 +1200,9 @@ pub unsafe fn xml_xpath_convert_string(val: XmlXPathObjectPtr) -> XmlXPathObject
     match (*val).typ {
         XmlXPathObjectType::XPathUndefined => {}
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            res = Some(xml_xpath_cast_node_set_to_string((*val).nodesetval));
+            res = Some(xml_xpath_cast_node_set_to_string(
+                (*val).nodesetval.as_deref_mut(),
+            ));
         }
         XmlXPathObjectType::XPathString => {
             return val;
@@ -1297,10 +1296,7 @@ unsafe fn xml_xpath_cache_free_object_list(list: XmlPointerListPtr) {
         obj = *(*list).items.add(i as usize) as _;
         // Note that it is already assured that we don't need to
         // look out for namespace nodes in the node-set.
-        if let Some(mut nodeset) = (*obj).nodesetval.take() {
-            let _ = nodeset.as_mut().node_tab.take();
-            let _ = *Box::from_raw(nodeset.as_ptr());
-        }
+        let _ = (*obj).nodesetval.take();
         xml_free(obj as _);
     }
     xml_pointer_list_free(list);
@@ -1619,14 +1615,10 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
             return ((*res).floatval == (*ctxt).proximity_position as _) as i32;
         }
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
-            let Some(nodeset) = (*res).nodesetval else {
+            let Some(nodeset) = (*res).nodesetval.as_deref() else {
                 return 0;
             };
-            return nodeset
-                .as_ref()
-                .node_tab
-                .as_ref()
-                .map_or(false, |s| !s.is_empty()) as i32;
+            return nodeset.node_tab.as_ref().map_or(false, |s| !s.is_empty()) as i32;
         }
         XmlXPathObjectType::XPathString => {
             return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty()) as i32;
@@ -2330,7 +2322,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let ns = gen_xml_node_set_ptr(n_ns, 0);
 
-                let _ = xml_xpath_cast_node_set_to_boolean(ns);
+                let _ = xml_xpath_cast_node_set_to_boolean(ns.as_deref());
                 // desret_int(ret_val);
                 des_xml_node_set_ptr(n_ns, ns, 0);
                 reset_last_error();
@@ -2358,9 +2350,9 @@ mod tests {
 
             for n_ns in 0..GEN_NB_XML_NODE_SET_PTR {
                 let mem_base = xml_mem_blocks();
-                let ns = gen_xml_node_set_ptr(n_ns, 0);
+                let mut ns = gen_xml_node_set_ptr(n_ns, 0);
 
-                let ret_val = xml_xpath_cast_node_set_to_number(ns);
+                let ret_val = xml_xpath_cast_node_set_to_number(ns.as_deref_mut());
                 desret_double(ret_val);
                 des_xml_node_set_ptr(n_ns, ns, 0);
                 reset_last_error();
@@ -2388,9 +2380,9 @@ mod tests {
 
             for n_ns in 0..GEN_NB_XML_NODE_SET_PTR {
                 let mem_base = xml_mem_blocks();
-                let ns = gen_xml_node_set_ptr(n_ns, 0);
+                let mut ns = gen_xml_node_set_ptr(n_ns, 0);
 
-                let _ = xml_xpath_cast_node_set_to_string(ns);
+                let _ = xml_xpath_cast_node_set_to_string(ns.as_deref_mut());
                 // desret_xml_char_ptr(ret_val);
                 des_xml_node_set_ptr(n_ns, ns, 0);
                 reset_last_error();
@@ -3630,7 +3622,7 @@ mod tests {
                     let nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
                     let nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
 
-                    let ret_val = xml_xpath_difference(nodes1, nodes2);
+                    let ret_val = xml_xpath_difference(nodes1.as_deref(), nodes2.as_deref());
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
@@ -3661,9 +3653,9 @@ mod tests {
 
             for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
                 let mem_base = xml_mem_blocks();
-                let nodes = gen_xml_node_set_ptr(n_nodes, 0);
+                let mut nodes = gen_xml_node_set_ptr(n_nodes, 0);
 
-                let ret_val = xml_xpath_distinct(nodes);
+                let ret_val = xml_xpath_distinct(nodes.as_deref_mut());
                 desret_xml_node_set_ptr(ret_val);
                 des_xml_node_set_ptr(n_nodes, nodes, 0);
                 reset_last_error();
@@ -3690,7 +3682,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let nodes = gen_xml_node_set_ptr(n_nodes, 0);
 
-                let ret_val = xml_xpath_distinct_sorted(nodes);
+                let ret_val = xml_xpath_distinct_sorted(nodes.as_deref());
                 desret_xml_node_set_ptr(ret_val);
                 des_xml_node_set_ptr(n_nodes, nodes, 0);
                 reset_last_error();
@@ -4079,10 +4071,10 @@ mod tests {
             for n_nodes1 in 0..GEN_NB_XML_NODE_SET_PTR {
                 for n_nodes2 in 0..GEN_NB_XML_NODE_SET_PTR {
                     let mem_base = xml_mem_blocks();
-                    let nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
-                    let nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
+                    let mut nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
+                    let mut nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
 
-                    let ret_val = xml_xpath_leading(nodes1, nodes2);
+                    let ret_val = xml_xpath_leading(nodes1.as_deref_mut(), nodes2.as_deref_mut());
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
@@ -4114,7 +4106,7 @@ mod tests {
                     let nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
                     let nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
 
-                    let ret_val = xml_xpath_leading_sorted(nodes1, nodes2);
+                    let ret_val = xml_xpath_leading_sorted(nodes1.as_deref(), nodes2.as_deref());
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
@@ -4355,9 +4347,9 @@ mod tests {
 
             for n_val in 0..GEN_NB_XML_NODE_SET_PTR {
                 let mem_base = xml_mem_blocks();
-                let val = gen_xml_node_set_ptr(n_val, 0);
+                let mut val = gen_xml_node_set_ptr(n_val, 0);
 
-                let ret_val = xml_xpath_new_node_set_list(val);
+                let ret_val = xml_xpath_new_node_set_list(val.as_deref_mut());
                 desret_xml_xpath_object_ptr(ret_val);
                 des_xml_node_set_ptr(n_val, val, 0);
                 reset_last_error();
@@ -4841,10 +4833,10 @@ mod tests {
             for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
                 for n_node in 0..GEN_NB_XML_NODE_PTR {
                     let mem_base = xml_mem_blocks();
-                    let nodes = gen_xml_node_set_ptr(n_nodes, 0);
+                    let mut nodes = gen_xml_node_set_ptr(n_nodes, 0);
                     let node = gen_xml_node_ptr(n_node, 1);
 
-                    let ret_val = xml_xpath_node_leading(nodes, node);
+                    let ret_val = xml_xpath_node_leading(nodes.as_deref_mut(), node);
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes, nodes, 0);
                     des_xml_node_ptr(n_node, node, 1);
@@ -4879,7 +4871,7 @@ mod tests {
                     let nodes = gen_xml_node_set_ptr(n_nodes, 0);
                     let node = gen_xml_node_ptr(n_node, 1);
 
-                    let ret_val = xml_xpath_node_leading_sorted(nodes, node);
+                    let ret_val = xml_xpath_node_leading_sorted(nodes.as_deref(), node);
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes, nodes, 0);
                     des_xml_node_ptr(n_node, node, 1);
@@ -4914,9 +4906,9 @@ mod tests {
                     let val1 = gen_xml_node_set_ptr(n_val1, 0);
                     let val2 = gen_xml_node_set_ptr(n_val2, 1);
 
-                    let ret_val = xml_xpath_node_set_merge(val1, val2);
+                    let ret_val = xml_xpath_node_set_merge(val1, val2.as_deref());
                     desret_xml_node_set_ptr(ret_val);
-                    des_xml_node_set_ptr(n_val1, val1, 0);
+                    // des_xml_node_set_ptr(n_val1, val1, 0);
                     des_xml_node_set_ptr(n_val2, val2, 1);
                     reset_last_error();
                     if mem_base != xml_mem_blocks() {
@@ -5963,10 +5955,10 @@ mod tests {
             for n_nodes1 in 0..GEN_NB_XML_NODE_SET_PTR {
                 for n_nodes2 in 0..GEN_NB_XML_NODE_SET_PTR {
                     let mem_base = xml_mem_blocks();
-                    let nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
-                    let nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
+                    let mut nodes1 = gen_xml_node_set_ptr(n_nodes1, 0);
+                    let mut nodes2 = gen_xml_node_set_ptr(n_nodes2, 1);
 
-                    let ret_val = xml_xpath_trailing(nodes1, nodes2);
+                    let ret_val = xml_xpath_trailing(nodes1.as_deref_mut(), nodes2.as_deref_mut());
                     desret_xml_node_set_ptr(ret_val);
                     des_xml_node_set_ptr(n_nodes1, nodes1, 0);
                     des_xml_node_set_ptr(n_nodes2, nodes2, 1);
@@ -6200,7 +6192,7 @@ mod tests {
 
                 let ret_val = xml_xpath_wrap_node_set(val);
                 desret_xml_xpath_object_ptr(ret_val);
-                des_xml_node_set_ptr(n_val, val, 0);
+                // des_xml_node_set_ptr(n_val, val, 0);
                 reset_last_error();
                 if mem_base != xml_mem_blocks() {
                     leaks += 1;
