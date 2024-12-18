@@ -1117,8 +1117,7 @@ pub unsafe fn xml_xpath_cast_node_set_to_string(ns: Option<&mut XmlNodeSet>) -> 
         ns.sort();
     }
 
-    let table = ns.node_tab.as_ref().unwrap();
-    xml_xpath_cast_node_to_string(table[0]).into()
+    xml_xpath_cast_node_to_string(ns.node_tab[0]).into()
 }
 
 /// Converts an existing object to its string() equivalent
@@ -1598,10 +1597,7 @@ pub unsafe extern "C" fn xml_xpath_eval_expression(
 /// Returns 1 if predicate is true, 0 otherwise
 #[doc(alias = "xmlXPathEvalPredicate")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_eval_predicate(
-    ctxt: XmlXPathContextPtr,
-    res: XmlXPathObjectPtr,
-) -> i32 {
+pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathObjectPtr) -> i32 {
     use crate::generic_error;
 
     if ctxt.is_null() || res.is_null() {
@@ -1618,7 +1614,7 @@ pub unsafe extern "C" fn xml_xpath_eval_predicate(
             let Some(nodeset) = (*res).nodesetval.as_deref() else {
                 return 0;
             };
-            return nodeset.node_tab.as_ref().map_or(false, |s| !s.is_empty()) as i32;
+            return !nodeset.node_tab.is_empty() as i32;
         }
         XmlXPathObjectType::XPathString => {
             return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty()) as i32;

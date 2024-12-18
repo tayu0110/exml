@@ -1279,63 +1279,61 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
             let Some(set) = (*obj).nodesetval.as_deref() else {
                 return null_mut();
             };
-            if let Some(table) = set.node_tab.as_deref() {
-                for &now in table {
-                    if now.is_null() {
-                        continue;
-                    }
-                    let node = match (*now).element_type() {
-                        XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                            let node = (*now)
-                                .as_document_node()
-                                .unwrap()
-                                .as_ref()
-                                .get_root_element();
-                            if node.is_null() {
-                                xml_xinclude_err!(
-                                    ctxt,
-                                    now,
-                                    XmlParserErrors::XmlErrInternalError,
-                                    "document without root\n"
-                                );
-                                continue;
-                            }
-                            node
-                        }
-                        XmlElementType::XmlTextNode
-                        | XmlElementType::XmlCDATASectionNode
-                        | XmlElementType::XmlElementNode
-                        | XmlElementType::XmlPINode
-                        | XmlElementType::XmlCommentNode => now,
-                        _ => {
+            for &now in &set.node_tab {
+                if now.is_null() {
+                    continue;
+                }
+                let node = match (*now).element_type() {
+                    XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
+                        let node = (*now)
+                            .as_document_node()
+                            .unwrap()
+                            .as_ref()
+                            .get_root_element();
+                        if node.is_null() {
                             xml_xinclude_err!(
                                 ctxt,
                                 now,
-                                XmlParserErrors::XmlXIncludeXPtrResult,
-                                "invalid node type in XPtr result\n"
+                                XmlParserErrors::XmlErrInternalError,
+                                "document without root\n"
                             );
-                            continue; /* for */
+                            continue;
                         }
-                    };
-                    // OPTIMIZE TODO: External documents should already be
-                    // expanded, so xmlDocCopyNode should work as well.
-                    // xmlXIncludeCopyNode is only required for the initial document.
-                    copy = xml_xinclude_copy_node(ctxt, node, 0);
-                    if copy.is_null() {
-                        xml_free_node_list(list);
-                        return null_mut();
+                        node
                     }
-                    if last.is_null() {
-                        list = copy;
-                    } else {
-                        while let Some(next) = (*last).next {
-                            last = next.as_ptr();
-                        }
-                        (*copy).prev = NodePtr::from_ptr(last);
-                        (*last).next = NodePtr::from_ptr(copy);
+                    XmlElementType::XmlTextNode
+                    | XmlElementType::XmlCDATASectionNode
+                    | XmlElementType::XmlElementNode
+                    | XmlElementType::XmlPINode
+                    | XmlElementType::XmlCommentNode => now,
+                    _ => {
+                        xml_xinclude_err!(
+                            ctxt,
+                            now,
+                            XmlParserErrors::XmlXIncludeXPtrResult,
+                            "invalid node type in XPtr result\n"
+                        );
+                        continue; /* for */
                     }
-                    last = copy;
+                };
+                // OPTIMIZE TODO: External documents should already be
+                // expanded, so xmlDocCopyNode should work as well.
+                // xmlXIncludeCopyNode is only required for the initial document.
+                copy = xml_xinclude_copy_node(ctxt, node, 0);
+                if copy.is_null() {
+                    xml_free_node_list(list);
+                    return null_mut();
                 }
+                if last.is_null() {
+                    list = copy;
+                } else {
+                    while let Some(next) = (*last).next {
+                        last = next.as_ptr();
+                    }
+                    (*copy).prev = NodePtr::from_ptr(last);
+                    (*last).next = NodePtr::from_ptr(copy);
+                }
+                last = copy;
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
@@ -1631,72 +1629,70 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                     XmlXPathObjectType::XPathRange | XmlXPathObjectType::XPathLocationset => {} // _ => {}
                 }
                 if let Some(set) = (*xptr).nodesetval.as_deref_mut() {
-                    if let Some(table) = set.node_tab.as_deref_mut() {
-                        for node in table.iter_mut() {
-                            if node.is_null() {
+                    for node in set.node_tab.iter_mut() {
+                        if node.is_null() {
+                            continue;
+                        }
+                        match (**node).element_type() {
+                            XmlElementType::XmlElementNode
+                            | XmlElementType::XmlTextNode
+                            | XmlElementType::XmlCDATASectionNode
+                            | XmlElementType::XmlEntityRefNode
+                            | XmlElementType::XmlEntityNode
+                            | XmlElementType::XmlPINode
+                            | XmlElementType::XmlCommentNode
+                            | XmlElementType::XmlDocumentNode
+                            | XmlElementType::XmlHTMLDocumentNode => continue,
+
+                            XmlElementType::XmlAttributeNode => {
+                                let fragment =
+                                    CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                                xml_xinclude_err!(
+                                    ctxt,
+                                    (*refe).elem,
+                                    XmlParserErrors::XmlXIncludeXPtrResult,
+                                    "XPointer selects an attribute: #{}\n",
+                                    fragment
+                                );
+                                *node = null_mut();
                                 continue;
                             }
-                            match (**node).element_type() {
-                                XmlElementType::XmlElementNode
-                                | XmlElementType::XmlTextNode
-                                | XmlElementType::XmlCDATASectionNode
-                                | XmlElementType::XmlEntityRefNode
-                                | XmlElementType::XmlEntityNode
-                                | XmlElementType::XmlPINode
-                                | XmlElementType::XmlCommentNode
-                                | XmlElementType::XmlDocumentNode
-                                | XmlElementType::XmlHTMLDocumentNode => continue,
-
-                                XmlElementType::XmlAttributeNode => {
-                                    let fragment =
-                                        CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                                    xml_xinclude_err!(
-                                        ctxt,
-                                        (*refe).elem,
-                                        XmlParserErrors::XmlXIncludeXPtrResult,
-                                        "XPointer selects an attribute: #{}\n",
-                                        fragment
-                                    );
-                                    *node = null_mut();
-                                    continue;
-                                }
-                                XmlElementType::XmlNamespaceDecl => {
-                                    let fragment =
-                                        CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                                    xml_xinclude_err!(
-                                        ctxt,
-                                        (*refe).elem,
-                                        XmlParserErrors::XmlXIncludeXPtrResult,
-                                        "XPointer selects a namespace: #{}\n",
-                                        fragment
-                                    );
-                                    *node = null_mut();
-                                    continue;
-                                }
-                                XmlElementType::XmlDocumentTypeNode
-                                | XmlElementType::XmlDocumentFragNode
-                                | XmlElementType::XmlNotationNode
-                                | XmlElementType::XmlDTDNode
-                                | XmlElementType::XmlElementDecl
-                                | XmlElementType::XmlAttributeDecl
-                                | XmlElementType::XmlEntityDecl
-                                | XmlElementType::XmlXIncludeStart
-                                | XmlElementType::XmlXIncludeEnd => {
-                                    let fragment =
-                                        CStr::from_ptr(fragment as *const i8).to_string_lossy();
-                                    xml_xinclude_err!(
-                                        ctxt,
-                                        (*refe).elem,
-                                        XmlParserErrors::XmlXIncludeXPtrResult,
-                                        "XPointer selects unexpected nodes: #{}\n",
-                                        fragment
-                                    );
-                                    *node = null_mut();
-                                    *node = null_mut();
-                                    continue; /* for */
-                                }
-                                _ => unreachable!(),
+                            XmlElementType::XmlNamespaceDecl => {
+                                let fragment =
+                                    CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                                xml_xinclude_err!(
+                                    ctxt,
+                                    (*refe).elem,
+                                    XmlParserErrors::XmlXIncludeXPtrResult,
+                                    "XPointer selects a namespace: #{}\n",
+                                    fragment
+                                );
+                                *node = null_mut();
+                                continue;
                             }
+                            XmlElementType::XmlDocumentTypeNode
+                            | XmlElementType::XmlDocumentFragNode
+                            | XmlElementType::XmlNotationNode
+                            | XmlElementType::XmlDTDNode
+                            | XmlElementType::XmlElementDecl
+                            | XmlElementType::XmlAttributeDecl
+                            | XmlElementType::XmlEntityDecl
+                            | XmlElementType::XmlXIncludeStart
+                            | XmlElementType::XmlXIncludeEnd => {
+                                let fragment =
+                                    CStr::from_ptr(fragment as *const i8).to_string_lossy();
+                                xml_xinclude_err!(
+                                    ctxt,
+                                    (*refe).elem,
+                                    XmlParserErrors::XmlXIncludeXPtrResult,
+                                    "XPointer selects unexpected nodes: #{}\n",
+                                    fragment
+                                );
+                                *node = null_mut();
+                                *node = null_mut();
+                                continue; /* for */
+                            }
+                            _ => unreachable!(),
                         }
                     }
                 }

@@ -2250,14 +2250,14 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
             #[cfg(feature = "libxml_output")]
             {
                 if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-                    if let Some(table) = nodeset.node_tab.as_deref().filter(|t| !t.is_empty()) {
+                    if !nodeset.node_tab.is_empty() {
                         let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                             eprintln!("Out of memory for XPath");
                             PROGRESULT = XmllintReturnCode::ErrMem;
                             return;
                         };
                         let buf = Rc::new(RefCell::new(buf));
-                        for &node in table {
+                        for &node in &nodeset.node_tab {
                             (*node).dump_output(buf.clone(), null_mut(), 0, 0, None);
                             buf.borrow_mut().write_bytes(b"\n");
                         }

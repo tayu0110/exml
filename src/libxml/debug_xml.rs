@@ -2041,10 +2041,8 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
             XmlXPathObjectType::XPathNodeset => {
                 #[cfg(feature = "libxml_output")]
                 if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                    if let Some(table) = nodeset.node_tab.as_deref() {
-                        for &node in table {
-                            xml_shell_print_node_ctxt(ctxt, node);
-                        }
+                    for &node in &nodeset.node_tab {
+                        xml_shell_print_node_ctxt(ctxt, node);
                     }
                 } else {
                     generic_error!("Empty node set\n");
@@ -3298,10 +3296,8 @@ pub unsafe fn xml_shell<'a>(
                         }
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                if let Some(table) = nodeset.node_tab.as_deref() {
-                                    for &node in table {
-                                        xml_shell_du(ctxt, null_mut(), node, null_mut());
-                                    }
+                                for &node in &nodeset.node_tab {
+                                    xml_shell_du(ctxt, null_mut(), node, null_mut());
                                 }
                             }
                         }
@@ -3472,13 +3468,11 @@ pub unsafe fn xml_shell<'a>(
                                 break;
                             };
 
-                            if let Some(table) = nodeset.node_tab.as_deref() {
-                                for &node in table {
-                                    if dir != 0 {
-                                        xml_shell_dir(ctxt, null_mut(), node, null_mut());
-                                    } else {
-                                        xml_shell_list(ctxt, null_mut(), node, null_mut());
-                                    }
+                            for &node in &nodeset.node_tab {
+                                if dir != 0 {
+                                    xml_shell_dir(ctxt, null_mut(), node, null_mut());
+                                } else {
+                                    xml_shell_list(ctxt, null_mut(), node, null_mut());
                                 }
                             }
                         }
@@ -3574,15 +3568,11 @@ pub unsafe fn xml_shell<'a>(
                         }
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                if let Some(table) = nodeset.node_tab.as_deref() {
-                                    for &node in table {
-                                        if xml_shell_pwd(ctxt, dir.as_mut_ptr(), node, null_mut())
-                                            == 0
-                                        {
-                                            let dir =
-                                                CStr::from_ptr(dir.as_ptr()).to_string_lossy();
-                                            writeln!((*ctxt).output, "{dir}");
-                                        }
+                                for &node in &nodeset.node_tab {
+                                    if xml_shell_pwd(ctxt, dir.as_mut_ptr(), node, null_mut()) == 0
+                                    {
+                                        let dir = CStr::from_ptr(dir.as_ptr()).to_string_lossy();
+                                        writeln!((*ctxt).output, "{dir}");
                                     }
                                 }
                             }
@@ -3678,10 +3668,8 @@ pub unsafe fn xml_shell<'a>(
                         }
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                if let Some(table) =
-                                    nodeset.node_tab.as_deref().filter(|t| t.len() == 1)
-                                {
-                                    (*ctxt).node = table[0];
+                                if nodeset.node_tab.len() == 1 {
+                                    (*ctxt).node = nodeset.node_tab[0];
                                     if !(*ctxt).node.is_null()
                                         && ((*(*ctxt).node).element_type()
                                             == XmlElementType::XmlNamespaceDecl)
@@ -3693,7 +3681,7 @@ pub unsafe fn xml_shell<'a>(
                                     generic_error!(
                                         "{} is a {} Node Set\n",
                                         CStr::from_ptr(arg.as_ptr()).to_string_lossy(),
-                                        nodeset.node_tab.as_ref().map_or(0, |t| t.len())
+                                        nodeset.node_tab.len()
                                     );
                                 }
                             } else {
@@ -3802,13 +3790,11 @@ pub unsafe fn xml_shell<'a>(
                         }
                         XmlXPathObjectType::XPathNodeset => {
                             if let Some(nodeset) = (*list).nodesetval.as_deref() {
-                                if let Some(table) = nodeset.node_tab.as_deref() {
-                                    for &node in table {
-                                        if i > 0 {
-                                            writeln!((*ctxt).output, " -------");
-                                        }
-                                        xml_shell_cat(ctxt, null_mut(), node, null_mut());
+                                for &node in &nodeset.node_tab {
+                                    if i > 0 {
+                                        writeln!((*ctxt).output, " -------");
                                     }
+                                    xml_shell_cat(ctxt, null_mut(), node, null_mut());
                                 }
                             }
                         }

@@ -25,7 +25,7 @@ pub type XmlNodeSetPtr = *mut XmlNodeSet;
 #[derive(Debug, Clone, Default)]
 pub struct XmlNodeSet {
     // array of nodes in no particular order
-    pub node_tab: Option<Vec<*mut XmlNode>>,
+    pub node_tab: Vec<*mut XmlNode>,
     // @@ with_ns to check whether namespace nodes should be looked at @@
 }
 
@@ -33,7 +33,7 @@ impl XmlNodeSet {
     pub unsafe fn with_value(val: *mut XmlNode) -> Option<Self> {
         let mut ret = Self::default();
         if !val.is_null() {
-            ret.node_tab = Some(vec![]);
+            ret.node_tab = vec![];
             if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
                 let ns = val as XmlNsPtr;
                 let ns_node = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
@@ -41,9 +41,9 @@ impl XmlNodeSet {
                 if ns_node.is_null() {
                     return None;
                 }
-                ret.node_tab.as_mut().unwrap().push(ns_node);
+                ret.node_tab.push(ns_node);
             } else {
-                ret.node_tab.as_mut().unwrap().push(val);
+                ret.node_tab.push(val);
             }
         }
         Some(ret)
@@ -54,7 +54,7 @@ impl XmlNodeSet {
     /// Returns %TRUE if @ns is an empty node-set.
     #[doc(alias = "xmlXPathNodeSetIsEmpty")]
     pub(crate) fn is_empty(&self) -> bool {
-        self.node_tab.as_ref().map_or(true, |t| t.is_empty())
+        self.node_tab.is_empty()
     }
 
     /// Implement a functionality similar to the DOM NodeList.length.
@@ -62,7 +62,7 @@ impl XmlNodeSet {
     /// Returns the number of nodes in the node-set.
     #[doc(alias = "xmlXPathNodeSetGetLength")]
     pub(crate) fn len(&self) -> usize {
-        self.node_tab.as_ref().map_or(0, |t| t.len())
+        self.node_tab.len()
     }
 
     /// Implements a functionality similar to the DOM NodeList.item().
@@ -71,11 +71,7 @@ impl XmlNodeSet {
     /// @index is out of range (0 to length-1)
     #[doc(alias = "xmlXPathNodeSetItem")]
     pub(crate) fn get(&self, index: usize) -> *mut XmlNode {
-        *self
-            .node_tab
-            .as_deref()
-            .and_then(|table| table.get(index))
-            .unwrap_or(&null_mut())
+        *self.node_tab.get(index).unwrap_or(&null_mut())
     }
 
     /// checks whether @cur contains @val
@@ -86,28 +82,27 @@ impl XmlNodeSet {
         if val.is_null() {
             return false;
         }
-        if let Some(table) = self.node_tab.as_ref() {
-            if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
-                for &node in table {
-                    if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                        let ns1: XmlNsPtr = val as XmlNsPtr;
-                        let ns2: XmlNsPtr = node as XmlNsPtr;
-                        if ns1 == ns2 {
-                            return true;
-                        }
-                        if !(*ns1).next.is_null()
-                            && (*ns2).next == (*ns1).next
-                            && xml_str_equal((*ns1).prefix as _, (*ns2).prefix as _)
-                        {
-                            return true;
-                        }
-                    }
-                }
-            } else {
-                for &node in table {
-                    if node == val {
+        let table = &self.node_tab;
+        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
+            for &node in table {
+                if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                    let ns1: XmlNsPtr = val as XmlNsPtr;
+                    let ns2: XmlNsPtr = node as XmlNsPtr;
+                    if ns1 == ns2 {
                         return true;
                     }
+                    if !(*ns1).next.is_null()
+                        && (*ns2).next == (*ns1).next
+                        && xml_str_equal((*ns1).prefix as _, (*ns2).prefix as _)
+                    {
+                        return true;
+                    }
+                }
+            }
+        } else {
+            for &node in table {
+                if node == val {
+                    return true;
                 }
             }
         }
@@ -120,12 +115,11 @@ impl XmlNodeSet {
     /// Returns true (1) if @nodes1 shares any node with @nodes2, false (0) otherwise
     #[doc(alias = "xmlXPathHasSameNodes")]
     pub unsafe fn has_same_nodes(&self, other: &XmlNodeSet) -> bool {
-        let Some(t1) = self.node_tab.as_deref().filter(|t| !t.is_empty()) else {
+        let t1 = &self.node_tab;
+        let t2 = &other.node_tab;
+        if t1.is_empty() || t2.is_empty() {
             return false;
-        };
-        let Some(t2) = other.node_tab.as_deref().filter(|t| !t.is_empty()) else {
-            return false;
-        };
+        }
         t1.iter().any(|node| t2.contains(node))
     }
 
@@ -137,12 +131,11 @@ impl XmlNodeSet {
     #[doc(alias = "xmlXPathIntersection")]
     pub unsafe fn intersection(&self, other: &XmlNodeSet) -> Option<Box<XmlNodeSet>> {
         let mut ret = xml_xpath_node_set_create(null_mut())?;
-        let Some(t1) = self.node_tab.as_deref().filter(|t| !t.is_empty()) else {
+        let t1 = &self.node_tab;
+        let t2 = &other.node_tab;
+        if t1.is_empty() || t2.is_empty() {
             return Some(ret);
-        };
-        let Some(t2) = other.node_tab.as_deref().filter(|t| !t.is_empty()) else {
-            return Some(ret);
-        };
+        }
 
         for node in t1 {
             if t2.contains(node) {
@@ -160,14 +153,13 @@ impl XmlNodeSet {
     /// If `free_actual_tree` is `true`, free the actual tree also.
     #[doc(alias = "xmlXPathFreeNodeSet", alias = "xmlXPathFreeValueTree")]
     pub(crate) unsafe fn cleanup(&mut self, free_actual_tree: bool) {
-        if let Some(table) = self.node_tab.as_mut() {
-            while let Some(node) = table.pop() {
-                if !node.is_null() {
-                    if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                        xml_xpath_node_set_free_ns(node as XmlNsPtr);
-                    } else if free_actual_tree {
-                        xml_free_node_list(node);
-                    }
+        let table = &mut self.node_tab;
+        while let Some(node) = table.pop() {
+            if !node.is_null() {
+                if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
+                } else if free_actual_tree {
+                    xml_free_node_list(node);
                 }
             }
         }
@@ -178,27 +170,26 @@ impl XmlNodeSet {
     pub unsafe fn sort(&mut self) {
         // Use the old Shell's sort implementation to sort the node-set
         // Timsort ought to be quite faster
-        if let Some(table) = self.node_tab.as_mut() {
-            // TODO: Use `sort_unstable` of Rust standard library.
-            //       When I tried to rewirte, it did not work fine
-            //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
-            let len = table.len();
-            let mut incr = len;
-            while {
-                incr /= 2;
-                incr > 0
-            } {
-                for i in incr..len {
-                    let mut j = i as i32 - incr as i32;
-                    while j >= 0 {
-                        if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
-                            .map_or(false, |f| f.is_gt())
-                        {
-                            table.swap(j as usize, j as usize + incr);
-                            j -= incr as i32;
-                        } else {
-                            break;
-                        }
+        let table = &mut self.node_tab;
+        // TODO: Use `sort_unstable` of Rust standard library.
+        //       When I tried to rewirte, it did not work fine
+        //       because `xml_xpath_cmp_nodes_ext` does not satisfy "total order" constraint.
+        let len = table.len();
+        let mut incr = len;
+        while {
+            incr /= 2;
+            incr > 0
+        } {
+            for i in incr..len {
+                let mut j = i as i32 - incr as i32;
+                while j >= 0 {
+                    if xml_xpath_cmp_nodes_ext(table[j as usize], table[j as usize + incr])
+                        .map_or(false, |f| f.is_gt())
+                    {
+                        table.swap(j as usize, j as usize + incr);
+                        j -= incr as i32;
+                    } else {
+                        break;
                     }
                 }
             }
@@ -208,20 +199,18 @@ impl XmlNodeSet {
     /// Removes an entry from an existing NodeSet list.
     #[doc(alias = "xmlXPathNodeSetRemove")]
     pub unsafe fn remove(&mut self, val: i32) {
-        if let Some(table) = self.node_tab.as_mut() {
-            if val >= table.len() as i32 {
-                return;
-            }
-            if !table[val as usize].is_null()
-                && matches!(
-                    (*(table[val as usize])).element_type(),
-                    XmlElementType::XmlNamespaceDecl
-                )
-            {
-                xml_xpath_node_set_free_ns(table[val as usize] as XmlNsPtr);
-            }
-            table.remove(val as usize);
+        if val >= self.node_tab.len() as i32 {
+            return;
         }
+        if !self.node_tab[val as usize].is_null()
+            && matches!(
+                (*(self.node_tab[val as usize])).element_type(),
+                XmlElementType::XmlNamespaceDecl
+            )
+        {
+            xml_xpath_node_set_free_ns(self.node_tab[val as usize] as XmlNsPtr);
+        }
+        self.node_tab.remove(val as usize);
     }
 
     /// Removes an xmlNodePtr from an existing NodeSet
@@ -232,20 +221,18 @@ impl XmlNodeSet {
         }
 
         // find node in nodeTab
-        if let Some(table) = self.node_tab.as_mut() {
-            let Some(pos) = table.iter().position(|&node| node == val) else {
-                return;
-            };
-            if !table[pos].is_null()
-                && matches!(
-                    (*table[pos]).element_type(),
-                    XmlElementType::XmlNamespaceDecl
-                )
-            {
-                xml_xpath_node_set_free_ns(table[pos] as XmlNsPtr);
-            }
-            table.remove(pos);
+        let Some(pos) = self.node_tab.iter().position(|&node| node == val) else {
+            return;
+        };
+        if !self.node_tab[pos].is_null()
+            && matches!(
+                (*self.node_tab[pos]).element_type(),
+                XmlElementType::XmlNamespaceDecl
+            )
+        {
+            xml_xpath_node_set_free_ns(self.node_tab[pos] as XmlNsPtr);
         }
+        self.node_tab.remove(pos);
     }
 
     /// Clears the list from temporary XPath objects (e.g. namespace nodes
@@ -253,11 +240,11 @@ impl XmlNodeSet {
     /// itself. Sets the length of the list to @pos.
     #[doc(alias = "xmlXPathNodeSetClearFromPos")]
     pub(super) unsafe fn truncate(&mut self, new_len: usize, has_ns_nodes: bool) {
-        let Some(table) = self.node_tab.as_mut().filter(|t| new_len >= t.len()) else {
+        if new_len >= self.node_tab.len() {
             return;
-        };
+        }
         if has_ns_nodes {
-            for &node in &table[new_len..] {
+            for &node in &self.node_tab[new_len..] {
                 if !node.is_null()
                     && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
                 {
@@ -265,7 +252,7 @@ impl XmlNodeSet {
                 }
             }
         }
-        table.truncate(new_len);
+        self.node_tab.truncate(new_len);
     }
 
     /// Clears the list from all temporary XPath objects (e.g. namespace nodes are feed),
@@ -286,17 +273,14 @@ impl XmlNodeSet {
 
         // @@ with_ns to check whether namespace nodes should be looked at @@
         // prevent duplicates
-        if let Some(table) = self.node_tab.as_ref() {
-            for &node in table {
-                if node == val {
-                    return 0;
-                }
+        for &node in &self.node_tab {
+            if node == val {
+                return 0;
             }
         }
 
         // grow the nodeTab if needed
-        let table = self.node_tab.get_or_insert_with(Vec::new);
-        if table.len() >= XPATH_MAX_NODESET_LENGTH {
+        if self.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
             xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
@@ -307,9 +291,9 @@ impl XmlNodeSet {
             if ns_node.is_null() {
                 return -1;
             }
-            table.push(ns_node);
+            self.node_tab.push(ns_node);
         } else {
-            table.push(val);
+            self.node_tab.push(val);
         }
         0
     }
@@ -326,8 +310,7 @@ impl XmlNodeSet {
 
         // @@ with_ns to check whether namespace nodes should be looked at @@
         // grow the nodeTab if needed
-        let table = self.node_tab.get_or_insert_with(Vec::new);
-        if table.len() >= XPATH_MAX_NODESET_LENGTH {
+        if self.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
             xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
@@ -338,9 +321,9 @@ impl XmlNodeSet {
             if ns_node.is_null() {
                 return -1;
             }
-            table.push(ns_node);
+            self.node_tab.push(ns_node);
         } else {
-            table.push(val);
+            self.node_tab.push(val);
         }
         0
     }
@@ -360,21 +343,18 @@ impl XmlNodeSet {
 
         // @@ with_ns to check whether namespace nodes should be looked at @@
         // prevent duplicates
-        if let Some(table) = self.node_tab.as_ref() {
-            for &node in table {
-                if node.is_null()
-                    && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                    && (*node).next == NodePtr::from_ptr(node)
-                    && xml_str_equal((*ns).prefix as _, (*(node as XmlNsPtr)).prefix)
-                {
-                    return 0;
-                }
+        for &node in &self.node_tab {
+            if node.is_null()
+                && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
+                && (*node).next == NodePtr::from_ptr(node)
+                && xml_str_equal((*ns).prefix as _, (*(node as XmlNsPtr)).prefix)
+            {
+                return 0;
             }
         }
 
         // grow the nodeTab if needed
-        let table = self.node_tab.get_or_insert_with(Vec::new);
-        if table.len() >= XPATH_MAX_NODESET_LENGTH {
+        if self.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
             xml_xpath_err_memory(null_mut(), Some("growing nodeset hit limit\n"));
             return -1;
         }
@@ -382,7 +362,7 @@ impl XmlNodeSet {
         if ns_node.is_null() {
             return -1;
         }
-        table.push(ns_node);
+        self.node_tab.push(ns_node);
         0
     }
 }
@@ -741,40 +721,35 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
     set2: Option<&mut XmlNodeSet>,
 ) -> Option<Box<XmlNodeSet>> {
     let mut set1 = set1?;
-    let init_nb_set1 = set1.node_tab.as_ref().map_or(0, |t| t.len());
+    let init_nb_set1 = set1.node_tab.len();
     let set2 = set2?;
-    if let Some(table) = set2.node_tab.as_mut() {
-        table.reverse();
-        'b: while let Some(n2) = table.pop() {
-            // Skip duplicates.
-            if let Some(set1_table) = set1.as_mut().node_tab.as_mut() {
-                for &n1 in &set1_table[..init_nb_set1] {
-                    if n1 == n2 {
-                        // goto skip_node;
-                        continue 'b;
-                    } else if matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
-                        && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl)
-                        && (*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
-                        && xml_str_equal((*(n1 as XmlNsPtr)).prefix, (*(n2 as XmlNsPtr)).prefix)
-                    {
-                        // Free the namespace node.
-                        xml_xpath_node_set_free_ns(n2 as XmlNsPtr);
-                        // goto skip_node;
-                        continue 'b;
-                    }
-                }
+    set2.node_tab.reverse();
+    'b: while let Some(n2) = set2.node_tab.pop() {
+        // Skip duplicates.
+        for &n1 in &set1.node_tab[..init_nb_set1] {
+            if n1 == n2 {
+                // goto skip_node;
+                continue 'b;
+            } else if matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
+                && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl)
+                && (*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
+                && xml_str_equal((*(n1 as XmlNsPtr)).prefix, (*(n2 as XmlNsPtr)).prefix)
+            {
+                // Free the namespace node.
+                xml_xpath_node_set_free_ns(n2 as XmlNsPtr);
+                // goto skip_node;
+                continue 'b;
             }
-            // grow the nodeTab if needed
-            let set1_table = set1.node_tab.get_or_insert_with(Vec::new);
-            if set1_table.len() >= XPATH_MAX_NODESET_LENGTH {
-                xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
-                // goto error;
-                xml_xpath_free_node_set(Some(set1));
-                set2.clear(true);
-                return None;
-            }
-            set1_table.push(n2);
         }
+        // grow the nodeTab if needed
+        if set1.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
+            xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
+            // goto error;
+            xml_xpath_free_node_set(Some(set1));
+            set2.clear(true);
+            return None;
+        }
+        set1.node_tab.push(n2);
     }
     Some(set1)
 
@@ -797,19 +772,16 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear_no_dupls(
 ) -> Option<Box<XmlNodeSet>> {
     let mut set1 = set1?;
     let set2 = set2?;
-    if let Some(table) = set2.node_tab.as_mut() {
-        table.reverse();
-        while let Some(n2) = table.pop() {
-            let set1_table = set1.node_tab.get_or_insert_with(Vec::new);
-            if set1_table.len() >= XPATH_MAX_NODESET_LENGTH {
-                xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
-                // goto error;
-                xml_xpath_free_node_set(Some(set1));
-                set2.clear(true);
-                return None;
-            }
-            set1_table.push(n2);
+    set2.node_tab.reverse();
+    while let Some(n2) = set2.node_tab.pop() {
+        if set1.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
+            xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
+            // goto error;
+            xml_xpath_free_node_set(Some(set1));
+            set2.clear(true);
+            return None;
         }
+        set1.node_tab.push(n2);
     }
     Some(set1)
 
@@ -838,52 +810,48 @@ pub unsafe fn xml_xpath_node_set_merge(
     let mut val1 = val1.or_else(|| xml_xpath_node_set_create(null_mut()))?;
 
     // @@ with_ns to check whether namespace nodes should be looked at @@
-    let init_nr = val1.as_ref().node_tab.as_ref().map_or(0, |t| t.len());
+    let init_nr = val1.as_ref().node_tab.len();
 
-    if let Some(table) = val2.node_tab.as_ref() {
-        for &n2 in table {
-            // check against duplicates
-            skip = 0;
-            let val1_table = val1.as_mut().node_tab.get_or_insert_with(Vec::new);
-            for &n1 in &val1_table[..init_nr] {
-                if n1 == n2
-                    || ((matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
-                        && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl))
-                        && ((*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
-                            && xml_str_equal(
-                                (*(n1 as XmlNsPtr)).prefix as _,
-                                (*(n2 as XmlNsPtr)).prefix as _,
-                            )))
-                {
-                    skip = 1;
-                    break;
-                }
+    for &n2 in &val2.node_tab {
+        // check against duplicates
+        skip = 0;
+        for &n1 in &val1.node_tab[..init_nr] {
+            if n1 == n2
+                || ((matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
+                    && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl))
+                    && ((*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
+                        && xml_str_equal(
+                            (*(n1 as XmlNsPtr)).prefix as _,
+                            (*(n2 as XmlNsPtr)).prefix as _,
+                        )))
+            {
+                skip = 1;
+                break;
             }
-            if skip != 0 {
-                continue;
-            }
+        }
+        if skip != 0 {
+            continue;
+        }
 
-            // grow the nodeTab if needed
-            if val1_table.len() >= XPATH_MAX_NODESET_LENGTH {
-                xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
+        // grow the nodeTab if needed
+        if val1.node_tab.len() >= XPATH_MAX_NODESET_LENGTH {
+            xml_xpath_err_memory(null_mut(), Some("merging nodeset hit limit\n"));
+            // goto error;
+            xml_xpath_free_node_set(Some(val1));
+            return None;
+        }
+        if matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl) {
+            let ns: XmlNsPtr = n2 as XmlNsPtr;
+            let ns_node: *mut XmlNode = xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
+
+            if ns_node.is_null() {
                 // goto error;
                 xml_xpath_free_node_set(Some(val1));
                 return None;
             }
-            if matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl) {
-                let ns: XmlNsPtr = n2 as XmlNsPtr;
-                let ns_node: *mut XmlNode =
-                    xml_xpath_node_set_dup_ns((*ns).next as *mut XmlNode, ns);
-
-                if ns_node.is_null() {
-                    // goto error;
-                    xml_xpath_free_node_set(Some(val1));
-                    return None;
-                }
-                val1_table.push(ns_node);
-            } else {
-                val1_table.push(n2);
-            }
+            val1.node_tab.push(ns_node);
+        } else {
+            val1.node_tab.push(n2);
         }
     }
 
@@ -901,22 +869,18 @@ pub unsafe fn xml_xpath_node_set_merge(
 #[doc(alias = "xmlXPathNewNodeSetList")]
 pub unsafe fn xml_xpath_new_node_set_list(val: Option<&mut XmlNodeSet>) -> XmlXPathObjectPtr {
     if let Some(val) = val {
-        if let Some(table) = val.node_tab.as_ref() {
-            let ret = xml_xpath_new_node_set(table[0]);
-            if !ret.is_null() {
-                if let Some(nodeset) = (*ret).nodesetval.as_deref_mut() {
-                    for &node in &table[1..] {
-                        // TODO: Propagate memory error.
-                        if nodeset.add_unique(node) < 0 {
-                            break;
-                        }
+        let ret = xml_xpath_new_node_set(val.node_tab[0]);
+        if !ret.is_null() {
+            if let Some(nodeset) = (*ret).nodesetval.as_deref_mut() {
+                for &node in &val.node_tab[1..] {
+                    // TODO: Propagate memory error.
+                    if nodeset.add_unique(node) < 0 {
+                        break;
                     }
                 }
             }
-            ret
-        } else {
-            xml_xpath_new_node_set(null_mut())
         }
+        ret
     } else {
         null_mut()
     }

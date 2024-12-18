@@ -1459,8 +1459,8 @@ unsafe extern "C" fn xml_schematron_get_node(
 
     if (*ret).typ == XmlXPathObjectType::XPathNodeset {
         if let Some(nodeset) = (*ret).nodesetval.as_deref() {
-            if let Some(table) = nodeset.node_tab.as_deref().filter(|t| !t.is_empty()) {
-                node = table[0];
+            if !nodeset.node_tab.is_empty() {
+                node = nodeset.node_tab[0];
             }
         }
     }
@@ -1526,13 +1526,11 @@ unsafe extern "C" fn xml_schematron_format_report(
                     let spacer: *mut XmlChar = c" ".as_ptr() as _;
 
                     if let Some(nodeset) = (*eval).nodesetval.as_deref() {
-                        if let Some(table) = nodeset.node_tab.as_deref() {
-                            for (indx, &node) in table.iter().enumerate() {
-                                if indx > 0 {
-                                    ret = xml_strcat(ret, spacer);
-                                }
-                                ret = xml_strcat(ret, (*node).name);
+                        for (indx, &node) in nodeset.node_tab.iter().enumerate() {
+                            if indx > 0 {
+                                ret = xml_strcat(ret, spacer);
                             }
+                            ret = xml_strcat(ret, (*node).name);
                         }
                     } else {
                         generic_error!("Empty node set\n");

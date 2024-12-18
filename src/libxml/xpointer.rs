@@ -2204,18 +2204,18 @@ unsafe extern "C" fn xml_xptr_get_child_no(ctxt: XmlXPathParserContextPtr, indx:
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     };
-    let Some(table) = oldset.node_tab.as_mut().filter(|t| t.len() == 1) else {
+    if oldset.node_tab.len() != 1 {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
-    };
-    let cur: XmlNodePtr = xml_xptr_get_nth_child(table[0], indx);
+    }
+    let cur: XmlNodePtr = xml_xptr_get_nth_child(oldset.node_tab[0], indx);
     if cur.is_null() {
         xml_xpath_free_object(obj);
         value_push(ctxt, xml_xpath_new_node_set(null_mut()));
         return;
     }
-    table[0] = cur;
+    oldset.node_tab[0] = cur;
     value_push(ctxt, obj);
 }
 

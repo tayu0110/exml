@@ -611,7 +611,7 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                                 // TODO: Check if this assumption is correct.
                                 (*obj).typ = XmlXPathObjectType::XPathXSLTTree; /* just for debugging */
                                 xml_xpath_free_value_tree(Some(nodeset));
-                            } else if nodeset.node_tab.as_ref().map_or(0, |t| t.len()) <= 40
+                            } else if nodeset.node_tab.len() <= 40
                                 && XP_CACHE_WANTS!((*cache).nodeset_objs, (*cache).max_nodeset)
                             {
                                 XP_CACHE_ADD!((*cache).nodeset_objs, obj);
@@ -669,24 +669,24 @@ pub(crate) unsafe extern "C" fn xml_xpath_release_object(
                 //  the list and free the ns-nodes.
                 // URGENT TODO: Check if it's actually slowing things down.
                 //  Maybe we shouldn't try to preserve the list.
-                if let Some(table) = nodeset.node_tab.as_ref().filter(|t| t.len() > 1) {
-                    for &node in table {
+                if nodeset.node_tab.len() > 1 {
+                    for &node in &nodeset.node_tab {
                         if !node.is_null()
                             && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
                         {
                             xml_xpath_node_set_free_ns(node as XmlNsPtr);
                         }
                     }
-                } else if let Some(table) = nodeset.node_tab.as_ref().filter(|t| {
-                    t.len() == 1
-                        && (!t[0].is_null()
-                            && matches!((*t[0]).element_type(), XmlElementType::XmlNamespaceDecl))
-                }) {
-                    xml_xpath_node_set_free_ns(table[0] as XmlNsPtr);
+                } else if nodeset.node_tab.len() == 1
+                    && (!nodeset.node_tab[0].is_null()
+                        && matches!(
+                            (*nodeset.node_tab[0]).element_type(),
+                            XmlElementType::XmlNamespaceDecl
+                        ))
+                {
+                    xml_xpath_node_set_free_ns(nodeset.node_tab[0] as XmlNsPtr);
                 }
-                if let Some(table) = nodeset.node_tab.as_mut() {
-                    table.clear();
-                }
+                nodeset.node_tab.clear();
                 *obj = XmlXPathObject {
                     nodesetval: Some(nodeset),
                     ..Default::default()
@@ -1072,17 +1072,11 @@ unsafe fn xml_xpath_debug_dump_node_set<'a>(
         return;
     };
 
-    writeln!(
-        output,
-        "Set contains {} nodes:",
-        cur.node_tab.as_ref().map_or(0, |t| t.len())
-    );
-    if let Some(table) = cur.node_tab.as_ref() {
-        for (i, &node) in table.iter().enumerate() {
-            write!(output, "{}", shift);
-            write!(output, "{}", i + 1);
-            xml_xpath_debug_dump_node(output, node, depth + 1);
-        }
+    writeln!(output, "Set contains {} nodes:", cur.node_tab.len());
+    for (i, &node) in cur.node_tab.iter().enumerate() {
+        write!(output, "{}", shift);
+        write!(output, "{}", i + 1);
+        xml_xpath_debug_dump_node(output, node, depth + 1);
     }
 }
 
@@ -1102,10 +1096,11 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
 
     write!(output, "{}", shift);
     write!(output, "{}", depth.clamp(0, 25) + 1);
-    let table = cur.node_tab.as_ref().unwrap();
     xml_xpath_debug_dump_node_list(
         output,
-        (*table[0]).children().map_or(null_mut(), |c| c.as_ptr()),
+        (*cur.node_tab[0])
+            .children()
+            .map_or(null_mut(), |c| c.as_ptr()),
         depth + 1,
     );
 }
@@ -2483,11 +2478,12 @@ unsafe fn xml_xpath_cache_new_node_set(
             (*ret).typ = XmlXPathObjectType::XPathNodeset;
             (*ret).boolval = false;
             if !val.is_null() {
-                if let Some(table) = (*ret).nodesetval.as_mut().and_then(|set| {
-                    set.as_mut().node_tab.as_mut().filter(|_| {
-                        !matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl)
-                    })
-                }) {
+                if let Some(table) = (*ret)
+                    .nodesetval
+                    .as_mut()
+                    .filter(|_| !matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl))
+                    .map(|set| &mut set.node_tab)
+                {
                     table.clear();
                     table.push(val);
                 } else if let Some(nodeset) = (*ret).nodesetval.as_deref_mut() {
@@ -5085,7 +5081,7 @@ unsafe fn xml_xpath_node_set_filter(
 
     // Check if the node set contains a sufficient number of nodes for
     // the requested range.
-    if set.node_tab.as_ref().map_or(0, |t| t.len() as i32) < min_pos {
+    if (set.node_tab.len() as i32) < min_pos {
         set.clear(has_ns_nodes);
         return;
     }
@@ -5097,82 +5093,79 @@ unsafe fn xml_xpath_node_set_filter(
     let oldpp: i32 = (*xpctxt).proximity_position;
     let filter_op: XmlXPathStepOpPtr = (*(*ctxt).comp).steps.add(filter_op_index as usize);
 
-    (*xpctxt).context_size = set.node_tab.as_ref().map_or(0, |t| t.len() as i32);
+    (*xpctxt).context_size = set.node_tab.len() as i32;
 
     let mut i = 0;
     let mut j = 0;
     let mut pos = 1;
-    if let Some(table) = set.node_tab.as_mut() {
-        while i < table.len() {
-            let node: XmlNodePtr = table[i];
+    while i < set.node_tab.len() {
+        let node: XmlNodePtr = set.node_tab[i];
 
-            (*xpctxt).node = node;
-            (*xpctxt).proximity_position = i as i32 + 1;
+        (*xpctxt).node = node;
+        (*xpctxt).proximity_position = i as i32 + 1;
 
-            // Also set the xpath document in case things like
-            // key() are evaluated in the predicate.
-            //
-            // TODO: Get real doc for namespace nodes.
-            if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                && !(*node).doc.is_null()
+        // Also set the xpath document in case things like
+        // key() are evaluated in the predicate.
+        //
+        // TODO: Get real doc for namespace nodes.
+        if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
+            && !(*node).doc.is_null()
+        {
+            (*xpctxt).doc = (*node).doc;
+        }
+
+        let res: i32 = xml_xpath_comp_op_eval_to_boolean(ctxt, filter_op, 1);
+
+        if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            break;
+        }
+        if res < 0 {
+            // Shouldn't happen
+            xml_xpath_err(ctxt, XmlXPathError::XPathExprError as i32);
+            break;
+        }
+
+        if res != 0 && (pos >= min_pos && pos <= max_pos) {
+            if i != j {
+                set.node_tab[j] = node;
+                set.node_tab[i] = null_mut();
+            }
+
+            j += 1;
+        } else {
+            // Remove the entry from the initial node set.
+            set.node_tab[i] = null_mut();
+            if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                xml_xpath_node_set_free_ns(node as XmlNsPtr);
+            }
+        }
+
+        if res != 0 {
+            if pos == max_pos {
+                i += 1;
+                break;
+            }
+
+            pos += 1;
+        }
+
+        i += 1;
+    }
+
+    // Free remaining nodes.
+    if has_ns_nodes {
+        while i < set.node_tab.len() {
+            let node: XmlNodePtr = set.node_tab[i];
+            if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
             {
-                (*xpctxt).doc = (*node).doc;
+                xml_xpath_node_set_free_ns(node as XmlNsPtr);
             }
-
-            let res: i32 = xml_xpath_comp_op_eval_to_boolean(ctxt, filter_op, 1);
-
-            if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-                break;
-            }
-            if res < 0 {
-                // Shouldn't happen
-                xml_xpath_err(ctxt, XmlXPathError::XPathExprError as i32);
-                break;
-            }
-
-            if res != 0 && (pos >= min_pos && pos <= max_pos) {
-                if i != j {
-                    table[j] = node;
-                    table[i] = null_mut();
-                }
-
-                j += 1;
-            } else {
-                // Remove the entry from the initial node set.
-                table[i] = null_mut();
-                if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
-                }
-            }
-
-            if res != 0 {
-                if pos == max_pos {
-                    i += 1;
-                    break;
-                }
-
-                pos += 1;
-            }
-
             i += 1;
         }
-
-        // Free remaining nodes.
-        if has_ns_nodes {
-            while i < table.len() {
-                let node: XmlNodePtr = table[i];
-                if !node.is_null()
-                    && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
-                {
-                    xml_xpath_node_set_free_ns(node as XmlNsPtr);
-                }
-                i += 1;
-            }
-        }
-
-        table.truncate(j);
-        table.shrink_to_fit();
     }
+
+    set.node_tab.truncate(j);
+    set.node_tab.shrink_to_fit();
 
     (*xpctxt).node = oldnode;
     (*xpctxt).doc = olddoc;
@@ -5211,7 +5204,7 @@ unsafe fn xml_xpath_comp_op_eval_predicate(
             (*comp).steps.add((*op).ch1 as usize),
             set,
             1,
-            set.node_tab.as_ref().map_or(0, |t| t.len() as i32),
+            set.node_tab.len() as i32,
             has_ns_nodes,
         );
         (*(*ctxt).context).depth -= 1;
@@ -5522,287 +5515,265 @@ unsafe extern "C" fn xml_xpath_node_collect_and_test(
     let context_node: XmlNodePtr = null_mut();
     let mut context_idx = 0;
 
-    if let Some(table) = context_seq.node_tab.as_ref() {
-        'main: while (context_idx < table.len() || !context_node.is_null())
-            && (*ctxt).error == XmlXPathError::XPathExpressionOK as i32
-        {
-            (*xpctxt).node = table[context_idx];
-            context_idx += 1;
+    'main: while (context_idx < context_seq.node_tab.len() || !context_node.is_null())
+        && (*ctxt).error == XmlXPathError::XPathExpressionOK as i32
+    {
+        (*xpctxt).node = context_seq.node_tab[context_idx];
+        context_idx += 1;
 
+        if seq.is_none() {
+            seq = xml_xpath_node_set_create(null_mut());
             if seq.is_none() {
-                seq = xml_xpath_node_set_create(null_mut());
-                if seq.is_none() {
-                    // TODO: Propagate memory error.
-                    total = 0;
-                    // goto error;
-                    break 'main;
+                // TODO: Propagate memory error.
+                total = 0;
+                // goto error;
+                break 'main;
+            }
+        }
+        // Traverse the axis and test the nodes.
+        pos = 0;
+        cur = null_mut();
+        has_ns_nodes = false;
+        while {
+            if OP_LIMIT_EXCEEDED!(ctxt, 1) {
+                // goto error;
+                break 'main;
+            }
+
+            cur = next(ctxt, cur);
+            !cur.is_null()
+        } {
+            // QUESTION TODO: What does the "first" and "last" stuff do?
+            if !first.is_null() && !(*first).is_null() {
+                if *first == cur {
+                    break;
+                }
+                if total % 256 == 0
+                    && xml_xpath_cmp_nodes_ext(*first, cur).map_or(false, |f| f.is_le())
+                {
+                    break;
                 }
             }
-            // Traverse the axis and test the nodes.
-            pos = 0;
-            cur = null_mut();
-            has_ns_nodes = false;
-            while {
-                if OP_LIMIT_EXCEEDED!(ctxt, 1) {
+            if !last.is_null() && !(*last).is_null() {
+                if *last == cur {
+                    break;
+                }
+                if total % 256 == 0
+                    && xml_xpath_cmp_nodes_ext(cur, *last).map_or(false, |f| f.is_le())
+                {
+                    break;
+                }
+            }
+
+            total += 1;
+
+            match test {
+                XmlXPathTestVal::NodeTestNone => {
+                    total = 0;
+                    generic_error!("Internal error at {}:{}\n", file!(), line!());
                     // goto error;
                     break 'main;
                 }
-
-                cur = next(ctxt, cur);
-                !cur.is_null()
-            } {
-                // QUESTION TODO: What does the "first" and "last" stuff do?
-                if !first.is_null() && !(*first).is_null() {
-                    if *first == cur {
-                        break;
-                    }
-                    if total % 256 == 0
-                        && xml_xpath_cmp_nodes_ext(*first, cur).map_or(false, |f| f.is_le())
-                    {
-                        break;
-                    }
-                }
-                if !last.is_null() && !(*last).is_null() {
-                    if *last == cur {
-                        break;
-                    }
-                    if total % 256 == 0
-                        && xml_xpath_cmp_nodes_ext(cur, *last).map_or(false, |f| f.is_le())
-                    {
-                        break;
-                    }
-                }
-
-                total += 1;
-
-                match test {
-                    XmlXPathTestVal::NodeTestNone => {
-                        total = 0;
-                        generic_error!("Internal error at {}:{}\n", file!(), line!());
-                        // goto error;
-                        break 'main;
-                    }
-                    XmlXPathTestVal::NodeTestType => {
-                        if matches!(typ, XmlXPathTypeVal::NodeTypeNode) {
-                            match (*cur).element_type() {
-                                XmlElementType::XmlDocumentNode
-                                | XmlElementType::XmlHTMLDocumentNode
-                                | XmlElementType::XmlElementNode
-                                | XmlElementType::XmlAttributeNode
-                                | XmlElementType::XmlPINode
-                                | XmlElementType::XmlCommentNode
-                                | XmlElementType::XmlCDATASectionNode
-                                | XmlElementType::XmlTextNode => {
+                XmlXPathTestVal::NodeTestType => {
+                    if matches!(typ, XmlXPathTypeVal::NodeTypeNode) {
+                        match (*cur).element_type() {
+                            XmlElementType::XmlDocumentNode
+                            | XmlElementType::XmlHTMLDocumentNode
+                            | XmlElementType::XmlElementNode
+                            | XmlElementType::XmlAttributeNode
+                            | XmlElementType::XmlPINode
+                            | XmlElementType::XmlCommentNode
+                            | XmlElementType::XmlCDATASectionNode
+                            | XmlElementType::XmlTextNode => {
+                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                            }
+                            XmlElementType::XmlNamespaceDecl => {
+                                if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
+                                    xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                } else {
+                                    has_ns_nodes = true;
                                     xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                                 }
-                                XmlElementType::XmlNamespaceDecl => {
-                                    if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
-                                        xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                    } else {
-                                        has_ns_nodes = true;
-                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                    }
-                                }
-                                _ => {}
                             }
-                        } else if (*cur).element_type() as isize == typ as isize {
-                            if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                            } else {
-                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                            }
-                        } else if matches!(typ, XmlXPathTypeVal::NodeTypeText)
-                            && matches!((*cur).element_type(), XmlElementType::XmlCDATASectionNode)
-                        {
+                            _ => {}
+                        }
+                    } else if (*cur).element_type() as isize == typ as isize {
+                        if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                            xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                        } else {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
+                    } else if matches!(typ, XmlXPathTypeVal::NodeTypeText)
+                        && matches!((*cur).element_type(), XmlElementType::XmlCDATASectionNode)
+                    {
+                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                     }
-                    XmlXPathTestVal::NodeTestPI => {
-                        if matches!((*cur).element_type(), XmlElementType::XmlPINode)
-                            && (name.is_null() || xml_str_equal(name, (*cur).name))
-                        {
-                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                        }
+                }
+                XmlXPathTestVal::NodeTestPI => {
+                    if matches!((*cur).element_type(), XmlElementType::XmlPINode)
+                        && (name.is_null() || xml_str_equal(name, (*cur).name))
+                    {
+                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                     }
-                    XmlXPathTestVal::NodeTestAll => {
-                        if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
-                            if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
-                                && (prefix.is_null()
-                                    || (!(*cur).ns.is_null()
-                                        && xml_str_equal(uri, (*(*cur).ns).href)))
-                            {
-                                xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                            }
-                        } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
-                            if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-                                xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                            }
-                        } else if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                }
+                XmlXPathTestVal::NodeTestAll => {
+                    if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
+                        if matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
                             && (prefix.is_null()
                                 || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
                         {
                             xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
-                    }
-                    XmlXPathTestVal::NodeTestNs => {
-                        // todo!();
-                    }
-                    XmlXPathTestVal::NodeTestName => 'to_break: {
-                        if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
-                            if !matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
-                                break 'to_break;
-                            }
-                        } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
-                            if !matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
-                                break 'to_break;
-                            }
-                        } else if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                            break 'to_break;
+                    } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
+                        if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                            xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                         }
-                        match (*cur).element_type() {
-                            XmlElementType::XmlElementNode => {
-                                if xml_str_equal(name, (*cur).name) {
-                                    if prefix.is_null() {
-                                        if (*cur).ns.is_null() {
-                                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                        }
-                                    } else if !(*cur).ns.is_null()
-                                        && xml_str_equal(uri, (*(*cur).ns).href)
-                                    {
-                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                    }
-                                }
-                            }
-                            XmlElementType::XmlAttributeNode => {
-                                let attr: XmlAttrPtr = (*cur).as_attribute_node().unwrap().as_ptr();
-
-                                if xml_str_equal(name, (*attr).name) {
-                                    if prefix.is_null() {
-                                        if (*attr).ns.is_null() || (*(*attr).ns).prefix.is_null() {
-                                            xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                        }
-                                    } else if !(*attr).ns.is_null()
-                                        && xml_str_equal(uri, (*(*attr).ns).href)
-                                    {
-                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                    }
-                                }
-                            }
-                            XmlElementType::XmlNamespaceDecl => {
-                                if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl)
-                                {
-                                    let ns: XmlNsPtr = cur as XmlNsPtr;
-
-                                    if !(*ns).prefix.is_null()
-                                        && !name.is_null()
-                                        && xml_str_equal((*ns).prefix, name)
-                                    {
-                                        xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
+                    } else if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                        && (prefix.is_null()
+                            || (!(*cur).ns.is_null() && xml_str_equal(uri, (*(*cur).ns).href)))
+                    {
+                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
                     }
                 }
+                XmlXPathTestVal::NodeTestNs => {
+                    // todo!();
+                }
+                XmlXPathTestVal::NodeTestName => 'to_break: {
+                    if matches!(axis, XmlXPathAxisVal::AxisAttribute) {
+                        if !matches!((*cur).element_type(), XmlElementType::XmlAttributeNode) {
+                            break 'to_break;
+                        }
+                    } else if matches!(axis, XmlXPathAxisVal::AxisNamespace) {
+                        if !matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                            break 'to_break;
+                        }
+                    } else if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
+                        break 'to_break;
+                    }
+                    match (*cur).element_type() {
+                        XmlElementType::XmlElementNode => {
+                            if xml_str_equal(name, (*cur).name) {
+                                if prefix.is_null() {
+                                    if (*cur).ns.is_null() {
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    }
+                                } else if !(*cur).ns.is_null()
+                                    && xml_str_equal(uri, (*(*cur).ns).href)
+                                {
+                                    xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                }
+                            }
+                        }
+                        XmlElementType::XmlAttributeNode => {
+                            let attr: XmlAttrPtr = (*cur).as_attribute_node().unwrap().as_ptr();
 
-                if cur.is_null() || (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-                    break;
+                            if xml_str_equal(name, (*attr).name) {
+                                if prefix.is_null() {
+                                    if (*attr).ns.is_null() || (*(*attr).ns).prefix.is_null() {
+                                        xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                    }
+                                } else if !(*attr).ns.is_null()
+                                    && xml_str_equal(uri, (*(*attr).ns).href)
+                                {
+                                    xp_test_hit!(has_axis_range, pos, max_pos, seq, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                }
+                            }
+                        }
+                        XmlElementType::XmlNamespaceDecl => {
+                            if matches!((*cur).element_type(), XmlElementType::XmlNamespaceDecl) {
+                                let ns: XmlNsPtr = cur as XmlNsPtr;
+
+                                if !(*ns).prefix.is_null()
+                                    && !name.is_null()
+                                    && xml_str_equal((*ns).prefix, name)
+                                {
+                                    xp_test_hit_ns!(has_axis_range, pos, max_pos, has_ns_nodes, seq, xpctxt, cur, ctxt, out_seq, merge_and_clear, to_bool, break_on_first_hit, 'main);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
 
-            // goto apply_predicates;
+            if cur.is_null() || (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                break;
+            }
+        }
 
-            // apply_predicates: /* --------------------------------------------------- */
+        // goto apply_predicates;
+
+        // apply_predicates: /* --------------------------------------------------- */
+        if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+            // goto error;
+            break 'main;
+        }
+
+        // Apply predicates.
+        if !pred_op.is_null() && !seq.as_deref().unwrap().node_tab.is_empty() {
+            // E.g. when we have a "/foo[some expression][n]".
+            // QUESTION TODO: The old predicate evaluation took into
+            // account location-sets.
+            // (E.g. (*(*ctxt).value).typ == XPATH_LOCATIONSET)
+            // Do we expect such a set here?
+            // All what I learned now from the evaluation semantics
+            // does not indicate that a location-set will be processed
+            // here, so this looks OK.
+            // Iterate over all predicates, starting with the outermost predicate.
+            // TODO: Problem: we cannot execute the inner predicates first
+            //  since we cannot go back *up* the operator tree!
+            //  Options we have:
+            //  1) Use of recursive functions (like is it currently done
+            //     via xmlXPathCompOpEval())
+            //  2) Add a predicate evaluation information stack to the
+            //     context struct
+            //  3) Change the way the operators are linked; we need a
+            //     "parent" field on xmlXPathStepOp
+            //
+            // For the moment, I'll try to solve this with a recursive
+            // function: xmlXPathCompOpEvalPredicate().
+            if has_predicate_range != 0 {
+                xml_xpath_comp_op_eval_predicate(
+                    ctxt,
+                    pred_op,
+                    seq.as_deref_mut().unwrap(),
+                    max_pos,
+                    max_pos,
+                    has_ns_nodes,
+                );
+            } else {
+                let max_pos = seq.as_deref().unwrap().node_tab.len() as i32;
+                xml_xpath_comp_op_eval_predicate(
+                    ctxt,
+                    pred_op,
+                    seq.as_deref_mut().unwrap(),
+                    1,
+                    max_pos,
+                    has_ns_nodes,
+                );
+            }
+
             if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
+                total = 0;
                 // goto error;
                 break 'main;
             }
-
-            // Apply predicates.
-            if !pred_op.is_null()
-                && seq
-                    .as_deref()
-                    .unwrap()
-                    .node_tab
-                    .as_ref()
-                    .map_or(false, |t| !t.is_empty())
-            {
-                // E.g. when we have a "/foo[some expression][n]".
-                // QUESTION TODO: The old predicate evaluation took into
-                // account location-sets.
-                // (E.g. (*(*ctxt).value).typ == XPATH_LOCATIONSET)
-                // Do we expect such a set here?
-                // All what I learned now from the evaluation semantics
-                // does not indicate that a location-set will be processed
-                // here, so this looks OK.
-                // Iterate over all predicates, starting with the outermost predicate.
-                // TODO: Problem: we cannot execute the inner predicates first
-                //  since we cannot go back *up* the operator tree!
-                //  Options we have:
-                //  1) Use of recursive functions (like is it currently done
-                //     via xmlXPathCompOpEval())
-                //  2) Add a predicate evaluation information stack to the
-                //     context struct
-                //  3) Change the way the operators are linked; we need a
-                //     "parent" field on xmlXPathStepOp
-                //
-                // For the moment, I'll try to solve this with a recursive
-                // function: xmlXPathCompOpEvalPredicate().
-                if has_predicate_range != 0 {
-                    xml_xpath_comp_op_eval_predicate(
-                        ctxt,
-                        pred_op,
-                        seq.as_deref_mut().unwrap(),
-                        max_pos,
-                        max_pos,
-                        has_ns_nodes,
-                    );
-                } else {
-                    let max_pos = seq
-                        .as_deref()
-                        .unwrap()
-                        .node_tab
-                        .as_ref()
-                        .map_or(0, |t| t.len() as i32);
-                    xml_xpath_comp_op_eval_predicate(
-                        ctxt,
-                        pred_op,
-                        seq.as_deref_mut().unwrap(),
-                        1,
-                        max_pos,
-                        has_ns_nodes,
-                    );
-                }
-
-                if (*ctxt).error != XmlXPathError::XPathExpressionOK as i32 {
-                    total = 0;
-                    // goto error;
-                    break 'main;
-                }
-            }
-
-            if seq
-                .as_deref()
-                .unwrap()
-                .node_tab
-                .as_ref()
-                .map_or(false, |t| !t.is_empty())
-            {
-                // Add to result set.
-                if out_seq.is_none() {
-                    out_seq = seq.take();
-                } else {
-                    // TODO: Check memory error.
-                    out_seq = merge_and_clear(out_seq, seq.as_deref_mut());
-                }
-
-                if to_bool != 0 {
-                    break 'main;
-                }
-            }
-            continue 'main;
         }
+
+        if !seq.as_deref().unwrap().node_tab.is_empty() {
+            // Add to result set.
+            if out_seq.is_none() {
+                out_seq = seq.take();
+            } else {
+                // TODO: Check memory error.
+                out_seq = merge_and_clear(out_seq, seq.as_deref_mut());
+            }
+
+            if to_bool != 0 {
+                break 'main;
+            }
+        }
+        continue 'main;
     }
 
     // error:
@@ -5880,10 +5851,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_last(
                 if let Some(nodeset) = (*(*ctxt).value).nodesetval.as_deref_mut() {
                     if !nodeset.is_empty() {
                         // limit tree traversing to first node in the result
-                        if nodeset.node_tab.as_ref().map_or(false, |t| t.len() > 1) {
+                        if nodeset.node_tab.len() > 1 {
                             nodeset.sort();
                         }
-                        *last = *nodeset.node_tab.as_deref().unwrap().last().unwrap();
+                        *last = *nodeset.node_tab.last().unwrap();
                     }
                 }
             }
@@ -6003,11 +5974,11 @@ unsafe fn xml_xpath_node_set_keep_last(set: Option<&mut XmlNodeSet>) {
     let Some(set) = set.filter(|s| s.len() > 1) else {
         return;
     };
-    let Some(table) = set.node_tab.as_mut().filter(|t| t.len() > 1) else {
+    if set.node_tab.len() <= 1 {
         return;
-    };
-    let len = table.len();
-    for node in table.drain(..len - 1) {
+    }
+    let len = set.node_tab.len();
+    for node in set.node_tab.drain(..len - 1) {
         if !node.is_null() && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
             xml_xpath_node_set_free_ns(node as XmlNsPtr);
         }
@@ -6188,7 +6159,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
                     .filter(|n| n.len() > 1)
                 {
                     xml_xpath_node_set_keep_last(Some(nodeset));
-                    *first = nodeset.node_tab.as_ref().unwrap()[0];
+                    *first = nodeset.node_tab[0];
                 }
             }
             return total;
@@ -6230,8 +6201,8 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_filter_first(
     let obj: XmlXPathObjectPtr = value_pop(ctxt);
     if let Some(set) = (*obj).nodesetval.as_deref_mut() {
         xml_xpath_node_set_filter(ctxt, Some(set), (*op).ch2, 1, 1, true);
-        if let Some(table) = set.node_tab.as_ref().filter(|t| !t.is_empty()) {
-            *first = table[0];
+        if !set.node_tab.is_empty() {
+            *first = set.node_tab[0];
         }
     }
     value_push(ctxt, obj);
@@ -6282,10 +6253,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval_first(
                     //  of the count() function, no sorting is needed.
                     // OPTIMIZE TODO: How do we know if the node-list wasn't
                     //  already sorted?
-                    if nodeset.node_tab.as_ref().map_or(0, |t| t.len()) > 1 {
+                    if nodeset.node_tab.len() > 1 {
                         nodeset.sort();
                     }
-                    *first = nodeset.node_tab.as_ref().unwrap()[0];
+                    *first = nodeset.node_tab[0];
                 }
             }
             cur = xml_xpath_comp_op_eval_first(ctxt, (*comp).steps.add((*op).ch2 as usize), first);
@@ -6541,7 +6512,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                 || (*arg2)
                     .nodesetval
                     .as_deref()
-                    .map_or(false, |n| n.node_tab.as_ref().map_or(0, |t| t.len()) != 0)
+                    .map_or(false, |n| !n.node_tab.is_empty())
             {
                 // TODO: Check memory error.
                 (*arg1).nodesetval = xml_xpath_node_set_merge(
@@ -7699,7 +7670,8 @@ unsafe fn xml_xpath_name_function(ctxt: XmlXPathParserContextPtr, mut nargs: i32
     let cur: XmlXPathObjectPtr = value_pop(ctxt);
 
     if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-        if let Some(table) = nodeset.node_tab.as_ref().filter(|t| !t.is_empty()) {
+        if !nodeset.node_tab.is_empty() {
+            let table = &nodeset.node_tab;
             let i = 0; /* Should be first in document order !!!!! */
 
             match (*table[i]).element_type() {
@@ -8132,24 +8104,18 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
         return 0;
     }
 
-    let Some(ns1) = (*arg1).nodesetval.as_deref() else {
+    let (Some(ns1), Some(ns2)) = ((*arg1).nodesetval.as_deref(), (*arg2).nodesetval.as_deref())
+    else {
         return 0;
     };
-    let Some(ns1_table) = ns1.node_tab.as_ref().filter(|t| !t.is_empty()) else {
+    if ns1.node_tab.is_empty() || ns2.node_tab.is_empty() {
         return 0;
-    };
-
-    let Some(ns2) = (*arg2).nodesetval.as_deref() else {
-        return 0;
-    };
-    let Some(ns2_table) = ns2.node_tab.as_ref().filter(|t| !t.is_empty()) else {
-        return 0;
-    };
+    }
 
     // for equal, check if there is a node pertaining to both sets
     if neq == 0 {
-        for &node1 in ns1_table {
-            for &node2 in ns2_table {
+        for &node1 in &ns1.node_tab {
+            for &node2 in &ns2.node_tab {
                 if node1 == node2 {
                     return 1;
                 }
@@ -8157,24 +8123,24 @@ unsafe extern "C" fn xml_xpath_equal_node_sets(
         }
     }
 
-    let mut values1 = vec![None; ns1_table.len()];
-    let hashs1: *mut u32 = xml_malloc(ns1_table.len() * size_of::<u32>()) as *mut u32;
+    let mut values1 = vec![None; ns1.node_tab.len()];
+    let hashs1: *mut u32 = xml_malloc(ns1.node_tab.len() * size_of::<u32>()) as *mut u32;
     if hashs1.is_null() {
         // TODO: Propagate memory error.
         xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
         return 0;
     }
-    let mut values2 = vec![None; ns2_table.len()];
-    let hashs2: *mut u32 = xml_malloc(ns2_table.len() * size_of::<u32>()) as *mut u32;
+    let mut values2 = vec![None; ns2.node_tab.len()];
+    let hashs2: *mut u32 = xml_malloc(ns2.node_tab.len() * size_of::<u32>()) as *mut u32;
     if hashs2.is_null() {
         // TODO: Propagate memory error.
         xml_xpath_err_memory(null_mut(), Some("comparing nodesets\n"));
         xml_free(hashs1 as _);
         return 0;
     }
-    for (i, &node1) in ns1_table.iter().enumerate() {
+    for (i, &node1) in ns1.node_tab.iter().enumerate() {
         *hashs1.add(i) = xml_xpath_node_val_hash(node1);
-        for (j, &node2) in ns2_table.iter().enumerate() {
+        for (j, &node2) in ns2.node_tab.iter().enumerate() {
             if i == 0 {
                 *hashs2.add(j) = xml_xpath_node_val_hash(node2);
             }
@@ -8235,30 +8201,28 @@ unsafe extern "C" fn xml_xpath_equal_node_set_float(
     }
 
     if let Some(ns) = (*arg).nodesetval.as_deref() {
-        if let Some(table) = ns.node_tab.as_ref() {
-            for &node in table {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_string(
-                        (*ctxt).context,
-                        Some(&xml_xpath_cast_node_to_string(node)),
-                    ),
-                );
-                xml_xpath_number_function(ctxt, 1);
-                CHECK_ERROR0!(ctxt);
-                val = value_pop(ctxt);
-                v = (*val).floatval;
-                xml_xpath_release_object((*ctxt).context, val);
-                if !xml_xpath_is_nan(v) {
-                    if (neq == 0 && v == f) || (neq != 0 && v != f) {
-                        ret = 1;
-                        break;
-                    }
-                } else {
-                    /* NaN is unequal to any value */
-                    if neq != 0 {
-                        ret = 1;
-                    }
+        for &node in &ns.node_tab {
+            value_push(
+                ctxt,
+                xml_xpath_cache_new_string(
+                    (*ctxt).context,
+                    Some(&xml_xpath_cast_node_to_string(node)),
+                ),
+            );
+            xml_xpath_number_function(ctxt, 1);
+            CHECK_ERROR0!(ctxt);
+            val = value_pop(ctxt);
+            v = (*val).floatval;
+            xml_xpath_release_object((*ctxt).context, val);
+            if !xml_xpath_is_nan(v) {
+                if (neq == 0 && v == f) || (neq != 0 && v != f) {
+                    ret = 1;
+                    break;
+                }
+            } else {
+                /* NaN is unequal to any value */
+                if neq != 0 {
+                    ret = 1;
                 }
             }
         }
@@ -8307,23 +8271,21 @@ unsafe fn xml_xpath_equal_node_set_string(arg: XmlXPathObjectPtr, str: &str, neq
     };
     let cstr = CString::new(str).unwrap();
     let hash: u32 = xml_xpath_string_hash(cstr.as_ptr() as *const u8);
-    if let Some(table) = ns.node_tab.as_ref() {
-        for &node in table {
-            if xml_xpath_node_val_hash(node) == hash {
-                let str2 = (*node).get_content();
-                if (str2.is_some() && Some(str) == str2.as_deref())
-                    || (str2.is_none() && str.is_empty())
-                {
-                    if neq != 0 {
-                        continue;
-                    }
-                    return 1;
-                } else if neq != 0 {
-                    return 1;
+    for &node in &ns.node_tab {
+        if xml_xpath_node_val_hash(node) == hash {
+            let str2 = (*node).get_content();
+            if (str2.is_some() && Some(str) == str2.as_deref())
+                || (str2.is_none() && str.is_empty())
+            {
+                if neq != 0 {
+                    continue;
                 }
+                return 1;
             } else if neq != 0 {
                 return 1;
             }
+        } else if neq != 0 {
+            return 1;
         }
     }
     0
@@ -8739,7 +8701,8 @@ unsafe extern "C" fn xml_xpath_compare_node_sets(
     let Some(ns1_table) = (*arg1)
         .nodesetval
         .as_deref()
-        .and_then(|n| n.node_tab.as_ref().filter(|t| !t.is_empty()))
+        .filter(|set| !set.node_tab.is_empty())
+        .map(|n| n.node_tab.as_slice())
     else {
         xml_xpath_free_object(arg1);
         xml_xpath_free_object(arg2);
@@ -8748,7 +8711,8 @@ unsafe extern "C" fn xml_xpath_compare_node_sets(
     let Some(ns2_table) = (*arg2)
         .nodesetval
         .as_deref()
-        .and_then(|n| n.node_tab.as_ref().filter(|t| !t.is_empty()))
+        .filter(|set| !set.node_tab.is_empty())
+        .map(|n| n.node_tab.as_slice())
     else {
         xml_xpath_free_object(arg1);
         xml_xpath_free_object(arg2);
@@ -8834,21 +8798,19 @@ unsafe extern "C" fn xml_xpath_compare_node_set_float(
         return 0;
     }
     if let Some(ns) = (*arg).nodesetval.as_deref() {
-        if let Some(table) = ns.node_tab.as_ref() {
-            for &node in table {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_string(
-                        (*ctxt).context,
-                        Some(&xml_xpath_cast_node_to_string(node)),
-                    ),
-                );
-                xml_xpath_number_function(ctxt, 1);
-                value_push(ctxt, xml_xpath_cache_object_copy((*ctxt).context, f));
-                ret = xml_xpath_compare_values(ctxt, inf, strict);
-                if ret != 0 {
-                    break;
-                }
+        for &node in &ns.node_tab {
+            value_push(
+                ctxt,
+                xml_xpath_cache_new_string(
+                    (*ctxt).context,
+                    Some(&xml_xpath_cast_node_to_string(node)),
+                ),
+            );
+            xml_xpath_number_function(ctxt, 1);
+            value_push(ctxt, xml_xpath_cache_object_copy((*ctxt).context, f));
+            ret = xml_xpath_compare_values(ctxt, inf, strict);
+            if ret != 0 {
+                break;
             }
         }
     }
@@ -8891,20 +8853,18 @@ unsafe extern "C" fn xml_xpath_compare_node_set_string(
         return 0;
     }
     if let Some(ns) = (*arg).nodesetval.as_deref() {
-        if let Some(table) = ns.node_tab.as_ref() {
-            for &node in table {
-                value_push(
-                    ctxt,
-                    xml_xpath_cache_new_string(
-                        (*ctxt).context,
-                        Some(&xml_xpath_cast_node_to_string(node)),
-                    ),
-                );
-                value_push(ctxt, xml_xpath_cache_object_copy((*ctxt).context, s));
-                ret = xml_xpath_compare_values(ctxt, inf, strict);
-                if ret != 0 {
-                    break;
-                }
+        for &node in &ns.node_tab {
+            value_push(
+                ctxt,
+                xml_xpath_cache_new_string(
+                    (*ctxt).context,
+                    Some(&xml_xpath_cast_node_to_string(node)),
+                ),
+            );
+            value_push(ctxt, xml_xpath_cache_object_copy((*ctxt).context, s));
+            ret = xml_xpath_compare_values(ctxt, inf, strict);
+            if ret != 0 {
+                break;
             }
         }
     }
@@ -10161,18 +10121,16 @@ pub unsafe fn xml_xpath_id_function(ctxt: XmlXPathParserContextPtr, nargs: i32) 
         let mut ret = xml_xpath_node_set_create(null_mut());
 
         if let Some(nodeset) = (*obj).nodesetval.as_deref() {
-            if let Some(table) = nodeset.node_tab.as_ref() {
-                for &node in table {
-                    let tokens = xml_xpath_cast_node_to_string(node);
-                    let tokens = CString::new(tokens).unwrap();
-                    let ns = xml_xpath_get_elements_by_ids(
-                        (*(*ctxt).context).doc,
-                        tokens.as_ptr() as *const u8,
-                    );
-                    // TODO: Check memory error.
-                    ret = xml_xpath_node_set_merge(ret, ns.as_deref());
-                    xml_xpath_free_node_set(ns);
-                }
+            for &node in &nodeset.node_tab {
+                let tokens = xml_xpath_cast_node_to_string(node);
+                let tokens = CString::new(tokens).unwrap();
+                let ns = xml_xpath_get_elements_by_ids(
+                    (*(*ctxt).context).doc,
+                    tokens.as_ptr() as *const u8,
+                );
+                // TODO: Check memory error.
+                ret = xml_xpath_node_set_merge(ret, ns.as_deref());
+                xml_xpath_free_node_set(ns);
             }
         }
         xml_xpath_release_object((*ctxt).context, obj);
@@ -10230,7 +10188,8 @@ pub unsafe fn xml_xpath_local_name_function(ctxt: XmlXPathParserContextPtr, mut 
     let cur: XmlXPathObjectPtr = value_pop(ctxt);
 
     if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-        if let Some(table) = nodeset.node_tab.as_ref().filter(|t| !t.is_empty()) {
+        if !nodeset.node_tab.is_empty() {
+            let table = &nodeset.node_tab;
             let i = 0; /* Should be first in document order !!!!! */
             match (*table[i]).element_type() {
                 XmlElementType::XmlElementNode
@@ -10306,7 +10265,8 @@ pub unsafe fn xml_xpath_namespace_uri_function(ctxt: XmlXPathParserContextPtr, m
     let cur: XmlXPathObjectPtr = value_pop(ctxt);
 
     if let Some(nodeset) = (*cur).nodesetval.as_deref() {
-        if let Some(table) = nodeset.node_tab.as_ref().filter(|t| !t.is_empty()) {
+        if !nodeset.node_tab.is_empty() {
+            let table = &nodeset.node_tab;
             let i = 0; /* Should be first in document order !!!!! */
             match (*table[i]).element_type() {
                 XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
@@ -10971,8 +10931,8 @@ pub unsafe fn xml_xpath_sum_function(ctxt: XmlXPathParserContextPtr, nargs: i32)
     let cur: XmlXPathObjectPtr = value_pop(ctxt);
 
     if let Some(nodeset) = (*cur).nodesetval.as_deref().filter(|n| !n.is_empty()) {
-        if let Some(table) = nodeset.node_tab.as_ref().filter(|t| !t.is_empty()) {
-            for &node in table {
+        if !nodeset.node_tab.is_empty() {
+            for &node in &nodeset.node_tab {
                 res += xml_xpath_cast_node_to_number(node);
             }
         }
