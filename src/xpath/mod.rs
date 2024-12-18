@@ -1594,36 +1594,36 @@ pub unsafe extern "C" fn xml_xpath_eval_expression(
 /// is not a number, then the result will be converted as if by a call
 /// to the boolean function.
 ///
-/// Returns 1 if predicate is true, 0 otherwise
+/// Returns `true` if predicate is true, `false` otherwise
 #[doc(alias = "xmlXPathEvalPredicate")]
 #[cfg(feature = "xpath")]
-pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathObjectPtr) -> i32 {
+pub unsafe fn xml_xpath_eval_predicate(ctxt: XmlXPathContextPtr, res: XmlXPathObjectPtr) -> bool {
     use crate::generic_error;
 
     if ctxt.is_null() || res.is_null() {
-        return 0;
+        return false;
     }
     match (*res).typ {
         XmlXPathObjectType::XPathBoolean => {
-            return (*res).boolval as i32;
+            return (*res).boolval;
         }
         XmlXPathObjectType::XPathNumber => {
-            return ((*res).floatval == (*ctxt).proximity_position as _) as i32;
+            return (*res).floatval == (*ctxt).proximity_position as _;
         }
         XmlXPathObjectType::XPathNodeset | XmlXPathObjectType::XPathXSLTTree => {
             let Some(nodeset) = (*res).nodesetval.as_deref() else {
-                return 0;
+                return false;
             };
-            return !nodeset.node_tab.is_empty() as i32;
+            return !nodeset.node_tab.is_empty();
         }
         XmlXPathObjectType::XPathString => {
-            return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty()) as i32;
+            return (*res).stringval.as_deref().map_or(false, |s| !s.is_empty());
         }
         _ => {
             generic_error!("Internal error at {}:{}\n", file!(), line!());
         }
     }
-    0
+    false
 }
 
 /// Compile an XPath expression
@@ -2969,8 +2969,8 @@ mod tests {
                     let ctxt = gen_xml_xpath_context_ptr(n_ctxt, 0);
                     let res = gen_xml_xpath_object_ptr(n_res, 1);
 
-                    let ret_val = xml_xpath_eval_predicate(ctxt, res);
-                    desret_int(ret_val);
+                    let _ = xml_xpath_eval_predicate(ctxt, res);
+                    // desret_int(ret_val);
                     des_xml_xpath_context_ptr(n_ctxt, ctxt, 0);
                     des_xml_xpath_object_ptr(n_res, res, 1);
                     reset_last_error();
