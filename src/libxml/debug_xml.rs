@@ -39,7 +39,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute,
         XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -875,16 +875,16 @@ unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntit
 }
 
 #[doc(alias = "xmlCtxtDumpNamespace")]
-unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr) {
+unsafe fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: Option<&XmlNs>) {
     xml_ctxt_dump_spaces(ctxt);
 
-    if ns.is_null() {
+    let Some(ns) = ns else {
         if (*ctxt).check == 0 {
             writeln!((*ctxt).output, "namespace node is NULL");
         }
         return;
-    }
-    if (*ns).typ != XmlElementType::XmlNamespaceDecl {
+    };
+    if ns.element_type() != XmlElementType::XmlNamespaceDecl {
         xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotNsDecl,
@@ -892,13 +892,13 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
         );
         return;
     }
-    if (*ns).href.is_null() {
-        if !(*ns).prefix.is_null() {
+    if ns.href.is_null() {
+        if !ns.prefix.is_null() {
             xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNoHref,
                 "Incomplete namespace {} href=NULL\n",
-                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
+                CStr::from_ptr(ns.prefix as *const i8).to_string_lossy()
             );
         } else {
             xml_debug_err!(
@@ -908,14 +908,14 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
             );
         }
     } else if (*ctxt).check == 0 {
-        if !(*ns).prefix.is_null() {
-            let prefix = CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy();
+        if !ns.prefix.is_null() {
+            let prefix = CStr::from_ptr(ns.prefix as *const i8).to_string_lossy();
             write!((*ctxt).output, "namespace {prefix} href=");
         } else {
             write!((*ctxt).output, "default namespace href=");
         }
 
-        let href = (*ns).href;
+        let href = ns.href;
         xml_ctxt_dump_string(
             ctxt,
             (!href.is_null())
@@ -927,9 +927,9 @@ unsafe extern "C" fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: XmlNsPtr
 }
 
 #[doc(alias = "xmlCtxtDumpNamespaceList")]
-unsafe extern "C" fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
+unsafe fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
     while !ns.is_null() {
-        xml_ctxt_dump_namespace(ctxt, ns);
+        xml_ctxt_dump_namespace(ctxt, Some(&*ns));
         ns = (*ns).next;
     }
 }
@@ -1143,7 +1143,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlNamespaceDecl => {
-            xml_ctxt_dump_namespace(ctxt, node as XmlNsPtr);
+            xml_ctxt_dump_namespace(ctxt, (*node).as_namespace_decl_node().map(|n| n.as_ref()));
             return;
         }
         XmlElementType::XmlXIncludeStart => {
