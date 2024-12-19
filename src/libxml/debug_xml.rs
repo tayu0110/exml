@@ -202,15 +202,13 @@ macro_rules! xml_debug_err {
 /// -2 if the namespace is not in scope,
 /// and -3 if not on an ancestor node.
 #[doc(alias = "xmlNsCheckScope")]
-unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i32 {
-    let mut cur: XmlNsPtr;
-
-    if node.is_null() || ns.is_null() {
+unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
+    if ns.is_null() {
         return -1;
     }
 
     if !matches!(
-        (*node).element_type(),
+        node.element_type(),
         XmlElementType::XmlElementNode
             | XmlElementType::XmlAttributeNode
             | XmlElementType::XmlDocumentNode
@@ -221,20 +219,21 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
         return -2;
     }
 
-    while !node.is_null()
-        && matches!(
-            (*node).element_type(),
+    let mut node = Some(node as &dyn NodeCommon);
+    while let Some(now) = node.filter(|n| {
+        matches!(
+            n.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlAttributeNode
                 | XmlElementType::XmlTextNode
                 | XmlElementType::XmlXIncludeStart
         )
-    {
+    }) {
         if matches!(
-            (*node).element_type(),
+            now.element_type(),
             XmlElementType::XmlElementNode | XmlElementType::XmlXIncludeStart
         ) {
-            cur = (*node).ns_def;
+            let mut cur = now.as_node().unwrap().as_ref().ns_def;
             while !cur.is_null() {
                 if cur == ns {
                     return 1;
@@ -245,16 +244,16 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
                 cur = (*cur).next;
             }
         }
-        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+        node = now.parent().map(|p| &*p.as_ptr() as &dyn NodeCommon);
     }
-    /* the xml namespace may be declared on the document node */
-    if !node.is_null()
-        && matches!(
-            (*node).element_type(),
+    // the xml namespace may be declared on the document node
+    if let Some(node) = node.filter(|node| {
+        matches!(
+            node.element_type(),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         )
-    {
-        let old_ns: XmlNsPtr = (*node).as_document_node().unwrap().as_ref().old_ns;
+    }) {
+        let old_ns: XmlNsPtr = node.as_document_node().unwrap().as_ref().old_ns;
         if old_ns == ns {
             return 1;
         }
@@ -264,11 +263,7 @@ unsafe extern "C" fn xml_ns_check_scope(mut node: XmlNodePtr, ns: XmlNsPtr) -> i
 
 /// Report if a given namespace is is not in scope.
 #[doc(alias = "xmlCtxtNsCheckScope")]
-unsafe extern "C" fn xml_ctxt_ns_check_scope(
-    ctxt: XmlDebugCtxtPtr,
-    node: XmlNodePtr,
-    ns: XmlNsPtr,
-) {
+unsafe fn xml_ctxt_ns_check_scope(ctxt: XmlDebugCtxtPtr, node: &impl NodeCommon, ns: XmlNsPtr) {
     let ret: i32 = xml_ns_check_scope(node, ns);
     if ret == -2 {
         if (*ns).prefix.is_null() {
@@ -357,7 +352,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
 }
 
 #[doc(alias = "xmlCtxtGenericNodeCheck")]
-unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
+unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     let dict: XmlDictPtr;
     let doc: XmlDocPtr = (*node).doc;
 
@@ -463,14 +458,14 @@ unsafe extern "C" fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: Xm
 
         ns = (*node).ns_def;
         while !ns.is_null() {
-            xml_ctxt_ns_check_scope(ctxt, node, ns);
+            xml_ctxt_ns_check_scope(ctxt, &*node, ns);
             ns = (*ns).next;
         }
         if !(*node).ns.is_null() {
-            xml_ctxt_ns_check_scope(ctxt, node, (*node).ns);
+            xml_ctxt_ns_check_scope(ctxt, &*node, (*node).ns);
         }
     } else if (*node).element_type() == XmlElementType::XmlAttributeNode && !(*node).ns.is_null() {
-        xml_ctxt_ns_check_scope(ctxt, node, (*node).ns);
+        xml_ctxt_ns_check_scope(ctxt, &*node, (*node).ns);
     }
 
     if !matches!(
