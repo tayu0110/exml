@@ -37,10 +37,9 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd,
-        XmlDtdPtr, XmlElement, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
-        XmlNodePtr, XmlNsPtr,
+        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute,
+        XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
     },
 };
 
@@ -667,16 +666,16 @@ unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElemen
 }
 
 #[doc(alias = "xmlCtxtDumpAttrDecl")]
-unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) {
+unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttribute>) {
     xml_ctxt_dump_spaces(ctxt);
 
-    if attr.is_null() {
+    let Some(attr) = attr else {
         if (*ctxt).check == 0 {
             writeln!((*ctxt).output, "Attribute declaration is NULL");
         }
         return;
-    }
-    if (*attr).typ != XmlElementType::XmlAttributeDecl {
+    };
+    if attr.element_type() != XmlElementType::XmlAttributeDecl {
         xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotAttrDecl,
@@ -684,9 +683,8 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
         );
         return;
     }
-    if !(*attr).name.is_null() {
+    if let Some(name) = attr.name() {
         if (*ctxt).check == 0 {
-            let name = CStr::from_ptr((*attr).name as *const i8).to_string_lossy();
             write!((*ctxt).output, "ATTRDECL({name})");
         }
     } else {
@@ -696,7 +694,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
             "Node attribute declaration has no name",
         );
     }
-    if let Some(elem) = (*attr).elem.as_deref() {
+    if let Some(elem) = attr.elem.as_deref() {
         if (*ctxt).check == 0 {
             write!((*ctxt).output, " for {elem}");
         }
@@ -708,7 +706,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
         );
     }
     if (*ctxt).check == 0 {
-        match (*attr).atype {
+        match attr.atype {
             XmlAttributeType::XmlAttributeCDATA => {
                 write!((*ctxt).output, " CDATA");
             }
@@ -740,8 +738,8 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
                 write!((*ctxt).output, " NOTATION ");
             }
         }
-        if !(*attr).tree.is_null() {
-            let mut cur: XmlEnumerationPtr = (*attr).tree;
+        if !attr.tree.is_null() {
+            let mut cur: XmlEnumerationPtr = attr.tree;
 
             for indx in 0..5 {
                 let name = (*cur).name.as_deref().unwrap();
@@ -761,7 +759,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
                 write!((*ctxt).output, "...)");
             }
         }
-        match (*attr).def {
+        match attr.def {
             XmlAttributeDefault::XmlAttributeNone => {}
             XmlAttributeDefault::XmlAttributeRequired => {
                 write!((*ctxt).output, " REQUIRED");
@@ -773,9 +771,9 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
                 write!((*ctxt).output, " FIXED");
             }
         }
-        if !(*attr).default_value.is_null() {
+        if !attr.default_value.is_null() {
             write!((*ctxt).output, "\"");
-            let def_value = (*attr).default_value;
+            let def_value = attr.default_value;
             xml_ctxt_dump_string(
                 ctxt,
                 Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
@@ -786,7 +784,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: XmlAttributePtr) 
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, &*attr);
+    xml_ctxt_generic_node_check(ctxt, attr);
 }
 
 #[doc(alias = "xmlCtxtDumpEntityDecl")]
@@ -1138,7 +1136,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlAttributeDecl => {
-            xml_ctxt_dump_attr_decl(ctxt, (*node).as_attribute_decl_node().unwrap().as_ptr());
+            xml_ctxt_dump_attr_decl(ctxt, (*node).as_attribute_decl_node().map(|a| a.as_ref()));
             return;
         }
         XmlElementType::XmlEntityDecl => {
