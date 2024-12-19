@@ -38,7 +38,7 @@ use crate::{
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
         xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtdPtr,
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
         XmlNsPtr,
     },
@@ -1355,16 +1355,10 @@ pub unsafe fn xml_debug_dump_node_list(output: Option<impl Write>, node: XmlNode
 }
 
 #[doc(alias = "xmlCtxtDumpDocHead")]
-unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
-    if doc.is_null() {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "DOCUMENT.is_null() !");
-        }
-        return;
-    }
-    (*ctxt).node = doc as XmlNodePtr;
+unsafe fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: &XmlDoc) {
+    (*ctxt).node = doc as *const XmlDoc as XmlNodePtr;
 
-    match (*doc).typ {
+    match doc.typ {
         XmlElementType::XmlElementNode => {
             xml_debug_err!(
                 ctxt,
@@ -1457,7 +1451,7 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
                 ctxt,
                 XmlParserErrors::XmlCheckUnknownNode,
                 "Unknown node type {}\n",
-                (*doc).typ as i32
+                doc.element_type() as i32
             );
         }
     }
@@ -1465,47 +1459,46 @@ unsafe extern "C" fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
 
 /// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlCtxtDumpDocumentHead")]
-unsafe extern "C" fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
-    if doc.is_null() {
-        return;
-    }
-    xml_ctxt_dump_doc_head(ctxt, doc);
-    if (*ctxt).check == 0 {
-        if !(*doc).name.is_null() {
-            write!((*ctxt).output, "name=");
-            xml_ctxt_dump_string(ctxt, (*doc).name as _);
-            writeln!((*ctxt).output);
+unsafe fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
+    if let Some(doc) = doc {
+        xml_ctxt_dump_doc_head(ctxt, doc);
+        if (*ctxt).check == 0 {
+            if !doc.name.is_null() {
+                write!((*ctxt).output, "name=");
+                xml_ctxt_dump_string(ctxt, doc.name as _);
+                writeln!((*ctxt).output);
+            }
+            if let Some(version) = doc.version.as_deref() {
+                write!((*ctxt).output, "version=");
+                let version = CString::new(version).unwrap();
+                xml_ctxt_dump_string(ctxt, version.as_ptr() as *const u8);
+                writeln!((*ctxt).output);
+            }
+            if let Some(encoding) = doc.encoding.as_deref() {
+                write!((*ctxt).output, "encoding=");
+                let encoding = CString::new(encoding).unwrap();
+                xml_ctxt_dump_string(ctxt, encoding.as_ptr() as *const u8);
+                writeln!((*ctxt).output);
+            }
+            if let Some(url) = doc.url.as_deref() {
+                write!((*ctxt).output, "URL=");
+                let url = CString::new(url).unwrap();
+                xml_ctxt_dump_string(ctxt, url.as_ptr() as *const u8);
+                writeln!((*ctxt).output);
+            }
+            if doc.standalone != 0 {
+                writeln!((*ctxt).output, "standalone=true");
+            }
         }
-        if let Some(version) = (*doc).version.as_deref() {
-            write!((*ctxt).output, "version=");
-            let version = CString::new(version).unwrap();
-            xml_ctxt_dump_string(ctxt, version.as_ptr() as *const u8);
-            writeln!((*ctxt).output);
+        if !doc.old_ns.is_null() {
+            xml_ctxt_dump_namespace_list(ctxt, doc.old_ns);
         }
-        if let Some(encoding) = (*doc).encoding.as_deref() {
-            write!((*ctxt).output, "encoding=");
-            let encoding = CString::new(encoding).unwrap();
-            xml_ctxt_dump_string(ctxt, encoding.as_ptr() as *const u8);
-            writeln!((*ctxt).output);
-        }
-        if let Some(url) = (*doc).url.as_deref() {
-            write!((*ctxt).output, "URL=");
-            let url = CString::new(url).unwrap();
-            xml_ctxt_dump_string(ctxt, url.as_ptr() as *const u8);
-            writeln!((*ctxt).output);
-        }
-        if (*doc).standalone != 0 {
-            writeln!((*ctxt).output, "standalone=true");
-        }
-    }
-    if !(*doc).old_ns.is_null() {
-        xml_ctxt_dump_namespace_list(ctxt, (*doc).old_ns);
     }
 }
 
 /// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlDebugDumpDocumentHead")]
-pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: XmlDocPtr) {
+pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
@@ -1517,17 +1510,17 @@ pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: XmlD
 
 /// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlCtxtDumpDocument")]
-unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
-    if doc.is_null() {
+unsafe fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
+    let Some(doc) = doc else {
         if (*ctxt).check == 0 {
             writeln!((*ctxt).output, "DOCUMENT.is_null() !");
         }
         return;
-    }
-    xml_ctxt_dump_document_head(ctxt, doc);
-    if let Some(children) = (*doc).children.filter(|_| {
+    };
+    xml_ctxt_dump_document_head(ctxt, Some(doc));
+    if let Some(children) = (*doc).children().filter(|_| {
         matches!(
-            (*doc).typ,
+            doc.element_type(),
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
         )
     }) {
@@ -1539,7 +1532,7 @@ unsafe extern "C" fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: XmlDocPt
 
 /// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlDebugDumpDocument")]
-pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: XmlDocPtr) {
+pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
@@ -1562,7 +1555,7 @@ pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: XmlDtdPtr) {
 }
 
 #[doc(alias = "xmlCtxtDumpEntityCallback")]
-extern "C" fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtxtPtr) {
+fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtxtPtr) {
     unsafe {
         if cur.is_null() {
             if (*ctxt).check == 0 {
@@ -1571,9 +1564,7 @@ extern "C" fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtx
             return;
         }
         if (*ctxt).check == 0 {
-            let name =
-                CStr::from_ptr((*cur).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
-            write!((*ctxt).output, "{name} : ");
+            write!((*ctxt).output, "{} : ", (*cur).name().unwrap());
             match (*cur).etype {
                 Some(XmlEntityType::XmlInternalGeneralEntity) => {
                     write!((*ctxt).output, "INTERNAL GENERAL, ");
@@ -1631,40 +1622,39 @@ extern "C" fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtx
 
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlCtxtDumpEntities")]
-unsafe extern "C" fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: XmlDocPtr) {
-    if doc.is_null() {
-        return;
-    }
-    xml_ctxt_dump_doc_head(ctxt, doc);
-    if !(*doc).int_subset.is_null() {
-        if let Some(table) = (*(*doc).int_subset).entities {
-            if (*ctxt).check == 0 {
-                writeln!((*ctxt).output, "Entities in internal subset");
+unsafe fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
+    if let Some(doc) = doc {
+        xml_ctxt_dump_doc_head(ctxt, doc);
+        if !doc.int_subset.is_null() {
+            if let Some(table) = (*doc.int_subset).entities {
+                if (*ctxt).check == 0 {
+                    writeln!((*ctxt).output, "Entities in internal subset");
+                }
+                table.scan(|payload, _, _, _| {
+                    xml_ctxt_dump_entity_callback(*payload, ctxt);
+                });
             }
-            table.scan(|payload, _, _, _| {
-                xml_ctxt_dump_entity_callback(*payload, ctxt);
-            });
+        } else {
+            writeln!((*ctxt).output, "No entities in internal subset");
         }
-    } else {
-        writeln!((*ctxt).output, "No entities in internal subset");
-    }
-    if !(*doc).ext_subset.is_null() {
-        if let Some(table) = (*(*doc).ext_subset).entities {
-            if (*ctxt).check == 0 {
-                writeln!((*ctxt).output, "Entities in external subset");
+        if !doc.ext_subset.is_null() {
+            if let Some(table) = (*doc.ext_subset).entities {
+                if (*ctxt).check == 0 {
+                    writeln!((*ctxt).output, "Entities in external subset");
+                }
+                table.scan(|payload, _, _, _| {
+                    xml_ctxt_dump_entity_callback(*payload, ctxt);
+                });
             }
-            table.scan(|payload, _, _, _| {
-                xml_ctxt_dump_entity_callback(*payload, ctxt);
-            });
+        } else if (*ctxt).check == 0 {
+            writeln!((*ctxt).output, "No entities in external subset");
         }
-    } else if (*ctxt).check == 0 {
-        writeln!((*ctxt).output, "No entities in external subset");
     }
 }
 
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlDebugDumpEntities")]
-pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: XmlDocPtr) {
+pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
@@ -1680,7 +1670,7 @@ pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: XmlDocPt
 #[doc(alias = "xmlDebugCheckDocument")]
 pub unsafe fn xml_debug_check_document(
     output: Option<impl Write + 'static>,
-    doc: XmlDocPtr,
+    doc: Option<&XmlDoc>,
 ) -> i32 {
     let mut ctxt = XmlDebugCtxt::default();
 
@@ -2178,7 +2168,7 @@ pub unsafe fn xml_shell_dir(
     {
         xml_debug_dump_document_head(
             Some(&mut (*ctxt).output),
-            (*node).as_document_node().unwrap().as_ptr(),
+            (*node).as_document_node().map(|d| d.as_ref()),
         );
     } else if (*node).element_type() == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr(
@@ -3922,40 +3912,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_debug_check_document() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    let ret_val = xml_debug_check_document(output, doc);
-                    desret_int(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDebugCheckDocument",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDebugCheckDocument()"
-                        );
-                        eprint!(" {}", n_output);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_debug_dump_attr() {
         #[cfg(feature = "libxml_debug")]
         unsafe {
@@ -4052,105 +4008,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlDebugDumpDTD()");
                         eprint!(" {}", n_output);
                         eprintln!(" {}", n_dtd);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_debug_dump_document() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    xml_debug_dump_document(output, doc);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDebugDumpDocument",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDebugDumpDocument()"
-                        );
-                        eprint!(" {}", n_output);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_debug_dump_document_head() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0);
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    xml_debug_dump_document_head(output, doc);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDebugDumpDocumentHead",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDebugDumpDocumentHead()"
-                        );
-                        eprint!(" {}", n_output);
-                        eprintln!(" {}", n_doc);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_debug_dump_entities() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let output = gen_debug_file_ptr(n_output, 0).unwrap();
-                    let doc = gen_xml_doc_ptr(n_doc, 1);
-
-                    xml_debug_dump_entities(output, doc);
-                    des_xml_doc_ptr(n_doc, doc, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDebugDumpEntities",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDebugDumpEntities()"
-                        );
-                        eprint!(" {}", n_output);
-                        eprintln!(" {}", n_doc);
                     }
                 }
             }

@@ -2992,7 +2992,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         .open(filename.as_ref())
                     {
                         Ok(f) => {
-                            xml_debug_dump_document(Some(f), doc);
+                            xml_debug_dump_document(Some(f), (!doc.is_null()).then(|| &*doc));
                         }
                         _ => {
                             eprintln!("failed to open {filename}");
@@ -3000,15 +3000,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         }
                     }
                 } else {
-                    xml_debug_dump_document(Some(stdout()), doc);
+                    xml_debug_dump_document(Some(stdout()), (!doc.is_null()).then(|| &*doc));
                 }
             }
         }
     }
 
-    /*
-     * A posteriori validation test
-     */
+    // A posteriori validation test
     #[cfg(feature = "libxml_valid")]
     if DTDVALID.lock().unwrap().is_some() || DTDVALIDFPI.lock().unwrap().is_some() {
         let dtd: XmlDtdPtr;
@@ -3242,12 +3240,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         any(feature = "html", feature = "libxml_valid")
     ))]
     if DEBUGENT != 0 && HTML == 0 {
-        xml_debug_dump_entities(stderr(), doc);
+        xml_debug_dump_entities(stderr(), (!doc.is_null()).then(|| &*doc));
     }
 
-    /*
-     * free it.
-     */
+    // free it.
     if TIMING != 0 && REPEAT == 0 {
         start_timer();
     }
