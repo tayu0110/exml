@@ -24,7 +24,6 @@ use std::{
     io::{stdout, Write},
     mem::zeroed,
     ptr::{addr_of_mut, null, null_mut},
-    str::from_utf8_unchecked,
     sync::atomic::Ordering,
 };
 
@@ -56,7 +55,7 @@ pub type XmlDebugCtxtPtr<'a> = *mut XmlDebugCtxt<'a>;
 #[repr(C)]
 pub struct XmlDebugCtxt<'a> {
     output: Box<dyn Write + 'a>, /* the output file */
-    shift: [u8; 100],            /* used for indenting */
+    shift: String,               /* used for indenting */
     depth: i32,                  /* current depth */
     doc: XmlDocPtr,              /* current document */
     node: XmlNodePtr,            /* current node */
@@ -65,6 +64,22 @@ pub struct XmlDebugCtxt<'a> {
     errors: i32,                 /* number of errors found */
     nodict: i32,                 /* if the document has no dictionary */
     options: i32,                /* options */
+}
+
+impl XmlDebugCtxt<'_> {
+    #[doc(alias = "xmlCtxtDumpSpaces")]
+    fn dump_spaces(&mut self) {
+        if self.check != 0 {
+            return;
+        }
+        if self.depth > 0 {
+            if self.depth < 50 {
+                write!(self.output, "{}", &self.shift[..2 * self.depth as usize]);
+            } else {
+                write!(self.output, "{}", &self.shift[..100]);
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -79,7 +94,7 @@ impl Default for XmlDebugCtxt<'_> {
             dict: null_mut(),
             nodict: 0,
             options: 0,
-            shift: [b' '; 100],
+            shift: " ".repeat(100),
         }
     }
 }
@@ -121,24 +136,7 @@ unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
     (*ctxt).dict = null_mut();
     (*ctxt).nodict = 0;
     (*ctxt).options = 0;
-    for i in 0..100 {
-        (*ctxt).shift[i] = b' ' as _;
-    }
-}
-
-#[doc(alias = "xmlCtxtDumpSpaces")]
-unsafe extern "C" fn xml_ctxt_dump_spaces(ctxt: XmlDebugCtxtPtr) {
-    if (*ctxt).check != 0 {
-        return;
-    }
-    if (*ctxt).depth > 0 {
-        if (*ctxt).depth < 50 {
-            let spaces = from_utf8_unchecked(&(*ctxt).shift[100 - 2 * (*ctxt).depth as usize..]);
-            write!((*ctxt).output, "{spaces}",);
-        } else {
-            write!((*ctxt).output, "{}", from_utf8_unchecked(&(*ctxt).shift));
-        }
-    }
+    (*ctxt).shift = " ".repeat(100);
 }
 
 #[doc(alias = "xmlCtxtDumpString")]
@@ -550,7 +548,7 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
 
 #[doc(alias = "xmlCtxtDumpDtdNode")]
 unsafe fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     let Some(dtd) = dtd else {
         if (*ctxt).check == 0 {
@@ -602,7 +600,7 @@ unsafe fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
 
 #[doc(alias = "xmlCtxtDumpElemDecl")]
 unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElement>) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     let Some(elem) = elem else {
         if (*ctxt).check == 0 {
@@ -667,7 +665,7 @@ unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElemen
 
 #[doc(alias = "xmlCtxtDumpAttrDecl")]
 unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttribute>) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     let Some(attr) = attr else {
         if (*ctxt).check == 0 {
@@ -789,7 +787,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttrib
 
 #[doc(alias = "xmlCtxtDumpEntityDecl")]
 unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntity>) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     let Some(ent) = ent else {
         if (*ctxt).check == 0 {
@@ -841,26 +839,26 @@ unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntit
             _ => unreachable!(),
         }
         if !ent.external_id.load(Ordering::Relaxed).is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             let external_id = CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
                 .to_string_lossy();
             writeln!((*ctxt).output, " ExternalID={external_id}");
         }
         if !ent.system_id.load(Ordering::Relaxed).is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
                 .to_string_lossy();
             writeln!((*ctxt).output, " SystemID={system_id}");
         }
         if !ent.uri.load(Ordering::Relaxed).is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             let uri =
                 CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
             writeln!((*ctxt).output, " URI={uri}");
         }
         let content = ent.content.load(Ordering::Relaxed);
         if !content.is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             write!((*ctxt).output, " content=");
             xml_ctxt_dump_string(
                 ctxt,
@@ -876,7 +874,7 @@ unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntit
 
 #[doc(alias = "xmlCtxtDumpNamespace")]
 unsafe fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: Option<&XmlNs>) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     let Some(ns) = ns else {
         if (*ctxt).check == 0 {
@@ -936,7 +934,7 @@ unsafe fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) 
 
 #[doc(alias = "xmlCtxtDumpEntity")]
 unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     if ent.is_null() {
         if (*ctxt).check == 0 {
@@ -970,27 +968,27 @@ unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityP
             CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
         writeln!((*ctxt).output, "{name}");
         if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             let external_id =
                 CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as *const i8)
                     .to_string_lossy();
             writeln!((*ctxt).output, "ExternalID={external_id}");
         }
         if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             let system_id = CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as *const i8)
                 .to_string_lossy();
             writeln!((*ctxt).output, "SystemID={system_id}");
         }
         if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             let uri =
                 CStr::from_ptr((*ent).uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
             writeln!((*ctxt).output, "URI={uri}");
         }
         let content = (*ent).content.load(Ordering::Relaxed);
         if !content.is_null() {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             write!((*ctxt).output, "content=");
             xml_ctxt_dump_string(
                 ctxt,
@@ -1015,7 +1013,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: Xm
 unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             writeln!((*ctxt).output, "node is NULL");
         }
         return;
@@ -1025,7 +1023,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 write!((*ctxt).output, "ELEMENT ");
                 if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
                     let prefix = (*(*node).ns).prefix;
@@ -1041,7 +1039,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
         }
         XmlElementType::XmlAttributeNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
             }
             writeln!((*ctxt).output, "Error, ATTRIBUTE found here");
             xml_ctxt_generic_node_check(ctxt, &*node);
@@ -1049,7 +1047,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
         }
         XmlElementType::XmlTextNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 if (*node).name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
                     write!((*ctxt).output, "TEXT no enc");
                 } else {
@@ -1070,39 +1068,39 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
         }
         XmlElementType::XmlCDATASectionNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "CDATA_SECTION");
             }
         }
         XmlElementType::XmlEntityRefNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
                 writeln!((*ctxt).output, "ENTITY_REF({name})");
             }
         }
         XmlElementType::XmlEntityNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "ENTITY");
             }
         }
         XmlElementType::XmlPINode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
                 writeln!((*ctxt).output, "PI {name}");
             }
         }
         XmlElementType::XmlCommentNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "COMMENT");
             }
         }
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
             }
             writeln!((*ctxt).output, "Error, DOCUMENT found here");
             xml_ctxt_generic_node_check(ctxt, &*node);
@@ -1110,19 +1108,19 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
         }
         XmlElementType::XmlDocumentTypeNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "DOCUMENT_TYPE");
             }
         }
         XmlElementType::XmlDocumentFragNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "DOCUMENT_FRAG");
             }
         }
         XmlElementType::XmlNotationNode => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "NOTATION");
             }
         }
@@ -1148,21 +1146,21 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
         }
         XmlElementType::XmlXIncludeStart => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "INCLUDE START");
             }
             return;
         }
         XmlElementType::XmlXIncludeEnd => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
                 writeln!((*ctxt).output, "INCLUDE END");
             }
             return;
         }
         _ => {
             if (*ctxt).check == 0 {
-                xml_ctxt_dump_spaces(ctxt);
+                (*ctxt).dump_spaces();
             }
             xml_debug_err!(
                 ctxt,
@@ -1175,7 +1173,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     }
     if (*node).doc.is_null() {
         if (*ctxt).check == 0 {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
         }
         writeln!((*ctxt).output, "PBM: doc.is_null() !!!");
     }
@@ -1191,7 +1189,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             && !(*node).content.is_null()
             && (*ctxt).check == 0
         {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             write!((*ctxt).output, "content=");
             let content = (*node).content;
             xml_ctxt_dump_string(
@@ -1217,7 +1215,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
 unsafe fn xml_ctxt_dump_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
-            xml_ctxt_dump_spaces(ctxt);
+            (*ctxt).dump_spaces();
             writeln!((*ctxt).output, "node is NULL");
         }
         return;
@@ -1245,7 +1243,7 @@ unsafe extern "C" fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, mut node: Xm
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlCtxtDumpAttr")]
 unsafe fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
-    xml_ctxt_dump_spaces(ctxt);
+    (*ctxt).dump_spaces();
 
     if attr.is_null() {
         if (*ctxt).check == 0 {
