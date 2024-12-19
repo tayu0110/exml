@@ -1015,7 +1015,7 @@ unsafe extern "C" fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: Xm
 
 /// Dumps debug information for the element node, it is not recursive
 #[doc(alias = "xmlCtxtDumpOneNode")]
-unsafe extern "C" fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
+unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         if (*ctxt).check == 0 {
             xml_ctxt_dump_spaces(ctxt);
@@ -1312,9 +1312,9 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
 
 /// Dumps debug information for the element node, it is not recursive
 #[doc(alias = "xmlDebugDumpOneNode")]
-pub unsafe extern "C" fn xml_debug_dump_one_node(
+pub unsafe fn xml_debug_dump_one_node(
     output: &mut impl Write,
-    node: XmlNodePtr,
+    node: Option<&impl NodeCommon>,
     depth: i32,
 ) {
     let mut ctxt = XmlDebugCtxt::default();
@@ -1322,7 +1322,10 @@ pub unsafe extern "C" fn xml_debug_dump_one_node(
     xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.output = Box::new(output);
     ctxt.depth = depth;
-    xml_ctxt_dump_one_node(addr_of_mut!(ctxt), node);
+    xml_ctxt_dump_one_node(
+        addr_of_mut!(ctxt),
+        node.map_or(null_mut(), |n| n as *const dyn NodeCommon as *mut XmlNode),
+    );
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
@@ -2159,7 +2162,7 @@ pub unsafe extern "C" fn xml_shell_base(
 /// Returns 0
 #[doc(alias = "xmlShellDir")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_dir(
+pub unsafe fn xml_shell_dir(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2186,7 +2189,7 @@ pub unsafe extern "C" fn xml_shell_dir(
             0,
         );
     } else {
-        xml_debug_dump_one_node(&mut (*ctxt).output, node, 0);
+        xml_debug_dump_one_node(&mut (*ctxt).output, (!node.is_null()).then(|| &*node), 0);
     }
     0
 }
@@ -4243,7 +4246,11 @@ mod tests {
                         let node = gen_xml_node_ptr(n_node, 1);
                         let depth = gen_int(n_depth, 2);
 
-                        xml_debug_dump_one_node(&mut output, node, depth);
+                        xml_debug_dump_one_node(
+                            &mut output,
+                            (!node.is_null()).then(|| &*node),
+                            depth,
+                        );
                         des_xml_node_ptr(n_node, node, 1);
                         des_int(n_depth, depth, 2);
                         reset_last_error();

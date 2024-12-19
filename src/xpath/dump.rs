@@ -20,26 +20,26 @@ use super::{XmlNodeSet, XmlXPathCompExprPtr, XmlXPathObjectPtr, XmlXPathStepOpPt
 
 unsafe fn xml_xpath_debug_dump_node<'a>(
     output: &mut (impl Write + 'a),
-    cur: XmlNodePtr,
+    cur: Option<&impl NodeCommon>,
     depth: i32,
 ) {
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    if cur.is_null() {
+    let Some(cur) = cur else {
         write!(output, "{}", shift);
         writeln!(output, "Node is NULL !");
         return;
-    }
+    };
 
-    if (*cur).element_type() == XmlElementType::XmlDocumentNode
-        || (*cur).element_type() == XmlElementType::XmlHTMLDocumentNode
+    if cur.element_type() == XmlElementType::XmlDocumentNode
+        || cur.element_type() == XmlElementType::XmlHTMLDocumentNode
     {
         write!(output, "{}", shift);
         writeln!(output, " /");
-    } else if (*cur).element_type() == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr(output, (*cur).as_attribute_node().unwrap().as_ptr(), depth);
+    } else if cur.element_type() == XmlElementType::XmlAttributeNode {
+        xml_debug_dump_attr(output, cur.as_attribute_node().unwrap().as_ptr(), depth);
     } else {
-        xml_debug_dump_one_node(output, cur, depth);
+        xml_debug_dump_one_node(output, Some(cur), depth);
     }
 }
 
@@ -60,7 +60,7 @@ unsafe fn xml_xpath_debug_dump_node_list<'a>(
     while !cur.is_null() {
         tmp = cur;
         cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-        xml_debug_dump_one_node(output, tmp, depth);
+        xml_debug_dump_one_node(output, (!tmp.is_null()).then(|| &*tmp), depth);
     }
 }
 
@@ -81,7 +81,7 @@ unsafe fn xml_xpath_debug_dump_node_set<'a>(
     for (i, &node) in cur.node_tab.iter().enumerate() {
         write!(output, "{}", shift);
         write!(output, "{}", i + 1);
-        xml_xpath_debug_dump_node(output, node, depth + 1);
+        xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
     }
 }
 
@@ -504,8 +504,7 @@ unsafe fn xml_xpath_debug_dump_step_op<'a>(
 
 /// Dumps the tree of the compiled XPath expression.
 #[doc(alias = "xmlXPathDebugDumpCompExpr")]
-#[cfg(feature = "libxml_debug")]
-pub unsafe extern "C" fn xml_xpath_debug_dump_comp_expr<'a>(
+pub unsafe fn xml_xpath_debug_dump_comp_expr<'a>(
     output: &mut (impl Write + 'a),
     comp: XmlXPathCompExprPtr,
     depth: i32,
