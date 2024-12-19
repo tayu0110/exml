@@ -101,8 +101,8 @@ const PORT_EMPTY_SERVER: Option<u16> = Some(0);
 ///
 /// # Note
 /// Query is a deprecated field which is incorrectly unescaped.
-/// query_raw takes precedence over query if the former is set.
-/// See: http://mail.gnome.org/archives/xml/2007-April/thread.html#00127
+/// query_raw takes precedence over query if the former is set.  
+/// See: <http://mail.gnome.org/archives/xml/2007-April/thread.html#00127>
 #[doc(alias = "xmlURI")]
 #[derive(Debug, Default)]
 pub struct XmlURI {

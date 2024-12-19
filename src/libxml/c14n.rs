@@ -192,8 +192,8 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 }
 
 /// Dumps the canonized image of given XML document into the provided buffer.  
-/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
-/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+/// For details see "Canonical XML" (<http://www.w3.org/TR/xml-c14n>) or
+/// "Exclusive XML Canonicalization" (<http://www.w3.org/TR/xml-exc-c14n>)
 ///
 /// Returns non-negative value on success or a negative value on fail
 #[doc(alias = "xmlC14NDocSaveTo")]
@@ -291,8 +291,8 @@ unsafe fn xml_c14n_err_internal(extra: &str) {
 }
 
 /// Dumps the canonized image of given XML document into memory.  
-/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
-/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+/// For details see "Canonical XML" (<http://www.w3.org/TR/xml-c14n>) or
+/// "Exclusive XML Canonicalization" (<http://www.w3.org/TR/xml-exc-c14n>)
 ///
 /// Returns the number of bytes written on success or a negative value on fail
 #[doc(alias = "xmlC14NDocDumpMemory")]
@@ -353,8 +353,8 @@ pub unsafe fn xml_c14n_doc_dump_memory(
 }
 
 /// Dumps the canonized image of given XML document into the file.  
-/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
-/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+/// For details see "Canonical XML" (<http://www.w3.org/TR/xml-c14n>) or
+/// "Exclusive XML Canonicalization" (<http://www.w3.org/TR/xml-exc-c14n>)
 ///
 /// Returns the number of bytes written success or a negative value on fail
 #[doc(alias = "xmlC14NDocSave")]
@@ -673,7 +673,7 @@ extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) ->
     unsafe { xml_strcmp((*ns1).prefix, (*ns2).prefix) }
 }
 
-/// Check whether `ns` is a default 'xml:' namespace with href="http://www.w3.org/XML/1998/namespace".  
+/// Check whether `ns` is a default 'xml:' namespace with `href="http://www.w3.org/XML/1998/namespace"`.  
 /// Return `true` if so, otherwise return `false`.
 ///
 /// Please refer to the document of `xmlC14NIsXmlNs` for original libxml2.
@@ -885,7 +885,7 @@ extern "C" fn xml_c14n_print_namespaces_walker(ns: *const c_void, ctx: *mut c_vo
 /// Prints out canonical namespace axis of the current node to the
 /// buffer from C14N context as follows
 ///
-/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+/// Canonical XML v 1.0 (<http://www.w3.org/TR/xml-c14n>)
 ///
 /// # Namespace Axis
 /// Consider a list L containing only namespace nodes in the
@@ -903,9 +903,9 @@ extern "C" fn xml_c14n_print_namespaces_walker(ns: *const c_void, ctx: *mut c_vo
 /// canonical form that has a non-empty default namespace.  
 /// To finish processing L, simply process every namespace node in L,
 /// except omit namespace node with local name xml, which defines the xml prefix,
-/// if its string value is http://www.w3.org/XML/1998/namespace.
+/// if its string value is `http://www.w3.org/XML/1998/namespace`.
 ///
-/// Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
+/// Exclusive XML Canonicalization v 1.0 (<http://www.w3.org/TR/xml-exc-c14n>)
 /// Canonical XML applied to a document subset requires the search of the
 /// ancestor nodes of each orphan element node for attributes in the xml
 /// namespace, such as xml:lang and xml:space.  
@@ -1053,7 +1053,7 @@ unsafe extern "C" fn xml_exc_c14n_visible_ns_stack_find(
 /// to the buffer from C14N context as follows
 ///
 /// Exclusive XML Canonicalization
-/// http://www.w3.org/TR/xml-exc-c14n
+/// <http://www.w3.org/TR/xml-exc-c14n>
 ///
 /// If the element node is in the XPath subset then output the node in
 /// accordance with Canonical XML except for namespace nodes which are
@@ -1294,7 +1294,7 @@ extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void)
     }
 }
 
-/// Checks whether `attr` is a default "xml:" namespace with href="http://www.w3.org/XML/1998/namespace".  
+/// Checks whether `attr` is a default "xml:" namespace with `href="http://www.w3.org/XML/1998/namespace"`.  
 /// Return `true` if so, otherwise return false.
 /* todo: make it a define? */
 #[doc(alias = "xmlC14NIsXmlAttr")]
@@ -1584,7 +1584,7 @@ unsafe extern "C" fn xml_c11n_normalize_attr(a: *const u8) -> *mut XmlChar {
 /// Prints out canonical attribute urrent node to the
 /// buffer from C14N context as follows
 ///
-/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+/// Canonical XML v 1.0 (<http://www.w3.org/TR/xml-c14n>)
 ///
 /// Returns 1 on success or 0 on fail.
 #[doc(alias = "xmlC14NPrintAttrs")]
@@ -1638,7 +1638,7 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
 /// Prints out canonical attribute axis of the current node to the
 /// buffer from C14N context as follows
 ///
-/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+/// Canonical XML v 1.0 (<http://www.w3.org/TR/xml-c14n>)
 ///
 /// # Attribute Axis
 /// In lexicographic order (ascending), process each node that
@@ -1648,7 +1648,7 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
 /// when an XPath node-set is given as input and the element's
 /// parent is omitted from the node-set.
 ///
-/// Exclusive XML Canonicalization v 1.0 (http://www.w3.org/TR/xml-exc-c14n)
+/// Exclusive XML Canonicalization v 1.0 (<http://www.w3.org/TR/xml-exc-c14n>)
 ///
 /// Canonical XML applied to a document subset requires the search of the
 /// ancestor nodes of each orphan element node for attributes in the xml
@@ -1916,7 +1916,7 @@ unsafe extern "C" fn xml_c14n_visible_ns_stack_restore(
     (*cur).ns_prev_end = (*state).ns_prev_end;
 }
 
-/// Canonical XML v 1.0 (http://www.w3.org/TR/xml-c14n)
+/// Canonical XML v 1.0 (<http://www.w3.org/TR/xml-c14n>)
 ///
 /// # Element Nodes
 /// If the element is not in the node-set, then the result is obtained
@@ -2323,8 +2323,8 @@ unsafe fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: XmlNodePtr) ->
 }
 
 /// Dumps the canonized image of given XML document into the provided buffer.
-/// For details see "Canonical XML" (http://www.w3.org/TR/xml-c14n) or
-/// "Exclusive XML Canonicalization" (http://www.w3.org/TR/xml-exc-c14n)
+/// For details see "Canonical XML" (<http://www.w3.org/TR/xml-c14n>) or
+/// "Exclusive XML Canonicalization" (<http://www.w3.org/TR/xml-exc-c14n>)
 ///
 /// Returns non-negative value on success or a negative value on fail
 #[doc(alias = "xmlC14NExecute")]

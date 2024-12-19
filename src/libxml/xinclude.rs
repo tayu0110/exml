@@ -68,25 +68,25 @@ use crate::{
 
 use super::chvalid::xml_is_char;
 
-/// Macro defining the Xinclude namespace: http://www.w3.org/2003/XInclude
+/// A constant defining the Xinclude namespace: `http://www.w3.org/2003/XInclude`
 pub const XINCLUDE_NS: &CStr = c"http://www.w3.org/2003/XInclude";
-/// Macro defining the draft Xinclude namespace: http://www.w3.org/2001/XInclude
+/// A constant defining the draft Xinclude namespace: `http://www.w3.org/2001/XInclude`
 pub const XINCLUDE_OLD_NS: &CStr = c"http://www.w3.org/2001/XInclude";
-/// Macro defining "include"
+/// A constant defining "include"
 pub const XINCLUDE_NODE: &str = "include";
-/// Macro defining "fallback"
+/// A constant defining "fallback"
 pub const XINCLUDE_FALLBACK: &str = "fallback";
-/// Macro defining "href"
+/// A constant defining "href"
 pub const XINCLUDE_HREF: &CStr = c"href";
-/// Macro defining "parse"
+/// A constant defining "parse"
 pub const XINCLUDE_PARSE: &CStr = c"parse";
-/// Macro defining "xml"
+/// A constant defining "xml"
 pub const XINCLUDE_PARSE_XML: &str = "xml";
-/// Macro defining "text"
+/// A constant defining "text"
 pub const XINCLUDE_PARSE_TEXT: &str = "text";
-/// Macro defining "encoding"
+/// A constant defining "encoding"
 pub const XINCLUDE_PARSE_ENCODING: &CStr = c"encoding";
-/// Macro defining "xpointer"
+/// A constant defining "xpointer"
 pub const XINCLUDE_PARSE_XPOINTER: &CStr = c"xpointer";
 
 pub type XmlURL = *mut XmlChar;

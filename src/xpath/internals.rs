@@ -2401,7 +2401,7 @@ macro_rules! PUSH_FULL_EXPR {
     };
 }
 
-/// ```ignore
+/// ```text
 /// [6] AxisName ::=   'ancestor'
 ///                  | 'ancestor-or-self'
 ///                  | 'attribute'
@@ -2520,7 +2520,7 @@ unsafe extern "C" fn xml_xpath_parse_literal(ctxt: XmlXPathParserContextPtr) -> 
     ret
 }
 
-/// ```ignore
+/// ```text
 /// [7] NodeTest ::=   NameTest
 ///            | NodeType '(' ')'
 ///            | 'processing-instruction' '(' Literal ')'
@@ -2659,7 +2659,7 @@ unsafe extern "C" fn xml_xpath_comp_node_test(
     name
 }
 
-/// ```ignore
+/// ```text
 /// [8]   Predicate ::=   '[' PredicateExpr ']'
 /// [9]   PredicateExpr ::=   Expr
 /// ```
@@ -2721,7 +2721,7 @@ unsafe extern "C" fn xml_xpath_comp_predicate(ctxt: XmlXPathParserContextPtr, fi
     SKIP_BLANKS!(ctxt);
 }
 
-/// ```ignore
+/// ```text
 /// [4] Step ::=   AxisSpecifier NodeTest Predicate* | AbbreviatedStep
 ///
 /// [12] AbbreviatedStep ::=   '.' | '..'
@@ -2898,7 +2898,7 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/// ```ignore
+/// ```text
 /// [3]   RelativeLocationPath ::=   Step
 ///                     | RelativeLocationPath '/' Step
 ///                     | AbbreviatedRelativeLocationPath
@@ -2951,7 +2951,7 @@ unsafe extern "C" fn xml_xpath_comp_relative_location_path(ctxt: XmlXPathParserC
     }
 }
 
-/// ```ignore
+/// ```text
 /// [1]   LocationPath ::=   RelativeLocationPath
 ///                    | AbsoluteLocationPath
 /// [2]   AbsoluteLocationPath ::=   '/' RelativeLocationPath?
@@ -3009,7 +3009,7 @@ unsafe extern "C" fn xml_xpath_comp_location_path(ctxt: XmlXPathParserContextPtr
 
 /// parse an XML qualified name
 ///
-/// ```ignore
+/// ```text
 /// [NS 5] QName ::= (Prefix ':')? LocalPart
 ///
 /// [NS 6] Prefix ::= NCName
@@ -3082,7 +3082,7 @@ unsafe extern "C" fn xml_xpath_comp_variable_reference(ctxt: XmlXPathParserConte
     }
 }
 
-/// ```ignore
+/// ```text
 /// [30]   Number ::=   Digits ('.' Digits?)?
 ///                   | '.' Digits
 /// [31]   Digits ::=   [0-9]+
@@ -3230,7 +3230,7 @@ unsafe extern "C" fn xml_xpath_comp_literal(ctxt: XmlXPathParserContextPtr) {
     xml_free(ret as _);
 }
 
-/// ```ignore
+/// ```text
 /// [16]   FunctionCall ::=   FunctionName '(' ( Argument ( ',' Argument)*)? ')'
 /// [17]   Argument ::=   Expr
 /// ```
@@ -3313,7 +3313,7 @@ unsafe extern "C" fn xml_xpath_comp_function_call(ctxt: XmlXPathParserContextPtr
     SKIP_BLANKS!(ctxt);
 }
 
-/// ```ignore
+/// ```text
 /// [15]   PrimaryExpr ::=   VariableReference
 ///                | '(' Expr ')'
 ///                | Literal
@@ -3368,7 +3368,7 @@ unsafe extern "C" fn xml_xpath_comp_filter_expr(ctxt: XmlXPathParserContextPtr) 
     }
 }
 
-/// ```ignore
+/// ```text
 /// [19]   PathExpr ::=   LocationPath
 ///               | FilterExpr
 ///               | FilterExpr '/' RelativeLocationPath
@@ -3564,7 +3564,7 @@ unsafe extern "C" fn xml_xpath_comp_unary_expr(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/// ```ignore
+/// ```text
 /// [26]   MultiplicativeExpr ::=   UnaryExpr
 ///                  | MultiplicativeExpr MultiplyOperator UnaryExpr
 ///                  | MultiplicativeExpr 'div' UnaryExpr
@@ -3610,7 +3610,7 @@ unsafe extern "C" fn xml_xpath_comp_multiplicative_expr(ctxt: XmlXPathParserCont
     }
 }
 
-/// ```ignore
+/// ```text
 /// [25]   AdditiveExpr ::=   MultiplicativeExpr
 ///                   | AdditiveExpr '+' MultiplicativeExpr
 ///                   | AdditiveExpr '-' MultiplicativeExpr
@@ -3642,7 +3642,7 @@ unsafe extern "C" fn xml_xpath_comp_additive_expr(ctxt: XmlXPathParserContextPtr
     }
 }
 
-/// ```ignore
+/// ```text
 /// [24]   RelationalExpr ::=   AdditiveExpr
 ///                | RelationalExpr '<' AdditiveExpr
 ///                | RelationalExpr '>' AdditiveExpr
@@ -3684,7 +3684,7 @@ unsafe extern "C" fn xml_xpath_comp_relational_expr(ctxt: XmlXPathParserContextP
     }
 }
 
-/// ```ignore
+/// ```text
 /// [23]   EqualityExpr ::=   RelationalExpr
 ///                | EqualityExpr '=' RelationalExpr
 ///                | EqualityExpr '!=' RelationalExpr
@@ -3751,7 +3751,7 @@ unsafe extern "C" fn xml_xpath_comp_and_expr(ctxt: XmlXPathParserContextPtr) {
     }
 }
 
-/// ```ignore
+/// ```text
 /// [14]   Expr ::=   OrExpr
 /// [21]   OrExpr ::=   AndExpr | OrExpr 'or' AndExpr
 /// ```
@@ -6687,7 +6687,7 @@ unsafe extern "C" fn xml_xpath_parse_name_complex(
 
 /// Parse an XML name
 ///
-/// ```ignore
+/// ```text
 /// [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | ':' | CombiningChar | Extender
 ///
 /// [5] Name ::= (Letter | '_' | ':') (NameChar)*
@@ -6739,7 +6739,7 @@ pub unsafe extern "C" fn xml_xpath_parse_name(ctxt: XmlXPathParserContextPtr) ->
 
 /// Parse an XML namespace non qualified name.
 ///
-/// ```ignore
+/// ```text
 /// [NS 3] NCName ::= (Letter | '_') (NCNameChar)*
 ///
 /// [NS 4] NCNameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender
@@ -6793,12 +6793,11 @@ pub unsafe extern "C" fn xml_xpath_parse_ncname(ctxt: XmlXPathParserContextPtr) 
 
 const MAX_FRAC: usize = 20;
 
-/// ```ignore
+/// ```text
 /// [30a]  Float  ::= Number ('e' Digits?)?
 ///
-/// [30]   Number ::=   Digits ('.' Digits?)?
-///                    | '.' Digits
-/// [31]   Digits ::=   [0-9]+
+/// [30]   Number ::= Digits ('.' Digits?)? | '.' Digits
+/// [31]   Digits ::= [0-9]+
 /// ```
 ///
 /// Compile a Number in the string
@@ -8493,7 +8492,7 @@ pub unsafe extern "C" fn xml_xpath_mod_values(ctxt: XmlXPathParserContextPtr) {
 
 /// Is the name given a NodeType one.
 ///
-/// ```ignore
+/// ```text
 /// [38]   NodeType ::=   'comment'
 ///                   | 'text'
 ///                   | 'processing-instruction'

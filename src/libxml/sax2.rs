@@ -94,8 +94,8 @@ pub unsafe extern "C" fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const Xml
     null()
 }
 
-/// Provides the system ID, basically URL or filename e.g.
-/// http://www.sgmlsource.com/dtds/memo.dtd
+/// Provides the system ID, basically URL or filename e.g.  
+/// <http://www.sgmlsource.com/dtds/memo.dtd>
 ///
 /// Returns a xmlChar *
 #[doc(alias = "xmlSAX2GetSystemId")]
@@ -1519,11 +1519,9 @@ unsafe fn xml_sax2_attribute_internal(
     } else {
         #[cfg(feature = "libxml_valid")]
         {
-            /*
-             * Do the last stage of the attribute normalization
-             * Needed for HTML too:
-             *   http://www.w3.org/TR/html4/types.html#h-6.2
-             */
+            // Do the last stage of the attribute normalization
+            // Needed for HTML too:
+            //   http://www.w3.org/TR/html4/types.html#h-6.2
             (*ctxt).vctxt.valid = 1;
             nval = xml_valid_ctxt_normalize_attribute_value(
                 addr_of_mut!((*ctxt).vctxt) as _,
@@ -1796,7 +1794,7 @@ unsafe fn xml_sax2_attribute_internal(
         namespace = null_mut();
     }
 
-    /* !!!!!! <a toto:arg="" xmlns:toto="http://toto.com"> */
+    // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
     let ret: XmlAttrPtr = xml_new_ns_prop_eat_name((*ctxt).node, namespace, name, null());
     if ret.is_null() {
         // goto error;

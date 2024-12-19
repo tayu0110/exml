@@ -46,8 +46,8 @@ pub type XmlURIPtr = *mut XmlURI;
 ///
 /// # Note
 /// Query is a deprecated field which is incorrectly unescaped.
-/// query_raw takes precedence over query if the former is set.
-/// See: http://mail.gnome.org/archives/xml/2007-April/thread.html#00127
+/// query_raw takes precedence over query if the former is set.  
+/// See: <http://mail.gnome.org/archives/xml/2007-April/thread.html#00127>
 #[doc(alias = "xmlURI")]
 #[repr(C)]
 pub struct XmlURI {
