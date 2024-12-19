@@ -2846,9 +2846,7 @@ unsafe fn stream_mem_parse_test(
     let mut size: i32 = 0;
     let cfilename = CString::new(filename).unwrap();
 
-    /*
-     * load and parse the memory
-     */
+    // load and parse the memory
     if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
@@ -2877,7 +2875,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     use exml::{
         libxml::xpointer::{xml_xptr_eval, xml_xptr_new_context},
         xpath::{
-            internals::xml_xpath_debug_dump_object, xml_xpath_compile, xml_xpath_compiled_eval,
+            xml_xpath_compile, xml_xpath_compiled_eval, xml_xpath_debug_dump_object,
             xml_xpath_eval_expression, xml_xpath_free_comp_expr, xml_xpath_free_context,
             xml_xpath_free_object, xml_xpath_new_context, XmlXPathCompExprPtr, XmlXPathContextPtr,
             XmlXPathObjectPtr,
@@ -2927,7 +2925,7 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     xml_xpath_free_object(res);
     xml_xpath_free_context(ctxt);
 
-    /* Reset generic error handler. */
+    // Reset generic error handler.
     set_generic_error(None, None);
 }
 

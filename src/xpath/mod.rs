@@ -34,6 +34,8 @@
 //
 // Author: daniel@veillard.com
 
+#[cfg(all(feature = "xpath", feature = "libxml_debug"))]
+pub mod dump;
 #[cfg(feature = "xpath")]
 pub mod internals;
 #[cfg(feature = "xpath")]
@@ -69,6 +71,8 @@ use crate::{
     tree::{NodeCommon, NodePtr, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNsPtr},
 };
 
+#[cfg(all(feature = "xpath", feature = "libxml_debug"))]
+pub use dump::*;
 #[cfg(feature = "xpath")]
 pub use internals::*;
 #[cfg(feature = "xpath")]

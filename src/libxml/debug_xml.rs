@@ -2962,7 +2962,7 @@ pub unsafe fn xml_shell<'a>(
         },
         tree::xml_free_doc,
         xpath::{
-            internals::xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
+            xml_xpath_debug_dump_object, xml_xpath_eval, xml_xpath_free_context,
             xml_xpath_free_object, xml_xpath_new_context,
         },
     };
