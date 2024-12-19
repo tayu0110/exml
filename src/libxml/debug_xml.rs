@@ -45,7 +45,7 @@ use crate::{
 
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-    entities::{xml_get_doc_entity, XmlEntityType},
+    entities::{xml_get_doc_entity, XmlEntity, XmlEntityType},
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
@@ -788,16 +788,16 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttrib
 }
 
 #[doc(alias = "xmlCtxtDumpEntityDecl")]
-unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
+unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntity>) {
     xml_ctxt_dump_spaces(ctxt);
 
-    if ent.is_null() {
+    let Some(ent) = ent else {
         if (*ctxt).check == 0 {
             writeln!((*ctxt).output, "Entity declaration is NULL");
         }
         return;
-    }
-    if (*ent).typ != XmlElementType::XmlEntityDecl {
+    };
+    if ent.element_type() != XmlElementType::XmlEntityDecl {
         xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotEntityDecl,
@@ -805,7 +805,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
         );
         return;
     }
-    if let Some(name) = (*ent).name() {
+    if let Some(name) = ent.name() {
         if (*ctxt).check == 0 {
             write!((*ctxt).output, "ENTITYDECL(");
             xml_ctxt_dump_string(ctxt, Some(&name));
@@ -819,7 +819,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
         );
     }
     if (*ctxt).check == 0 {
-        match (*ent).etype {
+        match ent.etype {
             Some(XmlEntityType::XmlInternalGeneralEntity) => {
                 writeln!((*ctxt).output, ", internal");
             }
@@ -840,26 +840,25 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
             }
             _ => unreachable!(),
         }
-        if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
+        if !ent.external_id.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            let external_id =
-                CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
+            let external_id = CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
+                .to_string_lossy();
             writeln!((*ctxt).output, " ExternalID={external_id}");
         }
-        if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
+        if !ent.system_id.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
-            let system_id = CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as *const i8)
+            let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
                 .to_string_lossy();
             writeln!((*ctxt).output, " SystemID={system_id}");
         }
-        if !(*ent).uri.load(Ordering::Relaxed).is_null() {
+        if !ent.uri.load(Ordering::Relaxed).is_null() {
             xml_ctxt_dump_spaces(ctxt);
             let uri =
-                CStr::from_ptr((*ent).uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
             writeln!((*ctxt).output, " URI={uri}");
         }
-        let content = (*ent).content.load(Ordering::Relaxed);
+        let content = ent.content.load(Ordering::Relaxed);
         if !content.is_null() {
             xml_ctxt_dump_spaces(ctxt);
             write!((*ctxt).output, " content=");
@@ -872,7 +871,7 @@ unsafe extern "C" fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: XmlEn
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, &*ent);
+    xml_ctxt_generic_node_check(ctxt, ent);
 }
 
 #[doc(alias = "xmlCtxtDumpNamespace")]
@@ -1140,7 +1139,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlEntityDecl => {
-            xml_ctxt_dump_entity_decl(ctxt, node as XmlEntityPtr);
+            xml_ctxt_dump_entity_decl(ctxt, (*node).as_entity_decl_node().map(|a| a.as_ref()));
             return;
         }
         XmlElementType::XmlNamespaceDecl => {
