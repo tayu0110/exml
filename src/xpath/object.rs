@@ -129,6 +129,48 @@ impl Default for XmlXPathObject {
     }
 }
 
+impl XmlXPathObject {}
+
+impl From<&str> for XmlXPathObject {
+    fn from(value: &str) -> Self {
+        Self {
+            typ: XmlXPathObjectType::XPathString,
+            stringval: Some(value.to_owned()),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<String> for XmlXPathObject {
+    fn from(value: String) -> Self {
+        Self {
+            typ: XmlXPathObjectType::XPathString,
+            stringval: Some(value),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<f64> for XmlXPathObject {
+    fn from(value: f64) -> Self {
+        Self {
+            typ: XmlXPathObjectType::XPathNumber,
+            floatval: value,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<bool> for XmlXPathObject {
+    fn from(value: bool) -> Self {
+        Self {
+            typ: XmlXPathObjectType::XPathBoolean,
+            boolval: value,
+            ..Default::default()
+        }
+    }
+}
+
 /// Create a new xmlXPathObjectPtr of type string and of value @val
 ///
 /// Returns the newly created object.
@@ -139,10 +181,7 @@ pub unsafe fn xml_xpath_new_string(val: Option<&str>) -> XmlXPathObjectPtr {
         xml_xpath_err_memory(null_mut(), Some("creating string object\n"));
         return null_mut();
     }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathString;
-    let val = val.unwrap_or("");
-    (*ret).stringval = Some(val.to_owned());
+    std::ptr::write(&mut *ret, XmlXPathObject::from(val.unwrap_or("")));
     ret
 }
 
@@ -174,9 +213,7 @@ pub unsafe fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
         xml_xpath_err_memory(null_mut(), Some("creating float object\n"));
         return null_mut();
     }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathNumber;
-    (*ret).floatval = val;
+    std::ptr::write(&mut *ret, XmlXPathObject::from(val));
     ret
 }
 
@@ -184,15 +221,13 @@ pub unsafe fn xml_xpath_new_float(val: f64) -> XmlXPathObjectPtr {
 ///
 /// Returns the newly created object.
 #[doc(alias = "xmlXPathNewBoolean")]
-pub unsafe fn xml_xpath_new_boolean(val: i32) -> XmlXPathObjectPtr {
+pub unsafe fn xml_xpath_new_boolean(val: bool) -> XmlXPathObjectPtr {
     let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
     if ret.is_null() {
         xml_xpath_err_memory(null_mut(), Some("creating boolean object\n"));
         return null_mut();
     }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathBoolean;
-    (*ret).boolval = val != 0;
+    std::ptr::write(&mut *ret, XmlXPathObject::from(val));
     ret
 }
 
@@ -213,6 +248,25 @@ pub unsafe fn xml_xpath_new_node_set(val: *mut XmlNode) -> XmlXPathObjectPtr {
     // TODO: Check memory error.
     (*ret).nodesetval = xml_xpath_node_set_create(val);
     /* @@ with_ns to check whether namespace nodes should be looked at @@ */
+    ret
+}
+
+/// Wrap the Nodeset @val in a new xmlXPathObjectPtr
+///
+/// Returns the newly created object.
+///
+/// In case of error the node set is destroyed and NULL is returned.
+#[doc(alias = "xmlXPathWrapNodeSet")]
+pub unsafe fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathObjectPtr {
+    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
+    if ret.is_null() {
+        xml_xpath_err_memory(null_mut(), Some("creating node set object\n"));
+        xml_xpath_free_node_set(val);
+        return null_mut();
+    }
+    std::ptr::write(&mut *ret, XmlXPathObject::default());
+    (*ret).typ = XmlXPathObjectType::XPathNodeset;
+    (*ret).nodesetval = val;
     ret
 }
 
@@ -440,12 +494,12 @@ pub unsafe fn xml_xpath_cast_to_string(val: XmlXPathObjectPtr) -> Cow<'static, s
 #[doc(alias = "xmlXPathConvertBoolean")]
 pub unsafe fn xml_xpath_convert_boolean(val: XmlXPathObjectPtr) -> XmlXPathObjectPtr {
     if val.is_null() {
-        return xml_xpath_new_boolean(0);
+        return xml_xpath_new_boolean(false);
     }
     if (*val).typ == XmlXPathObjectType::XPathBoolean {
         return val;
     }
-    let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(val) as i32);
+    let ret: XmlXPathObjectPtr = xml_xpath_new_boolean(xml_xpath_cast_to_boolean(val));
     xml_xpath_free_object(val);
     ret
 }

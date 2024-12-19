@@ -91,7 +91,7 @@ use crate::{
 
 use super::{
     xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
-    xml_xpath_node_set_merge, xml_xpath_wrap_string, XmlNodeSet,
+    xml_xpath_node_set_merge, xml_xpath_wrap_node_set, xml_xpath_wrap_string, XmlNodeSet,
 };
 
 // Many of these macros may later turn into functions.
@@ -1850,25 +1850,6 @@ macro_rules! XP_HAS_CACHE {
     };
 }
 
-/// Wrap the Nodeset @val in a new xmlXPathObjectPtr
-///
-/// Returns the newly created object.
-///
-/// In case of error the node set is destroyed and NULL is returned.
-#[doc(alias = "xmlXPathWrapNodeSet")]
-pub unsafe fn xml_xpath_wrap_node_set(val: Option<Box<XmlNodeSet>>) -> XmlXPathObjectPtr {
-    let ret: XmlXPathObjectPtr = xml_malloc(size_of::<XmlXPathObject>()) as XmlXPathObjectPtr;
-    if ret.is_null() {
-        xml_xpath_err_memory(null_mut(), Some("creating node set object\n"));
-        xml_xpath_free_node_set(val);
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlXPathObject::default());
-    (*ret).typ = XmlXPathObjectType::XPathNodeset;
-    (*ret).nodesetval = val;
-    ret
-}
-
 /// This is the cached version of xmlXPathWrapNodeSet().
 /// Wrap the Nodeset @val in a new xmlXPathObjectPtr
 ///
@@ -1999,10 +1980,7 @@ unsafe fn xml_xpath_cache_new_string(
 ///
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheNewBoolean")]
-unsafe extern "C" fn xml_xpath_cache_new_boolean(
-    ctxt: XmlXPathContextPtr,
-    val: i32,
-) -> XmlXPathObjectPtr {
+unsafe fn xml_xpath_cache_new_boolean(ctxt: XmlXPathContextPtr, val: bool) -> XmlXPathObjectPtr {
     if !ctxt.is_null() && !(*ctxt).cache.is_null() {
         let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
 
@@ -2013,7 +1991,7 @@ unsafe extern "C" fn xml_xpath_cache_new_boolean(
                 .add((*(*cache).boolean_objs).number as usize)
                 as XmlXPathObjectPtr;
             (*ret).typ = XmlXPathObjectType::XPathBoolean;
-            (*ret).boolval = val != 0;
+            (*ret).boolval = val;
             return ret;
         } else if !(*cache).misc_objs.is_null() && (*(*cache).misc_objs).number != 0 {
             (*(*cache).misc_objs).number -= 1;
@@ -2023,7 +2001,7 @@ unsafe extern "C" fn xml_xpath_cache_new_boolean(
                 as XmlXPathObjectPtr;
 
             (*ret).typ = XmlXPathObjectType::XPathBoolean;
-            (*ret).boolval = val != 0;
+            (*ret).boolval = val;
             return ret;
         }
     }
@@ -2091,7 +2069,7 @@ unsafe extern "C" fn xml_xpath_cache_object_copy(
                 return xml_xpath_cache_new_string(ctxt, (*val).stringval.as_deref());
             }
             XmlXPathObjectType::XPathBoolean => {
-                return xml_xpath_cache_new_boolean(ctxt, (*val).boolval as i32);
+                return xml_xpath_cache_new_boolean(ctxt, (*val).boolval);
             }
             XmlXPathObjectType::XPathNumber => {
                 return xml_xpath_cache_new_float(ctxt, (*val).floatval);
@@ -6331,7 +6309,10 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             } else {
                 equal = xml_xpath_not_equal_values(ctxt);
             }
-            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, equal));
+            value_push(
+                ctxt,
+                xml_xpath_cache_new_boolean((*ctxt).context, equal != 0),
+            );
         }
         XmlXPathOp::XpathOpCmp => {
             total += xml_xpath_comp_op_eval(ctxt, (*comp).steps.add((*op).ch1 as usize));
@@ -6339,7 +6320,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
             total += xml_xpath_comp_op_eval(ctxt, (*comp).steps.add((*op).ch2 as usize));
             CHECK_ERROR0!(ctxt);
             ret = xml_xpath_compare_values(ctxt, (*op).value, (*op).value2);
-            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret));
+            value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret != 0));
         }
         XmlXPathOp::XpathOpPlus => {
             total += xml_xpath_comp_op_eval(ctxt, (*comp).steps.add((*op).ch1 as usize));
@@ -10339,9 +10320,9 @@ pub unsafe fn xml_xpath_contains_function(ctxt: XmlXPathParserContextPtr, nargs:
         })
         .is_some()
     {
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
+        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, true));
     } else {
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
+        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, false));
     }
     xml_xpath_release_object((*ctxt).context, hay);
     xml_xpath_release_object((*ctxt).context, needle);
@@ -10370,9 +10351,9 @@ pub unsafe fn xml_xpath_starts_with_function(ctxt: XmlXPathParserContextPtr, nar
     if &(*hay).stringval.as_deref().unwrap()[..n.min(m)]
         != (*needle).stringval.as_deref().expect("Internal Error")
     {
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
+        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, false));
     } else {
-        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
+        value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, true));
     }
     xml_xpath_release_object((*ctxt).context, hay);
     xml_xpath_release_object((*ctxt).context, needle);
@@ -10675,7 +10656,7 @@ pub unsafe fn xml_xpath_not_function(ctxt: XmlXPathParserContextPtr, nargs: i32)
 #[doc(alias = "xmlXPathTrueFunction")]
 pub unsafe fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
-    value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 1));
+    value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, true));
 }
 
 /// Implement the false() XPath function
@@ -10683,7 +10664,7 @@ pub unsafe fn xml_xpath_true_function(ctxt: XmlXPathParserContextPtr, nargs: i32
 #[doc(alias = "xmlXPathFalseFunction")]
 pub unsafe fn xml_xpath_false_function(ctxt: XmlXPathParserContextPtr, nargs: i32) {
     CHECK_ARITY!(ctxt, nargs, 0);
-    value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, 0));
+    value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, false));
 }
 
 /// Implement the lang() XPath function
@@ -10732,7 +10713,7 @@ pub unsafe fn xml_xpath_lang_function(ctxt: XmlXPathParserContextPtr, nargs: i32
     // not_equal:
 
     xml_xpath_release_object((*ctxt).context, val);
-    value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret));
+    value_push(ctxt, xml_xpath_cache_new_boolean((*ctxt).context, ret != 0));
 }
 
 /// This is the cached version of xmlXPathConvertNumber().
@@ -10878,13 +10859,12 @@ unsafe extern "C" fn xml_xpath_cache_convert_boolean(
     val: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
     if val.is_null() {
-        return xml_xpath_cache_new_boolean(ctxt, 0);
+        return xml_xpath_cache_new_boolean(ctxt, false);
     }
     if matches!((*val).typ, XmlXPathObjectType::XPathBoolean) {
         return val;
     }
-    let ret: XmlXPathObjectPtr =
-        xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(val) as i32);
+    let ret: XmlXPathObjectPtr = xml_xpath_cache_new_boolean(ctxt, xml_xpath_cast_to_boolean(val));
     xml_xpath_release_object(ctxt, val);
     ret
 }

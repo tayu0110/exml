@@ -3879,7 +3879,7 @@ mod tests {
                 let mem_base = xml_mem_blocks();
                 let val = gen_int(n_val, 0);
 
-                let ret_val = xml_xpath_new_boolean(val);
+                let ret_val = xml_xpath_new_boolean(val != 0);
                 desret_xml_xpath_object_ptr(ret_val);
                 des_int(n_val, val, 0);
                 reset_last_error();

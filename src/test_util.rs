@@ -294,7 +294,7 @@ pub(crate) unsafe extern "C" fn gen_double(no: i32, _nr: i32) -> f64 {
 pub(crate) fn des_double(_no: i32, _val: f64, _nr: i32) {}
 
 #[cfg(feature = "xpath")]
-pub(crate) unsafe extern "C" fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> XmlXPathObjectPtr {
+pub(crate) unsafe fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> XmlXPathObjectPtr {
     use crate::xpath::object::{
         xml_xpath_new_boolean, xml_xpath_new_float, xml_xpath_new_node_set, xml_xpath_new_string,
     };
@@ -306,7 +306,7 @@ pub(crate) unsafe extern "C" fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> X
         return xml_xpath_new_float(1.1);
     }
     if no == 2 {
-        return xml_xpath_new_boolean(1);
+        return xml_xpath_new_boolean(true);
     }
     if no == 3 {
         return xml_xpath_new_node_set(null_mut());
@@ -315,11 +315,7 @@ pub(crate) unsafe extern "C" fn gen_xml_xpath_object_ptr(no: i32, _nr: i32) -> X
 }
 
 #[cfg(feature = "xpath")]
-pub(crate) unsafe extern "C" fn des_xml_xpath_object_ptr(
-    _no: i32,
-    val: XmlXPathObjectPtr,
-    _nr: i32,
-) {
+pub(crate) unsafe fn des_xml_xpath_object_ptr(_no: i32, val: XmlXPathObjectPtr, _nr: i32) {
     use crate::xpath::xml_xpath_free_object;
 
     if !val.is_null() {
