@@ -39,7 +39,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd,
-        XmlDtdPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
+        XmlDtdPtr, XmlElement, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode,
         XmlNodePtr, XmlNsPtr,
     },
 };
@@ -372,7 +372,7 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
             (*ctxt).dict = dict;
         }
     }
-    if (*node)
+    if node
         .parent()
         .filter(|p| node.document() != p.document() && node.name().as_deref() != Some("pseudoroot"))
         .is_some()
@@ -424,17 +424,17 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
                 "Node next->prev : forward link wrong\n",
             );
         }
-        if next.parent() != (*node).parent() {
+        if next.parent() != node.parent() {
             xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckWrongParent,
                 "Node next->prev : forward link wrong\n",
             );
         }
-    } else if (*node)
+    } else if node
         .parent()
         .filter(|p| {
-            (*node).element_type() != XmlElementType::XmlAttributeNode
+            node.element_type() != XmlElementType::XmlAttributeNode
                 && p.last() != NodePtr::from_ptr(node as *const dyn NodeCommon as _)
                 && p.element_type() == XmlElementType::XmlElementNode
         })
@@ -602,16 +602,16 @@ unsafe fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
 }
 
 #[doc(alias = "xmlCtxtDumpElemDecl")]
-unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlElementPtr) {
+unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElement>) {
     xml_ctxt_dump_spaces(ctxt);
 
-    if elem.is_null() {
+    let Some(elem) = elem else {
         if (*ctxt).check == 0 {
             writeln!((*ctxt).output, "Element declaration is NULL");
         }
         return;
-    }
-    if (*elem).typ != XmlElementType::XmlElementDecl {
+    };
+    if elem.element_type() != XmlElementType::XmlElementDecl {
         xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotElemDecl,
@@ -619,10 +619,10 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
         );
         return;
     }
-    if let Some(name) = (*elem).name.as_deref() {
+    if let Some(name) = elem.name() {
         if (*ctxt).check == 0 {
             write!((*ctxt).output, "ELEMDECL(");
-            xml_ctxt_dump_string(ctxt, Some(name.as_str()));
+            xml_ctxt_dump_string(ctxt, Some(&name));
             write!((*ctxt).output, ")");
         }
     } else {
@@ -633,7 +633,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
         );
     }
     if (*ctxt).check == 0 {
-        match (*elem).etype {
+        match elem.etype {
             XmlElementTypeVal::XmlElementTypeUndefined => {
                 write!((*ctxt).output, ", UNDEFINED");
             }
@@ -650,11 +650,11 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
                 write!((*ctxt).output, ", MIXED ");
             }
         }
-        if (*elem).typ != XmlElementType::XmlElementNode && !(*elem).content.is_null() {
+        if elem.element_type() != XmlElementType::XmlElementNode && !elem.content.is_null() {
             let mut buf: [c_char; 5001] = [0; 5001];
 
             buf[0] = 0;
-            xml_snprintf_element_content(buf.as_mut_ptr(), 5000, (*elem).content, 1);
+            xml_snprintf_element_content(buf.as_mut_ptr(), 5000, elem.content, 1);
             buf[5000] = 0;
             let elem = CStr::from_ptr(buf.as_ptr()).to_string_lossy();
             write!((*ctxt).output, "{}", elem);
@@ -663,7 +663,7 @@ unsafe extern "C" fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: XmlEle
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, &*elem);
+    xml_ctxt_generic_node_check(ctxt, elem);
 }
 
 #[doc(alias = "xmlCtxtDumpAttrDecl")]
@@ -1134,7 +1134,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlElementDecl => {
-            xml_ctxt_dump_elem_decl(ctxt, (*node).as_element_decl_node().unwrap().as_ptr());
+            xml_ctxt_dump_elem_decl(ctxt, (*node).as_element_decl_node().map(|e| e.as_ref()));
             return;
         }
         XmlElementType::XmlAttributeDecl => {
