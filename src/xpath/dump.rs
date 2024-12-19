@@ -1,8 +1,4 @@
-use std::{
-    ffi::{CStr, CString},
-    io::Write,
-    ptr::null_mut,
-};
+use std::{ffi::CStr, io::Write};
 
 use crate::{
     libxml::{
@@ -189,16 +185,8 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
         }
         XmlXPathObjectType::XPathString => {
             write!(output, "Object is a string : ");
-            let strval = (*cur)
-                .stringval
-                .as_deref()
-                .map(|s| CString::new(s).unwrap());
-            xml_debug_dump_string(
-                Some(output),
-                strval
-                    .as_deref()
-                    .map_or(null_mut(), |s| s.as_ptr() as *const u8),
-            );
+            let strval = (*cur).stringval.as_deref();
+            xml_debug_dump_string(Some(output), strval);
             writeln!(output);
         }
         #[cfg(feature = "libxml_xptr_locs")]

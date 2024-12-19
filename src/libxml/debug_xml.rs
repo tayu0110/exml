@@ -87,28 +87,25 @@ impl Default for XmlDebugCtxt<'_> {
 
 /// Dumps information about the string, shorten it if necessary
 #[doc(alias = "xmlDebugDumpString")]
-pub unsafe extern "C" fn xml_debug_dump_string<'a>(
-    mut output: Option<&mut (impl Write + 'a)>,
-    str: *const XmlChar,
-) {
+pub fn xml_debug_dump_string<'a>(mut output: Option<&mut (impl Write + 'a)>, s: Option<&str>) {
     let mut stdout = stdout();
     let output = output
         .as_mut()
         .map(|o| o as &mut dyn Write)
         .unwrap_or(&mut stdout as &mut dyn Write);
-    if str.is_null() {
+    let Some(s) = s else {
         write!(output, "(NULL)");
         return;
-    }
-    for i in 0..40 {
-        if *str.add(i) == 0 {
+    };
+    for c in s.bytes().take(40) {
+        if c == 0 {
             return;
-        } else if xml_is_blank_char(*str.add(i) as u32) {
+        } else if xml_is_blank_char(c as u32) {
             write!(output, " ");
-        } else if *str.add(i) >= 0x80 {
-            write!(output, "#{:X}", *str.add(i) as i32);
+        } else if c >= 0x80 {
+            write!(output, "#{:X}", c as i32);
         } else {
-            write!(output, "{}", *str.add(i) as char);
+            write!(output, "{}", c as char);
         }
     }
     write!(output, "...");
@@ -1784,7 +1781,8 @@ pub unsafe extern "C" fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), nod
         }
         XmlElementType::XmlTextNode => {
             if !(*node).content.is_null() {
-                xml_debug_dump_string(Some(output), (*node).content);
+                let content = CStr::from_ptr((*node).content as *const i8).to_string_lossy();
+                xml_debug_dump_string(Some(output), Some(&content));
             }
         }
         XmlElementType::XmlCDATASectionNode => {}
@@ -4268,39 +4266,6 @@ mod tests {
                             eprint!(" {}", n_node);
                             eprintln!(" {}", n_depth);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_debug_dump_string() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let mut output = gen_debug_file_ptr(n_output, 0);
-                    let str = gen_const_xml_char_ptr(n_str, 1);
-
-                    xml_debug_dump_string(output.as_mut(), str);
-                    des_const_xml_char_ptr(n_str, str, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDebugDumpString",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDebugDumpString()"
-                        );
-                        eprint!(" {}", n_output);
-                        eprintln!(" {}", n_str);
                     }
                 }
             }
