@@ -9,7 +9,7 @@ use crate::{
         debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
         xmlstring::XmlChar,
     },
-    tree::{NodeCommon, XmlElementType, XmlNodePtr},
+    tree::{NodeCommon, XmlElementType},
     xpath::{
         xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathAxisVal, XmlXPathObjectType, XmlXPathOp,
         XmlXPathTestVal, XmlXPathTypeVal,
@@ -45,22 +45,21 @@ unsafe fn xml_xpath_debug_dump_node<'a>(
 
 unsafe fn xml_xpath_debug_dump_node_list<'a>(
     output: &mut (impl Write + 'a),
-    mut cur: XmlNodePtr,
+    cur: Option<&impl NodeCommon>,
     depth: i32,
 ) {
-    let mut tmp: XmlNodePtr;
     let shift = "  ".repeat(depth.clamp(0, 25) as usize);
 
-    if cur.is_null() {
+    let Some(cur) = cur else {
         write!(output, "{}", shift);
         writeln!(output, "Node is NULL !");
         return;
-    }
-
-    while !cur.is_null() {
-        tmp = cur;
-        cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-        xml_debug_dump_one_node(output, (!tmp.is_null()).then(|| &*tmp), depth);
+    };
+    xml_debug_dump_one_node(output, Some(cur), depth);
+    let mut cur = cur as &dyn NodeCommon;
+    while let Some(next) = cur.next() {
+        xml_debug_dump_one_node(output, Some(&*next.as_ptr()), depth);
+        cur = &*next.as_ptr() as &dyn NodeCommon;
     }
 }
 
@@ -102,9 +101,7 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
     write!(output, "{}", depth.clamp(0, 25) + 1);
     xml_xpath_debug_dump_node_list(
         output,
-        (*cur.node_tab[0])
-            .children()
-            .map_or(null_mut(), |c| c.as_ptr()),
+        (*cur.node_tab[0]).children().map(|c| &*c.as_ptr()),
         depth + 1,
     );
 }
