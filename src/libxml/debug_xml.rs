@@ -125,20 +125,6 @@ pub fn xml_debug_dump_string<'a>(mut output: Option<&mut (impl Write + 'a)>, s: 
     }
 }
 
-#[doc(alias = "xmlCtxtDumpInitCtxt")]
-unsafe extern "C" fn xml_ctxt_dump_init_ctxt(ctxt: XmlDebugCtxtPtr) {
-    (*ctxt).depth = 0;
-    (*ctxt).check = 0;
-    (*ctxt).errors = 0;
-    (*ctxt).output = Box::new(stdout());
-    (*ctxt).doc = null_mut();
-    (*ctxt).node = null_mut();
-    (*ctxt).dict = null_mut();
-    (*ctxt).nodict = 0;
-    (*ctxt).options = 0;
-    (*ctxt).shift = " ".repeat(100);
-}
-
 #[doc(alias = "xmlCtxtDumpString")]
 unsafe fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, s: Option<&str>) {
     if (*ctxt).check != 0 {
@@ -1285,11 +1271,11 @@ pub unsafe extern "C" fn xml_debug_dump_attr(
     attr: XmlAttrPtr,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = Box::new(output);
-    ctxt.depth = depth;
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        depth,
+        ..Default::default()
+    };
     xml_ctxt_dump_attr(addr_of_mut!(ctxt), attr);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1301,11 +1287,11 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
     attr: XmlAttrPtr,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = Box::new(output);
-    ctxt.depth = depth;
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        depth,
+        ..Default::default()
+    };
     xml_ctxt_dump_attr_list(addr_of_mut!(ctxt), attr);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1317,11 +1303,11 @@ pub unsafe fn xml_debug_dump_one_node(
     node: Option<&impl NodeCommon>,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = Box::new(output);
-    ctxt.depth = depth;
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        depth,
+        ..Default::default()
+    };
     xml_ctxt_dump_one_node(
         addr_of_mut!(ctxt),
         node.map_or(null_mut(), |n| n as *const dyn NodeCommon as *mut XmlNode),
@@ -1336,11 +1322,11 @@ pub unsafe fn xml_debug_dump_node<'a>(
     node: XmlNodePtr,
     depth: i32,
 ) {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    ctxt.depth = depth;
+    let mut ctxt = XmlDebugCtxt {
+        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+        depth,
+        ..Default::default()
+    };
     xml_ctxt_dump_node(addr_of_mut!(ctxt), node);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1348,11 +1334,11 @@ pub unsafe fn xml_debug_dump_node<'a>(
 /// Dumps debug information for the list of element node, it is recursive
 #[doc(alias = "xmlDebugDumpNodeList")]
 pub unsafe fn xml_debug_dump_node_list(output: Option<impl Write>, node: XmlNodePtr, depth: i32) {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    ctxt.depth = depth;
+    let mut ctxt = XmlDebugCtxt {
+        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+        depth,
+        ..Default::default()
+    };
     xml_ctxt_dump_node_list(addr_of_mut!(ctxt), node);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1501,7 +1487,6 @@ unsafe fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc
 pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_document_head(addr_of_mut!(ctxt), doc);
@@ -1535,7 +1520,6 @@ unsafe fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
 pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
@@ -1547,7 +1531,6 @@ pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&X
 pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: Option<&XmlDtd>) {
     let mut ctxt = XmlDebugCtxt::default();
 
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_dtd(addr_of_mut!(ctxt), dtd);
@@ -1655,10 +1638,10 @@ unsafe fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlDebugDumpEntities")]
 pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&XmlDoc>) {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = Box::new(output);
+    let mut ctxt = XmlDebugCtxt {
+        output: Box::new(output),
+        ..Default::default()
+    };
     xml_ctxt_dump_entities(addr_of_mut!(ctxt), doc);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
@@ -1672,11 +1655,11 @@ pub unsafe fn xml_debug_check_document(
     output: Option<impl Write + 'static>,
     doc: Option<&XmlDoc>,
 ) -> i32 {
-    let mut ctxt = XmlDebugCtxt::default();
-
-    xml_ctxt_dump_init_ctxt(addr_of_mut!(ctxt));
-    ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    ctxt.check = 1;
+    let mut ctxt = XmlDebugCtxt {
+        output: output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o)),
+        check: 1,
+        ..Default::default()
+    };
     xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
     ctxt.errors
