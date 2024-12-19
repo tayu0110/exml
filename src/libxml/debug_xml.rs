@@ -80,6 +80,31 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpString")]
+    fn dump_string(&mut self, s: Option<&str>) {
+        if self.check != 0 {
+            return;
+        }
+        // TODO: check UTF8 content of the string
+        let Some(s) = s else {
+            write!(self.output, "(NULL)");
+            return;
+        };
+
+        for c in s.bytes().take(40) {
+            if xml_is_blank_char(c as u32) {
+                write!(self.output, " ");
+            } else if c >= 0x80 {
+                write!(self.output, "#{:0X}", c as i32);
+            } else {
+                write!(self.output, "{}", c as char);
+            }
+        }
+        if s.len() > 40 {
+            write!(self.output, "...");
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -122,31 +147,6 @@ pub fn xml_debug_dump_string<'a>(mut output: Option<&mut (impl Write + 'a)>, s: 
     }
     if s.len() > 40 {
         write!(output, "...");
-    }
-}
-
-#[doc(alias = "xmlCtxtDumpString")]
-unsafe fn xml_ctxt_dump_string(ctxt: XmlDebugCtxtPtr, s: Option<&str>) {
-    if (*ctxt).check != 0 {
-        return;
-    }
-    // TODO: check UTF8 content of the string
-    let Some(s) = s else {
-        write!((*ctxt).output, "(NULL)");
-        return;
-    };
-
-    for c in s.bytes().take(40) {
-        if xml_is_blank_char(c as u32) {
-            write!((*ctxt).output, " ");
-        } else if c >= 0x80 {
-            write!((*ctxt).output, "#{:0X}", c as i32);
-        } else {
-            write!((*ctxt).output, "{}", c as char);
-        }
-    }
-    if s.len() > 40 {
-        write!((*ctxt).output, "...");
     }
 }
 
@@ -605,7 +605,7 @@ unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElemen
     if let Some(name) = elem.name() {
         if (*ctxt).check == 0 {
             write!((*ctxt).output, "ELEMDECL(");
-            xml_ctxt_dump_string(ctxt, Some(&name));
+            (*ctxt).dump_string(Some(&name));
             write!((*ctxt).output, ")");
         }
     } else {
@@ -758,8 +758,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttrib
         if !attr.default_value.is_null() {
             write!((*ctxt).output, "\"");
             let def_value = attr.default_value;
-            xml_ctxt_dump_string(
-                ctxt,
+            (*ctxt).dump_string(
                 Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
             );
             write!((*ctxt).output, "\"");
@@ -792,7 +791,7 @@ unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntit
     if let Some(name) = ent.name() {
         if (*ctxt).check == 0 {
             write!((*ctxt).output, "ENTITYDECL(");
-            xml_ctxt_dump_string(ctxt, Some(&name));
+            (*ctxt).dump_string(Some(&name));
             write!((*ctxt).output, ")");
         }
     } else {
@@ -846,10 +845,9 @@ unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntit
         if !content.is_null() {
             (*ctxt).dump_spaces();
             write!((*ctxt).output, " content=");
-            xml_ctxt_dump_string(
-                ctxt,
-                Some(&CStr::from_ptr(content as *const i8).to_string_lossy()),
-            );
+            (*ctxt).dump_string(Some(
+                &CStr::from_ptr(content as *const i8).to_string_lossy(),
+            ));
             writeln!((*ctxt).output);
         }
     }
@@ -900,8 +898,7 @@ unsafe fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: Option<&XmlNs>) {
         }
 
         let href = ns.href;
-        xml_ctxt_dump_string(
-            ctxt,
+        (*ctxt).dump_string(
             (!href.is_null())
                 .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
                 .as_deref(),
@@ -976,10 +973,9 @@ unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityP
         if !content.is_null() {
             (*ctxt).dump_spaces();
             write!((*ctxt).output, "content=");
-            xml_ctxt_dump_string(
-                ctxt,
-                Some(&CStr::from_ptr(content as *const i8).to_string_lossy()),
-            );
+            (*ctxt).dump_string(Some(
+                &CStr::from_ptr(content as *const i8).to_string_lossy(),
+            ));
             writeln!((*ctxt).output);
         }
     }
@@ -1013,13 +1009,11 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
                 write!((*ctxt).output, "ELEMENT ");
                 if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
                     let prefix = (*(*node).ns).prefix;
-                    xml_ctxt_dump_string(
-                        ctxt,
-                        Some(&CStr::from_ptr(prefix as *const i8).to_string_lossy()),
-                    );
+                    (*ctxt)
+                        .dump_string(Some(&CStr::from_ptr(prefix as *const i8).to_string_lossy()));
                     write!((*ctxt).output, ":");
                 }
-                xml_ctxt_dump_string(ctxt, (*node).name().as_deref());
+                (*ctxt).dump_string((*node).name().as_deref());
                 writeln!((*ctxt).output);
             }
         }
@@ -1178,10 +1172,9 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             (*ctxt).dump_spaces();
             write!((*ctxt).output, "content=");
             let content = (*node).content;
-            xml_ctxt_dump_string(
-                ctxt,
-                Some(&CStr::from_ptr(content as *const i8).to_string_lossy()),
-            );
+            (*ctxt).dump_string(Some(
+                &CStr::from_ptr(content as *const i8).to_string_lossy(),
+            ));
             writeln!((*ctxt).output);
         }
     } else {
@@ -1239,7 +1232,7 @@ unsafe fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
     }
     if (*ctxt).check == 0 {
         write!((*ctxt).output, "ATTRIBUTE ");
-        xml_ctxt_dump_string(ctxt, (*attr).name().as_deref());
+        (*ctxt).dump_string((*attr).name().as_deref());
         writeln!((*ctxt).output);
         if let Some(children) = (*attr).children {
             (*ctxt).depth += 1;
@@ -1454,22 +1447,22 @@ unsafe fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc
         if (*ctxt).check == 0 {
             if let Some(name) = doc.name() {
                 write!((*ctxt).output, "name=");
-                xml_ctxt_dump_string(ctxt, Some(&name));
+                (*ctxt).dump_string(Some(&name));
                 writeln!((*ctxt).output);
             }
             if let Some(version) = doc.version.as_deref() {
                 write!((*ctxt).output, "version=");
-                xml_ctxt_dump_string(ctxt, Some(version));
+                (*ctxt).dump_string(Some(version));
                 writeln!((*ctxt).output);
             }
             if let Some(encoding) = doc.encoding.as_deref() {
                 write!((*ctxt).output, "encoding=");
-                xml_ctxt_dump_string(ctxt, Some(encoding));
+                (*ctxt).dump_string(Some(encoding));
                 writeln!((*ctxt).output);
             }
             if let Some(url) = doc.url.as_deref() {
                 write!((*ctxt).output, "URL=");
-                xml_ctxt_dump_string(ctxt, Some(url));
+                (*ctxt).dump_string(Some(url));
                 writeln!((*ctxt).output);
             }
             if doc.standalone != 0 {
