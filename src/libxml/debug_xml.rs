@@ -50,7 +50,7 @@ use super::{
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
-    xmlstring::{xml_check_utf8, xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
+    xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
 };
 
 pub type XmlDebugCtxtPtr<'a> = *mut XmlDebugCtxt<'a>;
@@ -301,16 +301,12 @@ unsafe fn xml_ctxt_ns_check_scope(ctxt: XmlDebugCtxtPtr, node: &impl NodeCommon,
 
 /// Do debugging on the string, currently it just checks the UTF-8 content
 #[doc(alias = "xmlCtxtCheckString")]
-unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const XmlChar) {
-    if str.is_null() {
-        return;
-    }
-    if (*ctxt).check != 0 && xml_check_utf8(str) == 0 {
+unsafe fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, s: &str) {
+    if (*ctxt).check != 0 {
         xml_debug_err!(
             ctxt,
             XmlParserErrors::XmlCheckNotUTF8,
-            "String is not UTF-8 {}",
-            CStr::from_ptr(str as *const i8).to_string_lossy()
+            "String is not UTF-8 {s}",
         );
     }
 }
@@ -318,23 +314,23 @@ unsafe extern "C" fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, str: *const Xm
 /// Do debugging on the name, for example the dictionary status and
 /// conformance to the Name production.
 #[doc(alias = "xmlCtxtCheckName")]
-unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const XmlChar) {
+unsafe fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: Option<&str>) {
     if (*ctxt).check != 0 {
-        if name.is_null() {
+        let Some(name) = name else {
             xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
             return;
-        }
+        };
+        let cname = CString::new(name).unwrap();
         #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-        if xml_validate_name(name, 0) != 0 {
+        if xml_validate_name(cname.as_ptr() as *const u8, 0) != 0 {
             xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckNotNCName,
-                "Name is not an NCName '{}'",
-                CStr::from_ptr(name as *const i8).to_string_lossy()
+                "Name is not an NCName '{name}'",
             );
         }
         if !(*ctxt).dict.is_null()
-            && xml_dict_owns((*ctxt).dict, name) == 0
+            && xml_dict_owns((*ctxt).dict, cname.as_ptr() as *const u8) == 0
             && ((*ctxt).doc.is_null()
                 || (*(*ctxt).doc).parse_flags
                     & (XmlParserOption::XmlParseSax1 as i32
@@ -344,8 +340,7 @@ unsafe extern "C" fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: *const Xml
             xml_debug_err!(
                 ctxt,
                 XmlParserErrors::XmlCheckOutsideDict,
-                "Name is not from the document dictionary '{}'",
-                CStr::from_ptr(name as *const i8).to_string_lossy()
+                "Name is not from the document dictionary '{name}'",
             );
         }
     }
@@ -479,11 +474,15 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             | XmlElementType::XmlDocumentNode
     ) && !(*node).content.is_null()
     {
-        xml_ctxt_check_string(ctxt, (*node).content as *const XmlChar);
+        let content = (*node).content;
+        xml_ctxt_check_string(
+            ctxt,
+            &CStr::from_ptr(content as *const i8).to_string_lossy(),
+        );
     }
     match (*node).element_type() {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            xml_ctxt_check_name(ctxt, (*node).name);
+            xml_ctxt_check_name(ctxt, (*node).name().as_deref());
         }
         XmlElementType::XmlTextNode => {
             if (*node).name == XML_STRING_TEXT.as_ptr() as _
@@ -519,7 +518,7 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             }
         }
         XmlElementType::XmlPINode => {
-            xml_ctxt_check_name(ctxt, (*node).name);
+            xml_ctxt_check_name(ctxt, (*node).name().as_deref());
         }
         XmlElementType::XmlCDATASectionNode => {
             if (*node).name.is_null() {
