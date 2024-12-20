@@ -51,6 +51,33 @@ use super::{
     xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
 };
 
+/// Handle a debug error.
+#[doc(alias = "xmlDebugErr", alias = "xmlDebugErr2", alias = "xmlDebugErr3")]
+macro_rules! xml_debug_err {
+    ($ctxt:expr, $error:expr, $msg:literal, $( $args:expr ),*) => {
+        (*$ctxt).errors += 1;
+        let msg = format!($msg, $( $args ),*);
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            null_mut(),
+            (*$ctxt).node as _,
+            XmlErrorDomain::XmlFromCheck,
+            $error,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            msg.as_str(),
+        );
+    };
+}
+
 pub type XmlDebugCtxtPtr<'a> = *mut XmlDebugCtxt<'a>;
 #[repr(C)]
 pub struct XmlDebugCtxt<'a> {
@@ -105,6 +132,44 @@ impl XmlDebugCtxt<'_> {
             write!(self.output, "...");
         }
     }
+
+    /// Report if a given namespace is is not in scope.
+    #[doc(alias = "xmlCtxtNsCheckScope")]
+    unsafe fn ns_check_scope(&mut self, node: &impl NodeCommon, ns: XmlNsPtr) {
+        let ret: i32 = xml_ns_check_scope(node, ns);
+        if ret == -2 {
+            if (*ns).prefix.is_null() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsScope,
+                    "Reference to default namespace not in scope\n",
+                );
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsScope,
+                    "Reference to namespace '{}' not in scope\n",
+                    CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
+                );
+            }
+        }
+        if ret == -3 {
+            if (*ns).prefix.is_null() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsAncestor,
+                    "Reference to default namespace not on ancestor\n",
+                );
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsAncestor,
+                    "Reference to namespace '{}' not on ancestor\n",
+                    CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
+                );
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -151,33 +216,6 @@ pub fn xml_debug_dump_string<'a>(mut output: Option<&mut (impl Write + 'a)>, s: 
 }
 
 const DUMP_TEXT_TYPE: i32 = 1;
-
-/// Handle a debug error.
-#[doc(alias = "xmlDebugErr", alias = "xmlDebugErr2", alias = "xmlDebugErr3")]
-macro_rules! xml_debug_err {
-    ($ctxt:expr, $error:expr, $msg:literal, $( $args:expr ),*) => {
-        (*$ctxt).errors += 1;
-        let msg = format!($msg, $( $args ),*);
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            null_mut(),
-            (*$ctxt).node as _,
-            XmlErrorDomain::XmlFromCheck,
-            $error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            msg.as_str(),
-        );
-    };
-}
 
 /// Check that a given namespace is in scope on a node.
 ///
@@ -242,44 +280,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-/// Report if a given namespace is is not in scope.
-#[doc(alias = "xmlCtxtNsCheckScope")]
-unsafe fn xml_ctxt_ns_check_scope(ctxt: XmlDebugCtxtPtr, node: &impl NodeCommon, ns: XmlNsPtr) {
-    let ret: i32 = xml_ns_check_scope(node, ns);
-    if ret == -2 {
-        if (*ns).prefix.is_null() {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNsScope,
-                "Reference to default namespace not in scope\n",
-            );
-        } else {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNsScope,
-                "Reference to namespace '{}' not in scope\n",
-                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
-            );
-        }
-    }
-    if ret == -3 {
-        if (*ns).prefix.is_null() {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNsAncestor,
-                "Reference to default namespace not on ancestor\n",
-            );
-        } else {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNsAncestor,
-                "Reference to namespace '{}' not on ancestor\n",
-                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
-            );
-        }
-    }
 }
 
 /// Do debugging on the string, currently it just checks the UTF-8 content
@@ -434,17 +434,17 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
 
         ns = node.as_node().unwrap().as_ref().ns_def;
         while !ns.is_null() {
-            xml_ctxt_ns_check_scope(ctxt, node, ns);
+            (*ctxt).ns_check_scope(node, ns);
             ns = (*ns).next;
         }
         if !node.as_node().unwrap().as_ref().ns.is_null() {
-            xml_ctxt_ns_check_scope(ctxt, node, node.as_node().unwrap().as_ref().ns);
+            (*ctxt).ns_check_scope(node, node.as_node().unwrap().as_ref().ns);
         }
     } else if let Some(attr) = node
         .as_attribute_node()
         .filter(|attr| !attr.as_ref().ns.is_null())
     {
-        xml_ctxt_ns_check_scope(ctxt, node, attr.as_ref().ns);
+        (*ctxt).ns_check_scope(node, attr.as_ref().ns);
     }
 
     if !matches!(
