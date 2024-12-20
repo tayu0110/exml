@@ -1257,6 +1257,42 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    /// Dumps debug information concerning the document, not recursive
+    #[doc(alias = "xmlCtxtDumpDocumentHead")]
+    unsafe fn dump_document_head(&mut self, doc: Option<&XmlDoc>) {
+        if let Some(doc) = doc {
+            self.dump_doc_head(doc);
+            if self.check == 0 {
+                if let Some(name) = doc.name() {
+                    write!(self.output, "name=");
+                    self.dump_string(Some(&name));
+                    writeln!(self.output);
+                }
+                if let Some(version) = doc.version.as_deref() {
+                    write!(self.output, "version=");
+                    self.dump_string(Some(version));
+                    writeln!(self.output);
+                }
+                if let Some(encoding) = doc.encoding.as_deref() {
+                    write!(self.output, "encoding=");
+                    self.dump_string(Some(encoding));
+                    writeln!(self.output);
+                }
+                if let Some(url) = doc.url.as_deref() {
+                    write!(self.output, "URL=");
+                    self.dump_string(Some(url));
+                    writeln!(self.output);
+                }
+                if doc.standalone != 0 {
+                    writeln!(self.output, "standalone=true");
+                }
+            }
+            if !doc.old_ns.is_null() {
+                self.dump_namespace_list(Some(&*doc.old_ns));
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -1441,49 +1477,13 @@ pub unsafe fn xml_debug_dump_node_list(
 }
 
 /// Dumps debug information concerning the document, not recursive
-#[doc(alias = "xmlCtxtDumpDocumentHead")]
-unsafe fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
-    if let Some(doc) = doc {
-        (*ctxt).dump_doc_head(doc);
-        if (*ctxt).check == 0 {
-            if let Some(name) = doc.name() {
-                write!((*ctxt).output, "name=");
-                (*ctxt).dump_string(Some(&name));
-                writeln!((*ctxt).output);
-            }
-            if let Some(version) = doc.version.as_deref() {
-                write!((*ctxt).output, "version=");
-                (*ctxt).dump_string(Some(version));
-                writeln!((*ctxt).output);
-            }
-            if let Some(encoding) = doc.encoding.as_deref() {
-                write!((*ctxt).output, "encoding=");
-                (*ctxt).dump_string(Some(encoding));
-                writeln!((*ctxt).output);
-            }
-            if let Some(url) = doc.url.as_deref() {
-                write!((*ctxt).output, "URL=");
-                (*ctxt).dump_string(Some(url));
-                writeln!((*ctxt).output);
-            }
-            if doc.standalone != 0 {
-                writeln!((*ctxt).output, "standalone=true");
-            }
-        }
-        if !doc.old_ns.is_null() {
-            (*ctxt).dump_namespace_list(Some(&*doc.old_ns));
-        }
-    }
-}
-
-/// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlDebugDumpDocumentHead")]
 pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    xml_ctxt_dump_document_head(addr_of_mut!(ctxt), doc);
+    ctxt.dump_document_head(doc);
 }
 
 /// Dumps debug information for the document, it's recursive
@@ -1495,7 +1495,7 @@ unsafe fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
         }
         return;
     };
-    xml_ctxt_dump_document_head(ctxt, Some(doc));
+    (*ctxt).dump_document_head(Some(doc));
     if let Some(children) = (*doc).children().filter(|_| {
         matches!(
             doc.element_type(),
