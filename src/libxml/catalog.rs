@@ -1865,7 +1865,7 @@ pub unsafe fn xml_a_catalog_remove(catal: XmlCatalogPtr, value: *const XmlChar) 
 }
 
 const XML_CATAL_BREAK: *mut XmlChar = usize::MAX as *mut XmlChar;
-const XML_URN_PUBID: &CStr = c"urn:publicid:";
+const XML_URN_PUBID: &str = "urn:publicid:";
 const MAX_DELEGATE: usize = 50;
 const MAX_CATAL_DEPTH: usize = 50;
 
@@ -1873,81 +1873,43 @@ const MAX_CATAL_DEPTH: usize = 50;
 ///
 /// Returns the new identifier or null_mut(), the string must be deallocated by the caller.
 #[doc(alias = "xmlCatalogUnWrapURN")]
-unsafe fn xml_catalog_unwrap_urn(mut urn: *const XmlChar) -> *mut XmlChar {
-    let mut result: [XmlChar; 2000] = [0; 2000];
-    let mut i: usize = 0;
-
-    if xml_strncmp(
-        urn,
-        XML_URN_PUBID.as_ptr() as _,
-        XML_URN_PUBID.to_bytes().len() as i32,
-    ) != 0
-    {
-        return null_mut();
-    }
-    urn = urn.add(XML_URN_PUBID.to_bytes().len());
-
-    while *urn != 0 {
-        if i > result.len() - 4 {
-            break;
-        }
-        if *urn == b'+' {
-            result[i] = b' ';
-            i += 1;
-            urn = urn.add(1);
-        } else if *urn == b':' {
-            result[i] = b'/';
-            i += 1;
-            result[i] = b'/';
-            i += 1;
-            urn = urn.add(1);
-        } else if *urn == b';' {
-            result[i] = b':';
-            i += 1;
-            result[i] = b':';
-            i += 1;
-            urn = urn.add(1);
-        } else if *urn == b'%' {
-            if *urn.add(1) == b'2' && *urn.add(2) == b'B' {
-                result[i] = b'+';
-                i += 1;
-            } else if *urn.add(1) == b'3' && *urn.add(2) == b'A' {
-                result[i] = b':';
-                i += 1;
-            } else if *urn.add(1) == b'2' && *urn.add(2) == b'F' {
-                result[i] = b'/';
-                i += 1;
-            } else if *urn.add(1) == b'3' && *urn.add(2) == b'B' {
-                result[i] = b';';
-                i += 1;
-            } else if *urn.add(1) == b'2' && *urn.add(2) == b'7' {
-                result[i] = b'\'';
-                i += 1;
-            } else if *urn.add(1) == b'3' && *urn.add(2) == b'F' {
-                result[i] = b'?';
-                i += 1;
-            } else if *urn.add(1) == b'2' && *urn.add(2) == b'3' {
-                result[i] = b'#';
-                i += 1;
-            } else if *urn.add(1) == b'2' && *urn.add(2) == b'5' {
-                result[i] = b'%';
-                i += 1;
-            } else {
-                result[i] = *urn;
-                i += 1;
-                urn = urn.add(1);
-                continue;
+fn xml_catalog_unwrap_urn(urn: &str) -> Option<String> {
+    let urn = urn.strip_prefix(XML_URN_PUBID)?;
+    let mut urn = urn.as_bytes();
+    let mut res = Vec::with_capacity(urn.len());
+    while !urn.is_empty() {
+        if urn[0] == b'+' {
+            res.push(b' ');
+            urn = &urn[1..];
+        } else if urn[0] == b':' {
+            res.extend_from_slice(b"//");
+            urn = &urn[1..];
+        } else if urn[0] == b';' {
+            res.extend_from_slice(b"::");
+            urn = &urn[1..];
+        } else if urn[0] == b'%' {
+            match urn[1..] {
+                [b'2', b'B', ..] => res.push(b'+'),
+                [b'3', b'A', ..] => res.push(b':'),
+                [b'2', b'F', ..] => res.push(b'/'),
+                [b'3', b'B', ..] => res.push(b';'),
+                [b'2', b'7', ..] => res.push(b'\''),
+                [b'3', b'F', ..] => res.push(b'?'),
+                [b'2', b'3', ..] => res.push(b'#'),
+                [b'2', b'5', ..] => res.push(b'%'),
+                _ => {
+                    res.push(urn[0]);
+                    urn = &urn[1..];
+                    continue;
+                }
             }
-            urn = urn.add(3);
+            urn = &urn[3..];
         } else {
-            result[i] = *urn;
-            i += 1;
-            urn = urn.add(1);
+            res.push(urn[0]);
+            urn = &urn[1..];
         }
     }
-    result[i] = 0;
-
-    xml_strdup(result.as_ptr() as _)
+    String::from_utf8(res).ok()
 }
 
 /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
@@ -2214,7 +2176,6 @@ unsafe fn xml_catalog_list_xml_resolve(
     sys_id: *const XmlChar,
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
-    let urn_id: *mut XmlChar;
 
     if catal.is_null() {
         return null_mut();
@@ -2228,29 +2189,27 @@ unsafe fn xml_catalog_list_xml_resolve(
         pub_id = if *normid != 0 { normid } else { null_mut() };
     }
 
-    if xml_strncmp(
-        pub_id,
-        XML_URN_PUBID.as_ptr() as _,
-        XML_URN_PUBID.to_bytes().len() as i32,
-    ) == 0
-    {
-        urn_id = xml_catalog_unwrap_urn(pub_id);
+    if xml_strncmp(pub_id, XML_URN_PUBID.as_ptr(), XML_URN_PUBID.len() as i32) == 0 {
+        let urn_id = xml_catalog_unwrap_urn(
+            CStr::from_ptr(pub_id as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        );
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            if urn_id.is_null() {
+            if let Some(urn_id) = urn_id.as_deref() {
+                generic_error!("Public URN ID expanded to {urn_id}\n");
+            } else {
                 generic_error!(
                     "Public URN ID {} expanded to null_mut()\n",
                     CStr::from_ptr(pub_id as *const i8).to_string_lossy()
                 );
-            } else {
-                generic_error!(
-                    "Public URN ID expanded to {}\n",
-                    CStr::from_ptr(urn_id as *const i8).to_string_lossy()
-                );
             }
         }
-        ret = xml_catalog_list_xml_resolve(catal, urn_id, sys_id);
-        if !urn_id.is_null() {
-            xml_free(urn_id as _);
+        if let Some(urn_id) = urn_id {
+            let urn_id = CString::new(urn_id).unwrap();
+            ret = xml_catalog_list_xml_resolve(catal, urn_id.as_ptr() as *const u8, sys_id);
+        } else {
+            ret = null_mut();
         }
         if !normid.is_null() {
             xml_free(normid as _);
@@ -2260,32 +2219,35 @@ unsafe fn xml_catalog_list_xml_resolve(
     if xml_strncmp(
         sys_id,
         XML_URN_PUBID.as_ptr() as _,
-        XML_URN_PUBID.to_bytes().len() as i32,
+        XML_URN_PUBID.len() as i32,
     ) == 0
     {
-        urn_id = xml_catalog_unwrap_urn(sys_id);
+        let urn_id = xml_catalog_unwrap_urn(
+            CStr::from_ptr(sys_id as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        );
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            if urn_id.is_null() {
+            if let Some(urn_id) = urn_id.as_deref() {
+                generic_error!("System URN ID expanded to {urn_id}\n");
+            } else {
                 generic_error!(
                     "System URN ID {} expanded to null_mut()\n",
                     CStr::from_ptr(sys_id as *const i8).to_string_lossy()
                 );
-            } else {
-                generic_error!(
-                    "System URN ID expanded to {}\n",
-                    CStr::from_ptr(urn_id as *const i8).to_string_lossy()
-                );
             }
         }
-        if pub_id.is_null() {
-            ret = xml_catalog_list_xml_resolve(catal, urn_id, null_mut());
-        } else if xml_str_equal(pub_id, urn_id) {
-            ret = xml_catalog_list_xml_resolve(catal, pub_id, null_mut());
+        if let Some(urn_id) = urn_id {
+            let urn_id = CString::new(urn_id).unwrap();
+            if pub_id.is_null() {
+                ret = xml_catalog_list_xml_resolve(catal, urn_id.as_ptr() as *const u8, null_mut());
+            } else if xml_str_equal(pub_id, urn_id.as_ptr() as *const u8) {
+                ret = xml_catalog_list_xml_resolve(catal, pub_id, null_mut());
+            } else {
+                ret = xml_catalog_list_xml_resolve(catal, pub_id, urn_id.as_ptr() as *const u8);
+            }
         } else {
-            ret = xml_catalog_list_xml_resolve(catal, pub_id, urn_id);
-        }
-        if !urn_id.is_null() {
-            xml_free(urn_id as _);
+            ret = null_mut();
         }
         if !normid.is_null() {
             xml_free(normid as _);
@@ -2693,7 +2655,6 @@ unsafe fn xml_catalog_list_xml_resolve_uri(
     uri: *const XmlChar,
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
-    let urn_id: *mut XmlChar;
 
     if catal.is_null() {
         return null_mut();
@@ -2702,29 +2663,24 @@ unsafe fn xml_catalog_list_xml_resolve_uri(
         return null_mut();
     }
 
-    if xml_strncmp(
-        uri,
-        XML_URN_PUBID.as_ptr() as _,
-        XML_URN_PUBID.to_bytes().len() as i32,
-    ) == 0
-    {
-        urn_id = xml_catalog_unwrap_urn(uri);
+    if xml_strncmp(uri, XML_URN_PUBID.as_ptr() as _, XML_URN_PUBID.len() as i32) == 0 {
+        let urn_id =
+            xml_catalog_unwrap_urn(CStr::from_ptr(uri as *const i8).to_string_lossy().as_ref());
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            if urn_id.is_null() {
+            if let Some(urn_id) = urn_id.as_deref() {
+                generic_error!("URN ID expanded to {urn_id}\n");
+            } else {
                 generic_error!(
                     "URN ID {} expanded to NULL\n",
                     CStr::from_ptr(uri as *const i8).to_string_lossy()
                 );
-            } else {
-                generic_error!(
-                    "URN ID expanded to {}\n",
-                    CStr::from_ptr(urn_id as *const i8).to_string_lossy()
-                );
             }
         }
-        ret = xml_catalog_list_xml_resolve(catal, urn_id, null_mut());
-        if !urn_id.is_null() {
-            xml_free(urn_id as _);
+        if let Some(urn_id) = urn_id {
+            let urn_id = CString::new(urn_id).unwrap();
+            ret = xml_catalog_list_xml_resolve(catal, urn_id.as_ptr() as *const u8, null_mut());
+        } else {
+            ret = null_mut();
         }
         return ret;
     }
@@ -2779,7 +2735,7 @@ pub unsafe fn xml_a_catalog_resolve_uri(catal: XmlCatalogPtr, uri: *const XmlCha
 /// Serialize an SGML Catalog entry
 #[doc(alias = "xmlCatalogDumpEntry")]
 #[cfg(feature = "libxml_output")]
-fn xml_catalog_dump_entry(payload: *mut c_void, out: &mut impl Write) {
+fn xml_catalog_dump_entry<'a>(payload: *mut c_void, out: &mut (impl Write + 'a)) {
     let entry: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     if entry.is_null() {
         return;
