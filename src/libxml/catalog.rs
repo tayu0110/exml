@@ -34,6 +34,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
+    borrow::Cow,
     cell::RefCell,
     ffi::{c_char, CStr, CString},
     fs::File,
@@ -57,7 +58,7 @@ use crate::{
     io::{xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
         chvalid::xml_is_blank_char,
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc},
         hash::{
             xml_hash_add_entry, xml_hash_create, xml_hash_free, xml_hash_lookup,
             xml_hash_remove_entry, xml_hash_size, XmlHashTable, XmlHashTablePtr,
@@ -71,7 +72,7 @@ use crate::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
         },
-        uri::{xml_build_uri, xml_canonic_path},
+        uri::xml_canonic_path,
         xmlstring::{
             xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
@@ -84,11 +85,7 @@ use crate::{
     SYSCONFDIR,
 };
 
-use super::{
-    chvalid::{xml_is_digit, xml_is_pubid_char},
-    hash::CVoidWrapper,
-    parser_internals::xml_is_letter,
-};
+use super::{chvalid::xml_is_pubid_char, hash::CVoidWrapper, parser_internals::xml_is_letter};
 
 /// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
@@ -333,129 +330,100 @@ macro_rules! SKIP_BLANKS {
     };
 }
 
+/// Trim blank chars at the head of `cur`.
+fn skip_blanks(mut cur: &[u8]) -> &[u8] {
+    while !cur.is_empty() && xml_is_blank_char(cur[0] as u32) {
+        cur = &cur[1..];
+    }
+    cur
+}
+
 /// Skip a comment in an SGML catalog
 ///
 /// Returns new current character
 #[doc(alias = "xmlParseSGMLCatalogComment")]
-unsafe fn xml_parse_sgmlcatalog_comment(mut cur: *const XmlChar) -> *const XmlChar {
-    if *cur.add(0) != b'-' || *cur.add(1) != b'-' {
-        return cur;
+fn xml_parse_sgmlcatalog_comment(mut cur: &[u8]) -> Option<&[u8]> {
+    let Some(rem) = cur.strip_prefix(b"--") else {
+        return Some(cur);
+    };
+    cur = rem;
+    while !cur.is_empty() && !cur.starts_with(b"--") {
+        cur = &cur[1..];
     }
-    SKIP!(cur, 2);
-    while *cur.add(0) != 0 && (*cur.add(0) != b'-' || *cur.add(1) != b'-') {
-        NEXT!(cur);
+    if cur.is_empty() {
+        None
+    } else {
+        Some(&cur[2..])
     }
-    if *cur.add(0) == 0 {
-        return null_mut();
-    }
-    cur.add(2)
 }
 
 /// Parse an SGML catalog name
 ///
-/// Returns new current character and store the value in @name
+/// If parsed successfully, return `Some((parsed_name, remained buffer))`.  
+/// Otherwise, return `None`.
 #[doc(alias = "xmlParseSGMLCatalogName")]
-unsafe fn xml_parse_sgml_catalog_name(
-    mut cur: *const XmlChar,
-    name: *mut *mut XmlChar,
-) -> *const XmlChar {
-    let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
-    let mut len: usize = 0;
-    let mut c: u32;
-
-    *name = null_mut();
-
+fn xml_parse_sgml_catalog_name(cur: &[u8]) -> Option<(&[u8], &[u8])> {
     // Handler for more complex cases
-    c = *cur as _;
-    if !xml_is_letter(c) && c != b'_' as u32 && c != b':' as u32 {
-        return null_mut();
-    }
+    cur.first()
+        .filter(|&&b| xml_is_letter(b as u32) || b == b'_' || b == b':')?;
 
-    while xml_is_letter(c)
-        || xml_is_digit(c)
-        || c == b'.' as u32
-        || c == b'-' as u32
-        || c == b'_' as u32
-        || c == b':' as u32
-    {
-        buf[len] = c as _;
-        len += 1;
-        cur = cur.add(1);
-        c = *cur as _;
-        if len >= XML_MAX_NAMELEN {
-            return null_mut();
-        }
+    let len = cur
+        .iter()
+        .take_while(|&&b| {
+            xml_is_letter(b as u32)
+                || b.is_ascii_digit()
+                || b == b'.'
+                || b == b'-'
+                || b == b'_'
+                || b == b':'
+        })
+        .count();
+    if len >= XML_MAX_NAMELEN {
+        return None;
     }
-    *name = xml_strndup(buf.as_mut_ptr() as _, len as i32);
-    cur
+    Some(cur.split_at(len))
 }
 
 /// Parse an SGML catalog ID
 ///
-/// Returns new current character and store the value in @id
+/// If parsed successfully, return `Some((parsed_pubid, remained buffer))`.  
+/// Otherwise, return `None`.
 #[doc(alias = "xmlParseSGMLCatalogPubid")]
-unsafe fn xml_parse_sgml_catalog_pubid(
-    mut cur: *const XmlChar,
-    id: *mut *mut XmlChar,
-) -> *const XmlChar {
-    let mut buf: *mut XmlChar;
-    let mut tmp: *mut XmlChar;
-    let mut len: usize = 0;
-    let mut size: usize = 50;
-    let stop: XmlChar;
-
-    *id = null_mut();
-
-    if RAW!(cur) == b'"' {
-        NEXT!(cur);
-        stop = b'"';
-    } else if RAW!(cur) == b'\'' {
-        NEXT!(cur);
-        stop = b'\'';
+fn xml_parse_sgml_catalog_pubid(mut cur: &[u8]) -> Option<(&[u8], &[u8])> {
+    let stop = if let Some(rem) = cur.strip_prefix(b"\"") {
+        cur = rem;
+        b'"'
+    } else if let Some(rem) = cur.strip_prefix(b"'") {
+        cur = rem;
+        b'\''
     } else {
-        stop = b' ';
-    }
-    buf = xml_malloc_atomic(size) as _;
-    if buf.is_null() {
-        xml_catalog_err_memory("allocating public ID");
-        return null_mut();
-    }
-    while xml_is_pubid_char(*cur as u32) || *cur == b'?' {
-        if *cur == stop && stop != b' ' {
+        b' '
+    };
+    let mut len = 0;
+    let orig = cur;
+    while let Some(&now) = cur
+        .first()
+        .filter(|&&b| xml_is_pubid_char(b as u32) || b == b'?')
+    {
+        if now == stop && stop != b' ' {
             break;
         }
-        if stop == b' ' && xml_is_blank_char(*cur as u32) {
+        if stop == b' ' && xml_is_blank_char(now as u32) {
             break;
         }
-        if len + 1 >= size {
-            size *= 2;
-            tmp = xml_realloc(buf as _, size) as _;
-            if tmp.is_null() {
-                xml_catalog_err_memory("allocating public ID");
-                xml_free(buf as _);
-                return null_mut();
-            }
-            buf = tmp;
-        }
-        *buf.add(len) = *cur;
         len += 1;
-        NEXT!(cur);
+        cur = &cur[1..];
     }
-    *buf.add(len) = 0;
+    let id = &orig[..len];
     if stop == b' ' {
-        if !xml_is_blank_char(*cur as u32) {
-            xml_free(buf as _);
-            return null_mut();
-        }
+        cur.first().filter(|&&b| xml_is_blank_char(b as u32))?;
     } else {
-        if *cur != stop {
-            xml_free(buf as _);
-            return null_mut();
+        if cur.first() != Some(&stop) {
+            return None;
         }
-        NEXT!(cur);
+        cur = &cur[1..];
     }
-    *id = buf;
-    cur
+    Some((id, cur))
 }
 
 /// Normalizes the Public Identifier
@@ -513,6 +481,53 @@ unsafe fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mut XmlChar {
     }
     *q = 0;
     ret
+}
+
+/// Normalizes the Public Identifier
+///
+/// Implements 6.2. Public Identifier Normalization
+/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
+///
+/// If performed normalization, return normalized bytes wrapped `Some`.  
+/// Otherwise, return `None`.
+#[doc(alias = "xmlCatalogNormalizePublic")]
+fn normalize_public(pub_id: &[u8]) -> Option<Vec<u8>> {
+    let mut ok = true;
+    let mut white = true;
+    let mut p = pub_id;
+    while !p.is_empty() && ok {
+        if !xml_is_blank_char(p[0] as u32) {
+            white = false;
+        } else if p[0] == 0x20 && !white {
+            white = true;
+        } else {
+            ok = false;
+        }
+        p = &p[1..];
+    }
+    if ok && !white {
+        // is normalized
+        return None;
+    }
+
+    let mut ret = Vec::with_capacity(pub_id.len());
+    let mut white = false;
+    let mut p = pub_id;
+    while !p.is_empty() {
+        if xml_is_blank_char(p[0] as u32) {
+            if !ret.is_empty() {
+                white = true;
+            }
+        } else {
+            if white {
+                ret.push(0x20);
+                white = false;
+            }
+            ret.push(p[0]);
+        }
+        p = &p[1..];
+    }
+    Some(ret)
 }
 
 /// create a new Catalog entry, this type is shared both by XML and SGML catalogs,
@@ -630,15 +645,13 @@ unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlSGMLCatalogType) {
-        let Some(mut content) =
+        let Some(content) =
             xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
         else {
             return -1;
         };
 
-        // workaround for non NULL-terminated contents
-        content.push(0);
-        let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename, 0);
+        let ret = xml_parse_sgml_catalog(catal, &content, filename, 0);
         if ret < 0 {
             return -1;
         }
@@ -673,222 +686,198 @@ unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i
 #[doc(alias = "xmlParseSGMLCatalog")]
 unsafe fn xml_parse_sgml_catalog(
     catal: XmlCatalogPtr,
-    value: *const XmlChar,
+    value: &[u8],
     file: *const c_char,
     is_super: i32,
 ) -> i32 {
-    let mut cur: *const XmlChar = value;
-    let mut base: *mut XmlChar;
+    let mut cur = value;
     let mut res: i32;
 
-    if cur.is_null() || file.is_null() {
+    if file.is_null() {
         return -1;
     }
-    base = xml_strdup(file as _);
+    let mut base = CStr::from_ptr(file).to_string_lossy().into_owned();
 
-    while !cur.is_null() && *cur.add(0) != 0 {
-        SKIP_BLANKS!(cur);
-        if *cur.add(0) == 0 {
+    while !cur.is_empty() {
+        cur = skip_blanks(cur);
+        if cur.is_empty() {
             break;
         }
-        if *cur.add(0) == b'-' && *cur.add(1) == b'-' {
-            cur = xml_parse_sgmlcatalog_comment(cur);
-            if cur.is_null() {
-                /* error */
-                break;
-            }
+        if cur.starts_with(b"--") {
+            let Some(rem) = xml_parse_sgmlcatalog_comment(cur) else {
+                return -1;
+            };
+            cur = rem;
         } else {
-            let mut sysid: *mut XmlChar = null_mut();
-            let mut name: *mut XmlChar = null_mut();
             let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
 
-            cur = xml_parse_sgml_catalog_name(cur, &raw mut name);
-            if cur.is_null() || name.is_null() {
-                /* error */
-                break;
+            let Some((name, rem)) = xml_parse_sgml_catalog_name(cur) else {
+                return -1;
+            };
+            cur = rem;
+            if cur
+                .first()
+                .filter(|&&b| xml_is_blank_char(b as u32))
+                .is_none()
+            {
+                return -1;
             }
-            if !xml_is_blank_char(*cur as u32) {
-                /* error */
-                xml_free(name as _);
-                break;
-            }
-            SKIP_BLANKS!(cur);
-            if xml_str_equal(name, c"SYSTEM".as_ptr() as _) {
+            cur = skip_blanks(cur);
+            if name == b"SYSTEM" {
                 typ = XmlCatalogEntryType::SgmlCataSystem;
-            } else if xml_str_equal(name, c"PUBLIC".as_ptr() as _) {
+            } else if name == b"PUBLIC" {
                 typ = XmlCatalogEntryType::SgmlCataPublic;
-            } else if xml_str_equal(name, c"DELEGATE".as_ptr() as _) {
+            } else if name == b"DELEGATE" {
                 typ = XmlCatalogEntryType::SgmlCataDelegate;
-            } else if xml_str_equal(name, c"ENTITY".as_ptr() as _) {
+            } else if name == b"ENTITY" {
                 typ = XmlCatalogEntryType::SgmlCataEntity;
-            } else if xml_str_equal(name, c"DOCTYPE".as_ptr() as _) {
+            } else if name == b"DOCTYPE" {
                 typ = XmlCatalogEntryType::SgmlCataDoctype;
-            } else if xml_str_equal(name, c"LINKTYPE".as_ptr() as _) {
+            } else if name == b"LINKTYPE" {
                 typ = XmlCatalogEntryType::SgmlCataLinktype;
-            } else if xml_str_equal(name, c"NOTATION".as_ptr() as _) {
+            } else if name == b"NOTATION" {
                 typ = XmlCatalogEntryType::SgmlCataNotation;
-            } else if xml_str_equal(name, c"SGMLDECL".as_ptr() as _) {
+            } else if name == b"SGMLDECL" {
                 typ = XmlCatalogEntryType::SgmlCataSGMLDecl;
-            } else if xml_str_equal(name, c"DOCUMENT".as_ptr() as _) {
+            } else if name == b"DOCUMENT" {
                 typ = XmlCatalogEntryType::SgmlCataDocument;
-            } else if xml_str_equal(name, c"CATALOG".as_ptr() as _) {
+            } else if name == b"CATALOG" {
                 typ = XmlCatalogEntryType::SgmlCataCatalog;
-            } else if xml_str_equal(name, c"BASE".as_ptr() as _) {
+            } else if name == b"BASE" {
                 typ = XmlCatalogEntryType::SgmlCataBase;
-            } else if xml_str_equal(name, c"OVERRIDE".as_ptr() as _) {
-                xml_free(name as _);
-                cur = xml_parse_sgml_catalog_name(cur, &raw mut name);
-                if name.is_null() {
-                    /* error */
-                    break;
-                }
-                xml_free(name as _);
+            } else if name == b"OVERRIDE" {
+                let Some((_, rem)) = xml_parse_sgml_catalog_name(cur) else {
+                    return -1;
+                };
+                cur = rem;
                 continue;
             }
-            xml_free(name as _);
-            name = null_mut();
 
-            match typ {
+            let (name, sysid) = match typ {
                 ty @ XmlCatalogEntryType::SgmlCataEntity
                 | ty @ XmlCatalogEntryType::SgmlCataPentity
                 | ty @ XmlCatalogEntryType::SgmlCataDoctype
                 | ty @ XmlCatalogEntryType::SgmlCataLinktype
-                | ty @ XmlCatalogEntryType::SgmlCataNotation => 'to_break: {
-                    if matches!(ty, XmlCatalogEntryType::SgmlCataEntity) && *cur == b'%' {
+                | ty @ XmlCatalogEntryType::SgmlCataNotation => {
+                    if matches!(ty, XmlCatalogEntryType::SgmlCataEntity)
+                        && cur.first() == Some(&b'%')
+                    {
                         typ = XmlCatalogEntryType::SgmlCataPentity;
                     }
-                    cur = xml_parse_sgml_catalog_name(cur, &raw mut name);
-                    if cur.is_null() {
-                        /* error */
-                        break 'to_break;
+                    let Some((name, rem)) = xml_parse_sgml_catalog_name(cur) else {
+                        return -1;
+                    };
+                    cur = rem;
+                    if cur
+                        .first()
+                        .filter(|&&b| xml_is_blank_char(b as u32))
+                        .is_none()
+                    {
+                        return -1;
                     }
-                    if !xml_is_blank_char(*cur as u32) {
-                        /* error */
-                        break 'to_break;
-                    }
-                    SKIP_BLANKS!(cur);
-                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut sysid);
-                    if cur.is_null() {
-                        /* error */
-                        break 'to_break;
-                    }
+                    cur = skip_blanks(cur);
+                    let Some((sysid, rem)) = xml_parse_sgml_catalog_pubid(cur) else {
+                        return -1;
+                    };
+                    cur = rem;
+                    (Some(Cow::Borrowed(name)), Some(Cow::Borrowed(sysid)))
                 }
                 XmlCatalogEntryType::SgmlCataPublic
                 | XmlCatalogEntryType::SgmlCataSystem
-                | XmlCatalogEntryType::SgmlCataDelegate => 'to_break: {
-                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut name);
-                    if cur.is_null() {
-                        /* error */
-                        break 'to_break;
-                    }
+                | XmlCatalogEntryType::SgmlCataDelegate => {
+                    let Some((name, rem)) = xml_parse_sgml_catalog_pubid(cur) else {
+                        return -1;
+                    };
+                    cur = rem;
+                    let mut cow_name = Some(Cow::Borrowed(name));
                     if !matches!(typ, XmlCatalogEntryType::SgmlCataSystem) {
-                        let normid: *mut XmlChar = xml_catalog_normalize_public(name);
-                        if !normid.is_null() {
-                            if !name.is_null() {
-                                xml_free(name as _);
-                            }
-                            if *normid != 0 {
-                                name = normid;
+                        if let Some(normid) = normalize_public(name) {
+                            if !normid.is_empty() {
+                                cow_name = Some(Cow::Owned(normid));
                             } else {
-                                xml_free(normid as _);
-                                name = null_mut();
+                                cow_name = None;
                             }
                         }
                     }
-                    if !xml_is_blank_char(*cur as u32) {
-                        /* error */
-                        break 'to_break;
+                    if cur
+                        .first()
+                        .filter(|&&b| xml_is_blank_char(b as u32))
+                        .is_none()
+                    {
+                        return -1;
                     }
-                    SKIP_BLANKS!(cur);
-                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut sysid);
-                    if cur.is_null() {
-                        /* error */
-                        break 'to_break;
-                    }
+                    cur = skip_blanks(cur);
+                    let Some((sysid, rem)) = xml_parse_sgml_catalog_pubid(cur) else {
+                        return -1;
+                    };
+                    cur = rem;
+                    (cow_name, Some(Cow::Borrowed(sysid)))
                 }
                 XmlCatalogEntryType::SgmlCataBase
                 | XmlCatalogEntryType::SgmlCataCatalog
                 | XmlCatalogEntryType::SgmlCataDocument
-                | XmlCatalogEntryType::SgmlCataSGMLDecl => 'to_break: {
-                    cur = xml_parse_sgml_catalog_pubid(cur, &raw mut sysid);
-                    if cur.is_null() {
-                        /* error */
-                        break 'to_break;
-                    }
+                | XmlCatalogEntryType::SgmlCataSGMLDecl => {
+                    let Some((sysid, rem)) = xml_parse_sgml_catalog_pubid(cur) else {
+                        return -1;
+                    };
+                    cur = rem;
+                    (None, Some(Cow::Borrowed(sysid)))
                 }
-                _ => {}
-            }
-            if cur.is_null() {
-                if !name.is_null() {
-                    xml_free(name as _);
-                }
-                if !sysid.is_null() {
-                    xml_free(sysid as _);
-                }
-                break;
-            } else if matches!(typ, XmlCatalogEntryType::SgmlCataBase) {
-                if !base.is_null() {
-                    xml_free(base as _);
-                }
-                base = xml_strdup(sysid);
+                _ => (None, None),
+            };
+            if matches!(typ, XmlCatalogEntryType::SgmlCataBase) {
+                base = String::from_utf8_lossy(sysid.unwrap().as_ref()).into_owned();
             } else if matches!(
                 typ,
                 XmlCatalogEntryType::SgmlCataPublic | XmlCatalogEntryType::SgmlCataSystem
             ) {
-                let filename: *mut XmlChar = xml_build_uri(sysid, base);
-                if !filename.is_null() {
+                let sysid = sysid.unwrap();
+                let sysid = String::from_utf8_lossy(sysid.as_ref());
+                if let Some(filename) = build_uri(&sysid, &base) {
+                    let filename = CString::new(filename).unwrap();
+                    let name =
+                        CString::new(String::from_utf8_lossy(name.unwrap().as_ref()).as_ref())
+                            .unwrap();
                     let entry: XmlCatalogEntryPtr = xml_new_catalog_entry(
                         typ,
-                        name,
-                        filename,
+                        name.as_ptr() as *const u8,
+                        filename.as_ptr() as *const u8,
                         null_mut(),
                         XmlCatalogPrefer::None,
                         null_mut(),
                     );
-                    res = xml_hash_add_entry((*catal).sgml, name, entry as _);
+                    res = xml_hash_add_entry((*catal).sgml, name.as_ptr() as *const u8, entry as _);
                     if res < 0 {
                         xml_free_catalog_entry(entry as _, null_mut());
                     }
-                    xml_free(filename as _);
                 }
             } else if matches!(typ, XmlCatalogEntryType::SgmlCataCatalog) {
                 if is_super != 0 {
+                    let sysid =
+                        CString::new(String::from_utf8_lossy(sysid.unwrap().as_ref()).as_ref())
+                            .unwrap();
                     let entry: XmlCatalogEntryPtr = xml_new_catalog_entry(
                         typ,
-                        sysid,
+                        sysid.as_ptr() as *const u8,
                         null_mut(),
                         null_mut(),
                         XmlCatalogPrefer::None,
                         null_mut(),
                     );
-                    res = xml_hash_add_entry((*catal).sgml, sysid, entry as _);
+                    res =
+                        xml_hash_add_entry((*catal).sgml, sysid.as_ptr() as *const u8, entry as _);
                     if res < 0 {
                         xml_free_catalog_entry(entry as _, null_mut());
                     }
-                } else {
-                    let filename: *mut XmlChar = xml_build_uri(sysid, base);
-                    if !filename.is_null() {
-                        xml_expand_catalog(catal, filename as _);
-                        xml_free(filename as _);
+                } else if let Some(sysid) = sysid {
+                    let sysid = String::from_utf8_lossy(&sysid);
+                    if let Some(filename) = build_uri(&sysid, &base) {
+                        let filename = CString::new(filename).unwrap();
+                        xml_expand_catalog(catal, filename.as_ptr());
                     }
                 }
             }
-            /*
-             * drop anything else we won't handle it
-             */
-            if !name.is_null() {
-                xml_free(name as _);
-            }
-            if !sysid.is_null() {
-                xml_free(sysid as _);
-            }
         }
-    }
-    if !base.is_null() {
-        xml_free(base as _);
-    }
-    if cur.is_null() {
-        return -1;
     }
     0
 }
@@ -902,23 +891,21 @@ unsafe fn xml_parse_sgml_catalog(
 #[doc(alias = "xmlLoadACatalog")]
 pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
     let filename = filename.as_ref();
-    let Some(mut content) = xml_load_file_content(filename) else {
+    let Some(content) = xml_load_file_content(filename) else {
         return null_mut();
     };
-    // workaround for non NULL-terminated contents
-    content.push(0);
 
-    let mut first = content.as_ptr();
+    let mut first = &content[..];
 
-    while *first != 0
-        && *first != b'-'
-        && *first != b'<'
-        && !((*first >= b'A' && *first <= b'Z') || (*first >= b'a' && *first <= b'z'))
+    while !first.is_empty()
+        && first[0] != b'-'
+        && first[0] != b'<'
+        && !((first[0] >= b'A' && first[0] <= b'Z') || (first[0] >= b'a' && first[0] <= b'z'))
     {
-        first = first.add(1);
+        first = &first[1..];
     }
 
-    if *first != b'<' {
+    if first.first() != Some(&b'<') {
         let catal = xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
@@ -927,7 +914,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
             return null_mut();
         }
         let filename = CString::new(filename.to_string_lossy().as_ref()).unwrap();
-        let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename.as_ptr(), 0);
+        let ret = xml_parse_sgml_catalog(catal, &content, filename.as_ptr(), 0);
         if ret < 0 {
             xml_free_catalog(catal);
             return null_mut();
@@ -964,13 +951,10 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalog
     if filename.is_null() {
         return null_mut();
     }
-    let Some(mut content) =
-        xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
+    let Some(content) = xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
     else {
         return null_mut();
     };
-    // workaround for non NULL-terminated contents
-    content.push(0);
 
     let catal: XmlCatalogPtr = xml_create_new_catalog(
         XmlCatalogType::XmlSGMLCatalogType,
@@ -980,7 +964,7 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalog
         return null_mut();
     }
 
-    let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename, 1);
+    let ret = xml_parse_sgml_catalog(catal, &content, filename, 1);
     if ret < 0 {
         xml_free_catalog(catal);
         return null_mut();
