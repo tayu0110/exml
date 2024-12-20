@@ -463,7 +463,7 @@ impl XmlDebugCtxt<'_> {
         self.dump_dtd_node(Some(dtd));
         if let Some(children) = dtd.children() {
             self.depth += 1;
-            xml_ctxt_dump_node_list(self, Some(&*children.as_ptr()));
+            self.dump_node_list(Some(&*children.as_ptr()));
             self.depth -= 1;
         } else {
             writeln!(self.output, "    DTD is empty");
@@ -884,7 +884,7 @@ impl XmlDebugCtxt<'_> {
             writeln!(self.output);
             if let Some(children) = attr.children() {
                 self.depth += 1;
-                xml_ctxt_dump_node_list(self, Some(&*children.as_ptr()));
+                self.dump_node_list(Some(&*children.as_ptr()));
                 self.depth -= 1;
             }
         }
@@ -1138,8 +1138,21 @@ impl XmlDebugCtxt<'_> {
                 && node.element_type() != XmlElementType::XmlEntityRefNode
         }) {
             self.depth += 1;
-            xml_ctxt_dump_node_list(self, Some(&*children.as_ptr()));
+            self.dump_node_list(Some(&*children.as_ptr()));
             self.depth -= 1;
+        }
+    }
+
+    /// Dumps debug information for the list of element node, it is recursive
+    #[doc(alias = "xmlCtxtDumpNodeList")]
+    unsafe fn dump_node_list(&mut self, node: Option<&impl NodeCommon>) {
+        if let Some(node) = node {
+            self.dump_node(Some(node));
+            let mut node = node as &dyn NodeCommon;
+            while let Some(next) = node.next() {
+                self.dump_node(Some(&*next));
+                node = &*next.as_ptr();
+            }
         }
     }
 }
@@ -1254,19 +1267,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     -3
 }
 
-/// Dumps debug information for the list of element node, it is recursive
-#[doc(alias = "xmlCtxtDumpNodeList")]
-unsafe fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, node: Option<&impl NodeCommon>) {
-    if let Some(node) = node {
-        (*ctxt).dump_node(Some(node));
-        let mut node = node as &dyn NodeCommon;
-        while let Some(next) = node.next() {
-            (*ctxt).dump_node(Some(&*next));
-            node = &*next.as_ptr();
-        }
-    }
-}
-
 #[doc(alias = "xmlCtxtDumpCleanCtxt")]
 unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
     /* remove the ATTRIBUTE_UNUSED when this is added */
@@ -1344,7 +1344,7 @@ pub unsafe fn xml_debug_dump_node_list(
         depth,
         ..Default::default()
     };
-    xml_ctxt_dump_node_list(addr_of_mut!(ctxt), node);
+    ctxt.dump_node_list(node);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
@@ -1515,7 +1515,7 @@ unsafe fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
         )
     }) {
         (*ctxt).depth += 1;
-        xml_ctxt_dump_node_list(ctxt, Some(&*children.as_ptr()));
+        (*ctxt).dump_node_list(Some(&*children.as_ptr()));
         (*ctxt).depth -= 1;
     }
 }
