@@ -416,6 +416,39 @@ impl XmlDebugCtxt<'_> {
             _ => unreachable!(),
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpDtdNode")]
+    unsafe fn dump_dtd_node(&mut self, dtd: Option<&XmlDtd>) {
+        self.dump_spaces();
+
+        let Some(dtd) = dtd else {
+            if self.check == 0 {
+                writeln!(self.output, "DTD node is NULL");
+            }
+            return;
+        };
+
+        if dtd.element_type() != XmlElementType::XmlDTDNode {
+            xml_debug_err!(self, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
+            return;
+        }
+        if self.check == 0 {
+            if let Some(name) = dtd.name() {
+                write!(self.output, "DTD({name})");
+            } else {
+                write!(self.output, "DTD");
+            }
+            if let Some(external_id) = dtd.external_id.as_deref() {
+                write!(self.output, ", PUBLIC {external_id}");
+            }
+            if let Some(system_id) = dtd.system_id.as_deref() {
+                write!(self.output, ", SYSTEM {system_id}");
+            }
+            writeln!(self.output);
+        }
+        // Do a bit of checking
+        self.generic_node_check(dtd);
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -528,39 +561,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     -3
 }
 
-#[doc(alias = "xmlCtxtDumpDtdNode")]
-unsafe fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
-    (*ctxt).dump_spaces();
-
-    let Some(dtd) = dtd else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "DTD node is NULL");
-        }
-        return;
-    };
-
-    if dtd.element_type() != XmlElementType::XmlDTDNode {
-        xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNotDTD, "Node is not a DTD",);
-        return;
-    }
-    if (*ctxt).check == 0 {
-        if let Some(name) = dtd.name() {
-            write!((*ctxt).output, "DTD({name})");
-        } else {
-            write!((*ctxt).output, "DTD");
-        }
-        if let Some(external_id) = dtd.external_id.as_deref() {
-            write!((*ctxt).output, ", PUBLIC {external_id}");
-        }
-        if let Some(system_id) = dtd.system_id.as_deref() {
-            write!((*ctxt).output, ", SYSTEM {system_id}");
-        }
-        writeln!((*ctxt).output);
-    }
-    // Do a bit of checking
-    (*ctxt).generic_node_check(dtd);
-}
-
 /// Dumps debug information for the DTD
 #[doc(alias = "xmlCtxtDumpDTD")]
 unsafe fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
@@ -570,7 +570,7 @@ unsafe fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
         }
         return;
     };
-    xml_ctxt_dump_dtd_node(ctxt, Some(dtd));
+    (*ctxt).dump_dtd_node(Some(dtd));
     if let Some(children) = dtd.children() {
         (*ctxt).depth += 1;
         xml_ctxt_dump_node_list(ctxt, children.as_ptr());
@@ -1101,7 +1101,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             }
         }
         XmlElementType::XmlDTDNode => {
-            xml_ctxt_dump_dtd_node(ctxt, (*node).as_dtd_node().map(|d| d.as_ref()));
+            (*ctxt).dump_dtd_node((*node).as_dtd_node().map(|d| d.as_ref()));
             return;
         }
         XmlElementType::XmlElementDecl => {
