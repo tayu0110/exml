@@ -80,6 +80,7 @@ use crate::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
         NodeCommon, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
+    uri::build_uri,
     SYSCONFDIR,
 };
 
@@ -364,9 +365,7 @@ unsafe fn xml_parse_sgml_catalog_name(
 
     *name = null_mut();
 
-    /*
-     * Handler for more complex cases
-     */
+    // Handler for more complex cases
     c = *cur as _;
     if !xml_is_letter(c) && c != b'_' as u32 && c != b':' as u32 {
         return null_mut();
@@ -488,7 +487,7 @@ unsafe fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mut XmlChar {
         p = p.add(1);
     }
     if ok != 0 && white == 0 {
-        /* is normalized */
+        // is normalized
         return null_mut();
     }
 
@@ -585,10 +584,7 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
     if ret.is_null() {
         return;
     }
-    /*
-     * Entries stored in the file hash must be deallocated
-     * only by the file hash cleaner !
-     */
+    // Entries stored in the file hash must be deallocated only by the file hash cleaner !
     unsafe {
         if (*ret).dealloc == 1 {
             return;
@@ -995,76 +991,6 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalog
     catal
 }
 
-// /**
-//  * xmlCatalogConvertEntry:
-//  * @entry:  the entry
-//  * @catal:  pointer to the catalog being converted
-//  *
-//  * Convert one entry from the catalog
-//  */
-// unsafe  fn xml_catalog_convert_entry(
-//     payload: *mut c_void,
-//     data: *mut c_void,
-//     _name: *const XmlChar,
-// ) {
-//     let entry: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
-//     let catal: XmlCatalogPtr = data as XmlCatalogPtr;
-//     if entry.is_null() || catal.is_null() || (*catal).sgml.is_null() || (*catal).xml.is_null() {
-//         return;
-//     }
-//     match (*entry).typ {
-//         XmlCatalogEntryType::SgmlCataEntity => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataPentity => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataDoctype => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataLinktype => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataNotation => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataPublic => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataPublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataSystem => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataSystem;
-//         }
-//         XmlCatalogEntryType::SgmlCataDelegate => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataDelegatePublic;
-//         }
-//         XmlCatalogEntryType::SgmlCataCatalog => {
-//             (*entry).typ = XmlCatalogEntryType::XmlCataCatalog;
-//         }
-//         _ => {
-//             xml_hash_remove_entry((*catal).sgml, (*entry).name, Some(xml_free_catalog_entry));
-//             return;
-//         }
-//     }
-//     /*
-//      * Conversion successful, remove from the SGML catalog
-//      * and add it to the default XML one
-//      */
-//     xml_hash_remove_entry((*catal).sgml, (*entry).name, None);
-//     (*entry).parent = (*catal).xml;
-//     (*entry).next = null_mut();
-//     if (*(*catal).xml).children.is_null() {
-//         (*(*catal).xml).children = entry;
-//     } else {
-//         let mut prev: XmlCatalogEntryPtr;
-
-//         prev = (*(*catal).xml).children;
-//         while !(*prev).next.is_null() {
-//             prev = (*prev).next;
-//         }
-//         (*prev).next = entry;
-//     }
-// }
-
 /// Convert all the SGML catalog entries as XML ones
 ///
 /// Returns the number of entries converted if successful, -1 otherwise
@@ -1127,10 +1053,8 @@ pub unsafe fn xml_convert_sgml_catalog(catal: XmlCatalogPtr) -> i32 {
                 continue;
             }
         }
-        /*
-         * Conversion successful, remove from the SGML catalog
-         * and add it to the default XML one
-         */
+        // Conversion successful, remove from the SGML catalog
+        // and add it to the default XML one
         (*entry).parent = (*catal).xml;
         (*entry).next = null_mut();
         if (*(*catal).xml).children.is_null() {
@@ -1192,7 +1116,7 @@ macro_rules! xml_catalog_err {
         $str2:expr,
     ) => {
         let msg = format!($msg, $str1, $str2);
-        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.into()), Some($str2.into()), None,);
+        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()), None,);
     };
     (
         $catal:expr,
@@ -1210,9 +1134,9 @@ macro_rules! xml_catalog_err {
             $node,
             $error,
             &msg,
-            Some($str1.into()),
-            Some($str2.into()),
-            Some($str3.into()),
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into()),
+            Some($str3.to_owned().into()),
         );
     };
     (
@@ -1254,87 +1178,67 @@ macro_rules! xml_catalog_err {
 unsafe fn xml_parse_xml_catalog_one_node(
     cur: XmlNodePtr,
     typ: XmlCatalogEntryType,
-    name: *const XmlChar,
-    attr_name: *const XmlChar,
-    uri_attr_name: *const XmlChar,
+    name: &str,
+    attr_name: Option<&str>,
+    uri_attr_name: &str,
     prefer: XmlCatalogPrefer,
     cgroup: XmlCatalogEntryPtr,
 ) -> XmlCatalogEntryPtr {
-    let mut ok: i32 = 1;
+    let mut ok = true;
     let mut name_value = None;
 
     let mut ret: XmlCatalogEntryPtr = null_mut();
 
-    if !attr_name.is_null() {
-        name_value = (*cur).get_prop(
-            CStr::from_ptr(attr_name as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        );
+    if let Some(attr_name) = attr_name {
+        name_value = (*cur).get_prop(attr_name);
         if name_value.is_none() {
             xml_catalog_err!(
                 ret,
                 cur,
                 XmlParserErrors::XmlCatalogMissingAttr,
                 "{} entry lacks '{}'\n",
-                CStr::from_ptr(name as *const i8).to_string_lossy(),
-                CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
+                name,
+                attr_name,
             );
-            ok = 0;
+            ok = false;
         }
     }
-    let Some(uri_value) = (*cur).get_prop(
-        CStr::from_ptr(uri_attr_name as *const i8)
-            .to_string_lossy()
-            .as_ref(),
-    ) else {
+    let Some(uri_value) = (*cur).get_prop(uri_attr_name) else {
         xml_catalog_err!(
             ret,
             cur,
             XmlParserErrors::XmlCatalogMissingAttr,
             "{} entry lacks '{}'\n",
-            CStr::from_ptr(name as *const i8).to_string_lossy(),
-            CStr::from_ptr(uri_attr_name as *const i8).to_string_lossy(),
+            name,
+            uri_attr_name,
         );
         return null_mut();
     };
-    if ok == 0 {
+    if !ok {
         return null_mut();
     }
 
-    let curi_value = CString::new(uri_value.as_str()).unwrap();
-    let base = (*cur)
+    if let Some(url) = (*cur)
         .get_base((*cur).doc)
-        .map(|c| CString::new(c).unwrap());
-    let url: *mut XmlChar = xml_build_uri(
-        curi_value.as_ptr() as *const u8,
-        base.as_ref()
-            .map_or(null_mut(), |b| b.as_ptr() as *const u8),
-    );
-    if !url.is_null() {
+        .and_then(|base| build_uri(&uri_value, &base))
+    {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) > 1 {
             if let Some(name_value) = name_value.as_deref() {
-                generic_error!(
-                    "Found {}: '{name_value}' '{}'\n",
-                    CStr::from_ptr(name as *const i8).to_string_lossy(),
-                    CStr::from_ptr(url as *const i8).to_string_lossy()
-                );
+                generic_error!("Found {}: '{}' '{}'\n", name, name_value, url);
             } else {
-                generic_error!(
-                    "Found {}: '{}'\n",
-                    CStr::from_ptr(name as *const i8).to_string_lossy(),
-                    CStr::from_ptr(url as *const i8).to_string_lossy()
-                );
+                generic_error!("Found {}: '{}'\n", name, url);
             }
         }
         let name_value = name_value.map(|n| CString::new(n).unwrap());
+        let uri_value = CString::new(uri_value).unwrap();
+        let url = CString::new(url).unwrap();
         ret = xml_new_catalog_entry(
             typ,
             name_value
                 .as_ref()
                 .map_or(null_mut(), |n| n.as_ptr() as *const u8),
-            curi_value.as_ptr() as *const u8,
-            url,
+            uri_value.as_ptr() as *const u8,
+            url.as_ptr() as *const u8,
             prefer,
             cgroup,
         );
@@ -1344,13 +1248,10 @@ unsafe fn xml_parse_xml_catalog_one_node(
             cur,
             XmlParserErrors::XmlCatalogEntryBroken,
             "{} entry '{}' broken ?: {}\n",
-            CStr::from_ptr(name as *const i8).to_string_lossy(),
-            CStr::from_ptr(uri_attr_name as *const i8).to_string_lossy(),
+            name,
+            uri_attr_name,
             uri_value,
         );
-    }
-    if !url.is_null() {
-        xml_free(url as _);
     }
     ret
 }
@@ -1406,9 +1307,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataPublic,
-            c"public".as_ptr() as _,
-            c"publicId".as_ptr() as _,
-            c"uri".as_ptr() as _,
+            "public",
+            Some("publicId"),
+            "uri",
             prefer,
             cgroup,
         );
@@ -1416,9 +1317,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataSystem,
-            c"system".as_ptr() as _,
-            c"systemId".as_ptr() as _,
-            c"uri".as_ptr() as _,
+            "system",
+            Some("systemId"),
+            "uri",
             prefer,
             cgroup,
         );
@@ -1426,9 +1327,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataRewriteSystem,
-            c"rewriteSystem".as_ptr() as _,
-            c"systemIdStartString".as_ptr() as _,
-            c"rewritePrefix".as_ptr() as _,
+            "rewriteSystem",
+            Some("systemIdStartString"),
+            "rewritePrefix",
             prefer,
             cgroup,
         );
@@ -1436,9 +1337,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegatePublic,
-            c"delegatePublic".as_ptr() as _,
-            c"publicIdStartString".as_ptr() as _,
-            c"catalog".as_ptr() as _,
+            "delegatePublic",
+            Some("publicIdStartString"),
+            "catalog",
             prefer,
             cgroup,
         );
@@ -1446,9 +1347,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegateSystem,
-            c"delegateSystem".as_ptr() as _,
-            c"systemIdStartString".as_ptr() as _,
-            c"catalog".as_ptr() as _,
+            "delegateSystem",
+            Some("systemIdStartString"),
+            "catalog",
             prefer,
             cgroup,
         );
@@ -1456,9 +1357,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataURI,
-            c"uri".as_ptr() as _,
-            c"name".as_ptr() as _,
-            c"uri".as_ptr() as _,
+            "uri",
+            Some("name"),
+            "uri",
             prefer,
             cgroup,
         );
@@ -1466,9 +1367,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataRewriteURI,
-            c"rewriteURI".as_ptr() as _,
-            c"uriStartString".as_ptr() as _,
-            c"rewritePrefix".as_ptr() as _,
+            "rewriteURI",
+            Some("uriStartString"),
+            "rewritePrefix",
             prefer,
             cgroup,
         );
@@ -1476,9 +1377,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegateURI,
-            c"delegateURI".as_ptr() as _,
-            c"uriStartString".as_ptr() as _,
-            c"catalog".as_ptr() as _,
+            "delegateURI",
+            Some("uriStartString"),
+            "catalog",
             prefer,
             cgroup,
         );
@@ -1486,9 +1387,9 @@ unsafe fn xml_parse_xml_catalog_node(
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataNextCatalog,
-            c"nextCatalog".as_ptr() as _,
-            null_mut(),
-            c"catalog".as_ptr() as _,
+            "nextCatalog",
+            None,
+            "catalog",
             prefer,
             cgroup,
         );
