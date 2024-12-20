@@ -2888,9 +2888,7 @@ unsafe fn xml_dump_xml_catalog_node(
 
     let mut node: XmlNodePtr;
     let mut cur: XmlCatalogEntryPtr;
-    /*
-     * add all the catalog entries
-     */
+    // add all the catalog entries
     cur = catal;
     while !cur.is_null() {
         if (*cur).group == cgroup {
@@ -3037,7 +3035,7 @@ unsafe fn xml_dump_xml_catalog_node(
 
 #[doc(alias = "xmlDumpXMLCatalog")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_dump_xml_catalog(out: impl Write + 'static, catal: XmlCatalogEntryPtr) -> i32 {
+unsafe fn xml_dump_xml_catalog<'a>(out: impl Write + 'a, catal: XmlCatalogEntryPtr) -> i32 {
     // Rebuild a catalog
 
     use crate::{io::XmlOutputBuffer, tree::NodeCommon};
@@ -3070,18 +3068,14 @@ unsafe fn xml_dump_xml_catalog(out: impl Write + 'static, catal: XmlCatalogEntry
 
     xml_dump_xml_catalog_node(catal, catalog, doc, ns, null_mut());
 
-    /*
-     * reserialize it
-     */
+    // reserialize it
     let Some(buf) = XmlOutputBuffer::from_writer(out, None) else {
         xml_free_doc(doc);
         return -1;
     };
     let ret: i32 = (*doc).save_format_file_to(buf, None, 1);
 
-    /*
-     * Free it
-     */
+    // Free it
     xml_free_doc(doc);
 
     ret
@@ -3090,7 +3084,7 @@ unsafe fn xml_dump_xml_catalog(out: impl Write + 'static, catal: XmlCatalogEntry
 /// Dump the given catalog to the given file.
 #[doc(alias = "xmlACatalogDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_a_catalog_dump(catal: XmlCatalogPtr, mut out: impl Write + 'static) {
+pub unsafe fn xml_a_catalog_dump<'a>(catal: XmlCatalogPtr, mut out: impl Write + 'a) {
     if catal.is_null() {
         return;
     }
@@ -3344,7 +3338,8 @@ const PATH_SEPARATOR: u8 = b':';
 
 /// Load the catalogs and makes their definitions effective for the default
 /// external entity loader.
-/// this function is not thread safe, catalog initialization should
+///
+/// This function is not thread safe, catalog initialization should
 /// preferably be done once at startup
 #[doc(alias = "xmlLoadCatalogs")]
 pub unsafe fn xml_load_catalogs(pathss: *const c_char) {
@@ -3448,7 +3443,7 @@ pub unsafe fn xml_catalog_cleanup() {
 /// Dump all the global catalog content to the given file.
 #[doc(alias = "xmlCatalogDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_catalog_dump(out: impl Write + 'static) {
+pub unsafe fn xml_catalog_dump<'a>(out: impl Write + 'a) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
