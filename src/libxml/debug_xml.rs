@@ -741,6 +741,57 @@ impl XmlDebugCtxt<'_> {
         // Do a bit of checking
         self.generic_node_check(ent);
     }
+
+    #[doc(alias = "xmlCtxtDumpNamespace")]
+    unsafe fn dump_namespace(&mut self, ns: Option<&XmlNs>) {
+        self.dump_spaces();
+
+        let Some(ns) = ns else {
+            if self.check == 0 {
+                writeln!(self.output, "namespace node is NULL");
+            }
+            return;
+        };
+        if ns.element_type() != XmlElementType::XmlNamespaceDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotNsDecl,
+                "Node is not a namespace declaration",
+            );
+            return;
+        }
+        if ns.href.is_null() {
+            if !ns.prefix.is_null() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoHref,
+                    "Incomplete namespace {} href=NULL\n",
+                    CStr::from_ptr(ns.prefix as *const i8).to_string_lossy()
+                );
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoHref,
+                    "Incomplete default namespace href=NULL\n",
+                );
+            }
+        } else if self.check == 0 {
+            if !ns.prefix.is_null() {
+                let prefix = CStr::from_ptr(ns.prefix as *const i8).to_string_lossy();
+                write!(self.output, "namespace {prefix} href=");
+            } else {
+                write!(self.output, "default namespace href=");
+            }
+
+            let href = ns.href;
+            self.dump_string(
+                (!href.is_null())
+                    .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
+            writeln!(self.output);
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -853,61 +904,10 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     -3
 }
 
-#[doc(alias = "xmlCtxtDumpNamespace")]
-unsafe fn xml_ctxt_dump_namespace(ctxt: XmlDebugCtxtPtr, ns: Option<&XmlNs>) {
-    (*ctxt).dump_spaces();
-
-    let Some(ns) = ns else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "namespace node is NULL");
-        }
-        return;
-    };
-    if ns.element_type() != XmlElementType::XmlNamespaceDecl {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNotNsDecl,
-            "Node is not a namespace declaration",
-        );
-        return;
-    }
-    if ns.href.is_null() {
-        if !ns.prefix.is_null() {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNoHref,
-                "Incomplete namespace {} href=NULL\n",
-                CStr::from_ptr(ns.prefix as *const i8).to_string_lossy()
-            );
-        } else {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNoHref,
-                "Incomplete default namespace href=NULL\n",
-            );
-        }
-    } else if (*ctxt).check == 0 {
-        if !ns.prefix.is_null() {
-            let prefix = CStr::from_ptr(ns.prefix as *const i8).to_string_lossy();
-            write!((*ctxt).output, "namespace {prefix} href=");
-        } else {
-            write!((*ctxt).output, "default namespace href=");
-        }
-
-        let href = ns.href;
-        (*ctxt).dump_string(
-            (!href.is_null())
-                .then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
-                .as_deref(),
-        );
-        writeln!((*ctxt).output);
-    }
-}
-
 #[doc(alias = "xmlCtxtDumpNamespaceList")]
 unsafe fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
     while !ns.is_null() {
-        xml_ctxt_dump_namespace(ctxt, Some(&*ns));
+        (*ctxt).dump_namespace(Some(&*ns));
         ns = (*ns).next;
     }
 }
@@ -1118,7 +1118,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlNamespaceDecl => {
-            xml_ctxt_dump_namespace(ctxt, (*node).as_namespace_decl_node().map(|n| n.as_ref()));
+            (*ctxt).dump_namespace((*node).as_namespace_decl_node().map(|n| n.as_ref()));
             return;
         }
         XmlElementType::XmlXIncludeStart => {
