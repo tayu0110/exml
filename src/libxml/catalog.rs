@@ -40,7 +40,7 @@ use std::{
     io::Read,
     mem::{size_of, transmute},
     os::raw::c_void,
-    path::Path,
+    path::{Path, PathBuf},
     ptr::{null, null_mut},
     rc::Rc,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
@@ -196,7 +196,7 @@ pub struct XmlCatalogEntry {
     typ: XmlCatalogEntryType,
     name: *mut XmlChar,
     value: *mut XmlChar,
-    url: *mut XmlChar, /* The expanded URL using the base */
+    url: Option<PathBuf>, /* The expanded URL using the base */
     prefer: XmlCatalogPrefer,
     dealloc: i32,
     depth: i32,
@@ -212,7 +212,7 @@ impl Default for XmlCatalogEntry {
             typ: XmlCatalogEntryType::default(),
             name: null_mut(),
             value: null_mut(),
-            url: null_mut(),
+            url: None,
             prefer: XmlCatalogPrefer::default(),
             dealloc: 0,
             depth: 0,
@@ -566,9 +566,11 @@ unsafe fn xml_new_catalog_entry(
         url = value;
     }
     if !url.is_null() {
-        (*ret).url = xml_strdup(url);
-    } else {
-        (*ret).url = null_mut();
+        (*ret).url = Some(PathBuf::from(
+            CStr::from_ptr(url as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ));
     }
     (*ret).prefer = prefer;
     (*ret).dealloc = 0;
@@ -612,9 +614,7 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
         if !(*ret).value.is_null() {
             xml_free((*ret).value as _);
         }
-        if !(*ret).url.is_null() {
-            xml_free((*ret).url as _);
-        }
+        let _ = (*ret).url.take();
         xml_free(ret as _);
     }
 }
@@ -1541,30 +1541,26 @@ unsafe fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
     if catal.is_null() {
         return -1;
     }
-    if (*catal).url.is_null() {
+    let Some(url) = (*catal).url.as_deref() else {
         return -1;
-    }
+    };
 
-    /*
-     * lock the whole catalog for modification
-     */
+    // lock the whole catalog for modification
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
     if !(*catal).children.is_null() {
-        /* Okay someone else did it in the meantime */
+        // Okay someone else did it in the meantime
         xml_rmutex_unlock(mutex);
         return 0;
     }
 
     let mut catalog_files = XML_CATALOG_XMLFILES.load(Ordering::Acquire);
     if !catalog_files.is_null() {
-        doc = xml_hash_lookup(catalog_files, (*catal).url) as XmlCatalogEntryPtr;
+        let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
+        doc = xml_hash_lookup(catalog_files, curl.as_ptr() as *const u8) as XmlCatalogEntryPtr;
         if !doc.is_null() {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-                generic_error!(
-                    "Found {} in file hash\n",
-                    CStr::from_ptr((*catal).url as *const i8).to_string_lossy()
-                );
+                generic_error!("Found {} in file hash\n", url.display());
             }
 
             if (*catal).typ == XmlCatalogEntryType::XmlCataCatalog {
@@ -1577,19 +1573,14 @@ unsafe fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
             return 0;
         }
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            generic_error!(
-                "{} not found in file hash\n",
-                CStr::from_ptr((*catal).url as *const i8).to_string_lossy()
-            );
+            generic_error!("{} not found in file hash\n", url.display());
         }
     }
 
-    /*
-     * Fetch and parse. Note that xmlParseXMLCatalogFile does not
-     * use the existing catalog, there is no recursion allowed at
-     * that level.
-     */
-    doc = xml_parse_xml_catalog_file((*catal).prefer, (*catal).url);
+    // Fetch and parse. Note that xmlParseXMLCatalogFile does not use the existing catalog,
+    // there is no recursion allowed at that level.
+    let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
+    doc = xml_parse_xml_catalog_file((*catal).prefer, curl.as_ptr() as *const u8);
     if doc.is_null() {
         (*catal).typ = XmlCatalogEntryType::XmlCataBrokenCatalog;
         xml_rmutex_unlock(mutex);
@@ -1609,12 +1600,9 @@ unsafe fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
     }
     if !catalog_files.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            generic_error!(
-                "{} added to file hash\n",
-                CStr::from_ptr((*catal).url as *const i8).to_string_lossy()
-            );
+            generic_error!("{} added to file hash\n", url.display());
         }
-        xml_hash_add_entry(catalog_files, (*catal).url, doc as _);
+        xml_hash_add_entry(catalog_files, curl.as_ptr() as *const u8, doc as _);
     }
     xml_rmutex_unlock(mutex);
     XML_CATALOG_XMLFILES.store(catalog_files, Ordering::Release);
@@ -1695,9 +1683,7 @@ unsafe fn xml_add_xml_catalog(
     }
 
     cur = (*catal).children;
-    /*
-     * Might be a simple "update in place"
-     */
+    // Might be a simple "update in place"
     if !cur.is_null() {
         while !cur.is_null() {
             if !orig.is_null() && ((*cur).typ == typ) && xml_str_equal(orig, (*cur).name) {
@@ -1714,11 +1700,13 @@ unsafe fn xml_add_xml_catalog(
                 if !(*cur).value.is_null() {
                     xml_free((*cur).value as _);
                 }
-                if !(*cur).url.is_null() {
-                    xml_free((*cur).url as _);
-                }
+                let _ = (*cur).url.take();
                 (*cur).value = xml_strdup(replace);
-                (*cur).url = xml_strdup(replace);
+                (*cur).url = Some(PathBuf::from(
+                    CStr::from_ptr(replace as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                ));
                 return 0;
             }
             if (*cur).next.is_null() {
@@ -1742,8 +1730,13 @@ unsafe fn xml_add_xml_catalog(
     }
     if doregister != 0 {
         (*catal).typ = XmlCatalogEntryType::XmlCataCatalog;
-        cur = xml_hash_lookup(XML_CATALOG_XMLFILES.load(Ordering::Relaxed), (*catal).url)
-            as XmlCatalogEntryPtr;
+        if let Some(url) = (*catal).url.as_deref() {
+            let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
+            cur = xml_hash_lookup(
+                XML_CATALOG_XMLFILES.load(Ordering::Relaxed),
+                curl.as_ptr() as *const u8,
+            ) as XmlCatalogEntryPtr;
+        }
         if !cur.is_null() {
             (*cur).children = (*catal).children;
         }
@@ -2025,15 +2018,17 @@ unsafe fn xml_catalog_xml_resolve(
             match (*cur).typ {
                 XmlCatalogEntryType::XmlCataSystem => {
                     if xml_str_equal(sys_id, (*cur).name) {
+                        let url = (*cur).url.as_deref().unwrap();
+                        let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             generic_error!(
                                 "Found system match {}, using {}\n",
                                 CStr::from_ptr((*cur).name as *const i8).to_string_lossy(),
-                                CStr::from_ptr((*cur).url as *const i8).to_string_lossy()
+                                url.display()
                             );
                         }
                         (*catal).depth -= 1;
-                        return xml_strdup((*cur).url);
+                        return xml_strdup(curl.as_ptr() as *const u8);
                     }
                 }
                 XmlCatalogEntryType::XmlCataRewriteSystem => {
@@ -2062,7 +2057,12 @@ unsafe fn xml_catalog_xml_resolve(
                     CStr::from_ptr((*rewrite).name as *const i8).to_string_lossy()
                 );
             }
-            ret = xml_strdup((*rewrite).url);
+            if let Some(url) = (*rewrite).url.as_deref() {
+                let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
+                ret = xml_strdup(url.as_ptr() as *const u8);
+            } else {
+                ret = null_mut();
+            }
             if !ret.is_null() {
                 ret = xml_strcat(ret, sys_id.add(lenrewrite as usize));
             }
@@ -2070,26 +2070,24 @@ unsafe fn xml_catalog_xml_resolve(
             return ret;
         }
         if have_delegate != 0 {
-            let mut delegates: [*const XmlChar; MAX_DELEGATE] = [null(); MAX_DELEGATE];
-            let mut nb_list: usize = 0;
+            let mut delegates: [Option<&Path>; MAX_DELEGATE] = [None; MAX_DELEGATE];
+            let mut nb_list = 0;
 
-            /*
-             * Assume the entries have been sorted by decreasing substring
-             * matches when the list was produced.
-             */
+            // Assume the entries have been sorted by decreasing substring
+            // matches when the list was produced.
             cur = catal;
             'b: while !cur.is_null() {
                 if matches!((*cur).typ, XmlCatalogEntryType::XmlCataDelegateSystem)
                     && xml_strncmp(sys_id, (*cur).name, xml_strlen((*cur).name)) == 0
                 {
                     for i in 0..nb_list {
-                        if xml_str_equal((*cur).url, delegates[i]) {
+                        if (*cur).url.as_deref() == delegates[i] {
                             cur = (*cur).next;
                             continue 'b;
                         }
                     }
                     if nb_list < MAX_DELEGATE {
-                        delegates[nb_list] = (*cur).url;
+                        delegates[nb_list] = (*cur).url.as_deref();
                         nb_list += 1;
                     }
 
@@ -2100,7 +2098,7 @@ unsafe fn xml_catalog_xml_resolve(
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             generic_error!(
                                 "Trying system delegate {}\n",
-                                CStr::from_ptr((*cur).url as *const i8).to_string_lossy()
+                                (*cur).url.as_deref().unwrap().display()
                             );
                         }
                         ret = xml_catalog_list_xml_resolve((*cur).children, null_mut(), sys_id);
@@ -2112,16 +2110,12 @@ unsafe fn xml_catalog_xml_resolve(
                 }
                 cur = (*cur).next;
             }
-            /*
-             * Apply the cut algorithm explained in 4/
-             */
+            // Apply the cut algorithm explained in 4/
             (*catal).depth -= 1;
             return XML_CATAL_BREAK;
         }
     }
-    /*
-     * Then tries 5/ 6/ if a public ID is provided
-     */
+    // Then tries 5/ 6/ if a public ID is provided
     if !pub_id.is_null() {
         cur = catal;
         have_delegate = 0;
@@ -2136,7 +2130,12 @@ unsafe fn xml_catalog_xml_resolve(
                             );
                         }
                         (*catal).depth -= 1;
-                        return xml_strdup((*cur).url);
+                        return if let Some(url) = (*cur).url.as_deref() {
+                            let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
+                            xml_strdup(url.as_ptr() as *const u8)
+                        } else {
+                            null_mut()
+                        };
                     }
                 }
                 XmlCatalogEntryType::XmlCataDelegatePublic => {
@@ -2156,13 +2155,11 @@ unsafe fn xml_catalog_xml_resolve(
             cur = (*cur).next;
         }
         if have_delegate != 0 {
-            let mut delegates: [*const XmlChar; MAX_DELEGATE] = [null(); MAX_DELEGATE];
+            let mut delegates: [Option<&Path>; MAX_DELEGATE] = [None; MAX_DELEGATE];
             let mut nb_list: usize = 0;
 
-            /*
-             * Assume the entries have been sorted by decreasing substring
-             * matches when the list was produced.
-             */
+            // Assume the entries have been sorted by decreasing substring
+            // matches when the list was produced.
             cur = catal;
             'b: while !cur.is_null() {
                 if (*cur).typ == XmlCatalogEntryType::XmlCataDelegatePublic
@@ -2170,13 +2167,13 @@ unsafe fn xml_catalog_xml_resolve(
                     && xml_strncmp(pub_id, (*cur).name, xml_strlen((*cur).name)) == 0
                 {
                     for i in 0..nb_list {
-                        if xml_str_equal((*cur).url, delegates[i]) {
+                        if (*cur).url.as_deref() == delegates[i] {
                             cur = (*cur).next;
                             continue 'b;
                         }
                     }
                     if nb_list < MAX_DELEGATE {
-                        delegates[nb_list] = (*cur).url;
+                        delegates[nb_list] = (*cur).url.as_deref();
                         nb_list += 1;
                     }
 
@@ -2187,7 +2184,7 @@ unsafe fn xml_catalog_xml_resolve(
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             generic_error!(
                                 "Trying public delegate {}\n",
-                                CStr::from_ptr((*cur).url as *const i8).to_string_lossy()
+                                (*cur).url.as_deref().unwrap().display()
                             );
                         }
                         ret = xml_catalog_list_xml_resolve((*cur).children, pub_id, null_mut());
@@ -2349,12 +2346,12 @@ unsafe fn xml_catalog_list_xml_resolve(
 ///
 /// Returns the local resource if found or null_mut() otherwise.
 #[doc(alias = "xmlCatalogGetSGMLPublic")]
-unsafe fn xml_catalog_get_sgml_public(
+unsafe fn xml_catalog_get_sgml_public<'a>(
     catal: XmlHashTablePtr,
     mut pub_id: *const XmlChar,
-) -> *const XmlChar {
+) -> Option<&'a Path> {
     if catal.is_null() {
-        return null_mut();
+        return None;
     }
 
     let normid: *mut XmlChar = xml_catalog_normalize_public(pub_id);
@@ -2367,70 +2364,70 @@ unsafe fn xml_catalog_get_sgml_public(
         if !normid.is_null() {
             xml_free(normid as _);
         }
-        return null_mut();
+        return None;
     }
     if (*entry).typ == XmlCatalogEntryType::SgmlCataPublic {
         if !normid.is_null() {
             xml_free(normid as _);
         }
-        return (*entry).url;
+        return (*entry).url.as_deref();
     }
     if !normid.is_null() {
         xml_free(normid as _);
     }
-    null_mut()
+    None
 }
 
 /// Try to lookup the catalog local reference for a system ID.
 ///
 /// Returns the local resource if found or null_mut() otherwise.
 #[doc(alias = "xmlCatalogGetSGMLSystem")]
-unsafe fn xml_catalog_get_sgml_system(
+unsafe fn xml_catalog_get_sgml_system<'a>(
     catal: XmlHashTablePtr,
     sys_id: *const XmlChar,
-) -> *const XmlChar {
+) -> Option<&'a Path> {
     if catal.is_null() {
-        return null_mut();
+        return None;
     }
 
     let entry: XmlCatalogEntryPtr = xml_hash_lookup(catal, sys_id) as XmlCatalogEntryPtr;
     if entry.is_null() {
-        return null_mut();
+        return None;
     }
     if (*entry).typ == XmlCatalogEntryType::SgmlCataSystem {
-        return (*entry).url;
+        return (*entry).url.as_deref();
     }
-    null_mut()
+    None
 }
 
 /// Do a complete resolution lookup of an External Identifier.
 ///
 /// Returns the URI of the resource or null_mut() if not found
 #[doc(alias = "xmlCatalogSGMLResolve")]
-unsafe fn xml_catalog_sgml_resolve(
+unsafe fn xml_catalog_sgml_resolve<'a>(
     catal: XmlCatalogPtr,
     pub_id: *const XmlChar,
     sys_id: *const XmlChar,
-) -> *const XmlChar {
-    let mut ret: *const XmlChar = null();
+) -> Option<&'a Path> {
+    let mut ret = None;
 
     if (*catal).sgml.is_null() {
-        return null_mut();
+        return None;
     }
 
     if !pub_id.is_null() {
         ret = xml_catalog_get_sgml_public((*catal).sgml, pub_id);
     }
-    if !ret.is_null() {
+    if ret.is_some() {
         return ret;
     }
     if !sys_id.is_null() {
         ret = xml_catalog_get_sgml_system((*catal).sgml, sys_id);
     }
-    if !ret.is_null() {
+    if ret.is_some() {
         return ret;
     }
-    null_mut()
+    None
 }
 
 /// Do a complete resolution lookup of an External Identifier
@@ -2473,11 +2470,9 @@ pub unsafe fn xml_a_catalog_resolve(
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
-    } else {
-        let sgml: *const XmlChar = xml_catalog_sgml_resolve(catal, pub_id, sys_id);
-        if !sgml.is_null() {
-            ret = xml_strdup(sgml);
-        }
+    } else if let Some(sgml) = xml_catalog_sgml_resolve(catal, pub_id, sys_id) {
+        let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
+        ret = xml_strdup(sgml.as_ptr() as *const u8);
     }
     ret
 }
@@ -2509,11 +2504,9 @@ pub unsafe fn xml_a_catalog_resolve_public(
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
-    } else {
-        let sgml: *const XmlChar = xml_catalog_get_sgml_public((*catal).sgml, pub_id);
-        if !sgml.is_null() {
-            ret = xml_strdup(sgml);
-        }
+    } else if let Some(sgml) = xml_catalog_get_sgml_public((*catal).sgml, pub_id) {
+        let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
+        ret = xml_strdup(sgml.as_ptr() as *const u8);
     }
     ret
 }
@@ -2545,11 +2538,9 @@ pub unsafe fn xml_a_catalog_resolve_system(
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
-    } else {
-        let sgml: *const XmlChar = xml_catalog_get_sgml_system((*catal).sgml, sys_id);
-        if !sgml.is_null() {
-            ret = xml_strdup(sgml);
-        }
+    } else if let Some(sgml) = xml_catalog_get_sgml_system((*catal).sgml, sys_id) {
+        let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
+        ret = xml_strdup(sgml.as_ptr() as *const u8);
     }
     ret
 }
@@ -2605,7 +2596,12 @@ unsafe fn xml_catalog_xml_resolve_uri(
                             CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
                         );
                     }
-                    return xml_strdup((*cur).url);
+                    return if let Some(url) = (*cur).url.as_deref() {
+                        let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
+                        xml_strdup(url.as_ptr() as *const u8)
+                    } else {
+                        null_mut()
+                    };
                 }
             }
             XmlCatalogEntryType::XmlCataRewriteURI => {
@@ -2634,20 +2630,23 @@ unsafe fn xml_catalog_xml_resolve_uri(
                 CStr::from_ptr((*rewrite).name as *const i8).to_string_lossy()
             );
         }
-        ret = xml_strdup((*rewrite).url);
+        if let Some(url) = (*rewrite).url.as_deref() {
+            let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
+            ret = xml_strdup(url.as_ptr() as *const u8);
+        } else {
+            ret = null_mut();
+        }
         if !ret.is_null() {
             ret = xml_strcat(ret, uri.add(lenrewrite as usize));
         }
         return ret;
     }
     if have_delegate != 0 {
-        let mut delegates: [*const XmlChar; MAX_DELEGATE] = [null(); MAX_DELEGATE];
+        let mut delegates: [Option<&Path>; MAX_DELEGATE] = [None; MAX_DELEGATE];
         let mut nb_list: usize = 0;
 
-        /*
-         * Assume the entries have been sorted by decreasing substring
-         * matches when the list was produced.
-         */
+        // Assume the entries have been sorted by decreasing substring
+        // matches when the list was produced.
         cur = catal;
         'b: while !cur.is_null() {
             if matches!(
@@ -2657,13 +2656,13 @@ unsafe fn xml_catalog_xml_resolve_uri(
             ) && xml_strncmp(uri, (*cur).name, xml_strlen((*cur).name)) == 0
             {
                 for i in 0..nb_list {
-                    if xml_str_equal((*cur).url, delegates[i]) {
+                    if (*cur).url.as_deref() == delegates[i] {
                         cur = (*cur).next;
                         continue 'b;
                     }
                 }
                 if nb_list < MAX_DELEGATE {
-                    delegates[nb_list] = (*cur).url;
+                    delegates[nb_list] = (*cur).url.as_deref();
                     nb_list += 1;
                 }
 
@@ -2674,7 +2673,7 @@ unsafe fn xml_catalog_xml_resolve_uri(
                     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                         generic_error!(
                             "Trying URI delegate {}\n",
-                            CStr::from_ptr((*cur).url as *const i8).to_string_lossy()
+                            (*cur).url.as_deref().unwrap().display()
                         );
                     }
                     ret = xml_catalog_list_xml_resolve_uri((*cur).children, uri);
@@ -2685,9 +2684,7 @@ unsafe fn xml_catalog_xml_resolve_uri(
             }
             cur = (*cur).next;
         }
-        /*
-         * Apply the cut algorithm explained in 4/
-         */
+        // Apply the cut algorithm explained in 4/
         return XML_CATAL_BREAK;
     }
     if have_next != 0 {
@@ -2799,11 +2796,9 @@ pub unsafe fn xml_a_catalog_resolve_uri(catal: XmlCatalogPtr, uri: *const XmlCha
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
-    } else {
-        let sgml: *const XmlChar = xml_catalog_sgml_resolve(catal, null_mut(), uri);
-        if !sgml.is_null() {
-            ret = xml_strdup(sgml);
-        }
+    } else if let Some(sgml) = xml_catalog_sgml_resolve(catal, null_mut(), uri) {
+        let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
+        ret = xml_strdup(sgml.as_ptr() as *const u8);
     }
     ret
 }
@@ -3973,7 +3968,19 @@ pub unsafe fn xml_catalog_get_system(sys_id: *const XmlChar) -> *const XmlChar {
     }
 
     if !default_catalog.is_null() {
-        return xml_catalog_get_sgml_system((*default_catalog).sgml, sys_id);
+        return if let Some(sgml) = xml_catalog_get_sgml_system((*default_catalog).sgml, sys_id) {
+            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
+            snprintf(
+                RESULT.as_mut_ptr() as _,
+                RESULT.len() - 1,
+                c"%s".as_ptr() as _,
+                sgml,
+            );
+            RESULT[RESULT.len() - 1] = 0;
+            return RESULT.as_ptr() as _;
+        } else {
+            null_mut()
+        };
     }
     null_mut()
 }
@@ -4002,9 +4009,7 @@ pub unsafe fn xml_catalog_get_public(pub_id: *const XmlChar) -> *const XmlChar {
         return null_mut();
     }
 
-    /*
-     * Check first the XML catalogs
-     */
+    // Check first the XML catalogs
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if !default_catalog.is_null() {
         ret = xml_catalog_list_xml_resolve((*default_catalog).xml, pub_id, null_mut());
@@ -4021,7 +4026,19 @@ pub unsafe fn xml_catalog_get_public(pub_id: *const XmlChar) -> *const XmlChar {
     }
 
     if !default_catalog.is_null() {
-        return xml_catalog_get_sgml_public((*default_catalog).sgml, pub_id);
+        return if let Some(sgml) = xml_catalog_get_sgml_public((*default_catalog).sgml, pub_id) {
+            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
+            snprintf(
+                RESULT.as_mut_ptr() as _,
+                RESULT.len() - 1,
+                c"%s".as_ptr() as _,
+                sgml,
+            );
+            RESULT[RESULT.len() - 1] = 0;
+            return RESULT.as_ptr() as _;
+        } else {
+            null_mut()
+        };
     }
     null_mut()
 }
