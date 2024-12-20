@@ -70,14 +70,13 @@ use crate::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
         },
-        uri::xml_canonic_path,
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strncmp, xml_strndup, XmlChar},
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
         NodeCommon, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
-    uri::build_uri,
+    uri::{build_uri, canonic_path},
     SYSCONFDIR,
 };
 
@@ -254,7 +253,7 @@ macro_rules! xml_catalog_err {
         $str1:expr,
     ) => {
         let msg = format!($msg, $str1);
-        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.into()), None, None,);
+        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.to_owned().into()), None, None,);
     };
     (
         $catal:expr,
@@ -1321,32 +1320,21 @@ unsafe fn xml_parse_xml_catalog_node_list(
 #[doc(alias = "xmlParseXMLCatalogFile")]
 unsafe fn xml_parse_xml_catalog_file(
     mut prefer: XmlCatalogPrefer,
-    filename: *const XmlChar,
+    filename: &str,
 ) -> XmlCatalogEntryPtr {
     let mut cur: XmlNodePtr;
     let parent: XmlCatalogEntryPtr;
 
-    if filename.is_null() {
-        return null_mut();
-    }
-
-    let doc: XmlDocPtr = xml_parse_catalog_file(filename as _);
+    let doc: XmlDocPtr = xml_parse_catalog_file(filename);
     if doc.is_null() {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            generic_error!(
-                "Failed to parse catalog {}\n",
-                CStr::from_ptr(filename as *const i8).to_string_lossy()
-            );
+            generic_error!("Failed to parse catalog {filename}\n");
         }
         return null_mut();
     }
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        generic_error!(
-            "{} Parsing catalog {}\n",
-            xml_get_thread_id(),
-            CStr::from_ptr(filename as *const i8).to_string_lossy()
-        );
+        generic_error!("{} Parsing catalog {filename}\n", xml_get_thread_id());
     }
 
     cur = (*doc).get_root_element();
@@ -1359,11 +1347,7 @@ unsafe fn xml_parse_xml_catalog_file(
         parent = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
             None,
-            Some(
-                CStr::from_ptr(filename as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ),
+            Some(filename),
             None,
             prefer,
             null_mut(),
@@ -1396,7 +1380,7 @@ unsafe fn xml_parse_xml_catalog_file(
             doc,
             XmlParserErrors::XmlCatalogNotCatalog,
             "File {} is not an XML Catalog\n",
-            CStr::from_ptr(filename as *const i8).to_string_lossy(),
+            filename,
         );
         xml_free_doc(doc);
         return null_mut();
@@ -1453,8 +1437,7 @@ unsafe fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
 
     // Fetch and parse. Note that xmlParseXMLCatalogFile does not use the existing catalog,
     // there is no recursion allowed at that level.
-    let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
-    doc = xml_parse_xml_catalog_file((*catal).prefer, curl.as_ptr() as *const u8);
+    doc = xml_parse_xml_catalog_file((*catal).prefer, url.to_string_lossy().as_ref());
     if doc.is_null() {
         (*catal).typ = XmlCatalogEntryType::XmlCataBrokenCatalog;
         xml_rmutex_unlock(mutex);
@@ -1476,6 +1459,7 @@ unsafe fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("{} added to file hash\n", url.display());
         }
+        let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
         xml_hash_add_entry(catalog_files, curl.as_ptr() as *const u8, doc as _);
     }
     xml_rmutex_unlock(mutex);
@@ -3418,7 +3402,7 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 ///
 /// Returns the resulting document tree or null_mut() in case of error
 #[doc(alias = "xmlParseCatalogFile")]
-pub unsafe fn xml_parse_catalog_file(filename: *const c_char) -> XmlDocPtr {
+pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
     let ret: XmlDocPtr;
     let mut directory: *mut c_char = null_mut();
 
@@ -3428,15 +3412,7 @@ pub unsafe fn xml_parse_catalog_file(filename: *const c_char) -> XmlDocPtr {
         return null_mut();
     }
 
-    if filename.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    }
-
-    let Some(buf) = XmlParserInputBuffer::from_uri(
-        CStr::from_ptr(filename).to_string_lossy().as_ref(),
-        XmlCharEncoding::None,
-    ) else {
+    let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     };
@@ -3449,15 +3425,8 @@ pub unsafe fn xml_parse_catalog_file(filename: *const c_char) -> XmlDocPtr {
     }
 
     {
-        let canonic = xml_canonic_path(filename as _);
-        if !canonic.is_null() {
-            (*input_stream).filename = Some(
-                CStr::from_ptr(canonic as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(canonic as _);
-        }
+        let canonic = canonic_path(filename);
+        (*input_stream).filename = Some(canonic.into_owned());
     }
     std::ptr::write(
         &raw mut (*input_stream).buf,
@@ -3467,7 +3436,8 @@ pub unsafe fn xml_parse_catalog_file(filename: *const c_char) -> XmlDocPtr {
 
     (*ctxt).input_push(input_stream);
     if (*ctxt).directory.is_none() {
-        directory = xml_parser_get_directory(filename);
+        let filename = CString::new(filename).unwrap();
+        directory = xml_parser_get_directory(filename.as_ptr());
     }
     if (*ctxt).directory.is_none() && !directory.is_null() {
         (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
@@ -4395,38 +4365,6 @@ mod tests {
                 des_const_char_ptr(n_pathss, pathss, 0);
                 reset_last_error();
             }
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_parse_catalog_file() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_parse_catalog_file(filename);
-                desret_xml_doc_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParseCatalogFile",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_filename);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParseCatalogFile()"
-            );
         }
         drop(lock);
     }
