@@ -900,14 +900,9 @@ unsafe fn xml_parse_sgml_catalog(
 ///
 /// Returns the catalog parsed or null_mut() in case of error
 #[doc(alias = "xmlLoadACatalog")]
-pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
-    if filename.is_null() {
-        return null_mut();
-    }
-
-    let Some(mut content) =
-        xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
-    else {
+pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
+    let filename = filename.as_ref();
+    let Some(mut content) = xml_load_file_content(filename) else {
         return null_mut();
     };
     // workaround for non NULL-terminated contents
@@ -931,7 +926,8 @@ pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
         if catal.is_null() {
             return null_mut();
         }
-        let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename, 0);
+        let filename = CString::new(filename.to_string_lossy().as_ref()).unwrap();
+        let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename.as_ptr(), 0);
         if ret < 0 {
             xml_free_catalog(catal);
             return null_mut();
@@ -945,11 +941,12 @@ pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
         if catal.is_null() {
             return null_mut();
         }
+        let filename = CString::new(filename.to_string_lossy().as_ref()).unwrap();
         (*catal).xml = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
             null_mut(),
             null_mut(),
-            filename as _,
+            filename.as_ptr() as *const u8,
             XML_CATALOG_DEFAULT_PREFER,
             null_mut(),
         );
@@ -3347,7 +3344,11 @@ pub unsafe fn xml_load_catalog(filename: *const c_char) -> i32 {
 
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if default_catalog.is_null() {
-        catal = xml_load_a_catalog(filename);
+        catal = if !filename.is_null() {
+            xml_load_a_catalog(CStr::from_ptr(filename).to_string_lossy().as_ref())
+        } else {
+            null_mut()
+        };
         if catal.is_null() {
             xml_rmutex_unlock(mutex);
             return -1;
