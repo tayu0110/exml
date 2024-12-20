@@ -36,15 +36,18 @@ use std::io::Write;
 use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, transmute, zeroed},
+    fs::File,
+    io::Read,
+    mem::{size_of, transmute},
     os::raw::c_void,
+    path::Path,
     ptr::{null, null_mut},
     rc::Rc,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
 use const_format::concatcp;
-use libc::{close, getenv, open, read, snprintf, stat, O_RDONLY};
+use libc::{getenv, snprintf};
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -292,39 +295,17 @@ pub unsafe fn xml_new_catalog(sgml: bool) -> XmlCatalogPtr {
 
 /// Load a file content into memory.
 ///
-/// Returns a pointer to the 0 terminated string or null_mut() in case of error
+/// Return the content buffer.  
+/// If it is failed to get contents, return `None`.
 #[doc(alias = "xmlLoadFileContent")]
-unsafe fn xml_load_file_content(filename: *const c_char) -> *mut XmlChar {
-    let mut info: stat = unsafe { zeroed() };
-
-    if filename.is_null() {
-        return null_mut();
+fn xml_load_file_content(filename: impl AsRef<Path>) -> Option<Vec<u8>> {
+    fn _load_file_content(filename: &Path) -> Option<Vec<u8>> {
+        let mut file = File::open(filename).ok()?;
+        let mut buf = vec![];
+        file.read_to_end(&mut buf).ok()?;
+        Some(buf)
     }
-
-    if stat(filename, &raw mut info) < 0 {
-        return null_mut();
-    }
-
-    let fd: i32 = open(filename, O_RDONLY);
-    if fd < 0 {
-        return null_mut();
-    }
-    let size: i64 = info.st_size;
-    let content: *mut XmlChar = xml_malloc_atomic(size as usize + 10) as _;
-    if content.is_null() {
-        xml_catalog_err_memory("allocating catalog data");
-        close(fd);
-        return null_mut();
-    }
-    let len: i32 = read(fd, content as _, size as _) as _;
-    close(fd);
-    if len < 0 {
-        xml_free(content as _);
-        return null_mut();
-    }
-    *content.add(len as usize) = 0;
-
-    content
+    _load_file_content(filename.as_ref())
 }
 
 macro_rules! RAW {
@@ -648,24 +629,23 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlExpandCatalog")]
 unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i32 {
-    let ret: i32;
-
     if catal.is_null() || filename.is_null() {
         return -1;
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlSGMLCatalogType) {
-        let content: *mut XmlChar = xml_load_file_content(filename);
-        if content.is_null() {
+        let Some(mut content) =
+            xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
+        else {
             return -1;
-        }
+        };
 
-        ret = xml_parse_sgml_catalog(catal, content, filename, 0);
+        // workaround for non NULL-terminated contents
+        content.push(0);
+        let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename, 0);
         if ret < 0 {
-            xml_free(content as _);
             return -1;
         }
-        xml_free(content as _);
     } else {
         let mut cur: XmlCatalogEntryPtr;
         let tmp: XmlCatalogEntryPtr = xml_new_catalog_entry(
@@ -925,16 +905,19 @@ unsafe fn xml_parse_sgml_catalog(
 /// Returns the catalog parsed or null_mut() in case of error
 #[doc(alias = "xmlLoadACatalog")]
 pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
-    let mut first: *mut XmlChar;
-    let catal: XmlCatalogPtr;
-    let ret: i32;
-
-    let content: *mut XmlChar = xml_load_file_content(filename);
-    if content.is_null() {
+    if filename.is_null() {
         return null_mut();
     }
 
-    first = content;
+    let Some(mut content) =
+        xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
+    else {
+        return null_mut();
+    };
+    // workaround for non NULL-terminated contents
+    content.push(0);
+
+    let mut first = content.as_ptr();
 
     while *first != 0
         && *first != b'-'
@@ -945,27 +928,25 @@ pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
     }
 
     if *first != b'<' {
-        catal = xml_create_new_catalog(
+        let catal = xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
         );
         if catal.is_null() {
-            xml_free(content as _);
             return null_mut();
         }
-        ret = xml_parse_sgml_catalog(catal, content, filename, 0);
+        let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename, 0);
         if ret < 0 {
             xml_free_catalog(catal);
-            xml_free(content as _);
             return null_mut();
         }
+        catal
     } else {
-        catal = xml_create_new_catalog(
+        let catal = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
         );
         if catal.is_null() {
-            xml_free(content as _);
             return null_mut();
         }
         (*catal).xml = xml_new_catalog_entry(
@@ -976,9 +957,8 @@ pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
             XML_CATALOG_DEFAULT_PREFER,
             null_mut(),
         );
+        catal
     }
-    xml_free(content as _);
-    catal
 }
 
 /// Load an SGML super catalog. It won't expand CATALOG or DELEGATE references.  
@@ -988,22 +968,26 @@ pub unsafe fn xml_load_a_catalog(filename: *const c_char) -> XmlCatalogPtr {
 /// Returns the catalog parsed or null_mut() in case of error
 #[doc(alias = "xmlLoadSGMLSuperCatalog")]
 pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalogPtr {
-    let content: *mut XmlChar = xml_load_file_content(filename);
-    if content.is_null() {
+    if filename.is_null() {
         return null_mut();
     }
+    let Some(mut content) =
+        xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
+    else {
+        return null_mut();
+    };
+    // workaround for non NULL-terminated contents
+    content.push(0);
 
     let catal: XmlCatalogPtr = xml_create_new_catalog(
         XmlCatalogType::XmlSGMLCatalogType,
         XML_CATALOG_DEFAULT_PREFER,
     );
     if catal.is_null() {
-        xml_free(content as _);
         return null_mut();
     }
 
-    let ret: i32 = xml_parse_sgml_catalog(catal, content, filename, 1);
-    xml_free(content as _);
+    let ret = xml_parse_sgml_catalog(catal, content.as_ptr(), filename, 1);
     if ret < 0 {
         xml_free_catalog(catal);
         return null_mut();
