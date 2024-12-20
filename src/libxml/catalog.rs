@@ -1712,7 +1712,7 @@ pub unsafe fn xml_a_catalog_add(
 ///
 /// Returns the number of entries removed if successful, -1 otherwise
 #[doc(alias = "xmlDelXMLCatalog")]
-unsafe fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *const XmlChar) -> i32 {
+unsafe fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: &str) -> i32 {
     let mut cur: XmlCatalogEntryPtr;
     let ret: i32 = 0;
 
@@ -1724,9 +1724,6 @@ unsafe fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *const XmlChar) 
     {
         return -1;
     }
-    if value.is_null() {
-        return -1;
-    }
     if (*catal).children.is_null() {
         xml_fetch_xml_catalog_file(catal);
     }
@@ -1734,13 +1731,11 @@ unsafe fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *const XmlChar) 
     // Scan the children
     cur = (*catal).children;
     while !cur.is_null() {
-        if ((*cur).name.is_some()
-            && Some(
-                CStr::from_ptr(value as *const i8)
+        if ((*cur).name.is_some() && Some(value) == (*cur).name.as_deref())
+            || value
+                == CStr::from_ptr((*cur).value as *const i8)
                     .to_string_lossy()
-                    .as_ref(),
-            ) == (*cur).name.as_deref())
-            || xml_str_equal(value, (*cur).value)
+                    .as_ref()
         {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 if let Some(name) = (*cur).name.as_deref() {
@@ -1763,18 +1758,14 @@ unsafe fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *const XmlChar) 
 ///
 /// Returns the number of entries removed if successful, -1 otherwise
 #[doc(alias = "xmlACatalogRemove")]
-pub unsafe fn xml_a_catalog_remove(catal: XmlCatalogPtr, value: *const XmlChar) -> i32 {
-    if catal.is_null() || value.is_null() {
+pub unsafe fn xml_a_catalog_remove(catal: XmlCatalogPtr, value: &str) -> i32 {
+    if catal.is_null() {
         return -1;
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlXMLCatalogType) {
         xml_del_xml_catalog((*catal).xml, value)
-    } else if let Some(removed) = (*catal).sgml.remove(
-        CStr::from_ptr(value as *const i8)
-            .to_string_lossy()
-            .as_ref(),
-    ) {
+    } else if let Some(removed) = (*catal).sgml.remove(value) {
         xml_free_catalog_entry(removed);
         1
     } else {
@@ -3436,7 +3427,7 @@ pub unsafe fn xml_catalog_add(
 ///
 /// Returns the number of entries removed if successful, -1 otherwise
 #[doc(alias = "xmlCatalogRemove")]
-pub unsafe fn xml_catalog_remove(value: *const XmlChar) -> i32 {
+pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3922,40 +3913,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_acatalog_remove() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_catal in 0..GEN_NB_XML_CATALOG_PTR {
-                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let catal = gen_xml_catalog_ptr(n_catal, 0);
-                    let value = gen_const_xml_char_ptr(n_value, 1);
-
-                    let ret_val = xml_a_catalog_remove(catal, value);
-                    desret_int(ret_val);
-                    des_xml_catalog_ptr(n_catal, catal, 0);
-                    des_const_xml_char_ptr(n_value, value, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlACatalogRemove",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_catal);
-                        eprintln!(" {}", n_value);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlACatalogRemove()");
-        }
-        drop(lock);
-    }
-
-    #[test]
     fn test_xml_acatalog_resolve() {
         let lock = TEST_CATALOG_LOCK.lock().unwrap();
         #[cfg(feature = "catalog")]
@@ -4210,23 +4167,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogIsEmpty()");
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_catalog_remove() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let value = gen_const_xml_char_ptr(n_value, 0);
-
-                let ret_val = xml_catalog_remove(value as *const XmlChar);
-                desret_int(ret_val);
-                des_const_xml_char_ptr(n_value, value, 0);
-                reset_last_error();
-            }
         }
         drop(lock);
     }
