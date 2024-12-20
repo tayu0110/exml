@@ -449,6 +449,25 @@ impl XmlDebugCtxt<'_> {
         // Do a bit of checking
         self.generic_node_check(dtd);
     }
+
+    /// Dumps debug information for the DTD
+    #[doc(alias = "xmlCtxtDumpDTD")]
+    unsafe fn dump_dtd(&mut self, dtd: Option<&XmlDtd>) {
+        let Some(dtd) = dtd else {
+            if self.check == 0 {
+                writeln!(self.output, "DTD is NULL");
+            }
+            return;
+        };
+        self.dump_dtd_node(Some(dtd));
+        if let Some(children) = dtd.children() {
+            self.depth += 1;
+            xml_ctxt_dump_node_list(self, children.as_ptr());
+            self.depth -= 1;
+        } else {
+            writeln!(self.output, "    DTD is empty");
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -559,25 +578,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-/// Dumps debug information for the DTD
-#[doc(alias = "xmlCtxtDumpDTD")]
-unsafe fn xml_ctxt_dump_dtd(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
-    let Some(dtd) = dtd else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "DTD is NULL");
-        }
-        return;
-    };
-    (*ctxt).dump_dtd_node(Some(dtd));
-    if let Some(children) = dtd.children() {
-        (*ctxt).depth += 1;
-        xml_ctxt_dump_node_list(ctxt, children.as_ptr());
-        (*ctxt).depth -= 1;
-    } else {
-        writeln!((*ctxt).output, "    DTD is empty");
-    }
 }
 
 #[doc(alias = "xmlCtxtDumpElemDecl")]
@@ -1522,7 +1522,7 @@ pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: Option<&XmlDtd
 
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    xml_ctxt_dump_dtd(addr_of_mut!(ctxt), dtd);
+    ctxt.dump_dtd(dtd);
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
