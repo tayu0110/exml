@@ -272,24 +272,22 @@ unsafe fn xml_create_new_catalog(typ: XmlCatalogType, prefer: XmlCatalogPrefer) 
 ///
 /// Returns the xmlCatalogPtr or null_mut() in case of error
 #[doc(alias = "xmlNewCatalog")]
-pub unsafe fn xml_new_catalog(sgml: i32) -> XmlCatalogPtr {
-    let catal: XmlCatalogPtr;
-
-    if sgml != 0 {
-        catal = xml_create_new_catalog(
+pub unsafe fn xml_new_catalog(sgml: bool) -> XmlCatalogPtr {
+    if sgml {
+        let catal = xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
         );
         if !catal.is_null() && (*catal).sgml.is_null() {
             (*catal).sgml = xml_hash_create(10);
         }
+        catal
     } else {
-        catal = xml_create_new_catalog(
+        xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
-        );
+        )
     }
-    catal
 }
 
 /// Load a file content into memory.
