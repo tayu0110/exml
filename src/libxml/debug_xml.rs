@@ -1154,6 +1154,109 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpDocHead")]
+    unsafe fn dump_doc_head(&mut self, doc: &XmlDoc) {
+        self.node = doc as *const XmlDoc as XmlNodePtr;
+
+        match doc.typ {
+            XmlElementType::XmlElementNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundElement,
+                    "Misplaced ELEMENT node\n",
+                );
+            }
+            XmlElementType::XmlAttributeNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundAttribute,
+                    "Misplaced ATTRIBUTE node\n",
+                );
+            }
+            XmlElementType::XmlTextNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundText,
+                    "Misplaced TEXT node\n",
+                );
+            }
+            XmlElementType::XmlCDATASectionNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundCDATA,
+                    "Misplaced CDATA node\n",
+                );
+            }
+            XmlElementType::XmlEntityRefNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundEntityRef,
+                    "Misplaced ENTITYREF node\n",
+                );
+            }
+            XmlElementType::XmlEntityNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundEntity,
+                    "Misplaced ENTITY node\n",
+                );
+            }
+            XmlElementType::XmlPINode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundPI,
+                    "Misplaced PI node\n",
+                );
+            }
+            XmlElementType::XmlCommentNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundComment,
+                    "Misplaced COMMENT node\n",
+                );
+            }
+            XmlElementType::XmlDocumentNode => {
+                if self.check == 0 {
+                    writeln!(self.output, "DOCUMENT");
+                }
+            }
+            XmlElementType::XmlHTMLDocumentNode => {
+                if self.check == 0 {
+                    writeln!(self.output, "HTML DOCUMENT");
+                }
+            }
+            XmlElementType::XmlDocumentTypeNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundDoctype,
+                    "Misplaced DOCTYPE node\n",
+                );
+            }
+            XmlElementType::XmlDocumentFragNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundFragment,
+                    "Misplaced FRAGMENT node\n",
+                );
+            }
+            XmlElementType::XmlNotationNode => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckFoundNotation,
+                    "Misplaced NOTATION node\n",
+                );
+            }
+            _ => {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckUnknownNode,
+                    "Unknown node type {}\n",
+                    doc.element_type() as i32
+                );
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -1294,8 +1397,8 @@ pub unsafe fn xml_debug_dump_attr_list<'a>(
 
 /// Dumps debug information for the element node, it is not recursive
 #[doc(alias = "xmlDebugDumpOneNode")]
-pub unsafe fn xml_debug_dump_one_node(
-    output: &mut impl Write,
+pub unsafe fn xml_debug_dump_one_node<'a>(
+    output: &mut (impl Write + 'a),
     node: Option<&impl NodeCommon>,
     depth: i32,
 ) {
@@ -1337,114 +1440,11 @@ pub unsafe fn xml_debug_dump_node_list(
     ctxt.dump_node_list(node);
 }
 
-#[doc(alias = "xmlCtxtDumpDocHead")]
-unsafe fn xml_ctxt_dump_doc_head(ctxt: XmlDebugCtxtPtr, doc: &XmlDoc) {
-    (*ctxt).node = doc as *const XmlDoc as XmlNodePtr;
-
-    match doc.typ {
-        XmlElementType::XmlElementNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundElement,
-                "Misplaced ELEMENT node\n",
-            );
-        }
-        XmlElementType::XmlAttributeNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundAttribute,
-                "Misplaced ATTRIBUTE node\n",
-            );
-        }
-        XmlElementType::XmlTextNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundText,
-                "Misplaced TEXT node\n",
-            );
-        }
-        XmlElementType::XmlCDATASectionNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundCDATA,
-                "Misplaced CDATA node\n",
-            );
-        }
-        XmlElementType::XmlEntityRefNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundEntityRef,
-                "Misplaced ENTITYREF node\n",
-            );
-        }
-        XmlElementType::XmlEntityNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundEntity,
-                "Misplaced ENTITY node\n",
-            );
-        }
-        XmlElementType::XmlPINode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundPI,
-                "Misplaced PI node\n",
-            );
-        }
-        XmlElementType::XmlCommentNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundComment,
-                "Misplaced COMMENT node\n",
-            );
-        }
-        XmlElementType::XmlDocumentNode => {
-            if (*ctxt).check == 0 {
-                writeln!((*ctxt).output, "DOCUMENT");
-            }
-        }
-        XmlElementType::XmlHTMLDocumentNode => {
-            if (*ctxt).check == 0 {
-                writeln!((*ctxt).output, "HTML DOCUMENT");
-            }
-        }
-        XmlElementType::XmlDocumentTypeNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundDoctype,
-                "Misplaced DOCTYPE node\n",
-            );
-        }
-        XmlElementType::XmlDocumentFragNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundFragment,
-                "Misplaced FRAGMENT node\n",
-            );
-        }
-        XmlElementType::XmlNotationNode => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckFoundNotation,
-                "Misplaced NOTATION node\n",
-            );
-        }
-        _ => {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckUnknownNode,
-                "Unknown node type {}\n",
-                doc.element_type() as i32
-            );
-        }
-    }
-}
-
 /// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlCtxtDumpDocumentHead")]
 unsafe fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
     if let Some(doc) = doc {
-        xml_ctxt_dump_doc_head(ctxt, doc);
+        (*ctxt).dump_doc_head(doc);
         if (*ctxt).check == 0 {
             if let Some(name) = doc.name() {
                 write!((*ctxt).output, "name=");
@@ -1598,7 +1598,7 @@ fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtxtPtr) {
 #[doc(alias = "xmlCtxtDumpEntities")]
 unsafe fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
     if let Some(doc) = doc {
-        xml_ctxt_dump_doc_head(ctxt, doc);
+        (*ctxt).dump_doc_head(doc);
         if !doc.int_subset.is_null() {
             if let Some(table) = (*doc.int_subset).entities {
                 if (*ctxt).check == 0 {
