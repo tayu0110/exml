@@ -182,6 +182,41 @@ impl XmlDebugCtxt<'_> {
             );
         }
     }
+
+    /// Do debugging on the name, for example the dictionary status and
+    /// conformance to the Name production.
+    #[doc(alias = "xmlCtxtCheckName")]
+    unsafe fn check_name(&mut self, name: Option<&str>) {
+        if self.check != 0 {
+            let Some(name) = name else {
+                xml_debug_err!(self, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
+                return;
+            };
+            let cname = CString::new(name).unwrap();
+            #[cfg(any(feature = "libxml_tree", feature = "schema"))]
+            if xml_validate_name(cname.as_ptr() as *const u8, 0) != 0 {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNotNCName,
+                    "Name is not an NCName '{name}'",
+                );
+            }
+            if !self.dict.is_null()
+                && xml_dict_owns(self.dict, cname.as_ptr() as *const u8) == 0
+                && (self.doc.is_null()
+                    || (*self.doc).parse_flags
+                        & (XmlParserOption::XmlParseSax1 as i32
+                            | XmlParserOption::XmlParseNodict as i32)
+                        == 0)
+            {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckOutsideDict,
+                    "Name is not from the document dictionary '{name}'",
+                );
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -292,41 +327,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-/// Do debugging on the name, for example the dictionary status and
-/// conformance to the Name production.
-#[doc(alias = "xmlCtxtCheckName")]
-unsafe fn xml_ctxt_check_name(ctxt: XmlDebugCtxtPtr, name: Option<&str>) {
-    if (*ctxt).check != 0 {
-        let Some(name) = name else {
-            xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNoName, "Name is NULL",);
-            return;
-        };
-        let cname = CString::new(name).unwrap();
-        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-        if xml_validate_name(cname.as_ptr() as *const u8, 0) != 0 {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNotNCName,
-                "Name is not an NCName '{name}'",
-            );
-        }
-        if !(*ctxt).dict.is_null()
-            && xml_dict_owns((*ctxt).dict, cname.as_ptr() as *const u8) == 0
-            && ((*ctxt).doc.is_null()
-                || (*(*ctxt).doc).parse_flags
-                    & (XmlParserOption::XmlParseSax1 as i32
-                        | XmlParserOption::XmlParseNodict as i32)
-                    == 0)
-        {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckOutsideDict,
-                "Name is not from the document dictionary '{name}'",
-            );
-        }
-    }
 }
 
 #[doc(alias = "xmlCtxtGenericNodeCheck")]
@@ -463,7 +463,7 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
     }
     match (*node).element_type() {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            xml_ctxt_check_name(ctxt, node.name().as_deref());
+            (*ctxt).check_name(node.name().as_deref());
         }
         XmlElementType::XmlTextNode => {
             if node.name().map_or(null(), |n| n.as_ptr()) == XML_STRING_TEXT.as_ptr() as _
@@ -500,7 +500,7 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
             }
         }
         XmlElementType::XmlPINode => {
-            xml_ctxt_check_name(ctxt, node.name().as_deref());
+            (*ctxt).check_name(node.name().as_deref());
         }
         XmlElementType::XmlCDATASectionNode => {
             if let Some(name) = node.name() {
