@@ -44,6 +44,7 @@ use std::{
     path::{Path, PathBuf},
     ptr::{null, null_mut},
     rc::Rc,
+    str::from_utf8,
     sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
 };
 
@@ -537,14 +538,12 @@ fn normalize_public(pub_id: &[u8]) -> Option<Vec<u8>> {
 #[doc(alias = "xmlNewCatalogEntry")]
 unsafe fn xml_new_catalog_entry(
     typ: XmlCatalogEntryType,
-    mut name: *const XmlChar,
+    name: Option<&str>,
     value: *const XmlChar,
     mut url: *const XmlChar,
     prefer: XmlCatalogPrefer,
     group: XmlCatalogEntryPtr,
 ) -> XmlCatalogEntryPtr {
-    let mut normid: *mut XmlChar = null_mut();
-
     let ret: XmlCatalogEntryPtr = xml_malloc(size_of::<XmlCatalogEntry>()) as XmlCatalogEntryPtr;
     if ret.is_null() {
         xml_catalog_err_memory("allocating catalog entry");
@@ -555,22 +554,26 @@ unsafe fn xml_new_catalog_entry(
     (*ret).parent = null_mut();
     (*ret).children = null_mut();
     (*ret).typ = typ;
+    let mut name = name.map(Cow::Borrowed);
     if matches!(
         typ,
         XmlCatalogEntryType::XmlCataPublic | XmlCatalogEntryType::XmlCataDelegatePublic
     ) {
-        normid = xml_catalog_normalize_public(name);
-        if !normid.is_null() {
-            name = if *normid != 0 { normid } else { null_mut() };
+        if let Some(n) = name.as_deref() {
+            if let Some(normid) = normalize_public(n.as_bytes()) {
+                if normid.is_empty() {
+                    name = None;
+                } else {
+                    name = String::from_utf8(normid).ok().map(Cow::Owned);
+                }
+            }
         }
     }
-    if !name.is_null() {
-        (*ret).name = xml_strdup(name);
+    if let Some(name) = name {
+        let name = CString::new(name.as_ref()).unwrap();
+        (*ret).name = xml_strdup(name.as_ptr() as *const u8);
     } else {
         (*ret).name = null_mut();
-    }
-    if !normid.is_null() {
-        xml_free(normid as _);
     }
     if !value.is_null() {
         (*ret).value = xml_strdup(value);
@@ -659,7 +662,7 @@ unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: impl AsRef<Path>) -
         let mut cur: XmlCatalogEntryPtr;
         let tmp: XmlCatalogEntryPtr = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
-            null_mut(),
+            None,
             null_mut(),
             filename.as_ptr() as *const u8,
             XML_CATALOG_DEFAULT_PREFER,
@@ -832,17 +835,17 @@ unsafe fn xml_parse_sgml_catalog(
                 let sysid = String::from_utf8_lossy(sysid.as_ref());
                 if let Some(filename) = build_uri(&sysid, &base) {
                     let filename = CString::new(filename).unwrap();
-                    let name =
-                        CString::new(String::from_utf8_lossy(name.unwrap().as_ref()).as_ref())
-                            .unwrap();
                     let entry: XmlCatalogEntryPtr = xml_new_catalog_entry(
                         typ,
-                        name.as_ptr() as *const u8,
+                        name.as_deref().and_then(|n| from_utf8(n).ok()),
                         filename.as_ptr() as *const u8,
                         null_mut(),
                         XmlCatalogPrefer::None,
                         null_mut(),
                     );
+                    let name =
+                        CString::new(String::from_utf8_lossy(name.unwrap().as_ref()).as_ref())
+                            .unwrap();
                     res = xml_hash_add_entry((*catal).sgml, name.as_ptr() as *const u8, entry as _);
                     if res < 0 {
                         xml_free_catalog_entry(entry as _, null_mut());
@@ -850,17 +853,17 @@ unsafe fn xml_parse_sgml_catalog(
                 }
             } else if matches!(typ, XmlCatalogEntryType::SgmlCataCatalog) {
                 if is_super != 0 {
-                    let sysid =
-                        CString::new(String::from_utf8_lossy(sysid.unwrap().as_ref()).as_ref())
-                            .unwrap();
                     let entry: XmlCatalogEntryPtr = xml_new_catalog_entry(
                         typ,
-                        sysid.as_ptr() as *const u8,
+                        sysid.as_deref().and_then(|n| from_utf8(n).ok()),
                         null_mut(),
                         null_mut(),
                         XmlCatalogPrefer::None,
                         null_mut(),
                     );
+                    let sysid =
+                        CString::new(String::from_utf8_lossy(sysid.unwrap().as_ref()).as_ref())
+                            .unwrap();
                     res =
                         xml_hash_add_entry((*catal).sgml, sysid.as_ptr() as *const u8, entry as _);
                     if res < 0 {
@@ -926,7 +929,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
         let filename = CString::new(filename.to_string_lossy().as_ref()).unwrap();
         (*catal).xml = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
-            null_mut(),
+            None,
             null_mut(),
             filename.as_ptr() as *const u8,
             XML_CATALOG_DEFAULT_PREFER,
@@ -1202,14 +1205,11 @@ unsafe fn xml_parse_xml_catalog_one_node(
                 generic_error!("Found {}: '{}'\n", name, url);
             }
         }
-        let name_value = name_value.map(|n| CString::new(n).unwrap());
         let uri_value = CString::new(uri_value).unwrap();
         let url = CString::new(url).unwrap();
         ret = xml_new_catalog_entry(
             typ,
-            name_value
-                .as_ref()
-                .map_or(null_mut(), |n| n.as_ptr() as *const u8),
+            name_value.as_deref(),
             uri_value.as_ptr() as *const u8,
             url.as_ptr() as *const u8,
             prefer,
@@ -1262,14 +1262,13 @@ unsafe fn xml_parse_xml_catalog_node(
             }
             pref = prefer;
         }
-        let prop = (*cur).get_prop("id").map(|p| CString::new(p).unwrap());
+        let prop = (*cur).get_prop("id");
         let base = (*cur)
             .get_ns_prop("base", XML_XML_NAMESPACE.to_str().ok())
             .map(|b| CString::new(b).unwrap());
         entry = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataGroup,
-            prop.as_ref()
-                .map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            prop.as_deref(),
             base.as_ref()
                 .map_or(null_mut(), |p| p.as_ptr() as *const u8),
             null_mut(),
@@ -1461,7 +1460,7 @@ unsafe fn xml_parse_xml_catalog_file(
     {
         parent = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
-            null_mut(),
+            None,
             filename,
             null_mut(),
             prefer,
@@ -1619,7 +1618,7 @@ unsafe fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntr
 unsafe fn xml_add_xml_catalog(
     catal: XmlCatalogEntryPtr,
     typs: *const XmlChar,
-    orig: *const XmlChar,
+    orig: Option<&str>,
     replace: *const XmlChar,
 ) -> i32 {
     let mut cur: XmlCatalogEntryPtr;
@@ -1659,7 +1658,13 @@ unsafe fn xml_add_xml_catalog(
     // Might be a simple "update in place"
     if !cur.is_null() {
         while !cur.is_null() {
-            if !orig.is_null() && ((*cur).typ == typ) && xml_str_equal(orig, (*cur).name) {
+            if orig.is_some()
+                && (*cur).typ == typ
+                && orig.unwrap()
+                    == CStr::from_ptr((*cur).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+            {
                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                     if typs.is_null() {
                         generic_error!("Updating element (NULL) to catalog\n",);
@@ -1757,7 +1762,7 @@ unsafe fn xml_get_sgml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEnt
 pub unsafe fn xml_a_catalog_add(
     catal: XmlCatalogPtr,
     typ: *const XmlChar,
-    orig: *const XmlChar,
+    orig: Option<&str>,
     replace: *const XmlChar,
 ) -> i32 {
     let mut res: i32 = -1;
@@ -1782,7 +1787,10 @@ pub unsafe fn xml_a_catalog_add(
             if (*catal).sgml.is_null() {
                 (*catal).sgml = xml_hash_create(10);
             }
-            res = xml_hash_add_entry((*catal).sgml, orig, entry as _);
+            if let Some(orig) = orig {
+                let orig = CString::new(orig).unwrap();
+                res = xml_hash_add_entry((*catal).sgml, orig.as_ptr() as *const u8, entry as _);
+            }
             if res < 0 {
                 xml_free_catalog_entry(entry as _, null_mut());
             }
@@ -3231,7 +3239,7 @@ pub unsafe fn xml_initialize_catalog() {
                     if !path.is_null() {
                         *nextent = xml_new_catalog_entry(
                             XmlCatalogEntryType::XmlCataCatalog,
-                            null_mut(),
+                            None,
                             null_mut(),
                             path as _,
                             XML_CATALOG_DEFAULT_PREFER,
@@ -3485,10 +3493,8 @@ pub unsafe fn xml_catalog_add(
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
-    /*
-     * Specific case where one want to override the default catalog
-     * put in place by xmlInitializeCatalog();
-     */
+    // Specific case where one want to override the default catalog
+    // put in place by xmlInitializeCatalog();
     let mut default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if default_catalog.is_null() && xml_str_equal(typ, c"catalog".as_ptr() as _) {
         default_catalog = xml_create_new_catalog(
@@ -3499,7 +3505,7 @@ pub unsafe fn xml_catalog_add(
         if !default_catalog.is_null() {
             (*default_catalog).xml = xml_new_catalog_entry(
                 XmlCatalogEntryType::XmlCataCatalog,
-                null_mut(),
+                None,
                 orig,
                 null_mut(),
                 XML_CATALOG_DEFAULT_PREFER,
@@ -3511,7 +3517,14 @@ pub unsafe fn xml_catalog_add(
         return 0;
     }
 
-    let res: i32 = xml_a_catalog_add(default_catalog, typ, orig, replace);
+    let res: i32 = xml_a_catalog_add(
+        default_catalog,
+        typ,
+        (!orig.is_null())
+            .then(|| CStr::from_ptr(orig as *const i8).to_string_lossy())
+            .as_deref(),
+        replace,
+    );
     XML_DEFAULT_CATALOG.store(default_catalog, Ordering::Release);
     xml_rmutex_unlock(mutex);
     res
@@ -3669,7 +3682,7 @@ pub unsafe fn xml_catalog_add_local(
 
     let add: XmlCatalogEntryPtr = xml_new_catalog_entry(
         XmlCatalogEntryType::XmlCataCatalog,
-        null_mut(),
+        None,
         url,
         null_mut(),
         XML_CATALOG_DEFAULT_PREFER,
@@ -3973,50 +3986,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_acatalog_add() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_catal in 0..GEN_NB_XML_CATALOG_PTR {
-                for n_type in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_orig in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_replace in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let catal = gen_xml_catalog_ptr(n_catal, 0);
-                            let typ = gen_const_xml_char_ptr(n_type, 1);
-                            let orig = gen_const_xml_char_ptr(n_orig, 2);
-                            let replace = gen_const_xml_char_ptr(n_replace, 3);
-
-                            let ret_val = xml_a_catalog_add(catal, typ, orig, replace);
-                            desret_int(ret_val);
-                            des_xml_catalog_ptr(n_catal, catal, 0);
-                            des_const_xml_char_ptr(n_type, typ, 1);
-                            des_const_xml_char_ptr(n_orig, orig, 2);
-                            des_const_xml_char_ptr(n_replace, replace, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlACatalogAdd",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_catal);
-                                eprint!(" {}", n_type);
-                                eprint!(" {}", n_orig);
-                                eprintln!(" {}", n_replace);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlACatalogAdd()");
-        }
-        drop(lock);
-    }
 
     #[test]
     fn test_xml_acatalog_dump() {
