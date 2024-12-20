@@ -639,34 +639,29 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
 ///
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlExpandCatalog")]
-unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i32 {
-    if catal.is_null() || filename.is_null() {
+unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: impl AsRef<Path>) -> i32 {
+    if catal.is_null() {
         return -1;
     }
+    let filename = filename.as_ref();
 
     if matches!((*catal).typ, XmlCatalogType::XmlSGMLCatalogType) {
-        let Some(content) =
-            xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
-        else {
+        let Some(content) = xml_load_file_content(filename) else {
             return -1;
         };
 
-        let ret = xml_parse_sgml_catalog(
-            catal,
-            &content,
-            CStr::from_ptr(filename).to_string_lossy().as_ref(),
-            0,
-        );
+        let ret = xml_parse_sgml_catalog(catal, &content, filename, 0);
         if ret < 0 {
             return -1;
         }
     } else {
+        let filename = CString::new(filename.to_string_lossy().as_ref()).unwrap();
         let mut cur: XmlCatalogEntryPtr;
         let tmp: XmlCatalogEntryPtr = xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
             null_mut(),
             null_mut(),
-            filename as _,
+            filename.as_ptr() as *const u8,
             XML_CATALOG_DEFAULT_PREFER,
             null_mut(),
         );
@@ -874,8 +869,7 @@ unsafe fn xml_parse_sgml_catalog(
                 } else if let Some(sysid) = sysid {
                     let sysid = String::from_utf8_lossy(&sysid);
                     if let Some(filename) = build_uri(&sysid, &base) {
-                        let filename = CString::new(filename).unwrap();
-                        xml_expand_catalog(catal, filename.as_ptr());
+                        xml_expand_catalog(catal, filename);
                     }
                 }
             }
@@ -3321,6 +3315,10 @@ pub unsafe fn xml_load_catalog(filename: *const c_char) -> i32 {
         xml_initialize_catalog_data();
     }
 
+    if filename.is_null() {
+        return -1;
+    }
+
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
 
@@ -3341,7 +3339,10 @@ pub unsafe fn xml_load_catalog(filename: *const c_char) -> i32 {
         return 0;
     }
 
-    let ret: i32 = xml_expand_catalog(default_catalog, filename);
+    let ret: i32 = xml_expand_catalog(
+        default_catalog,
+        CStr::from_ptr(filename).to_string_lossy().as_ref(),
+    );
     xml_rmutex_unlock(mutex);
     ret
 }
