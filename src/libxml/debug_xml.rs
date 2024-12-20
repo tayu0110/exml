@@ -170,6 +170,18 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    /// Do debugging on the string, currently it just checks the UTF-8 content
+    #[doc(alias = "xmlCtxtCheckString")]
+    unsafe fn check_string(&mut self, s: &str) {
+        if self.check != 0 {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotUTF8,
+                "String is not UTF-8 {s}",
+            );
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -280,18 +292,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-/// Do debugging on the string, currently it just checks the UTF-8 content
-#[doc(alias = "xmlCtxtCheckString")]
-unsafe fn xml_ctxt_check_string(ctxt: XmlDebugCtxtPtr, s: &str) {
-    if (*ctxt).check != 0 {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNotUTF8,
-            "String is not UTF-8 {s}",
-        );
-    }
 }
 
 /// Do debugging on the name, for example the dictionary status and
@@ -459,10 +459,7 @@ unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCom
     ) && !node.as_node().unwrap().as_ref().content.is_null()
     {
         let content = node.as_node().unwrap().as_ref().content;
-        xml_ctxt_check_string(
-            ctxt,
-            &CStr::from_ptr(content as *const i8).to_string_lossy(),
-        );
+        (*ctxt).check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
     }
     match (*node).element_type() {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
