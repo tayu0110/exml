@@ -651,7 +651,12 @@ unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i
             return -1;
         };
 
-        let ret = xml_parse_sgml_catalog(catal, &content, filename, 0);
+        let ret = xml_parse_sgml_catalog(
+            catal,
+            &content,
+            CStr::from_ptr(filename).to_string_lossy().as_ref(),
+            0,
+        );
         if ret < 0 {
             return -1;
         }
@@ -687,16 +692,13 @@ unsafe fn xml_expand_catalog(catal: XmlCatalogPtr, filename: *const c_char) -> i
 unsafe fn xml_parse_sgml_catalog(
     catal: XmlCatalogPtr,
     value: &[u8],
-    file: *const c_char,
+    file: impl AsRef<Path>,
     is_super: i32,
 ) -> i32 {
     let mut cur = value;
     let mut res: i32;
 
-    if file.is_null() {
-        return -1;
-    }
-    let mut base = CStr::from_ptr(file).to_string_lossy().into_owned();
+    let mut base = file.as_ref().to_string_lossy().into_owned();
 
     while !cur.is_empty() {
         cur = skip_blanks(cur);
@@ -913,8 +915,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
         if catal.is_null() {
             return null_mut();
         }
-        let filename = CString::new(filename.to_string_lossy().as_ref()).unwrap();
-        let ret = xml_parse_sgml_catalog(catal, &content, filename.as_ptr(), 0);
+        let ret = xml_parse_sgml_catalog(catal, &content, filename, 0);
         if ret < 0 {
             xml_free_catalog(catal);
             return null_mut();
@@ -964,7 +965,12 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalog
         return null_mut();
     }
 
-    let ret = xml_parse_sgml_catalog(catal, &content, filename, 1);
+    let ret = xml_parse_sgml_catalog(
+        catal,
+        &content,
+        CStr::from_ptr(filename).to_string_lossy().as_ref(),
+        1,
+    );
     if ret < 0 {
         xml_free_catalog(catal);
         return null_mut();
