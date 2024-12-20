@@ -472,63 +472,6 @@ fn xml_parse_sgml_catalog_pubid(mut cur: &[u8]) -> Option<(&[u8], &[u8])> {
 /// Implements 6.2. Public Identifier Normalization
 /// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
 ///
-/// Returns the new string or null_mut(), the string must be deallocated by the caller.
-#[doc(alias = "xmlCatalogNormalizePublic")]
-unsafe fn xml_catalog_normalize_public(pub_id: *const XmlChar) -> *mut XmlChar {
-    let mut ok: i32 = 1;
-    let mut white: i32;
-    let mut q: *mut XmlChar;
-
-    if pub_id.is_null() {
-        return null_mut();
-    }
-
-    white = 1;
-    let mut p = pub_id;
-    while *p != 0 && ok != 0 {
-        if !xml_is_blank_char(*p as u32) {
-            white = 0;
-        } else if *p == 0x20 && white == 0 {
-            white = 1;
-        } else {
-            ok = 0;
-        }
-        p = p.add(1);
-    }
-    if ok != 0 && white == 0 {
-        // is normalized
-        return null_mut();
-    }
-
-    let ret: *mut XmlChar = xml_strdup(pub_id);
-    q = ret;
-    white = 0;
-    p = pub_id;
-    while *p != 0 {
-        if xml_is_blank_char(*p as u32) {
-            if q != ret {
-                white = 1;
-            }
-        } else {
-            if white != 0 {
-                *q = 0x20;
-                q = q.add(1);
-                white = 0;
-            }
-            *q = *p;
-            q = q.add(1);
-        }
-        p = p.add(1);
-    }
-    *q = 0;
-    ret
-}
-
-/// Normalizes the Public Identifier
-///
-/// Implements 6.2. Public Identifier Normalization
-/// from http://www.oasis-open.org/committees/entity/spec-2001-08-06.html
-///
 /// If performed normalization, return normalized bytes wrapped `Some`.  
 /// Otherwise, return `None`.
 #[doc(alias = "xmlCatalogNormalizePublic")]
