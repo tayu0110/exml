@@ -654,6 +654,93 @@ impl XmlDebugCtxt<'_> {
         // Do a bit of checking
         self.generic_node_check(attr);
     }
+
+    #[doc(alias = "xmlCtxtDumpEntityDecl")]
+    unsafe fn dump_entity_decl(&mut self, ent: Option<&XmlEntity>) {
+        self.dump_spaces();
+
+        let Some(ent) = ent else {
+            if self.check == 0 {
+                writeln!(self.output, "Entity declaration is NULL");
+            }
+            return;
+        };
+        if ent.element_type() != XmlElementType::XmlEntityDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotEntityDecl,
+                "Node is not an entity declaration",
+            );
+            return;
+        }
+        if let Some(name) = ent.name() {
+            if self.check == 0 {
+                write!(self.output, "ENTITYDECL(");
+                self.dump_string(Some(&name));
+                write!(self.output, ")");
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Entity declaration has no name",
+            );
+        }
+        if self.check == 0 {
+            match ent.etype {
+                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                    writeln!(self.output, ", internal");
+                }
+                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                    writeln!(self.output, ", external parsed");
+                }
+                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                    writeln!(self.output, ", unparsed");
+                }
+                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                    writeln!(self.output, ", parameter");
+                }
+                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                    writeln!(self.output, ", external parameter");
+                }
+                Some(XmlEntityType::XmlInternalPredefinedEntity) => {
+                    writeln!(self.output, ", predefined");
+                }
+                _ => unreachable!(),
+            }
+            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+                self.dump_spaces();
+                let external_id =
+                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
+                        .to_string_lossy();
+                writeln!(self.output, " ExternalID={external_id}");
+            }
+            if !ent.system_id.load(Ordering::Relaxed).is_null() {
+                self.dump_spaces();
+                let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                writeln!(self.output, " SystemID={system_id}");
+            }
+            if !ent.uri.load(Ordering::Relaxed).is_null() {
+                self.dump_spaces();
+                let uri =
+                    CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                writeln!(self.output, " URI={uri}");
+            }
+            let content = ent.content.load(Ordering::Relaxed);
+            if !content.is_null() {
+                self.dump_spaces();
+                write!(self.output, " content=");
+                self.dump_string(Some(
+                    &CStr::from_ptr(content as *const i8).to_string_lossy(),
+                ));
+                writeln!(self.output);
+            }
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(ent);
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -764,92 +851,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-#[doc(alias = "xmlCtxtDumpEntityDecl")]
-unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntity>) {
-    (*ctxt).dump_spaces();
-
-    let Some(ent) = ent else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "Entity declaration is NULL");
-        }
-        return;
-    };
-    if ent.element_type() != XmlElementType::XmlEntityDecl {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNotEntityDecl,
-            "Node is not an entity declaration",
-        );
-        return;
-    }
-    if let Some(name) = ent.name() {
-        if (*ctxt).check == 0 {
-            write!((*ctxt).output, "ENTITYDECL(");
-            (*ctxt).dump_string(Some(&name));
-            write!((*ctxt).output, ")");
-        }
-    } else {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoName,
-            "Entity declaration has no name",
-        );
-    }
-    if (*ctxt).check == 0 {
-        match ent.etype {
-            Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                writeln!((*ctxt).output, ", internal");
-            }
-            Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                writeln!((*ctxt).output, ", external parsed");
-            }
-            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                writeln!((*ctxt).output, ", unparsed");
-            }
-            Some(XmlEntityType::XmlInternalParameterEntity) => {
-                writeln!((*ctxt).output, ", parameter");
-            }
-            Some(XmlEntityType::XmlExternalParameterEntity) => {
-                writeln!((*ctxt).output, ", external parameter");
-            }
-            Some(XmlEntityType::XmlInternalPredefinedEntity) => {
-                writeln!((*ctxt).output, ", predefined");
-            }
-            _ => unreachable!(),
-        }
-        if !ent.external_id.load(Ordering::Relaxed).is_null() {
-            (*ctxt).dump_spaces();
-            let external_id = CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
-                .to_string_lossy();
-            writeln!((*ctxt).output, " ExternalID={external_id}");
-        }
-        if !ent.system_id.load(Ordering::Relaxed).is_null() {
-            (*ctxt).dump_spaces();
-            let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
-                .to_string_lossy();
-            writeln!((*ctxt).output, " SystemID={system_id}");
-        }
-        if !ent.uri.load(Ordering::Relaxed).is_null() {
-            (*ctxt).dump_spaces();
-            let uri =
-                CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
-            writeln!((*ctxt).output, " URI={uri}");
-        }
-        let content = ent.content.load(Ordering::Relaxed);
-        if !content.is_null() {
-            (*ctxt).dump_spaces();
-            write!((*ctxt).output, " content=");
-            (*ctxt).dump_string(Some(
-                &CStr::from_ptr(content as *const i8).to_string_lossy(),
-            ));
-            writeln!((*ctxt).output);
-        }
-    }
-
-    // Do a bit of checking
-    (*ctxt).generic_node_check(ent);
 }
 
 #[doc(alias = "xmlCtxtDumpNamespace")]
@@ -1113,7 +1114,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlEntityDecl => {
-            xml_ctxt_dump_entity_decl(ctxt, (*node).as_entity_decl_node().map(|a| a.as_ref()));
+            (*ctxt).dump_entity_decl((*node).as_entity_decl_node().map(|a| a.as_ref()));
             return;
         }
         XmlElementType::XmlNamespaceDecl => {
