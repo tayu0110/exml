@@ -44,7 +44,7 @@ use std::{
 };
 
 use const_format::concatcp;
-use libc::{close, getenv, memset, open, read, snprintf, stat, O_RDONLY};
+use libc::{close, getenv, open, read, snprintf, stat, O_RDONLY};
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -93,8 +93,9 @@ pub(crate) const XML_CATALOG_PI: &CStr = c"oasis-xml-catalog";
 
 /// The API is voluntarily limited to general cataloging.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlCatalogPrefer {
+    #[default]
     None = 0,
     Public = 1,
     System,
@@ -110,9 +111,10 @@ pub enum XmlCatalogAllow {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum XmlCatalogEntryType {
     XmlCataRemoved = -1,
+    #[default]
     XmlCataNone = 0,
     XmlCataCatalog,
     XmlCataBrokenCatalog,
@@ -141,7 +143,9 @@ pub(crate) enum XmlCatalogEntryType {
 }
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum XmlCatalogType {
+    #[default]
     XmlXMLCatalogType = 1,
     XmlSGMLCatalogType,
 }
@@ -165,6 +169,20 @@ pub struct XmlCatalog {
     xml: XmlCatalogEntryPtr,
 }
 
+impl Default for XmlCatalog {
+    fn default() -> Self {
+        Self {
+            typ: XmlCatalogType::default(),
+            catal_tab: [null_mut(); XML_MAX_SGML_CATA_DEPTH],
+            catal_nr: 0,
+            catal_max: 0,
+            sgml: null_mut(),
+            prefer: XmlCatalogPrefer::default(),
+            xml: null_mut(),
+        }
+    }
+}
+
 pub type XmlCatalogEntryPtr = *mut XmlCatalogEntry;
 #[repr(C)]
 pub struct XmlCatalogEntry {
@@ -179,6 +197,24 @@ pub struct XmlCatalogEntry {
     dealloc: i32,
     depth: i32,
     group: *mut XmlCatalogEntry,
+}
+
+impl Default for XmlCatalogEntry {
+    fn default() -> Self {
+        Self {
+            next: null_mut(),
+            parent: null_mut(),
+            children: null_mut(),
+            typ: XmlCatalogEntryType::default(),
+            name: null_mut(),
+            value: null_mut(),
+            url: null_mut(),
+            prefer: XmlCatalogPrefer::default(),
+            dealloc: 0,
+            depth: 0,
+            group: null_mut(),
+        }
+    }
 }
 
 // Those are preferences
@@ -221,7 +257,7 @@ unsafe fn xml_create_new_catalog(typ: XmlCatalogType, prefer: XmlCatalogPrefer) 
         xml_catalog_err_memory("allocating catalog");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlCatalog>());
+    std::ptr::write(&mut *ret, XmlCatalog::default());
     (*ret).typ = typ;
     (*ret).catal_nr = 0;
     (*ret).catal_max = XML_MAX_SGML_CATA_DEPTH as _;
@@ -521,6 +557,7 @@ unsafe fn xml_new_catalog_entry(
         xml_catalog_err_memory("allocating catalog entry");
         return null_mut();
     }
+    std::ptr::write(&mut *ret, XmlCatalogEntry::default());
     (*ret).next = null_mut();
     (*ret).parent = null_mut();
     (*ret).children = null_mut();
