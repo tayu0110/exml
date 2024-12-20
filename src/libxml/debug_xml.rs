@@ -533,6 +533,127 @@ impl XmlDebugCtxt<'_> {
         // Do a bit of checking
         self.generic_node_check(elem);
     }
+
+    #[doc(alias = "xmlCtxtDumpAttrDecl")]
+    unsafe fn dump_attr_decl(&mut self, attr: Option<&XmlAttribute>) {
+        self.dump_spaces();
+
+        let Some(attr) = attr else {
+            if self.check == 0 {
+                writeln!(self.output, "Attribute declaration is NULL");
+            }
+            return;
+        };
+        if attr.element_type() != XmlElementType::XmlAttributeDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotAttrDecl,
+                "Node is not an attribute declaration",
+            );
+            return;
+        }
+        if let Some(name) = attr.name() {
+            if self.check == 0 {
+                write!(self.output, "ATTRDECL({name})");
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Node attribute declaration has no name",
+            );
+        }
+        if let Some(elem) = attr.elem.as_deref() {
+            if self.check == 0 {
+                write!(self.output, " for {elem}");
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoElem,
+                "Node attribute declaration has no element name",
+            );
+        }
+        if self.check == 0 {
+            match attr.atype {
+                XmlAttributeType::XmlAttributeCDATA => {
+                    write!(self.output, " CDATA");
+                }
+                XmlAttributeType::XmlAttributeID => {
+                    write!(self.output, " ID");
+                }
+                XmlAttributeType::XmlAttributeIDREF => {
+                    write!(self.output, " IDREF");
+                }
+                XmlAttributeType::XmlAttributeIDREFS => {
+                    write!(self.output, " IDREFS");
+                }
+                XmlAttributeType::XmlAttributeEntity => {
+                    write!(self.output, " ENTITY");
+                }
+                XmlAttributeType::XmlAttributeEntities => {
+                    write!(self.output, " ENTITIES");
+                }
+                XmlAttributeType::XmlAttributeNmtoken => {
+                    write!(self.output, " NMTOKEN");
+                }
+                XmlAttributeType::XmlAttributeNmtokens => {
+                    write!(self.output, " NMTOKENS");
+                }
+                XmlAttributeType::XmlAttributeEnumeration => {
+                    write!(self.output, " ENUMERATION");
+                }
+                XmlAttributeType::XmlAttributeNotation => {
+                    write!(self.output, " NOTATION ");
+                }
+            }
+            if !attr.tree.is_null() {
+                let mut cur: XmlEnumerationPtr = attr.tree;
+
+                for indx in 0..5 {
+                    let name = (*cur).name.as_deref().unwrap();
+                    if indx != 0 {
+                        write!(self.output, "|{name}");
+                    } else {
+                        write!(self.output, " ({name}");
+                    }
+                    cur = (*cur).next;
+                    if cur.is_null() {
+                        break;
+                    }
+                }
+                if cur.is_null() {
+                    write!(self.output, ")");
+                } else {
+                    write!(self.output, "...)");
+                }
+            }
+            match attr.def {
+                XmlAttributeDefault::XmlAttributeNone => {}
+                XmlAttributeDefault::XmlAttributeRequired => {
+                    write!(self.output, " REQUIRED");
+                }
+                XmlAttributeDefault::XmlAttributeImplied => {
+                    write!(self.output, " IMPLIED");
+                }
+                XmlAttributeDefault::XmlAttributeFixed => {
+                    write!(self.output, " FIXED");
+                }
+            }
+            if !attr.default_value.is_null() {
+                write!(self.output, "\"");
+                let def_value = attr.default_value;
+                self.dump_string(
+                    Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
+                );
+                write!(self.output, "\"");
+            }
+            writeln!(self.output);
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(attr);
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -643,127 +764,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-#[doc(alias = "xmlCtxtDumpAttrDecl")]
-unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttribute>) {
-    (*ctxt).dump_spaces();
-
-    let Some(attr) = attr else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "Attribute declaration is NULL");
-        }
-        return;
-    };
-    if attr.element_type() != XmlElementType::XmlAttributeDecl {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNotAttrDecl,
-            "Node is not an attribute declaration",
-        );
-        return;
-    }
-    if let Some(name) = attr.name() {
-        if (*ctxt).check == 0 {
-            write!((*ctxt).output, "ATTRDECL({name})");
-        }
-    } else {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoName,
-            "Node attribute declaration has no name",
-        );
-    }
-    if let Some(elem) = attr.elem.as_deref() {
-        if (*ctxt).check == 0 {
-            write!((*ctxt).output, " for {elem}");
-        }
-    } else {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoElem,
-            "Node attribute declaration has no element name",
-        );
-    }
-    if (*ctxt).check == 0 {
-        match attr.atype {
-            XmlAttributeType::XmlAttributeCDATA => {
-                write!((*ctxt).output, " CDATA");
-            }
-            XmlAttributeType::XmlAttributeID => {
-                write!((*ctxt).output, " ID");
-            }
-            XmlAttributeType::XmlAttributeIDREF => {
-                write!((*ctxt).output, " IDREF");
-            }
-            XmlAttributeType::XmlAttributeIDREFS => {
-                write!((*ctxt).output, " IDREFS");
-            }
-            XmlAttributeType::XmlAttributeEntity => {
-                write!((*ctxt).output, " ENTITY");
-            }
-            XmlAttributeType::XmlAttributeEntities => {
-                write!((*ctxt).output, " ENTITIES");
-            }
-            XmlAttributeType::XmlAttributeNmtoken => {
-                write!((*ctxt).output, " NMTOKEN");
-            }
-            XmlAttributeType::XmlAttributeNmtokens => {
-                write!((*ctxt).output, " NMTOKENS");
-            }
-            XmlAttributeType::XmlAttributeEnumeration => {
-                write!((*ctxt).output, " ENUMERATION");
-            }
-            XmlAttributeType::XmlAttributeNotation => {
-                write!((*ctxt).output, " NOTATION ");
-            }
-        }
-        if !attr.tree.is_null() {
-            let mut cur: XmlEnumerationPtr = attr.tree;
-
-            for indx in 0..5 {
-                let name = (*cur).name.as_deref().unwrap();
-                if indx != 0 {
-                    write!((*ctxt).output, "|{name}");
-                } else {
-                    write!((*ctxt).output, " ({name}");
-                }
-                cur = (*cur).next;
-                if cur.is_null() {
-                    break;
-                }
-            }
-            if cur.is_null() {
-                write!((*ctxt).output, ")");
-            } else {
-                write!((*ctxt).output, "...)");
-            }
-        }
-        match attr.def {
-            XmlAttributeDefault::XmlAttributeNone => {}
-            XmlAttributeDefault::XmlAttributeRequired => {
-                write!((*ctxt).output, " REQUIRED");
-            }
-            XmlAttributeDefault::XmlAttributeImplied => {
-                write!((*ctxt).output, " IMPLIED");
-            }
-            XmlAttributeDefault::XmlAttributeFixed => {
-                write!((*ctxt).output, " FIXED");
-            }
-        }
-        if !attr.default_value.is_null() {
-            write!((*ctxt).output, "\"");
-            let def_value = attr.default_value;
-            (*ctxt).dump_string(
-                Some(CStr::from_ptr(def_value as *const i8).to_string_lossy()).as_deref(),
-            );
-            write!((*ctxt).output, "\"");
-        }
-        writeln!((*ctxt).output);
-    }
-
-    // Do a bit of checking
-    (*ctxt).generic_node_check(attr);
 }
 
 #[doc(alias = "xmlCtxtDumpEntityDecl")]
@@ -1109,7 +1109,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlAttributeDecl => {
-            xml_ctxt_dump_attr_decl(ctxt, (*node).as_attribute_decl_node().map(|a| a.as_ref()));
+            (*ctxt).dump_attr_decl((*node).as_attribute_decl_node().map(|a| a.as_ref()));
             return;
         }
         XmlElementType::XmlEntityDecl => {
