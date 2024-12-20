@@ -154,11 +154,14 @@ pub type XmlCatalogPtr = *mut XmlCatalog;
 pub struct XmlCatalog {
     typ: XmlCatalogType, /* either XML or SGML */
 
+    // These fields seems to be unused in original libxml2...
+    // What is the field for?
+    // --------------------------
     // SGML Catalogs are stored as a simple hash table of catalog entries
     // Catalog stack to check against overflows when building the SGML catalog
-    catal_tab: [*mut c_char; XML_MAX_SGML_CATA_DEPTH], /* stack of catals */
-    catal_nr: i32,                                     /* Number of current catal streams */
-    catal_max: i32,                                    /* Max number of catal streams */
+    // catal_tab: [*mut c_char; XML_MAX_SGML_CATA_DEPTH], /* stack of catals */
+    // catal_nr: i32,                                     /* Number of current catal streams */
+    // catal_max: i32,                                    /* Max number of catal streams */
     sgml: HashMap<String, XmlCatalogEntryPtr>,
 
     // XML Catalogs are stored as a tree of Catalog entries
@@ -170,9 +173,6 @@ impl Default for XmlCatalog {
     fn default() -> Self {
         Self {
             typ: XmlCatalogType::default(),
-            catal_tab: [null_mut(); XML_MAX_SGML_CATA_DEPTH],
-            catal_nr: 0,
-            catal_max: 0,
             sgml: HashMap::new(),
             prefer: XmlCatalogPrefer::default(),
             xml: null_mut(),
@@ -332,8 +332,6 @@ unsafe fn xml_create_new_catalog(typ: XmlCatalogType, prefer: XmlCatalogPrefer) 
     }
     std::ptr::write(&mut *ret, XmlCatalog::default());
     (*ret).typ = typ;
-    (*ret).catal_nr = 0;
-    (*ret).catal_max = XML_MAX_SGML_CATA_DEPTH as _;
     (*ret).prefer = prefer;
     if matches!((*ret).typ, XmlCatalogType::XmlSGMLCatalogType) {
         (*ret).sgml = HashMap::new();
