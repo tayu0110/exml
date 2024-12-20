@@ -76,22 +76,19 @@ static mut NB_TESTS: c_int = 0;
 static mut NB_ERRORS: c_int = 0;
 static mut NB_LEAKS: c_int = 0;
 
-/*
- * We need to trap calls to the resolver to not account memory for the catalog
- * and not rely on any external resources.
- */
-unsafe extern "C" fn test_external_entity_loader(
-    url: *const c_char,
+// We need to trap calls to the resolver to not account memory for the catalog
+// and not rely on any external resources.
+unsafe fn test_external_entity_loader(
+    url: Option<&str>,
     _id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    xml_new_input_from_file(ctxt, url as *const c_char)
+    let url = CString::new(url.unwrap()).unwrap();
+    xml_new_input_from_file(ctxt, url.as_ptr())
 }
 
-/*
- * Trapping the error messages at the generic level to grab the equivalent of
- * stderr messages on CLI tools.
- */
+// Trapping the error messages at the generic level to grab the equivalent of
+// stderr messages on CLI tools.
 static mut TEST_ERRORS: [u8; 32769] = [0; 32769];
 static mut TEST_ERRORS_SIZE: usize = 0;
 static mut NB_ERROR: c_int = 0;
@@ -195,8 +192,7 @@ unsafe fn xmlconf_test_invalid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let cfilename = CString::new(filename).unwrap();
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -231,8 +227,7 @@ unsafe fn xmlconf_test_valid(
         test_log!(logfile, "test {id} : {filename} out of memory\n",);
         return 0;
     }
-    let cfilename = CString::new(filename).unwrap();
-    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
     if doc.is_null() {
         test_log!(
             logfile,
@@ -266,8 +261,7 @@ unsafe fn xmlconf_test_not_nswf(
 
     // In case of Namespace errors, libxml2 will still parse the document
     // but log a Namespace error.
-    let cfilename = CString::new(filename).unwrap();
-    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), None, options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         test_log!(logfile, "test {id} : {filename} failed to parse the XML\n",);
         NB_ERRORS += 1;
@@ -297,8 +291,7 @@ unsafe fn xmlconf_test_not_wf(
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    let cfilename = CString::new(filename).unwrap();
-    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), None, options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if !doc.is_null() {
         test_log!(
             logfile,
@@ -522,28 +515,24 @@ fn xmlconf_info() {
     eprintln!("  see http://www.w3.org/XML/Test/ for information");
 }
 
-unsafe extern "C" fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
-    let confxml: &CStr = c"xmlconf/xmlconf.xml";
+unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
+    let confxml: &str = "xmlconf/xmlconf.xml";
 
-    if !check_test_file(confxml.to_string_lossy().as_ref()) {
-        eprintln!("{} is missing ", confxml.to_string_lossy());
+    if !check_test_file(confxml) {
+        eprintln!("{} is missing ", confxml);
         xmlconf_info();
         return -1;
     }
-    let doc: XmlDocPtr = xml_read_file(
-        confxml.as_ptr(),
-        None,
-        XmlParserOption::XmlParseNoent as i32,
-    );
+    let doc: XmlDocPtr = xml_read_file(confxml, None, XmlParserOption::XmlParseNoent as i32);
     if doc.is_null() {
-        eprintln!("{} is corrupted ", confxml.to_string_lossy());
+        eprintln!("{} is corrupted ", confxml);
         xmlconf_info();
         return -1;
     }
 
     let cur: XmlNodePtr = (*doc).get_root_element();
     let ret = if cur.is_null() || !xml_str_equal((*cur).name, c"TESTSUITE".as_ptr() as _) {
-        eprintln!("Unexpected format {}", confxml.to_string_lossy());
+        eprintln!("Unexpected format {}", confxml);
         xmlconf_info();
         -1
     } else {

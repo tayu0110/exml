@@ -2926,9 +2926,9 @@ unsafe extern "C" fn xml_relaxng_document_pop(
 ///
 /// Returns the xmlRelaxNGDocumentPtr or NULL in case of error
 #[doc(alias = "xmlRelaxNGLoadExternalRef")]
-unsafe extern "C" fn xml_relaxng_load_external_ref(
+unsafe fn xml_relaxng_load_external_ref(
     ctxt: XmlRelaxNGParserCtxtPtr,
-    url: *const XmlChar,
+    url: &str,
     ns: *const XmlChar,
 ) -> XmlRelaxNGDocumentPtr {
     let mut doc: XmlDocPtr;
@@ -2936,8 +2936,11 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
 
     // check against recursion in the stack
     for i in 0..(*ctxt).doc_nr {
-        if xml_str_equal((*(*(*ctxt).doc_tab.add(i as usize))).href, url) {
-            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+        let curl = CString::new(url).unwrap();
+        if xml_str_equal(
+            (*(*(*ctxt).doc_tab.add(i as usize))).href,
+            curl.as_ptr() as *const u8,
+        ) {
             xml_rng_perr!(
                 ctxt,
                 null_mut(),
@@ -2950,9 +2953,8 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     }
 
     // load the document
-    doc = xml_read_file(url as _, None, 0);
+    doc = xml_read_file(url, None, 0);
     if doc.is_null() {
-        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
         xml_rng_perr!(
             ctxt,
             null_mut(),
@@ -2966,7 +2968,6 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     // Allocate the document structures and register it first.
     let ret: XmlRelaxNGDocumentPtr = xml_malloc(size_of::<XmlRelaxNGDocument>()) as _;
     if ret.is_null() {
-        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
         xml_rng_perr!(
             ctxt,
             doc,
@@ -2979,7 +2980,8 @@ unsafe extern "C" fn xml_relaxng_load_external_ref(
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGDocument>());
     (*ret).doc = doc;
-    (*ret).href = xml_strdup(url);
+    let url = CString::new(url).unwrap();
+    (*ret).href = xml_strdup(url.as_ptr() as *const u8);
     (*ret).next = (*ctxt).documents;
     (*ret).external_ref = 1;
     (*ctxt).documents = ret;
@@ -3201,9 +3203,9 @@ unsafe extern "C" fn xml_relaxng_remove_redefine(
 ///
 /// Returns the xmlRelaxNGIncludePtr or NULL in case of error
 #[doc(alias = "xmlRelaxNGLoadInclude")]
-unsafe extern "C" fn xml_relaxng_load_include(
+unsafe fn xml_relaxng_load_include(
     ctxt: XmlRelaxNGParserCtxtPtr,
-    url: *const XmlChar,
+    url: &str,
     node: XmlNodePtr,
     ns: *const XmlChar,
 ) -> XmlRelaxNGIncludePtr {
@@ -3213,8 +3215,11 @@ unsafe extern "C" fn xml_relaxng_load_include(
 
     // check against recursion in the stack
     for i in 0..(*ctxt).inc_nr {
-        if xml_str_equal((*(*(*ctxt).inc_tab.add(i as usize))).href, url) {
-            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+        let curl = CString::new(url).unwrap();
+        if xml_str_equal(
+            (*(*(*ctxt).inc_tab.add(i as usize))).href,
+            curl.as_ptr() as *const u8,
+        ) {
             xml_rng_perr!(
                 ctxt,
                 null_mut(),
@@ -3227,9 +3232,8 @@ unsafe extern "C" fn xml_relaxng_load_include(
     }
 
     // load the document
-    doc = xml_read_file(url as _, None, 0);
+    doc = xml_read_file(url, None, 0);
     if doc.is_null() {
-        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
         xml_rng_perr!(
             ctxt,
             node,
@@ -3249,7 +3253,8 @@ unsafe extern "C" fn xml_relaxng_load_include(
     }
     memset(ret as _, 0, size_of::<XmlRelaxNGInclude>());
     (*ret).doc = doc;
-    (*ret).href = xml_strdup(url);
+    let curl = CString::new(url).unwrap();
+    (*ret).href = xml_strdup(curl.as_ptr() as *const u8);
     (*ret).next = (*ctxt).includes;
     (*ctxt).includes = ret;
 
@@ -3282,7 +3287,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
     // Check that the top element is a grammar
     root = (*doc).get_root_element();
     if root.is_null() {
-        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
         xml_rng_perr!(
             ctxt,
             node,
@@ -3293,7 +3297,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
         return null_mut();
     }
     if !IS_RELAXNG!(root, c"grammar".as_ptr() as _) {
-        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
         xml_rng_perr!(
             ctxt,
             node,
@@ -3310,12 +3313,11 @@ unsafe extern "C" fn xml_relaxng_load_include(
         if IS_RELAXNG!(cur, c"start".as_ptr() as _) {
             let found: i32 = xml_relaxng_remove_redefine(
                 ctxt,
-                url,
+                curl.as_ptr() as *const u8,
                 (*root).children().map_or(null_mut(), |c| c.as_ptr()),
                 null_mut(),
             );
             if found == 0 {
-                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
                     node,
@@ -3331,12 +3333,11 @@ unsafe extern "C" fn xml_relaxng_load_include(
                 xml_relaxng_norm_ext_space(name);
                 let found: i32 = xml_relaxng_remove_redefine(
                     ctxt,
-                    url,
+                    curl.as_ptr() as *const u8,
                     (*root).children().map_or(null_mut(), |c| c.as_ptr()),
                     name,
                 );
                 if found == 0 {
-                    let url = CStr::from_ptr(url as *const i8).to_string_lossy();
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_rng_perr!(
                         ctxt,
@@ -3349,7 +3350,6 @@ unsafe extern "C" fn xml_relaxng_load_include(
                 }
                 xml_free(name as _);
             } else {
-                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
                     node,
@@ -3489,11 +3489,10 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             delete = cur;
                             break 'skip_children;
                         };
-                        let curl = CString::new(url.as_str()).unwrap();
                         let ns = ns.map(|n| CString::new(n).unwrap());
                         let docu: XmlRelaxNGDocumentPtr = xml_relaxng_load_external_ref(
                             ctxt,
-                            curl.as_ptr() as *const u8,
+                            &url,
                             ns.as_ref().map_or(null_mut(), |n| n.as_ptr() as *const u8),
                         );
                         if docu.is_null() {
@@ -3536,7 +3535,6 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             delete = cur;
                             break 'skip_children;
                         };
-                        let curl = CString::new(url.as_str()).unwrap();
                         let mut ns = (*cur).get_prop("ns");
                         if ns.is_none() {
                             tmp = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
@@ -3553,7 +3551,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         let ns = ns.map(|n| CString::new(n).unwrap());
                         let incl: XmlRelaxNGIncludePtr = xml_relaxng_load_include(
                             ctxt,
-                            curl.as_ptr() as *const u8,
+                            &url,
                             cur,
                             ns.as_ref().map_or(null_mut(), |n| n.as_ptr() as *const u8),
                         );
@@ -7833,7 +7831,7 @@ unsafe extern "C" fn xml_relaxng_try_compile(
 ///
 /// Returns the internal XML RelaxNG structure built from the resource or NULL in case of error
 #[doc(alias = "xmlRelaxNGParse")]
-pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
+pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
     let mut doc: XmlDocPtr;
 
     xml_relaxng_init_types();
@@ -7844,9 +7842,9 @@ pub unsafe extern "C" fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> Xml
 
     // First step is to parse the input document into an DOM/Infoset
     if !(*ctxt).url.is_null() {
-        doc = xml_read_file((*ctxt).url as _, None, 0);
+        let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
+        doc = xml_read_file(&url, None, 0);
         if doc.is_null() {
-            let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
                 null_mut(),
@@ -10827,9 +10825,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
             let mut content: *mut XmlChar;
             let mut child: XmlNodePtr;
 
-            /*
-             * Make sure it's only text nodes
-             */
+            // Make sure it's only text nodes
 
             content = null_mut();
             child = node;

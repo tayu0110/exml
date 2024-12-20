@@ -125,20 +125,19 @@ unsafe extern "C" fn add_entity(name: *mut c_char, content: *mut c_char) -> c_in
     0
 }
 
-/*
- * We need to trap calls to the resolver to not account memory for the catalog
- * which is shared to the current running test. We also don't want to have
- * network downloads modifying tests.
- */
-unsafe extern "C" fn test_external_entity_loader(
-    url: *const c_char,
+// We need to trap calls to the resolver to not account memory for the catalog
+// which is shared to the current running test. We also don't want to have
+// network downloads modifying tests.
+unsafe fn test_external_entity_loader(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
 
     for i in 0..NB_ENTITIES {
-        if strcmp(TEST_ENTITIES_NAME[i], url) == 0 {
+        let url = CString::new(url.unwrap()).unwrap();
+        if strcmp(TEST_ENTITIES_NAME[i], url.as_ptr()) == 0 {
             ret = xml_new_string_input_stream(ctxt, TEST_ENTITIES_VALUE[i] as *const XmlChar);
             if !ret.is_null() {
                 (*ret).filename = Some(
@@ -150,7 +149,7 @@ unsafe extern "C" fn test_external_entity_loader(
             return ret;
         }
     }
-    if check_test_file(CStr::from_ptr(url).to_string_lossy().as_ref()) {
+    if check_test_file(url.unwrap()) {
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
@@ -733,26 +732,22 @@ unsafe extern "C" fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNode
     0
 }
 
-unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
+unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     let mut cur: XmlNodePtr;
-    let filename: &CStr = c"test/xsdtest/xsdtestsuite.xml";
+    let filename = "test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(
-        filename.as_ptr() as _,
-        None,
-        XmlParserOption::XmlParseNoent as _,
-    );
+    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoent as _);
     if doc.is_null() {
-        eprintln!("Failed to parse {}", filename.to_string_lossy());
+        eprintln!("Failed to parse {}", filename);
         return -1;
     }
     println!("## XML Schemas datatypes test suite from James Clark");
-    test_log!(logfile, "filename: {}", filename.to_string_lossy());
+    test_log!(logfile, "filename: {}", filename);
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
-        eprintln!("Unexpected format {}", filename.to_string_lossy());
+        eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
             xml_free_doc(doc);
@@ -762,7 +757,7 @@ unsafe extern "C" fn xsd_test(logfile: &mut Option<File>) -> c_int {
 
     cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
-        eprintln!("Unexpected format {}", filename.to_string_lossy());
+        eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
             xml_free_doc(doc);
@@ -806,24 +801,20 @@ unsafe extern "C" fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNode
 
 unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
     let mut cur: XmlNodePtr;
-    let filename: &CStr = c"test/relaxng/OASIS/spectest.xml";
+    let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(
-        filename.as_ptr() as _,
-        None,
-        XmlParserOption::XmlParseNoent as _,
-    );
+    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoent as _);
     if doc.is_null() {
-        eprintln!("Failed to parse {}", filename.to_string_lossy());
+        eprintln!("Failed to parse {}", filename);
         return -1;
     }
     println!("## Relax NG test suite from James Clark");
-    test_log!(logfile, "filename: {}", filename.to_string_lossy());
+    test_log!(logfile, "filename: {}", filename);
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
-        eprintln!("Unexpected format {}", filename.to_string_lossy());
+        eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
             xml_free_doc(doc);
@@ -833,7 +824,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
 
     cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
-        eprintln!("Unexpected format {}", filename.to_string_lossy());
+        eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
             xml_free_doc(doc);
@@ -851,26 +842,22 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
     ret
 }
 
-unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
+unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
     let mut cur: XmlNodePtr;
-    let filename: &CStr = c"test/relaxng/testsuite.xml";
+    let filename = "test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(
-        filename.as_ptr() as _,
-        None,
-        XmlParserOption::XmlParseNoent as _,
-    );
+    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoent as _);
     if doc.is_null() {
-        eprintln!("Failed to parse {}", filename.to_string_lossy());
+        eprintln!("Failed to parse {}", filename);
         return -1;
     }
     println!("## Relax NG test suite for libxml2");
-    test_log!(logfile, "filename: {}", filename.to_string_lossy());
+    test_log!(logfile, "filename: {}", filename);
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
-        eprintln!("Unexpected format {}", filename.to_string_lossy());
+        eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
             xml_free_doc(doc);
@@ -880,7 +867,7 @@ unsafe extern "C" fn rng_test2(logfile: &mut Option<File>) -> c_int {
 
     cur = get_next(cur, c"./testSuite[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
-        eprintln!("Unexpected format {}", filename.to_string_lossy());
+        eprintln!("Unexpected format {}", filename);
         ret = -1;
         if !doc.is_null() {
             xml_free_doc(doc);
@@ -962,7 +949,7 @@ unsafe extern "C" fn xstc_test_instance(
             } else {
                 NB_TESTS += 1;
                 doc = xml_read_file(
-                    path as *const c_char,
+                    CStr::from_ptr(path as *const i8).to_string_lossy().as_ref(),
                     None,
                     XmlParserOption::XmlParseNoent as i32,
                 );
@@ -1249,29 +1236,19 @@ unsafe extern "C" fn xstc_test_group(
     ret
 }
 
-unsafe extern "C" fn xstc_metadata(
-    logfile: &mut Option<File>,
-    metadata: *const c_char,
-    base: *const c_char,
-) -> c_int {
+unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const c_char) -> c_int {
     let mut cur: XmlNodePtr;
     let mut ret: c_int = 0;
 
     let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoent as _);
     if doc.is_null() {
-        eprintln!(
-            "Failed to parse {}",
-            CStr::from_ptr(metadata as _).to_string_lossy()
-        );
+        eprintln!("Failed to parse {metadata}");
         return -1;
     }
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSet".as_ptr() as _) {
-        eprintln!(
-            "Unexpected format {}",
-            CStr::from_ptr(metadata as _).to_string_lossy()
-        );
+        eprintln!("Unexpected format {metadata}");
         return -1;
     }
     let contributor = (*cur)
@@ -1282,10 +1259,7 @@ unsafe extern "C" fn xstc_metadata(
 
     cur = get_next(cur, c"./ts:testGroup[1]".as_ptr() as _);
     if cur.is_null() || !xml_str_equal((*cur).name, c"testGroup".as_ptr() as _) {
-        eprintln!(
-            "Unexpected format {}",
-            CStr::from_ptr(metadata as _).to_string_lossy()
-        );
+        eprintln!("Unexpected format {metadata}");
         ret = -1;
         xml_free_doc(doc);
         return ret;
@@ -1386,7 +1360,7 @@ fn main() {
         NB_SCHEMATAS = 0;
         xstc_metadata(
             &mut logfile,
-            c"xstc/Tests/Metadata/NISTXMLSchemaDatatypes.testSet".as_ptr(),
+            "xstc/Tests/Metadata/NISTXMLSchemaDatatypes.testSet",
             c"xstc/Tests/Metadata/".as_ptr(),
         );
         if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
@@ -1413,7 +1387,7 @@ fn main() {
         NB_SCHEMATAS = 0;
         xstc_metadata(
             &mut logfile,
-            c"xstc/Tests/Metadata/SunXMLSchema1-0-20020116.testSet".as_ptr(),
+            "xstc/Tests/Metadata/SunXMLSchema1-0-20020116.testSet",
             c"xstc/Tests/".as_ptr(),
         );
         if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {
@@ -1442,7 +1416,7 @@ fn main() {
         NB_SCHEMATAS = 0;
         xstc_metadata(
             &mut logfile,
-            c"xstc/Tests/Metadata/MSXMLSchema1-0-20020116.testSet".as_ptr(),
+            "xstc/Tests/Metadata/MSXMLSchema1-0-20020116.testSet",
             c"xstc/Tests/".as_ptr(),
         );
         if NB_ERRORS == old_errors && NB_LEAKS == old_leaks {

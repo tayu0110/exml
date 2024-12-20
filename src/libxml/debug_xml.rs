@@ -2138,15 +2138,16 @@ pub unsafe fn xml_shell_dir(
 #[cfg(feature = "xpath")]
 pub unsafe fn xml_shell_load(
     ctxt: XmlShellCtxtPtr,
-    filename: *mut c_char,
+    filename: &str,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
     use crate::{
         libxml::{
             globals::xml_free, htmlparser::html_parse_file, parser::xml_read_file,
-            uri::xml_canonic_path,
+            xmlstring::xml_strdup,
         },
+        uri::canonic_path,
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };
 
@@ -2155,7 +2156,7 @@ pub unsafe fn xml_shell_load(
     let doc: XmlDocPtr;
     let mut html: i32 = 0;
 
-    if ctxt.is_null() || filename.is_null() {
+    if ctxt.is_null() {
         return -1;
     }
     if !(*ctxt).doc.is_null() {
@@ -2191,7 +2192,9 @@ pub unsafe fn xml_shell_load(
         {
             (*ctxt).pctxt = xml_xpath_new_context(doc);
         }
-        (*ctxt).filename = xml_canonic_path(filename as *mut XmlChar) as *mut c_char;
+        let canonic = canonic_path(filename);
+        let canonic = CString::new(canonic.as_ref()).unwrap();
+        (*ctxt).filename = xml_strdup(canonic.as_ptr() as *const u8) as *mut i8;
     } else {
         return -1;
     }
@@ -3143,7 +3146,12 @@ pub unsafe fn xml_shell<'a>(
                 xml_shell_validate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
             }
         } else if strcmp(command.as_ptr(), c"load".as_ptr()) == 0 {
-            xml_shell_load(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+            xml_shell_load(
+                ctxt,
+                CStr::from_ptr(arg.as_ptr()).to_string_lossy().as_ref(),
+                null_mut(),
+                null_mut(),
+            );
         } else if {
             #[cfg(feature = "schema")]
             {
@@ -4110,48 +4118,6 @@ mod tests {
                                 assert!(leaks == 0, "{leaks} Leaks are found in xmlShellList()");
                                 eprint!(" {}", n_ctxt);
                                 eprint!(" {}", n_arg);
-                                eprint!(" {}", n_node);
-                                eprintln!(" {}", n_node2);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_shell_load() {
-        #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_SHELL_CTXT_PTR {
-                for n_filename in 0..GEN_NB_CHAR_PTR {
-                    for n_node in 0..GEN_NB_XML_NODE_PTR {
-                        for n_node2 in 0..GEN_NB_XML_NODE_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let ctxt = gen_xml_shell_ctxt_ptr(n_ctxt, 0);
-                            let filename = gen_char_ptr(n_filename, 1);
-                            let node = gen_xml_node_ptr(n_node, 2);
-                            let node2 = gen_xml_node_ptr(n_node2, 3);
-
-                            let ret_val = xml_shell_load(ctxt, filename, node, node2);
-                            desret_int(ret_val);
-                            des_xml_shell_ctxt_ptr(n_ctxt, ctxt, 0);
-                            des_char_ptr(n_filename, filename, 1);
-                            des_xml_node_ptr(n_node, node, 2);
-                            des_xml_node_ptr(n_node2, node2, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlShellLoad",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlShellLoad()");
-                                eprint!(" {}", n_ctxt);
-                                eprint!(" {}", n_filename);
                                 eprint!(" {}", n_node);
                                 eprintln!(" {}", n_node2);
                             }

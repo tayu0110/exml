@@ -37,6 +37,7 @@ use crate::error::{XmlParserErrors, __xml_raise_error};
 use crate::hash::XmlHashTableRef;
 use crate::io::__xml_loader_err;
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
+use crate::uri::build_uri;
 #[cfg(feature = "catalog")]
 use crate::{
     encoding::{
@@ -74,14 +75,13 @@ use crate::{
             XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
-        uri::{xml_build_uri, xml_canonic_path},
+        uri::xml_canonic_path,
         valid::{
             xml_create_enumeration, xml_free_doc_element_content, xml_free_enumeration,
             xml_new_doc_element_content, xml_validate_element, xml_validate_root,
         },
         xmlstring::{
-            xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strncmp,
-            xml_strndup, XmlChar,
+            xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
     tree::{
@@ -362,7 +362,7 @@ pub(crate) use __xml_err_encoding;
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateFileParserCtxt")]
-pub unsafe extern "C" fn xml_create_file_parser_ctxt(filename: *const c_char) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> XmlParserCtxtPtr {
     xml_create_url_parser_ctxt(filename, 0)
 }
 
@@ -374,10 +374,7 @@ pub unsafe extern "C" fn xml_create_file_parser_ctxt(filename: *const c_char) ->
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateURLParserCtxt")]
-pub unsafe extern "C" fn xml_create_url_parser_ctxt(
-    filename: *const c_char,
-    options: i32,
-) -> XmlParserCtxtPtr {
+pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -> XmlParserCtxtPtr {
     let mut directory: *mut c_char = null_mut();
 
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
@@ -399,7 +396,10 @@ pub unsafe extern "C" fn xml_create_url_parser_ctxt(
 
     (*ctxt).input_push(input_stream);
     if (*ctxt).directory.is_none() && directory.is_null() {
-        directory = xml_parser_get_directory(filename);
+        if let Some(filename) = filename {
+            let filename = CString::new(filename).unwrap();
+            directory = xml_parser_get_directory(filename.as_ptr());
+        }
     }
     if (*ctxt).directory.is_none() && !directory.is_null() {
         (*ctxt).directory = Some(
@@ -457,9 +457,9 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
 pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-    mut url: *const XmlChar,
+    mut url: Option<&str>,
     id: *const XmlChar,
-    base: *const XmlChar,
+    base: Option<&str>,
     pctx: XmlParserCtxtPtr,
 ) -> XmlParserCtxtPtr {
     let input_stream: XmlParserInputPtr;
@@ -476,15 +476,13 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
         (*ctxt).input_id = (*pctx).input_id;
     }
 
-    /* Don't read from stdin. */
-    if xml_strcmp(url, c"-".as_ptr() as _) == 0 {
-        url = c"./-".as_ptr() as _;
+    // Don't read from stdin.
+    if url == Some("-") {
+        url = Some("./-");
     }
 
-    let uri: *mut XmlChar = xml_build_uri(url, base);
-
-    if uri.is_null() {
-        input_stream = xml_load_external_entity(url as _, id as _, ctxt);
+    if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
+        input_stream = xml_load_external_entity(Some(&uri), id as _, ctxt as _);
         if input_stream.is_null() {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
@@ -493,16 +491,18 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
         (*ctxt).input_push(input_stream);
 
         if (*ctxt).directory.is_none() && directory.is_null() {
-            directory = xml_parser_get_directory(url as _);
+            if let Some(url) = url {
+                let url = CString::new(url).unwrap();
+                directory = xml_parser_get_directory(url.as_ptr());
+            }
         }
         if (*ctxt).directory.is_none() && !directory.is_null() {
             (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
             xml_free(directory as _);
         }
     } else {
-        input_stream = xml_load_external_entity(uri as _, id as _, ctxt as _);
+        input_stream = xml_load_external_entity(url, id as _, ctxt);
         if input_stream.is_null() {
-            xml_free(uri as _);
             xml_free_parser_ctxt(ctxt);
             return null_mut();
         }
@@ -510,13 +510,15 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
         (*ctxt).input_push(input_stream);
 
         if (*ctxt).directory.is_none() && directory.is_null() {
-            directory = xml_parser_get_directory(uri as _);
+            if let Some(url) = url {
+                let url = CString::new(url).unwrap();
+                directory = xml_parser_get_directory(url.as_ptr());
+            }
         }
         if (*ctxt).directory.is_none() && !directory.is_null() {
             (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
             xml_free(directory as _);
         }
-        xml_free(uri as _);
     }
     ctxt
 }
@@ -529,10 +531,10 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
 ///
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateEntityParserCtxt")]
-pub unsafe extern "C" fn xml_create_entity_parser_ctxt(
-    url: *const XmlChar,
+pub unsafe fn xml_create_entity_parser_ctxt(
+    url: Option<&str>,
     id: *const XmlChar,
-    base: *const XmlChar,
+    base: Option<&str>,
 ) -> XmlParserCtxtPtr {
     xml_create_entity_parser_ctxt_internal(null_mut(), None, url, id, base, null_mut())
 }
@@ -758,7 +760,7 @@ pub unsafe extern "C" fn xml_new_string_input_stream(
 ///
 /// Returns the new input stream or NULL
 #[doc(alias = "xmlNewEntityInputStream")]
-pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
+pub(crate) unsafe fn xml_new_entity_input_stream(
     ctxt: XmlParserCtxtPtr,
     entity: XmlEntityPtr,
 ) -> XmlParserInputPtr {
@@ -783,8 +785,11 @@ pub(crate) unsafe extern "C" fn xml_new_entity_input_stream(
             }
             Some(XmlEntityType::XmlExternalGeneralParsedEntity)
             | Some(XmlEntityType::XmlExternalParameterEntity) => {
+                let uri = (*entity).uri.load(Ordering::Relaxed);
                 input = xml_load_external_entity(
-                    (*entity).uri.load(Ordering::Relaxed) as _,
+                    (!uri.is_null())
+                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                        .as_deref(),
                     (*entity).external_id.load(Ordering::Relaxed) as _,
                     ctxt,
                 );
@@ -3981,13 +3986,16 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             Some(XmlEntityType::XmlExternalGeneralParsedEntity)
         ) {
             (*ctxt).depth += 1;
+            let uri = (*ent).uri.load(Ordering::Relaxed);
             ret = xml_parse_external_entity_private(
                 (*ctxt).my_doc,
                 ctxt,
                 (*ctxt).sax,
                 user_data,
                 (*ctxt).depth,
-                (*ent).uri.load(Ordering::Relaxed) as _,
+                (!uri.is_null())
+                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                    .as_deref(),
                 (*ent).external_id.load(Ordering::Relaxed) as _,
                 addr_of_mut!(list),
             );
@@ -4123,13 +4131,16 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let oldsizeentities: u64 = (*ctxt).sizeentities;
 
                 (*ctxt).depth += 1;
+                let uri = (*ent).uri.load(Ordering::Relaxed);
                 ret = xml_parse_external_entity_private(
                     (*ctxt).my_doc,
                     ctxt,
                     (*ctxt).sax,
                     user_data,
                     (*ctxt).depth,
-                    (*ent).uri.load(Ordering::Relaxed) as _,
+                    (!uri.is_null())
+                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                        .as_deref(),
                     (*ent).external_id.load(Ordering::Relaxed) as _,
                     null_mut(),
                 );
@@ -6648,109 +6659,6 @@ mod tests {
                         );
                         eprint!(" {}", n_out);
                         eprintln!(" {}", n_val);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_create_entity_parser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_url in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_base in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let url = gen_const_xml_char_ptr(n_url, 0);
-                        let id = gen_const_xml_char_ptr(n_id, 1);
-                        let base = gen_const_xml_char_ptr(n_base, 2);
-
-                        let ret_val =
-                            xml_create_entity_parser_ctxt(url as *const XmlChar, id, base);
-                        desret_xml_parser_ctxt_ptr(ret_val);
-                        des_const_xml_char_ptr(n_url, url, 0);
-                        des_const_xml_char_ptr(n_id, id, 1);
-                        des_const_xml_char_ptr(n_base, base, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlCreateEntityParserCtxt",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlCreateEntityParserCtxt()"
-                            );
-                            eprint!(" {}", n_url);
-                            eprint!(" {}", n_id);
-                            eprintln!(" {}", n_base);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_create_file_parser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_fileoutput(n_filename, 0);
-
-                let ret_val = xml_create_file_parser_ctxt(filename);
-                desret_xml_parser_ctxt_ptr(ret_val);
-                des_fileoutput(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCreateFileParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlCreateFileParserCtxt()"
-                    );
-                    eprintln!(" {}", n_filename);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_create_urlparser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEOUTPUT {
-                for n_options in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let filename = gen_fileoutput(n_filename, 0);
-                    let options = gen_int(n_options, 1);
-
-                    let ret_val = xml_create_url_parser_ctxt(filename, options);
-                    desret_xml_parser_ctxt_ptr(ret_val);
-                    des_fileoutput(n_filename, filename, 0);
-                    des_int(n_options, options, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCreateURLParserCtxt",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlCreateURLParserCtxt()"
-                        );
-                        eprint!(" {}", n_filename);
-                        eprintln!(" {}", n_options);
                     }
                 }
             }

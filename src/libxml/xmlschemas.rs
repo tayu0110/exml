@@ -5517,14 +5517,12 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                 }
 
                 //  doc_load:
-                /*
-                 * Load the document.
-                 */
+                // Load the document.
                 if !schema_doc.is_null() {
                     doc = schema_doc;
-                    /* Don' free this one, since it was provided by the caller. */
+                    // Don' free this one, since it was provided by the caller.
                     preserve_doc = 1;
-                    /* TODO: Does the context or the doc hold the location? */
+                    // TODO: Does the context or the doc hold the location?
                     if let Some(url) = (*schema_doc).url.as_deref() {
                         let url = CString::new(url).unwrap();
                         schema_location =
@@ -5543,19 +5541,19 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         break 'exit_failure;
                     }
                     if !(*pctxt).dict.is_null() && !(*parser_ctxt).dict.is_null() {
-                        /*
-                         * TODO: Do we have to burden the schema parser dict with all
-                         * the content of the schema doc?
-                         */
+                        // TODO: Do we have to burden the schema parser dict with all
+                        // the content of the schema doc?
                         xml_dict_free((*parser_ctxt).dict);
                         (*parser_ctxt).dict = (*pctxt).dict;
                         xml_dict_reference((*parser_ctxt).dict);
                     }
                     if !schema_location.is_null() {
-                        /* Parse from file. */
+                        // Parse from file.
                         doc = xml_ctxt_read_file(
                             parser_ctxt,
-                            schema_location as _,
+                            CStr::from_ptr(schema_location as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
                             None,
                             SCHEMAS_PARSE_OPTIONS,
                         );
@@ -5563,7 +5561,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         let mem =
                             from_raw_parts(schema_buffer as *const u8, schema_buffer_len as usize)
                                 .to_vec();
-                        /* Parse from memory buffer. */
+                        // Parse from memory buffer.
                         doc = xml_ctxt_read_memory(
                             parser_ctxt,
                             mem,
@@ -5580,33 +5578,27 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                             );
                         }
                     }
-                    /*
-                     * For <import>:
-                     * 2.1 The referent is (a fragment of) a resource which is an
-                     * XML document (see clause 1.1), which in turn corresponds to
-                     * a <schema> element information item in a well-formed information
-                     * set, which in turn corresponds to a valid schema.
-                     * TODO: (2.1) fragments of XML documents are not supported.
-                     *
-                     * 2.2 The referent is a <schema> element information item in
-                     * a well-formed information set, which in turn corresponds
-                     * to a valid schema.
-                     * TODO: (2.2) is not supported.
-                     */
+                    // For <import>:
+                    // 2.1 The referent is (a fragment of) a resource which is an
+                    // XML document (see clause 1.1), which in turn corresponds to
+                    // a <schema> element information item in a well-formed information
+                    // set, which in turn corresponds to a valid schema.
+                    // TODO: (2.1) fragments of XML documents are not supported.
+                    //
+                    // 2.2 The referent is a <schema> element information item in
+                    // a well-formed information set, which in turn corresponds
+                    // to a valid schema.
+                    // TODO: (2.2) is not supported.
                     if doc.is_null() {
                         let lerr = GLOBAL_STATE.with_borrow(|state| state.last_error.clone());
-                        /*
-                         * Check if this a parser error, or if the document could
-                         * just not be located.
-                         * TODO: Try to find specific error codes to react only on
-                         * localisation failures.
-                         */
+                        // Check if this a parser error, or if the document could
+                        // just not be located.
+                        // TODO: Try to find specific error codes to react only on
+                        // localisation failures.
                         if lerr.is_ok() || lerr.domain() != XmlErrorDomain::XmlFromIO {
-                            /*
-                             * We assume a parser error here.
-                             */
+                            // We assume a parser error here.
                             located = 1;
-                            /* TODO: Error code ?? */
+                            // TODO: Error code ??
                             res = XmlParserErrors::XmlSchemapSrcImport2_1 as i32;
 
                             let schema_location =

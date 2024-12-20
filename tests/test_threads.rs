@@ -3,7 +3,7 @@
 #![cfg_attr(feature = "sax1", allow(deprecated))]
 
 use std::{
-    ffi::{c_char, c_int, c_void, CStr},
+    ffi::{c_int, c_void},
     io::{stderr, stdout, Write},
     mem::zeroed,
     ptr::{addr_of_mut, null_mut},
@@ -21,45 +21,45 @@ use exml::{
     },
     tree::{xml_free_doc, XmlDocPtr},
 };
-use libc::{memset, pthread_create, pthread_join, pthread_t, strcmp};
+use libc::{memset, pthread_create, pthread_join, pthread_t};
 
 const MAX_ARGC: usize = 20;
 const TEST_REPEAT_COUNT: usize = 500;
 static mut TID: [pthread_t; MAX_ARGC] = unsafe { zeroed() };
 
 struct XmlThreadParams<'a> {
-    filename: &'a CStr,
-    okay: c_int,
+    filename: &'a str,
+    okay: i32,
 }
 
 const CATALOG: &str = "test/threads/complex.xml";
 static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
     XmlThreadParams {
-        filename: c"test/threads/abc.xml",
+        filename: "test/threads/abc.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"test/threads/acb.xml",
+        filename: "test/threads/acb.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"test/threads/bac.xml",
+        filename: "test/threads/bac.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"test/threads/bca.xml",
+        filename: "test/threads/bca.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"test/threads/cab.xml",
+        filename: "test/threads/cab.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"test/threads/cba.xml",
+        filename: "test/threads/cba.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"test/threads/invalid.xml",
+        filename: "test/threads/invalid.xml",
         okay: 0,
     },
 ];
@@ -69,10 +69,10 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     unsafe {
         let my_doc: XmlDocPtr;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
-        let filename: *const c_char = (*params).filename.as_ptr();
+        let filename = (*params).filename;
         let mut okay: c_int = 1;
 
-        if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
+        if filename == "test/threads/invalid.xml" {
             set_do_validity_checking_default_value(0);
             let stdout: Box<dyn Write> = Box::new(stdout());
             set_generic_error(None, Some(GenericErrorContext::new(stdout)));
@@ -83,7 +83,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         }
         #[cfg(feature = "sax1")]
         {
-            my_doc = xml_parse_file(filename);
+            my_doc = xml_parse_file(Some(filename));
         }
         #[cfg(not(feature = "sax1"))]
         {
@@ -95,7 +95,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             println!("parse failed");
             okay = 0;
         }
-        if strcmp(filename, c"test/threads/invalid.xml".as_ptr()) == 0 {
+        if filename == "test/threads/invalid.xml" {
             if get_do_validity_checking_default_value() != 0 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
@@ -142,10 +142,9 @@ fn main() {
             xml_catalog_cleanup();
             for (i, param) in THREAD_PARAMS.iter().take(NUM_THREADS).enumerate() {
                 assert_ne!(
-                    param.okay,
-                    0,
+                    param.okay, 0,
                     "Thread {i} handling {} failed",
-                    param.filename.to_string_lossy()
+                    param.filename
                 );
             }
         }

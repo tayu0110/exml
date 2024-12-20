@@ -25,14 +25,14 @@
 // daniel@veillard.com
 
 use std::{
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     sync::atomic::Ordering,
 };
 
-use libc::{memset, strcmp};
+use libc::memset;
 
 #[cfg(feature = "libxml_xptr_locs")]
 use crate::libxml::xpointer::XmlLocationSetPtr;
@@ -583,10 +583,7 @@ unsafe extern "C" fn xml_xinclude_add_node(
 
 /// Parse a document for XInclude
 #[doc(alias = "xmlXIncludeParseFile")]
-unsafe extern "C" fn xml_xinclude_parse_file(
-    ctxt: XmlXincludeCtxtPtr,
-    mut url: *const c_char,
-) -> XmlDocPtr {
+unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> XmlDocPtr {
     let ret: XmlDocPtr;
 
     xml_init_parser();
@@ -616,11 +613,11 @@ unsafe extern "C" fn xml_xinclude_parse_file(
     );
 
     /* Don't read from stdin. */
-    if !url.is_null() && strcmp(url, c"-".as_ptr() as _) == 0 {
-        url = c"./-".as_ptr() as _;
+    if url == "-" {
+        url = "./-";
     }
 
-    let input_stream: XmlParserInputPtr = xml_load_external_entity(url, null_mut(), pctxt);
+    let input_stream: XmlParserInputPtr = xml_load_external_entity(Some(url), null_mut(), pctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(pctxt);
         return null_mut();
@@ -629,7 +626,8 @@ unsafe extern "C" fn xml_xinclude_parse_file(
     (*pctxt).input_push(input_stream);
 
     if (*pctxt).directory.is_none() {
-        let dir = xml_parser_get_directory(url);
+        let url = CString::new(url).unwrap();
+        let dir = xml_parser_get_directory(url.as_ptr());
         if !dir.is_null() {
             (*pctxt).directory = Some(CStr::from_ptr(dir).to_string_lossy().into_owned());
             xml_free(dir as _);
@@ -1372,7 +1370,7 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
 ///
 /// Returns 0 in case of success, -1 in case of failure
 #[doc(alias = "xmlXIncludeLoadDoc")]
-unsafe extern "C" fn xml_xinclude_load_doc(
+unsafe fn xml_xinclude_load_doc(
     ctxt: XmlXincludeCtxtPtr,
     url: *const XmlChar,
     refe: XmlXincludeRefPtr,
@@ -1474,7 +1472,10 @@ unsafe extern "C" fn xml_xinclude_load_doc(
                 }
             }
 
-            doc = xml_xinclude_parse_file(ctxt, url as _);
+            doc = xml_xinclude_parse_file(
+                ctxt,
+                CStr::from_ptr(url as *const i8).to_string_lossy().as_ref(),
+            );
             #[cfg(feature = "xpointer")]
             {
                 (*ctxt).parse_flags = save_flags;
@@ -1939,11 +1940,13 @@ unsafe extern "C" fn xml_xinclude_load_txt(
         }
     }
 
-    /*
-     * Load it.
-     */
+    // Load it.
     pctxt = xml_new_parser_ctxt();
-    input_stream = xml_load_external_entity(url as _, null_mut(), pctxt);
+    input_stream = xml_load_external_entity(
+        Some(CStr::from_ptr(url as *const i8).to_string_lossy().as_ref()),
+        null_mut(),
+        pctxt,
+    );
     if input_stream.is_null() {
         // goto error;
         xml_free_node(node);

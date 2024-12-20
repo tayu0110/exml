@@ -42,12 +42,8 @@ use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strnc
 const OPT_SAX: i32 = 1 << 0;
 const OPT_NO_SUBST: i32 = 1 << 1;
 
-type Functest = unsafe extern "C" fn(
-    filename: *const c_char,
-    result: *const c_char,
-    error: *const c_char,
-    options: c_int,
-) -> c_int;
+type Functest =
+    unsafe fn(filename: &str, result: *const c_char, error: *const c_char, options: c_int) -> c_int;
 
 struct TestDesc<'a> {
     desc: &'a str,            /* description of the test */
@@ -194,19 +190,17 @@ unsafe extern "C" fn fatal_error() -> c_int {
     exit(1);
 }
 
-/*
- * We need to trap calls to the resolver to not account memory for the catalog
- * which is shared to the current running test. We also don't want to have
- * network downloads modifying tests.
- */
-unsafe extern "C" fn test_external_entity_loader(
-    url: *const c_char,
+// We need to trap calls to the resolver to not account memory for the catalog
+// which is shared to the current running test. We also don't want to have
+// network downloads modifying tests.
+unsafe fn test_external_entity_loader(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
 
-    if check_test_file(url) != 0 {
+    if check_test_file(url.unwrap()) != 0 {
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: c_int = xml_mem_used();
@@ -493,8 +487,8 @@ unsafe extern "C" fn result_filename(
     strdup(res.as_ptr())
 }
 
-unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
-    match metadata(CStr::from_ptr(filename).to_string_lossy().as_ref()) {
+fn check_test_file(filename: &str) -> c_int {
+    match metadata(filename) {
         Ok(meta) => meta.is_file() as i32,
         _ => 0,
     }
@@ -511,18 +505,15 @@ unsafe extern "C" fn check_test_file(filename: *const c_char) -> c_int {
  *
  * Returns 0 in case of success, an error code otherwise
  */
-unsafe extern "C" fn recursive_detect_test(
-    filename: *const c_char,
+unsafe fn recursive_detect_test(
+    filename: &str,
     _result: *const c_char,
     _err: *const c_char,
     options: c_int,
 ) -> c_int {
     let res: c_int = 0;
-    /*
-     * xmlParserOption::XML_PARSE_DTDVALID is the only way to load external entities
-     * without xmlParserOption::XML_PARSE_NOENT. The validation result doesn't matter
-     * anyway.
-     */
+    // xmlParserOption::XML_PARSE_DTDVALID is the only way to load external entities
+    // without xmlParserOption::XML_PARSE_NOENT. The validation result doesn't matter anyway.
     let mut parser_options: c_int = XmlParserOption::XmlParseDtdvalid as i32;
 
     NB_TESTS += 1;
@@ -534,15 +525,10 @@ unsafe extern "C" fn recursive_detect_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoent as i32;
     }
-    /*
-     * base of the test, parse with the old API
-     */
+    // base of the test, parse with the old API
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
     if !doc.is_null() || (*ctxt).last_error.code() != XmlParserErrors::XmlErrEntityLoop {
-        eprintln!(
-            "Failed to detect recursion in {}",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        eprintln!("Failed to detect recursion in {filename}");
         xml_free_parser_ctxt(ctxt);
         xml_free_doc(doc);
         return 1;
@@ -563,8 +549,8 @@ unsafe extern "C" fn recursive_detect_test(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-unsafe extern "C" fn not_recursive_detect_test(
-    filename: *const c_char,
+unsafe fn not_recursive_detect_test(
+    filename: &str,
     _result: *const c_char,
     _err: *const c_char,
     options: c_int,
@@ -581,15 +567,10 @@ unsafe extern "C" fn not_recursive_detect_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoent as i32;
     }
-    /*
-     * base of the test, parse with the old API
-     */
+    // base of the test, parse with the old API
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
     if doc.is_null() {
-        eprintln!(
-            "Failed to parse correct file {}",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        eprintln!("Failed to parse correct file {filename}");
         xml_free_parser_ctxt(ctxt);
         return 1;
     }
@@ -610,8 +591,8 @@ unsafe extern "C" fn not_recursive_detect_test(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-unsafe extern "C" fn not_recursive_huge_test(
-    _filename: *const c_char,
+unsafe fn not_recursive_huge_test(
+    _filename: &str,
     _result: *const c_char,
     _err: *const c_char,
     options: c_int,
@@ -628,12 +609,7 @@ unsafe extern "C" fn not_recursive_huge_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoent as i32;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(
-        ctxt,
-        c"test/recurse/huge.xml".as_ptr(),
-        None,
-        parser_options,
-    );
+    let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options);
     if doc.is_null() {
         eprintln!("Failed to parse huge.xml");
         res = 1;
@@ -730,8 +706,8 @@ unsafe extern "C" fn not_recursive_huge_test(
  *
  * Returns 0 in case of success, an error code otherwise
  */
-unsafe extern "C" fn huge_dtd_test(
-    _filename: *const c_char,
+unsafe fn huge_dtd_test(
+    _filename: &str,
     _result: *const c_char,
     _err: *const c_char,
     options: c_int,
@@ -748,12 +724,8 @@ unsafe extern "C" fn huge_dtd_test(
     if options & OPT_NO_SUBST == 0 {
         parser_options |= XmlParserOption::XmlParseNoent as i32;
     }
-    let doc: XmlDocPtr = xml_ctxt_read_file(
-        ctxt,
-        c"test/recurse/huge_dtd.xml".as_ptr(),
-        None,
-        parser_options,
-    );
+    let doc: XmlDocPtr =
+        xml_ctxt_read_file(ctxt, "test/recurse/huge_dtd.xml", None, parser_options);
     if doc.is_null() {
         eprintln!("Failed to parse huge_dtd.xml");
         res = 1;
@@ -923,7 +895,8 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
         globbuf.gl_offs = 0;
         glob(input.as_ptr(), GLOB_DOOFFS, None, addr_of_mut!(globbuf));
         for i in 0..globbuf.gl_pathc {
-            if check_test_file(*globbuf.gl_pathv.add(i)) == 0 {
+            let filename = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+            if check_test_file(&filename) == 0 {
                 continue;
             }
             if let Some(suffix) = tst.suffix {
@@ -952,12 +925,16 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
             } else {
                 error = null_mut();
             }
-            if !result.is_null() && check_test_file(result) == 0 {
+            if !result.is_null()
+                && check_test_file(CStr::from_ptr(result).to_string_lossy().as_ref()) == 0
+            {
                 eprintln!(
                     "Missing result file {}",
                     CStr::from_ptr(result).to_string_lossy()
                 );
-            } else if !error.is_null() && check_test_file(error) == 0 {
+            } else if !error.is_null()
+                && check_test_file(CStr::from_ptr(error).to_string_lossy().as_ref()) == 0
+            {
                 eprintln!(
                     "Missing error file {}",
                     CStr::from_ptr(error).to_string_lossy()
@@ -968,7 +945,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
                 TEST_ERRORS_SIZE = 0;
                 TEST_ERRORS[0] = 0;
                 res = (tst.func)(
-                    *globbuf.gl_pathv.add(i),
+                    &filename,
                     result,
                     error,
                     tst.options | XmlParserOption::XmlParseCompact as i32,
@@ -1007,7 +984,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
         TEST_ERRORS_SIZE = 0;
         TEST_ERRORS[0] = 0;
         EXTRA_MEMORY_FROM_RESOLVER = 0;
-        res = (tst.func)(null_mut(), null_mut(), null_mut(), tst.options);
+        res = (tst.func)("", null_mut(), null_mut(), tst.options);
         if res != 0 {
             NB_ERRORS += 1;
             err += 1;

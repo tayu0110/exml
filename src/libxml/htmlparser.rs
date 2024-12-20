@@ -66,6 +66,7 @@ use crate::{
         xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlNodePtr,
     },
+    uri::canonic_path,
 };
 
 use super::{
@@ -9753,30 +9754,21 @@ pub unsafe fn html_parse_doc(cur: *const XmlChar, encoding: Option<&str>) -> Htm
 /// Returns the new parser context or NULL
 #[doc(alias = "htmlCreateFileParserCtxt")]
 pub unsafe fn html_create_file_parser_ctxt(
-    filename: *const c_char,
+    filename: &str,
     encoding: Option<&str>,
 ) -> HtmlParserCtxtPtr {
     /* htmlCharEncoding enc; */
     let content: *mut XmlChar;
     let content_line: *mut XmlChar = c"charset=".as_ptr() as _;
 
-    if filename.is_null() {
-        return null_mut();
-    }
-
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
         return null_mut();
     }
-    let canonic_filename: *mut c_char = xml_canonic_path(filename as _) as _;
-    if canonic_filename.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    }
 
+    let canonic_filename = canonic_path(filename);
     let input_stream: HtmlParserInputPtr =
-        xml_load_external_entity(canonic_filename, null_mut(), ctxt);
-    xml_free(canonic_filename as _);
+        xml_load_external_entity(Some(&canonic_filename), null_mut(), ctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -9812,7 +9804,7 @@ pub unsafe fn html_create_file_parser_ctxt(
 #[doc(alias = "htmlSAXParseFile")]
 #[deprecated = "Use htmlNewSAXParserCtxt and htmlCtxtReadFile"]
 pub unsafe fn html_sax_parse_file(
-    filename: *const c_char,
+    filename: &str,
     encoding: Option<&str>,
     sax: HtmlSaxhandlerPtr,
     user_data: Option<GenericErrorContext>,
@@ -9851,7 +9843,7 @@ pub unsafe fn html_sax_parse_file(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlParseFile")]
-pub unsafe fn html_parse_file(filename: *const c_char, encoding: Option<&str>) -> HtmlDocPtr {
+pub unsafe fn html_parse_file(filename: &str, encoding: Option<&str>) -> HtmlDocPtr {
     html_sax_parse_file(filename, encoding, null_mut(), None)
 }
 
@@ -11413,11 +11405,7 @@ pub unsafe fn html_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "htmlReadFile")]
-pub unsafe fn html_read_file(
-    filename: *const c_char,
-    encoding: Option<&str>,
-    options: i32,
-) -> HtmlDocPtr {
+pub unsafe fn html_read_file(filename: &str, encoding: Option<&str>, options: i32) -> HtmlDocPtr {
     xml_init_parser();
     let ctxt: HtmlParserCtxtPtr = html_create_file_parser_ctxt(filename, encoding);
     if ctxt.is_null() {
@@ -11502,13 +11490,10 @@ pub unsafe fn html_ctxt_read_doc(
 #[doc(alias = "htmlCtxtReadFile")]
 pub unsafe fn html_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
-    filename: *const c_char,
+    filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> HtmlDocPtr {
-    if filename.is_null() {
-        return null_mut();
-    }
     if ctxt.is_null() {
         return null_mut();
     }
@@ -11516,7 +11501,7 @@ pub unsafe fn html_ctxt_read_file(
 
     html_ctxt_reset(ctxt);
 
-    let stream: XmlParserInputPtr = xml_load_external_entity(filename, null_mut(), ctxt);
+    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), null_mut(), ctxt);
     if stream.is_null() {
         return null_mut();
     }

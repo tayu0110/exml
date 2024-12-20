@@ -99,19 +99,17 @@ thread_local! {
     static EXTRA_MEMORY_FROM_RESOLVER: Cell<i32> = const { Cell::new(0) };
 }
 
-/*
- * We need to trap calls to the resolver to not account memory for the catalog
- * which is shared to the current running test. We also don't want to have
- * network downloads modifying tests.
- */
-unsafe extern "C" fn test_external_entity_loader(
-    url: *const c_char,
+// We need to trap calls to the resolver to not account memory for the catalog
+// which is shared to the current running test. We also don't want to have
+// network downloads modifying tests.
+unsafe fn test_external_entity_loader(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
 
-    if check_test_file(CStr::from_ptr(url).to_string_lossy().as_ref()) {
+    if check_test_file(url.unwrap()) {
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
     } else {
         let memused: i32 = xml_mem_used();
@@ -1594,7 +1592,6 @@ unsafe fn sax_parse_test(
     mut options: i32,
 ) -> i32 {
     let mut ret: i32;
-    let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
     let temp = result_filename(
@@ -1614,7 +1611,7 @@ unsafe fn sax_parse_test(
     };
     SAX_DEBUG.with_borrow_mut(|f| *f = Some(out));
 
-    /* for SAX we really want the callbacks though the context handlers */
+    // for SAX we really want the callbacks though the context handlers
     set_structured_error(None, None);
     set_generic_error(Some(test_error_handler), None);
 
@@ -1622,11 +1619,11 @@ unsafe fn sax_parse_test(
     if options & XML_PARSE_HTML != 0 {
         let ctxt: HtmlParserCtxtPtr =
             html_new_sax_parser_ctxt(&raw const EMPTY_SAXHANDLER_STRUCT, None);
-        html_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
+        html_ctxt_read_file(ctxt, filename, None, options);
         html_free_parser_ctxt(ctxt);
         ret = 0;
     } else {
-        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(cfilename.as_ptr());
+        let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
         memcpy(
             (*ctxt).sax as _,
             &raw const EMPTY_SAXHANDLER_STRUCT as _,
@@ -1672,11 +1669,11 @@ unsafe fn sax_parse_test(
         if options & XML_PARSE_HTML != 0 {
             let ctxt: HtmlParserCtxtPtr =
                 html_new_sax_parser_ctxt(&raw const DEBUG_HTMLSAXHANDLER_STRUCT, None);
-            html_ctxt_read_file(ctxt, cfilename.as_ptr(), None, options);
+            html_ctxt_read_file(ctxt, filename, None, options);
             html_free_parser_ctxt(ctxt);
             ret = 0;
         } else {
-            let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(cfilename.as_ptr());
+            let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
             if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
                 memcpy(
                     (*ctxt).sax as _,
@@ -1767,14 +1764,11 @@ unsafe fn old_parse_test(
     _options: i32,
 ) -> i32 {
     let mut res: i32 = 0;
-    let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
-    /*
-     * base of the test, parse with the old API
-     */
+    // base of the test, parse with the old API
     #[cfg(feature = "sax1")]
-    let mut doc = xml_parse_file(cfilename.as_ptr());
+    let mut doc = xml_parse_file(Some(filename));
     #[cfg(not(feature = "sax1"))]
     let doc = xml_read_file(filename, NULL, 0);
     if doc.is_null() {
@@ -1785,19 +1779,16 @@ unsafe fn old_parse_test(
         TEMP_DIRECTORY.get().cloned().as_deref(),
         Some(".res"),
     );
-    let ctemp = CString::new(temp.as_str()).unwrap();
     (*doc).save_file(temp.as_str());
     if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0 {
         res = 1;
     }
     xml_free_doc(doc);
 
-    /*
-     * Parse the saved result to make sure the round trip is okay
-     */
+    // Parse the saved result to make sure the round trip is okay
     #[cfg(feature = "sax1")]
     {
-        doc = xml_parse_file(ctemp.as_ptr());
+        doc = xml_parse_file(Some(&temp));
     }
     #[cfg(not(feature = "sax1"))]
     {
@@ -2498,13 +2489,10 @@ unsafe fn noent_parse_test(
 ) -> i32 {
     let mut doc: XmlDocPtr;
     let mut res: i32 = 0;
-    let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
-    /*
-     * base of the test, parse with the old API
-     */
-    doc = xml_read_file(cfilename.as_ptr(), None, options);
+    // base of the test, parse with the old API
+    doc = xml_read_file(filename, None, options);
     if doc.is_null() {
         return 1;
     }
@@ -2519,10 +2507,8 @@ unsafe fn noent_parse_test(
     }
     xml_free_doc(doc);
 
-    /*
-     * Parse the saved result to make sure the round trip is okay
-     */
-    doc = xml_read_file(cfilename.as_ptr(), None, options);
+    // Parse the saved result to make sure the round trip is okay
+    doc = xml_read_file(filename, None, options);
     if doc.is_null() {
         return 1;
     }
@@ -2556,27 +2542,26 @@ unsafe fn err_parse_test(
     let mut base: *const c_char = null_mut();
     let mut size: i32 = 0;
     let mut res: i32 = 0;
-    let cfilename = CString::new(filename).unwrap();
     let cresult = result.as_deref().map(|s| CString::new(s).unwrap());
 
     NB_TESTS.set(NB_TESTS.get() + 1);
     if cfg!(feature = "html") && options & XML_PARSE_HTML != 0 {
         #[cfg(feature = "html")]
         {
-            doc = html_read_file(cfilename.as_ptr(), None, options);
+            doc = html_read_file(filename, None, options);
         }
     } else if cfg!(feature = "xinclude") && options & XmlParserOption::XmlParseXinclude as i32 != 0
     {
         #[cfg(feature = "xinclude")]
         {
-            doc = xml_read_file(cfilename.as_ptr(), None, options);
+            doc = xml_read_file(filename, None, options);
             if xml_xinclude_process_flags(doc, options) < 0 {
                 xml_free_doc(doc);
                 doc = null_mut();
             }
         }
     } else {
-        doc = xml_read_file(cfilename.as_ptr(), None, options);
+        doc = xml_read_file(filename, None, options);
     }
     if let Some(result) = cresult {
         if doc.is_null() {
@@ -2809,9 +2794,7 @@ unsafe fn walker_parse_test(
 ) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_walker};
 
-    let cfilename = CString::new(filename).unwrap();
-
-    let doc: XmlDocPtr = xml_read_file(cfilename.as_ptr(), None, options);
+    let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!("Failed to parse {filename}",);
         return -1;
@@ -3109,10 +3092,9 @@ unsafe fn xpath_doc_test(
     let mut globbuf: glob_t = unsafe { zeroed() };
     let mut ret: i32 = 0;
     let mut res: i32;
-    let cfilename = CString::new(filename).unwrap();
 
     let xpath_document = xml_read_file(
-        cfilename.as_ptr(),
+        filename,
         None,
         options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
@@ -3196,10 +3178,9 @@ unsafe fn xptr_doc_test(
     } else {
         c"xptr".as_ptr()
     };
-    let cfilename = CString::new(filename).unwrap();
 
     let xpath_document = xml_read_file(
-        cfilename.as_ptr(),
+        filename,
         None,
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
@@ -3273,10 +3254,9 @@ unsafe fn xmlid_doc_test(
 ) -> i32 {
     let mut res: i32 = 0;
     let mut ret: i32;
-    let cfilename = CString::new(filename).unwrap();
 
     let xpath_document = xml_read_file(
-        cfilename.as_ptr(),
+        filename,
         None,
         options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
@@ -3479,15 +3459,15 @@ unsafe fn uri_base_test(
     )
 }
 
-const URIP_TEST_URLS: &[&CStr] = &[
-    c"urip://example.com/a b.html",
-    c"urip://example.com/a%20b.html",
-    c"file:///path/to/a b.html",
-    c"file:///path/to/a%20b.html",
-    c"/path/to/a b.html",
-    c"/path/to/a%20b.html",
-    c"urip://example.com/r\xe9sum\xe9.html",
-    c"urip://example.com/test?a=1&b=2%263&c=4#foo",
+const URIP_TEST_URLS: &[&str] = &[
+    "urip://example.com/a b.html",
+    "urip://example.com/a%20b.html",
+    "file:///path/to/a b.html",
+    "file:///path/to/a%20b.html",
+    "/path/to/a b.html",
+    "/path/to/a%20b.html",
+    // "urip://example.com/r\xe9sum\xe9.html", // This is invalid UTF-8 sequence, so cannot compile.
+    "urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
 const URIP_RCVS_URLS: &[&str] = &[
     /* it is an URI the strings must be escaped */
@@ -3503,7 +3483,7 @@ const URIP_RCVS_URLS: &[&str] = &[
     /* check that paths with % are not broken */
     "/path/to/a%20b.html",
     /* out of context the encoding can't be guessed byte by byte conversion */
-    "urip://example.com/r%E9sum%E9.html",
+    // "urip://example.com/r%E9sum%E9.html",
     /* verify we don't destroy URIs especially the query part */
     "urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
@@ -3600,7 +3580,7 @@ unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut le
     len
 }
 
-unsafe extern "C" fn urip_check_url(url: *const c_char) -> i32 {
+unsafe fn urip_check_url(url: &str) -> i32 {
     let doc: XmlDocPtr = xml_read_file(url, None, 0);
     if doc.is_null() {
         return -1;
@@ -3629,9 +3609,7 @@ unsafe fn uri_path_test(
     let mut parsed: i32;
     let mut failures: i32 = 0;
 
-    /*
-     * register the new I/O handlers
-     */
+    // register the new I/O handlers
     struct URIPTest(*mut c_void);
     impl Read for URIPTest {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -3674,17 +3652,17 @@ unsafe fn uri_path_test(
     URIP_CURRENT.set(0);
     while URIP_CURRENT.get() < URIP_TEST_URLS.len() {
         URIP_SUCCESS.set(1);
-        parsed = urip_check_url(URIP_TEST_URLS[URIP_CURRENT.get()].as_ptr());
+        parsed = urip_check_url(URIP_TEST_URLS[URIP_CURRENT.get()]);
         if URIP_SUCCESS.get() != 1 {
-            eprint!(
+            eprintln!(
                 "failed the URL passing test for {}",
-                URIP_TEST_URLS[URIP_CURRENT.get()].to_string_lossy(),
+                URIP_TEST_URLS[URIP_CURRENT.get()]
             );
             failures += 1;
         } else if parsed != 1 {
-            eprint!(
+            eprintln!(
                 "failed the parsing test for {}",
-                URIP_TEST_URLS[URIP_CURRENT.get()].to_string_lossy(),
+                URIP_TEST_URLS[URIP_CURRENT.get()]
             );
             failures += 1;
         }
@@ -3699,7 +3677,7 @@ unsafe fn uri_path_test(
 #[cfg(feature = "schema")]
 unsafe fn schemas_one_test(
     sch: *const c_char,
-    filename: *const c_char,
+    filename: &str,
     result: *const c_char,
     options: i32,
     schemas: XmlSchemaPtr,
@@ -3714,8 +3692,7 @@ unsafe fn schemas_one_test(
     let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!(
-            "failed to parse instance {} for {}",
-            CStr::from_ptr(filename).to_string_lossy(),
+            "failed to parse instance {filename} for {}",
             CStr::from_ptr(sch).to_string_lossy(),
         );
         return -1;
@@ -3747,26 +3724,15 @@ unsafe fn schemas_one_test(
     let valid_result: i32 = xml_schema_validate_doc(ctxt, doc);
     match valid_result.cmp(&0) {
         std::cmp::Ordering::Equal => {
-            writeln!(
-                schemas_output,
-                "{} validates",
-                CStr::from_ptr(filename).to_string_lossy()
-            )
-            .ok();
+            writeln!(schemas_output, "{filename} validates").ok();
         }
         std::cmp::Ordering::Greater => {
-            writeln!(
-                schemas_output,
-                "{} fails to validate",
-                CStr::from_ptr(filename).to_string_lossy()
-            )
-            .ok();
+            writeln!(schemas_output, "{filename} fails to validate").ok();
         }
         std::cmp::Ordering::Less => {
             writeln!(
                 schemas_output,
-                "{} validation generated an internal error",
-                CStr::from_ptr(filename).to_string_lossy(),
+                "{filename} validation generated an internal error"
             )
             .ok();
         }
@@ -3778,8 +3744,7 @@ unsafe fn schemas_one_test(
         ) != 0
     {
         eprintln!(
-            "Result for {} on {} failed",
-            CStr::from_ptr(filename).to_string_lossy(),
+            "Result for {filename} on {} failed",
             CStr::from_ptr(sch).to_string_lossy()
         );
         ret = 1;
@@ -3819,7 +3784,6 @@ unsafe fn schemas_test(
     let cfilename = CString::new(filename).unwrap();
     let base = CString::new(base_filename(filename)).unwrap();
     let base = base.as_ptr();
-    let mut instance: *const c_char;
     let mut res: i32 = 0;
     let mut len: usize;
     let mut ret: i32;
@@ -3842,9 +3806,7 @@ unsafe fn schemas_test(
     xml_schema_free_parser_ctxt(ctxt);
     let parse_errors_size = TEST_ERRORS_SIZE.get();
 
-    /*
-     * most of the mess is about the output filenames generated by the Makefile
-     */
+    // most of the mess is about the output filenames generated by the Makefile
     len = strlen(base);
     if !(5..=499).contains(&len) {
         xml_schema_free(schemas);
@@ -3883,11 +3845,8 @@ unsafe fn schemas_test(
         TEST_ERRORS.with_borrow_mut(|errors| {
             errors[parse_errors_size] = 0;
         });
-        instance = *globbuf.gl_pathv.add(i);
-        let base2 = CString::new(base_filename(
-            CStr::from_ptr(instance).to_string_lossy().as_ref(),
-        ))
-        .unwrap();
+        let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+        let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
         let base2 = base2.as_ptr();
         len = strlen(base2);
         if len > 6 && *base2.add(len - 6) == b'_' as _ {
@@ -3913,17 +3872,14 @@ unsafe fn schemas_test(
                 err[499] = 0;
             }
         } else {
-            eprintln!(
-                "don't know how to process {}",
-                CStr::from_ptr(instance).to_string_lossy()
-            );
+            eprintln!("don't know how to process {}", instance);
             continue;
         }
         if !schemas.is_null() {
             NB_TESTS.set(NB_TESTS.get() + 1);
             ret = schemas_one_test(
                 cfilename.as_ptr(),
-                instance,
+                &instance,
                 result.as_ptr(),
                 options,
                 schemas,
@@ -3938,10 +3894,7 @@ unsafe fn schemas_test(
                 &errors[..TEST_ERRORS_SIZE.get()],
             ) != 0
             {
-                eprintln!(
-                    "Error for {} on {filename} failed",
-                    CStr::from_ptr(instance).to_string_lossy(),
-                );
+                eprintln!("Error for {instance} on {filename} failed");
                 res = 1;
             }
         });
@@ -3955,7 +3908,7 @@ unsafe fn schemas_test(
 #[cfg(feature = "schema")]
 unsafe fn rng_one_test(
     sch: *const c_char,
-    filename: *const c_char,
+    filename: &str,
     result: *const c_char,
     options: i32,
     schemas: XmlRelaxNGPtr,
@@ -3970,8 +3923,7 @@ unsafe fn rng_one_test(
     let doc: XmlDocPtr = xml_read_file(filename, None, options);
     if doc.is_null() {
         eprintln!(
-            "failed to parse instance {} for {}",
-            CStr::from_ptr(filename).to_string_lossy(),
+            "failed to parse instance {filename} for {}",
             CStr::from_ptr(sch).to_string_lossy(),
         );
         return -1;
@@ -4001,7 +3953,6 @@ unsafe fn rng_one_test(
         Some(GenericErrorContext::new(ctxt)),
     );
     ret = xml_relaxng_validate_doc(ctxt, doc);
-    let filename = CStr::from_ptr(filename).to_string_lossy();
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
             test_error_handler(None, format!("{filename} validates\n").as_str());
@@ -4064,7 +4015,6 @@ unsafe fn rng_test(
     let cfilename = CString::new(filename).unwrap();
     let base = CString::new(base_filename(filename)).unwrap();
     let base = base.as_ptr();
-    let mut instance: *const c_char;
     let mut res: i32;
     let mut len: usize;
     let mut ret: i32 = 0;
@@ -4120,11 +4070,8 @@ unsafe fn rng_test(
     for i in 0..globbuf.gl_pathc {
         TEST_ERRORS_SIZE.set(parse_errors_size);
         TEST_ERRORS.with_borrow_mut(|errors| errors[parse_errors_size] = 0);
-        instance = *globbuf.gl_pathv.add(i);
-        let base2 = CString::new(base_filename(
-            CStr::from_ptr(instance).to_string_lossy().as_ref(),
-        ))
-        .unwrap();
+        let instance = CStr::from_ptr(*globbuf.gl_pathv.add(i)).to_string_lossy();
+        let base2 = CString::new(base_filename(instance.as_ref())).unwrap();
         let base2 = base2.as_ptr();
         len = strlen(base2);
         if len > 6 && *base2.add(len - 6) == b'_' as i8 {
@@ -4150,17 +4097,14 @@ unsafe fn rng_test(
                 err[499] = 0;
             }
         } else {
-            eprintln!(
-                "don't know how to process {}",
-                CStr::from_ptr(instance).to_string_lossy()
-            );
+            eprintln!("don't know how to process {instance}");
             continue;
         }
         if !schemas.is_null() {
             NB_TESTS.set(NB_TESTS.get() + 1);
             res = rng_one_test(
                 cfilename.as_ptr(),
-                instance,
+                &instance,
                 result.as_ptr(),
                 options,
                 schemas,
@@ -4175,10 +4119,7 @@ unsafe fn rng_test(
                 &errors[..TEST_ERRORS_SIZE.get()],
             ) != 0
             {
-                eprintln!(
-                    "Error for {} on {filename} failed",
-                    CStr::from_ptr(instance).to_string_lossy(),
-                );
+                eprintln!("Error for {instance} on {filename} failed");
                 // res = 1;
             }
         });
@@ -4513,14 +4454,10 @@ unsafe fn pattern_test(
     };
     let mut str = vec![];
     loop {
-        /*
-         * read one line in string buffer.
-         */
+        // read one line in string buffer.
         match f.read_until(b'\n', &mut str) {
             Ok(mut size) if size > 0 => {
-                /*
-                 * remove the ending spaces
-                 */
+                // remove the ending spaces
                 while size > 0
                     && (str[size - 1] == b'\n'
                         || str[size - 1] == b'\r'
@@ -4530,12 +4467,10 @@ unsafe fn pattern_test(
                     size -= 1;
                     str[size] = 0;
                 }
-                doc = xml_read_file(xml.as_ptr(), None, options);
+                let xml = CStr::from_ptr(xml.as_ptr()).to_string_lossy();
+                doc = xml_read_file(&xml, None, options);
                 if doc.is_null() {
-                    eprintln!(
-                        "Failed to parse {}",
-                        CStr::from_ptr(xml.as_ptr()).to_string_lossy()
-                    );
+                    eprintln!("Failed to parse {xml}");
                     // ret = 1;
                 } else {
                     let mut namespaces: [(*const u8, *const u8); 20] = [(null(), null()); 20];
@@ -4611,10 +4546,7 @@ unsafe fn pattern_test(
 }
 
 #[cfg(feature = "c14n")]
-unsafe extern "C" fn load_xpath_expr(
-    parent_doc: XmlDocPtr,
-    filename: *const c_char,
-) -> XmlXPathObjectPtr {
+unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObjectPtr {
     use exml::{
         globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
         libxml::{
@@ -4631,9 +4563,7 @@ unsafe extern "C" fn load_xpath_expr(
     let mut node: XmlNodePtr;
     let mut ns: XmlNsPtr;
 
-    /*
-     * load XPath expr as a file
-     */
+    // load XPath expr as a file
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
     set_substitute_entities_default_value(1);
 
@@ -4643,19 +4573,13 @@ unsafe extern "C" fn load_xpath_expr(
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {
-        eprintln!(
-            "Error: unable to parse file \"{}\"",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        eprintln!("Error: unable to parse file \"{filename}\"");
         return null_mut();
     }
 
     // Check the document is of the right kind
     if (*doc).get_root_element().is_null() {
-        eprintln!(
-            "Error: empty document for file \"{}\"",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        eprintln!("Error: empty document for file \"{filename}\"");
         xml_free_doc(doc);
         return null_mut();
     }
@@ -4666,19 +4590,13 @@ unsafe extern "C" fn load_xpath_expr(
     }
 
     if node.is_null() {
-        eprintln!(
-            "Error: XPath element expected in the file  \"{}\"",
-            CStr::from_ptr(filename).to_string_lossy(),
-        );
+        eprintln!("Error: XPath element expected in the file  \"{filename}\"");
         xml_free_doc(doc);
         return null_mut();
     }
 
     let Some(expr) = (*node).get_content() else {
-        eprintln!(
-            "Error: XPath content element is NULL \"{}\"",
-            CStr::from_ptr(filename).to_string_lossy(),
-        );
+        eprintln!("Error: XPath content element is NULL \"{filename}\"");
         xml_free_doc(doc);
         return null_mut();
     };
@@ -4759,9 +4677,7 @@ unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
         *str.add(len - 1) = b'\0';
         str = str.add(1);
     }
-    /*
-     * allocate an translation buffer.
-     */
+    // allocate an translation buffer.
     buffer_size = 1000;
     buffer = xml_malloc(buffer_size * size_of::<*mut XmlChar>()) as *mut *mut XmlChar;
     if buffer.is_null() {
@@ -4792,11 +4708,11 @@ unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
 }
 
 #[cfg(feature = "c14n")]
-unsafe extern "C" fn c14n_run_test(
-    xml_filename: *const c_char,
+unsafe fn c14n_run_test(
+    xml_filename: &str,
     with_comments: i32,
     mode: i32,
-    xpath_filename: *const c_char,
+    xpath_filename: Option<&str>,
     ns_filename: *const c_char,
     result_file: *const c_char,
 ) -> i32 {
@@ -4816,10 +4732,8 @@ unsafe extern "C" fn c14n_run_test(
     let mut nslist: *const c_char = null_mut();
     let mut nssize: i32 = 0;
 
-    /*
-     * build an XML tree from a the file; we need to add default
-     * attributes and resolve all character and entities references
-     */
+    // build an XML tree from a the file; we need to add default
+    // attributes and resolve all character and entities references
     set_load_ext_dtd_default_value(XML_DETECT_IDS as i32 | XML_COMPLETE_ATTRS as i32);
     set_substitute_entities_default_value(1);
 
@@ -4829,29 +4743,19 @@ unsafe extern "C" fn c14n_run_test(
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {
-        eprintln!(
-            "Error: unable to parse file \"{}\"",
-            CStr::from_ptr(xml_filename).to_string_lossy()
-        );
+        eprintln!("Error: unable to parse file \"{xml_filename}\"");
         return -1;
     }
 
-    /*
-     * Check the document is of the right kind
-     */
+    // Check the document is of the right kind
     if (*doc).get_root_element().is_null() {
-        eprintln!(
-            "Error: empty document for file \"{}\"",
-            CStr::from_ptr(xml_filename).to_string_lossy(),
-        );
+        eprintln!("Error: empty document for file \"{xml_filename}\"");
         xml_free_doc(doc);
         return -1;
     }
 
-    /*
-     * load xpath file if specified
-     */
-    if !xpath_filename.is_null() {
+    // load xpath file if specified
+    if let Some(xpath_filename) = xpath_filename {
         xpath = load_xpath_expr(doc, xpath_filename);
         if xpath.is_null() {
             eprintln!("Error: unable to evaluate xpath expression");
@@ -4898,10 +4802,7 @@ unsafe extern "C" fn c14n_run_test(
                 from_raw_parts(result, ret as _),
             ) != 0
         {
-            eprintln!(
-                "Result mismatch for {}",
-                CStr::from_ptr(xml_filename).to_string_lossy()
-            );
+            eprintln!("Result mismatch for {xml_filename}");
             eprintln!(
                 "RESULT:\n{}",
                 CStr::from_ptr(result as *const c_char).to_string_lossy()
@@ -4910,16 +4811,13 @@ unsafe extern "C" fn c14n_run_test(
         }
     } else {
         eprintln!(
-            "Error: failed to canonicalize XML file \"{}\" (ret={})",
-            CStr::from_ptr(xml_filename).to_string_lossy(),
+            "Error: failed to canonicalize XML file \"{xml_filename}\" (ret={})",
             ret,
         );
         ret = -1;
     }
 
-    /*
-     * Cleanup
-     */
+    // Cleanup
     if !result.is_null() {
         xml_free(result as _);
     }
@@ -4952,7 +4850,6 @@ unsafe fn c14n_common_test(
     let mut xpath: *mut c_char = null_mut();
     let mut ns: *mut c_char = null_mut();
     let mut ret: i32 = 0;
-    let cfilename = CString::new(filename).unwrap();
 
     let base = CString::new(base_filename(filename)).unwrap();
     let base = base.as_ptr();
@@ -5000,7 +4897,17 @@ unsafe fn c14n_common_test(
     }
 
     NB_TESTS.set(NB_TESTS.get() + 1);
-    if c14n_run_test(cfilename.as_ptr(), with_comments, mode, xpath, ns, result) < 0 {
+    if c14n_run_test(
+        filename,
+        with_comments,
+        mode,
+        (!xpath.is_null())
+            .then(|| CStr::from_ptr(xpath as *const i8).to_string_lossy())
+            .as_deref(),
+        ns,
+        result,
+    ) < 0
+    {
         ret = 1;
     }
 
@@ -5091,7 +4998,7 @@ const MAX_ARGC: usize = 20;
 #[cfg(feature = "catalog")]
 #[repr(C)]
 struct XmlThreadParams<'a> {
-    filename: &'a CStr,
+    filename: &'a str,
     okay: i32,
 }
 
@@ -5100,31 +5007,31 @@ const CATALOG: &str = "./test/threads/complex.xml";
 #[cfg(feature = "catalog")]
 static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
     XmlThreadParams {
-        filename: c"./test/threads/abc.xml",
+        filename: "./test/threads/abc.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"./test/threads/acb.xml",
+        filename: "./test/threads/acb.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"./test/threads/bac.xml",
+        filename: "./test/threads/bac.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"./test/threads/bca.xml",
+        filename: "./test/threads/bca.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"./test/threads/cab.xml",
+        filename: "./test/threads/cab.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"./test/threads/cba.xml",
+        filename: "./test/threads/cba.xml",
         okay: 0,
     },
     XmlThreadParams {
-        filename: c"./test/threads/invalid.xml",
+        filename: "./test/threads/invalid.xml",
         okay: 0,
     },
 ];
@@ -5142,10 +5049,10 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
     unsafe {
         let my_doc: XmlDocPtr;
         let params: *mut XmlThreadParams = private_data as *mut XmlThreadParams;
-        let filename: *const c_char = (*params).filename.as_ptr();
+        let filename = (*params).filename;
         let mut okay: i32 = 1;
 
-        if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
+        if filename == "./test/threads/invalid.xml" {
             set_do_validity_checking_default_value(0);
             let stdout: Box<dyn Write> = Box::new(stdout());
             set_generic_error(None, Some(GenericErrorContext::new(stdout)));
@@ -5156,7 +5063,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
         }
         #[cfg(feature = "sax1")]
         {
-            my_doc = xml_parse_file(filename);
+            my_doc = xml_parse_file(Some(filename));
         }
         #[cfg(not(feature = "sax1"))]
         {
@@ -5168,7 +5075,7 @@ extern "C" fn thread_specific_data(private_data: *mut c_void) -> *mut c_void {
             println!("parse failed");
             okay = 0;
         }
-        if strcmp(filename, c"./test/threads/invalid.xml".as_ptr()) == 0 {
+        if filename == "./test/threads/invalid.xml" {
             if get_do_validity_checking_default_value() != 0 {
                 println!("ValidityCheckingDefaultValue override failed");
                 okay = 0;
@@ -5226,11 +5133,7 @@ unsafe extern "C" fn test_thread() -> i32 {
         xml_catalog_cleanup();
         for (i, params) in THREAD_PARAMS.iter().take(NUM_THREADS).enumerate() {
             if params.okay == 0 {
-                eprintln!(
-                    "Thread {} handling {} failed",
-                    i,
-                    params.filename.to_string_lossy()
-                );
+                eprintln!("Thread {} handling {} failed", i, params.filename);
                 res = 1;
             }
         }

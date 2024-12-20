@@ -30,7 +30,7 @@ use std::{
     fs::{metadata, File},
     io::{self, stdin, ErrorKind, Read},
     path::Path,
-    ptr::null_mut,
+    ptr::{null, null_mut},
     sync::atomic::Ordering,
 };
 
@@ -475,8 +475,8 @@ pub unsafe extern "C" fn xml_check_http_input(
 ///
 /// Returns a new allocated xmlParserInputPtr, or NULL.
 #[doc(alias = "xmlDefaultExternalEntityLoader")]
-pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
-    url: *const c_char,
+pub(crate) unsafe fn xml_default_external_entity_loader(
+    url: Option<&str>,
     mut id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
@@ -496,6 +496,8 @@ pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
         resource = xml_resolve_resource_from_catalog(url, id, ctxt);
     }
 
+    let url = url.map(|u| CString::new(u).unwrap());
+    let url = url.as_deref().map_or(null(), |u| u.as_ptr() as *const u8);
     if resource.is_null() {
         resource = url as _;
     }
@@ -518,36 +520,34 @@ pub(crate) unsafe extern "C" fn xml_default_external_entity_loader(
     ret
 }
 
-pub(crate) unsafe extern "C" fn xml_no_net_exists(url: *const c_char) -> c_int {
-    let path: *const c_char;
-
-    if url.is_null() {
+pub(crate) fn xml_no_net_exists(url: Option<&str>) -> i32 {
+    let Some(url) = url else {
         return 0;
-    }
+    };
 
-    if xml_strncasecmp(url as _, c"file://localhost/".as_ptr() as _, 17) == 0 {
+    let path = if url.starts_with("file://localhost/") {
         #[cfg(target_os = "windows")]
         {
-            path = url.add(17);
+            &url[17..]
         }
         #[cfg(not(target_os = "windows"))]
         {
-            path = url.add(16);
+            &url[16..]
         }
-    } else if xml_strncasecmp(url as _, c"file:///".as_ptr() as _, 8) == 0 {
+    } else if url.starts_with("file:///") {
         #[cfg(target_os = "windows")]
         {
-            path = url.add(8);
+            &url[8..]
         }
         #[cfg(not(target_os = "windows"))]
         {
-            path = url.add(7);
+            &url[7..]
         }
     } else {
-        path = url;
-    }
+        url
+    };
 
-    xml_check_filename(CStr::from_ptr(path).to_string_lossy().as_ref())
+    xml_check_filename(path)
 }
 
 /// Resolves the URL and ID against the appropriate catalog.
@@ -557,8 +557,8 @@ pub(crate) unsafe extern "C" fn xml_no_net_exists(url: *const c_char) -> c_int {
 /// Returns a new allocated URL, or NULL.
 #[doc(alias = "xmlResolveResourceFromCatalog")]
 #[cfg(feature = "catalog")]
-unsafe extern "C" fn xml_resolve_resource_from_catalog(
-    url: *const c_char,
+unsafe fn xml_resolve_resource_from_catalog(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> *mut XmlChar {
@@ -574,28 +574,44 @@ unsafe extern "C" fn xml_resolve_resource_from_catalog(
             && !(*ctxt).catalogs.is_null()
             && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
         {
-            resource = xml_catalog_local_resolve((*ctxt).catalogs, id as _, url as _);
+            resource = xml_catalog_local_resolve((*ctxt).catalogs, id as _, url);
         }
         // Try a global lookup
         if resource.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-            resource = xml_catalog_resolve(id as _, url as _);
+            resource = xml_catalog_resolve(id as _, url);
         }
-        if resource.is_null() && !url.is_null() {
-            resource = xml_strdup(url as _);
+        if resource.is_null() && url.is_some() {
+            let url = CString::new(url.unwrap()).unwrap();
+            resource = xml_strdup(url.as_ptr() as *const u8);
         }
 
         // TODO: do an URI lookup on the reference
-        if !resource.is_null() && xml_no_net_exists(resource as _) == 0 {
+        if !resource.is_null()
+            && xml_no_net_exists(Some(
+                CStr::from_ptr(resource as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            )) == 0
+        {
             let mut tmp: *mut XmlChar = null_mut();
 
             if !ctxt.is_null()
                 && !(*ctxt).catalogs.is_null()
                 && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
             {
-                tmp = xml_catalog_local_resolve_uri((*ctxt).catalogs, resource);
+                tmp = xml_catalog_local_resolve_uri(
+                    (*ctxt).catalogs,
+                    CStr::from_ptr(resource as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
             if tmp.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-                tmp = xml_catalog_resolve_uri(resource);
+                tmp = xml_catalog_resolve_uri(
+                    CStr::from_ptr(resource as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
 
             if !tmp.is_null() {
@@ -613,8 +629,8 @@ unsafe extern "C" fn xml_resolve_resource_from_catalog(
 ///
 /// Returns a new allocated xmlParserInputPtr, or NULL.
 #[doc(alias = "xmlNoNetExternalEntityLoader")]
-pub unsafe extern "C" fn xml_no_net_external_entity_loader(
-    url: *const c_char,
+pub unsafe fn xml_no_net_external_entity_loader(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
@@ -629,6 +645,8 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
         resource = null_mut();
     }
 
+    let url = url.map(|u| CString::new(u).unwrap());
+    let url = url.as_deref().map_or(null(), |u| u.as_ptr() as *const u8);
     if resource.is_null() {
         resource = url as _;
     }
@@ -650,7 +668,13 @@ pub unsafe extern "C" fn xml_no_net_external_entity_loader(
         }
         return null_mut();
     }
-    let input: XmlParserInputPtr = xml_default_external_entity_loader(resource as _, id, ctxt);
+    let input: XmlParserInputPtr = xml_default_external_entity_loader(
+        (!resource.is_null())
+            .then(|| CStr::from_ptr(resource as *const i8).to_string_lossy())
+            .as_deref(),
+        id,
+        ctxt,
+    );
     if resource != url as _ {
         xml_free(resource as _);
     }
@@ -932,47 +956,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_no_net_external_entity_loader() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        unsafe {
-            let mut leaks = 0;
-
-            for n_url in 0..GEN_NB_FILEPATH {
-                for n_id in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let url = gen_filepath(n_url, 0);
-                        let id = gen_const_char_ptr(n_id, 1);
-                        let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 2);
-
-                        let ret_val = xml_no_net_external_entity_loader(url, id, ctxt);
-                        desret_xml_parser_input_ptr(ret_val);
-                        des_filepath(n_url, url, 0);
-                        des_const_char_ptr(n_id, id, 1);
-                        des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNoNetExternalEntityLoader",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlNoNetExternalEntityLoader()"
-                            );
-                            eprint!(" {}", n_url);
-                            eprint!(" {}", n_id);
-                            eprintln!(" {}", n_ctxt);
-                        }
-                    }
-                }
-            }
-        }
-        drop(lock);
     }
 
     #[test]

@@ -603,7 +603,13 @@ pub unsafe fn xml_sax2_resolve_entity(
     }
 
     let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-    let ret: XmlParserInputPtr = xml_load_external_entity(uri as _, public_id as _, ctxt);
+    let ret: XmlParserInputPtr = xml_load_external_entity(
+        (!uri.is_null())
+            .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+            .as_deref(),
+        public_id as _,
+        ctxt,
+    );
     if !uri.is_null() {
         xml_free(uri as _);
     }

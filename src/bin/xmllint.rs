@@ -251,8 +251,8 @@ fn parse_path(mut path: &str) {
 
 static mut DEFAULT_ENTITY_LOADER: Option<XmlExternalEntityLoader> = None;
 
-unsafe extern "C" fn xmllint_external_entity_loader(
-    url: *const c_char,
+unsafe fn xmllint_external_entity_loader(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
@@ -260,15 +260,15 @@ unsafe extern "C" fn xmllint_external_entity_loader(
     let mut warning: Option<GenericError> = None;
     let mut err: Option<GenericError> = None;
 
-    let mut lastsegment: *const c_char = url;
-    let mut iter: *const c_char = url;
+    let mut lastsegment = url;
+    let mut iter = url;
 
-    if NBPATHS > 0 && !iter.is_null() {
-        while *iter != 0 {
-            if *iter == b'/' as i8 {
-                lastsegment = iter.add(1);
+    if let Some(mut iter) = iter.filter(|_| NBPATHS > 0) {
+        while !iter.is_empty() {
+            if let Some(rem) = iter.strip_prefix('/') {
+                lastsegment = Some(rem);
             }
-            iter = iter.add(1);
+            iter = &iter[1..];
         }
     }
 
@@ -291,12 +291,7 @@ unsafe extern "C" fn xmllint_external_entity_loader(
             if LOAD_TRACE != 0 {
                 eprintln!(
                     "Loaded URL=\"{}\" ID=\"{}\"",
-                    (if !url.is_null() {
-                        CStr::from_ptr(url)
-                    } else {
-                        c"(null)"
-                    })
-                    .to_string_lossy(),
+                    url.unwrap_or("(null)"),
                     (if !id.is_null() {
                         CStr::from_ptr(id)
                     } else {
@@ -312,10 +307,8 @@ unsafe extern "C" fn xmllint_external_entity_loader(
         for path in paths.iter() {
             let mut new_url = path.clone();
             new_url.push('/');
-            new_url.push_str(CStr::from_ptr(lastsegment).to_string_lossy().as_ref());
-            // to fix format of new_url to C string.
-            new_url.push('\0');
-            ret = loader(new_url.as_ptr() as *const c_char, id, ctxt);
+            new_url.push_str(lastsegment.unwrap());
+            ret = loader(Some(&new_url), id, ctxt);
             if !ret.is_null() {
                 if warning.is_some() {
                     (*(*ctxt).sax).warning = warning;
@@ -344,7 +337,7 @@ unsafe extern "C" fn xmllint_external_entity_loader(
     }
     if let Some(warning) = warning {
         (*(*ctxt).sax).warning = Some(warning);
-        if !url.is_null() {
+        if url.is_some() {
             todo!()
             // xml_error_with_format!(
             //     warning,
@@ -1692,7 +1685,7 @@ static mut DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 // static xmlSAXHandlerPtr debugSAX2Handler = &debugSAX2HandlerStruct;
 
-unsafe extern "C" fn test_sax(filename: *const c_char) {
+unsafe fn test_sax(filename: &str) {
     let handler: XmlSAXHandlerPtr;
     let user_data: &CStr = c"user_data"; /* mostly for debugging */
 
@@ -1720,10 +1713,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
     if f {
         #[cfg(feature = "schema")]
         {
-            let Some(buf) = XmlParserInputBuffer::from_uri(
-                CStr::from_ptr(filename).to_string_lossy().as_ref(),
-                XmlCharEncoding::None,
-            ) else {
+            let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
                 return;
             };
 
@@ -1740,7 +1730,8 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
                 Some(generic_error_default),
                 None,
             );
-            xml_schema_validate_set_filename(vctxt, filename);
+            let cfilename = CString::new(filename).unwrap();
+            xml_schema_validate_set_filename(vctxt, cfilename.as_ptr());
 
             let ret: c_int = xml_schema_validate_stream(
                 vctxt,
@@ -1753,21 +1744,15 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
                 match ret.cmp(&0) {
                     std::cmp::Ordering::Equal => {
                         if QUIET == 0 {
-                            eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
+                            eprintln!("{} validates", filename);
                         }
                     }
                     std::cmp::Ordering::Greater => {
-                        eprintln!(
-                            "{} fails to validate",
-                            CStr::from_ptr(filename).to_string_lossy()
-                        );
+                        eprintln!("{} fails to validate", filename);
                         PROGRESULT = XmllintReturnCode::ErrValid;
                     }
                     std::cmp::Ordering::Less => {
-                        eprintln!(
-                            "{} validation generated an internal error",
-                            CStr::from_ptr(filename).to_string_lossy()
-                        );
+                        eprintln!("{} validation generated an internal error", filename);
                         PROGRESULT = XmllintReturnCode::ErrValid;
                     }
                 }
@@ -1775,9 +1760,7 @@ unsafe extern "C" fn test_sax(filename: *const c_char) {
             xml_schema_free_valid_ctxt(vctxt);
         }
     } else {
-        /*
-         * Create the parser context amd hook the input
-         */
+        // Create the parser context amd hook the input
         let ctxt: XmlParserCtxtPtr =
             xml_new_sax_parser_ctxt(handler, Some(GenericErrorContext::new(user_data.as_ptr())));
         if ctxt.is_null() {
@@ -2445,13 +2428,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     } else if cfg!(feature = "html") && HTML != 0 {
         #[cfg(feature = "html")]
         {
-            let filename = filename.map(|f| CString::new(f).unwrap());
-            doc = html_read_file(filename.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
+            doc = html_read_file(filename.unwrap(), None, OPTIONS);
         }
     } else if cfg!(feature = "libxml_push") && PUSH != 0 {
-        /*
-         * build an XML tree from a string;
-         */
+        // build an XML tree from a string;
         #[cfg(feature = "libxml_push")]
         {
             extern "C" {
@@ -2543,8 +2523,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
-        let fname = filename.map(|f| CString::new(f).unwrap());
-        doc = xml_ctxt_read_file(ctxt, fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
+        doc = xml_ctxt_read_file(ctxt, filename.unwrap(), None, OPTIONS);
 
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
@@ -2597,8 +2576,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 ctxt = rectxt;
             }
 
-            let fname = filename.map(|f| CString::new(f).unwrap());
-            doc = xml_ctxt_read_file(ctxt, fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
+            doc = xml_ctxt_read_file(ctxt, filename.unwrap(), None, OPTIONS);
 
             if (*ctxt).valid == 0 {
                 PROGRESULT = XmllintReturnCode::ErrRdfile;
@@ -2608,16 +2586,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
     } else if !rectxt.is_null() {
-        let fname = filename.map(|f| CString::new(f).unwrap());
-        doc = xml_ctxt_read_file(rectxt, fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
+        doc = xml_ctxt_read_file(rectxt, filename.unwrap(), None, OPTIONS);
     } else {
-        let fname = filename.map(|f| CString::new(f).unwrap());
-        doc = xml_read_file(fname.map_or(null(), |f| f.as_ptr()), None, OPTIONS);
+        doc = xml_read_file(filename.unwrap(), None, OPTIONS);
     }
 
-    /*
-     * If we don't have a document we might as well give up.  Do we
-     * want an error message here?  <sven@zen.org> */
+    // If we don't have a document we might as well give up.
+    // Do we want an error message here?  <sven@zen.org>
     if doc.is_null() {
         PROGRESULT = XmllintReturnCode::ErrUnclass;
         return;
@@ -2627,9 +2602,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         end_timer!("Parsing");
     }
 
-    /*
-     * Remove DOCTYPE nodes
-     */
+    // Remove DOCTYPE nodes
     if DROPDTD != 0 {
         let dtd: XmlDtdPtr = (*doc).get_int_subset();
         if !dtd.is_null() {
@@ -4134,7 +4107,7 @@ fn main() {
                             if STREAM != 0 {
                                 stream_file(carg.as_ptr() as _);
                             } else if SAX != 0 {
-                                test_sax(carg.as_ptr());
+                                test_sax(arg.as_str());
                             } else {
                                 if ctxt.is_null() {
                                     ctxt = xml_new_parser_ctxt();
@@ -4167,7 +4140,7 @@ fn main() {
                             stream_file(carg.as_ptr() as _);
                         }
                     } else if SAX != 0 {
-                        test_sax(carg.as_ptr() as _);
+                        test_sax(arg.as_str());
                     } else {
                         parse_and_print_file(Some(&arg), null_mut());
                     }

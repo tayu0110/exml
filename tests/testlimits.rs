@@ -414,13 +414,11 @@ thread_local! {
     static EXTRA_MEMORY_FROM_RESOLVER: Cell<i32> = const { Cell::new(0) };
 }
 
-/*
- * We need to trap calls to the resolver to not account memory for the catalog
- * which is shared to the current running test. We also don't want to have
- * network downloads modifying tests.
- */
-unsafe extern "C" fn test_external_entity_loader(
-    url: *const i8,
+// We need to trap calls to the resolver to not account memory for the catalog
+// which is shared to the current running test. We also don't want to have
+// network downloads modifying tests.
+unsafe fn test_external_entity_loader(
+    url: Option<&str>,
     id: *const i8,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
@@ -605,9 +603,7 @@ unsafe extern "C" fn initialize_libxml2() {
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
     set_structured_error(Some(test_structured_error_handler), None);
-    /*
-     * register the new I/O handlers
-     */
+    // register the new I/O handlers
     struct HugeTestIO(*mut c_void);
     impl Read for HugeTestIO {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -992,7 +988,7 @@ static CALLBACK_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 ///
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
-unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
+unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
     let res: i32;
 
     NB_TESTS.set(NB_TESTS.get() + 1);
@@ -1004,6 +1000,8 @@ unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, f
         eprintln!("Failed to create parser context");
         return 1;
     }
+    let filename = CStr::from_ptr(filename).to_string_lossy();
+    let filename = filename.as_ref();
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);
 
     if !doc.is_null() {
@@ -1014,17 +1012,11 @@ unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, f
         if fail != 0 {
             res = 0;
         } else {
-            eprintln!(
-                "Failed to parse '{}' {limit}",
-                CStr::from_ptr(filename).to_string_lossy()
-            );
+            eprintln!("Failed to parse '{filename}' {limit}");
             res = 1;
         }
     } else if fail != 0 {
-        eprintln!(
-            "Failed to get failure for '{}' {limit}",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
+        eprintln!("Failed to get failure for '{filename}' {limit}");
         res = 1;
     } else {
         res = 0;
@@ -1039,12 +1031,7 @@ unsafe extern "C" fn sax_test(filename: *const i8, limit: usize, options: i32, f
 /// Returns 0 in case of success, an error code otherwise
 #[doc(alias = "readerTest")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn reader_test(
-    filename: *const i8,
-    limit: usize,
-    options: i32,
-    fail: i32,
-) -> i32 {
+unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file, XmlTextReaderPtr};
 
     let mut res: i32;
@@ -1113,8 +1100,7 @@ unsafe extern "C" fn reader_test(
  *									*
  ************************************************************************/
 
-type Functest =
-    unsafe extern "C" fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
+type Functest = unsafe fn(filename: *const i8, limit: usize, options: i32, fail: i32) -> i32;
 
 struct LimitDesc<'a> {
     name: &'a str, /* the huge generator name */

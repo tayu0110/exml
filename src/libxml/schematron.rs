@@ -1032,9 +1032,7 @@ unsafe extern "C" fn xml_schematron_parse_pattern(
 ///
 /// Returns the internal XML Schematron structure built from the resource or NULL in case of error
 #[doc(alias = "xmlSchematronParse")]
-pub unsafe extern "C" fn xml_schematron_parse(
-    ctxt: XmlSchematronParserCtxtPtr,
-) -> XmlSchematronPtr {
+pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchematronPtr {
     let doc: XmlDocPtr;
     let mut ret: XmlSchematronPtr = null_mut();
     let mut cur: XmlNodePtr;
@@ -1048,9 +1046,9 @@ pub unsafe extern "C" fn xml_schematron_parse(
 
     // First step is to parse the input document into an DOM/Infoset
     if !(*ctxt).url.is_null() {
-        doc = xml_read_file((*ctxt).url as _, None, SCHEMATRON_PARSE_OPTIONS as i32);
+        let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
+        doc = xml_read_file(&url, None, SCHEMATRON_PARSE_OPTIONS as i32);
         if doc.is_null() {
-            let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
             xml_schematron_perr!(
                 ctxt,
                 null_mut(),

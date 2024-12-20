@@ -86,8 +86,8 @@ use crate::{
     hash::XmlHashTableRef,
     io::{
         cleanup_input_callbacks, cleanup_output_callbacks, register_default_input_callbacks,
-        register_default_output_callbacks, xml_default_external_entity_loader, xml_ioerr_memory,
-        xml_no_net_exists, xml_parser_get_directory, XmlParserInputBuffer,
+        register_default_output_callbacks, xml_default_external_entity_loader, xml_no_net_exists,
+        xml_parser_get_directory, XmlParserInputBuffer,
     },
     libxml::{
         catalog::{xml_catalog_cleanup, xml_catalog_free_local},
@@ -139,6 +139,7 @@ use crate::{
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
+    uri::canonic_path,
     xpath::xml_init_xpath_internal,
 };
 
@@ -2006,11 +2007,8 @@ pub struct XmlSAXHandlerV1 {
 ///
 /// Returns the entity input parser.
 #[doc(alias = "xmlExternalEntityLoader")]
-pub type XmlExternalEntityLoader = unsafe extern "C" fn(
-    URL: *const c_char,
-    ID: *const c_char,
-    context: XmlParserCtxtPtr,
-) -> XmlParserInputPtr;
+pub type XmlExternalEntityLoader =
+    unsafe fn(url: Option<&str>, id: *const c_char, context: XmlParserCtxtPtr) -> XmlParserInputPtr;
 
 /*
  * Macros for accessing the content. Those should be used only by the parser,
@@ -2669,7 +2667,7 @@ pub unsafe extern "C" fn xml_parse_doc(cur: *const XmlChar) -> XmlDocPtr {
 #[doc(alias = "xmlParseFile")]
 #[deprecated = "Use xmlReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_parse_file(filename: *const c_char) -> XmlDocPtr {
+pub unsafe fn xml_parse_file(filename: Option<&str>) -> XmlDocPtr {
     xml_sax_parse_file(null_mut(), filename, 0)
 }
 
@@ -2788,7 +2786,7 @@ pub unsafe fn xml_recover_memory(buffer: Vec<u8>) -> XmlDocPtr {
 #[doc(alias = "xmlRecoverFile")]
 #[deprecated = "Use xmlReadFile with XML_PARSE_RECOVER"]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_recover_file(filename: *const c_char) -> XmlDocPtr {
+pub unsafe fn xml_recover_file(filename: Option<&str>) -> XmlDocPtr {
     xml_sax_parse_file(null_mut(), filename, 1)
 }
 
@@ -3382,7 +3380,7 @@ pub unsafe extern "C" fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32
 pub unsafe fn xml_sax_user_parse_file(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
-    filename: *const c_char,
+    filename: Option<&str>,
 ) -> i32 {
     let ret: i32;
 
@@ -3599,9 +3597,9 @@ pub unsafe fn xml_sax_parse_memory_with_data(
 #[doc(alias = "xmlSAXParseFile")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_sax_parse_file(
+pub unsafe fn xml_sax_parse_file(
     sax: XmlSAXHandlerPtr,
-    filename: *const c_char,
+    filename: Option<&str>,
     recovery: i32,
 ) -> XmlDocPtr {
     xml_sax_parse_file_with_data(sax, filename, recovery, null_mut())
@@ -3619,12 +3617,14 @@ pub unsafe extern "C" fn xml_sax_parse_file(
 #[doc(alias = "xmlSAXParseFileWithData")]
 #[deprecated = "Use xmlNewSAXParserCtxt and xmlCtxtReadFile"]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_sax_parse_file_with_data(
+pub unsafe fn xml_sax_parse_file_with_data(
     sax: XmlSAXHandlerPtr,
-    filename: *const c_char,
+    filename: Option<&str>,
     recovery: i32,
     data: *mut c_void,
 ) -> XmlDocPtr {
+    use std::ffi::CString;
+
     use crate::io::xml_parser_get_directory;
 
     let ret: XmlDocPtr;
@@ -3647,14 +3647,17 @@ pub unsafe extern "C" fn xml_sax_parse_file_with_data(
     }
 
     if (*ctxt).directory.is_none() {
-        let dir = xml_parser_get_directory(filename);
-        if !dir.is_null() {
-            (*ctxt).directory = Some(
-                CStr::from_ptr(dir as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(dir as _);
+        if let Some(filename) = filename {
+            let filename = CString::new(filename).unwrap();
+            let dir = xml_parser_get_directory(filename.as_ptr());
+            if !dir.is_null() {
+                (*ctxt).directory = Some(
+                    CStr::from_ptr(dir as *const i8)
+                        .to_string_lossy()
+                        .into_owned(),
+                );
+                xml_free(dir as _);
+            }
         }
     }
 
@@ -3695,9 +3698,9 @@ pub unsafe extern "C" fn xml_sax_parse_file_with_data(
 /// Returns the resulting document tree
 #[doc(alias = "xmlSAXParseEntity")]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe extern "C" fn xml_sax_parse_entity(
+pub(crate) unsafe fn xml_sax_parse_entity(
     sax: XmlSAXHandlerPtr,
-    filename: *const c_char,
+    filename: Option<&str>,
 ) -> XmlDocPtr {
     let ret: XmlDocPtr;
 
@@ -3740,7 +3743,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_entity(
 #[doc(alias = "xmlParseEntity")]
 #[deprecated]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_parse_entity(filename: *const c_char) -> XmlDocPtr {
+pub unsafe fn xml_parse_entity(filename: Option<&str>) -> XmlDocPtr {
     xml_sax_parse_entity(null_mut(), filename)
 }
 
@@ -4453,7 +4456,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
     depth: i32,
-    url: *const XmlChar,
+    url: Option<&str>,
     id: *const XmlChar,
     list: *mut XmlNodePtr,
 ) -> XmlParserErrors {
@@ -4475,7 +4478,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if !list.is_null() {
         *list = null_mut();
     }
-    if url.is_null() && id.is_null() {
+    if url.is_none() && id.is_null() {
         return XmlParserErrors::XmlErrInternalError;
     }
     if doc.is_null() {
@@ -4483,7 +4486,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     }
 
     let ctxt: XmlParserCtxtPtr =
-        xml_create_entity_parser_ctxt_internal(sax, user_data, url, id, null(), oldctxt);
+        xml_create_entity_parser_ctxt_internal(sax, user_data, url, id, None, oldctxt);
     if ctxt.is_null() {
         return XmlParserErrors::XmlWarUndeclaredEntity;
     }
@@ -4699,7 +4702,7 @@ pub(crate) unsafe fn xml_parse_external_entity(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
     depth: i32,
-    url: *const XmlChar,
+    url: Option<&str>,
     id: *const XmlChar,
     lst: *mut XmlNodePtr,
 ) -> i32 {
@@ -4715,20 +4718,18 @@ pub(crate) unsafe fn xml_parse_external_entity(
 /// Returns 0 if the entity is well formed, -1 in case of args problem and
 /// the parser error code otherwise
 #[doc(alias = "xmlParseCtxtExternalEntity")]
-pub unsafe extern "C" fn xml_parse_ctxt_external_entity(
+pub unsafe fn xml_parse_ctxt_external_entity(
     ctx: XmlParserCtxtPtr,
-    url: *const XmlChar,
+    url: Option<&str>,
     id: *const XmlChar,
     lst: *mut XmlNodePtr,
 ) -> i32 {
     if ctx.is_null() {
         return -1;
     }
-    /*
-     * If the user provided their own SAX callbacks, then reuse the
-     * userData callback field, otherwise the expected setup in a
-     * DOM builder is to have userData == ctxt
-     */
+    // If the user provided their own SAX callbacks, then reuse the
+    // userData callback field, otherwise the expected setup in a
+    // DOM builder is to have userData == ctxt
     let user_data = if (*ctx)
         .user_data
         .as_ref()
@@ -10443,13 +10444,13 @@ static mut XML_CURRENT_EXTERNAL_ENTITY_LOADER: XmlExternalEntityLoader =
 
 /// Changes the defaultexternal entity resolver function for the application
 #[doc(alias = "xmlSetExternalEntityLoader")]
-pub unsafe extern "C" fn xml_set_external_entity_loader(f: XmlExternalEntityLoader) {
+pub unsafe fn xml_set_external_entity_loader(f: XmlExternalEntityLoader) {
     XML_CURRENT_EXTERNAL_ENTITY_LOADER = f;
 }
 
 /// Returns the xmlExternalEntityLoader function pointer
 #[doc(alias = "xmlGetExternalEntityLoader")]
-pub unsafe extern "C" fn xml_get_external_entity_loader() -> XmlExternalEntityLoader {
+pub unsafe fn xml_get_external_entity_loader() -> XmlExternalEntityLoader {
     XML_CURRENT_EXTERNAL_ENTITY_LOADER
 }
 
@@ -10458,20 +10459,15 @@ pub unsafe extern "C" fn xml_get_external_entity_loader() -> XmlExternalEntityLo
 ///
 /// Returns the xmlParserInputPtr or NULL
 #[doc(alias = "xmlLoadExternalEntity")]
-pub unsafe extern "C" fn xml_load_external_entity(
-    url: *const c_char,
+pub unsafe fn xml_load_external_entity(
+    url: Option<&str>,
     id: *const c_char,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    if !url.is_null() && xml_no_net_exists(url) == 0 {
-        let canonic_filename: *mut c_char = xml_canonic_path(url as _) as _;
-        if canonic_filename.is_null() {
-            xml_ioerr_memory("building canonical path\n");
-            return null_mut();
-        }
-
-        let ret: XmlParserInputPtr = XML_CURRENT_EXTERNAL_ENTITY_LOADER(canonic_filename, id, ctxt);
-        xml_free(canonic_filename as _);
+    if let Some(url) = url.filter(|_| xml_no_net_exists(url) == 0) {
+        let canonic_filename = canonic_path(url);
+        let ret: XmlParserInputPtr =
+            XML_CURRENT_EXTERNAL_ENTITY_LOADER(Some(&canonic_filename), id, ctxt);
         return ret;
     }
     XML_CURRENT_EXTERNAL_ENTITY_LOADER(url, id, ctxt)
@@ -10800,13 +10796,9 @@ pub unsafe fn xml_read_doc(
 ///
 /// Returns the resulting document tree
 #[doc(alias = "xmlReadFile")]
-pub unsafe fn xml_read_file(
-    filename: *const c_char,
-    encoding: Option<&str>,
-    options: i32,
-) -> XmlDocPtr {
+pub unsafe fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> XmlDocPtr {
     xml_init_parser();
-    let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(filename, options);
+    let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
     if ctxt.is_null() {
         return null_mut();
     }
@@ -10896,13 +10888,10 @@ pub unsafe fn xml_ctxt_read_doc(
 #[doc(alias = "xmlCtxtReadFile")]
 pub unsafe fn xml_ctxt_read_file(
     ctxt: XmlParserCtxtPtr,
-    filename: *const c_char,
+    filename: &str,
     encoding: Option<&str>,
     options: i32,
 ) -> XmlDocPtr {
-    if filename.is_null() {
-        return null_mut();
-    }
     if ctxt.is_null() {
         return null_mut();
     }
@@ -10910,7 +10899,7 @@ pub unsafe fn xml_ctxt_read_file(
 
     xml_ctxt_reset(ctxt);
 
-    let stream: XmlParserInputPtr = xml_load_external_entity(filename, null(), ctxt);
+    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), null(), ctxt);
     if stream.is_null() {
         return null_mut();
     }
@@ -13448,45 +13437,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_load_external_entity() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_url in 0..GEN_NB_FILEPATH {
-                for n_id in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let url = gen_filepath(n_url, 0);
-                        let id = gen_const_char_ptr(n_id, 1);
-                        let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 2);
-
-                        let ret_val = xml_load_external_entity(url, id, ctxt);
-                        desret_xml_parser_input_ptr(ret_val);
-                        des_filepath(n_url, url, 0);
-                        des_const_char_ptr(n_id, id, 1);
-                        des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlLoadExternalEntity",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_url);
-                            eprint!(" {}", n_id);
-                            eprintln!(" {}", n_ctxt);
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlLoadExternalEntity()"
-            );
-        }
-    }
-
-    #[test]
     fn test_xml_new_parser_ctxt() {
         unsafe {
             let mut leaks = 0;
@@ -13552,49 +13502,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlParseChunk()");
-        }
-    }
-
-    #[test]
-    fn test_xml_parse_ctxt_external_entity() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctx in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_url in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_lst in 0..GEN_NB_XML_NODE_PTR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let ctx = gen_xml_parser_ctxt_ptr(n_ctx, 0);
-                            let url = gen_const_xml_char_ptr(n_url, 1);
-                            let id = gen_const_xml_char_ptr(n_id, 2);
-                            let lst = gen_xml_node_ptr_ptr(n_lst, 3);
-
-                            let ret_val = xml_parse_ctxt_external_entity(ctx, url, id, lst);
-                            desret_int(ret_val);
-                            des_xml_parser_ctxt_ptr(n_ctx, ctx, 0);
-                            des_const_xml_char_ptr(n_url, url, 1);
-                            des_const_xml_char_ptr(n_id, id, 2);
-                            des_xml_node_ptr_ptr(n_lst, lst, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlParseCtxtExternalEntity",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_ctx);
-                                eprint!(" {}", n_url);
-                                eprint!(" {}", n_id);
-                                eprintln!(" {}", n_lst);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParseCtxtExternalEntity()"
-            );
         }
     }
 
@@ -13687,32 +13594,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_parse_entity() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_parse_entity(filename);
-                desret_xml_doc_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParseEntity",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_filename);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlParseEntity()");
-        }
-    }
-
-    #[test]
     fn test_xml_parse_ext_parsed_ent() {
         unsafe {
             let mut leaks = 0;
@@ -13741,33 +13622,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlParseExtParsedEnt()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_parse_file() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_parse_file(filename);
-                desret_xml_doc_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParseFile",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_filename);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlParseFile()");
         }
     }
 
@@ -13996,33 +13850,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_recover_file() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_recover_file(filename);
-                desret_xml_doc_ptr(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRecoverFile",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_filename);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlRecoverFile()");
-        }
-    }
-
-    #[test]
     fn test_xml_saxparse_dtd() {
         #[cfg(feature = "libxml_valid")]
         unsafe {
@@ -14093,121 +13920,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlSAXParseDoc()");
-        }
-    }
-
-    #[test]
-    fn test_xml_saxparse_entity() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_sax in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    let mem_base = xml_mem_blocks();
-                    let sax = gen_xml_saxhandler_ptr(n_sax, 0);
-                    let filename = gen_filepath(n_filename, 1);
-
-                    let ret_val = xml_sax_parse_entity(sax, filename);
-                    desret_xml_doc_ptr(ret_val);
-                    des_xml_saxhandler_ptr(n_sax, sax, 0);
-                    des_filepath(n_filename, filename, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSAXParseEntity",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_sax);
-                        eprintln!(" {}", n_filename);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAXParseEntity()");
-        }
-    }
-
-    #[test]
-    fn test_xml_saxparse_file() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_sax in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    for n_recovery in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let sax = gen_xml_saxhandler_ptr(n_sax, 0);
-                        let filename = gen_filepath(n_filename, 1);
-                        let recovery = gen_int(n_recovery, 2);
-
-                        let ret_val = xml_sax_parse_file(sax, filename, recovery);
-                        desret_xml_doc_ptr(ret_val);
-                        des_xml_saxhandler_ptr(n_sax, sax, 0);
-                        des_filepath(n_filename, filename, 1);
-                        des_int(n_recovery, recovery, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSAXParseFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_sax);
-                            eprint!(" {}", n_filename);
-                            eprintln!(" {}", n_recovery);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAXParseFile()");
-        }
-    }
-
-    #[test]
-    fn test_xml_saxparse_file_with_data() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_sax in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    for n_recovery in 0..GEN_NB_INT {
-                        for n_data in 0..GEN_NB_USERDATA {
-                            let mem_base = xml_mem_blocks();
-                            let sax = gen_xml_saxhandler_ptr(n_sax, 0);
-                            let filename = gen_filepath(n_filename, 1);
-                            let recovery = gen_int(n_recovery, 2);
-                            let data = gen_userdata(n_data, 3);
-
-                            let ret_val =
-                                xml_sax_parse_file_with_data(sax, filename, recovery, data);
-                            desret_xml_doc_ptr(ret_val);
-                            des_xml_saxhandler_ptr(n_sax, sax, 0);
-                            des_filepath(n_filename, filename, 1);
-                            des_int(n_recovery, recovery, 2);
-                            des_userdata(n_data, data, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlSAXParseFileWithData",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                eprint!(" {}", n_sax);
-                                eprint!(" {}", n_filename);
-                                eprint!(" {}", n_recovery);
-                                eprintln!(" {}", n_data);
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSAXParseFileWithData()"
-            );
         }
     }
 
