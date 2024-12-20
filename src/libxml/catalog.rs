@@ -74,9 +74,7 @@ use crate::{
             XmlRMutex,
         },
         uri::xml_canonic_path,
-        xmlstring::{
-            xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
-        },
+        xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strncmp, xml_strndup, XmlChar},
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -192,7 +190,7 @@ pub struct XmlCatalogEntry {
     parent: *mut XmlCatalogEntry,
     children: *mut XmlCatalogEntry,
     typ: XmlCatalogEntryType,
-    name: *mut XmlChar,
+    name: Option<String>,
     value: *mut XmlChar,
     url: Option<PathBuf>, /* The expanded URL using the base */
     prefer: XmlCatalogPrefer,
@@ -208,7 +206,7 @@ impl Default for XmlCatalogEntry {
             parent: null_mut(),
             children: null_mut(),
             typ: XmlCatalogEntryType::default(),
-            name: null_mut(),
+            name: None,
             value: null_mut(),
             url: None,
             prefer: XmlCatalogPrefer::default(),
@@ -546,10 +544,7 @@ unsafe fn xml_new_catalog_entry(
         }
     }
     if let Some(name) = name {
-        let name = CString::new(name.as_ref()).unwrap();
-        (*ret).name = xml_strdup(name.as_ptr() as *const u8);
-    } else {
-        (*ret).name = null_mut();
+        (*ret).name = Some(name.into_owned());
     }
     if !value.is_null() {
         (*ret).value = xml_strdup(value);
@@ -587,11 +582,8 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
         }
 
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            if !(*ret).name.is_null() {
-                generic_error!(
-                    "Free catalog entry {}\n",
-                    CStr::from_ptr((*ret).name as *const i8).to_string_lossy()
-                );
+            if let Some(name) = (*ret).name.take() {
+                generic_error!("Free catalog entry {name}\n");
             } else if !(*ret).value.is_null() {
                 generic_error!(
                     "Free catalog entry {}\n",
@@ -602,9 +594,6 @@ extern "C" fn xml_free_catalog_entry(payload: *mut c_void, _name: *const XmlChar
             }
         }
 
-        if !(*ret).name.is_null() {
-            xml_free((*ret).name as _);
-        }
         if !(*ret).value.is_null() {
             xml_free((*ret).value as _);
         }
@@ -1634,13 +1623,7 @@ unsafe fn xml_add_xml_catalog(
     // Might be a simple "update in place"
     if !cur.is_null() {
         while !cur.is_null() {
-            if orig.is_some()
-                && (*cur).typ == typ
-                && orig.unwrap()
-                    == CStr::from_ptr((*cur).name as *const i8)
-                        .to_string_lossy()
-                        .as_ref()
-            {
+            if orig.is_some() && (*cur).typ == typ && orig == (*cur).name.as_deref() {
                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                     if typs.is_null() {
                         generic_error!("Updating element (NULL) to catalog\n",);
@@ -1798,20 +1781,20 @@ unsafe fn xml_del_xml_catalog(catal: XmlCatalogEntryPtr, value: *const XmlChar) 
         xml_fetch_xml_catalog_file(catal);
     }
 
-    /*
-     * Scan the children
-     */
+    // Scan the children
     cur = (*catal).children;
     while !cur.is_null() {
-        if (!(*cur).name.is_null() && xml_str_equal(value, (*cur).name))
+        if ((*cur).name.is_some()
+            && Some(
+                CStr::from_ptr(value as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ) == (*cur).name.as_deref())
             || xml_str_equal(value, (*cur).value)
         {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-                if !(*cur).name.is_null() {
-                    generic_error!(
-                        "Removing element {} from catalog\n",
-                        CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
-                    );
+                if let Some(name) = (*cur).name.as_deref() {
+                    generic_error!("Removing element {name} from catalog\n");
                 } else {
                     generic_error!(
                         "Removing element {} from catalog\n",
@@ -1920,7 +1903,7 @@ unsafe fn xml_catalog_xml_resolve(
             null_mut(),
             XmlParserErrors::XmlCatalogRecursion,
             "Detected recursion in catalog {}\n",
-            CStr::from_ptr((*catal).name as *const i8).to_string_lossy(),
+            (*catal).name.as_deref().unwrap(),
         );
         return null_mut();
     }
@@ -1930,35 +1913,42 @@ unsafe fn xml_catalog_xml_resolve(
     if !sys_id.is_null() {
         let mut rewrite: XmlCatalogEntryPtr = null_mut();
         let mut lenrewrite: i32 = 0;
-        let mut len: i32;
         cur = catal;
         have_delegate = 0;
         while !cur.is_null() {
             match (*cur).typ {
                 XmlCatalogEntryType::XmlCataSystem => {
-                    if xml_str_equal(sys_id, (*cur).name) {
-                        let url = (*cur).url.as_deref().unwrap();
-                        let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
-                        if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-                            generic_error!(
-                                "Found system match {}, using {}\n",
-                                CStr::from_ptr((*cur).name as *const i8).to_string_lossy(),
-                                url.display()
-                            );
+                    if let Some(name) = (*cur).name.as_deref() {
+                        if Some(
+                            CStr::from_ptr(sys_id as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        ) == (*cur).name.as_deref()
+                        {
+                            let url = (*cur).url.as_deref().unwrap();
+                            let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
+                            if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
+                                generic_error!(
+                                    "Found system match {name}, using {}\n",
+                                    url.display()
+                                );
+                            }
+                            (*catal).depth -= 1;
+                            return xml_strdup(curl.as_ptr() as *const u8);
                         }
-                        (*catal).depth -= 1;
-                        return xml_strdup(curl.as_ptr() as *const u8);
                     }
                 }
                 XmlCatalogEntryType::XmlCataRewriteSystem => {
-                    len = xml_strlen((*cur).name);
-                    if len > lenrewrite && xml_strncmp(sys_id, (*cur).name, len) == 0 {
+                    let len = (*cur).name.as_deref().map_or(0, |n| n.len()) as i32;
+                    let sys_id = CStr::from_ptr(sys_id as *const i8).to_string_lossy();
+                    if len > lenrewrite && sys_id.starts_with((*cur).name.as_deref().unwrap()) {
                         lenrewrite = len;
                         rewrite = cur;
                     }
                 }
                 XmlCatalogEntryType::XmlCataDelegateSystem => {
-                    if xml_strncmp(sys_id, (*cur).name, xml_strlen((*cur).name)) == 0 {
+                    let sys_id = CStr::from_ptr(sys_id as *const i8).to_string_lossy();
+                    if sys_id.starts_with((*cur).name.as_deref().unwrap()) {
                         have_delegate += 1;
                     }
                 }
@@ -1973,7 +1963,7 @@ unsafe fn xml_catalog_xml_resolve(
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 generic_error!(
                     "Using rewriting rule {}\n",
-                    CStr::from_ptr((*rewrite).name as *const i8).to_string_lossy()
+                    (*rewrite).name.as_deref().unwrap()
                 );
             }
             if let Some(url) = (*rewrite).url.as_deref() {
@@ -1997,7 +1987,9 @@ unsafe fn xml_catalog_xml_resolve(
             cur = catal;
             'b: while !cur.is_null() {
                 if matches!((*cur).typ, XmlCatalogEntryType::XmlCataDelegateSystem)
-                    && xml_strncmp(sys_id, (*cur).name, xml_strlen((*cur).name)) == 0
+                    && CStr::from_ptr(sys_id as *const i8)
+                        .to_string_lossy()
+                        .starts_with((*cur).name.as_deref().unwrap())
                 {
                     for i in 0..nb_list {
                         if (*cur).url.as_deref() == delegates[i] {
@@ -2041,11 +2033,16 @@ unsafe fn xml_catalog_xml_resolve(
         while !cur.is_null() {
             match (*cur).typ {
                 XmlCatalogEntryType::XmlCataPublic => {
-                    if xml_str_equal(pub_id, (*cur).name) {
+                    if Some(
+                        CStr::from_ptr(pub_id as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    ) == (*cur).name.as_deref()
+                    {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             generic_error!(
                                 "Found public match {}\n",
-                                CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
+                                (*cur).name.as_deref().unwrap()
                             );
                         }
                         (*catal).depth -= 1;
@@ -2058,7 +2055,8 @@ unsafe fn xml_catalog_xml_resolve(
                     }
                 }
                 XmlCatalogEntryType::XmlCataDelegatePublic => {
-                    if xml_strncmp(pub_id, (*cur).name, xml_strlen((*cur).name)) == 0
+                    let pub_id = CStr::from_ptr(pub_id as *const i8).to_string_lossy();
+                    if pub_id.starts_with((*cur).name.as_deref().unwrap())
                         && matches!((*cur).prefer, XmlCatalogPrefer::Public)
                     {
                         have_delegate += 1;
@@ -2083,7 +2081,9 @@ unsafe fn xml_catalog_xml_resolve(
             'b: while !cur.is_null() {
                 if (*cur).typ == XmlCatalogEntryType::XmlCataDelegatePublic
                     && matches!((*cur).prefer, XmlCatalogPrefer::Public)
-                    && xml_strncmp(pub_id, (*cur).name, xml_strlen((*cur).name)) == 0
+                    && CStr::from_ptr(pub_id as *const i8)
+                        .to_string_lossy()
+                        .starts_with((*cur).name.as_deref().unwrap())
                 {
                     for i in 0..nb_list {
                         if (*cur).url.as_deref() == delegates[i] {
@@ -2481,7 +2481,6 @@ unsafe fn xml_catalog_xml_resolve_uri(
     let mut have_next: i32 = 0;
     let mut rewrite: XmlCatalogEntryPtr = null_mut();
     let mut lenrewrite: i32 = 0;
-    let mut len: i32;
 
     if catal.is_null() {
         return null_mut();
@@ -2497,7 +2496,7 @@ unsafe fn xml_catalog_xml_resolve_uri(
             null_mut(),
             XmlParserErrors::XmlCatalogRecursion,
             "Detected recursion in catalog {}\n",
-            CStr::from_ptr((*catal).name as *const i8).to_string_lossy(),
+            (*catal).name.as_deref().unwrap(),
         );
         return null_mut();
     }
@@ -2508,12 +2507,11 @@ unsafe fn xml_catalog_xml_resolve_uri(
     while !cur.is_null() {
         match (*cur).typ {
             XmlCatalogEntryType::XmlCataURI => {
-                if xml_str_equal(uri, (*cur).name) {
+                if Some(CStr::from_ptr(uri as *const i8).to_string_lossy().as_ref())
+                    == (*cur).name.as_deref()
+                {
                     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-                        generic_error!(
-                            "Found URI match {}\n",
-                            CStr::from_ptr((*cur).name as *const i8).to_string_lossy()
-                        );
+                        generic_error!("Found URI match {}\n", (*cur).name.as_deref().unwrap());
                     }
                     return if let Some(url) = (*cur).url.as_deref() {
                         let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
@@ -2524,14 +2522,16 @@ unsafe fn xml_catalog_xml_resolve_uri(
                 }
             }
             XmlCatalogEntryType::XmlCataRewriteURI => {
-                len = xml_strlen((*cur).name);
-                if len > lenrewrite && xml_strncmp(uri, (*cur).name, len) == 0 {
+                let len = (*cur).name.as_deref().map_or(0, |n| n.len()) as i32;
+                let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
+                if len > lenrewrite && uri.starts_with((*cur).name.as_deref().unwrap()) {
                     lenrewrite = len;
                     rewrite = cur;
                 }
             }
             XmlCatalogEntryType::XmlCataDelegateURI => {
-                if xml_strncmp(uri, (*cur).name, xml_strlen((*cur).name)) == 0 {
+                let uri = CStr::from_ptr(uri as *const i8).to_string_lossy();
+                if uri.starts_with((*cur).name.as_deref().unwrap()) {
                     have_delegate += 1;
                 }
             }
@@ -2546,7 +2546,7 @@ unsafe fn xml_catalog_xml_resolve_uri(
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!(
                 "Using rewriting rule {}\n",
-                CStr::from_ptr((*rewrite).name as *const i8).to_string_lossy()
+                (*rewrite).name.as_deref().unwrap()
             );
         }
         if let Some(url) = (*rewrite).url.as_deref() {
@@ -2572,7 +2572,9 @@ unsafe fn xml_catalog_xml_resolve_uri(
                 (*cur).typ,
                 XmlCatalogEntryType::XmlCataDelegateSystem
                     | XmlCatalogEntryType::XmlCataDelegateURI
-            ) && xml_strncmp(uri, (*cur).name, xml_strlen((*cur).name)) == 0
+            ) && CStr::from_ptr(uri as *const i8)
+                .to_string_lossy()
+                .starts_with((*cur).name.as_deref().unwrap())
             {
                 for i in 0..nb_list {
                     if (*cur).url.as_deref() == delegates[i] {
@@ -2772,11 +2774,7 @@ fn xml_catalog_dump_entry<'a>(payload: *mut c_void, out: &mut (impl Write + 'a))
             | XmlCatalogEntryType::SgmlCataDoctype
             | XmlCatalogEntryType::SgmlCataLinktype
             | XmlCatalogEntryType::SgmlCataNotation => {
-                write!(
-                    out,
-                    "{}",
-                    CStr::from_ptr((*entry).name as *const i8).to_string_lossy()
-                );
+                write!(out, "{}", (*entry).name.as_deref().unwrap());
             }
             XmlCatalogEntryType::SgmlCataPublic
             | XmlCatalogEntryType::SgmlCataSystem
@@ -2785,11 +2783,7 @@ fn xml_catalog_dump_entry<'a>(payload: *mut c_void, out: &mut (impl Write + 'a))
             | XmlCatalogEntryType::SgmlCataCatalog
             | XmlCatalogEntryType::SgmlCataBase
             | XmlCatalogEntryType::SgmlCataDelegate => {
-                write!(
-                    out,
-                    "\"{}\"",
-                    CStr::from_ptr((*entry).name as *const i8).to_string_lossy()
-                );
+                write!(out, "\"{}\"", (*entry).name.as_deref().unwrap());
             }
             _ => {}
         }
@@ -2850,9 +2844,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 XmlCatalogEntryType::XmlCataNone => {}
                 XmlCatalogEntryType::XmlCataGroup => {
                     node = xml_new_doc_node(doc, ns, c"group".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("id", name.as_deref());
+                    (*node).set_prop("id", (*cur).name.as_deref());
                     if !(*cur).value.is_null() {
                         let xns: XmlNsPtr =
                             (*node).search_ns_by_href(doc, XML_XML_NAMESPACE.to_str().unwrap());
@@ -2877,9 +2869,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataPublic => {
                     node = xml_new_doc_node(doc, ns, c"public".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("publicId", name.as_deref());
+                    (*node).set_prop("publicId", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("uri", value.as_deref());
@@ -2887,9 +2877,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataSystem => {
                     node = xml_new_doc_node(doc, ns, c"system".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("systemId", name.as_deref());
+                    (*node).set_prop("systemId", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("uri", value.as_deref());
@@ -2897,9 +2885,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataRewriteSystem => {
                     node = xml_new_doc_node(doc, ns, c"rewriteSystem".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("systemIdStartString", name.as_deref());
+                    (*node).set_prop("systemIdStartString", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("rewritePrefix", value.as_deref());
@@ -2907,9 +2893,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataDelegatePublic => {
                     node = xml_new_doc_node(doc, ns, c"delegatePublic".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("publicIdStartString", name.as_deref());
+                    (*node).set_prop("publicIdStartString", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("catalog", value.as_deref());
@@ -2917,9 +2901,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataDelegateSystem => {
                     node = xml_new_doc_node(doc, ns, c"delegateSystem".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("systemIdStartString", name.as_deref());
+                    (*node).set_prop("systemIdStartString", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("catalog", value.as_deref());
@@ -2927,9 +2909,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataURI => {
                     node = xml_new_doc_node(doc, ns, c"uri".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("name", name.as_deref());
+                    (*node).set_prop("name", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("uri", value.as_deref());
@@ -2937,9 +2917,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataRewriteURI => {
                     node = xml_new_doc_node(doc, ns, c"rewriteURI".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("uriStartString", name.as_deref());
+                    (*node).set_prop("uriStartString", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("rewritePrefix", value.as_deref());
@@ -2947,9 +2925,7 @@ unsafe fn xml_dump_xml_catalog_node(
                 }
                 XmlCatalogEntryType::XmlCataDelegateURI => {
                     node = xml_new_doc_node(doc, ns, c"delegateURI".as_ptr() as _, null_mut());
-                    let name = (!(*cur).name.is_null())
-                        .then(|| CStr::from_ptr((*cur).name as *const i8).to_string_lossy());
-                    (*node).set_prop("uriStartString", name.as_deref());
+                    (*node).set_prop("uriStartString", (*cur).name.as_deref());
                     let value = (!(*cur).value.is_null())
                         .then(|| CStr::from_ptr((*cur).value as *const i8).to_string_lossy());
                     (*node).set_prop("catalog", value.as_deref());
