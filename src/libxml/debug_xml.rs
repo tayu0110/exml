@@ -1854,11 +1854,11 @@ pub unsafe fn xml_ls_count_node(node: Option<&impl NodeCommon>) -> usize {
 ///
 /// Returns a pointer to either "True" or "False"
 #[doc(alias = "xmlBoolToText")]
-pub unsafe fn xml_bool_to_text(boolval: i32) -> *const c_char {
-    if boolval != 0 {
-        c"True".as_ptr()
+pub fn xml_bool_to_text(boolval: bool) -> &'static str {
+    if boolval {
+        "True"
     } else {
-        c"False".as_ptr()
+        "False"
     }
 }
 
@@ -2007,10 +2007,7 @@ unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPat
                 }
             }
             XmlXPathObjectType::XPathBoolean => {
-                generic_error!(
-                    "Is a Boolean:{}\n",
-                    CStr::from_ptr(xml_bool_to_text((*list).boolval as i32)).to_string_lossy()
-                );
+                generic_error!("Is a Boolean:{}\n", xml_bool_to_text((*list).boolval));
             }
             XmlXPathObjectType::XPathNumber => {
                 generic_error!("Is a number:{}\n", (*list).floatval);
@@ -3846,33 +3843,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_bool_to_text() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_boolval in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let boolval = gen_int(n_boolval, 0);
-
-                let ret_val = xml_bool_to_text(boolval);
-                desret_const_char_ptr(ret_val);
-                des_int(n_boolval, boolval, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlBoolToText",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlBoolToText()");
-                    eprintln!(" {}", n_boolval);
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_debug_dump_one_node() {
