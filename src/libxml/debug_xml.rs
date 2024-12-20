@@ -217,6 +217,205 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    #[doc(alias = "xmlCtxtGenericNodeCheck")]
+    unsafe fn generic_node_check(&mut self, node: &impl NodeCommon) {
+        let doc: XmlDocPtr = node.document();
+
+        if node.parent().is_none() {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoParent,
+                "Node has no parent\n",
+            );
+        }
+        if node.document().is_null() {
+            xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
+        } else {
+            let dict = (*doc).dict;
+            if dict.is_null() && self.nodict == 0 {
+                self.nodict = 1;
+            }
+            if self.doc.is_null() {
+                self.doc = doc;
+            }
+
+            if self.dict.is_null() {
+                self.dict = dict;
+            }
+        }
+        if node
+            .parent()
+            .filter(|p| {
+                node.document() != p.document() && node.name().as_deref() != Some("pseudoroot")
+            })
+            .is_some()
+        {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckWrongDoc,
+                "Node doc differs from parent's one\n",
+            );
+        }
+        if node.prev().is_none() {
+            if node.element_type() == XmlElementType::XmlAttributeNode {
+                if node
+                    .parent()
+                    .filter(|p| {
+                        node as *const dyn NodeCommon as *mut XmlNode
+                            != p.properties as *mut XmlNode
+                    })
+                    .is_some()
+                {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNoPrev,
+                        "Attr has no prev and not first of attr list\n",
+                    );
+                }
+            } else if node
+                .parent()
+                .filter(|p| p.children() != NodePtr::from_ptr(node as *const dyn NodeCommon as _))
+                .is_some()
+            {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNoPrev,
+                    "Node has no prev and not first of parent list\n",
+                );
+            }
+        } else if node.prev().unwrap().next != NodePtr::from_ptr(node as *const dyn NodeCommon as _)
+        {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckWrongPrev,
+                "Node prev->next : back link wrong\n",
+            );
+        }
+        if let Some(next) = node.next() {
+            if next.prev != NodePtr::from_ptr(node as *const dyn NodeCommon as _) {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckWrongNext,
+                    "Node next->prev : forward link wrong\n",
+                );
+            }
+            if next.parent() != node.parent() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckWrongParent,
+                    "Node next->prev : forward link wrong\n",
+                );
+            }
+        } else if node
+            .parent()
+            .filter(|p| {
+                node.element_type() != XmlElementType::XmlAttributeNode
+                    && p.last() != NodePtr::from_ptr(node as *const dyn NodeCommon as _)
+                    && p.element_type() == XmlElementType::XmlElementNode
+            })
+            .is_some()
+        {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoNext,
+                "Node has no next and not last of parent list\n",
+            );
+        }
+        if node.element_type() == XmlElementType::XmlElementNode {
+            let mut ns: XmlNsPtr;
+
+            ns = node.as_node().unwrap().as_ref().ns_def;
+            while !ns.is_null() {
+                self.ns_check_scope(node, ns);
+                ns = (*ns).next;
+            }
+            if !node.as_node().unwrap().as_ref().ns.is_null() {
+                self.ns_check_scope(node, node.as_node().unwrap().as_ref().ns);
+            }
+        } else if let Some(attr) = node
+            .as_attribute_node()
+            .filter(|attr| !attr.as_ref().ns.is_null())
+        {
+            self.ns_check_scope(node, attr.as_ref().ns);
+        }
+
+        if !matches!(
+            node.element_type(),
+            XmlElementType::XmlElementNode
+                | XmlElementType::XmlAttributeNode
+                | XmlElementType::XmlElementDecl
+                | XmlElementType::XmlAttributeDecl
+                | XmlElementType::XmlDTDNode
+                | XmlElementType::XmlHTMLDocumentNode
+                | XmlElementType::XmlDocumentNode
+        ) && !node.as_node().unwrap().as_ref().content.is_null()
+        {
+            let content = node.as_node().unwrap().as_ref().content;
+            self.check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
+        }
+        match (*node).element_type() {
+            XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
+                self.check_name(node.name().as_deref());
+            }
+            XmlElementType::XmlTextNode => {
+                if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_TEXT.as_ptr() as _
+                    && (*node).name().map_or(null(), |n| n.as_ptr())
+                        != XML_STRING_TEXT_NOENC.as_ptr() as _
+                {
+                    // some case of entity substitution can lead to this
+                    if self.dict.is_null()
+                        || ((*node).name().map_or(null(), |n| n.as_ptr())
+                            != xml_dict_lookup(self.dict, c"nbktext".as_ptr() as _, 7))
+                    {
+                        xml_debug_err!(
+                            self,
+                            XmlParserErrors::XmlCheckWrongName,
+                            "Text node has wrong name '{}'",
+                            (*node).name().unwrap()
+                        );
+                    }
+                }
+            }
+            XmlElementType::XmlCommentNode => {
+                if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_COMMENT.as_ptr() as _ {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckWrongName,
+                        "Comment node has wrong name '{}'",
+                        node.name().unwrap()
+                    );
+                }
+            }
+            XmlElementType::XmlPINode => {
+                self.check_name(node.name().as_deref());
+            }
+            XmlElementType::XmlCDATASectionNode => {
+                if let Some(name) = node.name() {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckNameNotNull,
+                        "CData section has non NULL name '{name}'",
+                    );
+                }
+            }
+            XmlElementType::XmlEntityRefNode
+            | XmlElementType::XmlEntityNode
+            | XmlElementType::XmlDocumentTypeNode
+            | XmlElementType::XmlDocumentFragNode
+            | XmlElementType::XmlNotationNode
+            | XmlElementType::XmlDTDNode
+            | XmlElementType::XmlElementDecl
+            | XmlElementType::XmlAttributeDecl
+            | XmlElementType::XmlEntityDecl
+            | XmlElementType::XmlNamespaceDecl
+            | XmlElementType::XmlXIncludeStart
+            | XmlElementType::XmlXIncludeEnd
+            | XmlElementType::XmlDocumentNode
+            | XmlElementType::XmlHTMLDocumentNode => {}
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -329,206 +528,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     -3
 }
 
-#[doc(alias = "xmlCtxtGenericNodeCheck")]
-unsafe fn xml_ctxt_generic_node_check(ctxt: XmlDebugCtxtPtr, node: &impl NodeCommon) {
-    let doc: XmlDocPtr = node.document();
-
-    if node.parent().is_none() {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoParent,
-            "Node has no parent\n",
-        );
-    }
-    if node.document().is_null() {
-        xml_debug_err!(ctxt, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
-    } else {
-        let dict = (*doc).dict;
-        if dict.is_null() && (*ctxt).nodict == 0 {
-            (*ctxt).nodict = 1;
-        }
-        if (*ctxt).doc.is_null() {
-            (*ctxt).doc = doc;
-        }
-
-        if (*ctxt).dict.is_null() {
-            (*ctxt).dict = dict;
-        }
-    }
-    if node
-        .parent()
-        .filter(|p| node.document() != p.document() && node.name().as_deref() != Some("pseudoroot"))
-        .is_some()
-    {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckWrongDoc,
-            "Node doc differs from parent's one\n",
-        );
-    }
-    if node.prev().is_none() {
-        if node.element_type() == XmlElementType::XmlAttributeNode {
-            if node
-                .parent()
-                .filter(|p| {
-                    node as *const dyn NodeCommon as *mut XmlNode != p.properties as *mut XmlNode
-                })
-                .is_some()
-            {
-                xml_debug_err!(
-                    ctxt,
-                    XmlParserErrors::XmlCheckNoPrev,
-                    "Attr has no prev and not first of attr list\n",
-                );
-            }
-        } else if node
-            .parent()
-            .filter(|p| p.children() != NodePtr::from_ptr(node as *const dyn NodeCommon as _))
-            .is_some()
-        {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckNoPrev,
-                "Node has no prev and not first of parent list\n",
-            );
-        }
-    } else if node.prev().unwrap().next != NodePtr::from_ptr(node as *const dyn NodeCommon as _) {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckWrongPrev,
-            "Node prev->next : back link wrong\n",
-        );
-    }
-    if let Some(next) = node.next() {
-        if next.prev != NodePtr::from_ptr(node as *const dyn NodeCommon as _) {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckWrongNext,
-                "Node next->prev : forward link wrong\n",
-            );
-        }
-        if next.parent() != node.parent() {
-            xml_debug_err!(
-                ctxt,
-                XmlParserErrors::XmlCheckWrongParent,
-                "Node next->prev : forward link wrong\n",
-            );
-        }
-    } else if node
-        .parent()
-        .filter(|p| {
-            node.element_type() != XmlElementType::XmlAttributeNode
-                && p.last() != NodePtr::from_ptr(node as *const dyn NodeCommon as _)
-                && p.element_type() == XmlElementType::XmlElementNode
-        })
-        .is_some()
-    {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoNext,
-            "Node has no next and not last of parent list\n",
-        );
-    }
-    if node.element_type() == XmlElementType::XmlElementNode {
-        let mut ns: XmlNsPtr;
-
-        ns = node.as_node().unwrap().as_ref().ns_def;
-        while !ns.is_null() {
-            (*ctxt).ns_check_scope(node, ns);
-            ns = (*ns).next;
-        }
-        if !node.as_node().unwrap().as_ref().ns.is_null() {
-            (*ctxt).ns_check_scope(node, node.as_node().unwrap().as_ref().ns);
-        }
-    } else if let Some(attr) = node
-        .as_attribute_node()
-        .filter(|attr| !attr.as_ref().ns.is_null())
-    {
-        (*ctxt).ns_check_scope(node, attr.as_ref().ns);
-    }
-
-    if !matches!(
-        node.element_type(),
-        XmlElementType::XmlElementNode
-            | XmlElementType::XmlAttributeNode
-            | XmlElementType::XmlElementDecl
-            | XmlElementType::XmlAttributeDecl
-            | XmlElementType::XmlDTDNode
-            | XmlElementType::XmlHTMLDocumentNode
-            | XmlElementType::XmlDocumentNode
-    ) && !node.as_node().unwrap().as_ref().content.is_null()
-    {
-        let content = node.as_node().unwrap().as_ref().content;
-        (*ctxt).check_string(&CStr::from_ptr(content as *const i8).to_string_lossy());
-    }
-    match (*node).element_type() {
-        XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            (*ctxt).check_name(node.name().as_deref());
-        }
-        XmlElementType::XmlTextNode => {
-            if node.name().map_or(null(), |n| n.as_ptr()) == XML_STRING_TEXT.as_ptr() as _
-                || (*node).name().map_or(null(), |n| n.as_ptr())
-                    == XML_STRING_TEXT_NOENC.as_ptr() as _
-            {
-                // break;
-            } else {
-                // some case of entity substitution can lead to this
-                if !(*ctxt).dict.is_null()
-                    && ((*node).name().map_or(null(), |n| n.as_ptr())
-                        == xml_dict_lookup((*ctxt).dict, c"nbktext".as_ptr() as _, 7))
-                {
-                    // break;
-                } else {
-                    xml_debug_err!(
-                        ctxt,
-                        XmlParserErrors::XmlCheckWrongName,
-                        "Text node has wrong name '{}'",
-                        (*node).name().unwrap()
-                    );
-                }
-            }
-        }
-        XmlElementType::XmlCommentNode => {
-            if node.name().map_or(null(), |n| n.as_ptr()) != XML_STRING_COMMENT.as_ptr() as _ {
-                xml_debug_err!(
-                    ctxt,
-                    XmlParserErrors::XmlCheckWrongName,
-                    "Comment node has wrong name '{}'",
-                    node.name().unwrap()
-                );
-                // break;
-            }
-        }
-        XmlElementType::XmlPINode => {
-            (*ctxt).check_name(node.name().as_deref());
-        }
-        XmlElementType::XmlCDATASectionNode => {
-            if let Some(name) = node.name() {
-                xml_debug_err!(
-                    ctxt,
-                    XmlParserErrors::XmlCheckNameNotNull,
-                    "CData section has non NULL name '{name}'",
-                );
-            }
-        }
-        XmlElementType::XmlEntityRefNode
-        | XmlElementType::XmlEntityNode
-        | XmlElementType::XmlDocumentTypeNode
-        | XmlElementType::XmlDocumentFragNode
-        | XmlElementType::XmlNotationNode
-        | XmlElementType::XmlDTDNode
-        | XmlElementType::XmlElementDecl
-        | XmlElementType::XmlAttributeDecl
-        | XmlElementType::XmlEntityDecl
-        | XmlElementType::XmlNamespaceDecl
-        | XmlElementType::XmlXIncludeStart
-        | XmlElementType::XmlXIncludeEnd
-        | XmlElementType::XmlDocumentNode
-        | XmlElementType::XmlHTMLDocumentNode => {}
-        _ => unreachable!(),
-    }
-}
-
 #[doc(alias = "xmlCtxtDumpDtdNode")]
 unsafe fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
     (*ctxt).dump_spaces();
@@ -559,7 +558,7 @@ unsafe fn xml_ctxt_dump_dtd_node(ctxt: XmlDebugCtxtPtr, dtd: Option<&XmlDtd>) {
         writeln!((*ctxt).output);
     }
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, dtd);
+    (*ctxt).generic_node_check(dtd);
 }
 
 /// Dumps debug information for the DTD
@@ -643,7 +642,7 @@ unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElemen
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, elem);
+    (*ctxt).generic_node_check(elem);
 }
 
 #[doc(alias = "xmlCtxtDumpAttrDecl")]
@@ -764,7 +763,7 @@ unsafe fn xml_ctxt_dump_attr_decl(ctxt: XmlDebugCtxtPtr, attr: Option<&XmlAttrib
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, attr);
+    (*ctxt).generic_node_check(attr);
 }
 
 #[doc(alias = "xmlCtxtDumpEntityDecl")]
@@ -850,7 +849,7 @@ unsafe fn xml_ctxt_dump_entity_decl(ctxt: XmlDebugCtxtPtr, ent: Option<&XmlEntit
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, ent);
+    (*ctxt).generic_node_check(ent);
 }
 
 #[doc(alias = "xmlCtxtDumpNamespace")]
@@ -1019,7 +1018,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
                 (*ctxt).dump_spaces();
             }
             writeln!((*ctxt).output, "Error, ATTRIBUTE found here");
-            xml_ctxt_generic_node_check(ctxt, &*node);
+            (*ctxt).generic_node_check(&*node);
             return;
         }
         XmlElementType::XmlTextNode => {
@@ -1080,7 +1079,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
                 (*ctxt).dump_spaces();
             }
             writeln!((*ctxt).output, "Error, DOCUMENT found here");
-            xml_ctxt_generic_node_check(ctxt, &*node);
+            (*ctxt).generic_node_check(&*node);
             return;
         }
         XmlElementType::XmlDocumentTypeNode => {
@@ -1183,7 +1182,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     (*ctxt).depth -= 1;
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, &*node);
+    (*ctxt).generic_node_check(&*node);
 }
 
 /// Dumps debug information for the element node, it is recursive
@@ -1246,7 +1245,7 @@ unsafe fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
     }
 
     // Do a bit of checking
-    xml_ctxt_generic_node_check(ctxt, &*attr);
+    (*ctxt).generic_node_check(&*attr);
 }
 
 #[doc(alias = "xmlCtxtDumpCleanCtxt")]
