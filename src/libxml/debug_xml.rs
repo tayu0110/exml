@@ -1293,6 +1293,28 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    /// Dumps debug information for the document, it's recursive
+    #[doc(alias = "xmlCtxtDumpDocument")]
+    unsafe fn dump_document(&mut self, doc: Option<&XmlDoc>) {
+        let Some(doc) = doc else {
+            if self.check == 0 {
+                writeln!(self.output, "DOCUMENT.is_null() !");
+            }
+            return;
+        };
+        self.dump_document_head(Some(doc));
+        if let Some(children) = (*doc).children().filter(|_| {
+            matches!(
+                doc.element_type(),
+                XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
+            )
+        }) {
+            self.depth += 1;
+            self.dump_node_list(Some(&*children.as_ptr()));
+            self.depth -= 1;
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -1487,35 +1509,13 @@ pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Opti
 }
 
 /// Dumps debug information for the document, it's recursive
-#[doc(alias = "xmlCtxtDumpDocument")]
-unsafe fn xml_ctxt_dump_document(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
-    let Some(doc) = doc else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "DOCUMENT.is_null() !");
-        }
-        return;
-    };
-    (*ctxt).dump_document_head(Some(doc));
-    if let Some(children) = (*doc).children().filter(|_| {
-        matches!(
-            doc.element_type(),
-            XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode
-        )
-    }) {
-        (*ctxt).depth += 1;
-        (*ctxt).dump_node_list(Some(&*children.as_ptr()));
-        (*ctxt).depth -= 1;
-    }
-}
-
-/// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlDebugDumpDocument")]
 pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
-    xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
+    ctxt.dump_document(doc);
 }
 
 /// Dumps debug information for the DTD
@@ -1650,7 +1650,7 @@ pub unsafe fn xml_debug_check_document(
         check: 1,
         ..Default::default()
     };
-    xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
+    ctxt.dump_document(doc);
     ctxt.errors
 }
 
