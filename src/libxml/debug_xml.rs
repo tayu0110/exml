@@ -36,10 +36,9 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
-        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
-        XmlElement, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
-        XmlNs, XmlNsPtr,
+        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttr, XmlAttribute,
+        XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -1280,9 +1279,9 @@ pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: Option<&XmlAttr
 
 /// Dumps debug information for the attribute list
 #[doc(alias = "xmlDebugDumpAttrList")]
-pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
+pub unsafe fn xml_debug_dump_attr_list<'a>(
     output: &mut (impl Write + 'a),
-    attr: XmlAttrPtr,
+    attr: Option<&XmlAttr>,
     depth: i32,
 ) {
     let mut ctxt = XmlDebugCtxt {
@@ -1290,7 +1289,7 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
         depth,
         ..Default::default()
     };
-    ctxt.dump_attr_list((!attr.is_null()).then(|| &*attr));
+    ctxt.dump_attr_list(attr);
 }
 
 /// Dumps debug information for the element node, it is not recursive
@@ -1982,7 +1981,11 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
             .as_mut()
             .dump_file(&mut boxed);
     } else if (*node).element_type() == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr_list(&mut boxed, (*node).as_attribute_node().unwrap().as_ptr(), 0);
+        xml_debug_dump_attr_list(
+            &mut boxed,
+            (*node).as_attribute_node().map(|a| a.as_ref()),
+            0,
+        );
     } else {
         (*node).dump_file(&mut boxed, (*node).doc);
     }
@@ -3879,44 +3882,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBoolToText()");
                     eprintln!(" {}", n_boolval);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_debug_dump_attr_list() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                    for n_depth in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let mut output = gen_debug_file_ptr(n_output, 0).unwrap();
-                        let attr = gen_xml_attr_ptr(n_attr, 1);
-                        let depth = gen_int(n_depth, 2);
-
-                        xml_debug_dump_attr_list(&mut output, attr, depth);
-                        des_xml_attr_ptr(n_attr, attr, 1);
-                        des_int(n_depth, depth, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlDebugDumpAttrList",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlDebugDumpAttrList()"
-                            );
-                            eprint!(" {}", n_output);
-                            eprint!(" {}", n_attr);
-                            eprintln!(" {}", n_depth);
-                        }
-                    }
                 }
             }
         }
