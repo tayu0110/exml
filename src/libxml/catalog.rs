@@ -1270,7 +1270,7 @@ unsafe fn xml_parse_xml_catalog_node(
     if cur.is_null() {
         return;
     }
-    if xml_str_equal((*cur).name, c"group".as_ptr() as _) {
+    if (*cur).name().as_deref() == Some("group") {
         let mut pref: XmlCatalogPrefer = XmlCatalogPrefer::None;
 
         if let Some(prop) = (*cur).get_prop("prefer") {
@@ -1303,7 +1303,7 @@ unsafe fn xml_parse_xml_catalog_node(
             pref,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"public".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("public") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataPublic,
@@ -1313,7 +1313,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"system".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("system") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataSystem,
@@ -1323,7 +1323,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"rewriteSystem".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("rewriteSystem") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataRewriteSystem,
@@ -1333,7 +1333,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"delegatePublic".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("delegatePublic") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegatePublic,
@@ -1343,7 +1343,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"delegateSystem".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("delegateSystem") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegateSystem,
@@ -1353,7 +1353,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"uri".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("uri") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataURI,
@@ -1363,7 +1363,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"rewriteURI".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("rewriteURI") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataRewriteURI,
@@ -1373,7 +1373,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"delegateURI".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("delegateURI") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataDelegateURI,
@@ -1383,7 +1383,7 @@ unsafe fn xml_parse_xml_catalog_node(
             prefer,
             cgroup,
         );
-    } else if xml_str_equal((*cur).name, c"nextCatalog".as_ptr() as _) {
+    } else if (*cur).name().as_deref() == Some("nextCatalog") {
         entry = xml_parse_xml_catalog_one_node(
             cur,
             XmlCatalogEntryType::XmlCataNextCatalog,
