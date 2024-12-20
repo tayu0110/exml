@@ -948,12 +948,9 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
 ///
 /// Returns the catalog parsed or null_mut() in case of error
 #[doc(alias = "xmlLoadSGMLSuperCatalog")]
-pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalogPtr {
-    if filename.is_null() {
-        return null_mut();
-    }
-    let Some(content) = xml_load_file_content(CStr::from_ptr(filename).to_string_lossy().as_ref())
-    else {
+pub unsafe fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
+    let filename = filename.as_ref();
+    let Some(content) = xml_load_file_content(filename) else {
         return null_mut();
     };
 
@@ -965,12 +962,7 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: *const c_char) -> XmlCatalog
         return null_mut();
     }
 
-    let ret = xml_parse_sgml_catalog(
-        catal,
-        &content,
-        CStr::from_ptr(filename).to_string_lossy().as_ref(),
-        1,
-    );
+    let ret = xml_parse_sgml_catalog(catal, &content, filename, 1);
     if ret < 0 {
         xml_free_catalog(catal);
         return null_mut();
