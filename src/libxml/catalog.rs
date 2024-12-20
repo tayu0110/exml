@@ -3791,7 +3791,7 @@ pub unsafe fn xml_catalog_convert() -> i32 {
 
 /// Free up the memory associated to the catalog list
 #[doc(alias = "xmlCatalogFreeLocal")]
-pub unsafe fn xml_catalog_free_local(catalogs: *mut c_void) {
+pub unsafe fn xml_catalog_free_local(catalogs: XmlCatalogEntryPtr) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3806,7 +3806,10 @@ pub unsafe fn xml_catalog_free_local(catalogs: *mut c_void) {
 ///
 /// Returns the updated list
 #[doc(alias = "xmlCatalogAddLocal")]
-pub unsafe fn xml_catalog_add_local(catalogs: *mut c_void, url: *const XmlChar) -> *mut c_void {
+pub unsafe fn xml_catalog_add_local(
+    catalogs: XmlCatalogEntryPtr,
+    url: *const XmlChar,
+) -> XmlCatalogEntryPtr {
     let mut catal: XmlCatalogEntryPtr;
 
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
@@ -3855,7 +3858,7 @@ pub unsafe fn xml_catalog_add_local(catalogs: *mut c_void, url: *const XmlChar) 
 /// it must be freed by the caller.
 #[doc(alias = "xmlCatalogLocalResolve")]
 pub unsafe fn xml_catalog_local_resolve(
-    catalogs: *mut c_void,
+    catalogs: XmlCatalogEntryPtr,
     pub_id: *const XmlChar,
     sys_id: *const XmlChar,
 ) -> *mut XmlChar {
@@ -3905,7 +3908,7 @@ pub unsafe fn xml_catalog_local_resolve(
 /// it must be freed by the caller.
 #[doc(alias = "xmlCatalogLocalResolveURI")]
 pub unsafe fn xml_catalog_local_resolve_uri(
-    catalogs: *mut c_void,
+    catalogs: XmlCatalogEntryPtr,
     uri: *const XmlChar,
 ) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
@@ -4513,85 +4516,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogIsEmpty()");
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_catalog_local_resolve() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_catalogs in 0..GEN_NB_VOID_PTR {
-                for n_pub_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_sys_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let catalogs = gen_void_ptr(n_catalogs, 0);
-                        let pub_id = gen_const_xml_char_ptr(n_pub_id, 1);
-                        let sys_id = gen_const_xml_char_ptr(n_sys_id, 2);
-
-                        let ret_val = xml_catalog_local_resolve(catalogs, pub_id, sys_id);
-                        desret_xml_char_ptr(ret_val);
-                        des_void_ptr(n_catalogs, catalogs, 0);
-                        des_const_xml_char_ptr(n_pub_id, pub_id, 1);
-                        des_const_xml_char_ptr(n_sys_id, sys_id, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlCatalogLocalResolve",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_catalogs);
-                            eprint!(" {}", n_pub_id);
-                            eprintln!(" {}", n_sys_id);
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlCatalogLocalResolve()"
-            );
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_catalog_local_resolve_uri() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_catalogs in 0..GEN_NB_VOID_PTR {
-                for n_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let catalogs = gen_void_ptr(n_catalogs, 0);
-                    let uri = gen_const_xml_char_ptr(n_uri, 1);
-
-                    let ret_val = xml_catalog_local_resolve_uri(catalogs, uri);
-                    desret_xml_char_ptr(ret_val);
-                    des_void_ptr(n_catalogs, catalogs, 0);
-                    des_const_xml_char_ptr(n_uri, uri, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlCatalogLocalResolveURI",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_catalogs);
-                        eprintln!(" {}", n_uri);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlCatalogLocalResolveURI()"
-            );
         }
         drop(lock);
     }

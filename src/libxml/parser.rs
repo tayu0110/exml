@@ -143,6 +143,7 @@ use crate::{
 };
 
 use super::{
+    catalog::XmlCatalogEntryPtr,
     chvalid::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
@@ -518,11 +519,11 @@ pub struct XmlParserCtxt {
                                                         * 10 is HTML after <body>
                                                         */
 
-    /* Input stream stack */
+    // Input stream stack
     pub input: XmlParserInputPtr,          /* Current input stream */
     pub input_tab: Vec<XmlParserInputPtr>, /* stack of inputs */
 
-    /* Node analysis stack only used for DOM building */
+    // Node analysis stack only used for DOM building
     pub(crate) node: XmlNodePtr,          /* Current parsed Node */
     pub(crate) node_tab: Vec<XmlNodePtr>, /* array of nodes */
 
@@ -544,7 +545,7 @@ pub struct XmlParserCtxt {
 
     pub(crate) directory: Option<String>, /* the data directory */
 
-    /* Node name stack */
+    // Node name stack
     pub(crate) name: *const XmlChar, /* Current parsed Node */
     pub(crate) name_tab: Vec<*const XmlChar>, /* array of nodes */
 
@@ -557,7 +558,7 @@ pub struct XmlParserCtxt {
     pub(crate) ext_sub_uri: *mut XmlChar,    /* URI of external subset */
     pub(crate) ext_sub_system: *mut XmlChar, /* SYSTEM ID of external subset */
 
-    /* xml:space values */
+    // xml:space values
     pub(crate) space_tab: Vec<i32>, /* array of space infos */
 
     pub(crate) depth: i32, /* to prevent entity substitution loops */
@@ -571,7 +572,8 @@ pub struct XmlParserCtxt {
 
     pub(crate) loadsubset: i32,  /* should the external subset be loaded */
     pub(crate) linenumbers: i32, /* set line number in element content */
-    pub(crate) catalogs: *mut c_void, /* document's own catalog */
+    #[cfg(feature = "catalog")]
+    pub(crate) catalogs: XmlCatalogEntryPtr, /* document's own catalog */
     pub(crate) recovery: i32,    /* run in recovery mode */
     pub(crate) progressive: i32, /* is this a progressive parsing */
     pub(crate) dict: XmlDictPtr, /* dictionary for the parser */
@@ -579,16 +581,12 @@ pub struct XmlParserCtxt {
     pub(crate) maxatts: i32,     /* the size of the array */
     pub(crate) docdict: i32,     /* use strings from dict to build tree */
 
-    /*
-     * pre-interned strings
-     */
+    // pre-interned strings
     pub(crate) str_xml: *const XmlChar,
     pub(crate) str_xmlns: *const XmlChar,
     pub(crate) str_xml_ns: *const XmlChar,
 
-    /*
-     * Everything below is used only by the new SAX mode
-     */
+    // Everything below is used only by the new SAX mode
     pub(crate) sax2: i32,                   /* operating in the new SAX mode */
     pub(crate) ns_tab: Vec<*const XmlChar>, /* the array of prefix/namespace name */
     pub(crate) attallocs: *mut i32,         /* which attribute were allocated */
@@ -598,24 +596,20 @@ pub struct XmlParserCtxt {
     pub(crate) ns_well_formed: i32, /* is the document XML Namespace okay */
     pub(crate) options: i32,        /* Extra options */
 
-    /*
-     * Those fields are needed only for streaming parsing so far
-     */
+    // Those fields are needed only for streaming parsing so far
     pub(crate) dict_names: i32,    /* Use dictionary names for the tree */
     pub(crate) free_elems_nr: i32, /* number of freed element nodes */
     pub(crate) free_elems: XmlNodePtr, /* List of freed element nodes */
     pub(crate) free_attrs_nr: i32, /* number of freed attributes nodes */
     pub(crate) free_attrs: XmlAttrPtr, /* List of freed attributes nodes */
 
-    /*
-     * the complete error information for the last error.
-     */
+    // the complete error information for the last error.
     pub last_error: XmlError,
     pub(crate) parse_mode: XmlParserMode, /* the parser mode */
     pub(crate) nbentities: u64,           /* unused */
     pub sizeentities: u64,                /* size of parsed entities */
 
-    /* for use by HTML non-recursive parser */
+    // for use by HTML non-recursive parser
     pub(crate) node_info: *mut XmlParserNodeInfo, /* Current NodeInfo */
     pub(crate) node_info_nr: i32,                 /* Depth of the parsing stack */
     pub(crate) node_info_max: i32,                /* Max depth of the parsing stack */
@@ -719,10 +713,7 @@ impl XmlParserCtxt {
         }
 
         used = (*input).cur.offset_from((*input).base) as usize;
-        /*
-         * Do not shrink on large buffers whose only a tiny fraction
-         * was consumed
-         */
+        // Do not shrink on large buffers whose only a tiny fraction was consumed
         if used > INPUT_CHUNK {
             let res: size_t = buf
                 .borrow()
@@ -760,10 +751,7 @@ impl XmlParserCtxt {
             xml_free_input_stream(self.input_pop());
         }
         if !self.input.is_null() {
-            /*
-             * in case there was a specific allocation deallocate before
-             * overriding base
-             */
+            // in case there was a specific allocation deallocate before overriding base
             if let Some(free) = (*self.input).free {
                 free((*self.input).base as *mut XmlChar);
                 (*self.input).free = None;
@@ -843,11 +831,9 @@ impl XmlParserCtxt {
         }
 
         if self.charset != XmlCharEncoding::UTF8 {
-            /*
-             * Assume it's a fixed length encoding (1) with
-             * a compatible encoding for the ASCII set, since
-             * XML constructs only use < 128 chars
-             */
+            // Assume it's a fixed length encoding (1) with
+            // a compatible encoding for the ASCII set, since
+            // XML constructs only use < 128 chars
 
             if *((*self.input).cur) == b'\n' {
                 (*self.input).line += 1;
@@ -859,12 +845,10 @@ impl XmlParserCtxt {
             return;
         }
 
-        /*
-         *   2.11 End-of-Line Handling
-         *   the literal two-character sequence "#xD#xA" or a standalone
-         *   literal #xD, an XML processor must pass to the application
-         *   the single character #xA.
-         */
+        // 2.11 End-of-Line Handling
+        //   the literal two-character sequence "#xD#xA" or a standalone
+        //   literal #xD, an XML processor must pass to the application
+        //   the single character #xA.
         if *(*self.input).cur == b'\n' {
             (*self.input).line += 1;
             (*self.input).col = 1;
@@ -889,13 +873,10 @@ impl XmlParserCtxt {
             Err(_) => {}
         }
 
-        /*
-         * If we detect an UTF8 error that probably mean that the
-         * input encoding didn't get properly advertised in the
-         * declaration header. Report the error and switch the encoding
-         * to ISO-Latin-1 (if you don't like this policy, just declare the
-         * encoding !)
-         */
+        // If we detect an UTF8 error that probably mean that the
+        // input encoding didn't get properly advertised in the declaration header.
+        // Report the error and switch the encoding
+        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
         if self.input.is_null() || (*self.input).end.offset_from((*self.input).cur) < 4 {
             __xml_err_encoding!(
                 self,
@@ -929,16 +910,11 @@ impl XmlParserCtxt {
     pub(crate) unsafe fn skip_blanks(&mut self) -> i32 {
         let mut res = 0i32;
 
-        /*
-         * It's Okay to use CUR/NEXT here since all the blanks are on
-         * the ASCII range.
-         */
+        // It's Okay to use CUR/NEXT here since all the blanks are on the ASCII range.
         if (self.input_tab.len() == 1 && !matches!(self.instate, XmlParserInputState::XmlParserDTD))
             || matches!(self.instate, XmlParserInputState::XmlParserStart)
         {
-            /*
-             * if we are in the document content, go really fast
-             */
+            // if we are in the document content, go really fast
             let mut cur = (*self.input).cur;
             while xml_is_blank_char(*cur as u32) {
                 if *cur == b'\n' {
@@ -961,12 +937,10 @@ impl XmlParserCtxt {
 
             while !matches!(self.instate, XmlParserInputState::XmlParserEOF) {
                 if xml_is_blank_char(self.current_byte() as u32) {
-                    /* CHECKED tstblanks.xml */
+                    // CHECKED tstblanks.xml
                     self.skip_char();
                 } else if self.current_byte() == b'%' {
-                    /*
-                     * Need to handle support of entities branching here
-                     */
+                    // Need to handle support of entities branching here
                     if !expand_pe
                         || xml_is_blank_char(self.nth_byte(1) as u32)
                         || self.nth_byte(1) == 0
@@ -985,10 +959,7 @@ impl XmlParserCtxt {
                     consumed = consumed
                         .saturating_add((*self.input).cur.offset_from((*self.input).base) as _);
 
-                    /*
-                     * Add to sizeentities when parsing an external entity
-                     * for the first time.
-                     */
+                    // Add to sizeentities when parsing an external entity for the first time.
                     let ent: XmlEntityPtr = (*self.input).entity;
                     if matches!(
                         (*ent).etype,
@@ -1007,13 +978,10 @@ impl XmlParserCtxt {
                     break;
                 }
 
-                /*
-                 * Also increase the counter when entering or exiting a PERef.
-                 * The spec says: "When a parameter-entity reference is recognized
-                 * in the DTD and included, its replacement text MUST be enlarged
-                 * by the attachment of one leading and one following space (#x20)
-                 * character."
-                 */
+                // Also increase the counter when entering or exiting a PERef.
+                // The spec says: "When a parameter-entity reference is recognized
+                // in the DTD and included, its replacement text MUST be enlarged
+                // by the attachment of one leading and one following space (#x20) character."
                 res = res.saturating_add(1);
             }
         }
@@ -1056,11 +1024,9 @@ impl XmlParserCtxt {
         }
 
         if self.charset != XmlCharEncoding::UTF8 {
-            /*
-             * Assume it's a fixed length encoding (1) with
-             * a compatible encoding for the ASCII set, since
-             * XML constructs only use < 128 chars
-             */
+            // Assume it's a fixed length encoding (1) with
+            // a compatible encoding for the ASCII set, since
+            // XML constructs only use < 128 chars
             *len = 1;
             if *(*self.input).cur == 0xD {
                 if *(*self.input).cur.add(1) == 0xA {
@@ -1091,13 +1057,10 @@ impl XmlParserCtxt {
                 match e.error_len() {
                     Some(l) => {
                         *len = l as i32;
-                        /*
-                         * If we detect an UTF8 error that probably mean that the
-                         * input encoding didn't get properly advertised in the
-                         * declaration header. Report the error and switch the encoding
-                         * to ISO-Latin-1 (if you don't like this policy, just declare the
-                         * encoding !)
-                         */
+                        // If we detect an UTF8 error that probably mean that the
+                        // input encoding didn't get properly advertised in the
+                        // declaration header. Report the error and switch the encoding
+                        // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
                         if (*self.input).end.offset_from((*self.input).cur) < 4 {
                             __xml_err_encoding!(
                                 self,
@@ -1697,6 +1660,7 @@ impl Default for XmlParserCtxt {
             _private: null_mut(),
             loadsubset: 0,
             linenumbers: 0,
+            #[cfg(feature = "catalog")]
             catalogs: null_mut(),
             recovery: 0,
             progressive: 0,
