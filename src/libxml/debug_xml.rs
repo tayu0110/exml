@@ -1586,8 +1586,8 @@ pub unsafe fn xml_debug_dump_node<'a>(
 
 /// Dumps debug information for the list of element node, it is recursive
 #[doc(alias = "xmlDebugDumpNodeList")]
-pub unsafe fn xml_debug_dump_node_list(
-    output: Option<impl Write>,
+pub unsafe fn xml_debug_dump_node_list<'a>(
+    output: Option<impl Write + 'a>,
     node: Option<&impl NodeCommon>,
     depth: i32,
 ) {
