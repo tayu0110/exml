@@ -5096,7 +5096,7 @@ struct XmlThreadParams<'a> {
 }
 
 #[cfg(feature = "catalog")]
-const CATALOG: &CStr = c"./test/threads/complex.xml";
+const CATALOG: &str = "./test/threads/complex.xml";
 #[cfg(feature = "catalog")]
 static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
     XmlThreadParams {
@@ -5197,7 +5197,7 @@ unsafe extern "C" fn test_thread() -> i32 {
 
     let mut tid = TID.lock().unwrap();
     for _ in 0..500 {
-        xml_load_catalog(CATALOG.as_ptr());
+        xml_load_catalog(CATALOG);
         NB_TESTS.set(NB_TESTS.get() + 1);
 
         tid[..NUM_THREADS].fill(u64::MAX);

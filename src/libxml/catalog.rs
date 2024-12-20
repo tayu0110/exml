@@ -3308,27 +3308,20 @@ pub unsafe fn xml_initialize_catalog() {
 ///
 /// Returns 0 in case of success -1 in case of error
 #[doc(alias = "xmlLoadCatalog")]
-pub unsafe fn xml_load_catalog(filename: *const c_char) -> i32 {
+pub unsafe fn xml_load_catalog(filename: impl AsRef<Path>) -> i32 {
     let catal: XmlCatalogPtr;
 
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog_data();
     }
 
-    if filename.is_null() {
-        return -1;
-    }
-
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
 
+    let filename = filename.as_ref();
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if default_catalog.is_null() {
-        catal = if !filename.is_null() {
-            xml_load_a_catalog(CStr::from_ptr(filename).to_string_lossy().as_ref())
-        } else {
-            null_mut()
-        };
+        catal = xml_load_a_catalog(filename);
         if catal.is_null() {
             xml_rmutex_unlock(mutex);
             return -1;
@@ -3339,10 +3332,7 @@ pub unsafe fn xml_load_catalog(filename: *const c_char) -> i32 {
         return 0;
     }
 
-    let ret: i32 = xml_expand_catalog(
-        default_catalog,
-        CStr::from_ptr(filename).to_string_lossy().as_ref(),
-    );
+    let ret: i32 = xml_expand_catalog(default_catalog, filename);
     xml_rmutex_unlock(mutex);
     ret
 }
@@ -3391,7 +3381,7 @@ pub unsafe fn xml_load_catalogs(pathss: *const c_char) {
                         }
                     }
                 }
-                xml_load_catalog(path as _);
+                xml_load_catalog(CStr::from_ptr(path as *const i8).to_string_lossy().as_ref());
                 xml_free(path as _);
             }
         }
@@ -4692,23 +4682,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlInitializeCatalog()"
             );
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_load_catalog() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            for n_filename in 0..GEN_NB_FILEPATH {
-                let filename = gen_filepath(n_filename, 0);
-
-                let ret_val = xml_load_catalog(filename);
-                desret_int(ret_val);
-                des_filepath(n_filename, filename, 0);
-                reset_last_error();
-            }
         }
         drop(lock);
     }

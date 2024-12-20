@@ -32,7 +32,7 @@ struct XmlThreadParams<'a> {
     okay: c_int,
 }
 
-static CATALOG: &CStr = c"test/threads/complex.xml";
+const CATALOG: &str = "test/threads/complex.xml";
 static mut THREAD_PARAMS: [XmlThreadParams; 7] = [
     XmlThreadParams {
         filename: c"test/threads/abc.xml",
@@ -116,7 +116,7 @@ fn main() {
     unsafe {
         xml_init_parser();
         for _ in 0..TEST_REPEAT_COUNT {
-            xml_load_catalog(CATALOG.as_ptr());
+            xml_load_catalog(CATALOG);
 
             memset(
                 TID.as_mut_ptr() as _,
