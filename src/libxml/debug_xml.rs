@@ -792,6 +792,15 @@ impl XmlDebugCtxt<'_> {
             writeln!(self.output);
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpNamespaceList")]
+    unsafe fn dump_namespace_list(&mut self, mut ns: Option<&XmlNs>) {
+        while let Some(now) = ns {
+            self.dump_namespace(Some(now));
+            let next = now.next;
+            ns = (!next.is_null()).then(|| &*next);
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -904,16 +913,8 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     -3
 }
 
-#[doc(alias = "xmlCtxtDumpNamespaceList")]
-unsafe fn xml_ctxt_dump_namespace_list(ctxt: XmlDebugCtxtPtr, mut ns: XmlNsPtr) {
-    while !ns.is_null() {
-        (*ctxt).dump_namespace(Some(&*ns));
-        ns = (*ns).next;
-    }
-}
-
 #[doc(alias = "xmlCtxtDumpEntity")]
-unsafe extern "C" fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
+unsafe fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
     (*ctxt).dump_spaces();
 
     if ent.is_null() {
@@ -1156,7 +1157,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     }
     (*ctxt).depth += 1;
     if (*node).element_type() == XmlElementType::XmlElementNode && !(*node).ns_def.is_null() {
-        xml_ctxt_dump_namespace_list(ctxt, (*node).ns_def);
+        (*ctxt).dump_namespace_list(Some(&*(*node).ns_def));
     }
     if (*node).element_type() == XmlElementType::XmlElementNode && !(*node).properties.is_null() {
         xml_ctxt_dump_attr_list(ctxt, (*node).properties);
@@ -1467,7 +1468,7 @@ unsafe fn xml_ctxt_dump_document_head(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc
             }
         }
         if !doc.old_ns.is_null() {
-            xml_ctxt_dump_namespace_list(ctxt, doc.old_ns);
+            (*ctxt).dump_namespace_list(Some(&*doc.old_ns));
         }
     }
 }
