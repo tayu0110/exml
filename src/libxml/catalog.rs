@@ -307,30 +307,6 @@ fn xml_load_file_content(filename: impl AsRef<Path>) -> Option<Vec<u8>> {
     _load_file_content(filename.as_ref())
 }
 
-macro_rules! RAW {
-    ($cur:expr) => {
-        *$cur
-    };
-}
-macro_rules! NEXT {
-    ($cur:expr) => {
-        $cur = $cur.add(1);
-    };
-}
-macro_rules! SKIP {
-    ($cur:expr, $x:expr) => {
-        $cur = $cur.add($x as usize);
-    };
-}
-
-macro_rules! SKIP_BLANKS {
-    ($cur:expr) => {
-        while xml_is_blank_char(*$cur as u32) {
-            NEXT!($cur);
-        }
-    };
-}
-
 /// Trim blank chars at the head of `cur`.
 fn skip_blanks(mut cur: &[u8]) -> &[u8] {
     while !cur.is_empty() && xml_is_blank_char(cur[0] as u32) {
