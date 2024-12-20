@@ -1315,6 +1315,103 @@ impl XmlDebugCtxt<'_> {
             self.depth -= 1;
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpEntityCallback")]
+    unsafe fn dump_entities_callback(&mut self, cur: Option<&XmlEntity>) {
+        let Some(cur) = cur else {
+            if self.check == 0 {
+                write!(self.output, "Entity is NULL");
+            }
+            return;
+        };
+        if self.check == 0 {
+            write!(self.output, "{} : ", cur.name().unwrap());
+            match cur.etype {
+                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                    write!(self.output, "INTERNAL GENERAL, ");
+                }
+                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                    write!(self.output, "EXTERNAL PARSED, ");
+                }
+                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                    write!(self.output, "EXTERNAL UNPARSED, ");
+                }
+                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                    write!(self.output, "INTERNAL PARAMETER, ");
+                }
+                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                    write!(self.output, "EXTERNAL PARAMETER, ");
+                }
+                Some(e) => {
+                    xml_debug_err!(
+                        self,
+                        XmlParserErrors::XmlCheckEntityType,
+                        "Unknown entity type {}\n",
+                        e as i32
+                    );
+                }
+                _ => unreachable!(),
+            }
+            if !cur.external_id.load(Ordering::Relaxed).is_null() {
+                let external_id =
+                    CStr::from_ptr(cur.external_id.load(Ordering::Relaxed) as *const i8)
+                        .to_string_lossy();
+                write!(self.output, "ID \"{external_id}\"");
+            }
+            if !cur.system_id.load(Ordering::Relaxed).is_null() {
+                let system_id = CStr::from_ptr(cur.system_id.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                write!(self.output, "SYSTEM \"{system_id}\"");
+            }
+            if !cur.orig.load(Ordering::Relaxed).is_null() {
+                let orig =
+                    CStr::from_ptr(cur.orig.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                write!(self.output, "\n orig \"{orig}\"");
+            }
+            if cur.typ != XmlElementType::XmlElementNode
+                && !cur.content.load(Ordering::Relaxed).is_null()
+            {
+                let content = CStr::from_ptr(cur.content.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                write!(self.output, "\n content \"{content}\"");
+            }
+            writeln!(self.output);
+        }
+    }
+
+    /// Dumps debug information for all the entities in use by the document
+    #[doc(alias = "xmlCtxtDumpEntities")]
+    unsafe fn dump_entities(&mut self, doc: Option<&XmlDoc>) {
+        if let Some(doc) = doc {
+            self.dump_doc_head(doc);
+            if !doc.int_subset.is_null() {
+                if let Some(table) = (*doc.int_subset).entities {
+                    if self.check == 0 {
+                        writeln!(self.output, "Entities in internal subset");
+                    }
+                    table.scan(|payload, _, _, _| {
+                        let entity = *payload;
+                        self.dump_entities_callback((!entity.is_null()).then(|| &*entity));
+                    });
+                }
+            } else {
+                writeln!(self.output, "No entities in internal subset");
+            }
+            if !doc.ext_subset.is_null() {
+                if let Some(table) = (*doc.ext_subset).entities {
+                    if self.check == 0 {
+                        writeln!(self.output, "Entities in external subset");
+                    }
+                    table.scan(|payload, _, _, _| {
+                        let entity = *payload;
+                        self.dump_entities_callback((!entity.is_null()).then(|| &*entity));
+                    });
+                }
+            } else if self.check == 0 {
+                writeln!(self.output, "No entities in external subset");
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -1528,104 +1625,6 @@ pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: Option<&XmlDtd
     ctxt.dump_dtd(dtd);
 }
 
-#[doc(alias = "xmlCtxtDumpEntityCallback")]
-fn xml_ctxt_dump_entity_callback(cur: XmlEntityPtr, ctxt: XmlDebugCtxtPtr) {
-    unsafe {
-        if cur.is_null() {
-            if (*ctxt).check == 0 {
-                write!((*ctxt).output, "Entity is NULL");
-            }
-            return;
-        }
-        if (*ctxt).check == 0 {
-            write!((*ctxt).output, "{} : ", (*cur).name().unwrap());
-            match (*cur).etype {
-                Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                    write!((*ctxt).output, "INTERNAL GENERAL, ");
-                }
-                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                    write!((*ctxt).output, "EXTERNAL PARSED, ");
-                }
-                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                    write!((*ctxt).output, "EXTERNAL UNPARSED, ");
-                }
-                Some(XmlEntityType::XmlInternalParameterEntity) => {
-                    write!((*ctxt).output, "INTERNAL PARAMETER, ");
-                }
-                Some(XmlEntityType::XmlExternalParameterEntity) => {
-                    write!((*ctxt).output, "EXTERNAL PARAMETER, ");
-                }
-                Some(e) => {
-                    xml_debug_err!(
-                        ctxt,
-                        XmlParserErrors::XmlCheckEntityType,
-                        "Unknown entity type {}\n",
-                        e as i32
-                    );
-                }
-                _ => unreachable!(),
-            }
-            if !(*cur).external_id.load(Ordering::Relaxed).is_null() {
-                let external_id =
-                    CStr::from_ptr((*cur).external_id.load(Ordering::Relaxed) as *const i8)
-                        .to_string_lossy();
-                write!((*ctxt).output, "ID \"{external_id}\"");
-            }
-            if !(*cur).system_id.load(Ordering::Relaxed).is_null() {
-                let system_id =
-                    CStr::from_ptr((*cur).system_id.load(Ordering::Relaxed) as *const i8)
-                        .to_string_lossy();
-                write!((*ctxt).output, "SYSTEM \"{system_id}\"");
-            }
-            if !(*cur).orig.load(Ordering::Relaxed).is_null() {
-                let orig = CStr::from_ptr((*cur).orig.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-                write!((*ctxt).output, "\n orig \"{orig}\"");
-            }
-            if (*cur).typ != XmlElementType::XmlElementNode
-                && !(*cur).content.load(Ordering::Relaxed).is_null()
-            {
-                let content = CStr::from_ptr((*cur).content.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-                write!((*ctxt).output, "\n content \"{content}\"");
-            }
-            writeln!((*ctxt).output);
-        }
-    }
-}
-
-/// Dumps debug information for all the entities in use by the document
-#[doc(alias = "xmlCtxtDumpEntities")]
-unsafe fn xml_ctxt_dump_entities(ctxt: XmlDebugCtxtPtr, doc: Option<&XmlDoc>) {
-    if let Some(doc) = doc {
-        (*ctxt).dump_doc_head(doc);
-        if !doc.int_subset.is_null() {
-            if let Some(table) = (*doc.int_subset).entities {
-                if (*ctxt).check == 0 {
-                    writeln!((*ctxt).output, "Entities in internal subset");
-                }
-                table.scan(|payload, _, _, _| {
-                    xml_ctxt_dump_entity_callback(*payload, ctxt);
-                });
-            }
-        } else {
-            writeln!((*ctxt).output, "No entities in internal subset");
-        }
-        if !doc.ext_subset.is_null() {
-            if let Some(table) = (*doc.ext_subset).entities {
-                if (*ctxt).check == 0 {
-                    writeln!((*ctxt).output, "Entities in external subset");
-                }
-                table.scan(|payload, _, _, _| {
-                    xml_ctxt_dump_entity_callback(*payload, ctxt);
-                });
-            }
-        } else if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "No entities in external subset");
-        }
-    }
-}
-
 /// Dumps debug information for all the entities in use by the document
 #[doc(alias = "xmlDebugDumpEntities")]
 pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&XmlDoc>) {
@@ -1633,7 +1632,7 @@ pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&
         output: Box::new(output),
         ..Default::default()
     };
-    xml_ctxt_dump_entities(addr_of_mut!(ctxt), doc);
+    ctxt.dump_entities(doc);
 }
 
 /// Check the document for potential content problems, and output
