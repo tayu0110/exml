@@ -1267,11 +1267,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
     -3
 }
 
-#[doc(alias = "xmlCtxtDumpCleanCtxt")]
-unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
-    /* remove the ATTRIBUTE_UNUSED when this is added */
-}
-
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlDebugDumpAttr")]
 pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: XmlAttrPtr, depth: i32) {
@@ -1281,7 +1276,6 @@ pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: XmlAttrPtr, dep
         ..Default::default()
     };
     ctxt.dump_attr((!attr.is_null()).then(|| &*attr));
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the attribute list
@@ -1297,7 +1291,6 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
         ..Default::default()
     };
     ctxt.dump_attr_list((!attr.is_null()).then(|| &*attr));
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the element node, it is not recursive
@@ -1313,7 +1306,6 @@ pub unsafe fn xml_debug_dump_one_node(
         ..Default::default()
     };
     ctxt.dump_one_node(node);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the element node, it is recursive
@@ -1329,7 +1321,6 @@ pub unsafe fn xml_debug_dump_node<'a>(
         ..Default::default()
     };
     ctxt.dump_node(node);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the list of element node, it is recursive
@@ -1345,7 +1336,6 @@ pub unsafe fn xml_debug_dump_node_list(
         ..Default::default()
     };
     ctxt.dump_node_list(node);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 #[doc(alias = "xmlCtxtDumpDocHead")]
@@ -1495,7 +1485,6 @@ pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Opti
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_document_head(addr_of_mut!(ctxt), doc);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the document, it's recursive
@@ -1528,7 +1517,6 @@ pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&X
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Dumps debug information for the DTD
@@ -1539,7 +1527,6 @@ pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: Option<&XmlDtd
     ctxt.options |= DUMP_TEXT_TYPE;
     ctxt.output = output.map_or(Box::new(stdout()) as Box<dyn Write>, |o| Box::new(o));
     ctxt.dump_dtd(dtd);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 #[doc(alias = "xmlCtxtDumpEntityCallback")]
@@ -1648,7 +1635,6 @@ pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&
         ..Default::default()
     };
     xml_ctxt_dump_entities(addr_of_mut!(ctxt), doc);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
 /// Check the document for potential content problems, and output
@@ -1666,7 +1652,6 @@ pub unsafe fn xml_debug_check_document(
         ..Default::default()
     };
     xml_ctxt_dump_document(addr_of_mut!(ctxt), doc);
-    xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
     ctxt.errors
 }
 
