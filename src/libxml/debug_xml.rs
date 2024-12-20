@@ -36,9 +36,10 @@ use crate::{
     generic_error,
     libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
     tree::{
-        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute,
-        XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
+        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
+        XmlElement, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
+        XmlNs, XmlNsPtr,
     },
 };
 
@@ -865,6 +866,39 @@ impl XmlDebugCtxt<'_> {
             }
         }
     }
+
+    /// Dumps debug information for the attribute
+    #[doc(alias = "xmlCtxtDumpAttr")]
+    unsafe fn dump_attr(&mut self, attr: Option<&XmlAttr>) {
+        self.dump_spaces();
+
+        let Some(attr) = attr else {
+            if self.check == 0 {
+                write!(self.output, "Attr is NULL");
+            }
+            return;
+        };
+        if self.check == 0 {
+            write!(self.output, "ATTRIBUTE ");
+            self.dump_string(attr.name().as_deref());
+            writeln!(self.output);
+            if let Some(children) = attr.children() {
+                self.depth += 1;
+                xml_ctxt_dump_node_list(self, children.as_ptr());
+                self.depth -= 1;
+            }
+        }
+        if attr.name().is_none() {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Attribute has no name",
+            );
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(attr);
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -979,9 +1013,9 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
 
 /// Dumps debug information for the attribute list
 #[doc(alias = "xmlCtxtDumpAttrList")]
-unsafe extern "C" fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: XmlAttrPtr) {
+unsafe fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: XmlAttrPtr) {
     while !attr.is_null() {
-        xml_ctxt_dump_attr(ctxt, attr);
+        (*ctxt).dump_attr(Some(&*attr));
         attr = (*attr).next;
     }
 }
@@ -1215,39 +1249,6 @@ unsafe extern "C" fn xml_ctxt_dump_node_list(ctxt: XmlDebugCtxtPtr, mut node: Xm
     }
 }
 
-/// Dumps debug information for the attribute
-#[doc(alias = "xmlCtxtDumpAttr")]
-unsafe fn xml_ctxt_dump_attr(ctxt: XmlDebugCtxtPtr, attr: XmlAttrPtr) {
-    (*ctxt).dump_spaces();
-
-    if attr.is_null() {
-        if (*ctxt).check == 0 {
-            write!((*ctxt).output, "Attr is NULL");
-        }
-        return;
-    }
-    if (*ctxt).check == 0 {
-        write!((*ctxt).output, "ATTRIBUTE ");
-        (*ctxt).dump_string((*attr).name().as_deref());
-        writeln!((*ctxt).output);
-        if let Some(children) = (*attr).children {
-            (*ctxt).depth += 1;
-            xml_ctxt_dump_node_list(ctxt, children.as_ptr());
-            (*ctxt).depth -= 1;
-        }
-    }
-    if (*attr).name.is_null() {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoName,
-            "Attribute has no name",
-        );
-    }
-
-    // Do a bit of checking
-    (*ctxt).generic_node_check(&*attr);
-}
-
 #[doc(alias = "xmlCtxtDumpCleanCtxt")]
 unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
     /* remove the ATTRIBUTE_UNUSED when this is added */
@@ -1255,17 +1256,13 @@ unsafe extern "C" fn xml_ctxt_dump_clean_ctxt(_ctxt: XmlDebugCtxtPtr) {
 
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlDebugDumpAttr")]
-pub unsafe extern "C" fn xml_debug_dump_attr(
-    output: &mut impl Write,
-    attr: XmlAttrPtr,
-    depth: i32,
-) {
+pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: XmlAttrPtr, depth: i32) {
     let mut ctxt = XmlDebugCtxt {
         output: Box::new(output),
         depth,
         ..Default::default()
     };
-    xml_ctxt_dump_attr(addr_of_mut!(ctxt), attr);
+    ctxt.dump_attr((!attr.is_null()).then(|| &*attr));
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
