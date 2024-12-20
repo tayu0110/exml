@@ -468,6 +468,71 @@ impl XmlDebugCtxt<'_> {
             writeln!(self.output, "    DTD is empty");
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpElemDecl")]
+    unsafe fn dump_elem_decl(&mut self, elem: Option<&XmlElement>) {
+        self.dump_spaces();
+
+        let Some(elem) = elem else {
+            if self.check == 0 {
+                writeln!(self.output, "Element declaration is NULL");
+            }
+            return;
+        };
+        if elem.element_type() != XmlElementType::XmlElementDecl {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNotElemDecl,
+                "Node is not an element declaration",
+            );
+            return;
+        }
+        if let Some(name) = elem.name() {
+            if self.check == 0 {
+                write!(self.output, "ELEMDECL(");
+                self.dump_string(Some(&name));
+                write!(self.output, ")");
+            }
+        } else {
+            xml_debug_err!(
+                self,
+                XmlParserErrors::XmlCheckNoName,
+                "Element declaration has no name",
+            );
+        }
+        if self.check == 0 {
+            match elem.etype {
+                XmlElementTypeVal::XmlElementTypeUndefined => {
+                    write!(self.output, ", UNDEFINED");
+                }
+                XmlElementTypeVal::XmlElementTypeEmpty => {
+                    write!(self.output, ", EMPTY");
+                }
+                XmlElementTypeVal::XmlElementTypeAny => {
+                    write!(self.output, ", ANY");
+                }
+                XmlElementTypeVal::XmlElementTypeMixed => {
+                    write!(self.output, ", MIXED ");
+                }
+                XmlElementTypeVal::XmlElementTypeElement => {
+                    write!(self.output, ", MIXED ");
+                }
+            }
+            if elem.element_type() != XmlElementType::XmlElementNode && !elem.content.is_null() {
+                let mut buf: [c_char; 5001] = [0; 5001];
+
+                buf[0] = 0;
+                xml_snprintf_element_content(buf.as_mut_ptr(), 5000, elem.content, 1);
+                buf[5000] = 0;
+                let elem = CStr::from_ptr(buf.as_ptr()).to_string_lossy();
+                write!(self.output, "{}", elem);
+            }
+            writeln!(self.output);
+        }
+
+        // Do a bit of checking
+        self.generic_node_check(elem);
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -578,71 +643,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-#[doc(alias = "xmlCtxtDumpElemDecl")]
-unsafe fn xml_ctxt_dump_elem_decl(ctxt: XmlDebugCtxtPtr, elem: Option<&XmlElement>) {
-    (*ctxt).dump_spaces();
-
-    let Some(elem) = elem else {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "Element declaration is NULL");
-        }
-        return;
-    };
-    if elem.element_type() != XmlElementType::XmlElementDecl {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNotElemDecl,
-            "Node is not an element declaration",
-        );
-        return;
-    }
-    if let Some(name) = elem.name() {
-        if (*ctxt).check == 0 {
-            write!((*ctxt).output, "ELEMDECL(");
-            (*ctxt).dump_string(Some(&name));
-            write!((*ctxt).output, ")");
-        }
-    } else {
-        xml_debug_err!(
-            ctxt,
-            XmlParserErrors::XmlCheckNoName,
-            "Element declaration has no name",
-        );
-    }
-    if (*ctxt).check == 0 {
-        match elem.etype {
-            XmlElementTypeVal::XmlElementTypeUndefined => {
-                write!((*ctxt).output, ", UNDEFINED");
-            }
-            XmlElementTypeVal::XmlElementTypeEmpty => {
-                write!((*ctxt).output, ", EMPTY");
-            }
-            XmlElementTypeVal::XmlElementTypeAny => {
-                write!((*ctxt).output, ", ANY");
-            }
-            XmlElementTypeVal::XmlElementTypeMixed => {
-                write!((*ctxt).output, ", MIXED ");
-            }
-            XmlElementTypeVal::XmlElementTypeElement => {
-                write!((*ctxt).output, ", MIXED ");
-            }
-        }
-        if elem.element_type() != XmlElementType::XmlElementNode && !elem.content.is_null() {
-            let mut buf: [c_char; 5001] = [0; 5001];
-
-            buf[0] = 0;
-            xml_snprintf_element_content(buf.as_mut_ptr(), 5000, elem.content, 1);
-            buf[5000] = 0;
-            let elem = CStr::from_ptr(buf.as_ptr()).to_string_lossy();
-            write!((*ctxt).output, "{}", elem);
-        }
-        writeln!((*ctxt).output);
-    }
-
-    // Do a bit of checking
-    (*ctxt).generic_node_check(elem);
 }
 
 #[doc(alias = "xmlCtxtDumpAttrDecl")]
@@ -1105,7 +1105,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
             return;
         }
         XmlElementType::XmlElementDecl => {
-            xml_ctxt_dump_elem_decl(ctxt, (*node).as_element_decl_node().map(|e| e.as_ref()));
+            (*ctxt).dump_elem_decl((*node).as_element_decl_node().map(|e| e.as_ref()));
             return;
         }
         XmlElementType::XmlAttributeDecl => {
