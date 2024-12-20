@@ -70,7 +70,7 @@ use crate::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
         },
-        xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strncmp, xml_strndup, XmlChar},
+        xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strndup, XmlChar},
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -1810,7 +1810,7 @@ fn xml_catalog_unwrap_urn(urn: &str) -> Option<String> {
 #[doc(alias = "xmlCatalogXMLResolve")]
 unsafe fn xml_catalog_xml_resolve(
     catal: XmlCatalogEntryPtr,
-    pub_id: *const XmlChar,
+    pub_id: Option<&str>,
     sys_id: Option<&str>,
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar;
@@ -1834,7 +1834,7 @@ unsafe fn xml_catalog_xml_resolve(
     // First tries steps 2/ 3/ 4/ if a system ID is provided.
     if let Some(sys_id) = sys_id {
         let mut rewrite: XmlCatalogEntryPtr = null_mut();
-        let mut lenrewrite: i32 = 0;
+        let mut lenrewrite = 0;
         cur = catal;
         have_delegate = 0;
         while !cur.is_null() {
@@ -1856,7 +1856,7 @@ unsafe fn xml_catalog_xml_resolve(
                     }
                 }
                 XmlCatalogEntryType::XmlCataRewriteSystem => {
-                    let len = (*cur).name.as_deref().map_or(0, |n| n.len()) as i32;
+                    let len = (*cur).name.as_deref().map_or(0, |n| n.len());
                     if len > lenrewrite && sys_id.starts_with((*cur).name.as_deref().unwrap()) {
                         lenrewrite = len;
                         rewrite = cur;
@@ -1888,7 +1888,7 @@ unsafe fn xml_catalog_xml_resolve(
                 ret = null_mut();
             }
             if !ret.is_null() {
-                let sys_id = CString::new(&sys_id[lenrewrite as usize..]).unwrap();
+                let sys_id = CString::new(&sys_id[lenrewrite..]).unwrap();
                 ret = xml_strcat(ret, sys_id.as_ptr() as *const u8);
             }
             (*catal).depth -= 1;
@@ -1926,8 +1926,7 @@ unsafe fn xml_catalog_xml_resolve(
                                 (*cur).url.as_deref().unwrap().display()
                             );
                         }
-                        ret =
-                            xml_catalog_list_xml_resolve((*cur).children, null_mut(), Some(sys_id));
+                        ret = xml_catalog_list_xml_resolve((*cur).children, None, Some(sys_id));
                         if !ret.is_null() {
                             (*catal).depth -= 1;
                             return ret;
@@ -1942,18 +1941,13 @@ unsafe fn xml_catalog_xml_resolve(
         }
     }
     // Then tries 5/ 6/ if a public ID is provided
-    if !pub_id.is_null() {
+    if let Some(pub_id) = pub_id {
         cur = catal;
         have_delegate = 0;
         while !cur.is_null() {
             match (*cur).typ {
                 XmlCatalogEntryType::XmlCataPublic => {
-                    if Some(
-                        CStr::from_ptr(pub_id as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    ) == (*cur).name.as_deref()
-                    {
+                    if Some(pub_id) == (*cur).name.as_deref() {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             generic_error!(
                                 "Found public match {}\n",
@@ -1970,7 +1964,6 @@ unsafe fn xml_catalog_xml_resolve(
                     }
                 }
                 XmlCatalogEntryType::XmlCataDelegatePublic => {
-                    let pub_id = CStr::from_ptr(pub_id as *const i8).to_string_lossy();
                     if pub_id.starts_with((*cur).name.as_deref().unwrap())
                         && matches!((*cur).prefer, XmlCatalogPrefer::Public)
                     {
@@ -1996,9 +1989,7 @@ unsafe fn xml_catalog_xml_resolve(
             'b: while !cur.is_null() {
                 if (*cur).typ == XmlCatalogEntryType::XmlCataDelegatePublic
                     && matches!((*cur).prefer, XmlCatalogPrefer::Public)
-                    && CStr::from_ptr(pub_id as *const i8)
-                        .to_string_lossy()
-                        .starts_with((*cur).name.as_deref().unwrap())
+                    && pub_id.starts_with((*cur).name.as_deref().unwrap())
                 {
                     for i in 0..nb_list {
                         if (*cur).url.as_deref() == delegates[i] {
@@ -2021,7 +2012,7 @@ unsafe fn xml_catalog_xml_resolve(
                                 (*cur).url.as_deref().unwrap().display()
                             );
                         }
-                        ret = xml_catalog_list_xml_resolve((*cur).children, pub_id, None);
+                        ret = xml_catalog_list_xml_resolve((*cur).children, Some(pub_id), None);
                         if !ret.is_null() {
                             (*catal).depth -= 1;
                             return ret;
@@ -2030,9 +2021,7 @@ unsafe fn xml_catalog_xml_resolve(
                 }
                 cur = (*cur).next;
             }
-            /*
-             * Apply the cut algorithm explained in 4/
-             */
+            // Apply the cut algorithm explained in 4/
             (*catal).depth -= 1;
             return XML_CATAL_BREAK;
         }
@@ -2071,7 +2060,7 @@ unsafe fn xml_catalog_xml_resolve(
 #[doc(alias = "xmlCatalogListXMLResolve")]
 unsafe fn xml_catalog_list_xml_resolve(
     mut catal: XmlCatalogEntryPtr,
-    mut pub_id: *const XmlChar,
+    pub_id: Option<&str>,
     sys_id: Option<&str>,
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
@@ -2079,39 +2068,35 @@ unsafe fn xml_catalog_list_xml_resolve(
     if catal.is_null() {
         return null_mut();
     }
-    if pub_id.is_null() && sys_id.is_none() {
+    if pub_id.is_none() && sys_id.is_none() {
         return null_mut();
     }
 
-    let normid: *mut XmlChar = xml_catalog_normalize_public(pub_id);
-    if !normid.is_null() {
-        pub_id = if *normid != 0 { normid } else { null_mut() };
+    let mut pub_id = pub_id.map(Cow::Borrowed);
+    if let Some(normid) = pub_id
+        .as_deref()
+        .and_then(|pub_id| normalize_public(pub_id.as_bytes()))
+    {
+        if normid.is_empty() {
+            pub_id = None;
+        } else {
+            pub_id = String::from_utf8(normid).ok().map(Cow::Owned);
+        }
     }
 
-    if xml_strncmp(pub_id, XML_URN_PUBID.as_ptr(), XML_URN_PUBID.len() as i32) == 0 {
-        let urn_id = xml_catalog_unwrap_urn(
-            CStr::from_ptr(pub_id as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        );
+    if let Some(pub_id) = pub_id.as_deref().filter(|p| p.starts_with(XML_URN_PUBID)) {
+        let urn_id = xml_catalog_unwrap_urn(pub_id);
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             if let Some(urn_id) = urn_id.as_deref() {
                 generic_error!("Public URN ID expanded to {urn_id}\n");
             } else {
-                generic_error!(
-                    "Public URN ID {} expanded to null_mut()\n",
-                    CStr::from_ptr(pub_id as *const i8).to_string_lossy()
-                );
+                generic_error!("Public URN ID {pub_id} expanded to null_mut()\n",);
             }
         }
         if let Some(urn_id) = urn_id {
-            let urn_id = CString::new(urn_id).unwrap();
-            ret = xml_catalog_list_xml_resolve(catal, urn_id.as_ptr() as *const u8, sys_id);
+            ret = xml_catalog_list_xml_resolve(catal, Some(&urn_id), sys_id);
         } else {
             ret = null_mut();
-        }
-        if !normid.is_null() {
-            xml_free(normid as _);
         }
         return ret;
     }
@@ -2125,19 +2110,17 @@ unsafe fn xml_catalog_list_xml_resolve(
             }
         }
         if let Some(urn_id) = urn_id {
-            let curn_id = CString::new(urn_id.as_str()).unwrap();
-            if pub_id.is_null() {
-                ret = xml_catalog_list_xml_resolve(catal, curn_id.as_ptr() as *const u8, None);
-            } else if xml_str_equal(pub_id, curn_id.as_ptr() as *const u8) {
-                ret = xml_catalog_list_xml_resolve(catal, pub_id, None);
+            if let Some(pub_id) = pub_id {
+                if pub_id == urn_id {
+                    ret = xml_catalog_list_xml_resolve(catal, Some(&pub_id), None);
+                } else {
+                    ret = xml_catalog_list_xml_resolve(catal, Some(&pub_id), Some(&urn_id));
+                }
             } else {
-                ret = xml_catalog_list_xml_resolve(catal, pub_id, Some(&urn_id));
+                ret = xml_catalog_list_xml_resolve(catal, Some(&urn_id), None);
             }
         } else {
             ret = null_mut();
-        }
-        if !normid.is_null() {
-            xml_free(normid as _);
         }
         return ret;
     }
@@ -2147,7 +2130,7 @@ unsafe fn xml_catalog_list_xml_resolve(
                 xml_fetch_xml_catalog_file(catal);
             }
             if !(*catal).children.is_null() {
-                ret = xml_catalog_xml_resolve((*catal).children, pub_id, sys_id);
+                ret = xml_catalog_xml_resolve((*catal).children, pub_id.as_deref(), sys_id);
                 if !ret.is_null() {
                     break;
                 } else if (*(*catal).children).depth > MAX_CATAL_DEPTH as i32 {
@@ -2158,9 +2141,6 @@ unsafe fn xml_catalog_list_xml_resolve(
         }
         catal = (*catal).next;
     }
-    if !normid.is_null() {
-        xml_free(normid as _);
-    }
     ret
 }
 
@@ -2170,38 +2150,22 @@ unsafe fn xml_catalog_list_xml_resolve(
 #[doc(alias = "xmlCatalogGetSGMLPublic")]
 unsafe fn xml_catalog_get_sgml_public<'a>(
     catal: &HashMap<String, XmlCatalogEntryPtr>,
-    mut pub_id: *const XmlChar,
+    pub_id: &str,
 ) -> Option<&'a Path> {
-    let normid: *mut XmlChar = xml_catalog_normalize_public(pub_id);
-    if !normid.is_null() {
-        pub_id = if *normid != 0 { normid } else { null_mut() };
+    let mut pub_id = Cow::Borrowed(pub_id);
+    if let Some(normid) = normalize_public(pub_id.as_bytes()) {
+        if normid.is_empty() {
+            return None;
+        }
+        pub_id = Cow::Owned(String::from_utf8(normid).ok()?);
     }
 
-    let entry: XmlCatalogEntryPtr = if !pub_id.is_null() {
-        *catal
-            .get(
-                CStr::from_ptr(pub_id as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            )
-            .unwrap_or(&null_mut())
-    } else {
-        null_mut()
-    };
+    let entry: XmlCatalogEntryPtr = *catal.get(pub_id.as_ref()).unwrap_or(&null_mut());
     if entry.is_null() {
-        if !normid.is_null() {
-            xml_free(normid as _);
-        }
         return None;
     }
     if (*entry).typ == XmlCatalogEntryType::SgmlCataPublic {
-        if !normid.is_null() {
-            xml_free(normid as _);
-        }
         return (*entry).url.as_deref();
-    }
-    if !normid.is_null() {
-        xml_free(normid as _);
     }
     None
 }
@@ -2230,12 +2194,12 @@ unsafe fn xml_catalog_get_sgml_system<'a>(
 #[doc(alias = "xmlCatalogSGMLResolve")]
 unsafe fn xml_catalog_sgml_resolve<'a>(
     catal: XmlCatalogPtr,
-    pub_id: *const XmlChar,
+    pub_id: Option<&str>,
     sys_id: Option<&str>,
 ) -> Option<&'a Path> {
     let mut ret = None;
 
-    if !pub_id.is_null() {
+    if let Some(pub_id) = pub_id {
         ret = xml_catalog_get_sgml_public(&(*catal).sgml, pub_id);
     }
     if ret.is_some() {
@@ -2256,26 +2220,20 @@ unsafe fn xml_catalog_sgml_resolve<'a>(
 #[doc(alias = "xmlACatalogResolve")]
 pub unsafe fn xml_a_catalog_resolve(
     catal: XmlCatalogPtr,
-    pub_id: *const XmlChar,
+    pub_id: Option<&str>,
     sys_id: Option<&str>,
 ) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
 
-    if (pub_id.is_null() && sys_id.is_none()) || catal.is_null() {
+    if (pub_id.is_none() && sys_id.is_none()) || catal.is_null() {
         return null_mut();
     }
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        if let Some(sys_id) = sys_id.filter(|_| !pub_id.is_null()) {
-            generic_error!(
-                "Resolve: pubID {} sysID {sys_id}\n",
-                CStr::from_ptr(pub_id as *const i8).to_string_lossy()
-            );
-        } else if !pub_id.is_null() {
-            generic_error!(
-                "Resolve: pubID {}\n",
-                CStr::from_ptr(pub_id as *const i8).to_string_lossy()
-            );
+        if let (Some(pub_id), Some(sys_id)) = (pub_id, sys_id) {
+            generic_error!("Resolve: pubID {pub_id} sysID {sys_id}\n");
+        } else if let Some(pub_id) = pub_id {
+            generic_error!("Resolve: pubID {pub_id}\n");
         } else {
             generic_error!("Resolve: sysID {}\n", sys_id.unwrap());
         }
@@ -2298,25 +2256,19 @@ pub unsafe fn xml_a_catalog_resolve(
 /// Returns the local resource if found or null_mut() otherwise,
 /// the value returned must be freed by the caller.
 #[doc(alias = "xmlACatalogResolvePublic")]
-pub unsafe fn xml_a_catalog_resolve_public(
-    catal: XmlCatalogPtr,
-    pub_id: *const XmlChar,
-) -> *mut XmlChar {
+pub unsafe fn xml_a_catalog_resolve_public(catal: XmlCatalogPtr, pub_id: &str) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
 
-    if pub_id.is_null() || catal.is_null() {
+    if catal.is_null() {
         return null_mut();
     }
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        generic_error!(
-            "Resolve pubID {}\n",
-            CStr::from_ptr(pub_id as *const i8).to_string_lossy()
-        );
+        generic_error!("Resolve pubID {pub_id}\n");
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlXMLCatalogType) {
-        ret = xml_catalog_list_xml_resolve((*catal).xml, pub_id, None);
+        ret = xml_catalog_list_xml_resolve((*catal).xml, Some(pub_id), None);
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
@@ -2344,7 +2296,7 @@ pub unsafe fn xml_a_catalog_resolve_system(catal: XmlCatalogPtr, sys_id: &str) -
     }
 
     if matches!((*catal).typ, XmlCatalogType::XmlXMLCatalogType) {
-        ret = xml_catalog_list_xml_resolve((*catal).xml, null_mut(), Some(sys_id));
+        ret = xml_catalog_list_xml_resolve((*catal).xml, None, Some(sys_id));
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
@@ -2535,8 +2487,7 @@ unsafe fn xml_catalog_list_xml_resolve_uri(
             }
         }
         if let Some(urn_id) = urn_id {
-            let urn_id = CString::new(urn_id).unwrap();
-            ret = xml_catalog_list_xml_resolve(catal, urn_id.as_ptr() as *const u8, None);
+            ret = xml_catalog_list_xml_resolve(catal, Some(&urn_id), None);
         } else {
             ret = null_mut();
         }
@@ -2580,7 +2531,7 @@ pub unsafe fn xml_a_catalog_resolve_uri(catal: XmlCatalogPtr, uri: &str) -> *mut
         if ret == XML_CATAL_BREAK {
             ret = null_mut();
         }
-    } else if let Some(sgml) = xml_catalog_sgml_resolve(catal, null_mut(), Some(uri)) {
+    } else if let Some(sgml) = xml_catalog_sgml_resolve(catal, None, Some(uri)) {
         let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
         ret = xml_strdup(sgml.as_ptr() as *const u8);
     }
@@ -3208,7 +3159,7 @@ pub unsafe fn xml_catalog_dump<'a>(out: impl Write + 'a) {
 /// Returns the URI of the resource or null_mut() if not found,
 /// it must be freed by the caller.
 #[doc(alias = "xmlCatalogResolve")]
-pub unsafe fn xml_catalog_resolve(pub_id: *const XmlChar, sys_id: Option<&str>) -> *mut XmlChar {
+pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3238,7 +3189,7 @@ pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> *mut XmlChar {
 /// Returns the resource if found or null_mut() otherwise,
 /// the value returned must be freed by the caller.
 #[doc(alias = "xmlCatalogResolvePublic")]
-pub unsafe fn xml_catalog_resolve_public(pub_id: *const XmlChar) -> *mut XmlChar {
+pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3488,28 +3439,22 @@ pub unsafe fn xml_catalog_add_local(
 #[doc(alias = "xmlCatalogLocalResolve")]
 pub unsafe fn xml_catalog_local_resolve(
     catalogs: XmlCatalogEntryPtr,
-    pub_id: *const XmlChar,
+    pub_id: Option<&str>,
     sys_id: Option<&str>,
 ) -> *mut XmlChar {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
 
-    if pub_id.is_null() && sys_id.is_none() {
+    if pub_id.is_none() && sys_id.is_none() {
         return null_mut();
     }
 
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        if let Some(sys_id) = sys_id.filter(|_| !pub_id.is_null()) {
-            generic_error!(
-                "Local Resolve: pubID {} sysID {sys_id}\n",
-                CStr::from_ptr(pub_id as *const i8).to_string_lossy()
-            );
-        } else if !pub_id.is_null() {
-            generic_error!(
-                "Local Resolve: pubID {}\n",
-                CStr::from_ptr(pub_id as *const i8).to_string_lossy()
-            );
+        if let (Some(pub_id), Some(sys_id)) = (pub_id, sys_id) {
+            generic_error!("Local Resolve: pubID {pub_id} sysID {sys_id}\n");
+        } else if let Some(pub_id) = pub_id {
+            generic_error!("Local Resolve: pubID {pub_id}\n");
         } else {
             generic_error!("Local Resolve: sysID {}\n", sys_id.unwrap());
         }
@@ -3653,7 +3598,7 @@ pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
     // Check first the XML catalogs
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if !default_catalog.is_null() {
-        ret = xml_catalog_list_xml_resolve((*default_catalog).xml, null_mut(), Some(sys_id));
+        ret = xml_catalog_list_xml_resolve((*default_catalog).xml, None, Some(sys_id));
         if !ret.is_null() && ret != XML_CATAL_BREAK {
             snprintf(
                 RESULT.as_mut_ptr() as _,
@@ -3689,7 +3634,7 @@ pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
 /// Returns the resource if found or null_mut() otherwise.
 #[deprecated = "use xmlCatalogResolvePublic()"]
 #[doc(alias = "xmlCatalogGetPublic")]
-pub unsafe fn xml_catalog_get_public(pub_id: *const XmlChar) -> *const XmlChar {
+pub unsafe fn xml_catalog_get_public(pub_id: &str) -> *const XmlChar {
     let ret: *mut XmlChar;
     static mut RESULT: [XmlChar; 1000] = [0; 1000];
     static MSG: AtomicI32 = AtomicI32::new(0);
@@ -3704,14 +3649,10 @@ pub unsafe fn xml_catalog_get_public(pub_id: *const XmlChar) -> *const XmlChar {
         MSG.store(old + 1, Ordering::Release);
     }
 
-    if pub_id.is_null() {
-        return null_mut();
-    }
-
     // Check first the XML catalogs
     let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
     if !default_catalog.is_null() {
-        ret = xml_catalog_list_xml_resolve((*default_catalog).xml, pub_id, None);
+        ret = xml_catalog_list_xml_resolve((*default_catalog).xml, Some(pub_id), None);
         if !ret.is_null() && ret != XML_CATAL_BREAK {
             snprintf(
                 RESULT.as_mut_ptr() as _,
@@ -3776,43 +3717,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlACatalogDump()");
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_acatalog_resolve_public() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_catal in 0..GEN_NB_XML_CATALOG_PTR {
-                for n_pub_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let catal = gen_xml_catalog_ptr(n_catal, 0);
-                    let pub_id = gen_const_xml_char_ptr(n_pub_id, 1);
-
-                    let ret_val = xml_a_catalog_resolve_public(catal, pub_id);
-                    desret_xml_char_ptr(ret_val);
-                    des_xml_catalog_ptr(n_catal, catal, 0);
-                    des_const_xml_char_ptr(n_pub_id, pub_id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlACatalogResolvePublic",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_catal);
-                        eprintln!(" {}", n_pub_id);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlACatalogResolvePublic()"
-            );
         }
         drop(lock);
     }
@@ -3919,38 +3823,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogIsEmpty()");
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_catalog_resolve_public() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_pub_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let pub_id = gen_const_xml_char_ptr(n_pub_id, 0);
-
-                let ret_val = xml_catalog_resolve_public(pub_id as *const XmlChar);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_char_ptr(n_pub_id, pub_id, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCatalogResolvePublic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_pub_id);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlCatalogResolvePublic()"
-            );
         }
         drop(lock);
     }

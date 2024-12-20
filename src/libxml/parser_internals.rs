@@ -388,7 +388,7 @@ pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -
     }
     (*ctxt).linenumbers = 1;
 
-    let input_stream: XmlParserInputPtr = xml_load_external_entity(filename, null_mut(), ctxt);
+    let input_stream: XmlParserInputPtr = xml_load_external_entity(filename, None, ctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -458,7 +458,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     sax: XmlSAXHandlerPtr,
     user_data: Option<GenericErrorContext>,
     mut url: Option<&str>,
-    id: *const XmlChar,
+    id: Option<&str>,
     base: Option<&str>,
     pctx: XmlParserCtxtPtr,
 ) -> XmlParserCtxtPtr {
@@ -482,7 +482,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     }
 
     if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
-        input_stream = xml_load_external_entity(Some(&uri), id as _, ctxt as _);
+        input_stream = xml_load_external_entity(Some(&uri), id, ctxt as _);
         if input_stream.is_null() {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
@@ -501,7 +501,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
             xml_free(directory as _);
         }
     } else {
-        input_stream = xml_load_external_entity(url, id as _, ctxt);
+        input_stream = xml_load_external_entity(url, id, ctxt);
         if input_stream.is_null() {
             xml_free_parser_ctxt(ctxt);
             return null_mut();
@@ -533,7 +533,7 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
 #[doc(alias = "xmlCreateEntityParserCtxt")]
 pub unsafe fn xml_create_entity_parser_ctxt(
     url: Option<&str>,
-    id: *const XmlChar,
+    id: Option<&str>,
     base: Option<&str>,
 ) -> XmlParserCtxtPtr {
     xml_create_entity_parser_ctxt_internal(null_mut(), None, url, id, base, null_mut())
@@ -786,11 +786,14 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
             Some(XmlEntityType::XmlExternalGeneralParsedEntity)
             | Some(XmlEntityType::XmlExternalParameterEntity) => {
                 let uri = (*entity).uri.load(Ordering::Relaxed);
+                let external_id = (*entity).external_id.load(Ordering::Relaxed);
                 input = xml_load_external_entity(
                     (!uri.is_null())
                         .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                         .as_deref(),
-                    (*entity).external_id.load(Ordering::Relaxed) as _,
+                    (!external_id.is_null())
+                        .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                        .as_deref(),
                     ctxt,
                 );
                 if !input.is_null() {
@@ -3987,6 +3990,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         ) {
             (*ctxt).depth += 1;
             let uri = (*ent).uri.load(Ordering::Relaxed);
+            let external_id = (*ent).external_id.load(Ordering::Relaxed);
             ret = xml_parse_external_entity_private(
                 (*ctxt).my_doc,
                 ctxt,
@@ -3996,7 +4000,9 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 (!uri.is_null())
                     .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                     .as_deref(),
-                (*ent).external_id.load(Ordering::Relaxed) as _,
+                (!external_id.is_null())
+                    .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                    .as_deref(),
                 addr_of_mut!(list),
             );
             (*ctxt).depth -= 1;
@@ -4132,6 +4138,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
                 (*ctxt).depth += 1;
                 let uri = (*ent).uri.load(Ordering::Relaxed);
+                let external_id = (*ent).external_id.load(Ordering::Relaxed);
                 ret = xml_parse_external_entity_private(
                     (*ctxt).my_doc,
                     ctxt,
@@ -4141,7 +4148,9 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     (!uri.is_null())
                         .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                         .as_deref(),
-                    (*ent).external_id.load(Ordering::Relaxed) as _,
+                    (!external_id.is_null())
+                        .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                        .as_deref(),
                     null_mut(),
                 );
                 (*ctxt).depth -= 1;

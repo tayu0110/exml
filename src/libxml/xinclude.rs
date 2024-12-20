@@ -612,12 +612,12 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Xm
         (*ctxt).parse_flags | XmlParserOption::XmlParseDtdload as i32,
     );
 
-    /* Don't read from stdin. */
+    // Don't read from stdin.
     if url == "-" {
         url = "./-";
     }
 
-    let input_stream: XmlParserInputPtr = xml_load_external_entity(Some(url), null_mut(), pctxt);
+    let input_stream: XmlParserInputPtr = xml_load_external_entity(Some(url), None, pctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(pctxt);
         return null_mut();
@@ -1944,7 +1944,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     pctxt = xml_new_parser_ctxt();
     input_stream = xml_load_external_entity(
         Some(CStr::from_ptr(url as *const i8).to_string_lossy().as_ref()),
-        null_mut(),
+        None,
         pctxt,
     );
     if input_stream.is_null() {

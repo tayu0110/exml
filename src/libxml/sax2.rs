@@ -607,7 +607,9 @@ pub unsafe fn xml_sax2_resolve_entity(
         (!uri.is_null())
             .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
             .as_deref(),
-        public_id as _,
+        (!public_id.is_null())
+            .then(|| CStr::from_ptr(public_id as *const i8).to_string_lossy())
+            .as_deref(),
         ctxt,
     );
     if !uri.is_null() {

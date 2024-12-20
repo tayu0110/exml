@@ -3,7 +3,7 @@
 
 use std::{
     env::args,
-    ffi::{c_char, c_int, CStr, CString},
+    ffi::{c_int, CStr, CString},
     fs::{metadata, File},
     os::fd::AsRawFd,
     ptr::{addr_of_mut, null_mut},
@@ -80,7 +80,7 @@ static mut NB_LEAKS: c_int = 0;
 // and not rely on any external resources.
 unsafe fn test_external_entity_loader(
     url: Option<&str>,
-    _id: *const c_char,
+    _id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let url = CString::new(url.unwrap()).unwrap();

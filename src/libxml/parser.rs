@@ -2008,7 +2008,7 @@ pub struct XmlSAXHandlerV1 {
 /// Returns the entity input parser.
 #[doc(alias = "xmlExternalEntityLoader")]
 pub type XmlExternalEntityLoader =
-    unsafe fn(url: Option<&str>, id: *const c_char, context: XmlParserCtxtPtr) -> XmlParserInputPtr;
+    unsafe fn(url: Option<&str>, id: Option<&str>, context: XmlParserCtxtPtr) -> XmlParserInputPtr;
 
 /*
  * Macros for accessing the content. Those should be used only by the parser,
@@ -4457,7 +4457,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     url: Option<&str>,
-    id: *const XmlChar,
+    id: Option<&str>,
     list: *mut XmlNodePtr,
 ) -> XmlParserErrors {
     let ret: XmlParserErrors;
@@ -4478,7 +4478,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if !list.is_null() {
         *list = null_mut();
     }
-    if url.is_none() && id.is_null() {
+    if url.is_none() && id.is_none() {
         return XmlParserErrors::XmlErrInternalError;
     }
     if doc.is_null() {
@@ -4703,7 +4703,7 @@ pub(crate) unsafe fn xml_parse_external_entity(
     user_data: Option<GenericErrorContext>,
     depth: i32,
     url: Option<&str>,
-    id: *const XmlChar,
+    id: Option<&str>,
     lst: *mut XmlNodePtr,
 ) -> i32 {
     xml_parse_external_entity_private(doc, null_mut(), sax, user_data, depth, url, id, lst) as i32
@@ -4721,7 +4721,7 @@ pub(crate) unsafe fn xml_parse_external_entity(
 pub unsafe fn xml_parse_ctxt_external_entity(
     ctx: XmlParserCtxtPtr,
     url: Option<&str>,
-    id: *const XmlChar,
+    id: Option<&str>,
     lst: *mut XmlNodePtr,
 ) -> i32 {
     if ctx.is_null() {
@@ -10461,7 +10461,7 @@ pub unsafe fn xml_get_external_entity_loader() -> XmlExternalEntityLoader {
 #[doc(alias = "xmlLoadExternalEntity")]
 pub unsafe fn xml_load_external_entity(
     url: Option<&str>,
-    id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     if let Some(url) = url.filter(|_| xml_no_net_exists(url) == 0) {
@@ -10899,7 +10899,7 @@ pub unsafe fn xml_ctxt_read_file(
 
     xml_ctxt_reset(ctxt);
 
-    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), null(), ctxt);
+    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
     if stream.is_null() {
         return null_mut();
     }

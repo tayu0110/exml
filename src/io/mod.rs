@@ -477,7 +477,7 @@ pub unsafe extern "C" fn xml_check_http_input(
 #[doc(alias = "xmlDefaultExternalEntityLoader")]
 pub(crate) unsafe fn xml_default_external_entity_loader(
     url: Option<&str>,
-    mut id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
@@ -503,14 +503,8 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
     }
 
     if resource.is_null() {
-        if id.is_null() {
-            id = c"NULL".as_ptr();
-        }
-        __xml_loader_err!(
-            ctxt,
-            "failed to load external entity \"{}\"\n",
-            CStr::from_ptr(id).to_string_lossy()
-        );
+        let id = id.unwrap_or("NULL").to_owned();
+        __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
         return null_mut();
     }
     ret = xml_new_input_from_file(ctxt, resource as _);
@@ -559,7 +553,7 @@ pub(crate) fn xml_no_net_exists(url: Option<&str>) -> i32 {
 #[cfg(feature = "catalog")]
 unsafe fn xml_resolve_resource_from_catalog(
     url: Option<&str>,
-    id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> *mut XmlChar {
     let mut resource: *mut XmlChar = null_mut();
@@ -574,11 +568,11 @@ unsafe fn xml_resolve_resource_from_catalog(
             && !(*ctxt).catalogs.is_null()
             && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
         {
-            resource = xml_catalog_local_resolve((*ctxt).catalogs, id as _, url);
+            resource = xml_catalog_local_resolve((*ctxt).catalogs, id, url);
         }
         // Try a global lookup
         if resource.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-            resource = xml_catalog_resolve(id as _, url);
+            resource = xml_catalog_resolve(id, url);
         }
         if resource.is_null() && url.is_some() {
             let url = CString::new(url.unwrap()).unwrap();
@@ -631,7 +625,7 @@ unsafe fn xml_resolve_resource_from_catalog(
 #[doc(alias = "xmlNoNetExternalEntityLoader")]
 pub unsafe fn xml_no_net_external_entity_loader(
     url: Option<&str>,
-    id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let mut resource: *mut XmlChar;

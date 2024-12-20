@@ -130,7 +130,7 @@ unsafe extern "C" fn add_entity(name: *mut c_char, content: *mut c_char) -> c_in
 // network downloads modifying tests.
 unsafe fn test_external_entity_loader(
     url: Option<&str>,
-    id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;

@@ -9768,7 +9768,7 @@ pub unsafe fn html_create_file_parser_ctxt(
 
     let canonic_filename = canonic_path(filename);
     let input_stream: HtmlParserInputPtr =
-        xml_load_external_entity(Some(&canonic_filename), null_mut(), ctxt);
+        xml_load_external_entity(Some(&canonic_filename), None, ctxt);
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -11501,7 +11501,7 @@ pub unsafe fn html_ctxt_read_file(
 
     html_ctxt_reset(ctxt);
 
-    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), null_mut(), ctxt);
+    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
     if stream.is_null() {
         return null_mut();
     }

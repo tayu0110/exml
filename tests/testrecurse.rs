@@ -195,7 +195,7 @@ unsafe extern "C" fn fatal_error() -> c_int {
 // network downloads modifying tests.
 unsafe fn test_external_entity_loader(
     url: Option<&str>,
-    id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;

@@ -419,7 +419,7 @@ thread_local! {
 // network downloads modifying tests.
 unsafe fn test_external_entity_loader(
     url: Option<&str>,
-    id: *const i8,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let memused: i32 = xml_mem_used();

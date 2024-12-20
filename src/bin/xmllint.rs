@@ -253,7 +253,7 @@ static mut DEFAULT_ENTITY_LOADER: Option<XmlExternalEntityLoader> = None;
 
 unsafe fn xmllint_external_entity_loader(
     url: Option<&str>,
-    id: *const c_char,
+    id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let mut ret: XmlParserInputPtr;
@@ -292,12 +292,7 @@ unsafe fn xmllint_external_entity_loader(
                 eprintln!(
                     "Loaded URL=\"{}\" ID=\"{}\"",
                     url.unwrap_or("(null)"),
-                    (if !id.is_null() {
-                        CStr::from_ptr(id)
-                    } else {
-                        c"(null)"
-                    })
-                    .to_string_lossy()
+                    id.unwrap_or("(null)"),
                 );
             }
             return ret;
@@ -320,12 +315,7 @@ unsafe fn xmllint_external_entity_loader(
                     eprintln!(
                         "Loaded URL=\"{}\" ID=\"{}\"",
                         new_url,
-                        (if !id.is_null() {
-                            CStr::from_ptr(id)
-                        } else {
-                            c"(null)"
-                        })
-                        .to_string_lossy()
+                        id.unwrap_or("(null)"),
                     );
                 }
                 return ret;
@@ -345,7 +335,7 @@ unsafe fn xmllint_external_entity_loader(
             //     c"failed to load external entity \"%s\"\n".as_ptr(),
             //     url
             // );
-        } else if !id.is_null() {
+        } else if id.is_some() {
             todo!()
             // xml_error_with_format!(
             //     warning,
