@@ -48,7 +48,7 @@ use super::{
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
-    xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strstr, XmlChar},
+    xmlstring::{xml_str_equal, xml_strchr, xml_strstr, XmlChar},
 };
 
 /// Handle a debug error.
@@ -1727,7 +1727,7 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodeP
         }
     }
 
-    write!(output, " {} ", xml_ls_count_node(node));
+    write!(output, " {} ", xml_ls_count_node(Some(&*node)));
 
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
@@ -1803,41 +1803,28 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodeP
 ///
 /// Returns the number of children of @node.
 #[doc(alias = "xmlLsCountNode")]
-pub unsafe fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
-    let mut ret: i32 = 0;
-    let mut list: XmlNodePtr = null_mut();
-
-    if node.is_null() {
+pub unsafe fn xml_ls_count_node(node: Option<&impl NodeCommon>) -> usize {
+    let Some(node) = node else {
         return 0;
-    }
+    };
 
-    match (*node).element_type() {
-        XmlElementType::XmlElementNode => {
-            list = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-        }
+    let mut list = match node.element_type() {
+        XmlElementType::XmlElementNode => node.children(),
         XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-            list = (*node)
-                .as_document_node()
-                .unwrap()
-                .as_ref()
-                .children
-                .map_or(null_mut(), |c| c.as_ptr());
+            node.as_document_node().unwrap().as_ref().children()
         }
-        XmlElementType::XmlAttributeNode => {
-            list = (*node)
-                .as_attribute_node()
-                .unwrap()
-                .as_ref()
-                .children
-                .map_or(null_mut(), |c| c.as_ptr());
-        }
+        XmlElementType::XmlAttributeNode => node.as_attribute_node().unwrap().as_ref().children(),
         XmlElementType::XmlTextNode
         | XmlElementType::XmlCDATASectionNode
         | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {
-            if !(*node).content.is_null() {
-                ret = xml_strlen((*node).content);
-            }
+            let node = node.as_node().unwrap();
+            let content = node.as_ref().content;
+            return if !content.is_null() {
+                CStr::from_ptr(content as *const i8).to_bytes().len()
+            } else {
+                0
+            };
         }
         XmlElementType::XmlEntityRefNode
         | XmlElementType::XmlDocumentTypeNode
@@ -1851,12 +1838,13 @@ pub unsafe fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
         | XmlElementType::XmlNamespaceDecl
         | XmlElementType::XmlXIncludeStart
         | XmlElementType::XmlXIncludeEnd => {
-            ret = 1;
+            return 1;
         }
         _ => unreachable!(),
-    }
-    while !list.is_null() {
-        list = (*list).next.map_or(null_mut(), |n| n.as_ptr());
+    };
+    let mut ret = 0;
+    while let Some(now) = list {
+        list = now.next();
         ret += 1;
     }
     ret
@@ -3923,33 +3911,6 @@ mod tests {
                             eprintln!(" {}", n_depth);
                         }
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ls_count_node() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                let mem_base = xml_mem_blocks();
-                let node = gen_xml_node_ptr(n_node, 0);
-
-                let ret_val = xml_ls_count_node(node);
-                desret_int(ret_val);
-                des_xml_node_ptr(n_node, node, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlLsCountNode",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlLsCountNode()");
-                    eprintln!(" {}", n_node);
                 }
             }
         }
