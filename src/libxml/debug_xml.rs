@@ -899,6 +899,16 @@ impl XmlDebugCtxt<'_> {
         // Do a bit of checking
         self.generic_node_check(attr);
     }
+
+    /// Dumps debug information for the attribute list
+    #[doc(alias = "xmlCtxtDumpAttrList")]
+    unsafe fn dump_attr_list(&mut self, mut attr: Option<&XmlAttr>) {
+        while let Some(now) = attr {
+            self.dump_attr(Some(now));
+            let next = now.next;
+            attr = (!next.is_null()).then(|| &*next);
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -1009,15 +1019,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-/// Dumps debug information for the attribute list
-#[doc(alias = "xmlCtxtDumpAttrList")]
-unsafe fn xml_ctxt_dump_attr_list(ctxt: XmlDebugCtxtPtr, mut attr: XmlAttrPtr) {
-    while !attr.is_null() {
-        (*ctxt).dump_attr(Some(&*attr));
-        attr = (*attr).next;
-    }
 }
 
 /// Dumps debug information for the element node, it is not recursive
@@ -1192,7 +1193,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
         (*ctxt).dump_namespace_list(Some(&*(*node).ns_def));
     }
     if (*node).element_type() == XmlElementType::XmlElementNode && !(*node).properties.is_null() {
-        xml_ctxt_dump_attr_list(ctxt, (*node).properties);
+        (*ctxt).dump_attr_list(Some(&*(*node).properties));
     }
     if (*node).element_type() != XmlElementType::XmlEntityRefNode {
         if (*node).element_type() != XmlElementType::XmlElementNode
@@ -1278,7 +1279,7 @@ pub unsafe extern "C" fn xml_debug_dump_attr_list<'a>(
         depth,
         ..Default::default()
     };
-    xml_ctxt_dump_attr_list(addr_of_mut!(ctxt), attr);
+    ctxt.dump_attr_list((!attr.is_null()).then(|| &*attr));
     xml_ctxt_dump_clean_ctxt(addr_of_mut!(ctxt));
 }
 
