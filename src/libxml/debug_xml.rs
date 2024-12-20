@@ -1526,7 +1526,11 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
 
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlDebugDumpAttr")]
-pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: Option<&XmlAttr>, depth: i32) {
+pub unsafe fn xml_debug_dump_attr<'a>(
+    output: &mut (impl Write + 'a),
+    attr: Option<&XmlAttr>,
+    depth: i32,
+) {
     let mut ctxt = XmlDebugCtxt {
         output: Box::new(output),
         depth,
@@ -1597,7 +1601,10 @@ pub unsafe fn xml_debug_dump_node_list(
 
 /// Dumps debug information concerning the document, not recursive
 #[doc(alias = "xmlDebugDumpDocumentHead")]
-pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Option<&XmlDoc>) {
+pub unsafe fn xml_debug_dump_document_head<'a>(
+    output: Option<impl Write + 'a>,
+    doc: Option<&XmlDoc>,
+) {
     let mut ctxt = XmlDebugCtxt::default();
 
     ctxt.options |= DUMP_TEXT_TYPE;
@@ -1607,7 +1614,7 @@ pub unsafe fn xml_debug_dump_document_head(output: Option<impl Write>, doc: Opti
 
 /// Dumps debug information for the document, it's recursive
 #[doc(alias = "xmlDebugDumpDocument")]
-pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&XmlDoc>) {
+pub unsafe fn xml_debug_dump_document<'a>(output: Option<impl Write + 'a>, doc: Option<&XmlDoc>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     ctxt.options |= DUMP_TEXT_TYPE;
@@ -1617,7 +1624,7 @@ pub unsafe fn xml_debug_dump_document(output: Option<impl Write>, doc: Option<&X
 
 /// Dumps debug information for the DTD
 #[doc(alias = "xmlDebugDumpDTD")]
-pub unsafe fn xml_debug_dump_dtd(output: Option<impl Write>, dtd: Option<&XmlDtd>) {
+pub unsafe fn xml_debug_dump_dtd<'a>(output: Option<impl Write + 'a>, dtd: Option<&XmlDtd>) {
     let mut ctxt = XmlDebugCtxt::default();
 
     ctxt.options |= DUMP_TEXT_TYPE;
@@ -1640,8 +1647,8 @@ pub unsafe fn xml_debug_dump_entities<'a>(output: impl Write + 'a, doc: Option<&
 ///
 /// Returns the number of errors found
 #[doc(alias = "xmlDebugCheckDocument")]
-pub unsafe fn xml_debug_check_document(
-    output: Option<impl Write + 'static>,
+pub unsafe fn xml_debug_check_document<'a>(
+    output: Option<impl Write + 'a>,
     doc: Option<&XmlDoc>,
 ) -> i32 {
     let mut ctxt = XmlDebugCtxt {
@@ -1655,7 +1662,7 @@ pub unsafe fn xml_debug_check_document(
 
 /// Dump to `output` the type and name of @node.
 #[doc(alias = "xmlLsOneNode")]
-pub unsafe extern "C" fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodePtr) {
+pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodePtr) {
     if node.is_null() {
         writeln!(output, "NULL");
         return;
@@ -1796,7 +1803,7 @@ pub unsafe extern "C" fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), nod
 ///
 /// Returns the number of children of @node.
 #[doc(alias = "xmlLsCountNode")]
-pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
+pub unsafe fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
     let mut list: XmlNodePtr = null_mut();
 
@@ -1859,7 +1866,7 @@ pub unsafe extern "C" fn xml_ls_count_node(node: XmlNodePtr) -> i32 {
 ///
 /// Returns a pointer to either "True" or "False"
 #[doc(alias = "xmlBoolToText")]
-pub unsafe extern "C" fn xml_bool_to_text(boolval: i32) -> *const c_char {
+pub unsafe fn xml_bool_to_text(boolval: i32) -> *const c_char {
     if boolval != 0 {
         c"True".as_ptr()
     } else {
@@ -1872,7 +1879,7 @@ pub unsafe extern "C" fn xml_bool_to_text(boolval: i32) -> *const c_char {
 /// Returns a string which will be freed by the Shell.
 #[doc(alias = "xmlShellReadlineFunc")]
 #[cfg(feature = "xpath")]
-pub type XmlShellReadlineFunc = unsafe extern "C" fn(prompt: *mut c_char) -> *mut c_char;
+pub type XmlShellReadlineFunc = unsafe fn(prompt: *mut c_char) -> *mut c_char;
 
 /// A debugging shell context.  
 /// TODO: add the defined function tables.
@@ -1896,17 +1903,13 @@ pub struct XmlShellCtxt<'a> {
 /// Returns an int, negative returns indicating errors.
 #[doc(alias = "xmlShellCmd")]
 #[cfg(feature = "xpath")]
-pub type XmlShellCmd = unsafe extern "C" fn(
-    ctxt: XmlShellCtxtPtr,
-    arg: *mut c_char,
-    node: XmlNodePtr,
-    node2: XmlNodePtr,
-) -> i32;
+pub type XmlShellCmd =
+    unsafe fn(ctxt: XmlShellCtxtPtr, arg: *mut c_char, node: XmlNodePtr, node2: XmlNodePtr) -> i32;
 
 /// Print the xpath error to libxml default error channel
 #[doc(alias = "xmlShellPrintXPathError")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *const c_char) {
+pub unsafe fn xml_shell_print_xpath_error(error_type: i32, mut arg: *const c_char) {
     use std::ffi::CStr;
 
     use crate::generic_error;
@@ -1961,7 +1964,7 @@ pub unsafe extern "C" fn xml_shell_print_xpath_error(error_type: i32, mut arg: *
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNodeCtxt")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
+unsafe fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlNodePtr) {
     if node.is_null() {
         return;
     }
@@ -1994,10 +1997,7 @@ unsafe extern "C" fn xml_shell_print_node_ctxt(ctxt: XmlShellCtxtPtr, node: XmlN
 
 /// Prints result to the output FILE
 #[doc(alias = "xmlShellPrintXPathResultCtxt")]
-unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
-    ctxt: XmlShellCtxtPtr,
-    list: XmlXPathObjectPtr,
-) {
+unsafe fn xml_shell_print_xpath_result_ctxt(ctxt: XmlShellCtxtPtr, list: XmlXPathObjectPtr) {
     if !ctxt.is_null() {
         return;
     }
@@ -2040,7 +2040,7 @@ unsafe extern "C" fn xml_shell_print_xpath_result_ctxt(
 /// Prints result to the output FILE
 #[doc(alias = "xmlShellPrintXPathResult")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
+pub unsafe fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
     xml_shell_print_xpath_result_ctxt(null_mut(), list);
 }
 
@@ -2050,7 +2050,7 @@ pub unsafe extern "C" fn xml_shell_print_xpath_result(list: XmlXPathObjectPtr) {
 /// Returns 0
 #[doc(alias = "xmlShellList")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_list(
+pub unsafe fn xml_shell_list(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2095,7 +2095,7 @@ pub unsafe extern "C" fn xml_shell_list(
 /// Returns 0
 #[doc(alias = "xmlShellBase")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_base(
+pub unsafe fn xml_shell_base(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2163,7 +2163,7 @@ pub unsafe fn xml_shell_dir(
 /// Returns 0 or -1 if loading failed
 #[doc(alias = "xmlShellLoad")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_load(
+pub unsafe fn xml_shell_load(
     ctxt: XmlShellCtxtPtr,
     filename: *mut c_char,
     _node: XmlNodePtr,
@@ -2228,7 +2228,7 @@ pub unsafe extern "C" fn xml_shell_load(
 /// Print node to the output FILE
 #[doc(alias = "xmlShellPrintNode")]
 #[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe extern "C" fn xml_shell_print_node(node: XmlNodePtr) {
+pub unsafe fn xml_shell_print_node(node: XmlNodePtr) {
     xml_shell_print_node_ctxt(null_mut(), node);
 }
 
@@ -2238,7 +2238,7 @@ pub unsafe extern "C" fn xml_shell_print_node(node: XmlNodePtr) {
 /// Returns 0
 #[doc(alias = "xmlShellCat")]
 #[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe extern "C" fn xml_shell_cat(
+pub unsafe fn xml_shell_cat(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     node: XmlNodePtr,
@@ -2357,7 +2357,7 @@ pub unsafe fn xml_shell_write(
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellSave")]
 #[cfg(all(feature = "xpath", feature = "libxml_output"))]
-pub unsafe extern "C" fn xml_shell_save(
+pub unsafe fn xml_shell_save(
     ctxt: XmlShellCtxtPtr,
     mut filename: *mut c_char,
     _node: XmlNodePtr,
@@ -2416,7 +2416,7 @@ pub unsafe extern "C" fn xml_shell_save(
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellValidate")]
 #[cfg(all(feature = "xpath", feature = "libxml_valid"))]
-pub unsafe extern "C" fn xml_shell_validate(
+pub unsafe fn xml_shell_validate(
     ctxt: XmlShellCtxtPtr,
     dtd: *mut c_char,
     _node: XmlNodePtr,
@@ -2467,7 +2467,7 @@ pub unsafe extern "C" fn xml_shell_validate(
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellDu")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_du(
+pub unsafe fn xml_shell_du(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     tree: XmlNodePtr,
@@ -2560,7 +2560,7 @@ pub unsafe extern "C" fn xml_shell_du(
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlShellPwd")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_shell_pwd(
+pub unsafe fn xml_shell_pwd(
     _ctxt: XmlShellCtxtPtr,
     buffer: *mut c_char,
     node: XmlNodePtr,
@@ -2594,7 +2594,7 @@ pub unsafe extern "C" fn xml_shell_pwd(
 /// Returns 0
 #[doc(alias = "xmlShellRNGValidate")]
 #[cfg(feature = "schema")]
-unsafe extern "C" fn xml_shell_rng_validate(
+unsafe fn xml_shell_rng_validate(
     sctxt: XmlShellCtxtPtr,
     schemas: *mut c_char,
     _node: XmlNodePtr,
@@ -2654,7 +2654,7 @@ unsafe extern "C" fn xml_shell_rng_validate(
 ///
 /// Returns 0
 #[doc(alias = "xmlShellGrep")]
-unsafe extern "C" fn xml_shell_grep(
+unsafe fn xml_shell_grep(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
     mut node: XmlNodePtr,
@@ -2740,7 +2740,7 @@ unsafe extern "C" fn xml_shell_grep(
 ///
 /// Returns 0
 #[doc(alias = "xmlShellSetContent")]
-unsafe extern "C" fn xml_shell_set_content(
+unsafe fn xml_shell_set_content(
     ctxt: XmlShellCtxtPtr,
     value: *mut c_char,
     node: XmlNodePtr,
@@ -2785,7 +2785,7 @@ unsafe extern "C" fn xml_shell_set_content(
 /// Returns 0 on success and a negative value otherwise.
 #[doc(alias = "xmlShellRegisterNamespace")]
 #[cfg(feature = "xpath")]
-unsafe extern "C" fn xml_shell_register_namespace(
+unsafe fn xml_shell_register_namespace(
     ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
     _node: XmlNodePtr,
@@ -2850,7 +2850,7 @@ unsafe extern "C" fn xml_shell_register_namespace(
 /// Returns 0 on success and a negative value otherwise.
 #[doc(alias = "xmlShellRegisterRootNamespaces")]
 #[cfg(feature = "xpath")]
-unsafe extern "C" fn xml_shell_register_root_namespaces(
+unsafe fn xml_shell_register_root_namespaces(
     ctxt: XmlShellCtxtPtr,
     _arg: *mut c_char,
     root: XmlNodePtr,
@@ -2886,7 +2886,7 @@ unsafe extern "C" fn xml_shell_register_root_namespaces(
 /// Returns 0
 #[doc(alias = "xmlShellSetBase")]
 #[cfg(feature = "libxml_tree")]
-unsafe extern "C" fn xml_shell_set_base(
+unsafe fn xml_shell_set_base(
     _ctxt: XmlShellCtxtPtr,
     arg: *mut c_char,
     node: XmlNodePtr,

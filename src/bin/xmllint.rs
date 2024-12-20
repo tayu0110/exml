@@ -728,7 +728,7 @@ fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
  *     free the returned string.
  */
 #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
-unsafe extern "C" fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
+unsafe fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
     use std::io::{stdin, stdout, Write};
 
     use libc::{malloc, memcpy};
