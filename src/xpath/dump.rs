@@ -33,7 +33,7 @@ unsafe fn xml_xpath_debug_dump_node<'a>(
         write!(output, "{}", shift);
         writeln!(output, " /");
     } else if cur.element_type() == XmlElementType::XmlAttributeNode {
-        xml_debug_dump_attr(output, cur.as_attribute_node().unwrap().as_ptr(), depth);
+        xml_debug_dump_attr(output, cur.as_attribute_node().map(|n| n.as_ref()), depth);
     } else {
         xml_debug_dump_one_node(output, Some(cur), depth);
     }

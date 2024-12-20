@@ -1269,13 +1269,13 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
 
 /// Dumps debug information for the attribute
 #[doc(alias = "xmlDebugDumpAttr")]
-pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: XmlAttrPtr, depth: i32) {
+pub unsafe fn xml_debug_dump_attr(output: &mut impl Write, attr: Option<&XmlAttr>, depth: i32) {
     let mut ctxt = XmlDebugCtxt {
         output: Box::new(output),
         depth,
         ..Default::default()
     };
-    ctxt.dump_attr((!attr.is_null()).then(|| &*attr));
+    ctxt.dump_attr(attr);
 }
 
 /// Dumps debug information for the attribute list
@@ -2146,7 +2146,7 @@ pub unsafe fn xml_shell_dir(
     } else if (*node).element_type() == XmlElementType::XmlAttributeNode {
         xml_debug_dump_attr(
             &mut (*ctxt).output,
-            (*node).as_attribute_node().unwrap().as_ptr(),
+            (*node).as_attribute_node().map(|n| n.as_ref()),
             0,
         );
     } else {
@@ -3879,41 +3879,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlBoolToText()");
                     eprintln!(" {}", n_boolval);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_debug_dump_attr() {
-        #[cfg(feature = "libxml_debug")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_output in 0..GEN_NB_DEBUG_FILE_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTR_PTR {
-                    for n_depth in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let mut output = gen_debug_file_ptr(n_output, 0).unwrap();
-                        let attr = gen_xml_attr_ptr(n_attr, 1);
-                        let depth = gen_int(n_depth, 2);
-
-                        xml_debug_dump_attr(&mut output, attr, depth);
-                        des_xml_attr_ptr(n_attr, attr, 1);
-                        des_int(n_depth, depth, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlDebugDumpAttr",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlDebugDumpAttr()");
-                            eprint!(" {}", n_output);
-                            eprint!(" {}", n_attr);
-                            eprintln!(" {}", n_depth);
-                        }
-                    }
                 }
             }
         }
