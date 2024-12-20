@@ -801,6 +801,70 @@ impl XmlDebugCtxt<'_> {
             ns = (!next.is_null()).then(|| &*next);
         }
     }
+
+    #[doc(alias = "xmlCtxtDumpEntity")]
+    unsafe fn dump_entity(&mut self, ent: Option<&XmlEntity>) {
+        self.dump_spaces();
+
+        let Some(ent) = ent else {
+            if self.check == 0 {
+                writeln!(self.output, "Entity is NULL");
+            }
+            return;
+        };
+        if self.check == 0 {
+            match ent.etype {
+                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                    write!(self.output, "INTERNAL_GENERAL_ENTITY ");
+                }
+                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                    write!(self.output, "EXTERNAL_GENERAL_PARSED_ENTITY ");
+                }
+                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                    write!(self.output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ");
+                }
+                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                    write!(self.output, "INTERNAL_PARAMETER_ENTITY ");
+                }
+                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                    write!(self.output, "EXTERNAL_PARAMETER_ENTITY ");
+                }
+                Some(e) => {
+                    write!(self.output, "ENTITY_{} ! ", e as i32);
+                }
+                _ => unreachable!(),
+            }
+            writeln!(self.output, "{}", ent.name().unwrap());
+            if !ent.external_id.load(Ordering::Relaxed).is_null() {
+                self.dump_spaces();
+                let external_id =
+                    CStr::from_ptr(ent.external_id.load(Ordering::Relaxed) as *const i8)
+                        .to_string_lossy();
+                writeln!(self.output, "ExternalID={external_id}");
+            }
+            if !ent.system_id.load(Ordering::Relaxed).is_null() {
+                self.dump_spaces();
+                let system_id = CStr::from_ptr(ent.system_id.load(Ordering::Relaxed) as *const i8)
+                    .to_string_lossy();
+                writeln!(self.output, "SystemID={system_id}");
+            }
+            if !ent.uri.load(Ordering::Relaxed).is_null() {
+                self.dump_spaces();
+                let uri =
+                    CStr::from_ptr(ent.uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
+                writeln!(self.output, "URI={uri}");
+            }
+            let content = ent.content.load(Ordering::Relaxed);
+            if !content.is_null() {
+                self.dump_spaces();
+                write!(self.output, "content=");
+                self.dump_string(Some(
+                    &CStr::from_ptr(content as *const i8).to_string_lossy(),
+                ));
+                writeln!(self.output);
+            }
+        }
+    }
 }
 
 impl Default for XmlDebugCtxt<'_> {
@@ -911,72 +975,6 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
         }
     }
     -3
-}
-
-#[doc(alias = "xmlCtxtDumpEntity")]
-unsafe fn xml_ctxt_dump_entity(ctxt: XmlDebugCtxtPtr, ent: XmlEntityPtr) {
-    (*ctxt).dump_spaces();
-
-    if ent.is_null() {
-        if (*ctxt).check == 0 {
-            writeln!((*ctxt).output, "Entity is NULL");
-        }
-        return;
-    }
-    if (*ctxt).check == 0 {
-        match (*ent).etype {
-            Some(XmlEntityType::XmlInternalGeneralEntity) => {
-                write!((*ctxt).output, "INTERNAL_GENERAL_ENTITY ");
-            }
-            Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
-                write!((*ctxt).output, "EXTERNAL_GENERAL_PARSED_ENTITY ");
-            }
-            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-                write!((*ctxt).output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ");
-            }
-            Some(XmlEntityType::XmlInternalParameterEntity) => {
-                write!((*ctxt).output, "INTERNAL_PARAMETER_ENTITY ");
-            }
-            Some(XmlEntityType::XmlExternalParameterEntity) => {
-                write!((*ctxt).output, "EXTERNAL_PARAMETER_ENTITY ");
-            }
-            Some(e) => {
-                write!((*ctxt).output, "ENTITY_{} ! ", e as i32);
-            }
-            _ => unreachable!(),
-        }
-        let name =
-            CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as *const i8).to_string_lossy();
-        writeln!((*ctxt).output, "{name}");
-        if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-            (*ctxt).dump_spaces();
-            let external_id =
-                CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-            writeln!((*ctxt).output, "ExternalID={external_id}");
-        }
-        if !(*ent).system_id.load(Ordering::Relaxed).is_null() {
-            (*ctxt).dump_spaces();
-            let system_id = CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as *const i8)
-                .to_string_lossy();
-            writeln!((*ctxt).output, "SystemID={system_id}");
-        }
-        if !(*ent).uri.load(Ordering::Relaxed).is_null() {
-            (*ctxt).dump_spaces();
-            let uri =
-                CStr::from_ptr((*ent).uri.load(Ordering::Relaxed) as *const i8).to_string_lossy();
-            writeln!((*ctxt).output, "URI={uri}");
-        }
-        let content = (*ent).content.load(Ordering::Relaxed);
-        if !content.is_null() {
-            (*ctxt).dump_spaces();
-            write!((*ctxt).output, "content=");
-            (*ctxt).dump_string(Some(
-                &CStr::from_ptr(content as *const i8).to_string_lossy(),
-            ));
-            writeln!((*ctxt).output);
-        }
-    }
 }
 
 /// Dumps debug information for the attribute list
@@ -1178,7 +1176,7 @@ unsafe fn xml_ctxt_dump_one_node(ctxt: XmlDebugCtxtPtr, node: XmlNodePtr) {
     } else {
         let ent: XmlEntityPtr = xml_get_doc_entity((*node).doc, (*node).name);
         if !ent.is_null() {
-            xml_ctxt_dump_entity(ctxt, ent);
+            (*ctxt).dump_entity(Some(&*ent));
         }
     }
     (*ctxt).depth -= 1;
