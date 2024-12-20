@@ -243,6 +243,82 @@ unsafe fn xml_catalog_err_memory(extra: &str) {
     );
 }
 
+/// Handle a catalog error
+#[doc(alias = "xmlCatalogErr")]
+macro_rules! xml_catalog_err {
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal,
+        $str1:expr,
+    ) => {
+        let msg = format!($msg, $str1);
+        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.into()), None, None,);
+    };
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal,
+        $str1:expr,
+        $str2:expr,
+    ) => {
+        let msg = format!($msg, $str1, $str2);
+        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()), None,);
+    };
+    (
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:literal,
+        $str1:expr,
+        $str2:expr,
+        $str3:expr,
+    ) => {
+        let msg = format!($msg, $str1, $str2, $str3);
+        xml_catalog_err!(
+            @inner
+            $catal,
+            $node,
+            $error,
+            &msg,
+            Some($str1.to_owned().into()),
+            Some($str2.to_owned().into()),
+            Some($str3.to_owned().into()),
+        );
+    };
+    (
+        @inner
+        $catal:expr,
+        $node:expr,
+        $error:expr,
+        $msg:expr,
+        $str1:expr,
+        $str2:expr,
+        $str3:expr,
+    ) => {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            $catal as _,
+            $node as _,
+            XmlErrorDomain::XmlFromCatalog,
+            $error,
+            XmlErrorLevel::XmlErrError,
+            None,
+            0,
+            $str1,
+            $str2,
+            $str3,
+            0,
+            0,
+            $msg,
+        );
+    };
+}
+
 /// create a new Catalog, this type is shared both by XML and SGML catalogs,
 /// but the acceptable types values differs.
 ///
@@ -563,36 +639,34 @@ unsafe fn xml_new_catalog_entry(
 
 /// Free the memory allocated to a Catalog entry
 #[doc(alias = "xmlFreeCatalogEntry")]
-extern "C" fn xml_free_catalog_entry(payload: XmlCatalogEntryPtr) {
+unsafe fn xml_free_catalog_entry(payload: XmlCatalogEntryPtr) {
     let ret: XmlCatalogEntryPtr = payload as XmlCatalogEntryPtr;
     if ret.is_null() {
         return;
     }
     // Entries stored in the file hash must be deallocated only by the file hash cleaner !
-    unsafe {
-        if (*ret).dealloc == 1 {
-            return;
-        }
-
-        if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            if let Some(name) = (*ret).name.take() {
-                generic_error!("Free catalog entry {name}\n");
-            } else if !(*ret).value.is_null() {
-                generic_error!(
-                    "Free catalog entry {}\n",
-                    CStr::from_ptr((*ret).value as *const i8).to_string_lossy()
-                );
-            } else {
-                generic_error!("Free catalog entry\n");
-            }
-        }
-
-        if !(*ret).value.is_null() {
-            xml_free((*ret).value as _);
-        }
-        let _ = (*ret).url.take();
-        xml_free(ret as _);
+    if (*ret).dealloc == 1 {
+        return;
     }
+
+    if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
+        if let Some(name) = (*ret).name.take() {
+            generic_error!("Free catalog entry {name}\n");
+        } else if !(*ret).value.is_null() {
+            generic_error!(
+                "Free catalog entry {}\n",
+                CStr::from_ptr((*ret).value as *const i8).to_string_lossy()
+            );
+        } else {
+            generic_error!("Free catalog entry\n");
+        }
+    }
+
+    if !(*ret).value.is_null() {
+        xml_free((*ret).value as _);
+    }
+    let _ = (*ret).url.take();
+    xml_free(ret as _);
 }
 
 /// Load the catalog and expand the existing catal structure.
@@ -994,90 +1068,6 @@ static XML_CATALOG_XMLFILES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
 // It also protects xmlCatalogXMLFiles.
 // The core of this readers/writer scheme is in `xmlFetchXMLCatalogFile()`.
 static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
-
-/// Handle a catalog error
-#[doc(alias = "xmlCatalogErr")]
-macro_rules! xml_catalog_err {
-    (
-        $catal:expr,
-        $node:expr,
-        $error:expr,
-        $msg:literal
-    ) => {
-        xml_catalog_err!(@inner $catal, $node, $error, $msg, None, None, None,);
-    };
-    (
-        $catal:expr,
-        $node:expr,
-        $error:expr,
-        $msg:literal,
-        $str1:expr,
-    ) => {
-        let msg = format!($msg, $str1);
-        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.into()), None, None,);
-    };
-    (
-        $catal:expr,
-        $node:expr,
-        $error:expr,
-        $msg:literal,
-        $str1:expr,
-        $str2:expr,
-    ) => {
-        let msg = format!($msg, $str1, $str2);
-        xml_catalog_err!(@inner $catal, $node, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()), None,);
-    };
-    (
-        $catal:expr,
-        $node:expr,
-        $error:expr,
-        $msg:literal,
-        $str1:expr,
-        $str2:expr,
-        $str3:expr,
-    ) => {
-        let msg = format!($msg, $str1, $str2, $str3);
-        xml_catalog_err!(
-            @inner
-            $catal,
-            $node,
-            $error,
-            &msg,
-            Some($str1.to_owned().into()),
-            Some($str2.to_owned().into()),
-            Some($str3.to_owned().into()),
-        );
-    };
-    (
-        @inner
-        $catal:expr,
-        $node:expr,
-        $error:expr,
-        $msg:expr,
-        $str1:expr,
-        $str2:expr,
-        $str3:expr,
-    ) => {
-        __xml_raise_error!(
-            None,
-            None,
-            None,
-            $catal as _,
-            $node as _,
-            XmlErrorDomain::XmlFromCatalog,
-            $error,
-            XmlErrorLevel::XmlErrError,
-            None,
-            0,
-            $str1,
-            $str2,
-            $str3,
-            0,
-            0,
-            $msg,
-        );
-    };
-}
 
 /// Finishes the examination of an XML tree node of a catalog and build
 /// a Catalog entry from it.
@@ -1518,27 +1508,27 @@ unsafe fn xml_fetch_xml_catalog_file(catal: XmlCatalogEntryPtr) -> i32 {
 ///
 /// Returns the type associated with that name
 #[doc(alias = "xmlGetXMLCatalogEntryType")]
-unsafe fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntryType {
+fn xml_get_xml_catalog_entry_type(name: Option<&str>) -> XmlCatalogEntryType {
     let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
-    if xml_str_equal(name, c"system".as_ptr() as _) {
+    if name == Some("system") {
         typ = XmlCatalogEntryType::XmlCataSystem;
-    } else if xml_str_equal(name, c"public".as_ptr() as _) {
+    } else if name == Some("public") {
         typ = XmlCatalogEntryType::XmlCataPublic;
-    } else if xml_str_equal(name, c"rewriteSystem".as_ptr() as _) {
+    } else if name == Some("rewriteSystem") {
         typ = XmlCatalogEntryType::XmlCataRewriteSystem;
-    } else if xml_str_equal(name, c"delegatePublic".as_ptr() as _) {
+    } else if name == Some("delegatePublic") {
         typ = XmlCatalogEntryType::XmlCataDelegatePublic;
-    } else if xml_str_equal(name, c"delegateSystem".as_ptr() as _) {
+    } else if name == Some("delegateSystem") {
         typ = XmlCatalogEntryType::XmlCataDelegateSystem;
-    } else if xml_str_equal(name, c"uri".as_ptr() as _) {
+    } else if name == Some("uri") {
         typ = XmlCatalogEntryType::XmlCataURI;
-    } else if xml_str_equal(name, c"rewriteURI".as_ptr() as _) {
+    } else if name == Some("rewriteURI") {
         typ = XmlCatalogEntryType::XmlCataRewriteURI;
-    } else if xml_str_equal(name, c"delegateURI".as_ptr() as _) {
+    } else if name == Some("delegateURI") {
         typ = XmlCatalogEntryType::XmlCataDelegateURI;
-    } else if xml_str_equal(name, c"nextCatalog".as_ptr() as _) {
+    } else if name == Some("nextCatalog") {
         typ = XmlCatalogEntryType::XmlCataNextCatalog;
-    } else if xml_str_equal(name, c"catalog".as_ptr() as _) {
+    } else if name == Some("catalog") {
         typ = XmlCatalogEntryType::XmlCataCatalog;
     }
     typ
@@ -1550,7 +1540,7 @@ unsafe fn xml_get_xml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntr
 #[doc(alias = "xmlAddXMLCatalog")]
 unsafe fn xml_add_xml_catalog(
     catal: XmlCatalogEntryPtr,
-    typs: *const XmlChar,
+    typs: Option<&str>,
     orig: Option<&str>,
     replace: *const XmlChar,
 ) -> i32 {
@@ -1575,13 +1565,10 @@ unsafe fn xml_add_xml_catalog(
     let typ: XmlCatalogEntryType = xml_get_xml_catalog_entry_type(typs);
     if matches!(typ, XmlCatalogEntryType::XmlCataNone) {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-            if typs.is_null() {
-                generic_error!("Failed to add unknown element (NULL) to catalog\n",);
+            if let Some(types) = typs {
+                generic_error!("Failed to add unknown element {types} to catalog\n",);
             } else {
-                generic_error!(
-                    "Failed to add unknown element {} to catalog\n",
-                    CStr::from_ptr(typs as *const i8).to_string_lossy()
-                );
+                generic_error!("Failed to add unknown element (NULL) to catalog\n",);
             }
         }
         return -1;
@@ -1593,13 +1580,10 @@ unsafe fn xml_add_xml_catalog(
         while !cur.is_null() {
             if orig.is_some() && (*cur).typ == typ && orig == (*cur).name.as_deref() {
                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-                    if typs.is_null() {
-                        generic_error!("Updating element (NULL) to catalog\n",);
+                    if let Some(types) = typs {
+                        generic_error!("Updating element {types} to catalog\n");
                     } else {
-                        generic_error!(
-                            "Updating element {} to catalog\n",
-                            CStr::from_ptr(typs as *const i8).to_string_lossy()
-                        );
+                        generic_error!("Updating element (NULL) to catalog\n",);
                     }
                 }
                 if !(*cur).value.is_null() {
@@ -1621,10 +1605,11 @@ unsafe fn xml_add_xml_catalog(
         }
     }
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        generic_error!(
-            "Adding element {} to catalog\n",
-            CStr::from_ptr(typs as *const i8).to_string_lossy()
-        );
+        if let Some(types) = typs {
+            generic_error!("Adding element {types} to catalog\n");
+        } else {
+            generic_error!("Adding element (NULL) to catalog\n");
+        }
     }
     if cur.is_null() {
         (*catal).children =
@@ -1654,29 +1639,29 @@ unsafe fn xml_add_xml_catalog(
 ///
 /// Returns Catalog entry type
 #[doc(alias = "xmlGetSGMLCatalogEntryType")]
-unsafe fn xml_get_sgml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEntryType {
+fn xml_get_sgml_catalog_entry_type(name: Option<&str>) -> XmlCatalogEntryType {
     let mut typ: XmlCatalogEntryType = XmlCatalogEntryType::XmlCataNone;
-    if xml_str_equal(name, c"SYSTEM".as_ptr() as _) {
+    if name == Some("SYSTEM") {
         typ = XmlCatalogEntryType::SgmlCataSystem;
-    } else if xml_str_equal(name, c"PUBLIC".as_ptr() as _) {
+    } else if name == Some("PUBLIC") {
         typ = XmlCatalogEntryType::SgmlCataPublic;
-    } else if xml_str_equal(name, c"DELEGATE".as_ptr() as _) {
+    } else if name == Some("DELEGATE") {
         typ = XmlCatalogEntryType::SgmlCataDelegate;
-    } else if xml_str_equal(name, c"ENTITY".as_ptr() as _) {
+    } else if name == Some("ENTITY") {
         typ = XmlCatalogEntryType::SgmlCataEntity;
-    } else if xml_str_equal(name, c"DOCTYPE".as_ptr() as _) {
+    } else if name == Some("DOCTYPE") {
         typ = XmlCatalogEntryType::SgmlCataDoctype;
-    } else if xml_str_equal(name, c"LINKTYPE".as_ptr() as _) {
+    } else if name == Some("LINKTYPE") {
         typ = XmlCatalogEntryType::SgmlCataLinktype;
-    } else if xml_str_equal(name, c"NOTATION".as_ptr() as _) {
+    } else if name == Some("NOTATION") {
         typ = XmlCatalogEntryType::SgmlCataNotation;
-    } else if xml_str_equal(name, c"SGMLDECL".as_ptr() as _) {
+    } else if name == Some("SGMLDECL") {
         typ = XmlCatalogEntryType::SgmlCataSGMLDecl;
-    } else if xml_str_equal(name, c"DOCUMENT".as_ptr() as _) {
+    } else if name == Some("DOCUMENT") {
         typ = XmlCatalogEntryType::SgmlCataDocument;
-    } else if xml_str_equal(name, c"CATALOG".as_ptr() as _) {
+    } else if name == Some("CATALOG") {
         typ = XmlCatalogEntryType::SgmlCataCatalog;
-    } else if xml_str_equal(name, c"BASE".as_ptr() as _) {
+    } else if name == Some("BASE") {
         typ = XmlCatalogEntryType::SgmlCataBase;
     }
     typ
@@ -1688,7 +1673,7 @@ unsafe fn xml_get_sgml_catalog_entry_type(name: *const XmlChar) -> XmlCatalogEnt
 #[doc(alias = "xmlACatalogAdd")]
 pub unsafe fn xml_a_catalog_add(
     catal: XmlCatalogPtr,
-    typ: *const XmlChar,
+    typ: Option<&str>,
     orig: Option<&str>,
     replace: *const XmlChar,
 ) -> i32 {
@@ -2702,40 +2687,40 @@ fn xml_catalog_dump_entry<'a>(entry: XmlCatalogEntryPtr, out: &mut (impl Write +
     unsafe {
         match (*entry).typ {
             XmlCatalogEntryType::SgmlCataEntity => {
-                write!(out, "ENTITY ");
+                write!(out, "ENTITY ").ok();
             }
             XmlCatalogEntryType::SgmlCataPentity => {
-                write!(out, "ENTITY %");
+                write!(out, "ENTITY %").ok();
             }
             XmlCatalogEntryType::SgmlCataDoctype => {
-                write!(out, "DOCTYPE ");
+                write!(out, "DOCTYPE ").ok();
             }
             XmlCatalogEntryType::SgmlCataLinktype => {
-                write!(out, "LINKTYPE ");
+                write!(out, "LINKTYPE ").ok();
             }
             XmlCatalogEntryType::SgmlCataNotation => {
-                write!(out, "NOTATION ");
+                write!(out, "NOTATION ").ok();
             }
             XmlCatalogEntryType::SgmlCataPublic => {
-                write!(out, "PUBLIC ");
+                write!(out, "PUBLIC ").ok();
             }
             XmlCatalogEntryType::SgmlCataSystem => {
-                write!(out, "SYSTEM ");
+                write!(out, "SYSTEM ").ok();
             }
             XmlCatalogEntryType::SgmlCataDelegate => {
-                write!(out, "DELEGATE ");
+                write!(out, "DELEGATE ").ok();
             }
             XmlCatalogEntryType::SgmlCataBase => {
-                write!(out, "BASE ");
+                write!(out, "BASE ").ok();
             }
             XmlCatalogEntryType::SgmlCataCatalog => {
-                write!(out, "CATALOG ");
+                write!(out, "CATALOG ").ok();
             }
             XmlCatalogEntryType::SgmlCataDocument => {
-                write!(out, "DOCUMENT ");
+                write!(out, "DOCUMENT ").ok();
             }
             XmlCatalogEntryType::SgmlCataSGMLDecl => {
-                write!(out, "SGMLDECL ");
+                write!(out, "SGMLDECL ").ok();
             }
             _ => {
                 return;
@@ -2747,7 +2732,7 @@ fn xml_catalog_dump_entry<'a>(entry: XmlCatalogEntryPtr, out: &mut (impl Write +
             | XmlCatalogEntryType::SgmlCataDoctype
             | XmlCatalogEntryType::SgmlCataLinktype
             | XmlCatalogEntryType::SgmlCataNotation => {
-                write!(out, "{}", (*entry).name.as_deref().unwrap());
+                write!(out, "{}", (*entry).name.as_deref().unwrap()).ok();
             }
             XmlCatalogEntryType::SgmlCataPublic
             | XmlCatalogEntryType::SgmlCataSystem
@@ -2756,7 +2741,7 @@ fn xml_catalog_dump_entry<'a>(entry: XmlCatalogEntryPtr, out: &mut (impl Write +
             | XmlCatalogEntryType::SgmlCataCatalog
             | XmlCatalogEntryType::SgmlCataBase
             | XmlCatalogEntryType::SgmlCataDelegate => {
-                write!(out, "\"{}\"", (*entry).name.as_deref().unwrap());
+                write!(out, "\"{}\"", (*entry).name.as_deref().unwrap()).ok();
             }
             _ => {}
         }
@@ -2773,11 +2758,12 @@ fn xml_catalog_dump_entry<'a>(entry: XmlCatalogEntryPtr, out: &mut (impl Write +
                     out,
                     " \"{}\"",
                     CStr::from_ptr((*entry).value as *const i8).to_string_lossy()
-                );
+                )
+                .ok();
             }
             _ => {}
         }
-        writeln!(out);
+        writeln!(out).ok();
     }
 }
 
@@ -3399,7 +3385,7 @@ pub unsafe fn xml_catalog_resolve_uri(uri: *const XmlChar) -> *mut XmlChar {
 /// Returns 0 if successful, -1 otherwise
 #[doc(alias = "xmlCatalogAdd")]
 pub unsafe fn xml_catalog_add(
-    typ: *const XmlChar,
+    typ: Option<&str>,
     orig: *const XmlChar,
     replace: *const XmlChar,
 ) -> i32 {
@@ -3412,7 +3398,7 @@ pub unsafe fn xml_catalog_add(
     // Specific case where one want to override the default catalog
     // put in place by xmlInitializeCatalog();
     let mut default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if default_catalog.is_null() && xml_str_equal(typ, c"catalog".as_ptr() as _) {
+    if default_catalog.is_null() && typ == Some("catalog") {
         default_catalog = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
@@ -4118,45 +4104,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlACatalogResolveURI()"
             );
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_catalog_add() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_type in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_orig in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_replace in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let typ = gen_const_xml_char_ptr(n_type, 0);
-                        let orig = gen_const_xml_char_ptr(n_orig, 1);
-                        let replace = gen_const_xml_char_ptr(n_replace, 2);
-
-                        let ret_val = xml_catalog_add(typ as *const XmlChar, orig, replace);
-                        desret_int(ret_val);
-                        des_const_xml_char_ptr(n_type, typ, 0);
-                        des_const_xml_char_ptr(n_orig, orig, 1);
-                        des_const_xml_char_ptr(n_replace, replace, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlCatalogAdd",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_type);
-                            eprint!(" {}", n_orig);
-                            eprintln!(" {}", n_replace);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCatalogAdd()");
         }
         drop(lock);
     }
