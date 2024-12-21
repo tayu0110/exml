@@ -2378,7 +2378,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *
 /// to be used if there is a resolution need further down in the document.
 #[doc(alias = "xmlParseCatalogPI")]
 #[cfg(feature = "catalog")]
-unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *const XmlChar) {
+unsafe fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *const XmlChar) {
     let mut url: *mut XmlChar = null_mut();
     let mut tmp: *const XmlChar;
     let base: *const XmlChar;

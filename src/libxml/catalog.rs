@@ -504,7 +504,7 @@ impl XmlCatalog {
         &mut self,
         typ: Option<&str>,
         orig: Option<&str>,
-        replace: *const XmlChar,
+        replace: Option<&str>,
     ) -> i32 {
         let mut res: i32 = -1;
 
@@ -516,9 +516,7 @@ impl XmlCatalog {
                 let entry: XmlCatalogEntryPtr = xml_new_catalog_entry(
                     cattype,
                     orig,
-                    (!replace.is_null())
-                        .then(|| CStr::from_ptr(replace as *const i8).to_string_lossy())
-                        .as_deref(),
+                    replace,
                     None,
                     XmlCatalogPrefer::None,
                     null_mut(),
@@ -1504,7 +1502,7 @@ impl XmlCatalogEntry {
         &mut self,
         typs: Option<&str>,
         orig: Option<&str>,
-        replace: *const XmlChar,
+        replace: Option<&str>,
     ) -> i32 {
         let mut cur: XmlCatalogEntryPtr;
         let mut doregister: i32 = 0;
@@ -1548,16 +1546,8 @@ impl XmlCatalogEntry {
                     }
                     let _ = (*cur).value.take();
                     let _ = (*cur).url.take();
-                    (*cur).value = Some(
-                        CStr::from_ptr(replace as *const i8)
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                    (*cur).url = Some(PathBuf::from(
-                        CStr::from_ptr(replace as *const i8)
-                            .to_string_lossy()
-                            .into_owned(),
-                    ));
+                    (*cur).value = replace.map(|r| r.to_owned());
+                    (*cur).url = replace.map(PathBuf::from);
                     return 0;
                 }
                 if (*cur).next.is_null() {
@@ -1574,27 +1564,10 @@ impl XmlCatalogEntry {
             }
         }
         if cur.is_null() {
-            self.children = xml_new_catalog_entry(
-                typ,
-                orig,
-                (!replace.is_null())
-                    .then(|| CStr::from_ptr(replace as *const i8).to_string_lossy())
-                    .as_deref(),
-                None,
-                self.prefer,
-                null_mut(),
-            );
+            self.children =
+                xml_new_catalog_entry(typ, orig, replace, None, self.prefer, null_mut());
         } else {
-            (*cur).next = xml_new_catalog_entry(
-                typ,
-                orig,
-                (!replace.is_null())
-                    .then(|| CStr::from_ptr(replace as *const i8).to_string_lossy())
-                    .as_deref(),
-                None,
-                self.prefer,
-                null_mut(),
-            );
+            (*cur).next = xml_new_catalog_entry(typ, orig, replace, None, self.prefer, null_mut());
         }
         if doregister != 0 {
             self.typ = XmlCatalogEntryType::XmlCataCatalog;
@@ -3121,11 +3094,7 @@ pub unsafe fn xml_catalog_resolve_uri(uri: &str) -> *mut XmlChar {
 ///
 /// Returns 0 if successful, -1 otherwise
 #[doc(alias = "xmlCatalogAdd")]
-pub unsafe fn xml_catalog_add(
-    typ: Option<&str>,
-    orig: *const XmlChar,
-    replace: *const XmlChar,
-) -> i32 {
+pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Option<&str>) -> i32 {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog_data();
     }
@@ -3145,9 +3114,7 @@ pub unsafe fn xml_catalog_add(
             (*default_catalog).xml = xml_new_catalog_entry(
                 XmlCatalogEntryType::XmlCataCatalog,
                 None,
-                (!orig.is_null())
-                    .then(|| CStr::from_ptr(orig as *const i8).to_string_lossy())
-                    .as_deref(),
+                orig,
                 None,
                 XML_CATALOG_DEFAULT_PREFER,
                 null_mut(),
@@ -3158,13 +3125,7 @@ pub unsafe fn xml_catalog_add(
         return 0;
     }
 
-    let res: i32 = (*default_catalog).add(
-        typ,
-        (!orig.is_null())
-            .then(|| CStr::from_ptr(orig as *const i8).to_string_lossy())
-            .as_deref(),
-        replace,
-    );
+    let res: i32 = (*default_catalog).add(typ, orig, replace);
     XML_DEFAULT_CATALOG.store(default_catalog, Ordering::Release);
     xml_rmutex_unlock(mutex);
     res
