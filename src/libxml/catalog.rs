@@ -37,10 +37,10 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::HashMap,
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, CStr, CString, OsStr, OsString},
     fs::File,
     io::Read,
-    mem::{size_of, transmute},
+    mem::size_of,
     os::raw::c_void,
     path::{Path, PathBuf},
     ptr::{drop_in_place, null_mut},
@@ -50,7 +50,7 @@ use std::{
 };
 
 use const_format::concatcp;
-use libc::{getenv, snprintf};
+use libc::snprintf;
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -2829,8 +2829,7 @@ static XML_CATALOG_INITIALIZED: AtomicBool = AtomicBool::new(false);
 // The default catalog in use by the application
 static XML_DEFAULT_CATALOG: AtomicPtr<XmlCatalog> = AtomicPtr::new(null_mut());
 
-const XML_XML_DEFAULT_CATALOG: &CStr =
-    unsafe { transmute(concatcp!("file://", SYSCONFDIR, "/xml/catalog", "\0")) };
+const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
 const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/catalog");
 
 /// Do the catalog initialization only of global data, doesn't try to load
@@ -2844,7 +2843,7 @@ unsafe fn xml_initialize_catalog_data() {
         return;
     }
 
-    if !getenv(c"XML_DEBUG_CATALOG".as_ptr() as _).is_null() {
+    if std::env::var_os("XML_DEBUG_CATALOG").is_some() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
     }
     XML_CATALOG_MUTEX.store(xml_new_rmutex(), Ordering::Release);
@@ -2866,87 +2865,37 @@ pub unsafe fn xml_initialize_catalog() {
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
 
-    if !getenv(c"XML_DEBUG_CATALOG".as_ptr() as _).is_null() {
+    if std::env::var_os("XML_DEBUG_CATALOG").is_some() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
     }
 
     if XML_DEFAULT_CATALOG.load(Ordering::Relaxed).is_null() {
-        let mut catalogs: *const c_char;
-        let mut path: *mut c_char;
-        let mut cur: *const c_char;
-        let mut paths: *const c_char;
         let mut nextent: *mut XmlCatalogEntryPtr;
 
-        catalogs = getenv(c"XML_CATALOG_FILES".as_ptr() as _);
-        if catalogs.is_null() {
-            #[cfg(target_os = "windows")]
-            {
-                let hmodule: *mut c_void;
-                hmodule = GetModuleHandleA(c"libxml2.dll".as_ptr() as _);
-                if hmodule.is_null() {
-                    hmodule = GetModuleHandleA(null_mut());
-                }
-                if !hmodule.is_null() {
-                    let buf: [c_char; 256];
-                    let len: c_ulong = GetModuleFileNameA(hmodule, buf, 255);
-                    if len != 0 {
-                        let mut p: *mut c_char = buf.as_mut_ptr().add(len);
-                        while (*p != b'\\' && p > buf) {
-                            p = p.sub(1);
-                        }
-                        if p != buf.as_mut_ptr() {
-                            let uri: *mut XmlChar;
-                            strncpy(p, c"\\..\\etc\\catalog".as_ptr() as _, 255 - (p - buf));
-                            uri = xml_canonic_path(buf);
-                            if !uri.is_null() {
-                                strncpy(XML_XML_DEFAULT_CATALOG, uri, 255);
-                                xml_free(uri as _);
-                            }
-                        }
-                    }
-                }
-                catalogs = XML_XML_DEFAULT_CATALOG.as_ptr() as _;
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                catalogs = XML_XML_DEFAULT_CATALOG.as_ptr() as _;
-            }
-        }
+        let catalogs = std::env::var_os("XML_CATALOG_FILES")
+            .unwrap_or_else(|| OsString::from(XML_XML_DEFAULT_CATALOG));
 
         let catal: XmlCatalogPtr = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
             XML_CATALOG_DEFAULT_PREFER,
         );
         if !catal.is_null() {
-            /* the XML_CATALOG_FILES envvar is allowed to contain a
-            space-separated list of entries. */
-            cur = catalogs;
             nextent = &raw mut (*catal).xml;
-            while *cur != b'\0' as i8 {
-                while xml_is_blank_char(*cur as u32) {
-                    cur = cur.add(1);
-                }
-                if *cur != 0 {
-                    paths = cur;
-                    while *cur != 0 && !xml_is_blank_char(*cur as u32) {
-                        cur = cur.add(1);
-                    }
-                    path = xml_strndup(paths as _, cur.offset_from(paths) as _) as _;
-                    if !path.is_null() {
-                        *nextent = xml_new_catalog_entry(
-                            XmlCatalogEntryType::XmlCataCatalog,
-                            None,
-                            None,
-                            Some(PathBuf::from(
-                                CStr::from_ptr(path as *const i8).to_string_lossy().as_ref(),
-                            )),
-                            XML_CATALOG_DEFAULT_PREFER,
-                            null_mut(),
-                        );
-                        if !(*nextent).is_null() {
-                            nextent = &raw mut (*(*nextent)).next;
-                        }
-                        xml_free(path as _);
+            // the XML_CATALOG_FILES envvar is allowed to contain a space-separated list of entries.
+            let bytes = catalogs.as_encoded_bytes();
+            for path in bytes.split(|b| xml_is_blank_char(*b as u32)) {
+                if !path.is_empty() {
+                    let path = PathBuf::from(OsStr::from_encoded_bytes_unchecked(path));
+                    *nextent = xml_new_catalog_entry(
+                        XmlCatalogEntryType::XmlCataCatalog,
+                        None,
+                        None,
+                        Some(path),
+                        XML_CATALOG_DEFAULT_PREFER,
+                        null_mut(),
+                    );
+                    if !(*nextent).is_null() {
+                        nextent = &raw mut (*(*nextent)).next;
                     }
                 }
             }
