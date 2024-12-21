@@ -918,6 +918,42 @@ impl XmlCatalogEntry {
         null_mut()
     }
 
+    /// Do a complete resolution lookup of an External Identifier using a
+    /// document's private catalog list
+    ///
+    /// Returns the URI of the resource or null_mut() if not found,
+    /// it must be freed by the caller.
+    #[doc(alias = "xmlCatalogLocalResolve")]
+    pub unsafe fn local_resolve(
+        &mut self,
+        pub_id: Option<&str>,
+        sys_id: Option<&str>,
+    ) -> *mut XmlChar {
+        if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
+            xml_initialize_catalog();
+        }
+
+        if pub_id.is_none() && sys_id.is_none() {
+            return null_mut();
+        }
+
+        if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
+            if let (Some(pub_id), Some(sys_id)) = (pub_id, sys_id) {
+                generic_error!("Local Resolve: pubID {pub_id} sysID {sys_id}\n");
+            } else if let Some(pub_id) = pub_id {
+                generic_error!("Local Resolve: pubID {pub_id}\n");
+            } else {
+                generic_error!("Local Resolve: sysID {}\n", sys_id.unwrap());
+            }
+        }
+
+        let ret: *mut XmlChar = self.list_xml_resolve(pub_id, sys_id);
+        if !ret.is_null() && ret != XML_CATAL_BREAK {
+            return ret;
+        }
+        null_mut()
+    }
+
     /// Do a complete resolution lookup of an URI for a list of catalogs
     ///
     /// Implements (or tries to) 7.2. URI Resolution
@@ -3343,46 +3379,6 @@ pub unsafe fn xml_catalog_add_local(
     }
     (*catal).next = add;
     catalogs
-}
-
-/// Do a complete resolution lookup of an External Identifier using a
-/// document's private catalog list
-///
-/// Returns the URI of the resource or null_mut() if not found,
-/// it must be freed by the caller.
-#[doc(alias = "xmlCatalogLocalResolve")]
-pub unsafe fn xml_catalog_local_resolve(
-    catalogs: XmlCatalogEntryPtr,
-    pub_id: Option<&str>,
-    sys_id: Option<&str>,
-) -> *mut XmlChar {
-    if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
-        xml_initialize_catalog();
-    }
-
-    if pub_id.is_none() && sys_id.is_none() {
-        return null_mut();
-    }
-
-    if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        if let (Some(pub_id), Some(sys_id)) = (pub_id, sys_id) {
-            generic_error!("Local Resolve: pubID {pub_id} sysID {sys_id}\n");
-        } else if let Some(pub_id) = pub_id {
-            generic_error!("Local Resolve: pubID {pub_id}\n");
-        } else {
-            generic_error!("Local Resolve: sysID {}\n", sys_id.unwrap());
-        }
-    }
-
-    let catal: XmlCatalogEntryPtr = catalogs as XmlCatalogEntryPtr;
-    if catal.is_null() {
-        return null_mut();
-    }
-    let ret: *mut XmlChar = (*catal).list_xml_resolve(pub_id, sys_id);
-    if !ret.is_null() && ret != XML_CATAL_BREAK {
-        return ret;
-    }
-    null_mut()
 }
 
 /// Used to set the debug level for catalog operation, 0 disable

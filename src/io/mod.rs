@@ -51,8 +51,7 @@ use crate::{
     },
     libxml::{
         catalog::{
-            xml_catalog_get_defaults, xml_catalog_local_resolve, xml_catalog_resolve,
-            xml_catalog_resolve_uri, XmlCatalogAllow,
+            xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
         },
         globals::{xml_free, xml_mem_strdup},
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
@@ -568,7 +567,7 @@ unsafe fn xml_resolve_resource_from_catalog(
             && !(*ctxt).catalogs.is_null()
             && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
         {
-            resource = xml_catalog_local_resolve((*ctxt).catalogs, id, url);
+            resource = (*(*ctxt).catalogs).local_resolve(id, url);
         }
         // Try a global lookup
         if resource.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
