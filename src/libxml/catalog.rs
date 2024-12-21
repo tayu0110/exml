@@ -3285,31 +3285,21 @@ pub unsafe fn xml_catalog_free_local(catalogs: XmlCatalogEntryPtr) {
 ///
 /// Returns the updated list
 #[doc(alias = "xmlCatalogAddLocal")]
-pub unsafe fn xml_catalog_add_local(
-    catalogs: XmlCatalogEntryPtr,
-    url: *const XmlChar,
-) -> XmlCatalogEntryPtr {
+pub unsafe fn xml_catalog_add_local(catalogs: XmlCatalogEntryPtr, url: &str) -> XmlCatalogEntryPtr {
     let mut catal: XmlCatalogEntryPtr;
 
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
 
-    if url.is_null() {
-        return catalogs;
-    }
-
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
-        generic_error!(
-            "Adding document catalog {}\n",
-            CStr::from_ptr(url as *const i8).to_string_lossy()
-        );
+        generic_error!("Adding document catalog {url}\n");
     }
 
     let add: XmlCatalogEntryPtr = xml_new_catalog_entry(
         XmlCatalogEntryType::XmlCataCatalog,
         None,
-        Some(CStr::from_ptr(url as *const i8).to_string_lossy().as_ref()),
+        Some(url),
         None,
         XML_CATALOG_DEFAULT_PREFER,
         null_mut(),

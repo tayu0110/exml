@@ -2424,7 +2424,10 @@ unsafe extern "C" fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *cons
             break 'error;
         }
         if !url.is_null() {
-            (*ctxt).catalogs = xml_catalog_add_local((*ctxt).catalogs, url);
+            (*ctxt).catalogs = xml_catalog_add_local(
+                (*ctxt).catalogs,
+                CStr::from_ptr(url as *const i8).to_string_lossy().as_ref(),
+            );
             xml_free(url as _);
         }
         return;
