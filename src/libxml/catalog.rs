@@ -46,7 +46,10 @@ use std::{
     ptr::{drop_in_place, null_mut},
     rc::Rc,
     str::from_utf8,
-    sync::atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
+        RwLock,
+    },
 };
 
 use const_format::concatcp;
@@ -181,6 +184,20 @@ macro_rules! xml_catalog_err {
         );
     };
 }
+
+// Hash table containing all the trees of XML catalogs parsed by the application.
+static XML_CATALOG_XMLFILES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
+    AtomicPtr::new(null_mut());
+
+// A mutex for modifying the shared global catalog(s) xmlDefaultCatalog tree.
+// It also protects xmlCatalogXMLFiles.
+// The core of this readers/writer scheme is in `xmlFetchXMLCatalogFile()`.
+static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
+
+// Those are preferences
+static XML_DEBUG_CATALOGS: AtomicI32 = AtomicI32::new(0); /* used for debugging */
+static XML_CATALOG_DEFAULT_ALLOW: RwLock<XmlCatalogAllow> = RwLock::new(XmlCatalogAllow::All);
+static XML_CATALOG_DEFAULT_PREFER: RwLock<XmlCatalogPrefer> = RwLock::new(XmlCatalogPrefer::Public);
 
 /// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
@@ -479,7 +496,7 @@ impl XmlCatalog {
                 None,
                 None,
                 Some(filename.to_owned()),
-                XML_CATALOG_DEFAULT_PREFER,
+                *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
                 null_mut(),
             );
 
@@ -1899,11 +1916,6 @@ impl Default for XmlCatalogEntry {
     }
 }
 
-// Those are preferences
-static XML_DEBUG_CATALOGS: AtomicI32 = AtomicI32::new(0); /* used for debugging */
-static mut XML_CATALOG_DEFAULT_ALLOW: XmlCatalogAllow = XmlCatalogAllow::All;
-static mut XML_CATALOG_DEFAULT_PREFER: XmlCatalogPrefer = XmlCatalogPrefer::Public;
-
 /// create a new Catalog, this type is shared both by XML and SGML catalogs,
 /// but the acceptable types values differs.
 ///
@@ -1932,12 +1944,12 @@ pub unsafe fn xml_new_catalog(sgml: bool) -> XmlCatalogPtr {
     if sgml {
         xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         )
     } else {
         xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         )
     }
 }
@@ -2206,7 +2218,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
     if first.first() != Some(&b'<') {
         let catal = xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         );
         if catal.is_null() {
             return null_mut();
@@ -2220,7 +2232,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
     } else {
         let catal = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         );
         if catal.is_null() {
             return null_mut();
@@ -2230,7 +2242,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
             None,
             None,
             Some(filename.to_owned()),
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
             null_mut(),
         );
         catal
@@ -2251,7 +2263,7 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> XmlCata
 
     let catal: XmlCatalogPtr = xml_create_new_catalog(
         XmlCatalogType::XmlSGMLCatalogType,
-        XML_CATALOG_DEFAULT_PREFER,
+        *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
     );
     if catal.is_null() {
         return null_mut();
@@ -2264,15 +2276,6 @@ pub unsafe fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> XmlCata
     }
     catal
 }
-
-// Hash table containing all the trees of XML catalogs parsed by the application.
-static XML_CATALOG_XMLFILES: AtomicPtr<XmlHashTable<'static, CVoidWrapper>> =
-    AtomicPtr::new(null_mut());
-
-// A mutex for modifying the shared global catalog(s) xmlDefaultCatalog tree.
-// It also protects xmlCatalogXMLFiles.
-// The core of this readers/writer scheme is in `xmlFetchXMLCatalogFile()`.
-static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 
 /// Finishes the examination of an XML tree node of a catalog and build
 /// a Catalog entry from it.
@@ -2850,7 +2853,7 @@ pub unsafe fn xml_initialize_catalog() {
 
         let catal: XmlCatalogPtr = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         );
         if !catal.is_null() {
             nextent = &raw mut (*catal).xml;
@@ -2864,7 +2867,7 @@ pub unsafe fn xml_initialize_catalog() {
                         None,
                         None,
                         Some(path),
-                        XML_CATALOG_DEFAULT_PREFER,
+                        *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
                         null_mut(),
                     );
                     if !(*nextent).is_null() {
@@ -3107,7 +3110,7 @@ pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Op
     if default_catalog.is_null() && typ == Some("catalog") {
         default_catalog = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
-            XML_CATALOG_DEFAULT_PREFER,
+            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         ) as _;
 
         if !default_catalog.is_null() {
@@ -3116,7 +3119,7 @@ pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Op
                 None,
                 orig,
                 None,
-                XML_CATALOG_DEFAULT_PREFER,
+                *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
                 null_mut(),
             );
         }
@@ -3262,7 +3265,7 @@ pub unsafe fn xml_catalog_add_local(catalogs: XmlCatalogEntryPtr, url: &str) -> 
         None,
         Some(url),
         None,
-        XML_CATALOG_DEFAULT_PREFER,
+        *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         null_mut(),
     );
     if add.is_null() {
@@ -3286,8 +3289,8 @@ pub unsafe fn xml_catalog_add_local(catalogs: XmlCatalogEntryPtr, url: &str) -> 
 ///
 /// Returns the previous value of the catalog debugging level
 #[doc(alias = "xmlCatalogSetDebug")]
-pub unsafe fn xml_catalog_set_debug(level: i32) -> i32 {
-    let ret: i32 = XML_DEBUG_CATALOGS.load(Ordering::Acquire);
+pub fn xml_catalog_set_debug(level: i32) -> i32 {
+    let ret = XML_DEBUG_CATALOGS.load(Ordering::Acquire);
 
     if level <= 0 {
         XML_DEBUG_CATALOGS.store(0, Ordering::Release);
@@ -3303,8 +3306,8 @@ pub unsafe fn xml_catalog_set_debug(level: i32) -> i32 {
 ///
 /// Returns the previous value of the default preference for delegation
 #[doc(alias = "xmlCatalogSetDefaultPrefer")]
-pub unsafe fn xml_catalog_set_default_prefer(prefer: XmlCatalogPrefer) -> XmlCatalogPrefer {
-    let ret: XmlCatalogPrefer = XML_CATALOG_DEFAULT_PREFER;
+pub fn xml_catalog_set_default_prefer(prefer: XmlCatalogPrefer) -> XmlCatalogPrefer {
+    let ret = *XML_CATALOG_DEFAULT_PREFER.read().unwrap();
 
     if matches!(prefer, XmlCatalogPrefer::None) {
         return ret;
@@ -3323,13 +3326,13 @@ pub unsafe fn xml_catalog_set_default_prefer(prefer: XmlCatalogPrefer) -> XmlCat
             }
         }
     }
-    XML_CATALOG_DEFAULT_PREFER = prefer;
+    *XML_CATALOG_DEFAULT_PREFER.write().unwrap() = prefer;
     ret
 }
 
 /// Used to set the user preference w.r.t. to what catalogs should be accepted
 #[doc(alias = "xmlCatalogSetDefaults")]
-pub unsafe fn xml_catalog_set_defaults(allow: XmlCatalogAllow) {
+pub fn xml_catalog_set_defaults(allow: XmlCatalogAllow) {
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         match allow {
             XmlCatalogAllow::None => {
@@ -3346,15 +3349,15 @@ pub unsafe fn xml_catalog_set_defaults(allow: XmlCatalogAllow) {
             }
         }
     }
-    XML_CATALOG_DEFAULT_ALLOW = allow;
+    *XML_CATALOG_DEFAULT_ALLOW.write().unwrap() = allow;
 }
 
 /// Used to get the user preference w.r.t. to what catalogs should be accepted
 ///
 /// Returns the current xmlCatalogAllow value
 #[doc(alias = "xmlCatalogGetDefaults")]
-pub unsafe fn xml_catalog_get_defaults() -> XmlCatalogAllow {
-    XML_CATALOG_DEFAULT_ALLOW
+pub fn xml_catalog_get_defaults() -> XmlCatalogAllow {
+    *XML_CATALOG_DEFAULT_ALLOW.read().unwrap()
 }
 
 /// Try to lookup the catalog reference associated to a system ID
