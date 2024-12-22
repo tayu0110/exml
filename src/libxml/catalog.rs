@@ -47,7 +47,7 @@ use std::{
     str::from_utf8,
     sync::{
         atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
-        Arc, RwLock,
+        Arc, RwLock, Weak,
     },
 };
 
@@ -785,7 +785,7 @@ impl XmlCatalog {
             }
             // Conversion successful, remove from the SGML catalog
             // and add it to the default XML one
-            node.write().unwrap().parent = self.xml.as_ref().map(|xml| xml.node.clone());
+            node.write().unwrap().parent = self.xml.as_ref().map(|xml| Arc::downgrade(&xml.node));
             node.write().unwrap().next = None;
             if self
                 .xml
@@ -822,7 +822,7 @@ impl XmlCatalog {
 #[derive(Debug, Default)]
 struct CatalogEntryListNode {
     next: Option<Arc<RwLock<CatalogEntryListNode>>>,
-    parent: Option<Arc<RwLock<CatalogEntryListNode>>>,
+    parent: Option<Weak<RwLock<CatalogEntryListNode>>>,
     children: Option<Arc<RwLock<CatalogEntryListNode>>>,
     typ: XmlCatalogEntryType,
     name: Option<String>,
@@ -1855,6 +1855,11 @@ impl XmlCatalogEntry {
     }
 
     /// Add the new entry to the catalog list
+    ///
+    /// # Note
+    /// In original libxml2, you can create a new catalog by passing a NULL pointer to this method,
+    /// but it is not possible in this crate.  
+    /// You need to use `XmlCatalogEntry::new` instead.
     #[doc(alias = "xmlCatalogAddLocal")]
     pub unsafe fn add_local(&mut self, url: &str) {
         if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
@@ -2614,7 +2619,7 @@ unsafe fn xml_parse_xml_catalog_node(
     };
     if let Some(entry) = entry {
         if let Some(parent) = parent.as_ref() {
-            entry.node.write().unwrap().parent = Some(parent.node.clone());
+            entry.node.write().unwrap().parent = Some(Arc::downgrade(&parent.node));
             if parent.node.read().unwrap().children.is_none() {
                 parent.node.write().unwrap().children = Some(entry.node.clone());
             } else {
