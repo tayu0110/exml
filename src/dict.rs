@@ -59,15 +59,15 @@ fn xml_dict_compute_fast_key(name: &[u8], seed: i32) -> u64 {
     if name.is_empty() {
         return value;
     }
-    value += name[0] as u64;
+    value = value.wrapping_add(name[0] as u64);
     value <<= 5;
     let mut namelen = name.len();
     if name.len() > 10 {
-        value += *name.last().unwrap() as u64;
+        value = value.wrapping_add(*name.last().unwrap() as u64);
         namelen = 10;
     }
     for i in 1..namelen {
-        value += name[i] as u64;
+        value = value.wrapping_add(name[i] as u64);
     }
     value
 }
@@ -117,9 +117,9 @@ fn xml_dict_compute_fast_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
     let mut value: u64 = seed as _;
 
     if prefix.is_empty() {
-        value += 30 * b':' as u64;
+        value = value.wrapping_add(30 * b':' as u64);
     } else {
-        value += 30 * prefix[0] as u64;
+        value = value.wrapping_add(30 * prefix[0] as u64);
     }
 
     let mut plen = prefix.len();
@@ -129,17 +129,17 @@ fn xml_dict_compute_fast_qkey(prefix: &[u8], name: &[u8], seed: i32) -> u64 {
         if offset < 0 {
             offset = len as i32 - (10 + 1);
         }
-        value += name[offset as usize] as u64;
+        value = value.wrapping_add(name[offset as usize] as u64);
         len = 10;
         plen = plen.min(10);
     }
 
-    value += prefix[..plen].iter().fold(0u64, |s, &v| s + v as u64);
+    value = value.wrapping_add(prefix[..plen].iter().fold(0u64, |s, &v| s + v as u64));
     len = len.saturating_sub(plen);
     if len > 0 {
-        value += b':' as u64;
+        value = value.wrapping_add(b':' as u64);
         len -= 1;
-        value += name[..len].iter().fold(0u64, |s, &v| s + v as u64);
+        value = value.wrapping_add(name[..len].iter().fold(0u64, |s, &v| s + v as u64));
     }
     value
 }

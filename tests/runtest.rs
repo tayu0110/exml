@@ -5757,16 +5757,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         options: XmlParserOption::XmlParseXinclude as i32
             | XmlParserOption::XmlParseNoxincnode as i32,
     },
-    #[cfg(feature = "xinclude")]
-    TestDesc {
-        desc: "XInclude regression tests without reader",
-        func: err_parse_test,
-        input: Some("./test/XInclude/without-reader/*"),
-        out: Some("./result/XInclude/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32,
-    },
     #[cfg(all(
         feature = "xpath",
         feature = "libxml_debug",
@@ -5969,6 +5959,20 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+#[cfg(feature = "xinclude")]
+fn xinclude_regression_without_reader_test() {
+    test_common(&TestDesc {
+        desc: "XInclude regression tests without reader",
+        func: err_parse_test,
+        input: Some("./test/XInclude/without-reader/*"),
+        out: Some("./result/XInclude/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseXinclude as i32,
+    });
 }
 
 #[test]
