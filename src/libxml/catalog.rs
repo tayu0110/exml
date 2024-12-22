@@ -40,7 +40,6 @@ use std::{
     ffi::{c_char, CStr, CString, OsStr, OsString},
     fs::File,
     io::Read,
-    mem::size_of,
     path::{Path, PathBuf},
     ptr::{drop_in_place, null, null_mut},
     rc::Rc,
@@ -61,7 +60,7 @@ use crate::{
     io::{xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
         chvalid::xml_is_blank_char,
-        globals::{xml_free, xml_malloc},
+        globals::xml_free,
         parser::{
             xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
             XmlParserInputPtr,
@@ -196,6 +195,14 @@ static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 static XML_DEBUG_CATALOGS: AtomicI32 = AtomicI32::new(0); /* used for debugging */
 static XML_CATALOG_DEFAULT_ALLOW: RwLock<XmlCatalogAllow> = RwLock::new(XmlCatalogAllow::All);
 static XML_CATALOG_DEFAULT_PREFER: RwLock<XmlCatalogPrefer> = RwLock::new(XmlCatalogPrefer::Public);
+
+// Whether the catalog support was initialized.
+static XML_CATALOG_INITIALIZED: AtomicBool = AtomicBool::new(false);
+// The default catalog in use by the application
+static XML_DEFAULT_CATALOG: RwLock<Option<XmlCatalog>> = RwLock::new(None);
+
+const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
+const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/catalog");
 
 /// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
@@ -2078,17 +2085,14 @@ impl Default for XmlCatalogEntry {
 ///
 /// Returns the xmlCatalogPtr or null_mut() in case of error
 #[doc(alias = "xmlCreateNewCatalog")]
-unsafe fn xml_create_new_catalog(typ: XmlCatalogType, prefer: XmlCatalogPrefer) -> XmlCatalogPtr {
-    let ret: XmlCatalogPtr = xml_malloc(size_of::<XmlCatalog>()) as XmlCatalogPtr;
-    if ret.is_null() {
-        xml_catalog_err_memory("allocating catalog");
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlCatalog::default());
-    (*ret).typ = typ;
-    (*ret).prefer = prefer;
-    if matches!((*ret).typ, XmlCatalogType::XmlSGMLCatalogType) {
-        (*ret).sgml = HashMap::new();
+fn xml_create_new_catalog(typ: XmlCatalogType, prefer: XmlCatalogPrefer) -> XmlCatalog {
+    let mut ret = XmlCatalog {
+        typ,
+        prefer,
+        ..Default::default()
+    };
+    if matches!(ret.typ, XmlCatalogType::XmlSGMLCatalogType) {
+        ret.sgml = HashMap::new();
     }
     ret
 }
@@ -2097,7 +2101,7 @@ unsafe fn xml_create_new_catalog(typ: XmlCatalogType, prefer: XmlCatalogPrefer) 
 ///
 /// Returns the xmlCatalogPtr or null_mut() in case of error
 #[doc(alias = "xmlNewCatalog")]
-pub unsafe fn xml_new_catalog(sgml: bool) -> XmlCatalogPtr {
+pub fn xml_new_catalog(sgml: bool) -> XmlCatalog {
     if sgml {
         xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
@@ -2325,11 +2329,9 @@ fn xml_new_catalog_entry(
 ///
 /// Returns the catalog parsed or null_mut() in case of error
 #[doc(alias = "xmlLoadACatalog")]
-pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
+pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> Option<XmlCatalog> {
     let filename = filename.as_ref();
-    let Some(content) = xml_load_file_content(filename) else {
-        return null_mut();
-    };
+    let content = xml_load_file_content(filename)?;
 
     let mut first = &content[..];
 
@@ -2342,28 +2344,21 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
     }
 
     if first.first() != Some(&b'<') {
-        let catal = xml_create_new_catalog(
+        let mut catal = xml_create_new_catalog(
             XmlCatalogType::XmlSGMLCatalogType,
             *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         );
-        if catal.is_null() {
-            return null_mut();
-        }
-        let ret = (*catal).parse_sgml_catalog(&content, filename, 0);
+        let ret = catal.parse_sgml_catalog(&content, filename, 0);
         if ret < 0 {
-            xml_free_catalog(catal);
-            return null_mut();
+            return None;
         }
-        catal
+        Some(catal)
     } else {
-        let catal = xml_create_new_catalog(
+        let mut catal = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
             *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         );
-        if catal.is_null() {
-            return null_mut();
-        }
-        (*catal).xml = Some(xml_new_catalog_entry(
+        catal.xml = Some(xml_new_catalog_entry(
             XmlCatalogEntryType::XmlCataCatalog,
             None,
             None,
@@ -2371,7 +2366,7 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
             *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
             None,
         ));
-        catal
+        Some(catal)
     }
 }
 
@@ -2381,26 +2376,20 @@ pub unsafe fn xml_load_a_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
 ///
 /// Returns the catalog parsed or null_mut() in case of error
 #[doc(alias = "xmlLoadSGMLSuperCatalog")]
-pub unsafe fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> XmlCatalogPtr {
+pub unsafe fn xml_load_sgml_super_catalog(filename: impl AsRef<Path>) -> Option<XmlCatalog> {
     let filename = filename.as_ref();
-    let Some(content) = xml_load_file_content(filename) else {
-        return null_mut();
-    };
+    let content = xml_load_file_content(filename)?;
 
-    let catal: XmlCatalogPtr = xml_create_new_catalog(
+    let mut catal = xml_create_new_catalog(
         XmlCatalogType::XmlSGMLCatalogType,
         *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
     );
-    if catal.is_null() {
-        return null_mut();
-    }
 
-    let ret = (*catal).parse_sgml_catalog(&content, filename, 1);
+    let ret = catal.parse_sgml_catalog(&content, filename, 1);
     if ret < 0 {
-        xml_free_catalog(catal);
-        return null_mut();
+        return None;
     }
-    catal
+    Some(catal)
 }
 
 /// Finishes the examination of an XML tree node of a catalog and build
@@ -2909,14 +2898,6 @@ pub unsafe fn xml_free_catalog(catal: XmlCatalogPtr) {
     xml_free(catal as _);
 }
 
-// Whether the catalog support was initialized.
-static XML_CATALOG_INITIALIZED: AtomicBool = AtomicBool::new(false);
-// The default catalog in use by the application
-static XML_DEFAULT_CATALOG: AtomicPtr<XmlCatalog> = AtomicPtr::new(null_mut());
-
-const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
-const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/catalog");
-
 /// Do the catalog initialization only of global data, doesn't try to load
 /// any catalog actually.
 /// this function is not thread safe, catalog initialization should
@@ -2954,39 +2935,38 @@ pub unsafe fn xml_initialize_catalog() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
     }
 
-    if XML_DEFAULT_CATALOG.load(Ordering::Relaxed).is_null() {
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    if default_catalog.is_none() {
         let catalogs = std::env::var_os("XML_CATALOG_FILES")
             .unwrap_or_else(|| OsString::from(XML_XML_DEFAULT_CATALOG));
 
-        let catal: XmlCatalogPtr = xml_create_new_catalog(
+        let mut catal = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
             *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
         );
-        if !catal.is_null() {
-            let mut next = None::<XmlCatalogEntry>;
-            // the XML_CATALOG_FILES envvar is allowed to contain a space-separated list of entries.
-            let bytes = catalogs.as_encoded_bytes();
-            for path in bytes.split(|b| xml_is_blank_char(*b as u32)) {
-                if !path.is_empty() {
-                    let path = PathBuf::from(OsStr::from_encoded_bytes_unchecked(path));
-                    let new = xml_new_catalog_entry(
-                        XmlCatalogEntryType::XmlCataCatalog,
-                        None,
-                        None,
-                        Some(path),
-                        *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
-                        None,
-                    );
-                    if let Some(nt) = next {
-                        nt.node.write().unwrap().next = Some(new.node.clone());
-                    } else {
-                        (*catal).xml = Some(new.clone());
-                    }
-                    next = Some(new);
+        let mut next = None::<XmlCatalogEntry>;
+        // the XML_CATALOG_FILES envvar is allowed to contain a space-separated list of entries.
+        let bytes = catalogs.as_encoded_bytes();
+        for path in bytes.split(|b| xml_is_blank_char(*b as u32)) {
+            if !path.is_empty() {
+                let path = PathBuf::from(OsStr::from_encoded_bytes_unchecked(path));
+                let new = xml_new_catalog_entry(
+                    XmlCatalogEntryType::XmlCataCatalog,
+                    None,
+                    None,
+                    Some(path),
+                    *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
+                    None,
+                );
+                if let Some(nt) = next {
+                    nt.node.write().unwrap().next = Some(new.node.clone());
+                } else {
+                    catal.xml = Some(new.clone());
                 }
+                next = Some(new);
             }
-            XML_DEFAULT_CATALOG.store(catal, Ordering::Relaxed);
         }
+        *default_catalog = Some(catal);
     }
 
     xml_rmutex_unlock(mutex);
@@ -3000,8 +2980,6 @@ pub unsafe fn xml_initialize_catalog() {
 /// Returns 0 in case of success -1 in case of error
 #[doc(alias = "xmlLoadCatalog")]
 pub unsafe fn xml_load_catalog(filename: impl AsRef<Path>) -> i32 {
-    let catal: XmlCatalogPtr;
-
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog_data();
     }
@@ -3010,20 +2988,17 @@ pub unsafe fn xml_load_catalog(filename: impl AsRef<Path>) -> i32 {
     xml_rmutex_lock(mutex);
 
     let filename = filename.as_ref();
-    let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if default_catalog.is_null() {
-        catal = xml_load_a_catalog(filename);
-        if catal.is_null() {
-            xml_rmutex_unlock(mutex);
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    let Some(default_catalog) = default_catalog.as_mut() else {
+        let Some(catal) = xml_load_a_catalog(filename) else {
             return -1;
-        }
-
-        XML_DEFAULT_CATALOG.store(catal, Ordering::Release);
+        };
+        *default_catalog = Some(catal);
         xml_rmutex_unlock(mutex);
         return 0;
-    }
+    };
 
-    let ret: i32 = (*default_catalog).expand_catalog(filename);
+    let ret = default_catalog.expand_catalog(filename);
     xml_rmutex_unlock(mutex);
     ret
 }
@@ -3097,11 +3072,7 @@ pub unsafe fn xml_catalog_cleanup() {
     }
     let mut files = XML_CATALOG_XMLFILES.write().unwrap();
     files.clear();
-    let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if !default_catalog.is_null() {
-        xml_free_catalog(default_catalog);
-    }
-    XML_DEFAULT_CATALOG.store(null_mut(), Ordering::Release);
+    XML_DEFAULT_CATALOG.write().unwrap().take();
     XML_DEBUG_CATALOGS.store(0, Ordering::Release);
     XML_CATALOG_INITIALIZED.store(false, Ordering::Release);
     xml_rmutex_unlock(mutex);
@@ -3115,8 +3086,13 @@ pub unsafe fn xml_catalog_dump<'a>(out: impl Write + 'a) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
-
-    (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).dump(out);
+    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
+    xml_rmutex_lock(mutex);
+    let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
+    if let Some(catalog) = lock.as_mut() {
+        catalog.dump(out);
+    }
+    xml_rmutex_unlock(mutex);
 }
 
 /// Do a complete resolution lookup of an External Identifier
@@ -3129,7 +3105,16 @@ pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) ->
         xml_initialize_catalog();
     }
 
-    (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).resolve(pub_id, sys_id)
+    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
+    xml_rmutex_lock(mutex);
+    let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
+    let res = if let Some(catalog) = lock.as_mut() {
+        catalog.resolve(pub_id, sys_id)
+    } else {
+        null_mut()
+    };
+    xml_rmutex_unlock(mutex);
+    res
 }
 
 /// Try to lookup the catalog resource for a system ID
@@ -3142,7 +3127,16 @@ pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> *mut XmlChar {
         xml_initialize_catalog();
     }
 
-    (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).resolve_system(sys_id)
+    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
+    xml_rmutex_lock(mutex);
+    let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
+    let res = if let Some(catalog) = lock.as_mut() {
+        catalog.resolve_system(sys_id)
+    } else {
+        null_mut()
+    };
+    xml_rmutex_unlock(mutex);
+    res
 }
 
 /// Try to lookup the catalog reference associated to a public ID
@@ -3155,7 +3149,16 @@ pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> *mut XmlChar {
         xml_initialize_catalog();
     }
 
-    (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).resolve_public(pub_id)
+    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
+    xml_rmutex_lock(mutex);
+    let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
+    let res = if let Some(catalog) = lock.as_mut() {
+        catalog.resolve_public(pub_id)
+    } else {
+        null_mut()
+    };
+    xml_rmutex_unlock(mutex);
+    res
 }
 
 /// Do a complete resolution lookup of an URI
@@ -3168,7 +3171,16 @@ pub unsafe fn xml_catalog_resolve_uri(uri: &str) -> *mut XmlChar {
         xml_initialize_catalog();
     }
 
-    (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).resolve_uri(uri)
+    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
+    xml_rmutex_lock(mutex);
+    let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
+    let res = if let Some(catalog) = lock.as_mut() {
+        catalog.resolve_uri(uri)
+    } else {
+        null_mut()
+    };
+    xml_rmutex_unlock(mutex);
+    res
 }
 
 /// Add an entry in the catalog, it may overwrite existing but
@@ -3187,15 +3199,15 @@ pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Op
     xml_rmutex_lock(mutex);
     // Specific case where one want to override the default catalog
     // put in place by xmlInitializeCatalog();
-    let mut default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if default_catalog.is_null() && typ == Some("catalog") {
-        default_catalog = xml_create_new_catalog(
-            XmlCatalogType::XmlXMLCatalogType,
-            *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
-        ) as _;
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    let Some(default_catalog) = default_catalog.as_mut() else {
+        if typ == Some("catalog") {
+            let mut new = xml_create_new_catalog(
+                XmlCatalogType::XmlXMLCatalogType,
+                *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
+            );
 
-        if !default_catalog.is_null() {
-            (*default_catalog).xml = Some(xml_new_catalog_entry(
+            new.xml = Some(xml_new_catalog_entry(
                 XmlCatalogEntryType::XmlCataCatalog,
                 None,
                 orig,
@@ -3203,14 +3215,15 @@ pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Op
                 *XML_CATALOG_DEFAULT_PREFER.read().unwrap(),
                 None,
             ));
+            *default_catalog = Some(new);
+            xml_rmutex_unlock(mutex);
+            return 0;
+        } else {
+            return -1;
         }
-        XML_DEFAULT_CATALOG.store(default_catalog, Ordering::Release);
-        xml_rmutex_unlock(mutex);
-        return 0;
-    }
+    };
 
-    let res: i32 = (*default_catalog).add(typ, orig, replace);
-    XML_DEFAULT_CATALOG.store(default_catalog, Ordering::Release);
+    let res: i32 = default_catalog.add(typ, orig, replace);
     xml_rmutex_unlock(mutex);
     res
 }
@@ -3226,7 +3239,12 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
-    let res: i32 = (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).remove(value);
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    let res = if let Some(default_catalog) = default_catalog.as_mut() {
+        default_catalog.remove(value)
+    } else {
+        -1
+    };
     xml_rmutex_unlock(mutex);
     res
 }
@@ -3308,7 +3326,12 @@ pub unsafe fn xml_catalog_convert() -> i32 {
 
     let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
     xml_rmutex_lock(mutex);
-    let res: i32 = (*XML_DEFAULT_CATALOG.load(Ordering::Relaxed)).convert_sgml_catalog();
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    let res = if let Some(default_catalog) = default_catalog.as_mut() {
+        default_catalog.convert_sgml_catalog()
+    } else {
+        -1
+    };
     xml_rmutex_unlock(mutex);
     res
 }
@@ -3409,9 +3432,9 @@ pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
     }
 
     // Check first the XML catalogs
-    let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if !default_catalog.is_null() {
-        ret = (*default_catalog)
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    if let Some(default_catalog) = default_catalog.as_mut() {
+        ret = default_catalog
             .xml
             .as_mut()
             .unwrap()
@@ -3428,8 +3451,8 @@ pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
         }
     }
 
-    if !default_catalog.is_null() {
-        return if let Some(sgml) = xml_catalog_get_sgml_system(&(*default_catalog).sgml, sys_id) {
+    if let Some(default_catalog) = default_catalog.as_mut() {
+        return if let Some(sgml) = xml_catalog_get_sgml_system(&default_catalog.sgml, sys_id) {
             let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
             snprintf(
                 RESULT.as_mut_ptr() as _,
@@ -3467,9 +3490,9 @@ pub unsafe fn xml_catalog_get_public(pub_id: &str) -> *const XmlChar {
     }
 
     // Check first the XML catalogs
-    let default_catalog = XML_DEFAULT_CATALOG.load(Ordering::Acquire);
-    if !default_catalog.is_null() {
-        ret = (*default_catalog)
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
+    if let Some(default_catalog) = default_catalog.as_mut() {
+        ret = default_catalog
             .xml
             .as_mut()
             .unwrap()
@@ -3486,8 +3509,8 @@ pub unsafe fn xml_catalog_get_public(pub_id: &str) -> *const XmlChar {
         }
     }
 
-    if !default_catalog.is_null() {
-        return if let Some(sgml) = xml_catalog_get_sgml_public(&(*default_catalog).sgml, pub_id) {
+    if let Some(default_catalog) = default_catalog.as_mut() {
+        return if let Some(sgml) = xml_catalog_get_sgml_public(&default_catalog.sgml, pub_id) {
             let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
             snprintf(
                 RESULT.as_mut_ptr() as _,

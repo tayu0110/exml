@@ -5746,17 +5746,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         options: XmlParserOption::XmlParseXinclude as i32
             | XmlParserOption::XmlParseNoxincnode as i32,
     },
-    #[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
-    TestDesc {
-        desc: "XInclude xmlReader regression tests stripping include nodes",
-        func: stream_parse_test,
-        input: Some("./test/XInclude/docs/*"),
-        out: Some("./result/XInclude/"),
-        suffix: Some(".rdr"),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32
-            | XmlParserOption::XmlParseNoxincnode as i32,
-    },
     #[cfg(all(
         feature = "xpath",
         feature = "libxml_debug",
@@ -5959,6 +5948,21 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+#[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
+fn xinclude_xmlreader_regression_stripping_include_nodes_test() {
+    test_common(&TestDesc {
+        desc: "XInclude xmlReader regression tests stripping include nodes",
+        func: stream_parse_test,
+        input: Some("./test/XInclude/docs/*"),
+        out: Some("./result/XInclude/"),
+        suffix: Some(".rdr"),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseXinclude as i32
+            | XmlParserOption::XmlParseNoxincnode as i32,
+    });
 }
 
 #[test]

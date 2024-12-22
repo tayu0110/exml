@@ -69,10 +69,8 @@ fn check_time() -> i32 {
     1
 }
 
-/*
- * Huge documents are built using fixed start and end chunks
- * and filling between the two an unconventional amount of char data
- */
+// Huge documents are built using fixed start and end chunks
+// and filling between the two an unconventional amount of char data
 
 struct HugeTest<'a> {
     _description: &'a str,
@@ -136,28 +134,20 @@ thread_local! {
     static DOCUMENT_CONTEXT: RefCell<DocumentContext> = RefCell::new(DocumentContext::default());
 }
 
-/**
- * hugeMatch:
- * @URI: an URI to test
- *
- * Check for an huge: query
- *
- * Returns 1 if yes and 0 if another Input module should be used
- */
+/// Check for an huge: query
+///
+/// Returns 1 if yes and 0 if another Input module should be used
+#[doc(alias = "hugeMatch")]
 fn huge_match(uri: &str) -> i32 {
     uri.starts_with("huge:") as i32
 }
 
-/**
- * hugeOpen:
- * @URI: an URI to test
- *
- * Return a pointer to the huge: query handler, in this example simply
- * the current pointer...
- *
- * Returns an Input context or NULL in case or error
- */
-unsafe fn huge_open(uri: &str) -> *mut c_void {
+/// Return a pointer to the huge: query handler, in this example simply
+/// the current pointer...
+///
+/// Returns an Input context or NULL in case or error
+#[doc(alias = "hugeOpen")]
+fn huge_open(uri: &str) -> *mut c_void {
     if !uri.starts_with("huge:") {
         return null_mut();
     }
@@ -177,15 +167,11 @@ unsafe fn huge_open(uri: &str) -> *mut c_void {
     })
 }
 
-/**
- * hugeClose:
- * @context: the read context
- *
- * Close the huge: query handler
- *
- * Returns 0 or -1 in case of error
- */
-unsafe extern "C" fn huge_close(context: *mut c_void) -> i32 {
+/// Close the huge: query handler
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "hugeClose")]
+fn huge_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
@@ -208,17 +194,11 @@ fn fill_filling() {
     })
 }
 
-/**
- * hugeRead:
- * @context: the read context
- * @buffer: where to store data
- * @len: number of bytes to read
- *
- * Implement an huge: query read.
- *
- * Returns the number of bytes read or -1 in case of error
- */
-unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
+/// Implement an huge: query read.
+///
+/// Returns the number of bytes read or -1 in case of error
+#[doc(alias = "hugeRead")]
+unsafe fn huge_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
     }
@@ -283,27 +263,19 @@ thread_local! {
 
 const CRAZY: &CStr = c"<?xml version='1.0' encoding='UTF-8'?><?tst ?><!-- tst --><!DOCTYPE foo [<?tst ?><!-- tst --><!ELEMENT foo (#PCDATA)><!ELEMENT p (#PCDATA|emph)* >]><?tst ?><!-- tst --><foo bar='foo'><?tst ?><!-- tst -->foo<![CDATA[ ]]></foo><?tst ?><!-- tst -->";
 
-/**
- * crazyMatch:
- * @URI: an URI to test
- *
- * Check for a crazy: query
- *
- * Returns 1 if yes and 0 if another Input module should be used
- */
+/// Check for a crazy: query
+///
+/// Returns 1 if yes and 0 if another Input module should be used
+#[doc(alias = "crazyMatch")]
 fn crazy_match(uri: &str) -> i32 {
     uri.starts_with("crazy:") as i32
 }
 
-/**
- * crazyOpen:
- * @URI: an URI to test
- *
- * Return a pointer to the crazy: query handler, in this example simply
- * the current pointer...
- *
- * Returns an Input context or NULL in case or error
- */
+/// Return a pointer to the crazy: query handler, in this example simply
+/// the current pointer...
+///
+/// Returns an Input context or NULL in case or error
+#[doc(alias = "crazyOpen")]
 fn crazy_open(uri: &str) -> *mut c_void {
     if !uri.starts_with("crazy:") {
         return null_mut();
@@ -321,32 +293,22 @@ fn crazy_open(uri: &str) -> *mut c_void {
     })
 }
 
-/**
- * crazyClose:
- * @context: the read context
- *
- * Close the crazy: query handler
- *
- * Returns 0 or -1 in case of error
- */
-unsafe extern "C" fn crazy_close(context: *mut c_void) -> i32 {
+/// Close the crazy: query handler
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "crazyClose")]
+fn crazy_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
     0
 }
 
-/**
- * crazyRead:
- * @context: the read context
- * @buffer: where to store data
- * @len: number of bytes to read
- *
- * Implement an crazy: query read.
- *
- * Returns the number of bytes read or -1 in case of error
- */
-unsafe extern "C" fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
+/// Implement an crazy: query read.
+///
+/// Returns the number of bytes read or -1 in case of error
+#[doc(alias = "crazyRead")]
+unsafe fn crazy_read(context: *mut c_void, buffer: *mut i8, mut len: i32) -> i32 {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
     }
@@ -430,10 +392,8 @@ unsafe fn test_external_entity_loader(
     ret
 }
 
-/*
- * Trapping the error messages at the generic level to grab the equivalent of
- * stderr messages on CLI tools.
- */
+// Trapping the error messages at the generic level to grab the equivalent of
+// stderr messages on CLI tools.
 thread_local! {
     static TEST_ERRORS: RefCell<[u8; 32769]> = const { RefCell::new([0; 32769]) };
     static TEST_ERRORS_SIZE: Cell<usize> = const { Cell::new(0) };
@@ -491,9 +451,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
             name = node.as_ref().name;
         }
 
-        /*
-         * Maintain the compatibility with the legacy error handling
-         */
+        // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
             input = (*ctxt).input;
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
@@ -590,7 +548,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 }
 
-unsafe extern "C" fn initialize_libxml2() {
+unsafe fn initialize_libxml2() {
     set_get_warnings_default_value(0);
     set_pedantic_parser_default_value(0);
 
@@ -619,9 +577,7 @@ unsafe extern "C" fn initialize_libxml2() {
     impl Drop for HugeTestIO {
         fn drop(&mut self) {
             if !self.0.is_null() {
-                unsafe {
-                    huge_close(self.0);
-                }
+                huge_close(self.0);
             }
         }
     }
@@ -630,7 +586,7 @@ unsafe extern "C" fn initialize_libxml2() {
             huge_match(filename) != 0
         }
         fn open(&mut self, filename: &str) -> std::io::Result<Box<dyn Read>> {
-            let ptr = unsafe { huge_open(filename) };
+            let ptr = huge_open(filename);
             if ptr.is_null() {
                 Err(io::Error::other("Failed to execute huge_open"))
             } else {
@@ -656,9 +612,7 @@ unsafe extern "C" fn initialize_libxml2() {
     impl Drop for CrazyTestIO {
         fn drop(&mut self) {
             if !self.0.is_null() {
-                unsafe {
-                    crazy_close(self.0);
-                }
+                crazy_close(self.0);
             }
         }
     }
@@ -1228,7 +1182,7 @@ static TEST_EXCEPTIONS: &[TestException] = &[
     },
 ];
 
-unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
+unsafe fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
     let mut res: i32;
     let mut err: i32 = 0;
     let mut limit: usize;
@@ -1237,9 +1191,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
     for (i, descr) in LIMIT_DESCRIPTIONS.iter().enumerate() {
         limit = descr.limit;
         fail = descr.fail;
-        /*
-         * Handle exceptions if any
-         */
+        // Handle exceptions if any
         for exception in TEST_EXCEPTIONS {
             if exception.test == test && exception.limit == i as _ {
                 if exception.fail != -1 {
@@ -1261,7 +1213,7 @@ unsafe extern "C" fn launch_tests(tst: &TestDesc, test: u32) -> i32 {
     err
 }
 
-unsafe extern "C" fn runtest(i: u32) -> i32 {
+unsafe fn runtest(i: u32) -> i32 {
     let mut ret: i32 = 0;
 
     let old_errors: i32 = NB_ERRORS.get();
@@ -1330,11 +1282,9 @@ unsafe fn launch_crazy(test: u32, fail: i32) -> i32 {
 }
 
 unsafe extern "C" fn get_crazy_fail(test: i32) -> i32 {
-    /*
-     * adding 1000000 of character 'a' leads to parser failure mostly
-     * everywhere except in those special spots. Need to be updated
-     * each time crazy is updated
-     */
+    // adding 1000000 of character 'a' leads to parser failure mostly
+    // everywhere except in those special spots. Need to be updated
+    // each time crazy is updated
     1 - (test == 44 || /* PI in Misc */
         (50..=55).contains(&test) || /* Comment in Misc */
         test == 79 || /* PI in DTD */
