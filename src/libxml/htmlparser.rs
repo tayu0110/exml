@@ -9085,7 +9085,10 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).record_info = 0;
     (*ctxt).validate = 0;
     (*ctxt).check_index = 0;
-    (*ctxt).catalogs = null_mut();
+    #[cfg(feature = "catalog")]
+    {
+        (*ctxt).catalogs = None;
+    }
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
     0
 }
@@ -11261,7 +11264,10 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
     (*ctxt).charset = XmlCharEncoding::None;
-    (*ctxt).catalogs = null_mut();
+    #[cfg(feature = "catalog")]
+    {
+        (*ctxt).catalogs = None;
+    }
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
 
     if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {

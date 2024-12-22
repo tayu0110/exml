@@ -563,11 +563,10 @@ unsafe fn xml_resolve_resource_from_catalog(
 
     if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
         // Do a local lookup
-        if !ctxt.is_null()
-            && !(*ctxt).catalogs.is_null()
-            && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
-        {
-            resource = (*(*ctxt).catalogs).local_resolve(id, url);
+        if !ctxt.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
+            if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
+                resource = catalogs.local_resolve(id, url);
+            }
         }
         // Try a global lookup
         if resource.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
@@ -588,15 +587,14 @@ unsafe fn xml_resolve_resource_from_catalog(
         {
             let mut tmp: *mut XmlChar = null_mut();
 
-            if !ctxt.is_null()
-                && !(*ctxt).catalogs.is_null()
-                && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document)
-            {
-                tmp = (*(*ctxt).catalogs).local_resolve_uri(
-                    CStr::from_ptr(resource as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
+            if !ctxt.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
+                if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
+                    tmp = catalogs.local_resolve_uri(
+                        CStr::from_ptr(resource as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
+                }
             }
             if tmp.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
                 tmp = xml_catalog_resolve_uri(

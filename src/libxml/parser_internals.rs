@@ -48,9 +48,7 @@ use crate::{
     globals::{get_parser_debug_entities, GenericErrorContext},
     io::{xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
-        catalog::{
-            xml_catalog_add_local, xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI,
-        },
+        catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI},
         chvalid::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
             xml_is_extender, xml_is_ideographic,
@@ -2379,6 +2377,8 @@ pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *
 #[doc(alias = "xmlParseCatalogPI")]
 #[cfg(feature = "catalog")]
 unsafe fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *const XmlChar) {
+    use crate::libxml::catalog::XmlCatalogEntry;
+
     let mut url: *mut XmlChar = null_mut();
     let mut tmp: *const XmlChar;
     let base: *const XmlChar;
@@ -2424,10 +2424,12 @@ unsafe fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *const XmlChar) 
             break 'error;
         }
         if !url.is_null() {
-            (*ctxt).catalogs = xml_catalog_add_local(
-                (*ctxt).catalogs,
-                CStr::from_ptr(url as *const i8).to_string_lossy().as_ref(),
-            );
+            let u = CStr::from_ptr(url as *const i8).to_string_lossy();
+            if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
+                catalogs.add_local(u.as_ref());
+            } else {
+                (*ctxt).catalogs = Some(XmlCatalogEntry::new(u.as_ref()));
+            }
             xml_free(url as _);
         }
         return;

@@ -90,7 +90,7 @@ use crate::{
         xml_parser_get_directory, XmlParserInputBuffer,
     },
     libxml::{
-        catalog::{xml_catalog_cleanup, xml_catalog_free_local},
+        catalog::xml_catalog_cleanup,
         dict::{
             __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_create, xml_dict_free,
             xml_dict_lookup, xml_dict_reference, xml_dict_set_limit, XmlDictPtr,
@@ -144,7 +144,7 @@ use crate::{
 };
 
 use super::{
-    catalog::XmlCatalogEntryPtr,
+    catalog::XmlCatalogEntry,
     chvalid::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
@@ -574,7 +574,7 @@ pub struct XmlParserCtxt {
     pub(crate) loadsubset: i32,  /* should the external subset be loaded */
     pub(crate) linenumbers: i32, /* set line number in element content */
     #[cfg(feature = "catalog")]
-    pub(crate) catalogs: XmlCatalogEntryPtr, /* document's own catalog */
+    pub(crate) catalogs: Option<XmlCatalogEntry>, /* document's own catalog */
     pub(crate) recovery: i32,    /* run in recovery mode */
     pub(crate) progressive: i32, /* is this a progressive parsing */
     pub(crate) dict: XmlDictPtr, /* dictionary for the parser */
@@ -1662,7 +1662,7 @@ impl Default for XmlParserCtxt {
             loadsubset: 0,
             linenumbers: 0,
             #[cfg(feature = "catalog")]
-            catalogs: null_mut(),
+            catalogs: None,
             recovery: 0,
             progressive: 0,
             dict: null_mut(),
@@ -4893,7 +4893,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
     (*ctxt).charset = XmlCharEncoding::UTF8;
-    (*ctxt).catalogs = null_mut();
+    (*ctxt).catalogs = None;
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
     (*ctxt).input_id = 1;
@@ -5033,9 +5033,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
 
     #[cfg(feature = "catalog")]
     {
-        if !(*ctxt).catalogs.is_null() {
-            xml_catalog_free_local((*ctxt).catalogs);
-        }
+        (*ctxt).catalogs = None;
     }
     xml_free(ctxt as _);
 }
@@ -10633,7 +10631,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
     (*ctxt).charset = XmlCharEncoding::UTF8;
-    (*ctxt).catalogs = null_mut();
+    (*ctxt).catalogs = None;
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
@@ -10644,8 +10642,8 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
 
     #[cfg(feature = "catalog")]
-    if !(*ctxt).catalogs.is_null() {
-        xml_catalog_free_local((*ctxt).catalogs);
+    {
+        (*ctxt).catalogs = None;
     }
     (*ctxt).nb_errors = 0;
     (*ctxt).nb_warnings = 0;
