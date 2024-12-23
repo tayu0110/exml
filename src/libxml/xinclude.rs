@@ -626,11 +626,8 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Xm
     (*pctxt).input_push(input_stream);
 
     if (*pctxt).directory.is_none() {
-        let url = CString::new(url).unwrap();
-        let dir = xml_parser_get_directory(url.as_ptr());
-        if !dir.is_null() {
-            (*pctxt).directory = Some(CStr::from_ptr(dir).to_string_lossy().into_owned());
-            xml_free(dir as _);
+        if let Some(dir) = xml_parser_get_directory(url) {
+            (*pctxt).directory = Some(dir.to_string_lossy().into_owned());
         }
     }
 

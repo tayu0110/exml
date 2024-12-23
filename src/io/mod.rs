@@ -26,20 +26,20 @@ mod output;
 
 use std::{
     borrow::Cow,
+    env::current_dir,
     ffi::{c_char, c_int, c_uint, c_void, CString},
     fs::{metadata, File},
     io::{self, stdin, ErrorKind, Read},
-    path::Path,
+    path::{Path, PathBuf},
     ptr::null_mut,
-    sync::atomic::Ordering,
 };
 
 use libc::{
-    __errno_location, getcwd, strlen, strncpy, EACCES, EADDRINUSE, EAFNOSUPPORT, EAGAIN, EALREADY,
-    EBADF, EBADMSG, EBUSY, ECANCELED, ECHILD, ECONNREFUSED, EDEADLK, EDOM, EEXIST, EFAULT, EFBIG,
-    EINPROGRESS, EINTR, EINVAL, EIO, EISCONN, EISDIR, EMFILE, EMLINK, EMSGSIZE, ENAMETOOLONG,
-    ENFILE, ENODEV, ENOENT, ENOEXEC, ENOLCK, ENOMEM, ENOSPC, ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK,
-    ENOTSUP, ENOTTY, ENXIO, EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH, ETIMEDOUT, EXDEV,
+    __errno_location, EACCES, EADDRINUSE, EAFNOSUPPORT, EAGAIN, EALREADY, EBADF, EBADMSG, EBUSY,
+    ECANCELED, ECHILD, ECONNREFUSED, EDEADLK, EDOM, EEXIST, EFAULT, EFBIG, EINPROGRESS, EINTR,
+    EINVAL, EIO, EISCONN, EISDIR, EMFILE, EMLINK, EMSGSIZE, ENAMETOOLONG, ENFILE, ENODEV, ENOENT,
+    ENOEXEC, ENOLCK, ENOMEM, ENOSPC, ENOSYS, ENOTDIR, ENOTEMPTY, ENOTSOCK, ENOTSUP, ENOTTY, ENXIO,
+    EPERM, EPIPE, ERANGE, EROFS, ESPIPE, ESRCH, ETIMEDOUT, EXDEV,
 };
 use url::Url;
 
@@ -53,7 +53,6 @@ use crate::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
         },
-        globals::xml_mem_strdup,
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
@@ -277,49 +276,14 @@ const MINLEN: usize = 4000;
 ///
 /// Returns a new allocated string containing the directory, or NULL.
 #[doc(alias = "xmlParserGetDirectory")]
-pub unsafe extern "C" fn xml_parser_get_directory(filename: *const c_char) -> *mut c_char {
-    let mut ret: *mut c_char = null_mut();
-    let mut dir: [c_char; 1024] = [0; 1024];
-    let mut cur: *mut c_char;
-
-    if !XML_INPUT_CALLBACK_INITIALIZED.load(Ordering::Relaxed) {
-        register_default_input_callbacks();
+pub fn xml_parser_get_directory(filename: impl AsRef<Path>) -> Option<PathBuf> {
+    fn _xml_parser_get_directory(filename: &Path) -> Option<PathBuf> {
+        filename
+            .parent()
+            .map(|p| p.to_path_buf())
+            .or_else(|| current_dir().ok())
     }
-
-    if filename.is_null() {
-        return null_mut();
-    }
-
-    #[cfg(target_os = "windows")]
-    fn is_xmlpgd_sep(ch: u8) -> bool {
-        ch == b'/' || ch == b'\\'
-    }
-    #[cfg(not(target_os = "windows"))]
-    fn is_xmlpgd_sep(ch: u8) -> bool {
-        ch == b'/'
-    }
-
-    strncpy(dir.as_mut_ptr() as _, filename as _, 1023);
-    dir[1023] = 0;
-    cur = dir.as_mut_ptr().add(strlen(dir.as_ptr() as _));
-    while cur > dir.as_ptr() as _ {
-        if is_xmlpgd_sep(*cur as u8) {
-            break;
-        }
-        cur = cur.sub(1);
-    }
-    if is_xmlpgd_sep(*cur as u8) {
-        if cur == dir.as_ptr() as _ {
-            dir[1] = 0;
-        } else {
-            *cur = 0;
-        }
-        ret = xml_mem_strdup(dir.as_ptr() as _) as _;
-    } else if !getcwd(dir.as_ptr() as _, 1024).is_null() {
-        dir[1023] = 0;
-        ret = xml_mem_strdup(dir.as_ptr() as _) as _;
-    }
-    ret
+    _xml_parser_get_directory(filename.as_ref())
 }
 
 /// Take a block of UTF-8 chars in and escape them.

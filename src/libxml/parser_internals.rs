@@ -373,8 +373,6 @@ pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> XmlParserCt
 /// Returns the new parser context or NULL
 #[doc(alias = "xmlCreateURLParserCtxt")]
 pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -> XmlParserCtxtPtr {
-    let mut directory: *mut c_char = null_mut();
-
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
         xml_err_memory(null_mut(), Some("cannot allocate parser context"));
@@ -393,19 +391,12 @@ pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -
     }
 
     (*ctxt).input_push(input_stream);
-    if (*ctxt).directory.is_none() && directory.is_null() {
+    if (*ctxt).directory.is_none() {
         if let Some(filename) = filename {
-            let filename = CString::new(filename).unwrap();
-            directory = xml_parser_get_directory(filename.as_ptr());
+            if let Some(directory) = xml_parser_get_directory(filename) {
+                (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+            }
         }
-    }
-    if (*ctxt).directory.is_none() && !directory.is_null() {
-        (*ctxt).directory = Some(
-            CStr::from_ptr(directory as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-        xml_free(directory as _);
     }
 
     ctxt
@@ -461,7 +452,6 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
     pctx: XmlParserCtxtPtr,
 ) -> XmlParserCtxtPtr {
     let input_stream: XmlParserInputPtr;
-    let mut directory: *mut c_char = null_mut();
 
     let ctxt: XmlParserCtxtPtr = xml_new_sax_parser_ctxt(sax, user_data);
     if ctxt.is_null() {
@@ -488,15 +478,12 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
 
         (*ctxt).input_push(input_stream);
 
-        if (*ctxt).directory.is_none() && directory.is_null() {
+        if (*ctxt).directory.is_none() {
             if let Some(url) = url {
-                let url = CString::new(url).unwrap();
-                directory = xml_parser_get_directory(url.as_ptr());
+                if let Some(directory) = xml_parser_get_directory(url) {
+                    (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                }
             }
-        }
-        if (*ctxt).directory.is_none() && !directory.is_null() {
-            (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
-            xml_free(directory as _);
         }
     } else {
         input_stream = xml_load_external_entity(url, id, ctxt);
@@ -507,15 +494,12 @@ pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
 
         (*ctxt).input_push(input_stream);
 
-        if (*ctxt).directory.is_none() && directory.is_null() {
+        if (*ctxt).directory.is_none() {
             if let Some(url) = url {
-                let url = CString::new(url).unwrap();
-                directory = xml_parser_get_directory(url.as_ptr());
+                if let Some(directory) = xml_parser_get_directory(url) {
+                    (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+                }
             }
-        }
-        if (*ctxt).directory.is_none() && !directory.is_null() {
-            (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
-            xml_free(directory as _);
         }
     }
     ctxt
@@ -1100,7 +1084,8 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     } else {
         xml_strdup(filename as *mut XmlChar)
     };
-    let directory: *mut c_char = xml_parser_get_directory(uri as *const c_char);
+    let directory =
+        xml_parser_get_directory(CStr::from_ptr(uri as *const i8).to_string_lossy().as_ref());
     {
         let canonic = xml_canonic_path(uri as *const XmlChar);
         if !canonic.is_null() {
@@ -1115,25 +1100,18 @@ pub unsafe extern "C" fn xml_new_input_from_file(
     if !uri.is_null() {
         xml_free(uri as _);
     }
-    if !directory.is_null() {
-        (*input_stream).directory = Some(
-            CStr::from_ptr(directory as *const i8)
-                .to_string_lossy()
-                .into(),
-        );
+    if let Some(directory) = directory.as_deref() {
+        (*input_stream).directory = Some(directory.to_string_lossy().into_owned());
     } else {
         (*input_stream).directory = None;
     }
     (*input_stream).reset_base();
 
-    if (*ctxt).directory.is_none() && !directory.is_null() {
-        (*ctxt).directory = Some(
-            CStr::from_ptr(directory as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
+    if (*ctxt).directory.is_none() {
+        if let Some(directory) = directory {
+            (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+        }
     }
-    xml_free(directory as _);
     input_stream
 }
 

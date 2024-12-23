@@ -10202,16 +10202,10 @@ pub unsafe fn html_create_push_parser_ctxt(
     }
     if filename.is_null() {
         (*ctxt).directory = None;
-    } else {
-        let dir = xml_parser_get_directory(filename);
-        if !dir.is_null() {
-            (*ctxt).directory = Some(
-                CStr::from_ptr(dir as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(dir as _);
-        }
+    } else if let Some(dir) =
+        xml_parser_get_directory(CStr::from_ptr(filename).to_string_lossy().as_ref())
+    {
+        (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
     let input_stream: HtmlParserInputPtr = html_new_input_stream(ctxt);

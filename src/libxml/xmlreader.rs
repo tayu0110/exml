@@ -3307,12 +3307,10 @@ pub unsafe fn xml_new_text_reader(
 /// Returns the new xmlTextReaderPtr or NULL in case of error
 #[doc(alias = "xmlNewTextReaderFilename")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
+pub unsafe fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
     use std::ffi::CStr;
 
     use crate::{encoding::XmlCharEncoding, io::xml_parser_get_directory};
-
-    let mut directory: *mut c_char = null_mut();
 
     if uri.is_null() {
         return null_mut();
@@ -3330,13 +3328,11 @@ pub unsafe extern "C" fn xml_new_text_reader_filename(uri: *const c_char) -> Xml
     }
     (*ret).allocs |= XML_TEXTREADER_INPUT;
     if (*(*ret).ctxt).directory.is_none() {
-        directory = xml_parser_get_directory(uri);
-    }
-    if (*(*ret).ctxt).directory.is_none() && !directory.is_null() {
-        (*(*ret).ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
-    }
-    if !directory.is_null() {
-        xml_free(directory as _);
+        if let Some(directory) =
+            xml_parser_get_directory(CStr::from_ptr(uri).to_string_lossy().as_ref())
+        {
+            (*(*ret).ctxt).directory = Some(directory.to_string_lossy().into_owned());
+        }
     }
     ret
 }

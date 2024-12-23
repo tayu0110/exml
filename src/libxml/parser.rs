@@ -3623,8 +3623,6 @@ pub unsafe fn xml_sax_parse_file_with_data(
     recovery: i32,
     data: *mut c_void,
 ) -> XmlDocPtr {
-    use std::ffi::CString;
-
     use crate::io::xml_parser_get_directory;
 
     let ret: XmlDocPtr;
@@ -3648,15 +3646,8 @@ pub unsafe fn xml_sax_parse_file_with_data(
 
     if (*ctxt).directory.is_none() {
         if let Some(filename) = filename {
-            let filename = CString::new(filename).unwrap();
-            let dir = xml_parser_get_directory(filename.as_ptr());
-            if !dir.is_null() {
-                (*ctxt).directory = Some(
-                    CStr::from_ptr(dir as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-                xml_free(dir as _);
+            if let Some(dir) = xml_parser_get_directory(filename) {
+                (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
             }
         }
     }
@@ -5422,16 +5413,10 @@ pub unsafe fn xml_create_push_parser_ctxt(
     (*ctxt).dict_names = 1;
     if filename.is_null() {
         (*ctxt).directory = None;
-    } else {
-        let dir = xml_parser_get_directory(filename);
-        if !dir.is_null() {
-            (*ctxt).directory = Some(
-                CStr::from_ptr(dir as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(dir as _);
-        }
+    } else if let Some(dir) =
+        xml_parser_get_directory(CStr::from_ptr(filename).to_string_lossy().as_ref())
+    {
+        (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
@@ -10687,16 +10672,10 @@ pub unsafe extern "C" fn xml_ctxt_reset_push(
 
     if filename.is_null() {
         (*ctxt).directory = None;
-    } else {
-        let dir = xml_parser_get_directory(filename);
-        if !dir.is_null() {
-            (*ctxt).directory = Some(
-                CStr::from_ptr(dir as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(dir as _);
-        }
+    } else if let Some(dir) =
+        xml_parser_get_directory(CStr::from_ptr(filename).to_string_lossy().as_ref())
+    {
+        (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);

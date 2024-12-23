@@ -38,7 +38,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
     env::split_paths,
-    ffi::{c_char, CStr, CString, OsStr, OsString},
+    ffi::{CStr, OsStr, OsString},
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -2937,11 +2937,6 @@ pub unsafe fn xml_load_catalog(filename: impl AsRef<Path>) -> i32 {
     ret
 }
 
-#[cfg(target_os = "windows")]
-const PATH_SEPARATOR: u8 = b';';
-#[cfg(not(target_os = "windows"))]
-const PATH_SEPARATOR: u8 = b':';
-
 /// Load the catalogs and makes their definitions effective for the default
 /// external entity loader.
 ///
@@ -3152,7 +3147,6 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 #[doc(alias = "xmlParseCatalogFile")]
 pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
     let ret: XmlDocPtr;
-    let mut directory: *mut c_char = null_mut();
 
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
@@ -3184,12 +3178,9 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
 
     (*ctxt).input_push(input_stream);
     if (*ctxt).directory.is_none() {
-        let filename = CString::new(filename).unwrap();
-        directory = xml_parser_get_directory(filename.as_ptr());
-    }
-    if (*ctxt).directory.is_none() && !directory.is_null() {
-        (*ctxt).directory = Some(CStr::from_ptr(directory).to_string_lossy().into_owned());
-        xml_free(directory as _);
+        if let Some(directory) = xml_parser_get_directory(filename) {
+            (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+        }
     }
     (*ctxt).valid = 0;
     (*ctxt).validate = 0;
