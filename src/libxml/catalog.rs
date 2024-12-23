@@ -46,7 +46,7 @@ use std::{
     rc::Rc,
     str::from_utf8,
     sync::{
-        atomic::{AtomicBool, AtomicI32, AtomicPtr, Ordering},
+        atomic::{AtomicBool, AtomicI32, Ordering},
         Arc, RwLock, Weak,
     },
 };
@@ -66,10 +66,7 @@ use crate::{
             XmlParserInputPtr,
         },
         parser_internals::{xml_new_input_stream, XML_MAX_NAMELEN},
-        threads::{
-            xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
-            XmlRMutex,
-        },
+        threads::xml_get_thread_id,
         xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
@@ -185,11 +182,6 @@ macro_rules! xml_catalog_err {
 // Hash table containing all the trees of XML catalogs parsed by the application.
 static XML_CATALOG_XMLFILES: RwLock<BTreeMap<String, Arc<RwLock<CatalogEntryListNode>>>> =
     RwLock::new(BTreeMap::new());
-
-// A mutex for modifying the shared global catalog(s) xmlDefaultCatalog tree.
-// It also protects xmlCatalogXMLFiles.
-// The core of this readers/writer scheme is in `xmlFetchXMLCatalogFile()`.
-static XML_CATALOG_MUTEX: AtomicPtr<XmlRMutex> = AtomicPtr::new(null_mut());
 
 // Those are preferences
 static XML_DEBUG_CATALOGS: AtomicI32 = AtomicI32::new(0); /* used for debugging */
@@ -826,15 +818,12 @@ impl CatalogEntryListNode {
         };
 
         // lock the whole catalog for modification
-        let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-        xml_rmutex_lock(mutex);
+        let mut catalog_files = XML_CATALOG_XMLFILES.write().unwrap();
         if self.children.is_some() {
             // Okay someone else did it in the meantime
-            xml_rmutex_unlock(mutex);
             return 0;
         }
 
-        let mut catalog_files = XML_CATALOG_XMLFILES.write().unwrap();
         if let Some(doc) = catalog_files.get(url.to_string_lossy().as_ref()) {
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                 generic_error!("Found {} in file hash\n", url.display());
@@ -846,7 +835,6 @@ impl CatalogEntryListNode {
                 self.children = Some(doc.clone());
             }
             self.dealloc = 0;
-            xml_rmutex_unlock(mutex);
             return 0;
         }
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
@@ -858,7 +846,6 @@ impl CatalogEntryListNode {
         let Some(doc) = xml_parse_xml_catalog_file(self.prefer, url.to_string_lossy().as_ref())
         else {
             self.typ = XmlCatalogEntryType::XmlCataBrokenCatalog;
-            xml_rmutex_unlock(mutex);
             return -1;
         };
 
@@ -874,7 +861,6 @@ impl CatalogEntryListNode {
             generic_error!("{} added to file hash\n", url.display());
         }
         catalog_files.insert(url.to_string_lossy().into_owned(), doc);
-        xml_rmutex_unlock(mutex);
         0
     }
 
@@ -2846,7 +2832,6 @@ unsafe fn xml_initialize_catalog_data() {
     if std::env::var_os("XML_DEBUG_CATALOG").is_some() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
     }
-    XML_CATALOG_MUTEX.store(xml_new_rmutex(), Ordering::Release);
 
     XML_CATALOG_INITIALIZED.store(true, Ordering::Release);
 }
@@ -2862,14 +2847,12 @@ pub unsafe fn xml_initialize_catalog() {
     }
 
     xml_initialize_catalog_data();
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
+    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
 
     if std::env::var_os("XML_DEBUG_CATALOG").is_some() {
         XML_DEBUG_CATALOGS.store(1, Ordering::Release);
     }
 
-    let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
     if default_catalog.is_none() {
         let catalogs = std::env::var_os("XML_CATALOG_FILES")
             .unwrap_or_else(|| OsString::from(XML_XML_DEFAULT_CATALOG));
@@ -2902,8 +2885,6 @@ pub unsafe fn xml_initialize_catalog() {
         }
         *default_catalog = Some(catal);
     }
-
-    xml_rmutex_unlock(mutex);
 }
 
 /// Load the catalog and makes its definitions effective for the default
@@ -2918,9 +2899,6 @@ pub unsafe fn xml_load_catalog(filename: impl AsRef<Path>) -> i32 {
         xml_initialize_catalog_data();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
-
     let filename = filename.as_ref();
     let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
     let Some(default_catalog) = default_catalog.as_mut() else {
@@ -2928,13 +2906,10 @@ pub unsafe fn xml_load_catalog(filename: impl AsRef<Path>) -> i32 {
             return -1;
         };
         *default_catalog = Some(catal);
-        xml_rmutex_unlock(mutex);
         return 0;
     };
 
-    let ret = default_catalog.expand_catalog(filename);
-    xml_rmutex_unlock(mutex);
-    ret
+    default_catalog.expand_catalog(filename)
 }
 
 /// Load the catalogs and makes their definitions effective for the default
@@ -2956,18 +2931,14 @@ pub unsafe fn xml_catalog_cleanup() {
         return;
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
+    let mut files = XML_CATALOG_XMLFILES.write().unwrap();
     if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
         generic_error!("Catalogs cleanup\n");
     }
-    let mut files = XML_CATALOG_XMLFILES.write().unwrap();
     files.clear();
     XML_DEFAULT_CATALOG.write().unwrap().take();
     XML_DEBUG_CATALOGS.store(0, Ordering::Release);
     XML_CATALOG_INITIALIZED.store(false, Ordering::Release);
-    xml_rmutex_unlock(mutex);
-    xml_free_rmutex(mutex);
 }
 
 /// Dump all the global catalog content to the given file.
@@ -2977,13 +2948,10 @@ pub unsafe fn xml_catalog_dump<'a>(out: impl Write + 'a) {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
     if let Some(catalog) = lock.as_mut() {
         catalog.dump(out);
     }
-    xml_rmutex_unlock(mutex);
 }
 
 /// Do a complete resolution lookup of an External Identifier
@@ -2996,16 +2964,12 @@ pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) ->
         xml_initialize_catalog();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
-    let res = if let Some(catalog) = lock.as_mut() {
+    if let Some(catalog) = lock.as_mut() {
         catalog.resolve(pub_id, sys_id)
     } else {
         None
-    };
-    xml_rmutex_unlock(mutex);
-    res
+    }
 }
 
 /// Try to lookup the catalog resource for a system ID
@@ -3018,16 +2982,12 @@ pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> Option<String> {
         xml_initialize_catalog();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
-    let res = if let Some(catalog) = lock.as_mut() {
+    if let Some(catalog) = lock.as_mut() {
         catalog.resolve_system(sys_id)
     } else {
         None
-    };
-    xml_rmutex_unlock(mutex);
-    res
+    }
 }
 
 /// Try to lookup the catalog reference associated to a public ID
@@ -3040,16 +3000,12 @@ pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> Option<String> {
         xml_initialize_catalog();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
-    let res = if let Some(catalog) = lock.as_mut() {
+    if let Some(catalog) = lock.as_mut() {
         catalog.resolve_public(pub_id)
     } else {
         None
-    };
-    xml_rmutex_unlock(mutex);
-    res
+    }
 }
 
 /// Do a complete resolution lookup of an URI
@@ -3062,16 +3018,12 @@ pub unsafe fn xml_catalog_resolve_uri(uri: &str) -> Option<String> {
         xml_initialize_catalog();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut lock = XML_DEFAULT_CATALOG.write().unwrap();
-    let res = if let Some(catalog) = lock.as_mut() {
+    if let Some(catalog) = lock.as_mut() {
         catalog.resolve_uri(uri)
     } else {
         None
-    };
-    xml_rmutex_unlock(mutex);
-    res
+    }
 }
 
 /// Add an entry in the catalog, it may overwrite existing but
@@ -3086,8 +3038,6 @@ pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Op
         xml_initialize_catalog_data();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     // Specific case where one want to override the default catalog
     // put in place by xmlInitializeCatalog();
     let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
@@ -3107,16 +3057,13 @@ pub unsafe fn xml_catalog_add(typ: Option<&str>, orig: Option<&str>, replace: Op
                 None,
             ));
             *default_catalog = Some(new);
-            xml_rmutex_unlock(mutex);
             return 0;
         } else {
             return -1;
         }
     };
 
-    let res: i32 = default_catalog.add(typ, orig, replace);
-    xml_rmutex_unlock(mutex);
-    res
+    default_catalog.add(typ, orig, replace)
 }
 
 /// Remove an entry from the catalog
@@ -3128,16 +3075,12 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
         xml_initialize_catalog();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
-    let res = if let Some(default_catalog) = default_catalog.as_mut() {
+    if let Some(default_catalog) = default_catalog.as_mut() {
         default_catalog.remove(value)
     } else {
         -1
-    };
-    xml_rmutex_unlock(mutex);
-    res
+    }
 }
 
 /// Parse an XML file and build a tree.
@@ -3211,16 +3154,12 @@ pub unsafe fn xml_catalog_convert() -> i32 {
         xml_initialize_catalog();
     }
 
-    let mutex = XML_CATALOG_MUTEX.load(Ordering::Acquire);
-    xml_rmutex_lock(mutex);
     let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
-    let res = if let Some(default_catalog) = default_catalog.as_mut() {
+    if let Some(default_catalog) = default_catalog.as_mut() {
         default_catalog.convert_sgml_catalog()
     } else {
         -1
-    };
-    xml_rmutex_unlock(mutex);
-    res
+    }
 }
 
 /// Used to set the debug level for catalog operation, 0 disable
