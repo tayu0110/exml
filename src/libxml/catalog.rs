@@ -37,6 +37,7 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeMap, HashMap},
+    env::split_paths,
     ffi::{c_char, CStr, CString, OsStr, OsString},
     fs::File,
     io::Read,
@@ -69,7 +70,7 @@ use crate::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
         },
-        xmlstring::{xml_str_equal, xml_strndup, XmlChar},
+        xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -2947,47 +2948,9 @@ const PATH_SEPARATOR: u8 = b':';
 /// This function is not thread safe, catalog initialization should
 /// preferably be done once at startup
 #[doc(alias = "xmlLoadCatalogs")]
-pub unsafe fn xml_load_catalogs(pathss: *const c_char) {
-    let mut cur: *const c_char;
-    let mut paths: *const c_char;
-    let mut path: *mut XmlChar;
-    #[cfg(target_os = "windows")]
-    let i: i32;
-    #[cfg(target_os = "windows")]
-    let iLen: i32;
-
-    if pathss.is_null() {
-        return;
-    }
-
-    cur = pathss;
-    while *cur != 0 {
-        while xml_is_blank_char(*cur as u32) {
-            cur = cur.add(1);
-        }
-        if *cur != 0 {
-            paths = cur;
-            while *cur != 0 && *cur != PATH_SEPARATOR as i8 && !xml_is_blank_char(*cur as u32) {
-                cur = cur.add(1);
-            }
-            path = xml_strndup(paths as _, cur.offset_from(paths) as _);
-            if !path.is_null() {
-                #[cfg(target_os = "windows")]
-                {
-                    iLen = strlen(path);
-                    for i in 0..iLen {
-                        if *path.add(i as usize) == b'\\' {
-                            *path.add(i as usize) = b'/';
-                        }
-                    }
-                }
-                xml_load_catalog(CStr::from_ptr(path as *const i8).to_string_lossy().as_ref());
-                xml_free(path as _);
-            }
-        }
-        while *cur == PATH_SEPARATOR as i8 {
-            cur = cur.add(1);
-        }
+pub unsafe fn xml_load_catalogs(pathss: &str) {
+    for path in split_paths(pathss) {
+        xml_load_catalog(path);
     }
 }
 
@@ -3587,22 +3550,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlInitializeCatalog()"
             );
-        }
-        drop(lock);
-    }
-
-    #[test]
-    fn test_xml_load_catalogs() {
-        let lock = TEST_CATALOG_LOCK.lock().unwrap();
-        #[cfg(feature = "catalog")]
-        unsafe {
-            for n_pathss in 0..GEN_NB_CONST_CHAR_PTR {
-                let pathss = gen_const_char_ptr(n_pathss, 0);
-
-                xml_load_catalogs(pathss);
-                des_const_char_ptr(n_pathss, pathss, 0);
-                reset_last_error();
-            }
         }
         drop(lock);
     }

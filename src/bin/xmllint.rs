@@ -3903,8 +3903,7 @@ fn main() {
         #[cfg(feature = "catalog")]
         if NOCATALOGS == 0 && CATALOGS != 0 {
             if let Some(catal) = option_env!("SGML_CATALOG_FILES") {
-                let catal = CString::new(catal).expect("Failed to construct Catalog path");
-                xml_load_catalogs(catal.as_ptr());
+                xml_load_catalogs(catal);
             } else {
                 eprintln!("Variable $SGML_CATALOG_FILES not set");
             }
