@@ -116,12 +116,6 @@ pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 pub type XmlC14NIsVisibleCallback<T> =
     unsafe fn(user_data: &T, node: Option<&dyn NodeCommon>, parent: Option<&dyn NodeCommon>) -> i32;
 
-macro_rules! xml_c14n_is_exclusive {
-    ( $ctx:expr ) => {
-        matches!((*$ctx).mode, XmlC14NMode::XmlC14NExclusive1_0)
-    };
-}
-
 #[repr(C)]
 pub struct XmlC14NCtx<'a, T> {
     /* input parameters */
@@ -157,6 +151,10 @@ impl<T> XmlC14NCtx<'_, T> {
         } else {
             true
         }
+    }
+
+    fn is_exclusive(&self) -> bool {
+        matches!(self.mode, XmlC14NMode::XmlC14NExclusive1_0)
     }
 
     /// Checks that current element node has no relative namespaces defined
@@ -648,7 +646,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
         }
 
-        if !xml_c14n_is_exclusive!(self) {
+        if !self.is_exclusive() {
             ret = self.process_namespaces_axis(cur, visible);
         } else {
             ret = self.exc_c14n_process_namespaces_axis(cur, visible);
@@ -943,7 +941,7 @@ impl<T> XmlC14NCtx<'_, T> {
             return -1;
         }
 
-        if !xml_c14n_is_exclusive!(self) {
+        if !self.is_exclusive() {
             xml_c14n_err_param("processing namespaces axis (exc c14n)");
             return -1;
         }
@@ -1678,7 +1676,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
 
     // Set "mode" flag and remember list of inclusive prefixes for exclusive c14n
     (*ctx).mode = mode;
-    if xml_c14n_is_exclusive!(ctx) {
+    if (*ctx).is_exclusive() {
         (*ctx).inclusive_ns_prefixes = inclusive_ns_prefixes;
     }
     ctx
