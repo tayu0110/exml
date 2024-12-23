@@ -21,6 +21,8 @@ use std::{
 };
 
 use const_format::concatcp;
+#[cfg(feature = "c14n")]
+use exml::libxml::c14n::XmlC14NMode;
 use exml::{
     error::{
         parser_print_file_context_internal, XmlError, XmlErrorDomain, XmlErrorLevel,
@@ -4660,7 +4662,7 @@ macro_rules! xxx_grow_buffer_reentrant {
 }
 
 #[cfg(feature = "c14n")]
-unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
+unsafe fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
     use exml::libxml::globals::xml_malloc;
     use libc::perror;
 
@@ -4711,7 +4713,7 @@ unsafe extern "C" fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
 unsafe fn c14n_run_test(
     xml_filename: &str,
     with_comments: i32,
-    mode: i32,
+    mode: XmlC14NMode,
     xpath_filename: Option<&str>,
     ns_filename: *const c_char,
     result_file: *const c_char,
@@ -4839,7 +4841,7 @@ unsafe fn c14n_run_test(
 unsafe fn c14n_common_test(
     filename: &str,
     with_comments: i32,
-    mode: i32,
+    mode: XmlC14NMode,
     subdir: *const c_char,
 ) -> i32 {
     use libc::strdup;
@@ -4935,7 +4937,7 @@ unsafe fn c14n_with_comment_test(
     c14n_common_test(
         filename,
         1,
-        XmlC14NMode::XmlC14N1_0 as i32,
+        XmlC14NMode::XmlC14N1_0,
         c"with-comments".as_ptr(),
     )
 }
@@ -4952,7 +4954,7 @@ unsafe fn c14n_without_comment_test(
     c14n_common_test(
         filename,
         0,
-        XmlC14NMode::XmlC14N1_0 as i32,
+        XmlC14NMode::XmlC14N1_0,
         c"without-comments".as_ptr(),
     )
 }
@@ -4969,7 +4971,7 @@ unsafe fn c14n_exc_without_comment_test(
     c14n_common_test(
         filename,
         0,
-        XmlC14NMode::XmlC14NExclusive1_0 as i32,
+        XmlC14NMode::XmlC14NExclusive1_0,
         c"exc-without-comments".as_ptr(),
     )
 }
@@ -4986,7 +4988,7 @@ unsafe fn c14n11_without_comment_test(
     c14n_common_test(
         filename,
         0,
-        XmlC14NMode::XmlC14N1_1 as i32,
+        XmlC14NMode::XmlC14N1_1,
         c"1-1-without-comments".as_ptr(),
     )
 }

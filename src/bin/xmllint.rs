@@ -2760,7 +2760,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let size = xml_c14n_doc_dump_memory(
                         doc,
                         None,
-                        XmlC14NMode::XmlC14N1_0 as i32,
+                        XmlC14NMode::XmlC14N1_0,
                         null_mut(),
                         1,
                         addr_of_mut!(result),
@@ -2783,7 +2783,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let size: c_int = xml_c14n_doc_dump_memory(
                         doc,
                         None,
-                        XmlC14NMode::XmlC14N1_1 as i32,
+                        XmlC14NMode::XmlC14N1_1,
                         null_mut(),
                         1,
                         addr_of_mut!(result),
@@ -2806,7 +2806,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     let size: c_int = xml_c14n_doc_dump_memory(
                         doc,
                         None,
-                        XmlC14NMode::XmlC14NExclusive1_0 as i32,
+                        XmlC14NMode::XmlC14NExclusive1_0,
                         null_mut(),
                         1,
                         addr_of_mut!(result),

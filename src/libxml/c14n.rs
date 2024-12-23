@@ -200,8 +200,8 @@ unsafe extern "C" fn xml_c14n_is_node_in_nodeset(
 pub unsafe fn xml_c14n_doc_save_to(
     doc: XmlDocPtr,
     nodes: Option<&mut XmlNodeSet>,
-    mode: i32,
-    /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
+    mode: XmlC14NMode,
+    inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
     buf: Rc<RefCell<XmlOutputBuffer>>,
 ) -> i32 {
@@ -299,8 +299,8 @@ unsafe fn xml_c14n_err_internal(extra: &str) {
 pub unsafe fn xml_c14n_doc_dump_memory(
     doc: XmlDocPtr,
     nodes: Option<&mut XmlNodeSet>,
-    mode: i32,
-    /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
+    mode: XmlC14NMode,
+    inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
     doc_txt_ptr: *mut *mut XmlChar,
 ) -> i32 {
@@ -361,8 +361,8 @@ pub unsafe fn xml_c14n_doc_dump_memory(
 pub unsafe fn xml_c14n_doc_save(
     doc: XmlDocPtr,
     nodes: Option<&mut XmlNodeSet>,
-    mode: i32,
-    /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
+    mode: XmlC14NMode,
+    inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
     filename: *const c_char,
     compression: i32,
@@ -2332,8 +2332,8 @@ pub unsafe fn xml_c14n_execute(
     doc: XmlDocPtr,
     is_visible_callback: XmlC14NIsVisibleCallback,
     user_data: *mut c_void,
-    mode: i32,
-    /* a xmlC14NMode */ inclusive_ns_prefixes: *mut *mut XmlChar,
+    mode: XmlC14NMode,
+    inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
     buf: Rc<RefCell<XmlOutputBuffer>>,
 ) -> i32 {
@@ -2343,18 +2343,6 @@ pub unsafe fn xml_c14n_execute(
         xml_c14n_err_param("executing c14n");
         return -1;
     }
-
-    // for backward compatibility, we have to have "mode" as "int"
-    // and here we check that user gives valid value
-    let c14n_mode = match XmlC14NMode::try_from(mode) {
-        Ok(mode @ XmlC14NMode::XmlC14N1_0)
-        | Ok(mode @ XmlC14NMode::XmlC14NExclusive1_0)
-        | Ok(mode @ XmlC14NMode::XmlC14N1_1) => mode,
-        _ => {
-            xml_c14n_err_param("invalid mode for executing c14n");
-            return -1;
-        }
-    };
 
     //  Validate the encoding output buffer encoding
     if buf.borrow().encoder.is_some() {
@@ -2371,7 +2359,7 @@ pub unsafe fn xml_c14n_execute(
         doc,
         Some(is_visible_callback),
         user_data,
-        c14n_mode,
+        mode,
         inclusive_ns_prefixes,
         with_comments,
         buf.clone(),
@@ -2412,154 +2400,4 @@ pub unsafe fn xml_c14n_execute(
     // Cleanup
     xml_c14n_free_ctx(ctx);
     ret
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_c14n_doc_dump_memory() {
-        #[cfg(all(feature = "c14n", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
-                    for n_mode in 0..GEN_NB_INT {
-                        for n_inclusive_ns_prefixes in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                            for n_with_comments in 0..GEN_NB_INT {
-                                for n_doc_txt_ptr in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                                    let mut nodes = gen_xml_node_set_ptr(n_nodes, 1);
-                                    let mode = gen_int(n_mode, 2);
-                                    let inclusive_ns_prefixes =
-                                        gen_xml_char_ptr_ptr(n_inclusive_ns_prefixes, 3);
-                                    let with_comments = gen_int(n_with_comments, 4);
-                                    let doc_txt_ptr = gen_xml_char_ptr_ptr(n_doc_txt_ptr, 5);
-
-                                    let ret_val = xml_c14n_doc_dump_memory(
-                                        doc,
-                                        nodes.as_deref_mut(),
-                                        mode,
-                                        inclusive_ns_prefixes,
-                                        with_comments,
-                                        doc_txt_ptr,
-                                    );
-                                    desret_int(ret_val);
-                                    des_xml_doc_ptr(n_doc, doc, 0);
-                                    des_xml_node_set_ptr(n_nodes, nodes, 1);
-                                    des_int(n_mode, mode, 2);
-                                    des_xml_char_ptr_ptr(
-                                        n_inclusive_ns_prefixes,
-                                        inclusive_ns_prefixes,
-                                        3,
-                                    );
-                                    des_int(n_with_comments, with_comments, 4);
-                                    des_xml_char_ptr_ptr(n_doc_txt_ptr, doc_txt_ptr, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlC14NDocDumpMemory",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        eprint!(" {}", n_doc);
-                                        eprint!(" {}", n_nodes);
-                                        eprint!(" {}", n_mode);
-                                        eprint!(" {}", n_inclusive_ns_prefixes);
-                                        eprint!(" {}", n_with_comments);
-                                        eprintln!(" {}", n_doc_txt_ptr);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlC14NDocDumpMemory()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_c14n_doc_save() {
-        #[cfg(all(feature = "c14n", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_nodes in 0..GEN_NB_XML_NODE_SET_PTR {
-                    for n_mode in 0..GEN_NB_INT {
-                        for n_inclusive_ns_prefixes in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                            for n_with_comments in 0..GEN_NB_INT {
-                                for n_filename in 0..GEN_NB_FILEOUTPUT {
-                                    for n_compression in 0..GEN_NB_INT {
-                                        let mem_base = xml_mem_blocks();
-                                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                                        let mut nodes = gen_xml_node_set_ptr(n_nodes, 1);
-                                        let mode = gen_int(n_mode, 2);
-                                        let inclusive_ns_prefixes =
-                                            gen_xml_char_ptr_ptr(n_inclusive_ns_prefixes, 3);
-                                        let with_comments = gen_int(n_with_comments, 4);
-                                        let filename = gen_fileoutput(n_filename, 5);
-                                        let compression = gen_int(n_compression, 6);
-
-                                        let ret_val = xml_c14n_doc_save(
-                                            doc,
-                                            nodes.as_deref_mut(),
-                                            mode,
-                                            inclusive_ns_prefixes,
-                                            with_comments,
-                                            filename,
-                                            compression,
-                                        );
-                                        desret_int(ret_val);
-                                        des_xml_doc_ptr(n_doc, doc, 0);
-                                        des_xml_node_set_ptr(n_nodes, nodes, 1);
-                                        des_int(n_mode, mode, 2);
-                                        des_xml_char_ptr_ptr(
-                                            n_inclusive_ns_prefixes,
-                                            inclusive_ns_prefixes,
-                                            3,
-                                        );
-                                        des_int(n_with_comments, with_comments, 4);
-                                        des_fileoutput(n_filename, filename, 5);
-                                        des_int(n_compression, compression, 6);
-                                        reset_last_error();
-                                        if mem_base != xml_mem_blocks() {
-                                            leaks += 1;
-                                            eprint!(
-                                                "Leak of {} blocks found in xmlC14NDocSave",
-                                                xml_mem_blocks() - mem_base
-                                            );
-                                            eprint!(" {}", n_doc);
-                                            eprint!(" {}", n_nodes);
-                                            eprint!(" {}", n_mode);
-                                            eprint!(" {}", n_inclusive_ns_prefixes);
-                                            eprint!(" {}", n_with_comments);
-                                            eprint!(" {}", n_filename);
-                                            eprintln!(" {}", n_compression);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlC14NDocSave()");
-        }
-    }
-
-    #[test]
-    fn test_xml_c14n_execute() {
-
-        /* missing type support */
-    }
 }
