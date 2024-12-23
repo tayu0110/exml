@@ -34,7 +34,7 @@ use std::{
     any::type_name,
     cell::RefCell,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val, zeroed},
+    mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
@@ -98,6 +98,7 @@ pub enum XmlC14NPosition {
     XmlC14NAfterDocumentElement = 2,
 }
 
+pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 #[repr(C)]
 pub struct XmlC14NVisibleNsStack {
     ns_cur_end: i32,           /* number of nodes in the set */
@@ -107,7 +108,19 @@ pub struct XmlC14NVisibleNsStack {
     ns_tab: *mut XmlNsPtr,     /* array of ns in no particular order */
     node_tab: *mut XmlNodePtr, /* array of nodes in no particular order */
 }
-pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
+
+impl Default for XmlC14NVisibleNsStack {
+    fn default() -> Self {
+        Self {
+            ns_cur_end: 0,
+            ns_prev_start: 0,
+            ns_prev_end: 0,
+            ns_max: 0,
+            ns_tab: null_mut(),
+            node_tab: null_mut(),
+        }
+    }
+}
 
 /// Signature for a C14N callback on visible nodes
 ///
@@ -587,7 +600,7 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NProcessElementNode")]
     unsafe fn process_element_node(&mut self, cur: &mut XmlNode, visible: i32) -> i32 {
         let mut ret: i32;
-        let mut state: XmlC14NVisibleNsStack = unsafe { zeroed() };
+        let mut state: XmlC14NVisibleNsStack = XmlC14NVisibleNsStack::default();
         let mut parent_is_doc: i32 = 0;
 
         if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
@@ -604,7 +617,6 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Save ns_rendered stack position
-        memset(addr_of_mut!(state) as _, 0, size_of_val(&state));
         xml_c14n_visible_ns_stack_save(self.ns_rendered, addr_of_mut!(state));
 
         if visible != 0 {
@@ -1549,7 +1561,7 @@ unsafe fn xml_c14n_visible_ns_stack_create() -> XmlC14NVisibleNsStackPtr {
         xml_c14n_err_memory("creating namespaces stack");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlC14NVisibleNsStack>());
+    std::ptr::write(&mut *ret, XmlC14NVisibleNsStack::default());
     ret
 }
 
@@ -1559,22 +1571,11 @@ unsafe fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStackPtr) {
         return;
     }
     if !(*cur).ns_tab.is_null() {
-        memset(
-            (*cur).ns_tab as _,
-            0,
-            (*cur).ns_max as usize * size_of::<XmlNsPtr>(),
-        );
         xml_free((*cur).ns_tab as _);
     }
     if !(*cur).node_tab.is_null() {
-        memset(
-            (*cur).node_tab as _,
-            0,
-            (*cur).ns_max as usize * size_of::<XmlNodePtr>(),
-        );
         xml_free((*cur).node_tab as _);
     }
-    memset(cur as _, 0, size_of::<XmlC14NVisibleNsStack>());
     xml_free(cur as _);
 }
 
