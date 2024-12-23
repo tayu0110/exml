@@ -36,7 +36,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     rc::Rc,
 };
 
@@ -61,7 +61,7 @@ use super::{
         XmlListPtr,
     },
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
-    xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, xml_strndup, XmlChar},
+    xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, XmlChar},
 };
 
 // Predefined values for C14N modes
@@ -304,16 +304,11 @@ pub unsafe fn xml_c14n_doc_dump_memory(
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
-    doc_txt_ptr: *mut *mut XmlChar,
+    doc_txt_ptr: &mut String,
 ) -> i32 {
     let mut ret: i32;
 
-    if doc_txt_ptr.is_null() {
-        xml_c14n_err_param("dumping doc to memory");
-        return -1;
-    }
-
-    *doc_txt_ptr = null_mut();
+    doc_txt_ptr.clear();
 
     // create memory buffer with UTF8 (default) encoding
     let Some(buf) = XmlOutputBuffer::from_wrapped_encoder(None) else {
@@ -339,18 +334,20 @@ pub unsafe fn xml_c14n_doc_dump_memory(
 
     ret = buf.borrow().buffer.map_or(0, |buf| buf.len() as i32);
     if ret >= 0 {
-        *doc_txt_ptr = xml_strndup(
-            buf.borrow()
-                .buffer
-                .map_or(null(), |buf| buf.as_ref().as_ptr()),
-            ret,
-        );
+        if let Some(buffer) = buf.borrow_mut().buffer.take() {
+            let mut bytes = vec![];
+            buffer.dump(Some(&mut bytes)).ok();
+            let text = String::from_utf8(bytes);
+            match text {
+                Ok(text) => *doc_txt_ptr = text,
+                Err(_) => {
+                    xml_c14n_err_memory("copying canonicalized document");
+                    return -1;
+                }
+            }
+        }
     }
 
-    if (*doc_txt_ptr).is_null() && ret >= 0 {
-        xml_c14n_err_memory("copying canonicalized document");
-        return -1;
-    }
     ret
 }
 

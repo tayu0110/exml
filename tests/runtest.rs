@@ -4728,7 +4728,6 @@ unsafe fn c14n_run_test(
     };
 
     let mut xpath: XmlXPathObjectPtr = null_mut();
-    let mut result: *mut XmlChar = null_mut();
     let mut ret: i32;
     let mut inclusive_namespaces: *mut *mut XmlChar = null_mut();
     let mut nslist: *const c_char = null_mut();
@@ -4785,6 +4784,7 @@ unsafe fn c14n_run_test(
 
     // Canonical form
     // fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename);
+    let mut result = String::new();
     ret = xml_c14n_doc_dump_memory(
         doc,
         if !xpath.is_null() {
@@ -4795,20 +4795,16 @@ unsafe fn c14n_run_test(
         mode,
         inclusive_namespaces,
         with_comments,
-        addr_of_mut!(result),
+        &mut result,
     );
     if ret >= 0 {
-        if !result.is_null()
-            && compare_file_mem(
-                CStr::from_ptr(result_file).to_string_lossy().as_ref(),
-                from_raw_parts(result, ret as _),
-            ) != 0
+        if compare_file_mem(
+            CStr::from_ptr(result_file).to_string_lossy().as_ref(),
+            result.as_bytes(),
+        ) != 0
         {
             eprintln!("Result mismatch for {xml_filename}");
-            eprintln!(
-                "RESULT:\n{}",
-                CStr::from_ptr(result as *const c_char).to_string_lossy()
-            );
+            eprintln!("RESULT:\n{result}");
             ret = -1;
         }
     } else {
@@ -4820,9 +4816,6 @@ unsafe fn c14n_run_test(
     }
 
     // Cleanup
-    if !result.is_null() {
-        xml_free(result as _);
-    }
     if !xpath.is_null() {
         xml_xpath_free_object(xpath);
     }

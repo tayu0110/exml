@@ -2755,7 +2755,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             } else if cfg!(feature = "c14n") && CANONICAL != 0 {
                 #[cfg(feature = "c14n")]
                 {
-                    let mut result: *mut XmlChar = null_mut();
+                    let mut result = String::new();
 
                     let size = xml_c14n_doc_dump_memory(
                         doc,
@@ -2763,13 +2763,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         XmlC14NMode::XmlC14N1_0,
                         null_mut(),
                         1,
-                        addr_of_mut!(result),
+                        &mut result,
                     );
                     if size >= 0 {
-                        if write(1, result as _, size as _) == -1 {
-                            eprintln!("Can't write data");
-                        }
-                        xml_free(result as _);
+                        print!("{result}");
                     } else {
                         eprintln!("Failed to canonicalize");
                         PROGRESULT = XmllintReturnCode::ErrOut;
@@ -2778,7 +2775,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             } else if cfg!(feature = "c14n") && CANONICAL_11 != 0 {
                 #[cfg(feature = "c14n")]
                 {
-                    let mut result: *mut XmlChar = null_mut();
+                    let mut result = String::new();
 
                     let size: c_int = xml_c14n_doc_dump_memory(
                         doc,
@@ -2786,13 +2783,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         XmlC14NMode::XmlC14N1_1,
                         null_mut(),
                         1,
-                        addr_of_mut!(result),
+                        &mut result,
                     );
                     if size >= 0 {
-                        if write(1, result as _, size as _) == -1 {
-                            eprintln!("Can't write data");
-                        }
-                        xml_free(result as _);
+                        print!("{result}");
                     } else {
                         eprintln!("Failed to canonicalize");
                         PROGRESULT = XmllintReturnCode::ErrOut;
@@ -2801,7 +2795,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             } else if cfg!(feature = "c14n") && EXC_CANONICAL != 0 {
                 #[cfg(feature = "c14n")]
                 {
-                    let mut result: *mut XmlChar = null_mut();
+                    let mut result = String::new();
 
                     let size: c_int = xml_c14n_doc_dump_memory(
                         doc,
@@ -2809,13 +2803,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         XmlC14NMode::XmlC14NExclusive1_0,
                         null_mut(),
                         1,
-                        addr_of_mut!(result),
+                        &mut result,
                     );
                     if size >= 0 {
-                        if write(1, result as _, size as _) == -1 {
-                            eprintln!("Can't write data");
-                        }
-                        xml_free(result as _);
+                        print!("{result}");
                     } else {
                         eprintln!("Failed to canonicalize");
                         PROGRESULT = XmllintReturnCode::ErrOut;
