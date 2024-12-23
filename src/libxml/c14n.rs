@@ -51,7 +51,7 @@ use crate::{
         XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
-    xpath::{XmlNodeSet, XmlNodeSetPtr},
+    xpath::XmlNodeSet,
 };
 
 use super::{
@@ -168,31 +168,32 @@ pub enum XmlC14NNormalizationMode {
 }
 
 unsafe fn xml_c14n_is_node_in_nodeset(
-    user_data: &*mut c_void,
+    nodes: &Option<&mut XmlNodeSet>,
     node: XmlNodePtr,
     parent: XmlNodePtr,
 ) -> i32 {
-    let nodes: XmlNodeSetPtr = *user_data as XmlNodeSetPtr;
-    if !nodes.is_null() && !node.is_null() {
-        if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-            return (*nodes).contains(node) as i32;
-        } else {
-            let mut ns: XmlNs = unsafe { zeroed() };
-
-            memcpy(addr_of_mut!(ns) as _, node as _, size_of_val(&ns));
-
-            // this is a libxml hack! check xpath.c for details
-            if !parent.is_null()
-                && matches!((*parent).element_type(), XmlElementType::XmlAttributeNode)
-            {
-                ns.next = (*parent).parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
+    if let Some(nodes) = nodes {
+        if !node.is_null() {
+            if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
+                return nodes.contains(node) as i32;
             } else {
-                ns.next = parent as *mut XmlNs;
-            }
+                let mut ns: XmlNs = unsafe { zeroed() };
 
-            // If the input is an XPath node-set, then the node-set must explicitly
-            // contain every node to be rendered to the canonical form.
-            return (*nodes).contains(addr_of_mut!(ns) as XmlNodePtr) as i32;
+                memcpy(addr_of_mut!(ns) as _, node as _, size_of_val(&ns));
+
+                // this is a libxml hack! check xpath.c for details
+                if !parent.is_null()
+                    && matches!((*parent).element_type(), XmlElementType::XmlAttributeNode)
+                {
+                    ns.next = (*parent).parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
+                } else {
+                    ns.next = parent as *mut XmlNs;
+                }
+
+                // If the input is an XPath node-set, then the node-set must explicitly
+                // contain every node to be rendered to the canonical form.
+                return nodes.contains(addr_of_mut!(ns) as XmlNodePtr) as i32;
+            }
         }
     }
     1
@@ -215,9 +216,7 @@ pub unsafe fn xml_c14n_doc_save_to(
     xml_c14n_execute(
         doc,
         xml_c14n_is_node_in_nodeset,
-        // temporary workaround.
-        // I want to improve this...
-        nodes.map_or(null_mut(), |n| n as *mut XmlNodeSet as _),
+        nodes,
         mode,
         inclusive_ns_prefixes,
         with_comments,
