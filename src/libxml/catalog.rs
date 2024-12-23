@@ -38,7 +38,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
     env::split_paths,
-    ffi::{CStr, OsStr, OsString},
+    ffi::CStr,
     fs::File,
     io::Read,
     path::{Path, PathBuf},
@@ -1656,7 +1656,7 @@ pub struct XmlCatalogEntry {
 impl XmlCatalogEntry {
     /// Add the new entry to the catalog list
     #[doc(alias = "xmlCatalogAddLocal")]
-    pub unsafe fn new(url: &str) -> Self {
+    pub fn new(url: &str) -> Self {
         if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
             xml_initialize_catalog();
         }
@@ -1788,7 +1788,7 @@ impl XmlCatalogEntry {
     /// but it is not possible in this crate.  
     /// You need to use `XmlCatalogEntry::new` instead.
     #[doc(alias = "xmlCatalogAddLocal")]
-    pub unsafe fn add_local(&mut self, url: &str) {
+    pub fn add_local(&mut self, url: &str) {
         if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
             xml_initialize_catalog();
         }
@@ -2823,7 +2823,7 @@ pub unsafe fn xml_free_catalog(catal: XmlCatalogPtr) {
 /// this function is not thread safe, catalog initialization should
 /// preferably be done once at startup
 #[doc(alias = "xmlInitializeCatalogData")]
-unsafe fn xml_initialize_catalog_data() {
+fn xml_initialize_catalog_data() {
     let is_initialized = XML_CATALOG_INITIALIZED.load(Ordering::Acquire);
     if is_initialized {
         return;
@@ -2840,7 +2840,7 @@ unsafe fn xml_initialize_catalog_data() {
 /// this function is not thread safe, catalog initialization should
 /// preferably be done once at startup
 #[doc(alias = "xmlInitializeCatalog")]
-pub unsafe fn xml_initialize_catalog() {
+pub fn xml_initialize_catalog() {
     let is_initialized = XML_CATALOG_INITIALIZED.load(Ordering::Acquire);
     if is_initialized {
         return;
@@ -2854,8 +2854,9 @@ pub unsafe fn xml_initialize_catalog() {
     }
 
     if default_catalog.is_none() {
-        let catalogs = std::env::var_os("XML_CATALOG_FILES")
-            .unwrap_or_else(|| OsString::from(XML_XML_DEFAULT_CATALOG));
+        let catalogs = std::env::var("XML_CATALOG_FILES")
+            .ok()
+            .unwrap_or_else(|| XML_XML_DEFAULT_CATALOG.to_owned());
 
         let mut catal = xml_create_new_catalog(
             XmlCatalogType::XmlXMLCatalogType,
@@ -2863,10 +2864,9 @@ pub unsafe fn xml_initialize_catalog() {
         );
         let mut next = None::<XmlCatalogEntry>;
         // the XML_CATALOG_FILES envvar is allowed to contain a space-separated list of entries.
-        let bytes = catalogs.as_encoded_bytes();
-        for path in bytes.split(|b| xml_is_blank_char(*b as u32)) {
+        for path in catalogs.split(|b: char| xml_is_blank_char(b as u32)) {
             if !path.is_empty() {
-                let path = PathBuf::from(OsStr::from_encoded_bytes_unchecked(path));
+                let path = PathBuf::from(path);
                 let new = xml_new_catalog_entry(
                     XmlCatalogEntryType::XmlCataCatalog,
                     None,
