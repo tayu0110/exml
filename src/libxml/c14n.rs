@@ -187,9 +187,9 @@ unsafe fn xml_c14n_is_node_in_nodeset(
 
             // If the input is an XPath node-set, then the node-set must explicitly
             // contain every node to be rendered to the canonical form.
-            return nodes.contains(addr_of_mut!(ns) as XmlNodePtr) as i32;
+            return nodes.contains(Some(&ns)) as i32;
         } else {
-            return nodes.contains(node as *const dyn NodeCommon as XmlNodePtr) as i32;
+            return nodes.contains(Some(node)) as i32;
         }
     }
     1

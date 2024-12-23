@@ -78,22 +78,21 @@ impl XmlNodeSet {
     ///
     /// Returns true (1) if @cur contains @val, false (0) otherwise
     #[doc(alias = "xmlXPathNodeSetContains")]
-    pub unsafe fn contains(&self, val: *mut XmlNode) -> bool {
-        if val.is_null() {
+    pub unsafe fn contains(&self, val: Option<&dyn NodeCommon>) -> bool {
+        let Some(val) = val else {
             return false;
-        }
+        };
         let table = &self.node_tab;
-        if matches!((*val).element_type(), XmlElementType::XmlNamespaceDecl) {
+        if let Some(ns1) = val.as_namespace_decl_node() {
             for &node in table {
                 if matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                    let ns1: XmlNsPtr = val as XmlNsPtr;
                     let ns2: XmlNsPtr = node as XmlNsPtr;
-                    if ns1 == ns2 {
+                    if ns1.as_ptr() == ns2 {
                         return true;
                     }
-                    if !(*ns1).next.is_null()
-                        && (*ns2).next == (*ns1).next
-                        && xml_str_equal((*ns1).prefix as _, (*ns2).prefix as _)
+                    if !ns1.as_ref().next.is_null()
+                        && (*ns2).next == ns1.as_ref().next
+                        && xml_str_equal(ns1.as_ref().prefix as _, (*ns2).prefix as _)
                     {
                         return true;
                     }
@@ -101,7 +100,7 @@ impl XmlNodeSet {
             }
         } else {
             for &node in table {
-                if node == val {
+                if std::ptr::addr_eq(val, node) {
                     return true;
                 }
             }
@@ -423,7 +422,7 @@ pub unsafe fn xml_xpath_difference(
     if let Some(ret) = ret.as_mut() {
         for i in 0..l1 {
             let cur = nodes1.get(i);
-            if !nodes2.contains(cur) {
+            if !nodes2.contains((!cur.is_null()).then(|| &*cur as _)) {
                 // TODO: Propagate memory error.
                 if ret.add_unique(cur) < 0 {
                     break;
@@ -511,7 +510,9 @@ pub unsafe fn xml_xpath_node_leading_sorted(
         return nodes.cloned().map(Box::new);
     }
     let mut ret = xml_xpath_node_set_create(null_mut())?;
-    let Some(nodes) = nodes.filter(|n| !n.is_empty() && n.contains(node)) else {
+    let Some(nodes) =
+        nodes.filter(|n| !n.is_empty() && n.contains((!node.is_null()).then(|| &*node as _)))
+    else {
         return Some(ret);
     };
 
@@ -617,7 +618,7 @@ pub unsafe fn xml_xpath_node_trailing_sorted(
     }
 
     let mut ret = xml_xpath_node_set_create(null_mut())?;
-    if nodes.is_empty() || !nodes.contains(node) {
+    if nodes.is_empty() || !nodes.contains((!node.is_null()).then(|| &*node as _)) {
         return Some(ret);
     }
 
