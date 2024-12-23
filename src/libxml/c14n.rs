@@ -40,7 +40,7 @@ use std::{
     rc::Rc,
 };
 
-use libc::{memcpy, memset};
+use libc::memset;
 
 use crate::{
     buf::libxml_api::xml_buf_write_quoted_string,
@@ -114,7 +114,7 @@ pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 /// Returns 1 if the node should be included
 #[doc(alias = "xmlC14NIsVisibleCallback")]
 pub type XmlC14NIsVisibleCallback<T> =
-    unsafe fn(user_data: &T, node: XmlNodePtr, parent: XmlNodePtr) -> i32;
+    unsafe fn(user_data: &T, node: Option<&dyn NodeCommon>, parent: Option<&dyn NodeCommon>) -> i32;
 
 #[repr(C)]
 pub struct XmlC14NCtx<'a, T> {
@@ -169,31 +169,27 @@ pub enum XmlC14NNormalizationMode {
 
 unsafe fn xml_c14n_is_node_in_nodeset(
     nodes: &Option<&mut XmlNodeSet>,
-    node: XmlNodePtr,
-    parent: XmlNodePtr,
+    node: Option<&dyn NodeCommon>,
+    parent: Option<&dyn NodeCommon>,
 ) -> i32 {
-    if let Some(nodes) = nodes {
-        if !node.is_null() {
-            if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
-                return nodes.contains(node) as i32;
-            } else {
-                let mut ns: XmlNs = unsafe { zeroed() };
+    if let (Some(nodes), Some(node)) = (nodes, node) {
+        if let Some(node) = node.as_namespace_decl_node() {
+            let mut ns = XmlNs { ..*node.as_ref() };
 
-                memcpy(addr_of_mut!(ns) as _, node as _, size_of_val(&ns));
-
-                // this is a libxml hack! check xpath.c for details
-                if !parent.is_null()
-                    && matches!((*parent).element_type(), XmlElementType::XmlAttributeNode)
-                {
-                    ns.next = (*parent).parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
-                } else {
-                    ns.next = parent as *mut XmlNs;
-                }
-
-                // If the input is an XPath node-set, then the node-set must explicitly
-                // contain every node to be rendered to the canonical form.
-                return nodes.contains(addr_of_mut!(ns) as XmlNodePtr) as i32;
+            // this is a libxml hack! check xpath.c for details
+            if let Some(parent) =
+                parent.filter(|p| p.element_type() == XmlElementType::XmlAttributeNode)
+            {
+                ns.next = parent.parent().map_or(null_mut(), |p| p.as_ptr()) as *mut XmlNs;
+            } else if let Some(parent) = parent {
+                ns.next = parent as *const dyn NodeCommon as *mut XmlNs;
             }
+
+            // If the input is an XPath node-set, then the node-set must explicitly
+            // contain every node to be rendered to the canonical form.
+            return nodes.contains(addr_of_mut!(ns) as XmlNodePtr) as i32;
+        } else {
+            return nodes.contains(node as *const dyn NodeCommon as XmlNodePtr) as i32;
         }
     }
     1
@@ -575,8 +571,8 @@ macro_rules! xml_c14n_is_visible {
         if let Some(callback) = (*$ctx).is_visible_callback {
             callback(
                 &(*$ctx).user_data,
-                $node as XmlNodePtr,
-                $parent as XmlNodePtr,
+                (!$node.is_null()).then(|| &*$node as &dyn NodeCommon),
+                (!$parent.is_null()).then(|| &*$parent as &dyn NodeCommon),
             )
         } else {
             1
