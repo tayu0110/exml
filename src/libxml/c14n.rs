@@ -36,7 +36,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::null_mut,
     rc::Rc,
 };
 
@@ -107,6 +107,131 @@ pub struct XmlC14NVisibleNsStack {
     ns_max: i32,               /* size of the array as allocated */
     ns_tab: *mut XmlNsPtr,     /* array of ns in no particular order */
     node_tab: *mut XmlNodePtr, /* array of nodes in no particular order */
+}
+
+impl XmlC14NVisibleNsStack {
+    fn save(&self, state: &mut XmlC14NVisibleNsStack) {
+        state.ns_cur_end = self.ns_cur_end;
+        state.ns_prev_start = self.ns_prev_start;
+        state.ns_prev_end = self.ns_prev_end;
+    }
+
+    /// Check whether `ns` was already rendered or not.  
+    /// Return `true` if already rendered, otherwise return `false`.
+    ///
+    /// Please refer to the document of `xmlC14NVisibleNsStackFind` for original libxml2.
+    #[doc(alias = "xmlC14NVisibleNsStackFind")]
+    unsafe fn find(&self, ns: Option<&XmlNs>) -> bool {
+        // if the default namespace xmlns="" is not defined yet then we do not want to print it out
+        let prefix: *const XmlChar =
+            if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
+                prefix
+            } else {
+                c"".as_ptr() as _
+            };
+        let href: *const XmlChar =
+            if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
+                href
+            } else {
+                c"".as_ptr() as _
+            };
+
+        let has_empty_ns =
+            xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut());
+
+        if !self.ns_tab.is_null() {
+            let start: i32 = if has_empty_ns { 0 } else { self.ns_prev_start };
+            for i in (start..self.ns_cur_end).rev() {
+                let ns1: XmlNsPtr = *self.ns_tab.add(i as usize);
+
+                if xml_c14n_str_equal(
+                    prefix,
+                    if !ns1.is_null() {
+                        (*ns1).prefix
+                    } else {
+                        null_mut()
+                    },
+                ) {
+                    return xml_c14n_str_equal(
+                        href,
+                        if !ns1.is_null() {
+                            (*ns1).href
+                        } else {
+                            null_mut()
+                        },
+                    );
+                }
+            }
+        }
+        has_empty_ns
+    }
+
+    #[doc(alias = "xmlC14NVisibleNsStackAdd")]
+    unsafe fn add(&mut self, ns: XmlNsPtr, node: XmlNodePtr) {
+        if (self.ns_tab.is_null() && !self.node_tab.is_null())
+            || (!self.ns_tab.is_null() && self.node_tab.is_null())
+        {
+            xml_c14n_err_param("adding namespace to stack");
+            return;
+        }
+
+        if self.ns_tab.is_null() && self.node_tab.is_null() {
+            self.ns_tab = xml_malloc(XML_NAMESPACES_DEFAULT * size_of::<XmlNsPtr>()) as _;
+            self.node_tab = xml_malloc(XML_NAMESPACES_DEFAULT * size_of::<XmlNodePtr>()) as _;
+            if self.ns_tab.is_null() || self.node_tab.is_null() {
+                xml_c14n_err_memory("adding node to stack");
+                return;
+            }
+            memset(
+                self.ns_tab as _,
+                0,
+                XML_NAMESPACES_DEFAULT * size_of::<XmlNsPtr>(),
+            );
+            memset(
+                self.node_tab as _,
+                0,
+                XML_NAMESPACES_DEFAULT * size_of::<XmlNodePtr>(),
+            );
+            self.ns_max = XML_NAMESPACES_DEFAULT as _;
+        } else if self.ns_max == self.ns_cur_end {
+            let mut tmp: *mut c_void;
+
+            let tmp_size: i32 = 2 * self.ns_max;
+            tmp = xml_realloc(self.ns_tab as _, tmp_size as usize * size_of::<XmlNsPtr>()) as _;
+            if tmp.is_null() {
+                xml_c14n_err_memory("adding node to stack");
+                return;
+            }
+            self.ns_tab = tmp as _;
+
+            tmp = xml_realloc(
+                self.node_tab as _,
+                tmp_size as usize * size_of::<XmlNodePtr>(),
+            );
+            if tmp.is_null() {
+                xml_c14n_err_memory("adding node to stack");
+                return;
+            }
+            self.node_tab = tmp as _;
+
+            self.ns_max = tmp_size;
+        }
+        *self.ns_tab.add(self.ns_cur_end as usize) = ns;
+        *self.node_tab.add(self.ns_cur_end as usize) = node;
+
+        self.ns_cur_end += 1;
+    }
+
+    fn shift(&mut self) {
+        self.ns_prev_start = self.ns_prev_end;
+        self.ns_prev_end = self.ns_cur_end;
+    }
+
+    fn restore(&mut self, state: &XmlC14NVisibleNsStack) {
+        self.ns_cur_end = state.ns_cur_end;
+        self.ns_prev_start = state.ns_prev_start;
+        self.ns_prev_end = state.ns_prev_end;
+    }
 }
 
 impl Default for XmlC14NVisibleNsStack {
@@ -296,10 +421,9 @@ impl<T> XmlC14NCtx<'_, T> {
                     && !xml_c14n_is_xml_ns(ns)
                     && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
                 {
-                    already_rendered =
-                        xml_c14n_visible_ns_stack_find(self.ns_rendered, Some(&*ns)) as i32;
+                    already_rendered = (*self.ns_rendered).find(Some(&*ns)) as i32;
                     if visible != 0 {
-                        xml_c14n_visible_ns_stack_add(self.ns_rendered, ns, cur);
+                        (*self.ns_rendered).add(ns, cur);
                     }
                     if already_rendered == 0 {
                         xml_list_insert(list, ns as _);
@@ -320,10 +444,7 @@ impl<T> XmlC14NCtx<'_, T> {
         //   - the nearest ancestor element of E in the node-set has a default
         //      namespace node in the node-set (default namespace nodes always
         //      have non-empty values in XPath)
-        if visible != 0
-            && has_empty_ns == 0
-            && !xml_c14n_visible_ns_stack_find(self.ns_rendered, Some(&XmlNs::default()))
-        {
+        if visible != 0 && has_empty_ns == 0 && !(*self.ns_rendered).find(Some(&XmlNs::default())) {
             self.print_namespaces(&XmlNs::default());
         }
 
@@ -617,7 +738,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Save ns_rendered stack position
-        xml_c14n_visible_ns_stack_save(self.ns_rendered, addr_of_mut!(state));
+        (*self.ns_rendered).save(&mut state);
 
         if visible != 0 {
             if self.parent_is_doc != 0 {
@@ -653,7 +774,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
         // todo: shouldn't this go to "visible only"?
         if visible != 0 {
-            xml_c14n_visible_ns_stack_shift(self.ns_rendered);
+            (*self.ns_rendered).shift();
         }
 
         ret = self.process_attrs_axis(cur, visible);
@@ -695,7 +816,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Restore ns_rendered stack position
-        xml_c14n_visible_ns_stack_restore(self.ns_rendered, addr_of_mut!(state));
+        (*self.ns_rendered).restore(&state);
         0
     }
 
@@ -972,15 +1093,10 @@ impl<T> XmlC14NCtx<'_, T> {
                     && !xml_c14n_is_xml_ns(ns)
                     && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
                 {
-                    already_rendered =
-                        xml_c14n_visible_ns_stack_find(self.ns_rendered, Some(&*ns)) as i32;
+                    already_rendered = (*self.ns_rendered).find(Some(&*ns)) as i32;
                     if visible != 0 {
                         // TODO: replace `cur` to `Rc<XmlNode>`
-                        xml_c14n_visible_ns_stack_add(
-                            self.ns_rendered,
-                            ns,
-                            cur as *const XmlNode as _,
-                        );
+                        (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
                     }
                     if already_rendered == 0 {
                         xml_list_insert(list, ns as _);
@@ -1008,7 +1124,7 @@ impl<T> XmlC14NCtx<'_, T> {
             }
             if visible != 0 {
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                xml_c14n_visible_ns_stack_add(self.ns_rendered, ns, cur as *const XmlNode as _);
+                (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
             }
             if xml_strlen((*ns).prefix) == 0 {
                 has_empty_ns = 1;
@@ -1028,11 +1144,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 already_rendered =
                     self.exc_c14n_visible_ns_stack_find(self.ns_rendered, Some(&*(*attr).ns));
                 // TODO: replace `cur` to `Rc<XmlNode>`
-                xml_c14n_visible_ns_stack_add(
-                    self.ns_rendered,
-                    (*attr).ns,
-                    cur as *const XmlNode as _,
-                );
+                (*self.ns_rendered).add((*attr).ns, cur as *const XmlNode as _);
                 if already_rendered == 0 && visible != 0 {
                     xml_list_insert(list, (*attr).ns as _);
                 }
@@ -1062,7 +1174,7 @@ impl<T> XmlC14NCtx<'_, T> {
         } else if visible != 0
             && has_empty_ns == 0
             && has_empty_ns_in_inclusive_list != 0
-            && !xml_c14n_visible_ns_stack_find(self.ns_rendered, Some(&XmlNs::default()))
+            && !(*self.ns_rendered).find(Some(&XmlNs::default()))
         {
             self.print_namespaces(&XmlNs::default());
         }
@@ -1690,20 +1802,6 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
     );
 }
 
-unsafe fn xml_c14n_visible_ns_stack_save(
-    cur: XmlC14NVisibleNsStackPtr,
-    state: XmlC14NVisibleNsStackPtr,
-) {
-    if cur.is_null() || state.is_null() {
-        xml_c14n_err_param("saving namespaces stack");
-        return;
-    }
-
-    (*state).ns_cur_end = (*cur).ns_cur_end;
-    (*state).ns_prev_start = (*cur).ns_prev_start;
-    (*state).ns_prev_end = (*cur).ns_prev_end;
-}
-
 /// Compares the namespaces by names (prefixes).
 ///
 /// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
@@ -1758,133 +1856,7 @@ unsafe fn xml_c14n_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar)
     true
 }
 
-/// Check whether `ns` was already rendered or not.  
-/// Return `true` if already rendered, otherwise return `false`.
-///
-/// Please refer to the document of `xmlC14NVisibleNsStackFind` for original libxml2.
-#[doc(alias = "xmlC14NVisibleNsStackFind")]
-unsafe fn xml_c14n_visible_ns_stack_find(
-    cur: XmlC14NVisibleNsStackPtr,
-    ns: Option<&XmlNs>,
-) -> bool {
-    if cur.is_null() {
-        xml_c14n_err_param("searching namespaces stack (c14n)");
-        return false;
-    }
-
-    // if the default namespace xmlns="" is not defined yet then we do not want to print it out
-    let prefix: *const XmlChar =
-        if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
-            prefix
-        } else {
-            c"".as_ptr() as _
-        };
-    let href: *const XmlChar =
-        if let Some(href) = ns.filter(|ns| !ns.href.is_null()).map(|ns| ns.href) {
-            href
-        } else {
-            c"".as_ptr() as _
-        };
-
-    let has_empty_ns =
-        xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut());
-
-    if !(*cur).ns_tab.is_null() {
-        let start: i32 = if has_empty_ns {
-            0
-        } else {
-            (*cur).ns_prev_start
-        };
-        for i in (start..(*cur).ns_cur_end).rev() {
-            let ns1: XmlNsPtr = *(*cur).ns_tab.add(i as usize);
-
-            if xml_c14n_str_equal(
-                prefix,
-                if !ns1.is_null() {
-                    (*ns1).prefix
-                } else {
-                    null_mut()
-                },
-            ) {
-                return xml_c14n_str_equal(
-                    href,
-                    if !ns1.is_null() {
-                        (*ns1).href
-                    } else {
-                        null_mut()
-                    },
-                );
-            }
-        }
-    }
-    has_empty_ns
-}
-
 const XML_NAMESPACES_DEFAULT: usize = 16;
-
-#[doc(alias = "xmlC14NVisibleNsStackAdd")]
-unsafe fn xml_c14n_visible_ns_stack_add(
-    cur: XmlC14NVisibleNsStackPtr,
-    ns: XmlNsPtr,
-    node: XmlNodePtr,
-) {
-    if cur.is_null()
-        || ((*cur).ns_tab.is_null() && !(*cur).node_tab.is_null())
-        || (!(*cur).ns_tab.is_null() && (*cur).node_tab.is_null())
-    {
-        xml_c14n_err_param("adding namespace to stack");
-        return;
-    }
-
-    if (*cur).ns_tab.is_null() && (*cur).node_tab.is_null() {
-        (*cur).ns_tab = xml_malloc(XML_NAMESPACES_DEFAULT * size_of::<XmlNsPtr>()) as _;
-        (*cur).node_tab = xml_malloc(XML_NAMESPACES_DEFAULT * size_of::<XmlNodePtr>()) as _;
-        if (*cur).ns_tab.is_null() || (*cur).node_tab.is_null() {
-            xml_c14n_err_memory("adding node to stack");
-            return;
-        }
-        memset(
-            (*cur).ns_tab as _,
-            0,
-            XML_NAMESPACES_DEFAULT * size_of::<XmlNsPtr>(),
-        );
-        memset(
-            (*cur).node_tab as _,
-            0,
-            XML_NAMESPACES_DEFAULT * size_of::<XmlNodePtr>(),
-        );
-        (*cur).ns_max = XML_NAMESPACES_DEFAULT as _;
-    } else if (*cur).ns_max == (*cur).ns_cur_end {
-        let mut tmp: *mut c_void;
-
-        let tmp_size: i32 = 2 * (*cur).ns_max;
-        tmp = xml_realloc(
-            (*cur).ns_tab as _,
-            tmp_size as usize * size_of::<XmlNsPtr>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_c14n_err_memory("adding node to stack");
-            return;
-        }
-        (*cur).ns_tab = tmp as _;
-
-        tmp = xml_realloc(
-            (*cur).node_tab as _,
-            tmp_size as usize * size_of::<XmlNodePtr>(),
-        );
-        if tmp.is_null() {
-            xml_c14n_err_memory("adding node to stack");
-            return;
-        }
-        (*cur).node_tab = tmp as _;
-
-        (*cur).ns_max = tmp_size;
-    }
-    *(*cur).ns_tab.add((*cur).ns_cur_end as usize) = ns;
-    *(*cur).node_tab.add((*cur).ns_cur_end as usize) = node;
-
-    (*cur).ns_cur_end += 1;
-}
 
 #[doc(alias = "xmlC14NPrintNamespacesWalker")]
 extern "C" fn xml_c14n_print_namespaces_walker<T>(ns: *const c_void, ctx: *mut c_void) -> i32 {
@@ -1894,15 +1866,6 @@ extern "C" fn xml_c14n_print_namespaces_walker<T>(ns: *const c_void, ctx: *mut c
         let ctxt = ctx as *mut XmlC14NCtx<'_, T>;
         unsafe { (*ctxt).print_namespaces(&(*(ns as *const XmlNs))) }
     }
-}
-
-unsafe fn xml_c14n_visible_ns_stack_shift(cur: XmlC14NVisibleNsStackPtr) {
-    if cur.is_null() {
-        xml_c14n_err_param("shifting namespaces stack");
-        return;
-    }
-    (*cur).ns_prev_start = (*cur).ns_prev_end;
-    (*cur).ns_prev_end = (*cur).ns_cur_end;
 }
 
 /// Prints the given attribute to the output buffer from C14N context.
@@ -2173,19 +2136,6 @@ extern "C" fn xml_c14n_print_attrs<T>(data: *const c_void, user: *mut c_void) ->
         (*ctx).buf.borrow_mut().write_str("\"");
         1
     }
-}
-
-unsafe fn xml_c14n_visible_ns_stack_restore(
-    cur: XmlC14NVisibleNsStackPtr,
-    state: XmlC14NVisibleNsStackPtr,
-) {
-    if cur.is_null() || state.is_null() {
-        xml_c14n_err_param("restoring namespaces stack");
-        return;
-    }
-    (*cur).ns_cur_end = (*state).ns_cur_end;
-    (*cur).ns_prev_start = (*state).ns_prev_start;
-    (*cur).ns_prev_end = (*state).ns_prev_end;
 }
 
 unsafe fn xml_c11n_normalize_text(a: *const u8) -> *mut XmlChar {
