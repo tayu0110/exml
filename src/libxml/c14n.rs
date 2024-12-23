@@ -45,8 +45,8 @@ use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     io::XmlOutputBuffer,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttrPtr, XmlDocPtr, XmlElementType,
-        XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDocPtr,
+        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
     xpath::XmlNodeSet,
@@ -585,7 +585,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     // simple inheritance attributes - copy
                     if xml_lang_attr.is_null() {
                         xml_lang_attr = self.find_hidden_parent_attr(
-                            (*cur).parent().map_or(null_mut(), |p| p.as_ptr()),
+                            (*cur).parent().map(|p| &*p.as_ptr()),
                             c"lang".as_ptr() as _,
                             XML_XML_NAMESPACE.as_ptr() as _,
                         );
@@ -595,7 +595,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     }
                     if xml_space_attr.is_null() {
                         xml_space_attr = self.find_hidden_parent_attr(
-                            (*cur).parent().map_or(null_mut(), |p| p.as_ptr()),
+                            (*cur).parent().map(|p| &*p.as_ptr()),
                             c"space".as_ptr() as _,
                             XML_XML_NAMESPACE.as_ptr() as _,
                         );
@@ -608,13 +608,13 @@ impl<T> XmlC14NCtx<'_, T> {
                     if xml_base_attr.is_null() {
                         // if we don't have base uri attribute, check if we have a "hidden" one above
                         xml_base_attr = self.find_hidden_parent_attr(
-                            (*cur).parent().map_or(null_mut(), |p| p.as_ptr()),
+                            (*cur).parent().map(|p| &*p.as_ptr()),
                             c"base".as_ptr() as _,
                             XML_XML_NAMESPACE.as_ptr() as _,
                         );
                     }
                     if !xml_base_attr.is_null() {
-                        xml_base_attr = self.fixup_base_attr(xml_base_attr);
+                        xml_base_attr = self.fixup_base_attr(&*xml_base_attr);
                         if !xml_base_attr.is_null() {
                             xml_list_insert(list, xml_base_attr as _);
 
@@ -1191,18 +1191,15 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NFindHiddenParentAttr")]
     unsafe fn find_hidden_parent_attr(
         &self,
-        mut cur: XmlNodePtr,
+        mut cur: Option<&XmlNode>,
         name: *const XmlChar,
         ns: *const XmlChar,
     ) -> XmlAttrPtr {
         let mut res: XmlAttrPtr;
-        while !cur.is_null()
-            && !self.is_visible(
-                (!cur.is_null()).then(|| &*cur as _),
-                (*cur).parent().map(|p| &*p.as_ptr() as _),
-            )
+        while let Some(now) =
+            cur.filter(|&now| !self.is_visible(Some(now), now.parent().map(|p| &*p.as_ptr() as _)))
         {
-            res = (*cur).has_ns_prop(
+            res = now.has_ns_prop(
                 CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
                 (!ns.is_null())
                     .then(|| CStr::from_ptr(ns as *const i8).to_string_lossy())
@@ -1212,7 +1209,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 return res;
             }
 
-            cur = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
+            cur = now.parent().map(|p| &*p.as_ptr());
         }
 
         null_mut()
@@ -1222,22 +1219,18 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns the newly created attribute or NULL
     #[doc(alias = "xmlC14NFixupBaseAttr")]
-    unsafe fn fixup_base_attr(&self, xml_base_attr: XmlAttrPtr) -> XmlAttrPtr {
+    unsafe fn fixup_base_attr(&self, xml_base_attr: &XmlAttr) -> XmlAttrPtr {
         let mut cur: XmlNodePtr;
         let mut attr: XmlAttrPtr;
 
-        if xml_base_attr.is_null() {
-            xml_c14n_err_param("processing xml:base attribute");
-            return null_mut();
-        }
-        let Some(parent) = (*xml_base_attr).parent else {
+        let Some(parent) = xml_base_attr.parent() else {
             xml_c14n_err_param("processing xml:base attribute");
             return null_mut();
         };
 
         // start from current value
-        let Some(mut res) = (*xml_base_attr)
-            .children
+        let Some(mut res) = xml_base_attr
+            .children()
             .and_then(|c| c.get_string(self.doc, 1))
         else {
             xml_c14n_err_internal("processing xml:base attribute - can't get attr value");
@@ -1290,7 +1283,7 @@ impl<T> XmlC14NCtx<'_, T> {
         let res = CString::new(res).unwrap();
         attr = xml_new_ns_prop(
             null_mut(),
-            (*xml_base_attr).ns,
+            xml_base_attr.ns,
             c"base".as_ptr() as _,
             res.as_ptr() as *const u8,
         );
