@@ -51,7 +51,6 @@ use std::{
 };
 
 use const_format::concatcp;
-use libc::snprintf;
 
 use crate::{
     encoding::XmlCharEncoding,
@@ -70,7 +69,7 @@ use crate::{
             xml_free_rmutex, xml_get_thread_id, xml_new_rmutex, xml_rmutex_lock, xml_rmutex_unlock,
             XmlRMutex,
         },
-        xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strndup, XmlChar},
+        xmlstring::{xml_str_equal, xml_strndup, XmlChar},
     },
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
@@ -632,23 +631,17 @@ impl XmlCatalog {
     /// Returns the URI of the resource or null_mut() if not found,
     /// it must be freed by the caller.
     #[doc(alias = "xmlACatalogResolveURI")]
-    pub unsafe fn resolve_uri(&mut self, uri: &str) -> *mut XmlChar {
-        let mut ret: *mut XmlChar = null_mut();
-
+    pub unsafe fn resolve_uri(&mut self, uri: &str) -> Option<String> {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("Resolve URI {uri}\n");
         }
 
         if matches!(self.typ, XmlCatalogType::XmlXMLCatalogType) {
-            ret = self.xml.as_mut().unwrap().list_xml_resolve_uri(uri);
-            if ret == XML_CATAL_BREAK {
-                ret = null_mut();
-            }
-        } else if let Some(sgml) = self.sgml_resolve(None, Some(uri)) {
-            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
-            ret = xml_strdup(sgml.as_ptr() as *const u8);
+            self.xml.as_mut().unwrap().list_xml_resolve_uri(uri)
+        } else {
+            self.sgml_resolve(None, Some(uri))
+                .map(|sgml| sgml.to_string_lossy().into_owned())
         }
-        ret
     }
 
     /// Try to lookup the catalog local reference associated to a public ID in that catalog
@@ -656,27 +649,20 @@ impl XmlCatalog {
     /// Returns the local resource if found or null_mut() otherwise,
     /// the value returned must be freed by the caller.
     #[doc(alias = "xmlACatalogResolvePublic")]
-    pub unsafe fn resolve_public(&mut self, pub_id: &str) -> *mut XmlChar {
-        let mut ret: *mut XmlChar = null_mut();
-
+    pub unsafe fn resolve_public(&mut self, pub_id: &str) -> Option<String> {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("Resolve pubID {pub_id}\n");
         }
 
         if matches!(self.typ, XmlCatalogType::XmlXMLCatalogType) {
-            ret = self
-                .xml
+            self.xml
                 .as_mut()
                 .unwrap()
-                .list_xml_resolve(Some(pub_id), None);
-            if ret == XML_CATAL_BREAK {
-                ret = null_mut();
-            }
-        } else if let Some(sgml) = xml_catalog_get_sgml_public(&self.sgml, pub_id) {
-            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
-            ret = xml_strdup(sgml.as_ptr() as *const u8);
+                .list_xml_resolve(Some(pub_id), None)
+        } else {
+            xml_catalog_get_sgml_public(&self.sgml, pub_id)
+                .map(|sgml| sgml.to_string_lossy().into_owned())
         }
-        ret
     }
 
     /// Try to lookup the catalog resource for a system ID
@@ -684,38 +670,29 @@ impl XmlCatalog {
     /// Returns the resource if found or null_mut() otherwise,
     /// the value returned must be freed by the caller.
     #[doc(alias = "xmlACatalogResolveSystem")]
-    pub unsafe fn resolve_system(&mut self, sys_id: &str) -> *mut XmlChar {
-        let mut ret: *mut XmlChar = null_mut();
-
+    pub unsafe fn resolve_system(&mut self, sys_id: &str) -> Option<String> {
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
             generic_error!("Resolve sysID {sys_id}\n");
         }
 
         if matches!(self.typ, XmlCatalogType::XmlXMLCatalogType) {
-            ret = self
-                .xml
+            self.xml
                 .as_mut()
                 .unwrap()
-                .list_xml_resolve(None, Some(sys_id));
-            if ret == XML_CATAL_BREAK {
-                ret = null_mut();
-            }
-        } else if let Some(sgml) = xml_catalog_get_sgml_system(&self.sgml, sys_id) {
-            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
-            ret = xml_strdup(sgml.as_ptr() as *const u8);
+                .list_xml_resolve(None, Some(sys_id))
+        } else {
+            xml_catalog_get_sgml_system(&self.sgml, sys_id)
+                .map(|sgml| sgml.to_string_lossy().into_owned())
         }
-        ret
     }
 
     /// Do a complete resolution lookup of an External Identifier
     ///
     /// Returns the URI of the resource or null_mut() if not found, it must be freed by the caller.
     #[doc(alias = "xmlACatalogResolve")]
-    pub unsafe fn resolve(&mut self, pub_id: Option<&str>, sys_id: Option<&str>) -> *mut XmlChar {
-        let mut ret: *mut XmlChar = null_mut();
-
+    pub unsafe fn resolve(&mut self, pub_id: Option<&str>, sys_id: Option<&str>) -> Option<String> {
         if pub_id.is_none() && sys_id.is_none() {
-            return null_mut();
+            return None;
         }
 
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
@@ -729,15 +706,11 @@ impl XmlCatalog {
         }
 
         if matches!(self.typ, XmlCatalogType::XmlXMLCatalogType) {
-            ret = self.xml.as_mut().unwrap().list_xml_resolve(pub_id, sys_id);
-            if ret == XML_CATAL_BREAK {
-                ret = null_mut();
-            }
-        } else if let Some(sgml) = self.sgml_resolve(pub_id, sys_id) {
-            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
-            ret = xml_strdup(sgml.as_ptr() as *const u8);
+            self.xml.as_mut().unwrap().list_xml_resolve(pub_id, sys_id)
+        } else {
+            self.sgml_resolve(pub_id, sys_id)
+                .map(|sgml| sgml.to_string_lossy().into_owned())
         }
-        ret
     }
 
     /// Convert all the SGML catalog entries as XML ones
@@ -911,9 +884,7 @@ impl CatalogEntryListNode {
     ///
     /// Returns the URI of the resource or null_mut() if not found
     #[doc(alias = "xmlCatalogListXMLResolveURI")]
-    unsafe fn list_xml_resolve_uri(entry: &Arc<RwLock<Self>>, uri: &str) -> *mut XmlChar {
-        let mut ret: *mut XmlChar = null_mut();
-
+    unsafe fn list_xml_resolve_uri(entry: &Arc<RwLock<Self>>, uri: &str) -> Option<String> {
         if uri.starts_with(XML_URN_PUBID) {
             let urn_id = xml_catalog_unwrap_urn(uri);
             if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
@@ -923,12 +894,7 @@ impl CatalogEntryListNode {
                     generic_error!("URN ID {uri} expanded to NULL\n");
                 }
             }
-            if let Some(urn_id) = urn_id {
-                ret = Self::list_xml_resolve(entry, Some(&urn_id), None);
-            } else {
-                ret = null_mut();
-            }
-            return ret;
+            return Self::list_xml_resolve(entry, Some(&urn_id?), None);
         }
         let mut catal = Some(entry.clone());
         while let Some(now) = catal {
@@ -938,15 +904,14 @@ impl CatalogEntryListNode {
                     now.fetch_xml_catalog_file();
                 }
                 if let Some(children) = now.children.as_ref() {
-                    ret = Self::xml_resolve_uri(children, uri);
-                    if !ret.is_null() {
-                        return ret;
+                    if let Some(ret) = Self::xml_resolve_uri(children, uri) {
+                        return Some(ret);
                     }
                 }
             }
             catal = now.next.clone();
         }
-        ret
+        None
     }
 
     /// Do a complete resolution lookup of an External Identifier for a list of catalogs
@@ -960,11 +925,9 @@ impl CatalogEntryListNode {
         entry: &Arc<RwLock<Self>>,
         pub_id: Option<&str>,
         sys_id: Option<&str>,
-    ) -> *mut XmlChar {
-        let mut ret: *mut XmlChar = null_mut();
-
+    ) -> Option<String> {
         if pub_id.is_none() && sys_id.is_none() {
-            return null_mut();
+            return None;
         }
 
         let mut pub_id = pub_id.map(Cow::Borrowed);
@@ -988,12 +951,7 @@ impl CatalogEntryListNode {
                     generic_error!("Public URN ID {pub_id} expanded to null_mut()\n",);
                 }
             }
-            if let Some(urn_id) = urn_id {
-                ret = Self::list_xml_resolve(entry, Some(&urn_id), sys_id);
-            } else {
-                ret = null_mut();
-            }
-            return ret;
+            return Self::list_xml_resolve(entry, Some(&urn_id?), sys_id);
         }
         if let Some(sys_id) = sys_id.filter(|s| s.starts_with(XML_URN_PUBID)) {
             let urn_id = xml_catalog_unwrap_urn(sys_id);
@@ -1004,20 +962,16 @@ impl CatalogEntryListNode {
                     generic_error!("System URN ID {sys_id} expanded to null_mut()\n");
                 }
             }
-            if let Some(urn_id) = urn_id {
-                if let Some(pub_id) = pub_id {
-                    if pub_id == urn_id {
-                        ret = Self::list_xml_resolve(entry, Some(&pub_id), None);
-                    } else {
-                        ret = Self::list_xml_resolve(entry, Some(&pub_id), Some(&urn_id));
-                    }
+            let urn_id = urn_id?;
+            return if let Some(pub_id) = pub_id {
+                if pub_id == urn_id {
+                    Self::list_xml_resolve(entry, Some(&pub_id), None)
                 } else {
-                    ret = Self::list_xml_resolve(entry, Some(&urn_id), None);
+                    Self::list_xml_resolve(entry, Some(&pub_id), Some(&urn_id))
                 }
             } else {
-                ret = null_mut();
-            }
-            return ret;
+                Self::list_xml_resolve(entry, Some(&urn_id), None)
+            };
         }
         let mut catal = Some(entry.clone());
         while let Some(now) = catal {
@@ -1028,17 +982,16 @@ impl CatalogEntryListNode {
                     n.fetch_xml_catalog_file();
                 }
                 if let Some(children) = n.children.as_ref() {
-                    ret = Self::xml_resolve(children, pub_id.as_deref(), sys_id);
-                    if !ret.is_null() {
-                        break;
-                    } else if children.read().unwrap().depth > MAX_CATAL_DEPTH as i32 {
-                        ret = null_mut();
-                        break;
+                    if let Some(ret) = Self::xml_resolve(children, pub_id.as_deref(), sys_id) {
+                        return Some(ret);
+                    }
+                    if children.read().unwrap().depth > MAX_CATAL_DEPTH as i32 {
+                        return None;
                     }
                 }
             }
         }
-        ret
+        None
     }
 
     /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
@@ -1048,8 +1001,7 @@ impl CatalogEntryListNode {
     ///
     /// Returns the URI of the resource or null_mut() if not found
     #[doc(alias = "xmlCatalogXMLResolveURI")]
-    unsafe fn xml_resolve_uri(node: &Arc<RwLock<Self>>, uri: &str) -> *mut XmlChar {
-        let mut ret: *mut XmlChar;
+    unsafe fn xml_resolve_uri(node: &Arc<RwLock<Self>>, uri: &str) -> Option<String> {
         let mut have_next: i32 = 0;
         let mut lenrewrite: i32 = 0;
 
@@ -1061,7 +1013,7 @@ impl CatalogEntryListNode {
                 "Detected recursion in catalog {}\n",
                 node.read().unwrap().name.as_deref().unwrap(),
             );
-            return null_mut();
+            return None;
         }
 
         // First tries steps 2/ 3/ 4/ if a system ID is provided.
@@ -1077,12 +1029,7 @@ impl CatalogEntryListNode {
                         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                             generic_error!("Found URI match {}\n", n.name.as_deref().unwrap());
                         }
-                        return if let Some(url) = n.url.as_deref() {
-                            let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
-                            xml_strdup(url.as_ptr() as *const u8)
-                        } else {
-                            null_mut()
-                        };
+                        return Some(n.url.as_deref()?.to_string_lossy().into_owned());
                     }
                 }
                 XmlCatalogEntryType::XmlCataRewriteURI => {
@@ -1112,17 +1059,10 @@ impl CatalogEntryListNode {
                     rewrite.name.as_deref().unwrap()
                 );
             }
-            if let Some(url) = rewrite.url.as_deref() {
-                let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
-                ret = xml_strdup(url.as_ptr() as *const u8);
-            } else {
-                ret = null_mut();
-            }
-            if !ret.is_null() {
-                let uri = CString::new(&uri[lenrewrite as usize..]).unwrap();
-                ret = xml_strcat(ret, uri.as_ptr() as *const u8);
-            }
-            return ret;
+            let mut url = rewrite.url.as_deref()?.to_string_lossy().into_owned();
+            let uri = &uri[lenrewrite as usize..];
+            url.push_str(uri);
+            return Some(url);
         }
         if have_delegate != 0 {
             let mut delegates: [Option<PathBuf>; MAX_DELEGATE] = [const { None }; MAX_DELEGATE];
@@ -1160,16 +1100,15 @@ impl CatalogEntryListNode {
                                 now.url.as_deref().unwrap().display()
                             );
                         }
-                        ret = Self::list_xml_resolve_uri(children, uri);
-                        if !ret.is_null() {
-                            return ret;
+                        if let Some(ret) = Self::list_xml_resolve_uri(children, uri) {
+                            return Some(ret);
                         }
                     }
                 }
                 cur = now.next.clone();
             }
             // Apply the cut algorithm explained in 4/
-            return XML_CATAL_BREAK;
+            return None;
         }
         if have_next != 0 {
             let mut cur = Some(node.clone());
@@ -1180,9 +1119,8 @@ impl CatalogEntryListNode {
                         now.fetch_xml_catalog_file();
                     }
                     if let Some(children) = now.children.as_ref() {
-                        ret = Self::list_xml_resolve_uri(children, uri);
-                        if !ret.is_null() {
-                            return ret;
+                        if let Some(ret) = Self::list_xml_resolve_uri(children, uri) {
+                            return Some(ret);
                         }
                     }
                 }
@@ -1190,7 +1128,7 @@ impl CatalogEntryListNode {
             }
         }
 
-        null_mut()
+        None
     }
 
     /// Do a complete resolution lookup of an External Identifier for a list of catalog entries.
@@ -1204,8 +1142,7 @@ impl CatalogEntryListNode {
         entry: &Arc<RwLock<Self>>,
         pub_id: Option<&str>,
         sys_id: Option<&str>,
-    ) -> *mut XmlChar {
-        let mut ret: *mut XmlChar;
+    ) -> Option<String> {
         let mut have_delegate: i32;
         let mut have_next: i32 = 0;
 
@@ -1218,7 +1155,7 @@ impl CatalogEntryListNode {
                 "Detected recursion in catalog {}\n",
                 entry.read().unwrap().name.as_deref().unwrap(),
             );
-            return null_mut();
+            return None;
         }
         entry.write().unwrap().depth += 1;
 
@@ -1236,16 +1173,18 @@ impl CatalogEntryListNode {
                         if let Some(name) = n.name.as_deref() {
                             if Some(sys_id) == n.name.as_deref() {
                                 let url = n.url.as_deref().unwrap();
-                                let curl = CString::new(url.to_string_lossy().as_ref()).unwrap();
                                 if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
                                     generic_error!(
                                         "Found system match {name}, using {}\n",
                                         url.display()
                                     );
                                 }
+                                let res = url.to_string_lossy().into_owned();
+                                // If `n == entry`, deadlock occurs at next line `entry.write()....`.
+                                // Therefore, drop `n` at this.
                                 drop(n);
                                 entry.write().unwrap().depth -= 1;
-                                return xml_strdup(curl.as_ptr() as *const u8);
+                                return Some(res);
                             }
                         }
                     }
@@ -1276,19 +1215,17 @@ impl CatalogEntryListNode {
                         rewrite.name.as_deref().unwrap()
                     );
                 }
-                if let Some(url) = rewrite.url.as_deref() {
-                    let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
-                    ret = xml_strdup(url.as_ptr() as *const u8);
-                } else {
-                    ret = null_mut();
-                }
-                if !ret.is_null() {
-                    let sys_id = CString::new(&sys_id[lenrewrite..]).unwrap();
-                    ret = xml_strcat(ret, sys_id.as_ptr() as *const u8);
-                }
+                let url = rewrite
+                    .url
+                    .as_deref()
+                    .map(|p| p.to_string_lossy().into_owned());
+                // If `rewrite == entry`, deadlock occurs at next line `entry.write()....`.
+                // Therefore, drop `rewirte` at this.
                 drop(rewrite);
                 entry.write().unwrap().depth -= 1;
-                return ret;
+                let mut url = url?;
+                url.push_str(&sys_id[lenrewrite..]);
+                return Some(url);
             }
             if have_delegate != 0 {
                 let mut delegates: [Option<PathBuf>; MAX_DELEGATE] = [const { None }; MAX_DELEGATE];
@@ -1323,18 +1260,20 @@ impl CatalogEntryListNode {
                                     n.url.as_deref().unwrap().display()
                                 );
                             }
-                            ret = Self::list_xml_resolve(children, None, Some(sys_id));
-                            if !ret.is_null() {
+                            if let Some(ret) = Self::list_xml_resolve(children, None, Some(sys_id))
+                            {
+                                // If `n == entry`, deadlock occurs at next line `entry.write()....`.
+                                // Therefore, drop `n` at this.
                                 drop(n);
                                 entry.write().unwrap().depth -= 1;
-                                return ret;
+                                return Some(ret);
                             }
                         }
                     }
                 }
                 // Apply the cut algorithm explained in 4/
                 entry.write().unwrap().depth -= 1;
-                return XML_CATAL_BREAK;
+                return None;
             }
         }
         // Then tries 5/ 6/ if a public ID is provided
@@ -1353,12 +1292,9 @@ impl CatalogEntryListNode {
                                     n.name.as_deref().unwrap()
                                 );
                             }
-                            let res = if let Some(url) = n.url.as_deref() {
-                                let url = CString::new(url.to_string_lossy().as_ref()).unwrap();
-                                xml_strdup(url.as_ptr() as *const u8)
-                            } else {
-                                null_mut()
-                            };
+                            let res = n.url.as_deref().map(|u| u.to_string_lossy().into_owned());
+                            // If `n == entry`, deadlock occurs at next line `entry.write()....`.
+                            // Therefore, drop `n` at this.
                             drop(n);
                             entry.write().unwrap().depth -= 1;
                             return res;
@@ -1413,17 +1349,20 @@ impl CatalogEntryListNode {
                                     n.url.as_deref().unwrap().display()
                                 );
                             }
-                            ret = Self::list_xml_resolve(children, Some(pub_id), None);
-                            if !ret.is_null() {
+                            if let Some(ret) = Self::list_xml_resolve(children, Some(pub_id), None)
+                            {
+                                // If `n == entry`, deadlock occurs at next line `entry.write()....`.
+                                // Therefore, drop `n` at this.
+                                drop(n);
                                 entry.write().unwrap().depth -= 1;
-                                return ret;
+                                return Some(ret);
                             }
                         }
                     }
                 }
                 // Apply the cut algorithm explained in 4/
                 entry.write().unwrap().depth -= 1;
-                return XML_CATAL_BREAK;
+                return None;
             }
         }
         if have_next != 0 {
@@ -1437,13 +1376,15 @@ impl CatalogEntryListNode {
                         n.fetch_xml_catalog_file();
                     }
                     if let Some(children) = n.children.as_ref() {
-                        ret = Self::list_xml_resolve(children, pub_id, sys_id);
-                        if !ret.is_null() {
+                        if let Some(ret) = Self::list_xml_resolve(children, pub_id, sys_id) {
+                            // If `n == entry`, deadlock occurs at next line `entry.write()....`.
+                            // Therefore, drop `n` at this.
                             drop(n);
                             entry.write().unwrap().depth -= 1;
-                            return ret;
-                        } else if current_depth > MAX_CATAL_DEPTH as i32 {
-                            return null_mut();
+                            return Some(ret);
+                        }
+                        if current_depth > MAX_CATAL_DEPTH as i32 {
+                            return None;
                         }
                     }
                 }
@@ -1451,7 +1392,7 @@ impl CatalogEntryListNode {
         }
 
         entry.write().unwrap().depth -= 1;
-        null_mut()
+        None
     }
 
     /// Add an entry in the XML catalog, it may overwrite existing but different entries.
@@ -1761,7 +1702,7 @@ impl XmlCatalogEntry {
     /// Returns the URI of the resource or null_mut() if not found,
     /// it must be freed by the caller.
     #[doc(alias = "xmlCatalogLocalResolveURI")]
-    pub unsafe fn local_resolve_uri(&mut self, uri: &str) -> *mut XmlChar {
+    pub unsafe fn local_resolve_uri(&mut self, uri: &str) -> Option<String> {
         if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
             xml_initialize_catalog();
         }
@@ -1770,11 +1711,7 @@ impl XmlCatalogEntry {
             generic_error!("Resolve URI {uri}\n");
         }
 
-        let ret: *mut XmlChar = self.list_xml_resolve_uri(uri);
-        if !ret.is_null() && ret != XML_CATAL_BREAK {
-            return ret;
-        }
-        null_mut()
+        self.list_xml_resolve_uri(uri)
     }
 
     /// Do a complete resolution lookup of an External Identifier using a
@@ -1787,13 +1724,13 @@ impl XmlCatalogEntry {
         &mut self,
         pub_id: Option<&str>,
         sys_id: Option<&str>,
-    ) -> *mut XmlChar {
+    ) -> Option<String> {
         if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
             xml_initialize_catalog();
         }
 
         if pub_id.is_none() && sys_id.is_none() {
-            return null_mut();
+            return None;
         }
 
         if XML_DEBUG_CATALOGS.load(Ordering::Relaxed) != 0 {
@@ -1806,11 +1743,7 @@ impl XmlCatalogEntry {
             }
         }
 
-        let ret: *mut XmlChar = self.list_xml_resolve(pub_id, sys_id);
-        if !ret.is_null() && ret != XML_CATAL_BREAK {
-            return ret;
-        }
-        null_mut()
+        self.list_xml_resolve(pub_id, sys_id)
     }
 
     /// Do a complete resolution lookup of an URI for a list of catalogs
@@ -1820,7 +1753,7 @@ impl XmlCatalogEntry {
     ///
     /// Returns the URI of the resource or null_mut() if not found
     #[doc(alias = "xmlCatalogListXMLResolveURI")]
-    unsafe fn list_xml_resolve_uri(&mut self, uri: &str) -> *mut XmlChar {
+    unsafe fn list_xml_resolve_uri(&mut self, uri: &str) -> Option<String> {
         CatalogEntryListNode::list_xml_resolve_uri(&self.node, uri)
     }
 
@@ -1835,7 +1768,7 @@ impl XmlCatalogEntry {
         &mut self,
         pub_id: Option<&str>,
         sys_id: Option<&str>,
-    ) -> *mut XmlChar {
+    ) -> Option<String> {
         CatalogEntryListNode::list_xml_resolve(&self.node, pub_id, sys_id)
     }
 
@@ -1846,7 +1779,7 @@ impl XmlCatalogEntry {
     ///
     /// Returns the URI of the resource or null_mut() if not found
     #[doc(alias = "xmlCatalogXMLResolveURI")]
-    unsafe fn xml_resolve_uri(&mut self, uri: &str) -> *mut XmlChar {
+    unsafe fn xml_resolve_uri(&mut self, uri: &str) -> Option<String> {
         CatalogEntryListNode::xml_resolve_uri(&self.node, uri)
     }
 
@@ -1857,7 +1790,7 @@ impl XmlCatalogEntry {
     ///
     /// Returns the URI of the resource or null_mut() if not found
     #[doc(alias = "xmlCatalogXMLResolve")]
-    unsafe fn xml_resolve(&mut self, pub_id: Option<&str>, sys_id: Option<&str>) -> *mut XmlChar {
+    unsafe fn xml_resolve(&mut self, pub_id: Option<&str>, sys_id: Option<&str>) -> Option<String> {
         CatalogEntryListNode::xml_resolve(&self.node, pub_id, sys_id)
     }
 
@@ -3100,7 +3033,7 @@ pub unsafe fn xml_catalog_dump<'a>(out: impl Write + 'a) {
 /// Returns the URI of the resource or null_mut() if not found,
 /// it must be freed by the caller.
 #[doc(alias = "xmlCatalogResolve")]
-pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) -> *mut XmlChar {
+pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) -> Option<String> {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3111,7 +3044,7 @@ pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) ->
     let res = if let Some(catalog) = lock.as_mut() {
         catalog.resolve(pub_id, sys_id)
     } else {
-        null_mut()
+        None
     };
     xml_rmutex_unlock(mutex);
     res
@@ -3122,7 +3055,7 @@ pub unsafe fn xml_catalog_resolve(pub_id: Option<&str>, sys_id: Option<&str>) ->
 /// Returns the resource if found or null_mut() otherwise,
 /// the value returned must be freed by the caller.
 #[doc(alias = "xmlCatalogResolveSystem")]
-pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> *mut XmlChar {
+pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> Option<String> {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3133,7 +3066,7 @@ pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> *mut XmlChar {
     let res = if let Some(catalog) = lock.as_mut() {
         catalog.resolve_system(sys_id)
     } else {
-        null_mut()
+        None
     };
     xml_rmutex_unlock(mutex);
     res
@@ -3144,7 +3077,7 @@ pub unsafe fn xml_catalog_resolve_system(sys_id: &str) -> *mut XmlChar {
 /// Returns the resource if found or null_mut() otherwise,
 /// the value returned must be freed by the caller.
 #[doc(alias = "xmlCatalogResolvePublic")]
-pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> *mut XmlChar {
+pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> Option<String> {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3155,7 +3088,7 @@ pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> *mut XmlChar {
     let res = if let Some(catalog) = lock.as_mut() {
         catalog.resolve_public(pub_id)
     } else {
-        null_mut()
+        None
     };
     xml_rmutex_unlock(mutex);
     res
@@ -3166,7 +3099,7 @@ pub unsafe fn xml_catalog_resolve_public(pub_id: &str) -> *mut XmlChar {
 /// Returns the URI of the resource or null_mut() if not found,
 /// it must be freed by the caller.
 #[doc(alias = "xmlCatalogResolveURI")]
-pub unsafe fn xml_catalog_resolve_uri(uri: &str) -> *mut XmlChar {
+pub unsafe fn xml_catalog_resolve_uri(uri: &str) -> Option<String> {
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
         xml_initialize_catalog();
     }
@@ -3177,7 +3110,7 @@ pub unsafe fn xml_catalog_resolve_uri(uri: &str) -> *mut XmlChar {
     let res = if let Some(catalog) = lock.as_mut() {
         catalog.resolve_uri(uri)
     } else {
-        null_mut()
+        None
     };
     xml_rmutex_unlock(mutex);
     res
@@ -3417,9 +3350,7 @@ pub fn xml_catalog_get_defaults() -> XmlCatalogAllow {
 /// Returns the resource if found or null_mut() otherwise.
 #[deprecated = "use xmlCatalogResolveSystem()"]
 #[doc(alias = "xmlCatalogGetSystem")]
-pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
-    let ret: *mut XmlChar;
-    static mut RESULT: [XmlChar; 1000] = [0; 1000];
+pub unsafe fn xml_catalog_get_system(sys_id: &str) -> Option<String> {
     static MSG: AtomicI32 = AtomicI32::new(0);
 
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
@@ -3434,39 +3365,22 @@ pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
     // Check first the XML catalogs
     let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
     if let Some(default_catalog) = default_catalog.as_mut() {
-        ret = default_catalog
+        if let Some(ret) = default_catalog
             .xml
             .as_mut()
             .unwrap()
-            .list_xml_resolve(None, Some(sys_id));
-        if !ret.is_null() && ret != XML_CATAL_BREAK {
-            snprintf(
-                RESULT.as_mut_ptr() as _,
-                RESULT.len() - 1,
-                c"%s".as_ptr() as _,
-                ret,
-            );
-            RESULT[RESULT.len() - 1] = 0;
-            return RESULT.as_ptr() as _;
+            .list_xml_resolve(None, Some(sys_id))
+        {
+            return Some(ret);
         }
     }
 
-    if let Some(default_catalog) = default_catalog.as_mut() {
-        return if let Some(sgml) = xml_catalog_get_sgml_system(&default_catalog.sgml, sys_id) {
-            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
-            snprintf(
-                RESULT.as_mut_ptr() as _,
-                RESULT.len() - 1,
-                c"%s".as_ptr() as _,
-                sgml,
-            );
-            RESULT[RESULT.len() - 1] = 0;
-            return RESULT.as_ptr() as _;
-        } else {
-            null_mut()
-        };
-    }
-    null_mut()
+    let default_catalog = default_catalog.as_mut()?;
+    Some(
+        xml_catalog_get_sgml_system(&default_catalog.sgml, sys_id)?
+            .to_string_lossy()
+            .into_owned(),
+    )
 }
 
 /// Try to lookup the catalog reference associated to a public ID
@@ -3474,9 +3388,7 @@ pub unsafe fn xml_catalog_get_system(sys_id: &str) -> *const XmlChar {
 /// Returns the resource if found or null_mut() otherwise.
 #[deprecated = "use xmlCatalogResolvePublic()"]
 #[doc(alias = "xmlCatalogGetPublic")]
-pub unsafe fn xml_catalog_get_public(pub_id: &str) -> *const XmlChar {
-    let ret: *mut XmlChar;
-    static mut RESULT: [XmlChar; 1000] = [0; 1000];
+pub unsafe fn xml_catalog_get_public(pub_id: &str) -> Option<String> {
     static MSG: AtomicI32 = AtomicI32::new(0);
 
     if !XML_CATALOG_INITIALIZED.load(Ordering::Relaxed) {
@@ -3492,39 +3404,19 @@ pub unsafe fn xml_catalog_get_public(pub_id: &str) -> *const XmlChar {
     // Check first the XML catalogs
     let mut default_catalog = XML_DEFAULT_CATALOG.write().unwrap();
     if let Some(default_catalog) = default_catalog.as_mut() {
-        ret = default_catalog
+        if let Some(ret) = default_catalog
             .xml
             .as_mut()
             .unwrap()
-            .list_xml_resolve(Some(pub_id), None);
-        if !ret.is_null() && ret != XML_CATAL_BREAK {
-            snprintf(
-                RESULT.as_mut_ptr() as _,
-                RESULT.len() - 1,
-                c"%s".as_ptr() as _,
-                ret,
-            );
-            RESULT[RESULT.len() - 1] = 0;
-            return RESULT.as_ptr() as _;
+            .list_xml_resolve(Some(pub_id), None)
+        {
+            return Some(ret);
         }
     }
 
-    if let Some(default_catalog) = default_catalog.as_mut() {
-        return if let Some(sgml) = xml_catalog_get_sgml_public(&default_catalog.sgml, pub_id) {
-            let sgml = CString::new(sgml.to_string_lossy().as_ref()).unwrap();
-            snprintf(
-                RESULT.as_mut_ptr() as _,
-                RESULT.len() - 1,
-                c"%s".as_ptr() as _,
-                sgml,
-            );
-            RESULT[RESULT.len() - 1] = 0;
-            return RESULT.as_ptr() as _;
-        } else {
-            null_mut()
-        };
-    }
-    null_mut()
+    let default_catalog = default_catalog.as_mut()?;
+    let sgml = xml_catalog_get_sgml_public(&default_catalog.sgml, pub_id)?;
+    Some(sgml.to_string_lossy().into_owned())
 }
 
 #[cfg(test)]

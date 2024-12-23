@@ -26,11 +26,11 @@ mod output;
 
 use std::{
     borrow::Cow,
-    ffi::{c_char, c_int, c_uint, c_void, CStr, CString},
+    ffi::{c_char, c_int, c_uint, c_void, CString},
     fs::{metadata, File},
     io::{self, stdin, ErrorKind, Read},
     path::Path,
-    ptr::{null, null_mut},
+    ptr::null_mut,
     sync::atomic::Ordering,
 };
 
@@ -53,11 +53,10 @@ use crate::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
         },
-        globals::{xml_free, xml_mem_strdup},
+        globals::xml_mem_strdup,
         nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
-        xmlstring::{xml_strdup, xml_strncasecmp, XmlChar},
     },
     nanohttp::XmlNanoHTTPCtxt,
     uri::canonic_path,
@@ -480,7 +479,6 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
-    let mut resource: *mut XmlChar;
 
     if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNonet as i32 != 0 {
         let options: c_int = (*ctxt).options;
@@ -491,25 +489,18 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
         return ret;
     }
     #[cfg(feature = "catalog")]
-    {
-        resource = xml_resolve_resource_from_catalog(url, id, ctxt);
-    }
+    let resource =
+        xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
+    #[cfg(not(feature = "catalog"))]
+    let resource = url;
 
-    let url = url.map(|u| CString::new(u).unwrap());
-    let url = url.as_deref().map_or(null(), |u| u.as_ptr() as *const u8);
-    if resource.is_null() {
-        resource = url as _;
-    }
-
-    if resource.is_null() {
+    let Some(resource) = resource else {
         let id = id.unwrap_or("NULL").to_owned();
         __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
         return null_mut();
-    }
-    ret = xml_new_input_from_file(ctxt, resource as _);
-    if !resource.is_null() && resource != url as _ {
-        xml_free(resource as _);
-    }
+    };
+    let resource = CString::new(resource).unwrap();
+    ret = xml_new_input_from_file(ctxt, resource.as_ptr());
     ret
 }
 
@@ -554,8 +545,8 @@ unsafe fn xml_resolve_resource_from_catalog(
     url: Option<&str>,
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
-) -> *mut XmlChar {
-    let mut resource: *mut XmlChar = null_mut();
+) -> Option<String> {
+    let mut resource = None;
 
     // If the resource doesn't exists as a file,
     // try to load it from the resource poc_inted in the catalogs
@@ -569,44 +560,31 @@ unsafe fn xml_resolve_resource_from_catalog(
             }
         }
         // Try a global lookup
-        if resource.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
+        if resource.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
             resource = xml_catalog_resolve(id, url);
         }
-        if resource.is_null() && url.is_some() {
-            let url = CString::new(url.unwrap()).unwrap();
-            resource = xml_strdup(url.as_ptr() as *const u8);
+        if resource.is_none() && url.is_some() {
+            resource = url.map(|url| url.to_owned());
         }
 
         // TODO: do an URI lookup on the reference
-        if !resource.is_null()
-            && xml_no_net_exists(Some(
-                CStr::from_ptr(resource as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            )) == 0
+        if let Some(rsrc) = resource
+            .as_deref()
+            .filter(|resource| xml_no_net_exists(Some(resource)) == 0)
         {
-            let mut tmp: *mut XmlChar = null_mut();
+            let mut tmp = None;
 
             if !ctxt.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Document) {
                 if let Some(catalogs) = (*ctxt).catalogs.as_mut() {
-                    tmp = catalogs.local_resolve_uri(
-                        CStr::from_ptr(resource as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
+                    tmp = catalogs.local_resolve_uri(rsrc);
                 }
             }
-            if tmp.is_null() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
-                tmp = xml_catalog_resolve_uri(
-                    CStr::from_ptr(resource as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
+            if tmp.is_none() && matches!(pref, XmlCatalogAllow::All | XmlCatalogAllow::Global) {
+                tmp = xml_catalog_resolve_uri(rsrc);
             }
 
-            if !tmp.is_null() {
-                xml_free(resource as _);
-                resource = tmp;
+            if let Some(tmp) = tmp {
+                resource = Some(tmp);
             }
         }
     }
@@ -624,50 +602,21 @@ pub unsafe fn xml_no_net_external_entity_loader(
     id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let mut resource: *mut XmlChar;
-
     #[cfg(feature = "catalog")]
-    {
-        resource = xml_resolve_resource_from_catalog(url, id, ctxt);
-    }
+    let resource =
+        xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
     #[cfg(not(feature = "catalog"))]
-    {
-        resource = null_mut();
-    }
+    let mut resource = url;
 
-    let url = url.map(|u| CString::new(u).unwrap());
-    let url = url.as_deref().map_or(null(), |u| u.as_ptr() as *const u8);
-    if resource.is_null() {
-        resource = url as _;
-    }
-
-    if !resource.is_null()
-        && (xml_strncasecmp(resource as _, c"ftp://".as_ptr() as _, 6) == 0
-            || xml_strncasecmp(resource as _, c"http://".as_ptr() as _, 7) == 0)
-    {
-        xml_ioerr(
-            XmlParserErrors::XmlIONetworkAttempt,
-            Some(
-                CStr::from_ptr(resource as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ),
-        );
-        if resource != url as _ {
-            xml_free(resource as _);
-        }
+    if let Some(resource) = resource.as_deref().filter(|rsrc| {
+        (rsrc.len() >= 6 && rsrc[..6].eq_ignore_ascii_case("ftp://"))
+            || (rsrc.len() >= 7 && rsrc[..7].eq_ignore_ascii_case("http://"))
+    }) {
+        xml_ioerr(XmlParserErrors::XmlIONetworkAttempt, Some(resource));
         return null_mut();
     }
-    let input: XmlParserInputPtr = xml_default_external_entity_loader(
-        (!resource.is_null())
-            .then(|| CStr::from_ptr(resource as *const i8).to_string_lossy())
-            .as_deref(),
-        id,
-        ctxt,
-    );
-    if resource != url as _ {
-        xml_free(resource as _);
-    }
+    let input: XmlParserInputPtr =
+        xml_default_external_entity_loader(resource.as_deref(), id, ctxt);
     input
 }
 
