@@ -5715,16 +5715,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         err: None,
         options: XmlParserOption::XmlParseNoent as i32,
     },
-    #[cfg(feature = "xinclude")]
-    TestDesc {
-        desc: "XInclude regression tests",
-        func: err_parse_test,
-        input: Some("./test/XInclude/docs/*"),
-        out: Some("./result/XInclude/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32,
-    },
     #[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
     TestDesc {
         desc: "XInclude xmlReader regression tests",
@@ -5734,17 +5724,6 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         suffix: Some(".rdr"),
         err: Some(".err"),
         options: XmlParserOption::XmlParseXinclude as i32,
-    },
-    #[cfg(feature = "xinclude")]
-    TestDesc {
-        desc: "XInclude regression tests stripping include nodes",
-        func: err_parse_test,
-        input: Some("./test/XInclude/docs/*"),
-        out: Some("./result/XInclude/"),
-        suffix: Some(""),
-        err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32
-            | XmlParserOption::XmlParseNoxincnode as i32,
     },
     #[cfg(all(
         feature = "xpath",
@@ -5948,6 +5927,35 @@ fn test_common(desc: &TestDesc) {
         NB_LEAKS.get() - old_leaks,
     );
     test_cleanup();
+}
+
+#[test]
+#[cfg(feature = "xinclude")]
+fn xinclude_regression_test() {
+    test_common(&TestDesc {
+        desc: "XInclude regression tests",
+        func: err_parse_test,
+        input: Some("./test/XInclude/docs/*"),
+        out: Some("./result/XInclude/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseXinclude as i32,
+    });
+}
+
+#[test]
+#[cfg(feature = "xinclude")]
+fn xinclude_regression_stripping_include_nodes_test() {
+    test_common(&TestDesc {
+        desc: "XInclude regression tests stripping include nodes",
+        func: err_parse_test,
+        input: Some("./test/XInclude/docs/*"),
+        out: Some("./result/XInclude/"),
+        suffix: Some(""),
+        err: Some(".err"),
+        options: XmlParserOption::XmlParseXinclude as i32
+            | XmlParserOption::XmlParseNoxincnode as i32,
+    });
 }
 
 #[test]
