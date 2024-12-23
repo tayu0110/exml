@@ -113,15 +113,15 @@ pub type XmlC14NVisibleNsStackPtr = *mut XmlC14NVisibleNsStack;
 ///
 /// Returns 1 if the node should be included
 #[doc(alias = "xmlC14NIsVisibleCallback")]
-pub type XmlC14NIsVisibleCallback =
-    unsafe fn(user_data: *mut c_void, node: XmlNodePtr, parent: XmlNodePtr) -> i32;
+pub type XmlC14NIsVisibleCallback<T> =
+    unsafe fn(user_data: &T, node: XmlNodePtr, parent: XmlNodePtr) -> i32;
 
 #[repr(C)]
-pub struct XmlC14NCtx<'a> {
+pub struct XmlC14NCtx<'a, T> {
     /* input parameters */
     doc: XmlDocPtr,
-    is_visible_callback: Option<XmlC14NIsVisibleCallback>,
-    user_data: *mut c_void,
+    is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
+    user_data: T,
     with_comments: i32,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 
@@ -140,12 +140,12 @@ pub struct XmlC14NCtx<'a> {
     error: i32,
 }
 
-impl Default for XmlC14NCtx<'_> {
+impl<T: Default> Default for XmlC14NCtx<'_, T> {
     fn default() -> Self {
         Self {
             doc: null_mut(),
             is_visible_callback: None,
-            user_data: null_mut(),
+            user_data: T::default(),
             with_comments: 0,
             buf: Rc::new(RefCell::new(XmlOutputBuffer::default())),
             pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
@@ -158,7 +158,7 @@ impl Default for XmlC14NCtx<'_> {
     }
 }
 
-pub type XmlC14NCtxPtr<'a> = *mut XmlC14NCtx<'a>;
+pub type XmlC14NCtxPtr<'a, T> = *mut XmlC14NCtx<'a, T>;
 #[repr(C)]
 pub enum XmlC14NNormalizationMode {
     XmlC14NNormalizeAttr = 0,
@@ -168,11 +168,11 @@ pub enum XmlC14NNormalizationMode {
 }
 
 unsafe fn xml_c14n_is_node_in_nodeset(
-    user_data: *mut c_void,
+    user_data: &*mut c_void,
     node: XmlNodePtr,
     parent: XmlNodePtr,
 ) -> i32 {
-    let nodes: XmlNodeSetPtr = user_data as XmlNodeSetPtr;
+    let nodes: XmlNodeSetPtr = *user_data as XmlNodeSetPtr;
     if !nodes.is_null() && !node.is_null() {
         if !matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
             return (*nodes).contains(node) as i32;
@@ -414,7 +414,12 @@ pub unsafe fn xml_c14n_doc_save(
 
 /// Handle a redefinition of attribute error
 #[doc(alias = "xmlC14NErr")]
-unsafe fn xml_c14n_err(ctxt: XmlC14NCtxPtr, node: XmlNodePtr, error: XmlParserErrors, msg: &str) {
+unsafe fn xml_c14n_err<T>(
+    ctxt: XmlC14NCtxPtr<'_, T>,
+    node: XmlNodePtr,
+    error: XmlParserErrors,
+    msg: &str,
+) {
     if !ctxt.is_null() {
         (*ctxt).error = error as i32;
     }
@@ -475,7 +480,7 @@ unsafe fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStackPtr) {
 
 /// Cleanups the C14N context object.
 #[doc(alias = "xmlC14NFreeCtx")]
-unsafe fn xml_c14n_free_ctx(ctx: XmlC14NCtxPtr) {
+unsafe fn xml_c14n_free_ctx<T>(ctx: XmlC14NCtxPtr<'_, T>) {
     if ctx.is_null() {
         xml_c14n_err_param("freeing context");
         return;
@@ -497,16 +502,16 @@ macro_rules! xml_c14n_is_exclusive {
 ///
 /// Returns pointer to newly created object (success) or NULL (fail)
 #[doc(alias = "xmlC14NNewCtx")]
-unsafe fn xml_c14n_new_ctx(
+unsafe fn xml_c14n_new_ctx<'a, T>(
     doc: XmlDocPtr,
-    is_visible_callback: Option<XmlC14NIsVisibleCallback>,
-    user_data: *mut c_void,
+    is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
+    user_data: T,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
-    buf: Rc<RefCell<XmlOutputBuffer>>,
-) -> XmlC14NCtxPtr {
-    let mut ctx: XmlC14NCtxPtr = null_mut();
+    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
+) -> XmlC14NCtxPtr<'a, T> {
+    let mut ctx = null_mut();
 
     if doc.is_null() {
         xml_c14n_err_param("creating new context");
@@ -525,23 +530,27 @@ unsafe fn xml_c14n_new_ctx(
     }
 
     // Allocate a new xmlC14NCtxPtr and fill the fields.
-    ctx = xml_malloc(size_of::<XmlC14NCtx>()) as _;
+    ctx = xml_malloc(size_of::<XmlC14NCtx<'a, T>>()) as _;
     if ctx.is_null() {
         xml_c14n_err_memory("creating context");
         return null_mut();
     }
-    memset(ctx as _, 0, size_of::<XmlC14NCtx>());
-    std::ptr::write(&mut *ctx, XmlC14NCtx::default());
 
     // initialize C14N context
-    (*ctx).doc = doc;
-    (*ctx).with_comments = with_comments;
-    (*ctx).is_visible_callback = is_visible_callback;
-    (*ctx).user_data = user_data;
-    (*ctx).buf = buf;
-    (*ctx).parent_is_doc = 1;
-    (*ctx).pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
-    (*ctx).ns_rendered = xml_c14n_visible_ns_stack_create();
+    let tmp = XmlC14NCtx {
+        doc,
+        with_comments,
+        is_visible_callback,
+        user_data,
+        buf,
+        parent_is_doc: 1,
+        pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
+        ns_rendered: xml_c14n_visible_ns_stack_create(),
+        mode: XmlC14NMode::XmlC14N1_0,
+        inclusive_ns_prefixes: null_mut(),
+        error: 0,
+    };
+    std::ptr::write(&mut *ctx, tmp);
 
     if (*ctx).ns_rendered.is_null() {
         xml_c14n_err(
@@ -566,7 +575,7 @@ macro_rules! xml_c14n_is_visible {
     ( $ctx:expr, $node:expr, $parent:expr ) => {
         if let Some(callback) = (*$ctx).is_visible_callback {
             callback(
-                (*$ctx).user_data,
+                &(*$ctx).user_data,
                 $node as XmlNodePtr,
                 $parent as XmlNodePtr,
             )
@@ -604,7 +613,10 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
 ///
 /// Returns 0 if the node has no relative namespaces or -1 otherwise.
 #[doc(alias = "xmlC14NCheckForRelativeNamespaces")]
-unsafe fn xml_c14n_check_for_relative_namespaces(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) -> i32 {
+unsafe fn xml_c14n_check_for_relative_namespaces<T>(
+    ctx: XmlC14NCtxPtr<'_, T>,
+    cur: XmlNodePtr,
+) -> i32 {
     let mut ns: XmlNsPtr;
 
     if ctx.is_null()
@@ -836,7 +848,7 @@ unsafe fn xml_c14n_visible_ns_stack_add(
 ///
 /// Returns 1 on success or 0 on fail.
 #[doc(alias = "xmlC14NPrintNamespaces")]
-unsafe fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -> i32 {
+unsafe fn xml_c14n_print_namespaces<T>(ns: &XmlNs, ctx: XmlC14NCtxPtr<'_, T>) -> i32 {
     if ctx.is_null() {
         xml_c14n_err_param("writing namespaces");
         return 0;
@@ -869,8 +881,8 @@ unsafe fn xml_c14n_print_namespaces(ns: &XmlNs, ctx: XmlC14NCtxPtr) -> i32 {
 }
 
 #[doc(alias = "xmlC14NPrintNamespacesWalker")]
-extern "C" fn xml_c14n_print_namespaces_walker(ns: *const c_void, ctx: *mut c_void) -> i32 {
-    unsafe { xml_c14n_print_namespaces(&*(ns as *const XmlNs), ctx as _) }
+extern "C" fn xml_c14n_print_namespaces_walker<T>(ns: *const c_void, ctx: *mut c_void) -> i32 {
+    unsafe { xml_c14n_print_namespaces::<T>(&*(ns as *const XmlNs), ctx as _) }
 }
 
 /// Prints out canonical namespace axis of the current node to the
@@ -906,8 +918,8 @@ extern "C" fn xml_c14n_print_namespaces_walker(ns: *const c_void, ctx: *mut c_vo
 ///
 /// Returns 0 on success or -1 on fail.
 #[doc(alias = "xmlC14NProcessNamespacesAxis")]
-unsafe fn xml_c14n_process_namespaces_axis(
-    ctx: XmlC14NCtxPtr,
+unsafe fn xml_c14n_process_namespaces_axis<T>(
+    ctx: XmlC14NCtxPtr<T>,
     cur: XmlNodePtr,
     visible: i32,
 ) -> i32 {
@@ -975,7 +987,7 @@ unsafe fn xml_c14n_process_namespaces_axis(
     }
 
     // print out all elements from list
-    xml_list_walk(list, Some(xml_c14n_print_namespaces_walker), ctx as _);
+    xml_list_walk(list, Some(xml_c14n_print_namespaces_walker::<T>), ctx as _);
 
     // Cleanup
     xml_list_delete(list);
@@ -983,10 +995,10 @@ unsafe fn xml_c14n_process_namespaces_axis(
 }
 
 #[doc(alias = "xmlC14NVisibleNsStackFind")]
-unsafe fn xml_exc_c14n_visible_ns_stack_find(
+unsafe fn xml_exc_c14n_visible_ns_stack_find<T>(
     cur: XmlC14NVisibleNsStackPtr,
     ns: Option<&XmlNs>,
-    ctx: XmlC14NCtxPtr,
+    ctx: XmlC14NCtxPtr<T>,
 ) -> i32 {
     if cur.is_null() {
         xml_c14n_err_param("searching namespaces stack (exc c14n)");
@@ -1064,8 +1076,8 @@ unsafe fn xml_exc_c14n_visible_ns_stack_find(
 ///
 /// Returns 0 on success or -1 on fail.
 #[doc(alias = "xmlExcC14NProcessNamespacesAxis")]
-unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
-    ctx: XmlC14NCtxPtr,
+unsafe fn xml_exc_c14n_process_namespaces_axis<T>(
+    ctx: XmlC14NCtxPtr<T>,
     cur: XmlNodePtr,
     visible: i32,
 ) -> i32 {
@@ -1203,14 +1215,14 @@ unsafe extern "C" fn xml_exc_c14n_process_namespaces_axis(
     }
 
     // print out all elements from list
-    xml_list_walk(list, Some(xml_c14n_print_namespaces_walker), ctx as _);
+    xml_list_walk(list, Some(xml_c14n_print_namespaces_walker::<T>), ctx as _);
 
     // Cleanup
     xml_list_delete(list);
     0
 }
 
-unsafe extern "C" fn xml_c14n_visible_ns_stack_shift(cur: XmlC14NVisibleNsStackPtr) {
+unsafe fn xml_c14n_visible_ns_stack_shift(cur: XmlC14NVisibleNsStackPtr) {
     if cur.is_null() {
         xml_c14n_err_param("shifting namespaces stack");
         return;
@@ -1279,8 +1291,8 @@ unsafe extern "C" fn xml_c14n_is_xml_attr(attr: XmlAttrPtr) -> bool {
 ///
 /// Returns a pointer to the attribute node (if found) or NULL otherwise.
 #[doc(alias = "xmlC14NFindHiddenParentAttr")]
-unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
-    ctx: XmlC14NCtxPtr,
+unsafe fn xml_c14n_find_hidden_parent_attr<T>(
+    ctx: XmlC14NCtxPtr<T>,
     mut cur: XmlNodePtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -1309,8 +1321,8 @@ unsafe extern "C" fn xml_c14n_find_hidden_parent_attr(
 ///
 /// Returns the newly created attribute or NULL
 #[doc(alias = "xmlC14NFixupBaseAttr")]
-unsafe extern "C" fn xml_c14n_fixup_base_attr(
-    ctx: XmlC14NCtxPtr,
+unsafe fn xml_c14n_fixup_base_attr<T>(
+    ctx: XmlC14NCtxPtr<T>,
     xml_base_attr: XmlAttrPtr,
 ) -> XmlAttrPtr {
     let mut cur: XmlNodePtr;
@@ -1557,9 +1569,9 @@ unsafe fn xml_c11n_normalize_attr(a: *const u8) -> *mut XmlChar {
 ///
 /// Returns 1 on success or 0 on fail.
 #[doc(alias = "xmlC14NPrintAttrs")]
-extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i32 {
+extern "C" fn xml_c14n_print_attrs<T>(data: *const c_void, user: *mut c_void) -> i32 {
     let attr: XmlAttrPtr = data as _;
-    let ctx: XmlC14NCtxPtr = user as _;
+    let ctx: XmlC14NCtxPtr<T> = user as _;
     let buffer: *mut XmlChar;
 
     unsafe {
@@ -1629,8 +1641,8 @@ extern "C" fn xml_c14n_print_attrs(data: *const c_void, user: *mut c_void) -> i3
 ///
 /// Returns 0 on success or -1 on fail.
 #[doc(alias = "xmlC14NProcessAttrsAxis")]
-unsafe extern "C" fn xml_c14n_process_attrs_axis(
-    ctx: XmlC14NCtxPtr,
+unsafe fn xml_c14n_process_attrs_axis<T>(
+    ctx: XmlC14NCtxPtr<T>,
     cur: XmlNodePtr,
     parent_visible: i32,
 ) -> i32 {
@@ -1847,7 +1859,7 @@ unsafe extern "C" fn xml_c14n_process_attrs_axis(
     }
 
     // print out all elements from list
-    xml_list_walk(list, Some(xml_c14n_print_attrs), ctx as _);
+    xml_list_walk(list, Some(xml_c14n_print_attrs::<T>), ctx as _);
 
     // Cleanup
     xml_free_prop_list(attrs_to_delete);
@@ -1884,7 +1896,11 @@ unsafe fn xml_c14n_visible_ns_stack_restore(
 ///
 /// Returns non-negative value on success or negative value on fail
 #[doc(alias = "xmlC14NProcessElementNode")]
-unsafe fn xml_c14n_process_element_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr, visible: i32) -> i32 {
+unsafe fn xml_c14n_process_element_node<T>(
+    ctx: XmlC14NCtxPtr<'_, T>,
+    cur: XmlNodePtr,
+    visible: i32,
+) -> i32 {
     let mut ret: i32;
     let mut state: XmlC14NVisibleNsStack = unsafe { zeroed() };
     let mut parent_is_doc: i32 = 0;
@@ -2057,7 +2073,7 @@ unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
 ///
 /// Returns non-negative value on success or negative value on fail
 #[doc(alias = "xmlC14NProcessNode")]
-unsafe fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) -> i32 {
+unsafe fn xml_c14n_process_node<T>(ctx: XmlC14NCtxPtr<'_, T>, cur: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
 
     if ctx.is_null() || cur.is_null() {
@@ -2248,7 +2264,7 @@ unsafe fn xml_c14n_process_node(ctx: XmlC14NCtxPtr, cur: XmlNodePtr) -> i32 {
 ///
 /// Returns non-negative value on success or negative value on fail
 #[doc(alias = "xmlC14NProcessNodeList")]
-unsafe fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: XmlNodePtr) -> i32 {
+unsafe fn xml_c14n_process_node_list<T>(ctx: XmlC14NCtxPtr<'_, T>, mut cur: XmlNodePtr) -> i32 {
     let mut ret: i32;
 
     if ctx.is_null() {
@@ -2270,10 +2286,10 @@ unsafe fn xml_c14n_process_node_list(ctx: XmlC14NCtxPtr, mut cur: XmlNodePtr) ->
 ///
 /// Returns non-negative value on success or a negative value on fail
 #[doc(alias = "xmlC14NExecute")]
-pub unsafe fn xml_c14n_execute(
+pub unsafe fn xml_c14n_execute<T>(
     doc: XmlDocPtr,
-    is_visible_callback: XmlC14NIsVisibleCallback,
-    user_data: *mut c_void,
+    is_visible_callback: XmlC14NIsVisibleCallback<T>,
+    user_data: T,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: i32,
@@ -2288,7 +2304,7 @@ pub unsafe fn xml_c14n_execute(
 
     //  Validate the encoding output buffer encoding
     if buf.borrow().encoder.is_some() {
-        xml_c14n_err(
+        xml_c14n_err::<T>(
             null_mut(),
             doc as XmlNodePtr,
             XmlParserErrors::XmlC14NRequiresUtf8,
@@ -2297,7 +2313,7 @@ pub unsafe fn xml_c14n_execute(
         return -1;
     }
 
-    let ctx: XmlC14NCtxPtr = xml_c14n_new_ctx(
+    let ctx = xml_c14n_new_ctx(
         doc,
         Some(is_visible_callback),
         user_data,
@@ -2307,7 +2323,7 @@ pub unsafe fn xml_c14n_execute(
         buf.clone(),
     );
     if ctx.is_null() {
-        xml_c14n_err(
+        xml_c14n_err::<T>(
             null_mut(),
             doc as XmlNodePtr,
             XmlParserErrors::XmlC14NCreateCtxt,
