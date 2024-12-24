@@ -4581,8 +4581,18 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
     if !uri.is_null() || !external_id.is_null() {
         (*ctxt).has_external_subset = 1;
     }
-    (*ctxt).ext_sub_uri = uri;
-    (*ctxt).ext_sub_system = external_id;
+    (*ctxt).ext_sub_uri = (!uri.is_null()).then(|| {
+        CStr::from_ptr(uri as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    });
+    (*ctxt).ext_sub_system = (!external_id.is_null()).then(|| {
+        CStr::from_ptr(external_id as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    });
+    xml_free(uri as _);
+    xml_free(external_id as _);
 
     (*ctxt).skip_blanks();
 
@@ -4594,12 +4604,8 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
                 (!name.is_null())
                     .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
                     .as_deref(),
-                (!external_id.is_null())
-                    .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                    .as_deref(),
-                (!uri.is_null())
-                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                    .as_deref(),
+                (*ctxt).ext_sub_system.as_deref(),
+                (*ctxt).ext_sub_uri.as_deref(),
             );
         }
     }

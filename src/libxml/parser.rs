@@ -550,14 +550,14 @@ pub struct XmlParserCtxt {
     pub(crate) name: *const XmlChar, /* Current parsed Node */
     pub(crate) name_tab: Vec<*const XmlChar>, /* array of nodes */
 
-    nb_chars: i64,                           /* unused */
-    pub(crate) check_index: i64,             /* used by progressive parsing lookup */
-    pub(crate) keep_blanks: i32,             /* ugly but ... */
-    pub(crate) disable_sax: i32,             /* SAX callbacks are disabled */
-    pub in_subset: i32,                      /* Parsing is in int 1/ext 2 subset */
-    pub(crate) int_sub_name: *const XmlChar, /* name of subset */
-    pub(crate) ext_sub_uri: *mut XmlChar,    /* URI of external subset */
-    pub(crate) ext_sub_system: *mut XmlChar, /* SYSTEM ID of external subset */
+    nb_chars: i64,                             /* unused */
+    pub(crate) check_index: i64,               /* used by progressive parsing lookup */
+    pub(crate) keep_blanks: i32,               /* ugly but ... */
+    pub(crate) disable_sax: i32,               /* SAX callbacks are disabled */
+    pub in_subset: i32,                        /* Parsing is in int 1/ext 2 subset */
+    pub(crate) int_sub_name: *const XmlChar,   /* name of subset */
+    pub(crate) ext_sub_uri: Option<String>,    /* URI of external subset */
+    pub(crate) ext_sub_system: Option<String>, /* SYSTEM ID of external subset */
 
     // xml:space values
     pub(crate) space_tab: Vec<i32>, /* array of space infos */
@@ -1465,12 +1465,10 @@ impl XmlParserCtxt {
 
         self.ctxt_use_options_internal(options, encoding);
         if let Some(encoding) = encoding {
-            /*
-             * TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
-             * caller provided an encoding. Otherwise, we might match to
-             * the encoding from the XML declaration which is likely to
-             * break things. Also see xmlSwitchInputEncoding.
-             */
+            // TODO: We should consider to set XML_PARSE_IGNORE_ENC if the
+            // caller provided an encoding. Otherwise, we might match to
+            // the encoding from the XML declaration which is likely to
+            // break things. Also see xmlSwitchInputEncoding.
             if let Some(handler) = find_encoding_handler(encoding) {
                 self.switch_to_encoding(handler);
             }
@@ -1509,33 +1507,24 @@ impl XmlParserCtxt {
         };
 
         if input_buf.borrow_mut().encoder.replace(handler).is_some() {
-            /*
-             * Switching encodings during parsing is a really bad idea,
-             * but Chromium can match between ISO-8859-1 and UTF-16 before
-             * separate calls to xmlParseChunk.
-             *
-             * TODO: We should check whether the "raw" input buffer is empty and
-             * convert the old content using the old encoder.
-             */
+            // Switching encodings during parsing is a really bad idea,
+            // but Chromium can match between ISO-8859-1 and UTF-16 before
+            // separate calls to xmlParseChunk.
+            //
+            // TODO: We should check whether the "raw" input buffer is empty and
+            // convert the old content using the old encoder.
             return 0;
         }
 
         self.charset = XmlCharEncoding::UTF8;
 
-        /*
-         * Is there already some content down the pipe to convert ?
-         */
+        // Is there already some content down the pipe to convert ?
         let Some(mut buf) = input_buf.borrow().buffer.filter(|buf| !buf.is_empty()) else {
             return 0;
         };
-        /*
-         * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-         */
+        // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
 
-        /*
-         * Specific handling of the Byte Order Mark for
-         * UTF-16
-         */
+        // Specific handling of the Byte Order Mark for UTF-16
         if matches!(
             (*input_buf).borrow().encoder.as_ref().unwrap().name(),
             "UTF-16LE" | "UTF-16"
@@ -1550,11 +1539,8 @@ impl XmlParserCtxt {
         {
             (*input).cur = (*input).cur.add(2);
         }
-        /*
-         * Errata on XML-1.0 June 20 2001
-         * Specific handling of the Byte Order Mark for
-         * UTF-8
-         */
+        // Errata on XML-1.0 June 20 2001
+        // Specific handling of the Byte Order Mark for UTF-8
         if (*input_buf).borrow().encoder.as_ref().unwrap().name() == "UTF-8"
             && *(*input).cur.add(0) == 0xEF
             && *(*input).cur.add(1) == 0xBB
@@ -1563,10 +1549,8 @@ impl XmlParserCtxt {
             (*input).cur = (*input).cur.add(3);
         }
 
-        /*
-         * Shrink the current input buffer.
-         * Move it as the raw buffer and create a new input buffer
-         */
+        // Shrink the current input buffer.
+        // Move it as the raw buffer and create a new input buffer
         let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
         buf.trim_head(processed as usize);
         (*input).consumed += processed as u64;
@@ -1576,20 +1560,18 @@ impl XmlParserCtxt {
         input_buf.borrow_mut().rawconsumed = processed as u64;
         let using: size_t = buf.len();
 
-        /*
-         * TODO: We must flush and decode the whole buffer to make functions
-         * like xmlReadMemory work with a user-provided encoding. If the
-         * encoding is specified directly, we should probably set
-         * XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
-         * twice. Then we could set "flush" to false which should save
-         * a considerable amount of memory when parsing from memory.
-         * It's probably even possible to remove this whole if-block
-         * completely.
-         */
+        // TODO: We must flush and decode the whole buffer to make functions
+        // like xmlReadMemory work with a user-provided encoding. If the
+        // encoding is specified directly, we should probably set
+        // XML_PARSE_IGNORE_ENC in xmlDoRead to avoid switching encodings
+        // twice. Then we could set "flush" to false which should save
+        // a considerable amount of memory when parsing from memory.
+        // It's probably even possible to remove this whole if-block
+        // completely.
         let res = input_buf.borrow_mut().decode(true);
         (*input).reset_base();
         if res.is_err() {
-            /* TODO: This could be an out of memory or an encoding error. */
+            // TODO: This could be an out of memory or an encoding error.
             xml_err_internal!(self, "switching encoding: encoder error\n");
             self.halt();
             return -1;
@@ -1649,8 +1631,8 @@ impl Default for XmlParserCtxt {
             disable_sax: 0,
             in_subset: 0,
             int_sub_name: null(),
-            ext_sub_uri: null_mut(),
-            ext_sub_system: null_mut(),
+            ext_sub_uri: None,
+            ext_sub_system: None,
             space_tab: vec![],
             depth: 0,
             entity: null_mut(),
@@ -3174,14 +3156,8 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
                 external_subset(
                     (*ctxt).user_data.clone(),
                     (*ctxt).int_sub_name,
-                    (!(*ctxt).ext_sub_system.is_null())
-                        .then(|| {
-                            CStr::from_ptr((*ctxt).ext_sub_system as *const i8).to_string_lossy()
-                        })
-                        .as_deref(),
-                    (!(*ctxt).ext_sub_uri.is_null())
-                        .then(|| CStr::from_ptr((*ctxt).ext_sub_uri as *const i8).to_string_lossy())
-                        .as_deref(),
+                    (*ctxt).ext_sub_system.as_deref(),
+                    (*ctxt).ext_sub_uri.as_deref(),
                 );
             }
         }
@@ -4931,12 +4907,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     (*ctxt).input_tab.shrink_to_fit();
     (*ctxt).version = None;
     (*ctxt).encoding = None;
-    if !(*ctxt).ext_sub_uri.is_null() {
-        xml_free((*ctxt).ext_sub_uri as _);
-    }
-    if !(*ctxt).ext_sub_system.is_null() {
-        xml_free((*ctxt).ext_sub_system as _);
-    }
+    (*ctxt).ext_sub_uri = None;
+    (*ctxt).ext_sub_system = None;
     #[cfg(feature = "sax1")]
     {
         if !(*ctxt).sax.is_null() && (*ctxt).sax != xml_default_sax_handler() as _ {
@@ -9915,18 +9887,8 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                 ((*(*ctxt).sax).external_subset.unwrap())(
                                     (*ctxt).user_data.clone(),
                                     (*ctxt).int_sub_name,
-                                    (!(*ctxt).ext_sub_system.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr((*ctxt).ext_sub_system as *const i8)
-                                                .to_string_lossy()
-                                        })
-                                        .as_deref(),
-                                    (!(*ctxt).ext_sub_uri.is_null())
-                                        .then(|| {
-                                            CStr::from_ptr((*ctxt).ext_sub_uri as *const i8)
-                                                .to_string_lossy()
-                                        })
-                                        .as_deref(),
+                                    (*ctxt).ext_sub_system.as_deref(),
+                                    (*ctxt).ext_sub_uri.as_deref(),
                                 );
                             }
                             (*ctxt).in_subset = 0;
@@ -9974,18 +9936,8 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         ((*(*ctxt).sax).external_subset.unwrap())(
                             (*ctxt).user_data.clone(),
                             (*ctxt).int_sub_name,
-                            (!(*ctxt).ext_sub_system.is_null())
-                                .then(|| {
-                                    CStr::from_ptr((*ctxt).ext_sub_system as *const i8)
-                                        .to_string_lossy()
-                                })
-                                .as_deref(),
-                            (!(*ctxt).ext_sub_uri.is_null())
-                                .then(|| {
-                                    CStr::from_ptr((*ctxt).ext_sub_uri as *const i8)
-                                        .to_string_lossy()
-                                })
-                                .as_deref(),
+                            (*ctxt).ext_sub_system.as_deref(),
+                            (*ctxt).ext_sub_uri.as_deref(),
                         );
                     }
                     (*ctxt).in_subset = 0;
@@ -10550,8 +10502,6 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
         return;
     }
 
-    let dict: XmlDictPtr = (*ctxt).dict;
-
     while {
         input = (*ctxt).input_pop();
         !input.is_null()
@@ -10575,10 +10525,8 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).version = None;
     (*ctxt).encoding = None;
     (*ctxt).directory = None;
-    DICT_FREE!(dict, (*ctxt).ext_sub_uri);
-    (*ctxt).ext_sub_uri = null_mut();
-    DICT_FREE!(dict, (*ctxt).ext_sub_system);
-    (*ctxt).ext_sub_system = null_mut();
+    (*ctxt).ext_sub_uri = None;
+    (*ctxt).ext_sub_system = None;
     if !(*ctxt).my_doc.is_null() {
         xml_free_doc((*ctxt).my_doc);
     }
@@ -11077,7 +11025,7 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
 /// case publicID receives PubidLiteral, is strict is off
 /// it is possible to return NULL and have publicID set.
 #[doc(alias = "xmlParseExternalID")]
-pub(crate) unsafe extern "C" fn xml_parse_external_id(
+pub(crate) unsafe fn xml_parse_external_id(
     ctxt: XmlParserCtxtPtr,
     public_id: *mut *mut XmlChar,
     strict: i32,
@@ -11112,9 +11060,7 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrPubidRequired, None);
         }
         if strict != 0 {
-            /*
-             * We don't handle [83] so "S SystemLiteral" is required.
-             */
+            // We don't handle [83] so "S SystemLiteral" is required.
             if (*ctxt).skip_blanks() == 0 {
                 xml_fatal_err_msg(
                     ctxt,
@@ -11123,12 +11069,10 @@ pub(crate) unsafe extern "C" fn xml_parse_external_id(
                 );
             }
         } else {
-            /*
-             * We handle [83] so we return immediately, if
-             * "S SystemLiteral" is not detected. We skip blanks if no
-             * system literal was found, but this is harmless since we must
-             * be at the end of a NotationDecl.
-             */
+            // We handle [83] so we return immediately, if
+            // "S SystemLiteral" is not detected. We skip blanks if no
+            // system literal was found, but this is harmless since we must
+            // be at the end of a NotationDecl.
             if (*ctxt).skip_blanks() == 0 {
                 return null_mut();
             }

@@ -42,7 +42,7 @@ use crate::{
     globals::{get_keep_blanks_default_value, get_line_numbers_default_value, GenericErrorContext},
     io::XmlParserInputBuffer,
     libxml::{
-        dict::{xml_dict_create, xml_dict_lookup, XmlDictPtr},
+        dict::{xml_dict_create, xml_dict_lookup},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             xml_free_parser_ctxt, xml_init_node_info_seq, xml_init_parser,
@@ -11201,7 +11201,6 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     }
 
     xml_init_parser();
-    let dict: XmlDictPtr = (*ctxt).dict;
 
     while {
         input = (*ctxt).input_pop();
@@ -11226,10 +11225,8 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).version = None;
     (*ctxt).encoding = None;
     (*ctxt).directory = None;
-    DICT_FREE!(dict, (*ctxt).ext_sub_uri);
-    (*ctxt).ext_sub_uri = null_mut();
-    DICT_FREE!(dict, (*ctxt).ext_sub_system);
-    (*ctxt).ext_sub_system = null_mut();
+    (*ctxt).ext_sub_uri = None;
+    (*ctxt).ext_sub_system = None;
     if !(*ctxt).my_doc.is_null() {
         xml_free_doc((*ctxt).my_doc);
     }
