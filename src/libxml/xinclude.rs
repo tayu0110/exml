@@ -998,19 +998,19 @@ unsafe extern "C" fn xml_xinclude_copy_node(
 /// Returns the @n'th element child of @cur or NULL
 #[doc(alias = "xmlXIncludeGetNthChild")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xinclude_get_nth_child(mut cur: XmlNodePtr, no: i32) -> XmlNodePtr {
+unsafe fn xml_xinclude_get_nth_child(cur: XmlNodePtr, no: i32) -> XmlNodePtr {
     let mut i: i32;
     if cur.is_null() || (*cur).element_type() == XmlElementType::XmlNamespaceDecl {
         return null_mut();
     }
-    cur = (*cur).children();
+    let mut cur = (*cur).children();
     i = 0;
     while i <= no {
-        if cur.is_null() {
-            return cur;
-        }
+        let Some(now) = cur else {
+            return null_mut();
+        };
         if matches!(
-            (*cur).element_type(),
+            now.element_type(),
             XmlElementType::XmlElementNode
                 | XmlElementType::XmlDocumentNode
                 | XmlElementType::XmlHTMLDocumentNode
@@ -1021,9 +1021,9 @@ unsafe extern "C" fn xml_xinclude_get_nth_child(mut cur: XmlNodePtr, no: i32) ->
             }
         }
 
-        cur = (*cur).next;
+        cur = now.next();
     }
-    cur
+    cur.map_or(null_mut(), |c| c.as_ptr())
 }
 
 /// Build a node list tree copy of the XPointer result.
@@ -1032,13 +1032,13 @@ unsafe extern "C" fn xml_xinclude_get_nth_child(mut cur: XmlNodePtr, no: i32) ->
 /// The caller has to free the node tree.
 #[doc(alias = "xmlXIncludeCopyRange")]
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe extern "C" fn xml_xinclude_copy_range(
+unsafe fn xml_xinclude_copy_range(
     ctxt: XmlXincludeCtxtPtr,
     range: XmlXPathObjectPtr,
 ) -> XmlNodePtr {
-    use crate::libxml::{
-        tree::{xml_add_child, xml_new_doc_text, xml_new_doc_text_len},
-        xpointer::xml_xptr_advance_node,
+    use crate::{
+        libxml::xpointer::xml_xptr_advance_node,
+        tree::{xml_new_doc_text, xml_new_doc_text_len},
     };
 
     /* pointers to generated nodes */
@@ -1079,25 +1079,21 @@ unsafe extern "C" fn xml_xinclude_copy_range(
     cur = start;
     index1 = (*range).index;
     index2 = (*range).index2;
-    /*
-    * level is depth of the current node under consideration
-    * list is the pointer to the root of the output tree
-    * listParent is a pointer to the parent of output tree (within
-      the included file) in case we need to add another level
-    * last is a pointer to the last node added to the output tree
-    * lastLevel is the depth of last (relative to the root)
-    */
+    // level is depth of the current node under consideration
+    // list is the pointer to the root of the output tree
+    // listParent is a pointer to the parent of output tree (within
+    // the included file) in case we need to add another level
+    // last is a pointer to the last node added to the output tree
+    // lastLevel is the depth of last (relative to the root)
     while !cur.is_null() {
-        /*
-         * Check if our output tree needs a parent
-         */
+        // Check if our output tree needs a parent
         if level < 0 {
             while level < 0 {
                 // copy must include namespaces and properties
                 tmp2 = xml_doc_copy_node(list_parent, (*ctxt).doc, 2);
-                xml_add_child(tmp2, list);
+                (*tmp2).add_child(list);
                 list = tmp2;
-                list_parent = (*list_parent).parent;
+                list_parent = (*list_parent).parent().map_or(null_mut(), |n| n.as_ptr());
                 level += 1;
             }
             last = list;
@@ -1105,17 +1101,17 @@ unsafe extern "C" fn xml_xinclude_copy_range(
         }
         // Check whether we need to change our insertion point
         while level < last_level {
-            last = (*last).parent;
+            last = (*last).parent().map_or(null_mut(), |p| p.as_ptr());
             last_level -= 1;
         }
         if cur == end {
-            /* Are we at the end of the range? */
+            // Are we at the end of the range?
             if (*cur).element_type() == XmlElementType::XmlTextNode {
                 let mut content: *const XmlChar = (*cur).content;
                 let mut len: i32;
 
                 if content.is_null() {
-                    tmp = xmlNewDocTextLen((*ctxt).doc, null_mut(), 0);
+                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
                 } else {
                     len = index2;
                     if cur == start && index1 > 1 {
@@ -1124,33 +1120,33 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                     } else {
                         len = index2;
                     }
-                    tmp = xmlNewDocTextLen((*ctxt).doc, content, len);
+                    tmp = xml_new_doc_text_len((*ctxt).doc, content, len);
                 }
-                /* single sub text node selection */
+                // single sub text node selection
                 if list.is_null() {
                     return tmp;
                 }
-                /* prune and return full set */
+                // prune and return full set
                 if level == last_level {
-                    xml_add_next_sibling(last, tmp);
+                    (*last).add_next_sibling(tmp);
                 } else {
-                    xml_add_child(last, tmp);
+                    (*last).add_child(tmp);
                 }
                 return list;
             } else {
-                /* ending node not a text node */
+                // ending node not a text node
                 end_level = level; /* remember the level of the end node */
                 end_flag = 1;
-                /* last node - need to take care of properties + namespaces */
+                // last node - need to take care of properties + namespaces
                 tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 if list.is_null() {
                     list = tmp;
-                    list_parent = (*cur).parent;
+                    list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                     last = tmp;
                 } else if level == last_level {
-                    last = xml_add_next_sibling(last, tmp);
+                    last = (*last).add_next_sibling(tmp);
                 } else {
-                    last = xml_add_child(last, tmp);
+                    last = (*last).add_child(tmp);
                     last_level = level;
                 }
 
@@ -1162,16 +1158,15 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                     cur = xml_xinclude_get_nth_child(cur, index1 - 1);
                     index1 = 0;
                 } else {
-                    cur = (*cur).children();
+                    cur = (*cur).children().map_or(null_mut(), |p| p.as_ptr());
                 }
-                level += 1; /* increment level to show change */
-                /*
-                 * Now gather the remaining nodes from cur to end
-                 */
+                // increment level to show change
+                level += 1;
+                // Now gather the remaining nodes from cur to end
                 continue; /* while */
             }
         } else if cur == start {
-            /* Not at the end, are we at start? */
+            // Not at the end, are we at start?
             if matches!(
                 (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
@@ -1179,7 +1174,7 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 let mut content: *const XmlChar = (*cur).content;
 
                 if content.is_null() {
-                    tmp = xmlNewDocTextLen((*ctxt).doc, null_mut(), 0);
+                    tmp = xml_new_doc_text_len((*ctxt).doc, null_mut(), 0);
                 } else {
                     if index1 > 1 {
                         content = content.add(index1 as usize - 1);
@@ -1189,26 +1184,23 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 }
                 last = tmp;
                 list = tmp;
-                list_parent = (*cur).parent;
+                list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
             } else {
-                /* Not text node */
-                /*
-                 * start of the range - need to take care of
-                 * properties and namespaces
-                 */
+                // Not text node
+
+                // start of the range - need to take care of
+                // properties and namespaces
                 tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 list = tmp;
                 last = tmp;
-                list_parent = (*cur).parent;
+                list_parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
                 if index1 > 1 {
-                    /* Do we need to position? */
+                    // Do we need to position?
                     cur = xml_xinclude_get_nth_child(cur, index1 - 1);
                     level = 1;
                     last_level = 1;
                     index1 = 0;
-                    /*
-                     * Now gather the remaining nodes from cur to end
-                     */
+                    // Now gather the remaining nodes from cur to end
                     continue; /* while */
                 }
             }
@@ -1221,29 +1213,25 @@ unsafe extern "C" fn xml_xinclude_copy_range(
                 | XmlElementType::XmlEntityNode => { /* Do not copy DTD information */ }
                 XmlElementType::XmlEntityDecl => { /* handle crossing entities -> stack needed */ }
                 XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
-                    /* don't consider it part of the tree content */
+                    // don't consider it part of the tree content
                 }
                 XmlElementType::XmlAttributeNode => { /* Humm, should not happen ! */ }
                 _ => {
-                    /*
-                     * Middle of the range - need to take care of
-                     * properties and namespaces
-                     */
+                    // Middle of the range - need to take care of
+                    // properties and namespaces
                     tmp = xml_doc_copy_node(cur, (*ctxt).doc, 2);
                 }
             }
             if !tmp.is_null() {
                 if level == last_level {
-                    last = xml_add_next_sibling(last, tmp);
+                    last = (*last).add_next_sibling(tmp);
                 } else {
-                    last = xml_add_child(last, tmp);
+                    last = (*last).add_child(tmp);
                     last_level = level;
                 }
             }
         }
-        /*
-         * Skip to next node in document order
-         */
+        // Skip to next node in document order
         cur = xml_xptr_advance_node(cur, addr_of_mut!(level));
         if end_flag != 0 && level >= end_level {
             break;
@@ -1342,14 +1330,14 @@ unsafe extern "C" fn xml_xinclude_copy_xpointer(
                     list = xml_xinclude_copy_xpointer(ctxt, *(*set).loc_tab.add(i as usize));
                     last = list;
                 } else {
-                    xml_add_next_sibling(
-                        last,
-                        xml_xinclude_copy_xpointer(ctxt, *(*set).loc_tab.add(i as usize)),
-                    );
+                    (*last).add_next_sibling(xml_xinclude_copy_xpointer(
+                        ctxt,
+                        *(*set).loc_tab.add(i as usize),
+                    ));
                 }
                 if !last.is_null() {
-                    while !(*last).next.is_null() {
-                        last = (*last).next;
+                    while let Some(next) = (*last).next() {
+                        last = next.as_ptr();
                     }
                 }
             }

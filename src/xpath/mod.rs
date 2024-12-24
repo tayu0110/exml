@@ -52,10 +52,6 @@ use std::{
 
 use libc::memset;
 
-#[cfg(feature = "libxml_xptr_locs")]
-use crate::libxml::xpointer::{
-    xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
-};
 use crate::{
     error::XmlError,
     generic_error,

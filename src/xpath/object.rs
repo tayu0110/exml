@@ -5,6 +5,10 @@ use std::{
     ptr::null_mut,
 };
 
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::libxml::xpointer::{
+    xml_xptr_free_location_set, xml_xptr_location_set_merge, XmlLocationSetPtr,
+};
 use crate::{
     generic_error,
     libxml::globals::{xml_free, xml_malloc},

@@ -24,10 +24,12 @@ mod input;
 #[cfg(feature = "libxml_output")]
 mod output;
 
+#[cfg(feature = "ftp")]
+use std::ffi::{c_char, c_void};
 use std::{
     borrow::Cow,
     env::current_dir,
-    ffi::{c_char, c_int, c_uint, c_void, CString},
+    ffi::{c_int, c_uint, CString},
     fs::{metadata, File},
     io::{self, stdin, ErrorKind, Read},
     path::{Path, PathBuf},
@@ -43,6 +45,8 @@ use libc::{
 };
 use url::Url;
 
+#[cfg(feature = "ftp")]
+use crate::libxml::nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read};
 use crate::{
     encoding::find_encoding_handler,
     error::{
@@ -53,7 +57,6 @@ use crate::{
         catalog::{
             xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
         },
-        nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read},
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
     },
