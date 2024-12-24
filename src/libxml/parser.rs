@@ -555,7 +555,7 @@ pub struct XmlParserCtxt {
     pub(crate) keep_blanks: i32,               /* ugly but ... */
     pub(crate) disable_sax: i32,               /* SAX callbacks are disabled */
     pub in_subset: i32,                        /* Parsing is in int 1/ext 2 subset */
-    pub(crate) int_sub_name: *const XmlChar,   /* name of subset */
+    pub(crate) int_sub_name: Option<String>,   /* name of subset */
     pub(crate) ext_sub_uri: Option<String>,    /* URI of external subset */
     pub(crate) ext_sub_system: Option<String>, /* SYSTEM ID of external subset */
 
@@ -1630,7 +1630,7 @@ impl Default for XmlParserCtxt {
             keep_blanks: 0,
             disable_sax: 0,
             in_subset: 0,
-            int_sub_name: null(),
+            int_sub_name: None,
             ext_sub_uri: None,
             ext_sub_system: None,
             space_tab: vec![],
@@ -1722,7 +1722,7 @@ pub type InternalSubsetSAXFunc = unsafe fn(
 #[doc(alias = "externalSubsetSAXFunc")]
 pub type ExternalSubsetSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 );
@@ -3155,7 +3155,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
             if let Some(external_subset) = (*(*ctxt).sax).external_subset {
                 external_subset(
                     (*ctxt).user_data.clone(),
-                    (*ctxt).int_sub_name,
+                    (*ctxt).int_sub_name.as_deref(),
                     (*ctxt).ext_sub_system.as_deref(),
                     (*ctxt).ext_sub_uri.as_deref(),
                 );
@@ -3789,12 +3789,8 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         return null_mut();
     }
     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    (*(*ctxt).my_doc).ext_subset = xml_new_dtd(
-        (*ctxt).my_doc,
-        c"none".as_ptr() as _,
-        external_id,
-        system_id,
-    );
+    (*(*ctxt).my_doc).ext_subset =
+        xml_new_dtd((*ctxt).my_doc, Some("none"), external_id, system_id);
     xml_parse_external_subset(ctxt, external_id, system_id);
 
     if !(*ctxt).my_doc.is_null() {
@@ -3892,12 +3888,8 @@ pub unsafe fn xml_io_parse_dtd(
         return null_mut();
     }
     (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    (*(*ctxt).my_doc).ext_subset = xml_new_dtd(
-        (*ctxt).my_doc,
-        c"none".as_ptr() as _,
-        Some("none"),
-        Some("none"),
-    );
+    (*(*ctxt).my_doc).ext_subset =
+        xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
 
     if matches!(enc, XmlCharEncoding::None)
         && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4
@@ -9886,7 +9878,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                             {
                                 ((*(*ctxt).sax).external_subset.unwrap())(
                                     (*ctxt).user_data.clone(),
-                                    (*ctxt).int_sub_name,
+                                    (*ctxt).int_sub_name.as_deref(),
                                     (*ctxt).ext_sub_system.as_deref(),
                                     (*ctxt).ext_sub_uri.as_deref(),
                                 );
@@ -9935,7 +9927,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                     {
                         ((*(*ctxt).sax).external_subset.unwrap())(
                             (*ctxt).user_data.clone(),
-                            (*ctxt).int_sub_name,
+                            (*ctxt).int_sub_name.as_deref(),
                             (*ctxt).ext_sub_system.as_deref(),
                             (*ctxt).ext_sub_uri.as_deref(),
                         );
@@ -11430,7 +11422,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 }
                 if (*(*ctxt).my_doc).int_subset.is_null() {
                     (*(*ctxt).my_doc).int_subset =
-                        xml_new_dtd((*ctxt).my_doc, c"fake".as_ptr() as _, None, None);
+                        xml_new_dtd((*ctxt).my_doc, Some("fake"), None, None);
                 }
 
                 xml_sax2_entity_decl(
@@ -11538,7 +11530,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
 
                     if (*(*ctxt).my_doc).int_subset.is_null() {
                         (*(*ctxt).my_doc).int_subset =
-                            xml_new_dtd((*ctxt).my_doc, c"fake".as_ptr() as _, None, None);
+                            xml_new_dtd((*ctxt).my_doc, Some("fake"), None, None);
                     }
                     xml_sax2_entity_decl(
                         Some(GenericErrorContext::new(ctxt)),

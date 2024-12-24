@@ -314,7 +314,7 @@ pub unsafe fn xml_create_int_subset(
 #[doc(alias = "xmlNewDtd")]
 pub unsafe fn xml_new_dtd(
     doc: XmlDocPtr,
-    name: *const XmlChar,
+    name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> XmlDtdPtr {
@@ -328,12 +328,12 @@ pub unsafe fn xml_new_dtd(
         xml_tree_err_memory("building DTD");
         return null_mut();
     }
-    memset(cur as _, 0, size_of::<XmlDtd>());
     std::ptr::write(&mut *cur, XmlDtd::default());
     (*cur).typ = XmlElementType::XmlDTDNode;
 
-    if !name.is_null() {
-        (*cur).name = xml_strdup(name);
+    if let Some(name) = name {
+        let name = CString::new(name).unwrap();
+        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     }
     (*cur).external_id = external_id.map(|e| e.to_owned());
     (*cur).system_id = system_id.map(|s| s.to_owned());

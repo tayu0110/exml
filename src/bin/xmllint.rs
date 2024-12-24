@@ -882,7 +882,7 @@ unsafe fn internal_subset_debug(
 #[doc(alias = "externalSubsetDebug")]
 unsafe fn external_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
@@ -890,10 +890,7 @@ unsafe fn external_subset_debug(
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.externalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    print!("SAX.externalSubset({},", name.unwrap_or("(null)"));
     if let Some(external_id) = external_id {
         print!(" {external_id},");
     } else {

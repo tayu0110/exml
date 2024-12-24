@@ -1389,7 +1389,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
 // of the node with values 0 (no) and 1 (yes).  For XInclude,
 // however, we allow a value of 2 to indicate copy properties and
 // namespace info, but don't recurse on children.
-pub(crate) unsafe extern "C" fn xml_static_copy_node(
+pub(crate) unsafe fn xml_static_copy_node(
     node: XmlNodePtr,
     doc: XmlDocPtr,
     parent: XmlNodePtr,
@@ -1618,7 +1618,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     ret
 }
 
-pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
+pub(crate) unsafe fn xml_static_copy_node_list(
     mut node: XmlNodePtr,
     doc: XmlDocPtr,
     parent: XmlNodePtr,
@@ -1681,7 +1681,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
     //     return null_mut();
 }
 
-unsafe extern "C" fn xml_copy_prop_internal(
+unsafe fn xml_copy_prop_internal(
     doc: XmlDocPtr,
     target: XmlNodePtr,
     cur: XmlAttrPtr,
@@ -1794,7 +1794,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
 ///
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyProp")]
-pub unsafe extern "C" fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> XmlAttrPtr {
+pub unsafe fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> XmlAttrPtr {
     xml_copy_prop_internal(null_mut(), target, cur)
 }
 
@@ -1802,7 +1802,7 @@ pub unsafe extern "C" fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> X
 ///
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyPropList")]
-pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> XmlAttrPtr {
+pub unsafe fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> XmlAttrPtr {
     let mut ret: XmlAttrPtr = null_mut();
     let mut p: XmlAttrPtr = null_mut();
     let mut q: XmlAttrPtr;
@@ -1834,7 +1834,7 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
 /// Returns: a new #xmlDtdPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
+pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     use std::ffi::CString;
 
     use crate::libxml::{
@@ -1853,7 +1853,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     }
     let ret: XmlDtdPtr = xml_new_dtd(
         null_mut(),
-        (*dtd).name,
+        (*dtd).name().as_deref(),
         (*dtd).external_id.as_deref(),
         (*dtd).system_id.as_deref(),
     );

@@ -685,7 +685,7 @@ fn internal_subset_callback(
 #[doc(alias = "externalSubsetCallback")]
 fn external_subset_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
+    _name: Option<&str>,
     _external_id: Option<&str>,
     _system_id: Option<&str>,
 ) {

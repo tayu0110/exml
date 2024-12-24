@@ -1947,7 +1947,7 @@ impl XmlCatalogEntry {
         }
         let dtd: XmlDtdPtr = xml_new_dtd(
             doc,
-            c"catalog".as_ptr() as _,
+            Some("catalog"),
             Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
             Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),
         );

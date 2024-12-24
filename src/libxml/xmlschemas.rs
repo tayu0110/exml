@@ -30644,7 +30644,7 @@ unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
 
 unsafe fn external_subset_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {

@@ -805,7 +805,7 @@ unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
 
 pub(crate) unsafe extern "C" fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> XmlDtdPtr {
     if no == 0 {
-        return xml_new_dtd(null_mut(), c"dtd".as_ptr() as _, Some("foo"), Some("bar"));
+        return xml_new_dtd(null_mut(), Some("dtd"), Some("foo"), Some("bar"));
     }
     if no == 1 {
         return get_api_dtd();

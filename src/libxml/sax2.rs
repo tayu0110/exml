@@ -290,7 +290,7 @@ pub unsafe fn xml_sax2_internal_subset(
 #[doc(alias = "xmlSAX2ExternalSubset")]
 pub unsafe fn xml_sax2_external_subset(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {

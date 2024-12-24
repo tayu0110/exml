@@ -4571,7 +4571,11 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
             "xmlParseDocTypeDecl : no DOCTYPE name !\n",
         );
     }
-    (*ctxt).int_sub_name = name;
+    (*ctxt).int_sub_name = (!name.is_null()).then(|| {
+        CStr::from_ptr(name as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    });
 
     (*ctxt).skip_blanks();
 
