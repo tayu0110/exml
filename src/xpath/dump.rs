@@ -1,5 +1,7 @@
 use std::{ffi::CStr, io::Write};
 
+#[cfg(feature = "libxml_xptr_locs")]
+use crate::{libxml::xpointer::XmlLocationSetPtr, tree::XmlNodePtr};
 use crate::{
     libxml::{
         debug_xml::{xml_debug_dump_attr, xml_debug_dump_one_node},
@@ -103,25 +105,21 @@ unsafe fn xml_xpath_debug_dump_value_tree<'a>(
 }
 
 #[cfg(feature = "libxml_xptr_locs")]
-unsafe fn xml_xpath_debug_dump_location_set(output: *mut FILE, cur: XmlLocationSetPtr, depth: i32) {
-    let mut shift: [c_char; 100] = [0; 100];
-
-    for i in 0..depth.min(25) {
-        shift[2 * i as usize] = b' ' as _;
-        shift[2 * i as usize + 1] = b' ' as _;
-    }
-    shift[2 * depth.clamp(0, 25) as usize] = 0;
-    shift[2 * depth.clamp(0, 25) as usize + 1] = 0;
-
+unsafe fn xml_xpath_debug_dump_location_set<'a>(
+    output: &mut (impl Write + 'a),
+    cur: XmlLocationSetPtr,
+    depth: i32,
+) {
+    let shift = "  ".repeat(depth.clamp(0, 25) as usize);
     if cur.is_null() {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c"LocationSet is NULL !\n".as_ptr());
+        write!(output, "{}", shift).ok();
+        writeln!(output, "LocationSet is NULL !").ok();
         return;
     }
 
     for i in 0..(*cur).loc_nr {
-        fprintf(output, c"%s".as_ptr(), shift.as_ptr());
-        fprintf(output, c"%d : ".as_ptr(), i + 1);
+        write!(output, "{}", shift);
+        write!(output, "{} : ", i + 1);
         xml_xpath_debug_dump_object(output, *(*cur).loc_tab.add(i as usize), depth + 1);
     }
 }
@@ -192,43 +190,47 @@ pub unsafe fn xml_xpath_debug_dump_object<'a>(
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathPoint => {
             write!(output, "Object is a point : index {} in node", (*cur).index,);
-            xml_xpath_debug_dump_node(output, (*cur).user as XmlNodePtr, depth + 1);
-            write!(output, "\n");
+            let node = (*cur).user as XmlNodePtr;
+            xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+            writeln!(output);
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathRange => {
             if (*cur).user2.is_null()
                 || ((*cur).user2 == (*cur).user && (*cur).index == (*cur).index2)
             {
-                write!(output, "Object is a collapsed range :\n");
+                writeln!(output, "Object is a collapsed range :");
                 write!(output, "{}", shift);
                 if (*cur).index >= 0 {
                     write!(output, "index {} in ", (*cur).index);
                 }
-                write!(output, "node\n");
-                xml_xpath_debug_dump_node(output, (*cur).user as XmlNodePtr, depth + 1);
+                writeln!(output, "node");
+                let node = (*cur).user as XmlNodePtr;
+                xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
             } else {
-                write!(output, "Object is a range :\n");
+                writeln!(output, "Object is a range :");
                 write!(output, "{}", shift);
                 write!(output, "From ");
                 if (*cur).index >= 0 {
                     write!(output, "index {} in ", (*cur).index);
                 }
-                write!(output, "node\n");
-                xml_xpath_debug_dump_node(output, (*cur).user as XmlNodePtr, depth + 1);
+                writeln!(output, "node");
+                let node = (*cur).user as XmlNodePtr;
+                xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
                 write!(output, "{}", shift);
                 write!(output, "To ");
                 if (*cur).index2 >= 0 {
                     write!(output, "index {} in ", (*cur).index2);
                 }
-                write!(output, "node\n");
-                xml_xpath_debug_dump_node(output, (*cur).user2 as XmlNodePtr, depth + 1);
-                write!(output, "\n");
+                writeln!(output, "node");
+                let node = (*cur).user2 as XmlNodePtr;
+                xml_xpath_debug_dump_node(output, (!node.is_null()).then(|| &*node), depth + 1);
+                writeln!(output);
             }
         }
         #[cfg(feature = "libxml_xptr_locs")]
         XmlXPathObjectType::XPathLocationset => {
-            write!(output, "Object is a Location Set:\n");
+            writeln!(output, "Object is a Location Set:");
             xml_xpath_debug_dump_location_set(output, (*cur).user as XmlLocationSetPtr, depth);
         }
         XmlXPathObjectType::XPathUsers => {

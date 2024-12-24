@@ -26,7 +26,7 @@
         "libxml_unicode",
         "libxml_valid",
         "libxml_writer",
-        // "libxml_xptr_locs",
+        "libxml_xptr_locs",
     ],
     "files.associations": {
         "*.html": "html",

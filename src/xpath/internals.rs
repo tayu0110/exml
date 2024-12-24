@@ -2772,12 +2772,13 @@ unsafe extern "C" fn xml_xpath_comp_step(ctxt: XmlXPathParserContextPtr) {
         let mut name: *mut XmlChar = null_mut();
         let mut prefix: *mut XmlChar = null_mut();
         let mut test: XmlXPathTestVal = XmlXPathTestVal::NodeTestNone;
+        #[cfg(not(feature = "libxml_xptr_locs"))]
         let mut axis: Option<XmlXPathAxisVal>;
+        #[cfg(feature = "libxml_xptr_locs")]
+        let mut axis = None;
         let mut typ: XmlXPathTypeVal = XmlXPathTypeVal::NodeTypeNode;
 
-        /*
-         * The modification needed for XPointer change to the production
-         */
+        // The modification needed for XPointer change to the production
         #[cfg_attr(not(feature = "libxml_xptr_locs"), allow(unused_labels))]
         'eval_predicates: {
             #[cfg(feature = "libxml_xptr_locs")]
@@ -6172,11 +6173,9 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
         XmlXPathOp::XpathOpRangeto => 'to_break: {
             let mut range: XmlXPathObjectPtr;
             let mut res: XmlXPathObjectPtr;
-            let mut obj: XmlXPathObjectPtr = null_mut();
+            let obj: XmlXPathObjectPtr;
             let mut tmp: XmlXPathObjectPtr;
-            let mut newlocset: XmlLocationSetPtr = null_mut();
-            let oldlocset: XmlLocationSetPtr;
-            let oldset: XmlNodeSetPtr;
+            let newlocset: XmlLocationSetPtr;
             let oldnode: XmlNodePtr = (*(*ctxt).context).node;
             let oldcs: i32 = (*(*ctxt).context).context_size;
             let oldpp: i32 = (*(*ctxt).context).proximity_position;
@@ -6194,11 +6193,9 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
 
             'rangeto_error: {
                 if (*(*ctxt).value).typ == XmlXPathObjectType::XPathLocationset {
-                    /*
-                     * Extract the old locset, and then evaluate the result of the
-                     * expression for all the element in the locset. use it to grow
-                     * up a new locset.
-                     */
+                    // Extract the old locset, and then evaluate the result of the
+                    // expression for all the element in the locset. use it to grow
+                    // up a new locset.
                     CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathLocationset);
 
                     if (*(*ctxt).value).user.is_null()
@@ -6207,15 +6204,13 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                         break 'to_break;
                     }
                     obj = value_pop(ctxt);
-                    oldlocset = (*obj).user as _;
+                    let oldlocset = (*obj).user as XmlLocationSetPtr;
 
                     newlocset = xml_xptr_location_set_create(null_mut());
 
                     for i in 0..(*oldlocset).loc_nr {
-                        /*
-                         * Run the evaluation with a node list made of a
-                         * single item in the nodelocset.
-                         */
+                        // Run the evaluation with a node list made of a
+                        // single item in the nodelocset.
                         (*(*ctxt).context).node =
                             (*(*(*oldlocset).loc_tab.add(i as usize))).user as _;
                         (*(*ctxt).context).context_size = (*oldlocset).loc_nr;
@@ -6257,9 +6252,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                             }
                         }
 
-                        /*
-                         * Cleanup
-                         */
+                        // Cleanup
                         if !res.is_null() {
                             xml_xpath_release_object((*ctxt).context, res);
                         }
@@ -6269,23 +6262,17 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                         }
                     }
                 } else {
-                    /* Not a location set */
+                    // Not a location set
                     CHECK_TYPE0!(ctxt, XmlXPathObjectType::XPathNodeset);
                     obj = value_pop(ctxt);
-                    oldset = (*obj).nodesetval;
-
                     newlocset = xml_xptr_location_set_create(null_mut());
 
-                    if !oldset.is_null() {
-                        for i in 0..(*oldset).node_nr {
-                            /*
-                             * Run the evaluation with a node list made of a single item
-                             * in the nodeset.
-                             */
-                            (*(*ctxt).context).node = *(*oldset).node_tab.add(i as usize);
-                            /*
-                             * OPTIMIZE TODO: Avoid recreation for every iteration.
-                             */
+                    if let Some(oldset) = (*obj).nodesetval.as_deref() {
+                        for &node in &oldset.node_tab {
+                            // Run the evaluation with a node list made of a single item
+                            // in the nodeset.
+                            (*(*ctxt).context).node = node;
+                            // OPTIMIZE TODO: Avoid recreation for every iteration.
                             tmp = xml_xpath_cache_new_node_set(
                                 (*ctxt).context,
                                 (*(*ctxt).context).node,
@@ -6304,17 +6291,12 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                             }
 
                             res = value_pop(ctxt);
-                            range = xml_xptr_new_range_node_object(
-                                *(*oldset).node_tab.add(i as usize),
-                                res,
-                            );
+                            range = xml_xptr_new_range_node_object(node, res);
                             if !range.is_null() {
                                 xml_xptr_location_set_add(newlocset, range);
                             }
 
-                            /*
-                             * Cleanup
-                             */
+                            // Cleanup
                             if !res.is_null() {
                                 xml_xpath_release_object((*ctxt).context, res);
                             }
@@ -6326,9 +6308,7 @@ unsafe extern "C" fn xml_xpath_comp_op_eval(
                     }
                 }
 
-                /*
-                 * The result is used as the new evaluation set.
-                 */
+                // The result is used as the new evaluation set.
                 value_push(ctxt, xml_xptr_wrap_location_set(newlocset));
             }
             // rangeto_error:
