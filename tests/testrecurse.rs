@@ -619,7 +619,7 @@ unsafe fn not_recursive_huge_test(
         let allowed_expansion: c_ulong = 1000000;
         let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
 
-        ent = xml_get_doc_entity(doc, c"e".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "e");
         let e_size: c_ulong =
             f_size * 2 + xml_strlen(c"&f;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
         if (*ent).expanded_size != e_size {
@@ -631,7 +631,7 @@ unsafe fn not_recursive_huge_test(
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, c"b".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "b");
         if (*ent).expanded_size != e_size {
             eprintln!(
                 "Wrong size for entity b: {} (expected {})",
@@ -641,7 +641,7 @@ unsafe fn not_recursive_huge_test(
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, c"d".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "d");
         let d_size: c_ulong =
             e_size * 2 + xml_strlen(c"&e;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
         if (*ent).expanded_size != d_size {
@@ -653,7 +653,7 @@ unsafe fn not_recursive_huge_test(
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, c"c".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "c");
         if (*ent).expanded_size != d_size {
             eprintln!(
                 "Wrong size for entity c: {} (expected {})",

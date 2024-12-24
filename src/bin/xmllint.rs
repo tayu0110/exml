@@ -935,68 +935,40 @@ unsafe fn resolve_entity_debug(
     null_mut()
 }
 
-/**
- * getEntityDebug:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get an entity by name
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
-unsafe fn get_entity_debug(
-    _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+/// Get an entity by name
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "getEntityDebug")]
+unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return null_mut();
     }
-    println!(
-        "SAX.getEntity({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.getEntity({name})");
     null_mut()
 }
 
-/**
- * getParameterEntityDebug:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get a parameter entity by name
- *
- * Returns the xmlParserInputPtr
- */
+/// Get a parameter entity by name
+///
+/// Returns the xmlParserInputPtr
+#[doc(alias = "getParameterEntityDebug")]
 unsafe fn get_parameter_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
 ) -> XmlEntityPtr {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return null_mut();
     }
-    println!(
-        "SAX.getParameterEntity({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.getParameterEntity({name})");
     null_mut()
 }
 
-/**
- * entityDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the entity name
- * @type:  the entity type
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @content: the entity value (without processing).
- *
- * An entity definition has been parsed
- */
+/// An entity definition has been parsed
+#[doc(alias = "entityDeclDebug")]
 unsafe fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: c_int,
     mut public_id: *const XmlChar,
     mut system_id: *const XmlChar,
@@ -1018,8 +990,7 @@ unsafe fn entity_decl_debug(
         return;
     }
     println!(
-        "SAX.entityDecl({}, {}, {}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
+        "SAX.entityDecl({name}, {}, {}, {}, {})",
         typ,
         CStr::from_ptr(public_id as _).to_string_lossy(),
         CStr::from_ptr(system_id as _).to_string_lossy(),
@@ -1114,19 +1085,11 @@ unsafe fn notation_decl_debug(
     );
 }
 
-/**
- * unparsedEntityDeclDebug:
- * @ctxt:  An XML parser context
- * @name: The name of the entity
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @notationName: the name of the notation
- *
- * What to do when an unparsed entity declaration is parsed
- */
+/// What to do when an unparsed entity declaration is parsed
+#[doc(alias = "unparsedEntityDeclDebug")]
 unsafe fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     mut public_id: *const XmlChar,
     mut system_id: *const XmlChar,
     mut notation_name: *const XmlChar,
@@ -1147,8 +1110,7 @@ unsafe fn unparsed_entity_decl_debug(
         return;
     }
     println!(
-        "SAX.unparsedEntityDecl({}, {}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
+        "SAX.unparsedEntityDecl({name}, {}, {}, {})",
         CStr::from_ptr(public_id as _).to_string_lossy(),
         CStr::from_ptr(system_id as _).to_string_lossy(),
         CStr::from_ptr(notation_name as _).to_string_lossy()
@@ -1285,22 +1247,14 @@ unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar
     );
 }
 
-/**
- * referenceDebug:
- * @ctxt:  An XML parser context
- * @name:  The entity name
- *
- * called when an entity reference is detected.
- */
-unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when an entity reference is detected.
+#[doc(alias = "referenceDebug")]
+unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.reference({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.reference({name})");
 }
 
 /**

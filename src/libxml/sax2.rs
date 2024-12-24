@@ -455,10 +455,7 @@ macro_rules! xml_fatal_err_msg {
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "xmlSAX2GetEntity")]
-pub unsafe fn xml_sax2_get_entity(
-    ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+pub unsafe fn xml_sax2_get_entity(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     let mut ret: XmlEntityPtr;
 
     if ctx.is_none() {
@@ -487,7 +484,6 @@ pub unsafe fn xml_sax2_get_entity(
                 (*(*ctxt).my_doc).standalone = 0;
                 ret = xml_get_doc_entity((*ctxt).my_doc, name);
                 if !ret.is_null() {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_fatal_err_msg!(
                         ctxt,
                         XmlParserErrors::XmlErrNotStandalone,
@@ -510,7 +506,7 @@ pub unsafe fn xml_sax2_get_entity(
 #[doc(alias = "xmlSAX2GetParameterEntity")]
 pub unsafe fn xml_sax2_get_parameter_entity(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
 ) -> XmlEntityPtr {
     if ctx.is_none() {
         return null_mut();
@@ -597,7 +593,7 @@ macro_rules! xml_warn_msg {
 #[doc(alias = "xmlSAX2EntityDecl")]
 pub unsafe fn xml_sax2_entity_decl(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -616,7 +612,6 @@ pub unsafe fn xml_sax2_entity_decl(
     if (*ctxt).in_subset == 1 {
         ent = xml_add_doc_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
         if ent.is_null() && (*ctxt).pedantic != 0 {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_warn_msg!(
                 ctxt,
                 XmlParserErrors::XmlWarEntityRedefined,
@@ -654,11 +649,7 @@ pub unsafe fn xml_sax2_entity_decl(
         {
             (*(*ctxt).sax).warning.unwrap()(
                 (*ctxt).user_data.clone(),
-                format!(
-                    "Entity({}) already defined in the external subset\n",
-                    CStr::from_ptr(name as *const i8).to_string_lossy()
-                )
-                .as_str(),
+                format!("Entity({name}) already defined in the external subset\n",).as_str(),
             );
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
@@ -683,7 +674,6 @@ pub unsafe fn xml_sax2_entity_decl(
             (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrEntityProcessing,
@@ -1003,7 +993,7 @@ pub unsafe fn xml_sax2_notation_decl(
 #[doc(alias = "xmlSAX2UnparsedEntityDecl")]
 pub unsafe fn xml_sax2_unparsed_entity_decl(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
     notation_name: *const XmlChar,
@@ -1034,11 +1024,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         {
             (*(*ctxt).sax).warning.unwrap()(
                 (*ctxt).user_data.clone(),
-                format!(
-                    "Entity({}) already defined in the internal subset\n",
-                    CStr::from_ptr(name as *const i8).to_string_lossy()
-                )
-                .as_str(),
+                format!("Entity({name}) already defined in the internal subset\n").as_str(),
             )
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
@@ -1078,11 +1064,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         {
             (*(*ctxt).sax).warning.unwrap()(
                 (*ctxt).user_data.clone(),
-                format!(
-                    "Entity({}) already defined in the external subset\n",
-                    CStr::from_ptr(name as *const i8).to_string_lossy()
-                )
-                .as_str(),
+                format!("Entity({name}) already defined in the external subset\n").as_str(),
             )
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
@@ -1107,7 +1089,6 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
@@ -3106,7 +3087,7 @@ pub unsafe fn xml_sax2_end_element_ns(
 
 /// Called when an entity xmlSAX2Reference is detected.
 #[doc(alias = "xmlSAX2Reference")]
-pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: &str) {
     if ctx.is_none() {
         return;
     }
@@ -3116,7 +3097,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const 
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
 
-    let ret = if *name.add(0) == b'#' {
+    let ret = if name.starts_with('#') {
         xml_new_char_ref((*ctxt).my_doc, name)
     } else {
         xml_new_reference((*ctxt).my_doc, name)

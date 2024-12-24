@@ -713,7 +713,7 @@ fn resolve_entity_callback(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
-fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) -> XmlEntityPtr {
+fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
@@ -722,10 +722,7 @@ fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar)
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityCallback")]
-fn get_parameter_entity_callback(
-    _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-) -> XmlEntityPtr {
+fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
@@ -734,7 +731,7 @@ fn get_parameter_entity_callback(
 #[doc(alias = "entityDeclCallback")]
 fn entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
+    _name: &str,
     _typ: i32,
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
@@ -783,7 +780,7 @@ fn notation_decl_callback(
 #[doc(alias = "unparsedEntityDeclCallback")]
 fn unparsed_entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
+    _name: &str,
     _public_id: *const XmlChar,
     _system_id: *const XmlChar,
     _notation_name: *const XmlChar,
@@ -819,7 +816,7 @@ fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceCallback")]
-fn reference_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
+fn reference_callback(_ctx: Option<GenericErrorContext>, _name: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 

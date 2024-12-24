@@ -30567,7 +30567,7 @@ unsafe fn xml_schema_sax_handle_cdata_section(
     }
 }
 
-unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
+unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _name: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
@@ -30685,7 +30685,7 @@ unsafe fn resolve_entity_split(
     null_mut()
 }
 
-unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: *const XmlChar) -> XmlEntityPtr {
+unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -30695,10 +30695,7 @@ unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: *const XmlCha
     null_mut()
 }
 
-unsafe fn get_parameter_entity_split(
-    ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+unsafe fn get_parameter_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -30713,7 +30710,7 @@ unsafe fn get_parameter_entity_split(
 
 unsafe fn entity_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
@@ -30801,7 +30798,7 @@ unsafe fn notation_decl_split(
 
 unsafe fn unparsed_entity_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
     notation_name: *const XmlChar,
@@ -30961,7 +30958,7 @@ unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: *const XmlC
     }
 }
 
-unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();

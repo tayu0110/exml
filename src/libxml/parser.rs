@@ -1731,21 +1731,20 @@ pub type ExternalSubsetSAXFunc = unsafe fn(
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "getEntitySAXFunc")]
-pub type GetEntitySAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: *const XmlChar) -> XmlEntityPtr;
+pub type GetEntitySAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr;
 
 /// Get a parameter entity by name.
 ///
 /// Returns the xmlEntityPtr if found.
 #[doc(alias = "getParameterEntitySAXFunc")]
 pub type GetParameterEntitySAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: *const XmlChar) -> XmlEntityPtr;
+    unsafe fn(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr;
 
 /// An entity definition has been parsed.
 #[doc(alias = "entityDeclSAXFunc")]
 pub type EntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     publicId: *const XmlChar,
     systemId: *const XmlChar,
@@ -1786,7 +1785,7 @@ pub type ElementDeclSAXFunc = unsafe fn(
 #[doc(alias = "unparsedEntityDeclSAXFunc")]
 pub type UnparsedEntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: *const XmlChar,
     system_id: *const XmlChar,
     notation_name: *const XmlChar,
@@ -1823,7 +1822,7 @@ pub type AttributeSAXFunc =
 
 /// Called when an entity reference is detected.
 #[doc(alias = "referenceSAXFunc")]
-pub type ReferenceSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: *const XmlChar);
+pub type ReferenceSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str);
 
 /// Receiving some chars from the parser.
 #[doc(alias = "charactersSAXFunc")]
@@ -6031,7 +6030,7 @@ pub(crate) unsafe extern "C" fn xml_parse_string_name(
 /// Returns the xmlEntityPtr if found, or NULL otherwise. The str pointer
 /// is updated to the current location in the string.
 #[doc(alias = "xmlParseStringEntityRef")]
-unsafe extern "C" fn xml_parse_string_entity_ref(
+unsafe fn xml_parse_string_entity_ref(
     ctxt: XmlParserCtxtPtr,
     str: *mut *const XmlChar,
 ) -> XmlEntityPtr {
@@ -6058,36 +6057,37 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         *str = ptr;
         return null_mut();
     }
+    let name = {
+        let n = CStr::from_ptr(name as *const i8)
+            .to_string_lossy()
+            .into_owned();
+        xml_free(name as _);
+        n
+    };
     if *ptr != b';' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
-        xml_free(name as _);
         *str = ptr;
         return null_mut();
     }
     ptr = ptr.add(1);
 
-    /*
-     * Predefined entities override any extra definition
-     */
+    // Predefined entities override any extra definition
     if (*ctxt).options & XmlParserOption::XmlParseOldsax as i32 == 0 {
-        ent = xml_get_predefined_entity(name);
+        ent = xml_get_predefined_entity(&name);
         if !ent.is_null() {
-            xml_free(name as _);
             *str = ptr;
             return ent;
         }
     }
 
-    /*
-     * Ask first SAX for entity resolution, otherwise try the
-     * entities which may have stored in the parser context.
-     */
+    // Ask first SAX for entity resolution, otherwise try the
+    // entities which may have stored in the parser context.
     if !(*ctxt).sax.is_null() {
         if let Some(get_entity) = (*(*ctxt).sax).get_entity {
-            ent = get_entity((*ctxt).user_data.clone(), name);
+            ent = get_entity((*ctxt).user_data.clone(), &name);
         }
         if ent.is_null() && (*ctxt).options & XmlParserOption::XmlParseOldsax as i32 != 0 {
-            ent = xml_get_predefined_entity(name);
+            ent = xml_get_predefined_entity(&name);
         }
         if ent.is_null()
             && (*ctxt)
@@ -6096,39 +6096,35 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
                 .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                 == Some(ctxt)
         {
-            ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)) as _, name);
+            ent = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)) as _, &name);
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        xml_free(name as _);
         return null_mut();
     }
 
-    /*
-     * [ WFC: Entity Declared ]
-     * In a document without any DTD, a document with only an
-     * internal DTD subset which contains no parameter entity
-     * references, or a document with "standalone='yes'", the
-     * Name given in the entity reference must match that in an
-     * entity declaration, except that well-formed documents
-     * need not declare any of the following entities: amp, lt,
-     * gt, apos, quot.
-     * The declaration of a parameter entity must precede any
-     * reference to it.
-     * Similarly, the declaration of a general entity must
-     * precede any reference to it which appears in a default
-     * value in an attribute-list declaration. Note that if
-     * entities are declared in the external subset or in
-     * external parameter entities, a non-validating processor
-     * is not obligated to read and process their declarations;
-     * for such documents, the rule that an entity must be
-     * declared is a well-formedness constraint only if
-     * standalone='yes'.
-     */
+    // [ WFC: Entity Declared ]
+    // In a document without any DTD, a document with only an
+    // internal DTD subset which contains no parameter entity
+    // references, or a document with "standalone='yes'", the
+    // Name given in the entity reference must match that in an
+    // entity declaration, except that well-formed documents
+    // need not declare any of the following entities: amp, lt,
+    // gt, apos, quot.
+    // The declaration of a parameter entity must precede any
+    // reference to it.
+    // Similarly, the declaration of a general entity must
+    // precede any reference to it which appears in a default
+    // value in an attribute-list declaration. Note that if
+    // entities are declared in the external subset or in
+    // external parameter entities, a non-validating processor
+    // is not obligated to read and process their declarations;
+    // for such documents, the rule that an entity must be
+    // declared is a well-formedness constraint only if
+    // standalone='yes'.
     if ent.is_null() {
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
@@ -6136,7 +6132,6 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
                 name
             );
         } else {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
@@ -6144,7 +6139,7 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
                 name
             );
         }
-    /* TODO ? check regressions (*ctxt).valid = 0; */
+    // TODO ? check regressions (*ctxt).valid = 0;
     }
     // [ WFC: Parsed Entity ]
     // An entity reference must not contain the name of an
@@ -6153,7 +6148,6 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
     ) {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrUnparsedEntity,
@@ -6161,11 +6155,9 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
             name
         );
     }
-    /*
-     * [ WFC: No External Entity References ]
-     * Attribute values cannot contain direct or indirect
-     * entity references to external entities.
-     */
+    // [ WFC: No External Entity References ]
+    // Attribute values cannot contain direct or indirect
+    // entity references to external entities.
     else if matches!(
         (*ctxt).instate,
         XmlParserInputState::XmlParserAttributeValue
@@ -6173,7 +6165,6 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         (*ent).etype,
         Some(XmlEntityType::XmlExternalGeneralParsedEntity)
     ) {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrEntityIsExternal,
@@ -6201,7 +6192,6 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
             (*ent).flags |= XML_ENT_CHECKED_LT as i32;
         }
         if (*ent).flags & XML_ENT_CONTAINS_LT as i32 != 0 {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrLtInAttribute,
@@ -6215,7 +6205,6 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         match (*ent).etype {
             Some(XmlEntityType::XmlInternalParameterEntity)
             | Some(XmlEntityType::XmlExternalParameterEntity) => {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrEntityIsParameter,
@@ -6227,14 +6216,11 @@ unsafe extern "C" fn xml_parse_string_entity_ref(
         }
     }
 
-    /*
-     * [ WFC: No Recursion ]
-     * A parsed entity must not contain a recursive reference
-     * to itself, either directly or indirectly.
-     * Done somewhere else
-     */
+    // [ WFC: No Recursion ]
+    // A parsed entity must not contain a recursive reference
+    // to itself, either directly or indirectly.
+    // Done somewhere else
 
-    xml_free(name as _);
     *str = ptr;
     ent
 }
@@ -6292,23 +6278,26 @@ unsafe extern "C" fn xml_parse_string_pereference(
         *str = ptr;
         return null_mut();
     }
+    let name = {
+        let n = CStr::from_ptr(name as *const i8)
+            .to_string_lossy()
+            .into_owned();
+        xml_free(name as _);
+        n
+    };
     cur = *ptr;
     if cur != b';' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
-        xml_free(name as _);
         *str = ptr;
         return null_mut();
     }
     ptr = ptr.add(1);
 
-    /*
-     * Request the entity from SAX
-     */
+    // Request the entity from SAX
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).get_parameter_entity.is_some() {
-        entity = ((*(*ctxt).sax).get_parameter_entity.unwrap())((*ctxt).user_data.clone(), name);
+        entity = ((*(*ctxt).sax).get_parameter_entity.unwrap())((*ctxt).user_data.clone(), &name);
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        xml_free(name as _);
         *str = ptr;
         return null_mut();
     }
@@ -6321,7 +6310,6 @@ unsafe extern "C" fn xml_parse_string_pereference(
         // any reference to it...
         if (*ctxt).standalone == 1 || ((*ctxt).has_external_subset == 0 && (*ctxt).has_perefs == 0)
         {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrUndeclaredEntity,
@@ -6338,7 +6326,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
                 "PEReference: %{}; not found\n",
-                CStr::from_ptr(name as *const i8).to_string_lossy()
+                name
             );
             (*ctxt).valid = 0;
         }
@@ -6353,12 +6341,11 @@ unsafe extern "C" fn xml_parse_string_pereference(
                 ctxt,
                 XmlParserErrors::XmlWarUndeclaredEntity,
                 "%{}; is not a parameter entity\n",
-                CStr::from_ptr(name as *const i8).to_string_lossy()
+                name
             );
         }
     }
     (*ctxt).has_perefs = 1;
-    xml_free(name as _);
     *str = ptr;
     entity
 }
@@ -11255,7 +11242,7 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
 /// `[ VC: Notation Declared ]`  
 /// The Name must match the declared name of a notation.
 #[doc(alias = "xmlParseEntityDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
     let name: *const XmlChar;
     let mut value: *mut XmlChar = null_mut();
     let mut uri: *mut XmlChar = null_mut();
@@ -11302,8 +11289,8 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             );
             return;
         }
-        if !xml_strchr(name, b':').is_null() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        if name.contains(':') {
             xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrColon,
@@ -11320,9 +11307,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
         }
 
         (*ctxt).instate = XmlParserInputState::XmlParserEntityDecl;
-        /*
-         * handle the various case of definitions...
-         */
+        // handle the various case of definitions...
         if is_parameter != 0 {
             if (*ctxt).current_byte() == b'"' || (*ctxt).current_byte() == b'\'' {
                 value = xml_parse_entity_value(ctxt, addr_of_mut!(orig));
@@ -11330,7 +11315,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     if let Some(ent) = (*(*ctxt).sax).entity_decl {
                         ent(
                             (*ctxt).user_data.clone(),
-                            name,
+                            &name,
                             XmlEntityType::XmlInternalParameterEntity as i32,
                             null(),
                             null(),
@@ -11358,16 +11343,13 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     // E26 of the XML erratas.
                     } else {
                         if !(*parsed_uri).fragment.is_null() {
-                            /*
-                             * Okay this is foolish to block those but not
-                             * invalid URIs.
-                             */
+                            // Okay this is foolish to block those but not invalid URIs.
                             xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, None);
                         } else if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                             if let Some(ent) = (*(*ctxt).sax).entity_decl {
                                 ent(
                                     (*ctxt).user_data.clone(),
-                                    name,
+                                    &name,
                                     XmlEntityType::XmlExternalParameterEntity as i32,
                                     literal,
                                     uri as _,
@@ -11385,7 +11367,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 if let Some(ent) = (*(*ctxt).sax).entity_decl {
                     ent(
                         (*ctxt).user_data.clone(),
-                        name,
+                        &name,
                         XmlEntityType::XmlInternalGeneralEntity as i32,
                         null(),
                         null(),
@@ -11393,9 +11375,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     );
                 }
             }
-            /*
-             * For expat compatibility in SAX mode.
-             */
+            // For expat compatibility in SAX mode.
             if (*ctxt).my_doc.is_null()
                 || (*(*ctxt).my_doc).version.as_deref() == Some(SAX_COMPAT_MODE)
             {
@@ -11427,7 +11407,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
 
                 xml_sax2_entity_decl(
                     Some(GenericErrorContext::new(ctxt)),
-                    name,
+                    &name,
                     XmlEntityType::XmlInternalGeneralEntity as i32,
                     null(),
                     null(),
@@ -11454,10 +11434,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 // E26 of the XML erratas.
                 } else {
                     if !(*parsed_uri).fragment.is_null() {
-                        /*
-                         * Okay this is foolish to block those but not
-                         * invalid URIs.
-                         */
+                        // Okay this is foolish to block those but not invalid URIs.
                         xml_fatal_err(ctxt, XmlParserErrors::XmlErrURIFragment, None);
                     }
                     xml_free_uri(parsed_uri);
@@ -11482,7 +11459,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 ndata = xml_parse_name(ctxt);
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(unparsed_ent) = (*(*ctxt).sax).unparsed_entity_decl {
-                        unparsed_ent((*ctxt).user_data.clone(), name, literal, uri, ndata);
+                        unparsed_ent((*ctxt).user_data.clone(), &name, literal, uri, ndata);
                     }
                 }
             } else {
@@ -11490,7 +11467,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     if let Some(ent) = (*(*ctxt).sax).entity_decl {
                         ent(
                             (*ctxt).user_data.clone(),
-                            name,
+                            &name,
                             XmlEntityType::XmlExternalGeneralParsedEntity as i32,
                             literal,
                             uri,
@@ -11498,10 +11475,8 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         );
                     }
                 }
-                /*
-                 * For expat compatibility in SAX mode.
-                 * assuming the entity replacement was asked for
-                 */
+                // For expat compatibility in SAX mode.
+                // assuming the entity replacement was asked for
                 if (*ctxt).replace_entities != 0
                     && ((*ctxt).my_doc.is_null()
                         || (*(*ctxt).my_doc).version.as_deref() == Some(SAX_COMPAT_MODE))
@@ -11534,7 +11509,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     }
                     xml_sax2_entity_decl(
                         Some(GenericErrorContext::new(ctxt)),
-                        name,
+                        &name,
                         XmlEntityType::XmlExternalGeneralParsedEntity as i32,
                         literal,
                         uri,
@@ -11561,7 +11536,6 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
         }
         (*ctxt).skip_blanks();
         if (*ctxt).current_byte() != b'>' {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_fatal_err_msg_str!(
                 ctxt,
                 XmlParserErrors::XmlErrEntityNotFinished,
@@ -11580,21 +11554,19 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
             (*ctxt).skip_char();
         }
         if !orig.is_null() {
-            /*
-             * Ugly mechanism to save the raw entity value.
-             */
+            // Ugly mechanism to save the raw entity value.
             let mut cur: XmlEntityPtr = null_mut();
 
             if is_parameter != 0 {
                 if !(*ctxt).sax.is_null() {
                     if let Some(ent) = (*(*ctxt).sax).get_parameter_entity {
-                        cur = ent((*ctxt).user_data.clone(), name);
+                        cur = ent((*ctxt).user_data.clone(), &name);
                     }
                 }
             } else {
                 if !(*ctxt).sax.is_null() {
                     if let Some(ent) = (*(*ctxt).sax).get_entity {
-                        cur = ent((*ctxt).user_data.clone(), name);
+                        cur = ent((*ctxt).user_data.clone(), &name);
                     }
                 }
                 if cur.is_null()
@@ -11604,7 +11576,7 @@ pub(crate) unsafe extern "C" fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         .and_then(|d| d.lock().downcast_ref::<XmlParserCtxtPtr>().copied())
                         == Some(ctxt)
                 {
-                    cur = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), name);
+                    cur = xml_sax2_get_entity(Some(GenericErrorContext::new(ctxt)), &name);
                 }
             }
             if !cur.is_null() && (*cur).orig.load(Ordering::Relaxed).is_null() {

@@ -681,7 +681,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
         }
         let ret: XmlEntityPtr = xml_add_doc_entity(
             doc,
-            (*ent).name.load(Ordering::Relaxed),
+            &(*ent).name().unwrap(),
             (*ent).etype.map_or(0, |e| e as i32),
             (*ent).external_id.load(Ordering::Relaxed),
             (*ent).system_id.load(Ordering::Relaxed),
@@ -695,7 +695,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
                 );
             }
         } else {
-            prev = xml_get_doc_entity(doc, (*ent).name.load(Ordering::Relaxed));
+            prev = xml_get_doc_entity(doc, &(*ent).name().unwrap());
             if !prev.is_null() {
                 let error = || {
                     match (*ent).etype {

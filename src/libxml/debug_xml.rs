@@ -1109,8 +1109,8 @@ impl XmlDebugCtxt<'_> {
                 }
             }
         } else {
-            let name = CString::new(node.name().unwrap().as_ref()).unwrap();
-            let ent: XmlEntityPtr = xml_get_doc_entity(node.document(), name.as_ptr() as *const u8);
+            let name = node.name().unwrap();
+            let ent: XmlEntityPtr = xml_get_doc_entity(node.document(), &name);
             if !ent.is_null() {
                 self.dump_entity(Some(&*ent));
             }

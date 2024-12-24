@@ -4078,12 +4078,12 @@ pub unsafe extern "C" fn xml_validate_dtd(
 ///
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeValue2")]
-unsafe extern "C" fn xml_validate_attribute_value2(
+unsafe fn xml_validate_attribute_value2(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     name: *const XmlChar,
     typ: XmlAttributeType,
-    value: *const XmlChar,
+    value: &str,
 ) -> i32 {
     let mut ret: i32 = 1;
     match typ {
@@ -4095,9 +4095,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
         | XmlAttributeType::XmlAttributeNmtoken
         | XmlAttributeType::XmlAttributeCDATA => {}
         XmlAttributeType::XmlAttributeEntity => {
-            let mut ent: XmlEntityPtr;
-
-            ent = xml_get_doc_entity(doc, value);
+            let mut ent = xml_get_doc_entity(doc, value);
             /* yeah it's a bit messy... */
             if ent.is_null() && (*doc).standalone == 1 {
                 (*doc).standalone = 0;
@@ -4105,7 +4103,6 @@ unsafe extern "C" fn xml_validate_attribute_value2(
             }
             if ent.is_null() {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
                     doc as XmlNodePtr,
@@ -4113,7 +4110,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     format!("ENTITY attribute {name} reference an unknown entity \"{value}\"\n")
                         .as_str(),
                     Some(&name),
-                    Some(&value),
+                    Some(value),
                     None,
                 );
                 ret = 0;
@@ -4122,7 +4119,6 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                 Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
             ) {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
                     doc as XmlNodePtr,
@@ -4132,17 +4128,18 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     )
                     .as_str(),
                     Some(&name),
-                    Some(&value),
+                    Some(value),
                     None,
                 );
                 ret = 0;
             }
         }
         XmlAttributeType::XmlAttributeEntities => {
-            let mut nam: *mut XmlChar;
             let mut cur: *mut XmlChar;
             let mut save: XmlChar;
             let mut ent: XmlEntityPtr;
+            let value = CString::new(value).unwrap();
+            let value = value.as_ptr() as *const u8;
 
             let dup: *mut XmlChar = xml_strdup(value);
             if dup.is_null() {
@@ -4150,16 +4147,16 @@ unsafe extern "C" fn xml_validate_attribute_value2(
             }
             cur = dup;
             while *cur != 0 {
-                nam = cur;
+                let nam = cur;
                 while *cur != 0 && !xml_is_blank_char(*cur as u32) {
                     cur = cur.add(1);
                 }
                 save = *cur;
                 *cur = 0;
-                ent = xml_get_doc_entity(doc, nam);
+                let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
+                ent = xml_get_doc_entity(doc, &nam);
                 if ent.is_null() {
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
                         doc as XmlNodePtr,
@@ -4178,7 +4175,6 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
                 ) {
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    let nam = CStr::from_ptr(nam as *const i8).to_string_lossy();
                     xml_err_valid_node(
                         ctxt,
                         doc as XmlNodePtr,
@@ -4203,15 +4199,16 @@ unsafe extern "C" fn xml_validate_attribute_value2(
         }
         XmlAttributeType::XmlAttributeNotation => {
             let mut nota: XmlNotationPtr;
+            let cvalue = CString::new(value).unwrap();
+            let cvalue = cvalue.as_ptr() as *const u8;
 
-            nota = xml_get_dtd_notation_desc((*doc).int_subset, value);
+            nota = xml_get_dtd_notation_desc((*doc).int_subset, cvalue);
             if nota.is_null() && !(*doc).ext_subset.is_null() {
-                nota = xml_get_dtd_notation_desc((*doc).ext_subset, value);
+                nota = xml_get_dtd_notation_desc((*doc).ext_subset, cvalue);
             }
 
             if nota.is_null() {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
                     doc as XmlNodePtr,
@@ -4221,7 +4218,7 @@ unsafe extern "C" fn xml_validate_attribute_value2(
                     )
                     .as_str(),
                     Some(&name),
-                    Some(&value),
+                    Some(value),
                     None,
                 );
                 ret = 0;
@@ -4257,7 +4254,7 @@ extern "C" fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlVal
                         (*ctxt).doc,
                         (*cur).name,
                         (*cur).atype,
-                        (*cur).default_value,
+                        &CStr::from_ptr((*cur).default_value as *const i8).to_string_lossy(),
                     );
                     if ret == 0 && (*ctxt).valid == 1 {
                         (*ctxt).valid = 0;
@@ -4266,14 +4263,12 @@ extern "C" fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlVal
                 if !(*cur).tree.is_null() {
                     let mut tree: XmlEnumerationPtr = (*cur).tree;
                     while !tree.is_null() {
-                        let name = (*tree).name.as_deref().map(|n| CString::new(n).unwrap());
                         ret = xml_validate_attribute_value2(
                             ctxt,
                             (*ctxt).doc,
                             (*cur).name,
                             (*cur).atype,
-                            name.as_ref()
-                                .map_or(null_mut(), |n| n.as_ptr() as *const u8),
+                            (*tree).name.as_deref().unwrap(),
                         );
                         if ret == 0 && (*ctxt).valid == 1 {
                             (*ctxt).valid = 0;
@@ -6628,7 +6623,13 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
     }
 
     // Extra check for the attribute value
-    ret &= xml_validate_attribute_value2(ctxt, doc, (*attr).name, (*attr_decl).atype, value);
+    ret &= xml_validate_attribute_value2(
+        ctxt,
+        doc,
+        (*attr).name,
+        (*attr_decl).atype,
+        &CStr::from_ptr(value as *const i8).to_string_lossy(),
+    );
 
     ret
 }
@@ -7029,17 +7030,18 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         ret = 0;
     }
 
-    /* Extra check for the attribute value */
+    // Extra check for the attribute value
+    let value = CStr::from_ptr(value as *const i8).to_string_lossy();
     if !(*ns).prefix.is_null() {
         ret &=
-            xml_validate_attribute_value2(ctxt, doc, (*ns).prefix as _, (*attr_decl).atype, value);
+            xml_validate_attribute_value2(ctxt, doc, (*ns).prefix as _, (*attr_decl).atype, &value);
     } else {
         ret &= xml_validate_attribute_value2(
             ctxt,
             doc,
             c"xmlns".as_ptr() as _,
             (*attr_decl).atype,
-            value,
+            &value,
         );
     }
 

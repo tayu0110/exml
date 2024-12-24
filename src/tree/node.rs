@@ -1115,7 +1115,7 @@ impl XmlNode {
             }
             XmlElementType::XmlEntityRefNode => {
                 // lookup entity declaration
-                let ent: XmlEntityPtr = xml_get_doc_entity(self.document(), self.name);
+                let ent: XmlEntityPtr = xml_get_doc_entity(self.document(), &self.name().unwrap());
                 if ent.is_null() {
                     return None;
                 }
@@ -1286,7 +1286,7 @@ impl XmlNode {
             }
             XmlElementType::XmlEntityRefNode => {
                 // lookup entity declaration
-                let ent: XmlEntityPtr = xml_get_doc_entity(self.document(), self.name);
+                let ent: XmlEntityPtr = xml_get_doc_entity(self.document(), &self.name().unwrap());
                 if ent.is_null() {
                     return -1;
                 }
@@ -1670,7 +1670,7 @@ impl XmlNode {
                 }
             } else if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
                 if in_line != 0 {
-                    ent = xml_get_doc_entity(doc, (*node).name);
+                    ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
                     if !ent.is_null() {
                         // an entity content can be any "well balanced chunk",
                         // i.e. the result of the content [43] production:
@@ -1740,7 +1740,7 @@ impl XmlNode {
                 }
             } else if matches!((*node).element_type(), XmlElementType::XmlEntityRefNode) {
                 if in_line != 0 {
-                    ent = xml_get_doc_entity(doc, (*node).name);
+                    ent = xml_get_doc_entity(doc, &(*node).name().unwrap());
                     if !ent.is_null() {
                         // an entity content can be any "well balanced chunk",
                         // i.e. the result of the content [43] production:

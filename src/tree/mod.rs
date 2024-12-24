@@ -62,8 +62,7 @@ use crate::{
             XmlElementTablePtr, XmlNotationTablePtr,
         },
         xmlstring::{
-            xml_str_equal, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new, xml_strndup,
-            XmlChar,
+            xml_str_equal, xml_strdup, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
         },
     },
 };
@@ -1555,7 +1554,7 @@ pub(crate) unsafe fn xml_static_copy_node(
             // we cannot keep the reference. Try to find it in the
             // target document.
             (*ret).set_children(NodePtr::from_ptr(
-                xml_get_doc_entity(doc, (*ret).name) as *mut XmlNode
+                xml_get_doc_entity(doc, &(*ret).name().unwrap()) as *mut XmlNode,
             ));
         } else {
             (*ret).set_children((*node).children());
@@ -2454,14 +2453,8 @@ pub unsafe extern "C" fn xml_new_cdata_block(
 /// Creation of a new character reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCharRef")]
-pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlChar) -> XmlNodePtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_char_ref(doc: XmlDocPtr, name: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building character reference");
@@ -2471,16 +2464,16 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
     (*cur).typ = XmlElementType::XmlEntityRefNode;
 
     (*cur).doc = doc;
-    if *name.add(0) == b'&' {
-        name = name.add(1);
-        let len: i32 = xml_strlen(name);
-        if *name.add(len as usize - 1) == b';' {
-            (*cur).name = xml_strndup(name, len - 1);
+    if let Some(name) = name.strip_prefix('&') {
+        let len = name.len();
+        if let Some(name) = name.strip_suffix(';') {
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32 - 1);
         } else {
-            (*cur).name = xml_strndup(name, len);
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32);
         }
     } else {
-        (*cur).name = xml_strdup(name);
+        let name = CString::new(name).unwrap();
+        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -2494,17 +2487,8 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
 /// Creation of a new reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewReference")]
-pub unsafe extern "C" fn xml_new_reference(
-    doc: *const XmlDoc,
-    mut name: *const XmlChar,
-) -> XmlNodePtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building reference");
@@ -2514,19 +2498,19 @@ pub unsafe extern "C" fn xml_new_reference(
     (*cur).typ = XmlElementType::XmlEntityRefNode;
 
     (*cur).doc = doc as _;
-    if *name.add(0) == b'&' {
-        name = name.add(1);
-        let len: i32 = xml_strlen(name);
-        if *name.add(len as usize - 1) == b';' {
-            (*cur).name = xml_strndup(name, len - 1);
+    if let Some(name) = name.strip_prefix('&') {
+        let len = name.len();
+        if let Some(name) = name.strip_suffix(';') {
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32 - 1);
         } else {
-            (*cur).name = xml_strndup(name, len);
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32);
         }
     } else {
-        (*cur).name = xml_strdup(name);
+        let name = CString::new(name).unwrap();
+        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     }
 
-    let ent: XmlEntityPtr = xml_get_doc_entity(doc, (*cur).name);
+    let ent: XmlEntityPtr = xml_get_doc_entity(doc, &(*cur).name().unwrap());
     if !ent.is_null() {
         (*cur).content = (*ent).content.load(Ordering::Acquire);
         // The parent pointer in entity is a DTD pointer and thus is NOT
@@ -4601,7 +4585,8 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 || !(*dest_doc).ext_subset.is_null()
                             {
                                 // Assign new entity-node if available.
-                                let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
+                                let ent: XmlEntityPtr =
+                                    xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                                 if !ent.is_null() {
                                     (*cur).content = (*ent).content.load(Ordering::Relaxed);
                                     (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -4916,7 +4901,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
                 (*cur).set_last(None);
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     // Assign new entity-node if available.
-                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
+                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                     if !ent.is_null() {
                         (*cur).content = (*ent).content.load(Ordering::Relaxed);
                         (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -5055,7 +5040,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
                 (*node).set_last(None);
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     // Assign new entity-node if available.
-                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*node).name);
+                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
                     if !ent.is_null() {
                         (*node).content = (*ent).content.load(Ordering::Relaxed);
                         (*node).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -5627,7 +5612,8 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 || !(*dest_doc).ext_subset.is_null()
                             {
                                 // Different doc: Assign new entity-node if available.
-                                let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
+                                let ent: XmlEntityPtr =
+                                    xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                                 if !ent.is_null() {
                                     (*clone).content = (*ent).content.load(Ordering::Relaxed);
                                     (*clone).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -5917,7 +5903,11 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{
+        globals::reset_last_error,
+        libxml::{xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
+        test_util::*,
+    };
 
     use super::*;
 
@@ -6484,37 +6474,6 @@ mod tests {
                             eprint!(" {}", n_content);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_char_ref() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_new_char_ref(doc, name);
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewCharRef",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewCharRef()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
                     }
                 }
             }
@@ -7157,36 +7116,6 @@ mod tests {
                                 eprintln!(" {}", n_value);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_reference() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_new_reference(doc, name);
-                    desret_xml_node_ptr(ret_val);
-                    des_const_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewReference",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewReference()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
                     }
                 }
             }
