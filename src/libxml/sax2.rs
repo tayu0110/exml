@@ -89,7 +89,7 @@ use super::{
 ///
 /// Returns a xmlChar *
 #[doc(alias = "xmlSAX2GetPublicId")]
-pub unsafe extern "C" fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
+pub unsafe fn xml_sax2_get_public_id(_ctx: *mut c_void) -> *const XmlChar {
     /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
     null()
 }
@@ -121,7 +121,7 @@ pub unsafe fn xml_sax2_set_document_locator(
 ///
 /// Returns an int
 #[doc(alias = "xmlSAX2GetLineNumber")]
-pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
+pub unsafe fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return 0;
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn xml_sax2_get_line_number(ctx: *mut c_void) -> i32 {
 ///
 /// Returns an int
 #[doc(alias = "xmlSAX2GetColumnNumber")]
-pub unsafe extern "C" fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
+pub unsafe fn xml_sax2_get_column_number(ctx: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
     if ctx.is_null() || (*ctxt).input.is_null() {
         return 0;
@@ -1964,7 +1964,7 @@ unsafe fn xml_sax2_attribute_internal(
     feature = "libxml_writer",
     feature = "libxml_legacy"
 ))]
-unsafe extern "C" fn xml_check_defaulted_attributes(
+unsafe fn xml_check_defaulted_attributes(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
     prefix: *const XmlChar,
@@ -2708,11 +2708,7 @@ pub unsafe fn xml_sax2_start_element_ns(
 
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2TextNode")]
-unsafe extern "C" fn xml_sax2_text_node(
-    ctxt: XmlParserCtxtPtr,
-    str: *const XmlChar,
-    len: i32,
-) -> XmlNodePtr {
+unsafe fn xml_sax2_text_node(ctxt: XmlParserCtxtPtr, str: *const XmlChar, len: i32) -> XmlNodePtr {
     let mut intern: *const XmlChar = null();
 
     /*
@@ -2804,7 +2800,7 @@ unsafe extern "C" fn xml_sax2_text_node(
 /// Returns the newly allocated string or NULL if not needed or error
 #[doc(alias = "xmlSAX2DecodeAttrEntities")]
 #[cfg(feature = "libxml_valid")]
-unsafe extern "C" fn xml_sax2_decode_attr_entities(
+unsafe fn xml_sax2_decode_attr_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
     end: *const XmlChar,
@@ -2841,7 +2837,7 @@ unsafe extern "C" fn xml_sax2_decode_attr_entities(
 /// The default handling is to convert the attribute into an
 /// DOM subtree and past it in a new xmlAttr element added to the element.
 #[doc(alias = "xmlSAX2AttributeNs")]
-unsafe extern "C" fn xml_sax2_attribute_ns(
+unsafe fn xml_sax2_attribute_ns(
     ctxt: XmlParserCtxtPtr,
     localname: *const XmlChar,
     prefix: *const XmlChar,
@@ -3191,12 +3187,7 @@ pub unsafe fn xml_sax2_reference(ctx: Option<GenericErrorContext>, name: *const 
 
 /// Append characters.
 #[doc(alias = "xmlSAX2Text")]
-unsafe extern "C" fn xml_sax2_text(
-    ctxt: XmlParserCtxtPtr,
-    ch: *const XmlChar,
-    len: i32,
-    typ: XmlElementType,
-) {
+unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: *const XmlChar, len: i32, typ: XmlElementType) {
     if ctxt.is_null() {
         return;
     }
@@ -3465,7 +3456,7 @@ static mut XML_SAX2_DEFAULT_VERSION_VALUE: i32 = 2;
 #[doc(alias = "xmlSAXDefaultVersion")]
 #[deprecated = "Use parser option XML_PARSE_SAX1"]
 #[cfg(feature = "sax1")]
-pub unsafe extern "C" fn xml_sax_default_version(version: i32) -> i32 {
+pub unsafe fn xml_sax_default_version(version: i32) -> i32 {
     let ret: i32 = XML_SAX2_DEFAULT_VERSION_VALUE;
 
     if version != 1 && version != 2 {
@@ -3479,7 +3470,7 @@ pub unsafe extern "C" fn xml_sax_default_version(version: i32) -> i32 {
 ///
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlSAXVersion")]
-pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32) -> i32 {
+pub unsafe fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32) -> i32 {
     if hdlr.is_null() {
         return -1;
     }
@@ -3531,7 +3522,7 @@ pub unsafe extern "C" fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32)
 
 /// Initialize the default XML SAX2 handler
 #[doc(alias = "xmlSAX2InitDefaultSAXHandler")]
-pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHandler, warning: i32) {
+pub unsafe fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHandler, warning: i32) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
         return;
     }
@@ -3547,7 +3538,7 @@ pub unsafe extern "C" fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHand
 /// Initialize the default HTML SAX2 handler
 #[doc(alias = "xmlSAX2InitHtmlDefaultSAXHandler")]
 #[cfg(feature = "html")]
-pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSAXHandler) {
+pub unsafe fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSAXHandler) {
     if hdlr.is_null() || (*hdlr).initialized != 0 {
         return;
     }
@@ -3586,12 +3577,12 @@ pub unsafe extern "C" fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSA
 #[doc(alias = "htmlDefaultSAXHandlerInit")]
 #[deprecated = "This function is a no-op. Call xmlInitParser to initialize the library"]
 #[cfg(feature = "html")]
-pub unsafe extern "C" fn html_default_sax_handler_init() {}
+pub unsafe fn html_default_sax_handler_init() {}
 
 /// Initialize the default SAX2 handler
 #[doc(alias = "xmlDefaultSAXHandlerInit")]
 #[deprecated = "This function is a no-op. Call xmlInitParser to initialize the library"]
-pub unsafe extern "C" fn xml_default_sax_handler_init() {}
+pub unsafe fn xml_default_sax_handler_init() {}
 
 #[cfg(test)]
 mod tests {

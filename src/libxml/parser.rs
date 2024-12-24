@@ -1707,10 +1707,10 @@ pub type XmlSAXLocatorPtr = *mut XmlSAXLocator;
 #[doc(alias = "xmlSAXLocator")]
 #[repr(C)]
 pub struct XmlSAXLocator {
-    pub(crate) get_public_id: unsafe extern "C" fn(ctx: *mut c_void) -> *const XmlChar,
+    pub(crate) get_public_id: unsafe fn(ctx: *mut c_void) -> *const XmlChar,
     pub(crate) get_system_id: unsafe fn(ctx: *mut c_void) -> Option<String>,
-    pub(crate) get_line_number: unsafe extern "C" fn(ctx: *mut c_void) -> i32,
-    pub(crate) get_column_number: unsafe extern "C" fn(ctx: *mut c_void) -> i32,
+    pub(crate) get_line_number: unsafe fn(ctx: *mut c_void) -> i32,
+    pub(crate) get_column_number: unsafe fn(ctx: *mut c_void) -> i32,
 }
 
 /// Callback:
@@ -1805,9 +1805,9 @@ pub type ElementDeclSAXFunc = unsafe fn(
 pub type UnparsedEntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    publicId: *const XmlChar,
-    systemId: *const XmlChar,
-    notationName: *const XmlChar,
+    public_id: *const XmlChar,
+    system_id: *const XmlChar,
+    notation_name: *const XmlChar,
 );
 
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator.
@@ -1870,17 +1870,17 @@ pub type CdataBlockSAXFunc =
 
 /// Display and format a warning messages, callback.
 #[doc(alias = "warningSAXFunc")]
-pub type WarningSAXFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type WarningSAXFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 /// Display and format an error messages, callback.
 #[doc(alias = "errorSAXFunc")]
-pub type ErrorSAXFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type ErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 /// Display and format fatal error messages, callback.
 /// # Note
 /// so far fatalError() SAX callbacks are not used, error() get all the callbacks for errors.
 #[doc(alias = "fatalErrorSAXFunc")]
-pub type FatalErrorSAXFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type FatalErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 /// Is this document tagged standalone?
 ///
