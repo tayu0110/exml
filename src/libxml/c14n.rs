@@ -212,7 +212,7 @@ pub struct XmlC14NCtx<'a, T> {
     inclusive_ns_prefixes: *mut *mut XmlChar,
 
     // error number
-    error: i32,
+    error: XmlParserErrors,
 }
 
 impl<T> XmlC14NCtx<'_, T> {
@@ -1305,7 +1305,7 @@ impl<T: Default> Default for XmlC14NCtx<'_, T> {
             ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
             mode: XmlC14NMode::XmlC14N1_0,
             inclusive_ns_prefixes: null_mut(),
-            error: 0,
+            error: XmlParserErrors::default(),
         }
     }
 }
@@ -1565,7 +1565,7 @@ unsafe fn xml_c14n_err<T>(
     msg: &str,
 ) {
     if !ctxt.is_null() {
-        (*ctxt).error = error as i32;
+        (*ctxt).error = error;
     }
     __xml_raise_error!(
         None,
@@ -1658,7 +1658,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
         ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
         mode: XmlC14NMode::XmlC14N1_0,
         inclusive_ns_prefixes: null_mut(),
-        error: 0,
+        error: XmlParserErrors::default(),
     };
     std::ptr::write(&mut *ctx, tmp);
 
