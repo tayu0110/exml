@@ -34,7 +34,6 @@ use std::{
     any::type_name,
     cell::RefCell,
     ffi::{c_char, CStr, CString},
-    mem::size_of,
     os::raw::c_void,
     ptr::{drop_in_place, null_mut},
     rc::Rc,
@@ -45,7 +44,7 @@ use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     io::XmlOutputBuffer,
     tree::{
-        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDocPtr,
+        xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -53,7 +52,7 @@ use crate::{
 };
 
 use super::{
-    globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+    globals::{xml_free, xml_malloc_atomic, xml_realloc},
     list::{
         xml_list_create, xml_list_delete, xml_list_insert, xml_list_search, xml_list_walk,
         XmlListPtr,
@@ -194,7 +193,7 @@ pub type XmlC14NIsVisibleCallback<T> =
 #[repr(C)]
 pub struct XmlC14NCtx<'a, T> {
     // input parameters
-    doc: XmlDocPtr,
+    doc: &'a mut XmlDoc,
     is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
     user_data: T,
     with_comments: bool,
@@ -422,7 +421,7 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns 0 on success or -1 on fail.
     #[doc(alias = "xmlC14NProcessAttrsAxis")]
-    unsafe fn process_attrs_axis(&self, cur: &XmlNode, parent_visible: i32) -> i32 {
+    unsafe fn process_attrs_axis(&mut self, cur: &XmlNode, parent_visible: i32) -> i32 {
         let mut attr: XmlAttrPtr;
         let mut attrs_to_delete: XmlAttrPtr = null_mut();
 
@@ -1214,7 +1213,7 @@ impl<T> XmlC14NCtx<'_, T> {
     ///
     /// Returns the newly created attribute or NULL
     #[doc(alias = "xmlC14NFixupBaseAttr")]
-    unsafe fn fixup_base_attr(&self, xml_base_attr: &XmlAttr) -> XmlAttrPtr {
+    unsafe fn fixup_base_attr(&mut self, xml_base_attr: &XmlAttr) -> XmlAttrPtr {
         let mut cur: XmlNodePtr;
         let mut attr: XmlAttrPtr;
 
@@ -1292,24 +1291,6 @@ impl<T> XmlC14NCtx<'_, T> {
     }
 }
 
-impl<T: Default> Default for XmlC14NCtx<'_, T> {
-    fn default() -> Self {
-        Self {
-            doc: null_mut(),
-            is_visible_callback: None,
-            user_data: T::default(),
-            with_comments: false,
-            buf: Rc::new(RefCell::new(XmlOutputBuffer::default())),
-            pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
-            parent_is_doc: false,
-            ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
-            mode: XmlC14NMode::XmlC14N1_0,
-            inclusive_ns_prefixes: null_mut(),
-            error: XmlParserErrors::default(),
-        }
-    }
-}
-
 pub type XmlC14NCtxPtr<'a, T> = *mut XmlC14NCtx<'a, T>;
 #[repr(C)]
 pub enum XmlC14NNormalizationMode {
@@ -1353,13 +1334,13 @@ unsafe fn xml_c14n_is_node_in_nodeset(
 ///
 /// Returns non-negative value on success or a negative value on fail
 #[doc(alias = "xmlC14NDocSaveTo")]
-pub unsafe fn xml_c14n_doc_save_to(
-    doc: XmlDocPtr,
+pub unsafe fn xml_c14n_doc_save_to<'a>(
+    doc: &'a mut XmlDoc,
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: bool,
-    buf: Rc<RefCell<XmlOutputBuffer>>,
+    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 ) -> i32 {
     xml_c14n_execute(
         doc,
@@ -1451,7 +1432,7 @@ unsafe fn xml_c14n_err_internal(extra: &str) {
 /// Returns the number of bytes written on success or a negative value on fail
 #[doc(alias = "xmlC14NDocDumpMemory")]
 pub unsafe fn xml_c14n_doc_dump_memory(
-    doc: XmlDocPtr,
+    doc: &mut XmlDoc,
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
@@ -1510,7 +1491,7 @@ pub unsafe fn xml_c14n_doc_dump_memory(
 /// Returns the number of bytes written success or a negative value on fail
 #[doc(alias = "xmlC14NDocSave")]
 pub unsafe fn xml_c14n_doc_save(
-    doc: XmlDocPtr,
+    doc: &mut XmlDoc,
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
@@ -1613,41 +1594,27 @@ unsafe fn xml_c14n_free_ctx<T>(ctx: XmlC14NCtxPtr<'_, T>) {
 /// Returns pointer to newly created object (success) or NULL (fail)
 #[doc(alias = "xmlC14NNewCtx")]
 unsafe fn xml_c14n_new_ctx<'a, T>(
-    doc: XmlDocPtr,
+    doc: &'a mut XmlDoc,
     is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
     user_data: T,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
-) -> XmlC14NCtxPtr<'a, T> {
-    let mut ctx = null_mut();
-
-    if doc.is_null() {
-        xml_c14n_err_param("creating new context");
-        return null_mut();
-    }
-
+) -> Option<XmlC14NCtx<'a, T>> {
     // Validate the encoding output buffer encoding
     if buf.borrow().encoder.is_some() {
-        xml_c14n_err(
-            ctx,
-            doc as _,
+        xml_c14n_err::<T>(
+            null_mut(),
+            doc as *mut XmlDoc as _,
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NNewCtx: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
-        return null_mut();
-    }
-
-    // Allocate a new xmlC14NCtxPtr and fill the fields.
-    ctx = xml_malloc(size_of::<XmlC14NCtx<'a, T>>()) as _;
-    if ctx.is_null() {
-        xml_c14n_err_memory("creating context");
-        return null_mut();
+        return None;
     }
 
     // initialize C14N context
-    let tmp = XmlC14NCtx {
+    let mut context = XmlC14NCtx {
         doc,
         with_comments,
         is_visible_callback,
@@ -1660,14 +1627,13 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
         inclusive_ns_prefixes: null_mut(),
         error: XmlParserErrors::default(),
     };
-    std::ptr::write(&mut *ctx, tmp);
 
     // Set "mode" flag and remember list of inclusive prefixes for exclusive c14n
-    (*ctx).mode = mode;
-    if (*ctx).is_exclusive() {
-        (*ctx).inclusive_ns_prefixes = inclusive_ns_prefixes;
+    context.mode = mode;
+    if context.is_exclusive() {
+        context.inclusive_ns_prefixes = inclusive_ns_prefixes;
     }
-    ctx
+    Some(context)
 }
 
 /// Handle a redefinition of relative namespace error
@@ -2098,34 +2064,32 @@ unsafe fn xml_c14n_err_unknown_node(node_type: i32, extra: &str) {
 ///
 /// Returns non-negative value on success or a negative value on fail
 #[doc(alias = "xmlC14NExecute")]
-pub unsafe fn xml_c14n_execute<T>(
-    doc: XmlDocPtr,
+pub unsafe fn xml_c14n_execute<'a, T>(
+    doc: &'a mut XmlDoc,
     is_visible_callback: XmlC14NIsVisibleCallback<T>,
     user_data: T,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
     with_comments: bool,
-    buf: Rc<RefCell<XmlOutputBuffer>>,
+    buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 ) -> i32 {
     let mut ret: i32;
-
-    if doc.is_null() {
-        xml_c14n_err_param("executing c14n");
-        return -1;
-    }
 
     //  Validate the encoding output buffer encoding
     if buf.borrow().encoder.is_some() {
         xml_c14n_err::<T>(
             null_mut(),
-            doc as XmlNodePtr,
+            doc as *mut XmlDoc as XmlNodePtr,
             XmlParserErrors::XmlC14NRequiresUtf8,
             "xmlC14NExecute: output buffer encoder != NULL but C14N requires UTF8 output\n",
         );
         return -1;
     }
 
-    let ctx = xml_c14n_new_ctx(
+    let children = doc.children;
+    // currently, `xml_c14n_new_ctx` checks only output buffer encoding.
+    // It is already checked at this point, so buffer creation does not fail.
+    let mut ctx = xml_c14n_new_ctx(
         doc,
         Some(is_visible_callback),
         user_data,
@@ -2133,16 +2097,8 @@ pub unsafe fn xml_c14n_execute<T>(
         inclusive_ns_prefixes,
         with_comments,
         buf.clone(),
-    );
-    if ctx.is_null() {
-        xml_c14n_err::<T>(
-            null_mut(),
-            doc as XmlNodePtr,
-            XmlParserErrors::XmlC14NCreateCtxt,
-            "xmlC14NExecute: unable to create C14N context\n",
-        );
-        return -1;
-    }
+    )
+    .unwrap();
 
     // Root Node
     // The root node is the parent of the top-level document element. The
@@ -2150,11 +2106,10 @@ pub unsafe fn xml_c14n_execute<T>(
     // in document order. The root node does not generate a byte order mark,
     // XML declaration, nor anything from within the document type
     // declaration.
-    if let Some(children) = (*doc).children {
-        ret = (*ctx).process_node_list(Some(&*children.as_ptr()));
+    if let Some(children) = children {
+        ret = ctx.process_node_list(Some(&*children.as_ptr()));
         if ret < 0 {
             xml_c14n_err_internal("processing docs children list");
-            xml_c14n_free_ctx(ctx);
             return -1;
         }
     }
@@ -2163,11 +2118,8 @@ pub unsafe fn xml_c14n_execute<T>(
     ret = buf.borrow_mut().flush();
     if ret < 0 {
         xml_c14n_err_internal("flushing output buffer");
-        xml_c14n_free_ctx(ctx);
         return -1;
     }
 
-    // Cleanup
-    xml_c14n_free_ctx(ctx);
     ret
 }

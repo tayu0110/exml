@@ -4786,7 +4786,7 @@ unsafe fn c14n_run_test(
     // fprintf(stderr,"File \"%s\" loaded: start canonization\n", xml_filename);
     let mut result = String::new();
     ret = xml_c14n_doc_dump_memory(
-        doc,
+        &mut *doc,
         if !xpath.is_null() {
             (*xpath).nodesetval.as_deref_mut()
         } else {
