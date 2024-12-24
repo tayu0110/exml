@@ -2827,7 +2827,7 @@ unsafe extern "C" fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
     }
 }
 
-unsafe extern "C" fn xml_reg_check_character_range(
+unsafe fn xml_reg_check_character_range(
     typ: XmlRegAtomType,
     codepoint: i32,
     mut neg: i32,
@@ -2835,210 +2835,125 @@ unsafe extern "C" fn xml_reg_check_character_range(
     end: i32,
     block_name: *const XmlChar,
 ) -> i32 {
-    let mut ret: i32;
-
-    match typ {
+    let ret = match typ {
         XmlRegAtomType::XmlRegexpString
         | XmlRegAtomType::XmlRegexpSubreg
         | XmlRegAtomType::XmlRegexpRanges
         | XmlRegAtomType::XmlRegexpEpsilon => {
             return -1;
         }
-        XmlRegAtomType::XmlRegexpAnychar => {
-            ret = (codepoint != '\n' as i32 && codepoint != '\r' as i32) as _;
-        }
-        XmlRegAtomType::XmlRegexpCharval => {
-            ret = (codepoint >= start && codepoint <= end) as _;
-        }
+        XmlRegAtomType::XmlRegexpAnychar => codepoint != '\n' as i32 && codepoint != '\r' as i32,
+        XmlRegAtomType::XmlRegexpCharval => codepoint >= start && codepoint <= end,
         XmlRegAtomType::XmlRegexpNotspace => {
             neg = (neg == 0) as i32;
-            ret = (codepoint == '\n' as i32
+            codepoint == '\n' as i32
                 || codepoint == '\r' as i32
                 || codepoint == '\t' as i32
-                || codepoint == ' ' as i32) as _;
+                || codepoint == ' ' as i32
         }
         XmlRegAtomType::XmlRegexpAnyspace => {
-            ret = (codepoint == '\n' as i32
+            codepoint == '\n' as i32
                 || codepoint == '\r' as i32
                 || codepoint == '\t' as i32
-                || codepoint == ' ' as i32) as _;
+                || codepoint == ' ' as i32
         }
         XmlRegAtomType::XmlRegexpNotinitname => {
             neg = (neg == 0) as i32;
-            ret = (xml_is_letter(codepoint as u32)
-                || codepoint == '_' as i32
-                || codepoint == ':' as i32) as i32;
+            xml_is_letter(codepoint as u32) || codepoint == '_' as i32 || codepoint == ':' as i32
         }
         XmlRegAtomType::XmlRegexpInitname => {
-            ret = (xml_is_letter(codepoint as u32)
-                || codepoint == '_' as i32
-                || codepoint == ':' as i32) as i32;
+            xml_is_letter(codepoint as u32) || codepoint == '_' as i32 || codepoint == ':' as i32
         }
         XmlRegAtomType::XmlRegexpNotnamechar => {
             neg = (neg == 0) as i32;
-            ret = (xml_is_letter(codepoint as u32)
+            xml_is_letter(codepoint as u32)
                 || xml_is_digit(codepoint as u32)
                 || codepoint == '.' as i32
                 || codepoint == '-' as i32
                 || codepoint == '_' as i32
                 || codepoint == ':' as i32
                 || xml_is_combining(codepoint as u32)
-                || xml_is_extender(codepoint as u32)) as _;
+                || xml_is_extender(codepoint as u32)
         }
         XmlRegAtomType::XmlRegexpNamechar => {
-            ret = (xml_is_letter(codepoint as u32)
+            xml_is_letter(codepoint as u32)
                 || xml_is_digit(codepoint as u32)
                 || codepoint == '.' as i32
                 || codepoint == '-' as i32
                 || codepoint == '_' as i32
                 || codepoint == ':' as i32
                 || xml_is_combining(codepoint as u32)
-                || xml_is_extender(codepoint as u32)) as _;
+                || xml_is_extender(codepoint as u32)
         }
         XmlRegAtomType::XmlRegexpNotdecimal => {
             neg = (neg == 0) as i32;
-            ret = xml_ucs_is_cat_nd(codepoint);
+            xml_ucs_is_cat_nd(codepoint)
         }
-        XmlRegAtomType::XmlRegexpDecimal => {
-            ret = xml_ucs_is_cat_nd(codepoint);
-        }
+        XmlRegAtomType::XmlRegexpDecimal => xml_ucs_is_cat_nd(codepoint),
         XmlRegAtomType::XmlRegexpRealchar => {
             neg = (neg == 0) as i32;
-            ret = xml_ucs_is_cat_p(codepoint);
-            if ret == 0 {
-                ret = xml_ucs_is_cat_z(codepoint);
-            }
-            if ret == 0 {
-                ret = xml_ucs_is_cat_c(codepoint);
-            }
+            xml_ucs_is_cat_p(codepoint)
+                || xml_ucs_is_cat_z(codepoint)
+                || xml_ucs_is_cat_c(codepoint)
         }
         XmlRegAtomType::XmlRegexpNotrealchar => {
-            ret = xml_ucs_is_cat_p(codepoint);
-            if ret == 0 {
-                ret = xml_ucs_is_cat_z(codepoint);
-            }
-            if ret == 0 {
-                ret = xml_ucs_is_cat_c(codepoint);
-            }
+            xml_ucs_is_cat_p(codepoint)
+                || xml_ucs_is_cat_z(codepoint)
+                || xml_ucs_is_cat_c(codepoint)
         }
-        XmlRegAtomType::XmlRegexpLetter => {
-            ret = xml_ucs_is_cat_l(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpLetterUppercase => {
-            ret = xml_ucs_is_cat_lu(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpLetterLowercase => {
-            ret = xml_ucs_is_cat_ll(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpLetterTitlecase => {
-            ret = xml_ucs_is_cat_lt(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpLetterModifier => {
-            ret = xml_ucs_is_cat_lm(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpLetterOthers => {
-            ret = xml_ucs_is_cat_lo(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpMark => {
-            ret = xml_ucs_is_cat_m(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpMarkNonspacing => {
-            ret = xml_ucs_is_cat_mn(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpMarkSpacecombining => {
-            ret = xml_ucs_is_cat_mc(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpMarkEnclosing => {
-            ret = xml_ucs_is_cat_me(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpNumber => {
-            ret = xml_ucs_is_cat_n(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpNumberDecimal => {
-            ret = xml_ucs_is_cat_nd(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpNumberLetter => {
-            ret = xml_ucs_is_cat_nl(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpNumberOthers => {
-            ret = xml_ucs_is_cat_no(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunct => {
-            ret = xml_ucs_is_cat_p(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctConnector => {
-            ret = xml_ucs_is_cat_pc(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctDash => {
-            ret = xml_ucs_is_cat_pd(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctOpen => {
-            ret = xml_ucs_is_cat_ps(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctClose => {
-            ret = xml_ucs_is_cat_pe(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctInitquote => {
-            ret = xml_ucs_is_cat_pi(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctFinquote => {
-            ret = xml_ucs_is_cat_pf(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpPunctOthers => {
-            ret = xml_ucs_is_cat_po(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSepar => {
-            ret = xml_ucs_is_cat_z(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSeparSpace => {
-            ret = xml_ucs_is_cat_zs(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSeparLine => {
-            ret = xml_ucs_is_cat_zl(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSeparPara => {
-            ret = xml_ucs_is_cat_zp(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSymbol => {
-            ret = xml_ucs_is_cat_s(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSymbolMath => {
-            ret = xml_ucs_is_cat_sm(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSymbolCurrency => {
-            ret = xml_ucs_is_cat_sc(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSymbolModifier => {
-            ret = xml_ucs_is_cat_sk(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpSymbolOthers => {
-            ret = xml_ucs_is_cat_so(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpOther => {
-            ret = xml_ucs_is_cat_c(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpOtherControl => {
-            ret = xml_ucs_is_cat_cc(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpOtherFormat => {
-            ret = xml_ucs_is_cat_cf(codepoint);
-        }
-        XmlRegAtomType::XmlRegexpOtherPrivate => {
-            ret = xml_ucs_is_cat_co(codepoint);
-        }
+        XmlRegAtomType::XmlRegexpLetter => xml_ucs_is_cat_l(codepoint),
+        XmlRegAtomType::XmlRegexpLetterUppercase => xml_ucs_is_cat_lu(codepoint),
+        XmlRegAtomType::XmlRegexpLetterLowercase => xml_ucs_is_cat_ll(codepoint),
+        XmlRegAtomType::XmlRegexpLetterTitlecase => xml_ucs_is_cat_lt(codepoint),
+        XmlRegAtomType::XmlRegexpLetterModifier => xml_ucs_is_cat_lm(codepoint),
+        XmlRegAtomType::XmlRegexpLetterOthers => xml_ucs_is_cat_lo(codepoint),
+        XmlRegAtomType::XmlRegexpMark => xml_ucs_is_cat_m(codepoint),
+        XmlRegAtomType::XmlRegexpMarkNonspacing => xml_ucs_is_cat_mn(codepoint),
+        XmlRegAtomType::XmlRegexpMarkSpacecombining => xml_ucs_is_cat_mc(codepoint),
+        XmlRegAtomType::XmlRegexpMarkEnclosing => xml_ucs_is_cat_me(codepoint),
+        XmlRegAtomType::XmlRegexpNumber => xml_ucs_is_cat_n(codepoint),
+        XmlRegAtomType::XmlRegexpNumberDecimal => xml_ucs_is_cat_nd(codepoint),
+        XmlRegAtomType::XmlRegexpNumberLetter => xml_ucs_is_cat_nl(codepoint),
+        XmlRegAtomType::XmlRegexpNumberOthers => xml_ucs_is_cat_no(codepoint),
+        XmlRegAtomType::XmlRegexpPunct => xml_ucs_is_cat_p(codepoint),
+        XmlRegAtomType::XmlRegexpPunctConnector => xml_ucs_is_cat_pc(codepoint),
+        XmlRegAtomType::XmlRegexpPunctDash => xml_ucs_is_cat_pd(codepoint),
+        XmlRegAtomType::XmlRegexpPunctOpen => xml_ucs_is_cat_ps(codepoint),
+        XmlRegAtomType::XmlRegexpPunctClose => xml_ucs_is_cat_pe(codepoint),
+        XmlRegAtomType::XmlRegexpPunctInitquote => xml_ucs_is_cat_pi(codepoint),
+        XmlRegAtomType::XmlRegexpPunctFinquote => xml_ucs_is_cat_pf(codepoint),
+        XmlRegAtomType::XmlRegexpPunctOthers => xml_ucs_is_cat_po(codepoint),
+        XmlRegAtomType::XmlRegexpSepar => xml_ucs_is_cat_z(codepoint),
+        XmlRegAtomType::XmlRegexpSeparSpace => xml_ucs_is_cat_zs(codepoint),
+        XmlRegAtomType::XmlRegexpSeparLine => xml_ucs_is_cat_zl(codepoint),
+        XmlRegAtomType::XmlRegexpSeparPara => xml_ucs_is_cat_zp(codepoint),
+        XmlRegAtomType::XmlRegexpSymbol => xml_ucs_is_cat_s(codepoint),
+        XmlRegAtomType::XmlRegexpSymbolMath => xml_ucs_is_cat_sm(codepoint),
+        XmlRegAtomType::XmlRegexpSymbolCurrency => xml_ucs_is_cat_sc(codepoint),
+        XmlRegAtomType::XmlRegexpSymbolModifier => xml_ucs_is_cat_sk(codepoint),
+        XmlRegAtomType::XmlRegexpSymbolOthers => xml_ucs_is_cat_so(codepoint),
+        XmlRegAtomType::XmlRegexpOther => xml_ucs_is_cat_c(codepoint),
+        XmlRegAtomType::XmlRegexpOtherControl => xml_ucs_is_cat_cc(codepoint),
+        XmlRegAtomType::XmlRegexpOtherFormat => xml_ucs_is_cat_cf(codepoint),
+        XmlRegAtomType::XmlRegexpOtherPrivate => xml_ucs_is_cat_co(codepoint),
         XmlRegAtomType::XmlRegexpOtherNa => {
-            /* ret = xml_ucs_isCatCn(codepoint); */
-            /* Seems it doesn't exist anymore in recent Unicode releases */
-            ret = 0;
+            // ret = xml_ucs_isCatCn(codepoint);
+            // Seems it doesn't exist anymore in recent Unicode releases
+            false
         }
         XmlRegAtomType::XmlRegexpBlockName => {
-            ret = xml_ucs_is_block(codepoint, block_name as *const c_char);
+            xml_ucs_is_block(
+                codepoint,
+                CStr::from_ptr(block_name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ) != 0
         }
-    }
+    };
     if neg != 0 {
-        return (ret == 0) as i32;
+        return (!ret) as i32;
     }
-    ret
+    ret as i32
 }
 
 unsafe extern "C" fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {

@@ -28,689 +28,685 @@
 // Sources: Blocks-4.0.1.txt UnicodeData-4.0.1.txt
 // Daniel Veillard <veillard@redhat.com>
 
-use std::ffi::c_char;
-
-use libc::strcmp;
+use std::cmp::Ordering;
 
 use super::chvalid::{xml_char_in_range, XmlChLRange, XmlChRangeGroup, XmlChSRange};
 
-pub type XmlIntFunc = unsafe extern "C" fn(i32) -> i32; /* just to keep one's mind untwisted */
+pub type XmlIntFunc = fn(i32) -> bool; /* just to keep one's mind untwisted */
 
 #[repr(C)]
 pub struct XmlUnicodeRange {
-    rangename: *const c_char,
+    rangename: &'static str,
     func: XmlIntFunc,
 }
 
 #[repr(C)]
-pub struct XmlUnicodeNameTable {
-    table: *const XmlUnicodeRange,
+pub struct XmlUnicodeNameTable<'a> {
+    table: &'a [XmlUnicodeRange],
     numentries: i32,
 }
 
-const XML_UNICODE_BLOCKS: *const XmlUnicodeRange = [
+const XML_UNICODE_BLOCKS: &[XmlUnicodeRange] = &[
     XmlUnicodeRange {
-        rangename: c"AegeanNumbers".as_ptr(),
+        rangename: "AegeanNumbers",
         func: xml_ucs_is_aegean_numbers,
     },
     XmlUnicodeRange {
-        rangename: c"AlphabeticPresentationForms".as_ptr(),
+        rangename: "AlphabeticPresentationForms",
         func: xml_ucs_is_alphabetic_presentation_forms,
     },
     XmlUnicodeRange {
-        rangename: c"Arabic".as_ptr(),
+        rangename: "Arabic",
         func: xml_ucs_is_arabic,
     },
     XmlUnicodeRange {
-        rangename: c"ArabicPresentationForms-A".as_ptr(),
+        rangename: "ArabicPresentationForms-A",
         func: xml_ucs_is_arabic_presentation_forms_a,
     },
     XmlUnicodeRange {
-        rangename: c"ArabicPresentationForms-B".as_ptr(),
+        rangename: "ArabicPresentationForms-B",
         func: xml_ucs_is_arabic_presentation_forms_b,
     },
     XmlUnicodeRange {
-        rangename: c"Armenian".as_ptr(),
+        rangename: "Armenian",
         func: xml_ucs_is_armenian,
     },
     XmlUnicodeRange {
-        rangename: c"Arrows".as_ptr(),
+        rangename: "Arrows",
         func: xml_ucs_is_arrows,
     },
     XmlUnicodeRange {
-        rangename: c"BasicLatin".as_ptr(),
+        rangename: "BasicLatin",
         func: xml_ucs_is_basic_latin,
     },
     XmlUnicodeRange {
-        rangename: c"Bengali".as_ptr(),
+        rangename: "Bengali",
         func: xml_ucs_is_bengali,
     },
     XmlUnicodeRange {
-        rangename: c"BlockElements".as_ptr(),
+        rangename: "BlockElements",
         func: xml_ucs_is_block_elements,
     },
     XmlUnicodeRange {
-        rangename: c"Bopomofo".as_ptr(),
+        rangename: "Bopomofo",
         func: xml_ucs_is_bopomofo,
     },
     XmlUnicodeRange {
-        rangename: c"BopomofoExtended".as_ptr(),
+        rangename: "BopomofoExtended",
         func: xml_ucs_is_bopomofo_extended,
     },
     XmlUnicodeRange {
-        rangename: c"BoxDrawing".as_ptr(),
+        rangename: "BoxDrawing",
         func: xml_ucs_is_box_drawing,
     },
     XmlUnicodeRange {
-        rangename: c"BraillePatterns".as_ptr(),
+        rangename: "BraillePatterns",
         func: xml_ucs_is_braille_patterns,
     },
     XmlUnicodeRange {
-        rangename: c"Buhid".as_ptr(),
+        rangename: "Buhid",
         func: xml_ucs_is_buhid,
     },
     XmlUnicodeRange {
-        rangename: c"ByzantineMusicalSymbols".as_ptr(),
+        rangename: "ByzantineMusicalSymbols",
         func: xml_ucs_is_byzantine_musical_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"CJKCompatibility".as_ptr(),
+        rangename: "CJKCompatibility",
         func: xml_ucs_is_cjk_compatibility,
     },
     XmlUnicodeRange {
-        rangename: c"CJKCompatibilityForms".as_ptr(),
+        rangename: "CJKCompatibilityForms",
         func: xml_ucs_is_cjk_compatibility_forms,
     },
     XmlUnicodeRange {
-        rangename: c"CJKCompatibilityIdeographs".as_ptr(),
+        rangename: "CJKCompatibilityIdeographs",
         func: xml_ucs_is_cjk_compatibility_ideographs,
     },
     XmlUnicodeRange {
-        rangename: c"CJKCompatibilityIdeographsSupplement".as_ptr(),
+        rangename: "CJKCompatibilityIdeographsSupplement",
         func: xml_ucs_is_cjk_compatibility_ideographs_supplement,
     },
     XmlUnicodeRange {
-        rangename: c"CJKRadicalsSupplement".as_ptr(),
+        rangename: "CJKRadicalsSupplement",
         func: xml_ucs_is_cjk_radicals_supplement,
     },
     XmlUnicodeRange {
-        rangename: c"CJKSymbolsandPunctuation".as_ptr(),
+        rangename: "CJKSymbolsandPunctuation",
         func: xml_ucs_is_cjk_symbolsand_punctuation,
     },
     XmlUnicodeRange {
-        rangename: c"CJKUnifiedIdeographs".as_ptr(),
+        rangename: "CJKUnifiedIdeographs",
         func: xml_ucs_is_cjk_unified_ideographs,
     },
     XmlUnicodeRange {
-        rangename: c"CJKUnifiedIdeographsExtensionA".as_ptr(),
+        rangename: "CJKUnifiedIdeographsExtensionA",
         func: xml_ucs_is_cjk_unified_ideographs_extension_a,
     },
     XmlUnicodeRange {
-        rangename: c"CJKUnifiedIdeographsExtensionB".as_ptr(),
+        rangename: "CJKUnifiedIdeographsExtensionB",
         func: xml_ucs_is_cjk_unified_ideographs_extension_b,
     },
     XmlUnicodeRange {
-        rangename: c"Cherokee".as_ptr(),
+        rangename: "Cherokee",
         func: xml_ucs_is_cherokee,
     },
     XmlUnicodeRange {
-        rangename: c"CombiningDiacriticalMarks".as_ptr(),
+        rangename: "CombiningDiacriticalMarks",
         func: xml_ucs_is_combining_diacritical_marks,
     },
     XmlUnicodeRange {
-        rangename: c"CombiningDiacriticalMarksforSymbols".as_ptr(),
+        rangename: "CombiningDiacriticalMarksforSymbols",
         func: xml_ucs_is_combining_diacritical_marksfor_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"CombiningHalfMarks".as_ptr(),
+        rangename: "CombiningHalfMarks",
         func: xml_ucs_is_combining_half_marks,
     },
     XmlUnicodeRange {
-        rangename: c"CombiningMarksforSymbols".as_ptr(),
+        rangename: "CombiningMarksforSymbols",
         func: xml_ucs_is_combining_marksfor_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"ControlPictures".as_ptr(),
+        rangename: "ControlPictures",
         func: xml_ucs_is_control_pictures,
     },
     XmlUnicodeRange {
-        rangename: c"CurrencySymbols".as_ptr(),
+        rangename: "CurrencySymbols",
         func: xml_ucs_is_currency_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"CypriotSyllabary".as_ptr(),
+        rangename: "CypriotSyllabary",
         func: xml_ucs_is_cypriot_syllabary,
     },
     XmlUnicodeRange {
-        rangename: c"Cyrillic".as_ptr(),
+        rangename: "Cyrillic",
         func: xml_ucs_is_cyrillic,
     },
     XmlUnicodeRange {
-        rangename: c"CyrillicSupplement".as_ptr(),
+        rangename: "CyrillicSupplement",
         func: xml_ucs_is_cyrillic_supplement,
     },
     XmlUnicodeRange {
-        rangename: c"Deseret".as_ptr(),
+        rangename: "Deseret",
         func: xml_ucs_is_deseret,
     },
     XmlUnicodeRange {
-        rangename: c"Devanagari".as_ptr(),
+        rangename: "Devanagari",
         func: xml_ucs_is_devanagari,
     },
     XmlUnicodeRange {
-        rangename: c"Dingbats".as_ptr(),
+        rangename: "Dingbats",
         func: xml_ucs_is_dingbats,
     },
     XmlUnicodeRange {
-        rangename: c"EnclosedAlphanumerics".as_ptr(),
+        rangename: "EnclosedAlphanumerics",
         func: xml_ucs_is_enclosed_alphanumerics,
     },
     XmlUnicodeRange {
-        rangename: c"EnclosedCJKLettersandMonths".as_ptr(),
+        rangename: "EnclosedCJKLettersandMonths",
         func: xml_ucs_is_enclosed_cjk_lettersand_months,
     },
     XmlUnicodeRange {
-        rangename: c"Ethiopic".as_ptr(),
+        rangename: "Ethiopic",
         func: xml_ucs_is_ethiopic,
     },
     XmlUnicodeRange {
-        rangename: c"GeneralPunctuation".as_ptr(),
+        rangename: "GeneralPunctuation",
         func: xml_ucs_is_general_punctuation,
     },
     XmlUnicodeRange {
-        rangename: c"GeometricShapes".as_ptr(),
+        rangename: "GeometricShapes",
         func: xml_ucs_is_geometric_shapes,
     },
     XmlUnicodeRange {
-        rangename: c"Georgian".as_ptr(),
+        rangename: "Georgian",
         func: xml_ucs_is_georgian,
     },
     XmlUnicodeRange {
-        rangename: c"Gothic".as_ptr(),
+        rangename: "Gothic",
         func: xml_ucs_is_gothic,
     },
     XmlUnicodeRange {
-        rangename: c"Greek".as_ptr(),
+        rangename: "Greek",
         func: xml_ucs_is_greek,
     },
     XmlUnicodeRange {
-        rangename: c"GreekExtended".as_ptr(),
+        rangename: "GreekExtended",
         func: xml_ucs_is_greek_extended,
     },
     XmlUnicodeRange {
-        rangename: c"GreekandCoptic".as_ptr(),
+        rangename: "GreekandCoptic",
         func: xml_ucs_is_greekand_coptic,
     },
     XmlUnicodeRange {
-        rangename: c"Gujarati".as_ptr(),
+        rangename: "Gujarati",
         func: xml_ucs_is_gujarati,
     },
     XmlUnicodeRange {
-        rangename: c"Gurmukhi".as_ptr(),
+        rangename: "Gurmukhi",
         func: xml_ucs_is_gurmukhi,
     },
     XmlUnicodeRange {
-        rangename: c"HalfwidthandFullwidthForms".as_ptr(),
+        rangename: "HalfwidthandFullwidthForms",
         func: xml_ucs_is_halfwidthand_fullwidth_forms,
     },
     XmlUnicodeRange {
-        rangename: c"HangulCompatibilityJamo".as_ptr(),
+        rangename: "HangulCompatibilityJamo",
         func: xml_ucs_is_hangul_compatibility_jamo,
     },
     XmlUnicodeRange {
-        rangename: c"HangulJamo".as_ptr(),
+        rangename: "HangulJamo",
         func: xml_ucs_is_hangul_jamo,
     },
     XmlUnicodeRange {
-        rangename: c"HangulSyllables".as_ptr(),
+        rangename: "HangulSyllables",
         func: xml_ucs_is_hangul_syllables,
     },
     XmlUnicodeRange {
-        rangename: c"Hanunoo".as_ptr(),
+        rangename: "Hanunoo",
         func: xml_ucs_is_hanunoo,
     },
     XmlUnicodeRange {
-        rangename: c"Hebrew".as_ptr(),
+        rangename: "Hebrew",
         func: xml_ucs_is_hebrew,
     },
     XmlUnicodeRange {
-        rangename: c"HighPrivateUseSurrogates".as_ptr(),
+        rangename: "HighPrivateUseSurrogates",
         func: xml_ucs_is_high_private_use_surrogates,
     },
     XmlUnicodeRange {
-        rangename: c"HighSurrogates".as_ptr(),
+        rangename: "HighSurrogates",
         func: xml_ucs_is_high_surrogates,
     },
     XmlUnicodeRange {
-        rangename: c"Hiragana".as_ptr(),
+        rangename: "Hiragana",
         func: xml_ucs_is_hiragana,
     },
     XmlUnicodeRange {
-        rangename: c"IPAExtensions".as_ptr(),
+        rangename: "IPAExtensions",
         func: xml_ucs_is_ipa_extensions,
     },
     XmlUnicodeRange {
-        rangename: c"IdeographicDescriptionCharacters".as_ptr(),
+        rangename: "IdeographicDescriptionCharacters",
         func: xml_ucs_is_ideographic_description_characters,
     },
     XmlUnicodeRange {
-        rangename: c"Kanbun".as_ptr(),
+        rangename: "Kanbun",
         func: xml_ucs_is_kanbun,
     },
     XmlUnicodeRange {
-        rangename: c"KangxiRadicals".as_ptr(),
+        rangename: "KangxiRadicals",
         func: xml_ucs_is_kangxi_radicals,
     },
     XmlUnicodeRange {
-        rangename: c"Kannada".as_ptr(),
+        rangename: "Kannada",
         func: xml_ucs_is_kannada,
     },
     XmlUnicodeRange {
-        rangename: c"Katakana".as_ptr(),
+        rangename: "Katakana",
         func: xml_ucs_is_katakana,
     },
     XmlUnicodeRange {
-        rangename: c"KatakanaPhoneticExtensions".as_ptr(),
+        rangename: "KatakanaPhoneticExtensions",
         func: xml_ucs_is_katakana_phonetic_extensions,
     },
     XmlUnicodeRange {
-        rangename: c"Khmer".as_ptr(),
+        rangename: "Khmer",
         func: xml_ucs_is_khmer,
     },
     XmlUnicodeRange {
-        rangename: c"KhmerSymbols".as_ptr(),
+        rangename: "KhmerSymbols",
         func: xml_ucs_is_khmer_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"Lao".as_ptr(),
+        rangename: "Lao",
         func: xml_ucs_is_lao,
     },
     XmlUnicodeRange {
-        rangename: c"Latin-1Supplement".as_ptr(),
+        rangename: "Latin-1Supplement",
         func: xml_ucs_is_latin1_supplement,
     },
     XmlUnicodeRange {
-        rangename: c"LatinExtended-A".as_ptr(),
+        rangename: "LatinExtended-A",
         func: xml_ucs_is_latin_extended_a,
     },
     XmlUnicodeRange {
-        rangename: c"LatinExtended-B".as_ptr(),
+        rangename: "LatinExtended-B",
         func: xml_ucs_is_latin_extended_b,
     },
     XmlUnicodeRange {
-        rangename: c"LatinExtendedAdditional".as_ptr(),
+        rangename: "LatinExtendedAdditional",
         func: xml_ucs_is_latin_extended_additional,
     },
     XmlUnicodeRange {
-        rangename: c"LetterlikeSymbols".as_ptr(),
+        rangename: "LetterlikeSymbols",
         func: xml_ucs_is_letterlike_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"Limbu".as_ptr(),
+        rangename: "Limbu",
         func: xml_ucs_is_limbu,
     },
     XmlUnicodeRange {
-        rangename: c"LinearBIdeograms".as_ptr(),
+        rangename: "LinearBIdeograms",
         func: xml_ucs_is_linear_bideograms,
     },
     XmlUnicodeRange {
-        rangename: c"LinearBSyllabary".as_ptr(),
+        rangename: "LinearBSyllabary",
         func: xml_ucs_is_linear_bsyllabary,
     },
     XmlUnicodeRange {
-        rangename: c"LowSurrogates".as_ptr(),
+        rangename: "LowSurrogates",
         func: xml_ucs_is_low_surrogates,
     },
     XmlUnicodeRange {
-        rangename: c"Malayalam".as_ptr(),
+        rangename: "Malayalam",
         func: xml_ucs_is_malayalam,
     },
     XmlUnicodeRange {
-        rangename: c"MathematicalAlphanumericSymbols".as_ptr(),
+        rangename: "MathematicalAlphanumericSymbols",
         func: xml_ucs_is_mathematical_alphanumeric_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"MathematicalOperators".as_ptr(),
+        rangename: "MathematicalOperators",
         func: xml_ucs_is_mathematical_operators,
     },
     XmlUnicodeRange {
-        rangename: c"MiscellaneousMathematicalSymbols-A".as_ptr(),
+        rangename: "MiscellaneousMathematicalSymbols-A",
         func: xml_ucs_is_miscellaneous_mathematical_symbols_a,
     },
     XmlUnicodeRange {
-        rangename: c"MiscellaneousMathematicalSymbols-B".as_ptr(),
+        rangename: "MiscellaneousMathematicalSymbols-B",
         func: xml_ucs_is_miscellaneous_mathematical_symbols_b,
     },
     XmlUnicodeRange {
-        rangename: c"MiscellaneousSymbols".as_ptr(),
+        rangename: "MiscellaneousSymbols",
         func: xml_ucs_is_miscellaneous_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"MiscellaneousSymbolsandArrows".as_ptr(),
+        rangename: "MiscellaneousSymbolsandArrows",
         func: xml_ucs_is_miscellaneous_symbolsand_arrows,
     },
     XmlUnicodeRange {
-        rangename: c"MiscellaneousTechnical".as_ptr(),
+        rangename: "MiscellaneousTechnical",
         func: xml_ucs_is_miscellaneous_technical,
     },
     XmlUnicodeRange {
-        rangename: c"Mongolian".as_ptr(),
+        rangename: "Mongolian",
         func: xml_ucs_is_mongolian,
     },
     XmlUnicodeRange {
-        rangename: c"MusicalSymbols".as_ptr(),
+        rangename: "MusicalSymbols",
         func: xml_ucs_is_musical_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"Myanmar".as_ptr(),
+        rangename: "Myanmar",
         func: xml_ucs_is_myanmar,
     },
     XmlUnicodeRange {
-        rangename: c"NumberForms".as_ptr(),
+        rangename: "NumberForms",
         func: xml_ucs_is_number_forms,
     },
     XmlUnicodeRange {
-        rangename: c"Ogham".as_ptr(),
+        rangename: "Ogham",
         func: xml_ucs_is_ogham,
     },
     XmlUnicodeRange {
-        rangename: c"OldItalic".as_ptr(),
+        rangename: "OldItalic",
         func: xml_ucs_is_old_italic,
     },
     XmlUnicodeRange {
-        rangename: c"OpticalCharacterRecognition".as_ptr(),
+        rangename: "OpticalCharacterRecognition",
         func: xml_ucs_is_optical_character_recognition,
     },
     XmlUnicodeRange {
-        rangename: c"Oriya".as_ptr(),
+        rangename: "Oriya",
         func: xml_ucs_is_oriya,
     },
     XmlUnicodeRange {
-        rangename: c"Osmanya".as_ptr(),
+        rangename: "Osmanya",
         func: xml_ucs_is_osmanya,
     },
     XmlUnicodeRange {
-        rangename: c"PhoneticExtensions".as_ptr(),
+        rangename: "PhoneticExtensions",
         func: xml_ucs_is_phonetic_extensions,
     },
     XmlUnicodeRange {
-        rangename: c"PrivateUse".as_ptr(),
+        rangename: "PrivateUse",
         func: xml_ucs_is_private_use,
     },
     XmlUnicodeRange {
-        rangename: c"PrivateUseArea".as_ptr(),
+        rangename: "PrivateUseArea",
         func: xml_ucs_is_private_use_area,
     },
     XmlUnicodeRange {
-        rangename: c"Runic".as_ptr(),
+        rangename: "Runic",
         func: xml_ucs_is_runic,
     },
     XmlUnicodeRange {
-        rangename: c"Shavian".as_ptr(),
+        rangename: "Shavian",
         func: xml_ucs_is_shavian,
     },
     XmlUnicodeRange {
-        rangename: c"Sinhala".as_ptr(),
+        rangename: "Sinhala",
         func: xml_ucs_is_sinhala,
     },
     XmlUnicodeRange {
-        rangename: c"SmallFormVariants".as_ptr(),
+        rangename: "SmallFormVariants",
         func: xml_ucs_is_small_form_variants,
     },
     XmlUnicodeRange {
-        rangename: c"SpacingModifierLetters".as_ptr(),
+        rangename: "SpacingModifierLetters",
         func: xml_ucs_is_spacing_modifier_letters,
     },
     XmlUnicodeRange {
-        rangename: c"Specials".as_ptr(),
+        rangename: "Specials",
         func: xml_ucs_is_specials,
     },
     XmlUnicodeRange {
-        rangename: c"SuperscriptsandSubscripts".as_ptr(),
+        rangename: "SuperscriptsandSubscripts",
         func: xml_ucs_is_superscriptsand_subscripts,
     },
     XmlUnicodeRange {
-        rangename: c"SupplementalArrows-A".as_ptr(),
+        rangename: "SupplementalArrows-A",
         func: xml_ucs_is_supplemental_arrows_a,
     },
     XmlUnicodeRange {
-        rangename: c"SupplementalArrows-B".as_ptr(),
+        rangename: "SupplementalArrows-B",
         func: xml_ucs_is_supplemental_arrows_b,
     },
     XmlUnicodeRange {
-        rangename: c"SupplementalMathematicalOperators".as_ptr(),
+        rangename: "SupplementalMathematicalOperators",
         func: xml_ucs_is_supplemental_mathematical_operators,
     },
     XmlUnicodeRange {
-        rangename: c"SupplementaryPrivateUseArea-A".as_ptr(),
+        rangename: "SupplementaryPrivateUseArea-A",
         func: xml_ucs_is_supplementary_private_use_area_a,
     },
     XmlUnicodeRange {
-        rangename: c"SupplementaryPrivateUseArea-B".as_ptr(),
+        rangename: "SupplementaryPrivateUseArea-B",
         func: xml_ucs_is_supplementary_private_use_area_b,
     },
     XmlUnicodeRange {
-        rangename: c"Syriac".as_ptr(),
+        rangename: "Syriac",
         func: xml_ucs_is_syriac,
     },
     XmlUnicodeRange {
-        rangename: c"Tagalog".as_ptr(),
+        rangename: "Tagalog",
         func: xml_ucs_is_tagalog,
     },
     XmlUnicodeRange {
-        rangename: c"Tagbanwa".as_ptr(),
+        rangename: "Tagbanwa",
         func: xml_ucs_is_tagbanwa,
     },
     XmlUnicodeRange {
-        rangename: c"Tags".as_ptr(),
+        rangename: "Tags",
         func: xml_ucs_is_tags,
     },
     XmlUnicodeRange {
-        rangename: c"TaiLe".as_ptr(),
+        rangename: "TaiLe",
         func: xml_ucs_is_tai_le,
     },
     XmlUnicodeRange {
-        rangename: c"TaiXuanJingSymbols".as_ptr(),
+        rangename: "TaiXuanJingSymbols",
         func: xml_ucs_is_tai_xuan_jing_symbols,
     },
     XmlUnicodeRange {
-        rangename: c"Tamil".as_ptr(),
+        rangename: "Tamil",
         func: xml_ucs_is_tamil,
     },
     XmlUnicodeRange {
-        rangename: c"Telugu".as_ptr(),
+        rangename: "Telugu",
         func: xml_ucs_is_telugu,
     },
     XmlUnicodeRange {
-        rangename: c"Thaana".as_ptr(),
+        rangename: "Thaana",
         func: xml_ucs_is_thaana,
     },
     XmlUnicodeRange {
-        rangename: c"Thai".as_ptr(),
+        rangename: "Thai",
         func: xml_ucs_is_thai,
     },
     XmlUnicodeRange {
-        rangename: c"Tibetan".as_ptr(),
+        rangename: "Tibetan",
         func: xml_ucs_is_tibetan,
     },
     XmlUnicodeRange {
-        rangename: c"Ugaritic".as_ptr(),
+        rangename: "Ugaritic",
         func: xml_ucs_is_ugaritic,
     },
     XmlUnicodeRange {
-        rangename: c"UnifiedCanadianAboriginalSyllabics".as_ptr(),
+        rangename: "UnifiedCanadianAboriginalSyllabics",
         func: xml_ucs_is_unified_canadian_aboriginal_syllabics,
     },
     XmlUnicodeRange {
-        rangename: c"VariationSelectors".as_ptr(),
+        rangename: "VariationSelectors",
         func: xml_ucs_is_variation_selectors,
     },
     XmlUnicodeRange {
-        rangename: c"VariationSelectorsSupplement".as_ptr(),
+        rangename: "VariationSelectorsSupplement",
         func: xml_ucs_is_variation_selectors_supplement,
     },
     XmlUnicodeRange {
-        rangename: c"YiRadicals".as_ptr(),
+        rangename: "YiRadicals",
         func: xml_ucs_is_yi_radicals,
     },
     XmlUnicodeRange {
-        rangename: c"YiSyllables".as_ptr(),
+        rangename: "YiSyllables",
         func: xml_ucs_is_yi_syllables,
     },
     XmlUnicodeRange {
-        rangename: c"YijingHexagramSymbols".as_ptr(),
+        rangename: "YijingHexagramSymbols",
         func: xml_ucs_is_yijing_hexagram_symbols,
     },
-]
-.as_ptr();
+];
 
-const XML_UNICODE_CATS: *const XmlUnicodeRange = [
+const XML_UNICODE_CATS: &[XmlUnicodeRange] = &[
     XmlUnicodeRange {
-        rangename: c"C".as_ptr(),
+        rangename: "C",
         func: xml_ucs_is_cat_c,
     },
     XmlUnicodeRange {
-        rangename: c"Cc".as_ptr(),
+        rangename: "Cc",
         func: xml_ucs_is_cat_cc,
     },
     XmlUnicodeRange {
-        rangename: c"Cf".as_ptr(),
+        rangename: "Cf",
         func: xml_ucs_is_cat_cf,
     },
     XmlUnicodeRange {
-        rangename: c"Co".as_ptr(),
+        rangename: "Co",
         func: xml_ucs_is_cat_co,
     },
     XmlUnicodeRange {
-        rangename: c"Cs".as_ptr(),
+        rangename: "Cs",
         func: xml_ucs_is_cat_cs,
     },
     XmlUnicodeRange {
-        rangename: c"L".as_ptr(),
+        rangename: "L",
         func: xml_ucs_is_cat_l,
     },
     XmlUnicodeRange {
-        rangename: c"Ll".as_ptr(),
+        rangename: "Ll",
         func: xml_ucs_is_cat_ll,
     },
     XmlUnicodeRange {
-        rangename: c"Lm".as_ptr(),
+        rangename: "Lm",
         func: xml_ucs_is_cat_lm,
     },
     XmlUnicodeRange {
-        rangename: c"Lo".as_ptr(),
+        rangename: "Lo",
         func: xml_ucs_is_cat_lo,
     },
     XmlUnicodeRange {
-        rangename: c"Lt".as_ptr(),
+        rangename: "Lt",
         func: xml_ucs_is_cat_lt,
     },
     XmlUnicodeRange {
-        rangename: c"Lu".as_ptr(),
+        rangename: "Lu",
         func: xml_ucs_is_cat_lu,
     },
     XmlUnicodeRange {
-        rangename: c"M".as_ptr(),
+        rangename: "M",
         func: xml_ucs_is_cat_m,
     },
     XmlUnicodeRange {
-        rangename: c"Mc".as_ptr(),
+        rangename: "Mc",
         func: xml_ucs_is_cat_mc,
     },
     XmlUnicodeRange {
-        rangename: c"Me".as_ptr(),
+        rangename: "Me",
         func: xml_ucs_is_cat_me,
     },
     XmlUnicodeRange {
-        rangename: c"Mn".as_ptr(),
+        rangename: "Mn",
         func: xml_ucs_is_cat_mn,
     },
     XmlUnicodeRange {
-        rangename: c"N".as_ptr(),
+        rangename: "N",
         func: xml_ucs_is_cat_n,
     },
     XmlUnicodeRange {
-        rangename: c"Nd".as_ptr(),
+        rangename: "Nd",
         func: xml_ucs_is_cat_nd,
     },
     XmlUnicodeRange {
-        rangename: c"Nl".as_ptr(),
+        rangename: "Nl",
         func: xml_ucs_is_cat_nl,
     },
     XmlUnicodeRange {
-        rangename: c"No".as_ptr(),
+        rangename: "No",
         func: xml_ucs_is_cat_no,
     },
     XmlUnicodeRange {
-        rangename: c"P".as_ptr(),
+        rangename: "P",
         func: xml_ucs_is_cat_p,
     },
     XmlUnicodeRange {
-        rangename: c"Pc".as_ptr(),
+        rangename: "Pc",
         func: xml_ucs_is_cat_pc,
     },
     XmlUnicodeRange {
-        rangename: c"Pd".as_ptr(),
+        rangename: "Pd",
         func: xml_ucs_is_cat_pd,
     },
     XmlUnicodeRange {
-        rangename: c"Pe".as_ptr(),
+        rangename: "Pe",
         func: xml_ucs_is_cat_pe,
     },
     XmlUnicodeRange {
-        rangename: c"Pf".as_ptr(),
+        rangename: "Pf",
         func: xml_ucs_is_cat_pf,
     },
     XmlUnicodeRange {
-        rangename: c"Pi".as_ptr(),
+        rangename: "Pi",
         func: xml_ucs_is_cat_pi,
     },
     XmlUnicodeRange {
-        rangename: c"Po".as_ptr(),
+        rangename: "Po",
         func: xml_ucs_is_cat_po,
     },
     XmlUnicodeRange {
-        rangename: c"Ps".as_ptr(),
+        rangename: "Ps",
         func: xml_ucs_is_cat_ps,
     },
     XmlUnicodeRange {
-        rangename: c"S".as_ptr(),
+        rangename: "S",
         func: xml_ucs_is_cat_s,
     },
     XmlUnicodeRange {
-        rangename: c"Sc".as_ptr(),
+        rangename: "Sc",
         func: xml_ucs_is_cat_sc,
     },
     XmlUnicodeRange {
-        rangename: c"Sk".as_ptr(),
+        rangename: "Sk",
         func: xml_ucs_is_cat_sk,
     },
     XmlUnicodeRange {
-        rangename: c"Sm".as_ptr(),
+        rangename: "Sm",
         func: xml_ucs_is_cat_sm,
     },
     XmlUnicodeRange {
-        rangename: c"So".as_ptr(),
+        rangename: "So",
         func: xml_ucs_is_cat_so,
     },
     XmlUnicodeRange {
-        rangename: c"Z".as_ptr(),
+        rangename: "Z",
         func: xml_ucs_is_cat_z,
     },
     XmlUnicodeRange {
-        rangename: c"Zl".as_ptr(),
+        rangename: "Zl",
         func: xml_ucs_is_cat_zl,
     },
     XmlUnicodeRange {
-        rangename: c"Zp".as_ptr(),
+        rangename: "Zp",
         func: xml_ucs_is_cat_zp,
     },
     XmlUnicodeRange {
-        rangename: c"Zs".as_ptr(),
+        rangename: "Zs",
         func: xml_ucs_is_cat_zs,
     },
-]
-.as_ptr();
+];
 
 const XML_CS: &[XmlChSRange] = &[
     XmlChSRange { range: 0x0..=0x1f },
@@ -8345,907 +8341,907 @@ const XML_UNICODE_CAT_TBL: XmlUnicodeNameTable = XmlUnicodeNameTable {
 /// Check whether the character is part of AegeanNumbers UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_aegean_numbers(code: i32) -> i32 {
-    (0x10100..=0x1013F).contains(&code) as i32
+pub fn xml_ucs_is_aegean_numbers(code: i32) -> bool {
+    (0x10100..=0x1013F).contains(&code)
 }
 
 /// Check whether the character is part of AlphabeticPresentationForms UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_alphabetic_presentation_forms(code: i32) -> i32 {
-    (0xFB00..=0xFB4F).contains(&code) as i32
+pub fn xml_ucs_is_alphabetic_presentation_forms(code: i32) -> bool {
+    (0xFB00..=0xFB4F).contains(&code)
 }
 
 /// Check whether the character is part of Arabic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_arabic(code: i32) -> i32 {
-    (0x0600..=0x06FF).contains(&code) as i32
+pub fn xml_ucs_is_arabic(code: i32) -> bool {
+    (0x0600..=0x06FF).contains(&code)
 }
 
 /// Check whether the character is part of ArabicPresentationForms-A UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_a(code: i32) -> i32 {
-    (0xFB50..=0xFDFF).contains(&code) as i32
+pub fn xml_ucs_is_arabic_presentation_forms_a(code: i32) -> bool {
+    (0xFB50..=0xFDFF).contains(&code)
 }
 
 /// Check whether the character is part of ArabicPresentationForms-B UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_arabic_presentation_forms_b(code: i32) -> i32 {
-    (0xFE70..=0xFEFF).contains(&code) as i32
+pub fn xml_ucs_is_arabic_presentation_forms_b(code: i32) -> bool {
+    (0xFE70..=0xFEFF).contains(&code)
 }
 
 /// Check whether the character is part of Armenian UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_armenian(code: i32) -> i32 {
-    (0x0530..=0x058F).contains(&code) as i32
+pub fn xml_ucs_is_armenian(code: i32) -> bool {
+    (0x0530..=0x058F).contains(&code)
 }
 
 /// Check whether the character is part of Arrows UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_arrows(code: i32) -> i32 {
-    (0x2190..=0x21FF).contains(&code) as i32
+pub fn xml_ucs_is_arrows(code: i32) -> bool {
+    (0x2190..=0x21FF).contains(&code)
 }
 
 /// Check whether the character is part of BasicLatin UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_basic_latin(code: i32) -> i32 {
-    (0x0000..=0x007F).contains(&code) as i32
+pub fn xml_ucs_is_basic_latin(code: i32) -> bool {
+    (0x0000..=0x007F).contains(&code)
 }
 
 /// Check whether the character is part of Bengali UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_bengali(code: i32) -> i32 {
-    (0x0980..=0x09FF).contains(&code) as i32
+pub fn xml_ucs_is_bengali(code: i32) -> bool {
+    (0x0980..=0x09FF).contains(&code)
 }
 
 /// Check whether the character is part of BlockElements UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_block_elements(code: i32) -> i32 {
-    (0x2580..=0x259F).contains(&code) as i32
+pub fn xml_ucs_is_block_elements(code: i32) -> bool {
+    (0x2580..=0x259F).contains(&code)
 }
 
 /// Check whether the character is part of Bopomofo UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_bopomofo(code: i32) -> i32 {
-    (0x3100..=0x312F).contains(&code) as i32
+pub fn xml_ucs_is_bopomofo(code: i32) -> bool {
+    (0x3100..=0x312F).contains(&code)
 }
 
 /// Check whether the character is part of BopomofoExtended UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_bopomofo_extended(code: i32) -> i32 {
-    (0x31A0..=0x31BF).contains(&code) as i32
+pub fn xml_ucs_is_bopomofo_extended(code: i32) -> bool {
+    (0x31A0..=0x31BF).contains(&code)
 }
 
 /// Check whether the character is part of BoxDrawing UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_box_drawing(code: i32) -> i32 {
-    (0x2500..=0x257F).contains(&code) as i32
+pub fn xml_ucs_is_box_drawing(code: i32) -> bool {
+    (0x2500..=0x257F).contains(&code)
 }
 
 /// Check whether the character is part of BraillePatterns UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_braille_patterns(code: i32) -> i32 {
-    (0x2800..=0x28FF).contains(&code) as i32
+pub fn xml_ucs_is_braille_patterns(code: i32) -> bool {
+    (0x2800..=0x28FF).contains(&code)
 }
 
 /// Check whether the character is part of Buhid UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_buhid(code: i32) -> i32 {
-    (0x1740..=0x175F).contains(&code) as i32
+pub fn xml_ucs_is_buhid(code: i32) -> bool {
+    (0x1740..=0x175F).contains(&code)
 }
 
 /// Check whether the character is part of ByzantineMusicalSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_byzantine_musical_symbols(code: i32) -> i32 {
-    (0x1D000..=0x1D0FF).contains(&code) as i32
+pub fn xml_ucs_is_byzantine_musical_symbols(code: i32) -> bool {
+    (0x1D000..=0x1D0FF).contains(&code)
 }
 
 /// Check whether the character is part of CJKCompatibility UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility(code: i32) -> i32 {
-    (0x3300..=0x33FF).contains(&code) as i32
+pub fn xml_ucs_is_cjk_compatibility(code: i32) -> bool {
+    (0x3300..=0x33FF).contains(&code)
 }
 
 /// Check whether the character is part of CJKCompatibilityForms UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_forms(code: i32) -> i32 {
-    (0xFE30..=0xFE4F).contains(&code) as i32
+pub fn xml_ucs_is_cjk_compatibility_forms(code: i32) -> bool {
+    (0xFE30..=0xFE4F).contains(&code)
 }
 
 /// Check whether the character is part of CJKCompatibilityIdeographs UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs(code: i32) -> i32 {
-    (0xF900..=0xFAFF).contains(&code) as i32
+pub fn xml_ucs_is_cjk_compatibility_ideographs(code: i32) -> bool {
+    (0xF900..=0xFAFF).contains(&code)
 }
 
 /// Check whether the character is part of CJKCompatibilityIdeographsSupplement UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code: i32) -> i32 {
-    (0x2F800..=0x2FA1F).contains(&code) as i32
+pub fn xml_ucs_is_cjk_compatibility_ideographs_supplement(code: i32) -> bool {
+    (0x2F800..=0x2FA1F).contains(&code)
 }
 
 /// Check whether the character is part of CJKRadicalsSupplement UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_radicals_supplement(code: i32) -> i32 {
-    (0x2E80..=0x2EFF).contains(&code) as i32
+pub fn xml_ucs_is_cjk_radicals_supplement(code: i32) -> bool {
+    (0x2E80..=0x2EFF).contains(&code)
 }
 
 /// Check whether the character is part of CJKSymbolsandPunctuation UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_symbolsand_punctuation(code: i32) -> i32 {
-    (0x3000..=0x303F).contains(&code) as i32
+pub fn xml_ucs_is_cjk_symbolsand_punctuation(code: i32) -> bool {
+    (0x3000..=0x303F).contains(&code)
 }
 
 /// Check whether the character is part of CJKUnifiedIdeographs UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs(code: i32) -> i32 {
-    (0x4E00..=0x9FFF).contains(&code) as i32
+pub fn xml_ucs_is_cjk_unified_ideographs(code: i32) -> bool {
+    (0x4E00..=0x9FFF).contains(&code)
 }
 
 /// Check whether the character is part of CJKUnifiedIdeographsExtensionA UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: i32) -> i32 {
-    (0x3400..=0x4DBF).contains(&code) as i32
+pub fn xml_ucs_is_cjk_unified_ideographs_extension_a(code: i32) -> bool {
+    (0x3400..=0x4DBF).contains(&code)
 }
 
 /// Check whether the character is part of CJKUnifiedIdeographsExtensionB UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: i32) -> i32 {
-    (0x20000..=0x2A6DF).contains(&code) as i32
+pub fn xml_ucs_is_cjk_unified_ideographs_extension_b(code: i32) -> bool {
+    (0x20000..=0x2A6DF).contains(&code)
 }
 
 /// Check whether the character is part of Cherokee UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cherokee(code: i32) -> i32 {
-    (0x13A0..=0x13FF).contains(&code) as i32
+pub fn xml_ucs_is_cherokee(code: i32) -> bool {
+    (0x13A0..=0x13FF).contains(&code)
 }
 
 /// Check whether the character is part of CombiningDiacriticalMarks UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marks(code: i32) -> i32 {
-    (0x0300..=0x036F).contains(&code) as i32
+pub fn xml_ucs_is_combining_diacritical_marks(code: i32) -> bool {
+    (0x0300..=0x036F).contains(&code)
 }
 
 /// Check whether the character is part of CombiningDiacriticalMarksforSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_combining_diacritical_marksfor_symbols(code: i32) -> i32 {
-    (0x20D0..=0x20FF).contains(&code) as i32
+pub fn xml_ucs_is_combining_diacritical_marksfor_symbols(code: i32) -> bool {
+    (0x20D0..=0x20FF).contains(&code)
 }
 
 /// Check whether the character is part of CombiningHalfMarks UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_combining_half_marks(code: i32) -> i32 {
-    (0xFE20..=0xFE2F).contains(&code) as i32
+pub fn xml_ucs_is_combining_half_marks(code: i32) -> bool {
+    (0xFE20..=0xFE2F).contains(&code)
 }
 
 /// Check whether the character is part of CombiningMarksforSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_combining_marksfor_symbols(code: i32) -> i32 {
-    (0x20D0..=0x20FF).contains(&code) as i32
+pub fn xml_ucs_is_combining_marksfor_symbols(code: i32) -> bool {
+    (0x20D0..=0x20FF).contains(&code)
 }
 
 /// Check whether the character is part of ControlPictures UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_control_pictures(code: i32) -> i32 {
-    (0x2400..=0x243F).contains(&code) as i32
+pub fn xml_ucs_is_control_pictures(code: i32) -> bool {
+    (0x2400..=0x243F).contains(&code)
 }
 
 /// Check whether the character is part of CurrencySymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_currency_symbols(code: i32) -> i32 {
-    (0x20A0..=0x20CF).contains(&code) as i32
+pub fn xml_ucs_is_currency_symbols(code: i32) -> bool {
+    (0x20A0..=0x20CF).contains(&code)
 }
 
 /// Check whether the character is part of CypriotSyllabary UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cypriot_syllabary(code: i32) -> i32 {
-    (0x10800..=0x1083F).contains(&code) as i32
+pub fn xml_ucs_is_cypriot_syllabary(code: i32) -> bool {
+    (0x10800..=0x1083F).contains(&code)
 }
 
 /// Check whether the character is part of Cyrillic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cyrillic(code: i32) -> i32 {
-    (0x0400..=0x04FF).contains(&code) as i32
+pub fn xml_ucs_is_cyrillic(code: i32) -> bool {
+    (0x0400..=0x04FF).contains(&code)
 }
 
 /// Check whether the character is part of CyrillicSupplement UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cyrillic_supplement(code: i32) -> i32 {
-    (0x0500..=0x052F).contains(&code) as i32
+pub fn xml_ucs_is_cyrillic_supplement(code: i32) -> bool {
+    (0x0500..=0x052F).contains(&code)
 }
 
 /// Check whether the character is part of Deseret UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_deseret(code: i32) -> i32 {
-    (0x10400..=0x1044F).contains(&code) as i32
+pub fn xml_ucs_is_deseret(code: i32) -> bool {
+    (0x10400..=0x1044F).contains(&code)
 }
 
 /// Check whether the character is part of Devanagari UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_devanagari(code: i32) -> i32 {
-    (0x0900..=0x097F).contains(&code) as i32
+pub fn xml_ucs_is_devanagari(code: i32) -> bool {
+    (0x0900..=0x097F).contains(&code)
 }
 
 /// Check whether the character is part of Dingbats UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_dingbats(code: i32) -> i32 {
-    (0x2700..=0x27BF).contains(&code) as i32
+pub fn xml_ucs_is_dingbats(code: i32) -> bool {
+    (0x2700..=0x27BF).contains(&code)
 }
 
 /// Check whether the character is part of EnclosedAlphanumerics UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_enclosed_alphanumerics(code: i32) -> i32 {
-    (0x2460..=0x24FF).contains(&code) as i32
+pub fn xml_ucs_is_enclosed_alphanumerics(code: i32) -> bool {
+    (0x2460..=0x24FF).contains(&code)
 }
 
 /// Check whether the character is part of EnclosedCJKLettersandMonths UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_enclosed_cjk_lettersand_months(code: i32) -> i32 {
-    (0x3200..=0x32FF).contains(&code) as i32
+pub fn xml_ucs_is_enclosed_cjk_lettersand_months(code: i32) -> bool {
+    (0x3200..=0x32FF).contains(&code)
 }
 
 /// Check whether the character is part of Ethiopic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_ethiopic(code: i32) -> i32 {
-    (0x1200..=0x137F).contains(&code) as i32
+pub fn xml_ucs_is_ethiopic(code: i32) -> bool {
+    (0x1200..=0x137F).contains(&code)
 }
 
 /// Check whether the character is part of GeneralPunctuation UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_general_punctuation(code: i32) -> i32 {
-    (0x2000..=0x206F).contains(&code) as i32
+pub fn xml_ucs_is_general_punctuation(code: i32) -> bool {
+    (0x2000..=0x206F).contains(&code)
 }
 
 /// Check whether the character is part of GeometricShapes UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_geometric_shapes(code: i32) -> i32 {
-    (0x25A0..=0x25FF).contains(&code) as i32
+pub fn xml_ucs_is_geometric_shapes(code: i32) -> bool {
+    (0x25A0..=0x25FF).contains(&code)
 }
 
 /// Check whether the character is part of Georgian UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_georgian(code: i32) -> i32 {
-    (0x10A0..=0x10FF).contains(&code) as i32
+pub fn xml_ucs_is_georgian(code: i32) -> bool {
+    (0x10A0..=0x10FF).contains(&code)
 }
 
 /// Check whether the character is part of Gothic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_gothic(code: i32) -> i32 {
-    (0x10330..=0x1034F).contains(&code) as i32
+pub fn xml_ucs_is_gothic(code: i32) -> bool {
+    (0x10330..=0x1034F).contains(&code)
 }
 
 /// Check whether the character is part of Greek UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_greek(code: i32) -> i32 {
-    (0x0370..=0x03FF).contains(&code) as i32
+pub fn xml_ucs_is_greek(code: i32) -> bool {
+    (0x0370..=0x03FF).contains(&code)
 }
 
 /// Check whether the character is part of GreekExtended UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_greek_extended(code: i32) -> i32 {
-    (0x1F00..=0x1FFF).contains(&code) as i32
+pub fn xml_ucs_is_greek_extended(code: i32) -> bool {
+    (0x1F00..=0x1FFF).contains(&code)
 }
 
 /// Check whether the character is part of GreekandCoptic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_greekand_coptic(code: i32) -> i32 {
-    (0x0370..=0x03FF).contains(&code) as i32
+pub fn xml_ucs_is_greekand_coptic(code: i32) -> bool {
+    (0x0370..=0x03FF).contains(&code)
 }
 
 /// Check whether the character is part of Gujarati UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_gujarati(code: i32) -> i32 {
-    (0x0A80..=0x0AFF).contains(&code) as i32
+pub fn xml_ucs_is_gujarati(code: i32) -> bool {
+    (0x0A80..=0x0AFF).contains(&code)
 }
 
 /// Check whether the character is part of Gurmukhi UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_gurmukhi(code: i32) -> i32 {
-    (0x0A00..=0x0A7F).contains(&code) as i32
+pub fn xml_ucs_is_gurmukhi(code: i32) -> bool {
+    (0x0A00..=0x0A7F).contains(&code)
 }
 
 /// Check whether the character is part of HalfwidthandFullwidthForms UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_halfwidthand_fullwidth_forms(code: i32) -> i32 {
-    (0xFF00..=0xFFEF).contains(&code) as i32
+pub fn xml_ucs_is_halfwidthand_fullwidth_forms(code: i32) -> bool {
+    (0xFF00..=0xFFEF).contains(&code)
 }
 
 /// Check whether the character is part of HangulCompatibilityJamo UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_hangul_compatibility_jamo(code: i32) -> i32 {
-    (0x3130..=0x318F).contains(&code) as i32
+pub fn xml_ucs_is_hangul_compatibility_jamo(code: i32) -> bool {
+    (0x3130..=0x318F).contains(&code)
 }
 
 /// Check whether the character is part of HangulJamo UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_hangul_jamo(code: i32) -> i32 {
-    (0x1100..=0x11FF).contains(&code) as i32
+pub fn xml_ucs_is_hangul_jamo(code: i32) -> bool {
+    (0x1100..=0x11FF).contains(&code)
 }
 
 /// Check whether the character is part of HangulSyllables UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_hangul_syllables(code: i32) -> i32 {
-    (0xAC00..=0xD7AF).contains(&code) as i32
+pub fn xml_ucs_is_hangul_syllables(code: i32) -> bool {
+    (0xAC00..=0xD7AF).contains(&code)
 }
 
 /// Check whether the character is part of Hanunoo UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_hanunoo(code: i32) -> i32 {
-    (0x1720..=0x173F).contains(&code) as i32
+pub fn xml_ucs_is_hanunoo(code: i32) -> bool {
+    (0x1720..=0x173F).contains(&code)
 }
 
 /// Check whether the character is part of Hebrew UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_hebrew(code: i32) -> i32 {
-    (0x0590..=0x05FF).contains(&code) as i32
+pub fn xml_ucs_is_hebrew(code: i32) -> bool {
+    (0x0590..=0x05FF).contains(&code)
 }
 
 /// Check whether the character is part of HighPrivateUseSurrogates UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_high_private_use_surrogates(code: i32) -> i32 {
-    (0xDB80..=0xDBFF).contains(&code) as i32
+pub fn xml_ucs_is_high_private_use_surrogates(code: i32) -> bool {
+    (0xDB80..=0xDBFF).contains(&code)
 }
 
 /// Check whether the character is part of HighSurrogates UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_high_surrogates(code: i32) -> i32 {
-    (0xD800..=0xDB7F).contains(&code) as i32
+pub fn xml_ucs_is_high_surrogates(code: i32) -> bool {
+    (0xD800..=0xDB7F).contains(&code)
 }
 
 /// Check whether the character is part of Hiragana UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_hiragana(code: i32) -> i32 {
-    (0x3040..=0x309F).contains(&code) as i32
+pub fn xml_ucs_is_hiragana(code: i32) -> bool {
+    (0x3040..=0x309F).contains(&code)
 }
 
 /// Check whether the character is part of IPAExtensions UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_ipa_extensions(code: i32) -> i32 {
-    (0x0250..=0x02AF).contains(&code) as i32
+pub fn xml_ucs_is_ipa_extensions(code: i32) -> bool {
+    (0x0250..=0x02AF).contains(&code)
 }
 
 /// Check whether the character is part of IdeographicDescriptionCharacters UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_ideographic_description_characters(code: i32) -> i32 {
-    (0x2FF0..=0x2FFF).contains(&code) as i32
+pub fn xml_ucs_is_ideographic_description_characters(code: i32) -> bool {
+    (0x2FF0..=0x2FFF).contains(&code)
 }
 
 /// Check whether the character is part of Kanbun UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_kanbun(code: i32) -> i32 {
-    (0x3190..=0x319F).contains(&code) as i32
+pub fn xml_ucs_is_kanbun(code: i32) -> bool {
+    (0x3190..=0x319F).contains(&code)
 }
 
 /// Check whether the character is part of KangxiRadicals UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_kangxi_radicals(code: i32) -> i32 {
-    (0x2F00..=0x2FDF).contains(&code) as i32
+pub fn xml_ucs_is_kangxi_radicals(code: i32) -> bool {
+    (0x2F00..=0x2FDF).contains(&code)
 }
 
 /// Check whether the character is part of Kannada UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_kannada(code: i32) -> i32 {
-    (0x0C80..=0x0CFF).contains(&code) as i32
+pub fn xml_ucs_is_kannada(code: i32) -> bool {
+    (0x0C80..=0x0CFF).contains(&code)
 }
 
 /// Check whether the character is part of Katakana UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_katakana(code: i32) -> i32 {
-    (0x30A0..=0x30FF).contains(&code) as i32
+pub fn xml_ucs_is_katakana(code: i32) -> bool {
+    (0x30A0..=0x30FF).contains(&code)
 }
 
 /// Check whether the character is part of KatakanaPhoneticExtensions UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_katakana_phonetic_extensions(code: i32) -> i32 {
-    (0x31F0..=0x31FF).contains(&code) as i32
+pub fn xml_ucs_is_katakana_phonetic_extensions(code: i32) -> bool {
+    (0x31F0..=0x31FF).contains(&code)
 }
 
 /// Check whether the character is part of Khmer UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_khmer(code: i32) -> i32 {
-    (0x1780..=0x17FF).contains(&code) as i32
+pub fn xml_ucs_is_khmer(code: i32) -> bool {
+    (0x1780..=0x17FF).contains(&code)
 }
 
 /// Check whether the character is part of KhmerSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_khmer_symbols(code: i32) -> i32 {
-    (0x19E0..=0x19FF).contains(&code) as i32
+pub fn xml_ucs_is_khmer_symbols(code: i32) -> bool {
+    (0x19E0..=0x19FF).contains(&code)
 }
 
 /// Check whether the character is part of Lao UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_lao(code: i32) -> i32 {
-    (0x0E80..=0x0EFF).contains(&code) as i32
+pub fn xml_ucs_is_lao(code: i32) -> bool {
+    (0x0E80..=0x0EFF).contains(&code)
 }
 
 /// Check whether the character is part of Latin-1Supplement UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_latin1_supplement(code: i32) -> i32 {
-    (0x0080..=0x00FF).contains(&code) as i32
+pub fn xml_ucs_is_latin1_supplement(code: i32) -> bool {
+    (0x0080..=0x00FF).contains(&code)
 }
 
 /// Check whether the character is part of LatinExtended-A UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_latin_extended_a(code: i32) -> i32 {
-    (0x0100..=0x017F).contains(&code) as i32
+pub fn xml_ucs_is_latin_extended_a(code: i32) -> bool {
+    (0x0100..=0x017F).contains(&code)
 }
 
 /// Check whether the character is part of LatinExtended-B UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_latin_extended_b(code: i32) -> i32 {
-    (0x0180..=0x024F).contains(&code) as i32
+pub fn xml_ucs_is_latin_extended_b(code: i32) -> bool {
+    (0x0180..=0x024F).contains(&code)
 }
 
 /// Check whether the character is part of LatinExtendedAdditional UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_latin_extended_additional(code: i32) -> i32 {
-    (0x1E00..=0x1EFF).contains(&code) as i32
+pub fn xml_ucs_is_latin_extended_additional(code: i32) -> bool {
+    (0x1E00..=0x1EFF).contains(&code)
 }
 
 /// Check whether the character is part of LetterlikeSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_letterlike_symbols(code: i32) -> i32 {
-    (0x2100..=0x214F).contains(&code) as i32
+pub fn xml_ucs_is_letterlike_symbols(code: i32) -> bool {
+    (0x2100..=0x214F).contains(&code)
 }
 
 /// Check whether the character is part of Limbu UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_limbu(code: i32) -> i32 {
-    (0x1900..=0x194F).contains(&code) as i32
+pub fn xml_ucs_is_limbu(code: i32) -> bool {
+    (0x1900..=0x194F).contains(&code)
 }
 
 /// Check whether the character is part of LinearBIdeograms UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_linear_bideograms(code: i32) -> i32 {
-    (0x10080..=0x100FF).contains(&code) as i32
+pub fn xml_ucs_is_linear_bideograms(code: i32) -> bool {
+    (0x10080..=0x100FF).contains(&code)
 }
 
 /// Check whether the character is part of LinearBSyllabary UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_linear_bsyllabary(code: i32) -> i32 {
-    (0x10000..=0x1007F).contains(&code) as i32
+pub fn xml_ucs_is_linear_bsyllabary(code: i32) -> bool {
+    (0x10000..=0x1007F).contains(&code)
 }
 
 /// Check whether the character is part of LowSurrogates UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_low_surrogates(code: i32) -> i32 {
-    (0xDC00..=0xDFFF).contains(&code) as i32
+pub fn xml_ucs_is_low_surrogates(code: i32) -> bool {
+    (0xDC00..=0xDFFF).contains(&code)
 }
 
 /// Check whether the character is part of Malayalam UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_malayalam(code: i32) -> i32 {
-    (0x0D00..=0x0D7F).contains(&code) as i32
+pub fn xml_ucs_is_malayalam(code: i32) -> bool {
+    (0x0D00..=0x0D7F).contains(&code)
 }
 
 /// Check whether the character is part of MathematicalAlphanumericSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_mathematical_alphanumeric_symbols(code: i32) -> i32 {
-    (0x1D400..=0x1D7FF).contains(&code) as i32
+pub fn xml_ucs_is_mathematical_alphanumeric_symbols(code: i32) -> bool {
+    (0x1D400..=0x1D7FF).contains(&code)
 }
 
 /// Check whether the character is part of MathematicalOperators UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_mathematical_operators(code: i32) -> i32 {
-    (0x2200..=0x22FF).contains(&code) as i32
+pub fn xml_ucs_is_mathematical_operators(code: i32) -> bool {
+    (0x2200..=0x22FF).contains(&code)
 }
 
 /// Check whether the character is part of MiscellaneousMathematicalSymbols-A UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: i32) -> i32 {
-    (0x27C0..=0x27EF).contains(&code) as i32
+pub fn xml_ucs_is_miscellaneous_mathematical_symbols_a(code: i32) -> bool {
+    (0x27C0..=0x27EF).contains(&code)
 }
 
 /// Check whether the character is part of MiscellaneousMathematicalSymbols-B UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: i32) -> i32 {
-    (0x2980..=0x29FF).contains(&code) as i32
+pub fn xml_ucs_is_miscellaneous_mathematical_symbols_b(code: i32) -> bool {
+    (0x2980..=0x29FF).contains(&code)
 }
 
 /// Check whether the character is part of MiscellaneousSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbols(code: i32) -> i32 {
-    (0x2600..=0x26FF).contains(&code) as i32
+pub fn xml_ucs_is_miscellaneous_symbols(code: i32) -> bool {
+    (0x2600..=0x26FF).contains(&code)
 }
 
 /// Check whether the character is part of MiscellaneousSymbolsandArrows UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: i32) -> i32 {
-    (0x2B00..=0x2BFF).contains(&code) as i32
+pub fn xml_ucs_is_miscellaneous_symbolsand_arrows(code: i32) -> bool {
+    (0x2B00..=0x2BFF).contains(&code)
 }
 
 /// Check whether the character is part of MiscellaneousTechnical UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_miscellaneous_technical(code: i32) -> i32 {
-    (0x2300..=0x23FF).contains(&code) as i32
+pub fn xml_ucs_is_miscellaneous_technical(code: i32) -> bool {
+    (0x2300..=0x23FF).contains(&code)
 }
 
 /// Check whether the character is part of Mongolian UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_mongolian(code: i32) -> i32 {
-    (0x1800..=0x18AF).contains(&code) as i32
+pub fn xml_ucs_is_mongolian(code: i32) -> bool {
+    (0x1800..=0x18AF).contains(&code)
 }
 
 /// Check whether the character is part of MusicalSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_musical_symbols(code: i32) -> i32 {
-    (0x1D100..=0x1D1FF).contains(&code) as i32
+pub fn xml_ucs_is_musical_symbols(code: i32) -> bool {
+    (0x1D100..=0x1D1FF).contains(&code)
 }
 
 /// Check whether the character is part of Myanmar UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_myanmar(code: i32) -> i32 {
-    (0x1000..=0x109F).contains(&code) as i32
+pub fn xml_ucs_is_myanmar(code: i32) -> bool {
+    (0x1000..=0x109F).contains(&code)
 }
 
 /// Check whether the character is part of NumberForms UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_number_forms(code: i32) -> i32 {
-    (0x2150..=0x218F).contains(&code) as i32
+pub fn xml_ucs_is_number_forms(code: i32) -> bool {
+    (0x2150..=0x218F).contains(&code)
 }
 
 /// Check whether the character is part of Ogham UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_ogham(code: i32) -> i32 {
-    (0x1680..=0x169F).contains(&code) as i32
+pub fn xml_ucs_is_ogham(code: i32) -> bool {
+    (0x1680..=0x169F).contains(&code)
 }
 
 /// Check whether the character is part of OldItalic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_old_italic(code: i32) -> i32 {
-    (0x10300..=0x1032F).contains(&code) as i32
+pub fn xml_ucs_is_old_italic(code: i32) -> bool {
+    (0x10300..=0x1032F).contains(&code)
 }
 
 /// Check whether the character is part of OpticalCharacterRecognition UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_optical_character_recognition(code: i32) -> i32 {
-    (0x2440..=0x245F).contains(&code) as i32
+pub fn xml_ucs_is_optical_character_recognition(code: i32) -> bool {
+    (0x2440..=0x245F).contains(&code)
 }
 
 /// Check whether the character is part of Oriya UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_oriya(code: i32) -> i32 {
-    (0x0B00..=0x0B7F).contains(&code) as i32
+pub fn xml_ucs_is_oriya(code: i32) -> bool {
+    (0x0B00..=0x0B7F).contains(&code)
 }
 
 /// Check whether the character is part of Osmanya UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_osmanya(code: i32) -> i32 {
-    (0x10480..=0x104AF).contains(&code) as i32
+pub fn xml_ucs_is_osmanya(code: i32) -> bool {
+    (0x10480..=0x104AF).contains(&code)
 }
 
 /// Check whether the character is part of PhoneticExtensions UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_phonetic_extensions(code: i32) -> i32 {
-    (0x1D00..=0x1D7F).contains(&code) as i32
+pub fn xml_ucs_is_phonetic_extensions(code: i32) -> bool {
+    (0x1D00..=0x1D7F).contains(&code)
 }
 
 /// Check whether the character is part of PrivateUse UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_private_use(code: i32) -> i32 {
-    ((0xE000..=0xF8FF).contains(&code)
+pub fn xml_ucs_is_private_use(code: i32) -> bool {
+    (0xE000..=0xF8FF).contains(&code)
         || (0xF0000..=0xFFFFF).contains(&code)
-        || (0x100000..=0x10FFFF).contains(&code)) as i32
+        || (0x100000..=0x10FFFF).contains(&code)
 }
 
 /// Check whether the character is part of PrivateUseArea UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_private_use_area(code: i32) -> i32 {
-    (0xE000..=0xF8FF).contains(&code) as i32
+pub fn xml_ucs_is_private_use_area(code: i32) -> bool {
+    (0xE000..=0xF8FF).contains(&code)
 }
 
 /// Check whether the character is part of Runic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_runic(code: i32) -> i32 {
-    (0x16A0..=0x16FF).contains(&code) as i32
+pub fn xml_ucs_is_runic(code: i32) -> bool {
+    (0x16A0..=0x16FF).contains(&code)
 }
 
 /// Check whether the character is part of Shavian UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_shavian(code: i32) -> i32 {
-    (0x10450..=0x1047F).contains(&code) as i32
+pub fn xml_ucs_is_shavian(code: i32) -> bool {
+    (0x10450..=0x1047F).contains(&code)
 }
 
 /// Check whether the character is part of Sinhala UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_sinhala(code: i32) -> i32 {
-    (0x0D80..=0x0DFF).contains(&code) as i32
+pub fn xml_ucs_is_sinhala(code: i32) -> bool {
+    (0x0D80..=0x0DFF).contains(&code)
 }
 
 /// Check whether the character is part of SmallFormVariants UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_small_form_variants(code: i32) -> i32 {
-    (0xFE50..=0xFE6F).contains(&code) as i32
+pub fn xml_ucs_is_small_form_variants(code: i32) -> bool {
+    (0xFE50..=0xFE6F).contains(&code)
 }
 
 /// Check whether the character is part of SpacingModifierLetters UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_spacing_modifier_letters(code: i32) -> i32 {
-    (0x02B0..=0x02FF).contains(&code) as i32
+pub fn xml_ucs_is_spacing_modifier_letters(code: i32) -> bool {
+    (0x02B0..=0x02FF).contains(&code)
 }
 
 /// Check whether the character is part of Specials UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_specials(code: i32) -> i32 {
-    (0xFFF0..=0xFFFF).contains(&code) as i32
+pub fn xml_ucs_is_specials(code: i32) -> bool {
+    (0xFFF0..=0xFFFF).contains(&code)
 }
 
 /// Check whether the character is part of SuperscriptsandSubscripts UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_superscriptsand_subscripts(code: i32) -> i32 {
-    (0x2070..=0x209F).contains(&code) as i32
+pub fn xml_ucs_is_superscriptsand_subscripts(code: i32) -> bool {
+    (0x2070..=0x209F).contains(&code)
 }
 
 /// Check whether the character is part of SupplementalArrows-A UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_a(code: i32) -> i32 {
-    (0x27F0..=0x27FF).contains(&code) as i32
+pub fn xml_ucs_is_supplemental_arrows_a(code: i32) -> bool {
+    (0x27F0..=0x27FF).contains(&code)
 }
 
 /// Check whether the character is part of SupplementalArrows-B UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_supplemental_arrows_b(code: i32) -> i32 {
-    (0x2900..=0x297F).contains(&code) as i32
+pub fn xml_ucs_is_supplemental_arrows_b(code: i32) -> bool {
+    (0x2900..=0x297F).contains(&code)
 }
 
 /// Check whether the character is part of SupplementalMathematicalOperators UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_supplemental_mathematical_operators(code: i32) -> i32 {
-    (0x2A00..=0x2AFF).contains(&code) as i32
+pub fn xml_ucs_is_supplemental_mathematical_operators(code: i32) -> bool {
+    (0x2A00..=0x2AFF).contains(&code)
 }
 
 /// Check whether the character is part of SupplementaryPrivateUseArea-A UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_a(code: i32) -> i32 {
-    (0xF0000..=0xFFFFF).contains(&code) as i32
+pub fn xml_ucs_is_supplementary_private_use_area_a(code: i32) -> bool {
+    (0xF0000..=0xFFFFF).contains(&code)
 }
 
 /// Check whether the character is part of SupplementaryPrivateUseArea-B UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_supplementary_private_use_area_b(code: i32) -> i32 {
-    (0x100000..=0x10FFFF).contains(&code) as i32
+pub fn xml_ucs_is_supplementary_private_use_area_b(code: i32) -> bool {
+    (0x100000..=0x10FFFF).contains(&code)
 }
 
 /// Check whether the character is part of Syriac UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_syriac(code: i32) -> i32 {
-    (0x0700..=0x074F).contains(&code) as i32
+pub fn xml_ucs_is_syriac(code: i32) -> bool {
+    (0x0700..=0x074F).contains(&code)
 }
 
 /// Check whether the character is part of Tagalog UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tagalog(code: i32) -> i32 {
-    (0x1700..=0x171F).contains(&code) as i32
+pub fn xml_ucs_is_tagalog(code: i32) -> bool {
+    (0x1700..=0x171F).contains(&code)
 }
 
 /// Check whether the character is part of Tagbanwa UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tagbanwa(code: i32) -> i32 {
-    (0x1760..=0x177F).contains(&code) as i32
+pub fn xml_ucs_is_tagbanwa(code: i32) -> bool {
+    (0x1760..=0x177F).contains(&code)
 }
 
 /// Check whether the character is part of Tags UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tags(code: i32) -> i32 {
-    (0xE0000..=0xE007F).contains(&code) as i32
+pub fn xml_ucs_is_tags(code: i32) -> bool {
+    (0xE0000..=0xE007F).contains(&code)
 }
 
 /// Check whether the character is part of TaiLe UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tai_le(code: i32) -> i32 {
-    (0x1950..=0x197F).contains(&code) as i32
+pub fn xml_ucs_is_tai_le(code: i32) -> bool {
+    (0x1950..=0x197F).contains(&code)
 }
 
 /// Check whether the character is part of TaiXuanJingSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tai_xuan_jing_symbols(code: i32) -> i32 {
-    (0x1D300..=0x1D35F).contains(&code) as i32
+pub fn xml_ucs_is_tai_xuan_jing_symbols(code: i32) -> bool {
+    (0x1D300..=0x1D35F).contains(&code)
 }
 
 /// Check whether the character is part of Tamil UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tamil(code: i32) -> i32 {
-    (0x0B80..=0x0BFF).contains(&code) as i32
+pub fn xml_ucs_is_tamil(code: i32) -> bool {
+    (0x0B80..=0x0BFF).contains(&code)
 }
 
 /// Check whether the character is part of Telugu UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_telugu(code: i32) -> i32 {
-    (0x0C00..=0x0C7F).contains(&code) as i32
+pub fn xml_ucs_is_telugu(code: i32) -> bool {
+    (0x0C00..=0x0C7F).contains(&code)
 }
 
 /// Check whether the character is part of Thaana UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_thaana(code: i32) -> i32 {
-    (0x0780..=0x07BF).contains(&code) as i32
+pub fn xml_ucs_is_thaana(code: i32) -> bool {
+    (0x0780..=0x07BF).contains(&code)
 }
 
 /// Check whether the character is part of Thai UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_thai(code: i32) -> i32 {
-    (0x0E00..=0x0E7F).contains(&code) as i32
+pub fn xml_ucs_is_thai(code: i32) -> bool {
+    (0x0E00..=0x0E7F).contains(&code)
 }
 
 /// Check whether the character is part of Tibetan UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_tibetan(code: i32) -> i32 {
-    (0x0F00..=0x0FFF).contains(&code) as i32
+pub fn xml_ucs_is_tibetan(code: i32) -> bool {
+    (0x0F00..=0x0FFF).contains(&code)
 }
 
 /// Check whether the character is part of Ugaritic UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_ugaritic(code: i32) -> i32 {
-    (0x10380..=0x1039F).contains(&code) as i32
+pub fn xml_ucs_is_ugaritic(code: i32) -> bool {
+    (0x10380..=0x1039F).contains(&code)
 }
 
 /// Check whether the character is part of UnifiedCanadianAboriginalSyllabics UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: i32) -> i32 {
-    (0x1400..=0x167F).contains(&code) as i32
+pub fn xml_ucs_is_unified_canadian_aboriginal_syllabics(code: i32) -> bool {
+    (0x1400..=0x167F).contains(&code)
 }
 
 /// Check whether the character is part of VariationSelectors UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_variation_selectors(code: i32) -> i32 {
-    (0xFE00..=0xFE0F).contains(&code) as i32
+pub fn xml_ucs_is_variation_selectors(code: i32) -> bool {
+    (0xFE00..=0xFE0F).contains(&code)
 }
 
 /// Check whether the character is part of VariationSelectorsSupplement UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_variation_selectors_supplement(code: i32) -> i32 {
-    (0xE0100..=0xE01EF).contains(&code) as i32
+pub fn xml_ucs_is_variation_selectors_supplement(code: i32) -> bool {
+    (0xE0100..=0xE01EF).contains(&code)
 }
 
 /// Check whether the character is part of YiRadicals UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_yi_radicals(code: i32) -> i32 {
-    (0xA490..=0xA4CF).contains(&code) as i32
+pub fn xml_ucs_is_yi_radicals(code: i32) -> bool {
+    (0xA490..=0xA4CF).contains(&code)
 }
 
 /// Check whether the character is part of YiSyllables UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_yi_syllables(code: i32) -> i32 {
-    (0xA000..=0xA48F).contains(&code) as i32
+pub fn xml_ucs_is_yi_syllables(code: i32) -> bool {
+    (0xA000..=0xA48F).contains(&code)
 }
 
 /// Check whether the character is part of YijingHexagramSymbols UCS Block
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_yijing_hexagram_symbols(code: i32) -> i32 {
-    (0x4DC0..=0x4DFF).contains(&code) as i32
+pub fn xml_ucs_is_yijing_hexagram_symbols(code: i32) -> bool {
+    (0x4DC0..=0x4DFF).contains(&code)
 }
 
 /// Check whether the character is part of the UCS Block
 ///
 /// Returns 1 if true, 0 if false and -1 on unknown block
-pub unsafe extern "C" fn xml_ucs_is_block(code: i32, block: *const c_char) -> i32 {
+pub fn xml_ucs_is_block(code: i32, block: &str) -> i32 {
     if let Some(func) = xml_unicode_lookup(&XML_UNICODE_BLOCK_TBL, block) {
-        func(code)
+        func(code) as i32
     } else {
         -1
     }
@@ -9254,295 +9250,295 @@ pub unsafe extern "C" fn xml_ucs_is_block(code: i32, block: *const c_char) -> i3
 /// Check whether the character is part of C UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_c(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_CG) as i32
+pub fn xml_ucs_is_cat_c(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_CG)
 }
 
 /// Check whether the character is part of Cc UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_cc(code: i32) -> i32 {
-    ((0x0..=0x1f).contains(&code) || (0x7f..=0x9f).contains(&code)) as i32
+pub fn xml_ucs_is_cat_cc(code: i32) -> bool {
+    (0x0..=0x1f).contains(&code) || (0x7f..=0x9f).contains(&code)
 }
 
 /// Check whether the character is part of Cf UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_cf(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_CF_G) as i32
+pub fn xml_ucs_is_cat_cf(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_CF_G)
 }
 
 /// Check whether the character is part of Co UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_co(code: i32) -> i32 {
-    ((code == 0xe000)
-        || (code == 0xf8ff)
-        || (code == 0xf0000)
-        || (code == 0xffffd)
-        || (code == 0x100000)
-        || (code == 0x10fffd)) as i32
+pub fn xml_ucs_is_cat_co(code: i32) -> bool {
+    code == 0xe000
+        || code == 0xf8ff
+        || code == 0xf0000
+        || code == 0xffffd
+        || code == 0x100000
+        || code == 0x10fffd
 }
 
 /// Check whether the character is part of Cs UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_cs(code: i32) -> i32 {
-    ((code == 0xd800)
+pub fn xml_ucs_is_cat_cs(code: i32) -> bool {
+    code == 0xd800
         || (0xdb7f..=0xdb80).contains(&code)
         || (0xdbff..=0xdc00).contains(&code)
-        || (code == 0xdfff)) as i32
+        || code == 0xdfff
 }
 
 /// Check whether the character is part of L UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_l(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_LG) as i32
+pub fn xml_ucs_is_cat_l(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_LG)
 }
 
 /// Check whether the character is part of Ll UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_ll(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_LL_G) as i32
+pub fn xml_ucs_is_cat_ll(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_LL_G)
 }
 
 /// Check whether the character is part of Lm UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_lm(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_LM_G) as i32
+pub fn xml_ucs_is_cat_lm(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_LM_G)
 }
 
 /// Check whether the character is part of Lo UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_lo(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_LO_G) as i32
+pub fn xml_ucs_is_cat_lo(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_LO_G)
 }
 
 /// Check whether the character is part of Lt UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_lt(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_LT_G) as i32
+pub fn xml_ucs_is_cat_lt(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_LT_G)
 }
 
 /// Check whether the character is part of Lu UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_lu(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_LU_G) as i32
+pub fn xml_ucs_is_cat_lu(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_LU_G)
 }
 
 /// Check whether the character is part of M UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_m(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_MG) as i32
+pub fn xml_ucs_is_cat_m(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_MG)
 }
 
 /// Check whether the character is part of Mc UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_mc(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_MC_G) as i32
+pub fn xml_ucs_is_cat_mc(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_MC_G)
 }
 
 /// Check whether the character is part of Me UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_me(code: i32) -> i32 {
-    ((0x488..=0x489).contains(&code)
-        || (code == 0x6de)
+pub fn xml_ucs_is_cat_me(code: i32) -> bool {
+    (0x488..=0x489).contains(&code)
+        || code == 0x6de
         || (0x20dd..=0x20e0).contains(&code)
-        || (0x20e2..=0x20e4).contains(&code)) as i32
+        || (0x20e2..=0x20e4).contains(&code)
 }
 
 /// Check whether the character is part of Mn UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_mn(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_MN_G) as i32
+pub fn xml_ucs_is_cat_mn(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_MN_G)
 }
 
 /// Check whether the character is part of N UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_n(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_NG) as i32
+pub fn xml_ucs_is_cat_n(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_NG)
 }
 
 /// Check whether the character is part of Nd UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_nd(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_ND_G) as i32
+pub fn xml_ucs_is_cat_nd(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_ND_G)
 }
 
 /// Check whether the character is part of Nl UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_nl(code: i32) -> i32 {
-    ((0x16ee..=0x16f0).contains(&code)
+pub fn xml_ucs_is_cat_nl(code: i32) -> bool {
+    (0x16ee..=0x16f0).contains(&code)
         || (0x2160..=0x2183).contains(&code)
-        || (code == 0x3007)
+        || code == 0x3007
         || (0x3021..=0x3029).contains(&code)
         || (0x3038..=0x303a).contains(&code)
-        || (code == 0x1034a)) as i32
+        || code == 0x1034a
 }
 
 /// Check whether the character is part of No UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_no(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_NO_G) as i32
+pub fn xml_ucs_is_cat_no(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_NO_G)
 }
 
 /// Check whether the character is part of P UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_p(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_PG) as i32
+pub fn xml_ucs_is_cat_p(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_PG)
 }
 
 /// Check whether the character is part of Pc UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_pc(code: i32) -> i32 {
-    ((code == 0x5f)
+pub fn xml_ucs_is_cat_pc(code: i32) -> bool {
+    code == 0x5f
         || (0x203f..=0x2040).contains(&code)
-        || (code == 0x2054)
-        || (code == 0x30fb)
+        || code == 0x2054
+        || code == 0x30fb
         || (0xfe33..=0xfe34).contains(&code)
         || (0xfe4d..=0xfe4f).contains(&code)
-        || (code == 0xff3f)
-        || (code == 0xff65)) as i32
+        || code == 0xff3f
+        || code == 0xff65
 }
 
 /// Check whether the character is part of Pd UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_pd(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_PD_G) as i32
+pub fn xml_ucs_is_cat_pd(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_PD_G)
 }
 
 /// Check whether the character is part of Pe UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_pe(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_PE_G) as i32
+pub fn xml_ucs_is_cat_pe(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_PE_G)
 }
 
 /// Check whether the character is part of Pf UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_pf(code: i32) -> i32 {
-    ((code == 0xbb) || (code == 0x2019) || (code == 0x201d) || (code == 0x203a)) as i32
+pub fn xml_ucs_is_cat_pf(code: i32) -> bool {
+    code == 0xbb || code == 0x2019 || code == 0x201d || code == 0x203a
 }
 
 /// Check whether the character is part of Pi UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_pi(code: i32) -> i32 {
-    ((code == 0xab)
-        || (code == 0x2018)
+pub fn xml_ucs_is_cat_pi(code: i32) -> bool {
+    code == 0xab
+        || code == 0x2018
         || (0x201b..=0x201c).contains(&code)
-        || (code == 0x201f)
-        || (code == 0x2039)) as i32
+        || code == 0x201f
+        || code == 0x2039
 }
 
 /// Check whether the character is part of Po UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_po(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_PO_G) as i32
+pub fn xml_ucs_is_cat_po(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_PO_G)
 }
 
 /// Check whether the character is part of Ps UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_ps(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_PS_G) as i32
+pub fn xml_ucs_is_cat_ps(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_PS_G)
 }
 
 /// Check whether the character is part of S UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_s(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_SG) as i32
+pub fn xml_ucs_is_cat_s(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_SG)
 }
 
 /// Check whether the character is part of Sc UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_sc(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_SC_G) as i32
+pub fn xml_ucs_is_cat_sc(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_SC_G)
 }
 
 /// Check whether the character is part of Sk UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_sk(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_SK_G) as i32
+pub fn xml_ucs_is_cat_sk(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_SK_G)
 }
 
 /// Check whether the character is part of Sm UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_sm(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_SM_G) as i32
+pub fn xml_ucs_is_cat_sm(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_SM_G)
 }
 
 /// Check whether the character is part of So UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_so(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_SO_G) as i32
+pub fn xml_ucs_is_cat_so(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_SO_G)
 }
 
 /// Check whether the character is part of Z UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_z(code: i32) -> i32 {
-    xml_char_in_range(code as u32, &XML_ZG) as i32
+pub fn xml_ucs_is_cat_z(code: i32) -> bool {
+    xml_char_in_range(code as u32, &XML_ZG)
 }
 
 /// Check whether the character is part of Zl UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_zl(code: i32) -> i32 {
-    (code == 0x2028) as i32
+pub fn xml_ucs_is_cat_zl(code: i32) -> bool {
+    code == 0x2028
 }
 
 /// Check whether the character is part of Zp UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_zp(code: i32) -> i32 {
-    (code == 0x2029) as i32
+pub fn xml_ucs_is_cat_zp(code: i32) -> bool {
+    code == 0x2029
 }
 
 /// Check whether the character is part of Zs UCS Category
 ///
 /// Returns 1 if true 0 otherwise
-pub unsafe extern "C" fn xml_ucs_is_cat_zs(code: i32) -> i32 {
-    ((code == 0x20)
-        || (code == 0xa0)
-        || (code == 0x1680)
-        || (code == 0x180e)
+pub fn xml_ucs_is_cat_zs(code: i32) -> bool {
+    code == 0x20
+        || code == 0xa0
+        || code == 0x1680
+        || code == 0x180e
         || (0x2000..=0x200a).contains(&code)
-        || (code == 0x202f)
-        || (code == 0x205f)
-        || (code == 0x3000)) as i32
+        || code == 0x202f
+        || code == 0x205f
+        || code == 0x3000
 }
 
 /// Check whether the character is part of the UCS Category
 ///
 /// Returns 1 if true, 0 if false and -1 on unknown category
-pub unsafe extern "C" fn xml_ucs_is_cat(code: i32, cat: *const c_char) -> i32 {
+pub fn xml_ucs_is_cat(code: i32, cat: &str) -> i32 {
     if let Some(func) = xml_unicode_lookup(&XML_UNICODE_CAT_TBL, cat) {
-        func(code)
+        func(code) as i32
     } else {
         -1
     }
@@ -9552,4778 +9548,15 @@ pub unsafe extern "C" fn xml_ucs_is_cat(code: i32, cat: *const c_char) -> i32 {
 ///
 /// Returns pointer to range function if found, otherwise NULL
 #[doc(alias = "xmlUnicodeLookup")]
-unsafe extern "C" fn xml_unicode_lookup(
-    tptr: *const XmlUnicodeNameTable,
-    tname: *const c_char,
-) -> Option<XmlIntFunc> {
-    let mut low: i32;
-    let mut high: i32;
-    let mut mid: i32;
-    let mut cmp: i32;
-
-    if tptr.is_null() || tname.is_null() {
-        return None;
-    }
-
-    low = 0;
-    high = (*tptr).numentries - 1;
-    let sptr: *const XmlUnicodeRange = (*tptr).table;
-    while low <= high {
-        mid = (low + high) / 2;
-        let res = {
-            cmp = strcmp(tname, (*sptr.add(mid as usize)).rangename);
-            cmp == 0
-        };
-        if res {
-            return Some((*sptr.add(mid as usize)).func);
-        }
-        if cmp < 0 {
-            high = mid - 1;
-        } else {
-            low = mid + 1;
-        }
-    }
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
-
-    use super::*;
-
-    #[test]
-    fn test_xml_ucsis_aegean_numbers() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_aegean_numbers(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsAegeanNumbers",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsAegeanNumbers()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_alphabetic_presentation_forms() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_alphabetic_presentation_forms(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsAlphabeticPresentationForms",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsAlphabeticPresentationForms()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_arabic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_arabic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsArabic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsArabic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_arabic_presentation_forms_a() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_arabic_presentation_forms_a(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsArabicPresentationFormsA",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsArabicPresentationFormsA()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_arabic_presentation_forms_b() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_arabic_presentation_forms_b(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsArabicPresentationFormsB",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsArabicPresentationFormsB()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_armenian() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_armenian(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsArmenian",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsArmenian()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_arrows() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_arrows(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsArrows",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsArrows()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_basic_latin() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_basic_latin(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBasicLatin",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsBasicLatin()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_bengali() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_bengali(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBengali",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsBengali()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_block() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                for n_block in 0..GEN_NB_CONST_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let code = gen_int(n_code, 0);
-                    let block = gen_const_char_ptr(n_block, 1);
-
-                    let ret_val = xml_ucs_is_block(code, block);
-                    desret_int(ret_val);
-                    des_int(n_code, code, 0);
-                    des_const_char_ptr(n_block, block, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlUCSIsBlock",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsBlock()");
-                        eprint!(" {}", n_code);
-                        eprintln!(" {}", n_block);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_block_elements() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_block_elements(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBlockElements",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsBlockElements()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_bopomofo() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_bopomofo(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBopomofo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsBopomofo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_bopomofo_extended() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_bopomofo_extended(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBopomofoExtended",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsBopomofoExtended()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_box_drawing() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_box_drawing(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBoxDrawing",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsBoxDrawing()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_braille_patterns() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_braille_patterns(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBraillePatterns",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsBraillePatterns()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_buhid() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_buhid(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsBuhid",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsBuhid()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_byzantine_musical_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_byzantine_musical_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsByzantineMusicalSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsByzantineMusicalSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkcompatibility() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_compatibility(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKCompatibility",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKCompatibility()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkcompatibility_forms() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_compatibility_forms(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKCompatibilityForms",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKCompatibilityForms()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkcompatibility_ideographs() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_compatibility_ideographs(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKCompatibilityIdeographs",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKCompatibilityIdeographs()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkcompatibility_ideographs_supplement() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_compatibility_ideographs_supplement(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKCompatibilityIdeographsSupplement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKCompatibilityIdeographsSupplement()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkradicals_supplement() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_radicals_supplement(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKRadicalsSupplement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKRadicalsSupplement()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjksymbolsand_punctuation() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_symbolsand_punctuation(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKSymbolsandPunctuation",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKSymbolsandPunctuation()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkunified_ideographs() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_unified_ideographs(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKUnifiedIdeographs",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKUnifiedIdeographs()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkunified_ideographs_extension_a() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_unified_ideographs_extension_a(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKUnifiedIdeographsExtensionA",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKUnifiedIdeographsExtensionA()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cjkunified_ideographs_extension_b() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cjk_unified_ideographs_extension_b(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCJKUnifiedIdeographsExtensionB",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCJKUnifiedIdeographsExtensionB()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                for n_cat in 0..GEN_NB_CONST_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let code = gen_int(n_code, 0);
-                    let cat = gen_const_char_ptr(n_cat, 1);
-
-                    let ret_val = xml_ucs_is_cat(code, cat);
-                    desret_int(ret_val);
-                    des_int(n_code, code, 0);
-                    des_const_char_ptr(n_cat, cat, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlUCSIsCat",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCat()");
-                        eprint!(" {}", n_code);
-                        eprintln!(" {}", n_cat);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_c() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_c(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatC",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatC()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_cc() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_cc(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatCc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatCc()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_cf() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_cf(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatCf",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatCf()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_co() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_co(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatCo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatCo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_cs() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_cs(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatCs",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatCs()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_l() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_l(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatL",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatL()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_ll() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_ll(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatLl",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatLl()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_lm() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_lm(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatLm",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatLm()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_lo() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_lo(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatLo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatLo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_lt() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_lt(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatLt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatLt()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_lu() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_lu(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatLu",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatLu()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_m() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_m(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatM",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatM()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_mc() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_mc(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatMc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatMc()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_me() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_me(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatMe",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatMe()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_mn() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_mn(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatMn",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatMn()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_n() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_n(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatN",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatN()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_nd() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_nd(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatNd",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatNd()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_nl() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_nl(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatNl",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatNl()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_no() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_no(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatNo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatNo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_p() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_p(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatP",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatP()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_pc() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_pc(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPc()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_pd() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_pd(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPd",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPd()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_pe() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_pe(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPe",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPe()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_pf() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_pf(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPf",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPf()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_pi() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_pi(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPi",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPi()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_po() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_po(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_ps() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_ps(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatPs",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatPs()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_s() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_s(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatS",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatS()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_sc() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_sc(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatSc",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatSc()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_sk() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_sk(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatSk",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatSk()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_sm() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_sm(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatSm",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatSm()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_so() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_so(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatSo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatSo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_z() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_z(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatZ",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatZ()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_zl() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_zl(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatZl",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatZl()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_zp() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_zp(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatZp",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatZp()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cat_zs() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cat_zs(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCatZs",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCatZs()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cherokee() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cherokee(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCherokee",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCherokee()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_combining_diacritical_marks() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_combining_diacritical_marks(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCombiningDiacriticalMarks",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCombiningDiacriticalMarks()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_combining_diacritical_marksfor_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_combining_diacritical_marksfor_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCombiningDiacriticalMarksforSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCombiningDiacriticalMarksforSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_combining_half_marks() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_combining_half_marks(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCombiningHalfMarks",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCombiningHalfMarks()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_combining_marksfor_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_combining_marksfor_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCombiningMarksforSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCombiningMarksforSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_control_pictures() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_control_pictures(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsControlPictures",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsControlPictures()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_currency_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_currency_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCurrencySymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCurrencySymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cypriot_syllabary() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cypriot_syllabary(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCypriotSyllabary",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCypriotSyllabary()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cyrillic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cyrillic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCyrillic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsCyrillic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_cyrillic_supplement() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_cyrillic_supplement(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsCyrillicSupplement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsCyrillicSupplement()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_deseret() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_deseret(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsDeseret",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsDeseret()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_devanagari() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_devanagari(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsDevanagari",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsDevanagari()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_dingbats() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_dingbats(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsDingbats",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsDingbats()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_enclosed_alphanumerics() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_enclosed_alphanumerics(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsEnclosedAlphanumerics",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsEnclosedAlphanumerics()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_enclosed_cjklettersand_months() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_enclosed_cjk_lettersand_months(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsEnclosedCJKLettersandMonths",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsEnclosedCJKLettersandMonths()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_ethiopic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_ethiopic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsEthiopic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsEthiopic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_general_punctuation() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_general_punctuation(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGeneralPunctuation",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsGeneralPunctuation()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_geometric_shapes() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_geometric_shapes(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGeometricShapes",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsGeometricShapes()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_georgian() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_georgian(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGeorgian",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsGeorgian()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_gothic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_gothic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGothic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsGothic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_greek() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_greek(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGreek",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsGreek()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_greek_extended() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_greek_extended(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGreekExtended",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsGreekExtended()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_greekand_coptic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_greekand_coptic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGreekandCoptic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsGreekandCoptic()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_gujarati() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_gujarati(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGujarati",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsGujarati()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_gurmukhi() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_gurmukhi(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsGurmukhi",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsGurmukhi()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_halfwidthand_fullwidth_forms() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_halfwidthand_fullwidth_forms(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHalfwidthandFullwidthForms",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsHalfwidthandFullwidthForms()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_hangul_compatibility_jamo() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_hangul_compatibility_jamo(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHangulCompatibilityJamo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsHangulCompatibilityJamo()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_hangul_jamo() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_hangul_jamo(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHangulJamo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsHangulJamo()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_hangul_syllables() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_hangul_syllables(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHangulSyllables",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsHangulSyllables()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_hanunoo() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_hanunoo(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHanunoo",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsHanunoo()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_hebrew() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_hebrew(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHebrew",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsHebrew()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_high_private_use_surrogates() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_high_private_use_surrogates(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHighPrivateUseSurrogates",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsHighPrivateUseSurrogates()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_high_surrogates() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_high_surrogates(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHighSurrogates",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsHighSurrogates()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_hiragana() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_hiragana(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsHiragana",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsHiragana()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_ipaextensions() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_ipa_extensions(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsIPAExtensions",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsIPAExtensions()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_ideographic_description_characters() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_ideographic_description_characters(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsIdeographicDescriptionCharacters",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsIdeographicDescriptionCharacters()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_kanbun() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_kanbun(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKanbun",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsKanbun()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_kangxi_radicals() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_kangxi_radicals(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKangxiRadicals",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsKangxiRadicals()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_kannada() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_kannada(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKannada",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsKannada()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_katakana() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_katakana(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKatakana",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsKatakana()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_katakana_phonetic_extensions() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_katakana_phonetic_extensions(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKatakanaPhoneticExtensions",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsKatakanaPhoneticExtensions()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_khmer() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_khmer(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKhmer",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsKhmer()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_khmer_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_khmer_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsKhmerSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsKhmerSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_lao() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_lao(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLao",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsLao()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_latin1_supplement() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_latin1_supplement(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLatin1Supplement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLatin1Supplement()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_latin_extended_a() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_latin_extended_a(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLatinExtendedA",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLatinExtendedA()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_latin_extended_additional() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_latin_extended_additional(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLatinExtendedAdditional",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLatinExtendedAdditional()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_latin_extended_b() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_latin_extended_b(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLatinExtendedB",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLatinExtendedB()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_letterlike_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_letterlike_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLetterlikeSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLetterlikeSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_limbu() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_limbu(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLimbu",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsLimbu()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_linear_bideograms() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_linear_bideograms(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLinearBIdeograms",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLinearBIdeograms()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_linear_bsyllabary() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_linear_bsyllabary(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLinearBSyllabary",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLinearBSyllabary()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_low_surrogates() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_low_surrogates(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsLowSurrogates",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsLowSurrogates()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_malayalam() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_malayalam(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMalayalam",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsMalayalam()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_mathematical_alphanumeric_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_mathematical_alphanumeric_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMathematicalAlphanumericSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMathematicalAlphanumericSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_mathematical_operators() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_mathematical_operators(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMathematicalOperators",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMathematicalOperators()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_miscellaneous_mathematical_symbols_a() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_miscellaneous_mathematical_symbols_a(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMiscellaneousMathematicalSymbolsA",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMiscellaneousMathematicalSymbolsA()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_miscellaneous_mathematical_symbols_b() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_miscellaneous_mathematical_symbols_b(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMiscellaneousMathematicalSymbolsB",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMiscellaneousMathematicalSymbolsB()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_miscellaneous_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_miscellaneous_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMiscellaneousSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMiscellaneousSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_miscellaneous_symbolsand_arrows() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_miscellaneous_symbolsand_arrows(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMiscellaneousSymbolsandArrows",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMiscellaneousSymbolsandArrows()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_miscellaneous_technical() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_miscellaneous_technical(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMiscellaneousTechnical",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMiscellaneousTechnical()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_mongolian() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_mongolian(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMongolian",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsMongolian()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_musical_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_musical_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMusicalSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsMusicalSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_myanmar() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_myanmar(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsMyanmar",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsMyanmar()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_number_forms() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_number_forms(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsNumberForms",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsNumberForms()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_ogham() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_ogham(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsOgham",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsOgham()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_old_italic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_old_italic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsOldItalic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsOldItalic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_optical_character_recognition() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_optical_character_recognition(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsOpticalCharacterRecognition",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsOpticalCharacterRecognition()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_oriya() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_oriya(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsOriya",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsOriya()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_osmanya() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_osmanya(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsOsmanya",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsOsmanya()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_phonetic_extensions() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_phonetic_extensions(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsPhoneticExtensions",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsPhoneticExtensions()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_private_use() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_private_use(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsPrivateUse",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsPrivateUse()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_private_use_area() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_private_use_area(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsPrivateUseArea",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsPrivateUseArea()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_runic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_runic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsRunic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsRunic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_shavian() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_shavian(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsShavian",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsShavian()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_sinhala() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_sinhala(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSinhala",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsSinhala()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_small_form_variants() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_small_form_variants(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSmallFormVariants",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSmallFormVariants()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_spacing_modifier_letters() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_spacing_modifier_letters(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSpacingModifierLetters",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSpacingModifierLetters()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_specials() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_specials(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSpecials",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsSpecials()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_superscriptsand_subscripts() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_superscriptsand_subscripts(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSuperscriptsandSubscripts",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSuperscriptsandSubscripts()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_supplemental_arrows_a() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_supplemental_arrows_a(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSupplementalArrowsA",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSupplementalArrowsA()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_supplemental_arrows_b() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_supplemental_arrows_b(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSupplementalArrowsB",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSupplementalArrowsB()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_supplemental_mathematical_operators() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_supplemental_mathematical_operators(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSupplementalMathematicalOperators",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSupplementalMathematicalOperators()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_supplementary_private_use_area_a() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_supplementary_private_use_area_a(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSupplementaryPrivateUseAreaA",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSupplementaryPrivateUseAreaA()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_supplementary_private_use_area_b() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_supplementary_private_use_area_b(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSupplementaryPrivateUseAreaB",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsSupplementaryPrivateUseAreaB()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_syriac() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_syriac(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsSyriac",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsSyriac()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tagalog() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tagalog(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTagalog",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTagalog()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tagbanwa() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tagbanwa(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTagbanwa",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTagbanwa()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tags() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tags(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTags",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTags()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tai_le() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tai_le(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTaiLe",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTaiLe()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tai_xuan_jing_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tai_xuan_jing_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTaiXuanJingSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsTaiXuanJingSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tamil() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tamil(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTamil",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTamil()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_telugu() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_telugu(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTelugu",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTelugu()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_thaana() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_thaana(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsThaana",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsThaana()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_thai() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_thai(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsThai",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsThai()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_tibetan() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_tibetan(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsTibetan",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsTibetan()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_ugaritic() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_ugaritic(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsUgaritic",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlUCSIsUgaritic()");
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_unified_canadian_aboriginal_syllabics() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_unified_canadian_aboriginal_syllabics(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsUnifiedCanadianAboriginalSyllabics",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsUnifiedCanadianAboriginalSyllabics()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_variation_selectors() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_variation_selectors(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsVariationSelectors",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsVariationSelectors()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_variation_selectors_supplement() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_variation_selectors_supplement(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsVariationSelectorsSupplement",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsVariationSelectorsSupplement()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_yi_radicals() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_yi_radicals(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsYiRadicals",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsYiRadicals()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_yi_syllables() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_yi_syllables(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsYiSyllables",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsYiSyllables()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_ucsis_yijing_hexagram_symbols() {
-        #[cfg(feature = "libxml_unicode")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_code in 0..GEN_NB_INT {
-                let mem_base = xml_mem_blocks();
-                let code = gen_int(n_code, 0);
-
-                let ret_val = xml_ucs_is_yijing_hexagram_symbols(code);
-                desret_int(ret_val);
-                des_int(n_code, code, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlUCSIsYijingHexagramSymbols",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlUCSIsYijingHexagramSymbols()"
-                    );
-                    eprintln!(" {}", n_code);
-                }
-            }
-        }
-    }
+fn xml_unicode_lookup(tptr: &XmlUnicodeNameTable, tname: &str) -> Option<XmlIntFunc> {
+    let (mut low, mut high) = (0, tptr.table.len());
+    while high - low > 1 {
+        let mid = (low + high) / 2;
+        match tname.cmp(tptr.table[mid].rangename) {
+            Ordering::Less => high = mid,
+            Ordering::Equal => return Some(tptr.table[mid].func),
+            Ordering::Greater => low = mid,
+        }
+    }
+    (tptr.table[low].rangename == tname).then_some(tptr.table[low].func)
 }
