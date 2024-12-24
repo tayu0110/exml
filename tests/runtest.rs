@@ -760,18 +760,12 @@ unsafe fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     typ: i32,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     mut content: *mut XmlChar,
 ) {
     let nullstr: *const XmlChar = c"(null)".as_ptr() as _;
     /* not all libraries handle printing null pointers nicely */
-    if public_id.is_null() {
-        public_id = nullstr;
-    }
-    if system_id.is_null() {
-        system_id = nullstr;
-    }
     if content.is_null() {
         content = nullstr as *mut XmlChar;
     }
@@ -779,8 +773,8 @@ unsafe fn entity_decl_debug(
     sax_debugln!(
         "SAX.entityDecl({name}, {}, {}, {}, {})",
         typ,
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy(),
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
         CStr::from_ptr(content as _).to_string_lossy(),
     );
 }
@@ -868,26 +862,20 @@ unsafe fn notation_decl_debug(
 unsafe fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     mut notation_name: *const XmlChar,
 ) {
     let nullstr: *const XmlChar = c"(null)".as_ptr() as _;
 
-    if public_id.is_null() {
-        public_id = nullstr;
-    }
-    if system_id.is_null() {
-        system_id = nullstr;
-    }
     if notation_name.is_null() {
         notation_name = nullstr;
     }
     increment_callbacks_counter();
     sax_debugln!(
         "SAX.unparsedEntityDecl({name}, {}, {}, {})",
-        CStr::from_ptr(public_id as *mut c_char).to_string_lossy(),
-        CStr::from_ptr(system_id as *mut c_char).to_string_lossy(),
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
         CStr::from_ptr(notation_name as *mut c_char).to_string_lossy()
     );
 }

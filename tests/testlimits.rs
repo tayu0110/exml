@@ -733,8 +733,8 @@ fn entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: &str,
     _typ: i32,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
     _content: *mut XmlChar,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
@@ -781,8 +781,8 @@ fn notation_decl_callback(
 fn unparsed_entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: &str,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
     _notation_name: *const XmlChar,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));

@@ -970,18 +970,12 @@ unsafe fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     typ: c_int,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
+    mut public_id: Option<&str>,
+    mut system_id: Option<&str>,
     mut content: *mut XmlChar,
 ) {
     let nullstr: &CStr = c"(null)";
     /* not all libraries handle printing null pointers nicely */
-    if public_id.is_null() {
-        public_id = nullstr.as_ptr() as _;
-    }
-    if system_id.is_null() {
-        system_id = nullstr.as_ptr() as _;
-    }
     if content.is_null() {
         content = nullstr.as_ptr() as _;
     }
@@ -992,8 +986,8 @@ unsafe fn entity_decl_debug(
     println!(
         "SAX.entityDecl({name}, {}, {}, {}, {})",
         typ,
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy(),
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
         CStr::from_ptr(content as _).to_string_lossy()
     );
 }
@@ -1090,18 +1084,12 @@ unsafe fn notation_decl_debug(
 unsafe fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
+    mut public_id: Option<&str>,
+    mut system_id: Option<&str>,
     mut notation_name: *const XmlChar,
 ) {
     let nullstr: &CStr = c"(null)";
 
-    if public_id.is_null() {
-        public_id = nullstr.as_ptr() as _;
-    }
-    if system_id.is_null() {
-        system_id = nullstr.as_ptr() as _;
-    }
     if notation_name.is_null() {
         notation_name = nullstr.as_ptr() as _;
     }
@@ -1111,8 +1099,8 @@ unsafe fn unparsed_entity_decl_debug(
     }
     println!(
         "SAX.unparsedEntityDecl({name}, {}, {}, {})",
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy(),
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
         CStr::from_ptr(notation_name as _).to_string_lossy()
     );
 }

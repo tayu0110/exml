@@ -20,7 +20,7 @@
 // Daniel Veillard <daniel@veillard.com>
 
 use std::{
-    ffi::{c_char, c_void, CStr, CString},
+    ffi::{c_void, CStr, CString},
     mem::{replace, size_of},
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
@@ -73,7 +73,7 @@ use super::{
         xml_switch_encoding, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
         XML_VCTXT_DTD_VALIDATED,
     },
-    uri::{xml_build_uri, xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
+    uri::{xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
     valid::{
         xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
         xml_add_ref, xml_free_enumeration, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
@@ -595,8 +595,8 @@ pub unsafe fn xml_sax2_entity_decl(
     ctx: Option<GenericErrorContext>,
     name: &str,
     typ: i32,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     content: *mut XmlChar,
 ) {
     let ent: XmlEntityPtr;
@@ -619,26 +619,27 @@ pub unsafe fn xml_sax2_entity_decl(
                 name
             );
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
-            let mut base: *const c_char = null();
-            #[allow(unused_assignments)]
-            let mut dummy = c"".to_owned();
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+            if let Some(system_id) = system_id {
+                let base = if !(*ctxt).input.is_null() {
+                    (*(*ctxt).input)
+                        .filename
+                        .as_deref()
+                        .or((*ctxt).directory.as_deref())
+                        .map(|b| b.to_owned())
+                } else {
+                    (*ctxt).directory.clone()
+                };
 
-            if !(*ctxt).input.is_null() {
-                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
-                    dummy = CString::new(filename).unwrap();
-                    base = dummy.as_ptr();
+                if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
+                    let uri = CString::new(uri).unwrap();
+                    (*ent)
+                        .uri
+                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                } else {
+                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
-            if base.is_null() {
-                if let Some(dir) = (*ctxt).directory.as_deref() {
-                    dummy = CString::new(dir).unwrap();
-                    base = dummy.as_ptr();
-                }
-            }
-
-            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-            (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else if (*ctxt).in_subset == 2 {
         ent = xml_add_dtd_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
@@ -652,26 +653,27 @@ pub unsafe fn xml_sax2_entity_decl(
                 format!("Entity({name}) already defined in the external subset\n",).as_str(),
             );
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
-            let mut base: *const c_char = null();
-            #[allow(unused_assignments)]
-            let mut dummy = c"".to_owned();
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+            if let Some(system_id) = system_id {
+                let base = if !(*ctxt).input.is_null() {
+                    (*(*ctxt).input)
+                        .filename
+                        .as_deref()
+                        .or((*ctxt).directory.as_deref())
+                        .map(|b| b.to_owned())
+                } else {
+                    (*ctxt).directory.clone()
+                };
 
-            if !(*ctxt).input.is_null() {
-                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
-                    dummy = CString::new(filename).unwrap();
-                    base = dummy.as_ptr();
+                if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
+                    let uri = CString::new(uri).unwrap();
+                    (*ent)
+                        .uri
+                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                } else {
+                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
-            if base.is_null() {
-                if let Some(dir) = (*ctxt).directory.as_deref() {
-                    dummy = CString::new(dir).unwrap();
-                    base = dummy.as_ptr();
-                }
-            }
-
-            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-            (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else {
         xml_fatal_err_msg!(
@@ -994,8 +996,8 @@ pub unsafe fn xml_sax2_notation_decl(
 pub unsafe fn xml_sax2_unparsed_entity_decl(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     notation_name: *const XmlChar,
 ) {
     let ent: XmlEntityPtr;
@@ -1027,26 +1029,27 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 format!("Entity({name}) already defined in the internal subset\n").as_str(),
             )
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
-            let mut base: *const c_char = null();
-            #[allow(unused_assignments)]
-            let mut dummy = c"".to_owned();
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+            if let Some(system_id) = system_id {
+                let base = if !(*ctxt).input.is_null() {
+                    (*(*ctxt).input)
+                        .filename
+                        .as_deref()
+                        .or((*ctxt).directory.as_deref())
+                        .map(|b| b.to_owned())
+                } else {
+                    (*ctxt).directory.clone()
+                };
 
-            if !(*ctxt).input.is_null() {
-                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
-                    dummy = CString::new(filename).unwrap();
-                    base = dummy.as_ptr();
+                if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
+                    let uri = CString::new(uri).unwrap();
+                    (*ent)
+                        .uri
+                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                } else {
+                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
-            if base.is_null() {
-                if let Some(dir) = (*ctxt).directory.as_deref() {
-                    dummy = CString::new(dir).unwrap();
-                    base = dummy.as_ptr();
-                }
-            }
-
-            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-            (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else if (*ctxt).in_subset == 2 {
         ent = xml_add_dtd_entity(
@@ -1067,26 +1070,28 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
                 format!("Entity({name}) already defined in the external subset\n").as_str(),
             )
         }
-        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() && !system_id.is_null() {
-            let mut base: *const c_char = null();
-            #[allow(unused_assignments)]
-            let mut dummy = c"".to_owned();
 
-            if !(*ctxt).input.is_null() {
-                if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
-                    dummy = CString::new(filename).unwrap();
-                    base = dummy.as_ptr();
+        if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
+            if let Some(system_id) = system_id {
+                let base = if !(*ctxt).input.is_null() {
+                    (*(*ctxt).input)
+                        .filename
+                        .as_deref()
+                        .or((*ctxt).directory.as_deref())
+                        .map(|b| b.to_owned())
+                } else {
+                    (*ctxt).directory.clone()
+                };
+
+                if let Some(uri) = base.and_then(|b| build_uri(system_id, &b)) {
+                    let uri = CString::new(uri).unwrap();
+                    (*ent)
+                        .uri
+                        .store(xml_strdup(uri.as_ptr() as *const u8), Ordering::Relaxed);
+                } else {
+                    (*ent).uri.store(null_mut(), Ordering::Relaxed);
                 }
             }
-            if base.is_null() {
-                if let Some(dir) = (*ctxt).directory.as_deref() {
-                    dummy = CString::new(dir).unwrap();
-                    base = dummy.as_ptr();
-                }
-            }
-
-            let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-            (*ent).uri.store(uri, Ordering::Relaxed);
         }
     } else {
         xml_fatal_err_msg!(

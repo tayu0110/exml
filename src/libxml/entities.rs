@@ -194,8 +194,8 @@ unsafe fn xml_create_entity(
     dict: XmlDictPtr,
     name: &str,
     typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
     content: *const XmlChar,
 ) -> XmlEntityPtr {
     let ret: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
@@ -211,16 +211,28 @@ unsafe fn xml_create_entity(
     (*ret).etype = typ.try_into().ok();
     if dict.is_null() {
         (*ret).name = AtomicPtr::new(xml_strdup(name.as_ptr() as *const u8) as _);
-        if !external_id.is_null() {
-            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id) as _);
+        if let Some(external_id) = external_id {
+            let external_id = CString::new(external_id).unwrap();
+            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
         }
-        if !system_id.is_null() {
-            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id) as _);
+        if let Some(system_id) = system_id {
+            let system_id = CString::new(system_id).unwrap();
+            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
         }
     } else {
         (*ret).name = AtomicPtr::new(xml_dict_lookup(dict, name.as_ptr() as *const u8, -1) as _);
-        (*ret).external_id = AtomicPtr::new(xml_strdup(external_id) as _);
-        (*ret).system_id = AtomicPtr::new(xml_strdup(system_id) as _);
+        if let Some(external_id) = external_id {
+            let external_id = CString::new(external_id).unwrap();
+            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
+        } else {
+            (*ret).external_id = AtomicPtr::new(null_mut());
+        }
+        if let Some(system_id) = system_id {
+            let system_id = CString::new(system_id).unwrap();
+            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
+        } else {
+            (*ret).system_id = AtomicPtr::new(null_mut());
+        }
     }
     if !content.is_null() {
         (*ret).length = xml_strlen(content);
@@ -249,8 +261,8 @@ pub unsafe fn xml_new_entity(
     doc: XmlDocPtr,
     name: &str,
     typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
     content: *const XmlChar,
 ) -> XmlEntityPtr {
     if !doc.is_null() && !(*doc).int_subset.is_null() {
@@ -363,8 +375,8 @@ unsafe fn xml_add_entity(
     dtd: XmlDtdPtr,
     name: &str,
     typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
     content: *const XmlChar,
 ) -> XmlEntityPtr {
     let mut dict: XmlDictPtr = null_mut();
@@ -469,8 +481,8 @@ pub unsafe fn xml_add_doc_entity(
     doc: XmlDocPtr,
     name: &str,
     typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
     content: *const XmlChar,
 ) -> XmlEntityPtr {
     if doc.is_null() {
@@ -515,8 +527,8 @@ pub unsafe fn xml_add_dtd_entity(
     doc: XmlDocPtr,
     name: &str,
     typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
     content: *const XmlChar,
 ) -> XmlEntityPtr {
     if doc.is_null() {

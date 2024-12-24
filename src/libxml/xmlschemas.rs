@@ -30712,8 +30712,8 @@ unsafe fn entity_decl_split(
     ctx: Option<GenericErrorContext>,
     name: &str,
     typ: i32,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     content: *mut XmlChar,
 ) {
     let ctx = ctx.unwrap();
@@ -30799,8 +30799,8 @@ unsafe fn notation_decl_split(
 unsafe fn unparsed_entity_decl_split(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     notation_name: *const XmlChar,
 ) {
     let ctx = ctx.unwrap();

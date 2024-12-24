@@ -1746,8 +1746,8 @@ pub type EntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: &str,
     typ: i32,
-    publicId: *const XmlChar,
-    systemId: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     content: *mut XmlChar,
 );
 
@@ -1786,8 +1786,8 @@ pub type ElementDeclSAXFunc = unsafe fn(
 pub type UnparsedEntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
     notation_name: *const XmlChar,
 );
 
@@ -11317,8 +11317,8 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             (*ctxt).user_data.clone(),
                             &name,
                             XmlEntityType::XmlInternalParameterEntity as i32,
-                            null(),
-                            null(),
+                            None,
+                            None,
                             value,
                         );
                     }
@@ -11351,8 +11351,14 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                                     (*ctxt).user_data.clone(),
                                     &name,
                                     XmlEntityType::XmlExternalParameterEntity as i32,
-                                    literal,
-                                    uri as _,
+                                    (!literal.is_null())
+                                        .then(|| {
+                                            CStr::from_ptr(literal as *const i8).to_string_lossy()
+                                        })
+                                        .as_deref(),
+                                    (!uri.is_null())
+                                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                                        .as_deref(),
                                     null_mut(),
                                 );
                             }
@@ -11369,8 +11375,8 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         (*ctxt).user_data.clone(),
                         &name,
                         XmlEntityType::XmlInternalGeneralEntity as i32,
-                        null(),
-                        null(),
+                        None,
+                        None,
                         value,
                     );
                 }
@@ -11409,8 +11415,8 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     Some(GenericErrorContext::new(ctxt)),
                     &name,
                     XmlEntityType::XmlInternalGeneralEntity as i32,
-                    null(),
-                    null(),
+                    None,
+                    None,
                     value,
                 );
             }
@@ -11459,7 +11465,17 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 ndata = xml_parse_name(ctxt);
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(unparsed_ent) = (*(*ctxt).sax).unparsed_entity_decl {
-                        unparsed_ent((*ctxt).user_data.clone(), &name, literal, uri, ndata);
+                        unparsed_ent(
+                            (*ctxt).user_data.clone(),
+                            &name,
+                            (!literal.is_null())
+                                .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
+                                .as_deref(),
+                            (!uri.is_null())
+                                .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                                .as_deref(),
+                            ndata,
+                        );
                     }
                 }
             } else {
@@ -11469,8 +11485,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             (*ctxt).user_data.clone(),
                             &name,
                             XmlEntityType::XmlExternalGeneralParsedEntity as i32,
-                            literal,
-                            uri,
+                            (!literal.is_null())
+                                .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
+                                .as_deref(),
+                            (!uri.is_null())
+                                .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                                .as_deref(),
                             null_mut(),
                         );
                     }
@@ -11511,8 +11531,12 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         Some(GenericErrorContext::new(ctxt)),
                         &name,
                         XmlEntityType::XmlExternalGeneralParsedEntity as i32,
-                        literal,
-                        uri,
+                        (!literal.is_null())
+                            .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
+                            .as_deref(),
+                        (!uri.is_null())
+                            .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                            .as_deref(),
                         null_mut(),
                     );
                 }

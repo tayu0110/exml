@@ -679,12 +679,18 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
             _ => unreachable!(),
         }
+        let external_id = (*ent).external_id.load(Ordering::Relaxed);
+        let system_id = (*ent).system_id.load(Ordering::Relaxed);
         let ret: XmlEntityPtr = xml_add_doc_entity(
             doc,
             &(*ent).name().unwrap(),
             (*ent).etype.map_or(0, |e| e as i32),
-            (*ent).external_id.load(Ordering::Relaxed),
-            (*ent).system_id.load(Ordering::Relaxed),
+            (!external_id.is_null())
+                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                .as_deref(),
+            (!system_id.is_null())
+                .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
+                .as_deref(),
             (*ent).content.load(Ordering::Relaxed),
         );
         if !ret.is_null() {
