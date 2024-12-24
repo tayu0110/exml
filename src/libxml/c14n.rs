@@ -208,7 +208,7 @@ pub struct XmlC14NCtx<'a, T> {
     mode: XmlC14NMode,
 
     // exclusive canonicalization
-    inclusive_ns_prefixes: *mut *mut XmlChar,
+    inclusive_ns_prefixes: Option<Vec<String>>,
 
     // error number
     error: XmlParserErrors,
@@ -995,23 +995,17 @@ impl<T> XmlC14NCtx<'_, T> {
         // process inclusive namespaces:
         // All namespace nodes appearing on inclusive ns list are
         // handled as provided in Canonical XML
-        if !self.inclusive_ns_prefixes.is_null() {
-            for i in (0..).take_while(|&i| !(*self.inclusive_ns_prefixes.add(i)).is_null()) {
-                let mut prefix = *self.inclusive_ns_prefixes.add(i);
+        if let Some(inclusive_ns_prefixes) = self.inclusive_ns_prefixes.as_deref() {
+            for prefix in inclusive_ns_prefixes {
                 // Special values for namespace with empty prefix
-                if xml_str_equal(prefix, c"#default".as_ptr() as _)
-                    || xml_str_equal(prefix, c"".as_ptr() as _)
-                {
-                    prefix = null_mut();
+                let prefix = if prefix == "#default" || prefix.is_empty() {
                     has_empty_ns_in_inclusive_list = true;
-                }
+                    None
+                } else {
+                    Some(prefix.as_str())
+                };
 
-                ns = cur.search_ns(
-                    cur.doc,
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                );
+                ns = cur.search_ns(cur.doc, prefix);
                 if !ns.is_null()
                     && !xml_c14n_is_xml_ns(ns)
                     && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
@@ -1320,7 +1314,7 @@ pub unsafe fn xml_c14n_doc_save_to<'a>(
     doc: &'a mut XmlDoc,
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
-    inclusive_ns_prefixes: *mut *mut XmlChar,
+    inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 ) -> i32 {
@@ -1417,7 +1411,7 @@ pub unsafe fn xml_c14n_doc_dump_memory(
     doc: &mut XmlDoc,
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
-    inclusive_ns_prefixes: *mut *mut XmlChar,
+    inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
     doc_txt_ptr: &mut String,
 ) -> i32 {
@@ -1476,7 +1470,7 @@ pub unsafe fn xml_c14n_doc_save(
     doc: &mut XmlDoc,
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
-    inclusive_ns_prefixes: *mut *mut XmlChar,
+    inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
     filename: *const c_char,
     compression: i32,
@@ -1580,7 +1574,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
     is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
     user_data: T,
     mode: XmlC14NMode,
-    inclusive_ns_prefixes: *mut *mut XmlChar,
+    inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 ) -> Option<XmlC14NCtx<'a, T>> {
@@ -1606,7 +1600,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
         pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
         ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
         mode: XmlC14NMode::XmlC14N1_0,
-        inclusive_ns_prefixes: null_mut(),
+        inclusive_ns_prefixes: None,
         error: XmlParserErrors::default(),
     };
 
@@ -2051,7 +2045,7 @@ pub unsafe fn xml_c14n_execute<'a, T>(
     is_visible_callback: XmlC14NIsVisibleCallback<T>,
     user_data: T,
     mode: XmlC14NMode,
-    inclusive_ns_prefixes: *mut *mut XmlChar,
+    inclusive_ns_prefixes: Option<Vec<String>>,
     with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 ) -> i32 {

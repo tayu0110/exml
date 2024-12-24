@@ -2761,7 +2761,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         &mut *doc,
                         None,
                         XmlC14NMode::XmlC14N1_0,
-                        null_mut(),
+                        None,
                         true,
                         &mut result,
                     );
@@ -2781,7 +2781,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         &mut *doc,
                         None,
                         XmlC14NMode::XmlC14N1_1,
-                        null_mut(),
+                        None,
                         true,
                         &mut result,
                     );
@@ -2801,7 +2801,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         &mut *doc,
                         None,
                         XmlC14NMode::XmlC14NExclusive1_0,
-                        null_mut(),
+                        None,
                         true,
                         &mut result,
                     );

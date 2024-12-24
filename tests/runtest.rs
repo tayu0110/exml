@@ -63,7 +63,7 @@ use exml::{
         xmlregexp::XmlRegexpPtr,
         xmlschemas::{XmlSchemaPtr, XmlSchemaValidCtxtPtr},
         xmlschemastypes::xml_schema_init_types,
-        xmlstring::{xml_strlen, XmlChar},
+        xmlstring::XmlChar,
     },
     tree::{
         xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
@@ -4643,70 +4643,16 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     xpath
 }
 
-/*
- * Macro used to grow the current buffer.
- */
 #[cfg(feature = "c14n")]
-macro_rules! xxx_grow_buffer_reentrant {
-    ($buffer_size:expr, $buffer:expr) => {
-        $buffer_size *= 2;
-        $buffer = exml::libxml::globals::xml_realloc(
-            $buffer as _,
-            $buffer_size * size_of::<*mut XmlChar>(),
-        ) as *mut *mut XmlChar;
-        if $buffer.is_null() {
-            perror(c"realloc failed".as_ptr());
-            return null_mut();
-        }
-    };
-}
-
-#[cfg(feature = "c14n")]
-unsafe fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
-    use exml::libxml::globals::xml_malloc;
-    use libc::perror;
-
-    let mut buffer: *mut *mut XmlChar;
-    let mut out: *mut *mut XmlChar;
-    let mut buffer_size: usize;
-
-    if str.is_null() {
-        return null_mut();
+unsafe fn parse_list(s: *mut XmlChar) -> Option<Vec<String>> {
+    if s.is_null() {
+        return None;
     }
 
-    let len: usize = xml_strlen(str) as _;
-    if *str.add(0) == b'\'' && *str.add(len - 1) == b'\'' {
-        *str.add(len - 1) = b'\0';
-        str = str.add(1);
-    }
-    // allocate an translation buffer.
-    buffer_size = 1000;
-    buffer = xml_malloc(buffer_size * size_of::<*mut XmlChar>()) as *mut *mut XmlChar;
-    if buffer.is_null() {
-        perror(c"malloc failed".as_ptr());
-        return null_mut();
-    }
-    out = buffer;
-
-    while *str != b'\0' {
-        if out.offset_from(buffer) as usize > buffer_size - 10 {
-            let indx = out.offset_from(buffer) as usize;
-
-            xxx_grow_buffer_reentrant!(buffer_size, buffer);
-            out = buffer.add(indx);
-        }
-        *out = str;
-        out = out.add(1);
-        while *str != b',' && *str != b'\0' {
-            str = str.add(1);
-        }
-        if *str == b',' {
-            *str = b'\0';
-            str = str.add(1);
-        }
-    }
-    (*out) = null_mut();
-    buffer
+    let s = CStr::from_ptr(s as *const i8)
+        .to_string_lossy()
+        .into_owned();
+    Some(s.split(',').map(|s| s.to_owned()).collect())
 }
 
 #[cfg(feature = "c14n")]
@@ -4729,7 +4675,7 @@ unsafe fn c14n_run_test(
 
     let mut xpath: XmlXPathObjectPtr = null_mut();
     let mut ret: i32;
-    let mut inclusive_namespaces: *mut *mut XmlChar = null_mut();
+    let mut inclusive_namespaces = None;
     let mut nslist: *const c_char = null_mut();
     let mut nssize: i32 = 0;
 
@@ -4818,9 +4764,6 @@ unsafe fn c14n_run_test(
     // Cleanup
     if !xpath.is_null() {
         xml_xpath_free_object(xpath);
-    }
-    if !inclusive_namespaces.is_null() {
-        xml_free(inclusive_namespaces as _);
     }
     if !nslist.is_null() {
         free(nslist as _);
