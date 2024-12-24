@@ -200,18 +200,18 @@ pub struct XmlC14NCtx<'a, T> {
     with_comments: i32,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 
-    /* position in the XML document */
+    // position in the XML document
     pos: XmlC14NPosition,
     parent_is_doc: i32,
-    ns_rendered: XmlC14NVisibleNsStackPtr,
+    ns_rendered: Box<XmlC14NVisibleNsStack>,
 
-    /* C14N mode */
+    // C14N mode
     mode: XmlC14NMode,
 
-    /* exclusive canonicalization */
+    // exclusive canonicalization
     inclusive_ns_prefixes: *mut *mut XmlChar,
 
-    /* error number */
+    // error number
     error: i32,
 }
 
@@ -1055,7 +1055,7 @@ impl<T> XmlC14NCtx<'_, T> {
         if !ns.is_null() && !xml_c14n_is_xml_ns(ns) {
             if visible != 0
                 && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
-                && self.exc_c14n_visible_ns_stack_find(self.ns_rendered, Some(&*ns)) == 0
+                && self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*ns)) == 0
             {
                 xml_list_insert(list, ns as _);
             }
@@ -1079,7 +1079,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
             {
                 already_rendered =
-                    self.exc_c14n_visible_ns_stack_find(self.ns_rendered, Some(&*(*attr).ns));
+                    self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*(*attr).ns));
                 // TODO: replace `cur` to `Rc<XmlNode>`
                 (*self.ns_rendered).add((*attr).ns, cur as *const XmlNode as _);
                 if already_rendered == 0 && visible != 0 {
@@ -1104,7 +1104,7 @@ impl<T> XmlC14NCtx<'_, T> {
             && has_empty_ns_in_inclusive_list == 0
         {
             already_rendered =
-                self.exc_c14n_visible_ns_stack_find(self.ns_rendered, Some(&XmlNs::default()));
+                self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&XmlNs::default()));
             if already_rendered == 0 {
                 self.print_namespaces(&XmlNs::default());
             }
@@ -1131,14 +1131,9 @@ impl<T> XmlC14NCtx<'_, T> {
     #[doc(alias = "xmlC14NVisibleNsStackFind")]
     unsafe fn exc_c14n_visible_ns_stack_find(
         &self,
-        cur: XmlC14NVisibleNsStackPtr,
+        cur: &XmlC14NVisibleNsStack,
         ns: Option<&XmlNs>,
     ) -> i32 {
-        if cur.is_null() {
-            xml_c14n_err_param("searching namespaces stack (exc c14n)");
-            return 0;
-        }
-
         // if the default namespace xmlns="" is not defined yet then we do not want to print it out
         let prefix: *const XmlChar =
             if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
@@ -1155,7 +1150,7 @@ impl<T> XmlC14NCtx<'_, T> {
         let has_empty_ns: i32 =
             (xml_c14n_str_equal(prefix, null_mut()) && xml_c14n_str_equal(href, null_mut())) as _;
 
-        for (i, &ns1) in (*cur).ns_tab[0..(*cur).ns_cur_end].iter().enumerate().rev() {
+        for (i, &ns1) in cur.ns_tab[..cur.ns_cur_end].iter().enumerate().rev() {
             if xml_c14n_str_equal(
                 prefix,
                 if !ns1.is_null() {
@@ -1172,7 +1167,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         null_mut()
                     },
                 ) {
-                    let node = (*cur).node_tab[i];
+                    let node = cur.node_tab[i];
                     return self.is_visible(
                         (!ns1.is_null()).then(|| &*ns1 as _),
                         (!node.is_null()).then(|| &*node as _),
@@ -1307,7 +1302,7 @@ impl<T: Default> Default for XmlC14NCtx<'_, T> {
             buf: Rc::new(RefCell::new(XmlOutputBuffer::default())),
             pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
             parent_is_doc: 0,
-            ns_rendered: null_mut(),
+            ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
             mode: XmlC14NMode::XmlC14N1_0,
             inclusive_ns_prefixes: null_mut(),
             error: 0,
@@ -1592,16 +1587,6 @@ unsafe fn xml_c14n_err<T>(
     );
 }
 
-unsafe fn xml_c14n_visible_ns_stack_create() -> XmlC14NVisibleNsStackPtr {
-    let ret: XmlC14NVisibleNsStackPtr = xml_malloc(size_of::<XmlC14NVisibleNsStack>()) as _;
-    if ret.is_null() {
-        xml_c14n_err_memory("creating namespaces stack");
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlC14NVisibleNsStack::default());
-    ret
-}
-
 unsafe fn xml_c14n_visible_ns_stack_destroy(cur: XmlC14NVisibleNsStackPtr) {
     if cur.is_null() {
         xml_c14n_err_param("destroying namespaces stack");
@@ -1619,9 +1604,7 @@ unsafe fn xml_c14n_free_ctx<T>(ctx: XmlC14NCtxPtr<'_, T>) {
         return;
     }
 
-    if !(*ctx).ns_rendered.is_null() {
-        xml_c14n_visible_ns_stack_destroy((*ctx).ns_rendered);
-    }
+    drop_in_place(ctx);
     xml_free(ctx as _);
 }
 
@@ -1672,23 +1655,12 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
         buf,
         parent_is_doc: 1,
         pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
-        ns_rendered: xml_c14n_visible_ns_stack_create(),
+        ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
         mode: XmlC14NMode::XmlC14N1_0,
         inclusive_ns_prefixes: null_mut(),
         error: 0,
     };
     std::ptr::write(&mut *ctx, tmp);
-
-    if (*ctx).ns_rendered.is_null() {
-        xml_c14n_err(
-            ctx,
-            doc as _,
-            XmlParserErrors::XmlC14NCreateStack,
-            "xmlC14NNewCtx: xmlC14NVisibleNsStackCreate failed\n",
-        );
-        xml_c14n_free_ctx(ctx);
-        return null_mut();
-    }
 
     // Set "mode" flag and remember list of inclusive prefixes for exclusive c14n
     (*ctx).mode = mode;
