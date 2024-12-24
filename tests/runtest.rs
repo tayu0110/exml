@@ -4712,7 +4712,7 @@ unsafe fn parse_list(mut str: *mut XmlChar) -> *mut *mut XmlChar {
 #[cfg(feature = "c14n")]
 unsafe fn c14n_run_test(
     xml_filename: &str,
-    with_comments: i32,
+    with_comments: bool,
     mode: XmlC14NMode,
     xpath_filename: Option<&str>,
     ns_filename: *const c_char,
@@ -4833,7 +4833,7 @@ unsafe fn c14n_run_test(
 #[cfg(feature = "c14n")]
 unsafe fn c14n_common_test(
     filename: &str,
-    with_comments: i32,
+    with_comments: bool,
     mode: XmlC14NMode,
     subdir: *const c_char,
 ) -> i32 {
@@ -4929,7 +4929,7 @@ unsafe fn c14n_with_comment_test(
 
     c14n_common_test(
         filename,
-        1,
+        true,
         XmlC14NMode::XmlC14N1_0,
         c"with-comments".as_ptr(),
     )
@@ -4946,7 +4946,7 @@ unsafe fn c14n_without_comment_test(
 
     c14n_common_test(
         filename,
-        0,
+        false,
         XmlC14NMode::XmlC14N1_0,
         c"without-comments".as_ptr(),
     )
@@ -4963,7 +4963,7 @@ unsafe fn c14n_exc_without_comment_test(
 
     c14n_common_test(
         filename,
-        0,
+        false,
         XmlC14NMode::XmlC14NExclusive1_0,
         c"exc-without-comments".as_ptr(),
     )
@@ -4980,7 +4980,7 @@ unsafe fn c14n11_without_comment_test(
 
     c14n_common_test(
         filename,
-        0,
+        false,
         XmlC14NMode::XmlC14N1_1,
         c"1-1-without-comments".as_ptr(),
     )

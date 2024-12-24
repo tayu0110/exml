@@ -193,11 +193,11 @@ pub type XmlC14NIsVisibleCallback<T> =
 
 #[repr(C)]
 pub struct XmlC14NCtx<'a, T> {
-    /* input parameters */
+    // input parameters
     doc: XmlDocPtr,
     is_visible_callback: Option<XmlC14NIsVisibleCallback<T>>,
     user_data: T,
-    with_comments: i32,
+    with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 
     // position in the XML document
@@ -870,7 +870,7 @@ impl<T> XmlC14NCtx<'_, T> {
                  * top-level document element and outside of the document type
                  * declaration).
                  */
-                if visible != 0 && self.with_comments != 0 {
+                if visible != 0 && self.with_comments {
                     if matches!(self.pos, XmlC14NPosition::XmlC14NAfterDocumentElement) {
                         self.buf.borrow_mut().write_str("\x0A<!--");
                     } else {
@@ -1298,7 +1298,7 @@ impl<T: Default> Default for XmlC14NCtx<'_, T> {
             doc: null_mut(),
             is_visible_callback: None,
             user_data: T::default(),
-            with_comments: 0,
+            with_comments: false,
             buf: Rc::new(RefCell::new(XmlOutputBuffer::default())),
             pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
             parent_is_doc: false,
@@ -1358,7 +1358,7 @@ pub unsafe fn xml_c14n_doc_save_to(
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
-    with_comments: i32,
+    with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer>>,
 ) -> i32 {
     xml_c14n_execute(
@@ -1455,7 +1455,7 @@ pub unsafe fn xml_c14n_doc_dump_memory(
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
-    with_comments: i32,
+    with_comments: bool,
     doc_txt_ptr: &mut String,
 ) -> i32 {
     let mut ret: i32;
@@ -1514,7 +1514,7 @@ pub unsafe fn xml_c14n_doc_save(
     nodes: Option<&mut XmlNodeSet>,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
-    with_comments: i32,
+    with_comments: bool,
     filename: *const c_char,
     compression: i32,
 ) -> i32 {
@@ -1618,7 +1618,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
     user_data: T,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
-    with_comments: i32,
+    with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
 ) -> XmlC14NCtxPtr<'a, T> {
     let mut ctx = null_mut();
@@ -2104,7 +2104,7 @@ pub unsafe fn xml_c14n_execute<T>(
     user_data: T,
     mode: XmlC14NMode,
     inclusive_ns_prefixes: *mut *mut XmlChar,
-    with_comments: i32,
+    with_comments: bool,
     buf: Rc<RefCell<XmlOutputBuffer>>,
 ) -> i32 {
     let mut ret: i32;

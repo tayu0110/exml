@@ -2762,7 +2762,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         None,
                         XmlC14NMode::XmlC14N1_0,
                         null_mut(),
-                        1,
+                        true,
                         &mut result,
                     );
                     if size >= 0 {
@@ -2782,7 +2782,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         None,
                         XmlC14NMode::XmlC14N1_1,
                         null_mut(),
-                        1,
+                        true,
                         &mut result,
                     );
                     if size >= 0 {
@@ -2802,7 +2802,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         None,
                         XmlC14NMode::XmlC14NExclusive1_0,
                         null_mut(),
-                        1,
+                        true,
                         &mut result,
                     );
                     if size >= 0 {
