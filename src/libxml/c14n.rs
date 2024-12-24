@@ -202,7 +202,7 @@ pub struct XmlC14NCtx<'a, T> {
 
     // position in the XML document
     pos: XmlC14NPosition,
-    parent_is_doc: i32,
+    parent_is_doc: bool,
     ns_rendered: Box<XmlC14NVisibleNsStack>,
 
     // C14N mode
@@ -659,7 +659,7 @@ impl<T> XmlC14NCtx<'_, T> {
     unsafe fn process_element_node(&mut self, cur: &mut XmlNode, visible: i32) -> i32 {
         let mut ret: i32;
         let mut state: XmlC14NVisibleNsStack = XmlC14NVisibleNsStack::default();
-        let mut parent_is_doc: i32 = 0;
+        let mut parent_is_doc = false;
 
         if !matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
             xml_c14n_err_param("processing element node");
@@ -678,10 +678,10 @@ impl<T> XmlC14NCtx<'_, T> {
         (*self.ns_rendered).save(&mut state);
 
         if visible != 0 {
-            if self.parent_is_doc != 0 {
+            if self.parent_is_doc {
                 // save this flag into the stack
                 parent_is_doc = self.parent_is_doc;
-                self.parent_is_doc = 0;
+                self.parent_is_doc = false;
                 self.pos = XmlC14NPosition::XmlC14NInsideDocumentElement;
             }
             self.buf.borrow_mut().write_str("<");
@@ -745,7 +745,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 .borrow_mut()
                 .write_str(CStr::from_ptr(cur.name as _).to_string_lossy().as_ref());
             self.buf.borrow_mut().write_str(">");
-            if parent_is_doc != 0 {
+            if parent_is_doc {
                 // restore this flag from the stack for next node
                 self.parent_is_doc = parent_is_doc;
                 self.pos = XmlC14NPosition::XmlC14NAfterDocumentElement;
@@ -903,7 +903,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // should be processed as document?
                 if let Some(children) = (*cur).children() {
                     self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
-                    self.parent_is_doc = 1;
+                    self.parent_is_doc = true;
                     ret = self.process_node_list(Some(&*children.as_ptr()));
                 }
             }
@@ -912,7 +912,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // should be processed as document?
                 if let Some(children) = (*cur).children() {
                     self.pos = XmlC14NPosition::XmlC14NBeforeDocumentElement;
-                    self.parent_is_doc = 1;
+                    self.parent_is_doc = true;
                     ret = self.process_node_list(Some(&*children.as_ptr()));
                 }
             }
@@ -1301,7 +1301,7 @@ impl<T: Default> Default for XmlC14NCtx<'_, T> {
             with_comments: 0,
             buf: Rc::new(RefCell::new(XmlOutputBuffer::default())),
             pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
-            parent_is_doc: 0,
+            parent_is_doc: false,
             ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
             mode: XmlC14NMode::XmlC14N1_0,
             inclusive_ns_prefixes: null_mut(),
@@ -1653,7 +1653,7 @@ unsafe fn xml_c14n_new_ctx<'a, T>(
         is_visible_callback,
         user_data,
         buf,
-        parent_is_doc: 1,
+        parent_is_doc: true,
         pos: XmlC14NPosition::XmlC14NBeforeDocumentElement,
         ns_rendered: Box::new(XmlC14NVisibleNsStack::default()),
         mode: XmlC14NMode::XmlC14N1_0,
