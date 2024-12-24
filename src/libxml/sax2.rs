@@ -52,6 +52,7 @@ use crate::{
         XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
         XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
+    uri::{build_uri, canonic_path},
 };
 
 use super::{
@@ -72,9 +73,7 @@ use super::{
         xml_switch_encoding, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
         XML_VCTXT_DTD_VALIDATED,
     },
-    uri::{
-        xml_build_uri, xml_canonic_path, xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr,
-    },
+    uri::{xml_build_uri, xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
     valid::{
         xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
         xml_add_ref, xml_free_enumeration, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
@@ -292,8 +291,8 @@ pub unsafe fn xml_sax2_internal_subset(
 pub unsafe fn xml_sax2_external_subset(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     if ctx.is_none() {
         return;
@@ -303,16 +302,14 @@ pub unsafe fn xml_sax2_external_subset(
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    if (!external_id.is_null() || !system_id.is_null())
+    if (external_id.is_some() || system_id.is_some())
         && (((*ctxt).validate != 0 || (*ctxt).loadsubset != 0)
             && ((*ctxt).well_formed != 0 && !(*ctxt).my_doc.is_null()))
     {
         let mut input: XmlParserInputPtr = null_mut();
         let mut consumed: u64;
 
-        /*
-         * Ask the Entity resolver to load the damn thing
-         */
+        // Ask the Entity resolver to load the damn thing
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).resolve_entity.is_some() {
             input = ((*(*ctxt).sax).resolve_entity.unwrap())(
                 (*ctxt).user_data.clone(),
@@ -324,23 +321,11 @@ pub unsafe fn xml_sax2_external_subset(
             return;
         }
 
-        xml_new_dtd(
-            (*ctxt).my_doc,
-            name,
-            (!external_id.is_null())
-                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                .as_deref(),
-            (!system_id.is_null())
-                .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
-                .as_deref(),
-        );
+        xml_new_dtd((*ctxt).my_doc, name, external_id, system_id);
 
-        /*
-         * make sure we won't destroy the main document context
-         */
-        /*
-         * Try to fetch and parse the external subset.
-         */
+        // make sure we won't destroy the main document context
+
+        // Try to fetch and parse the external subset.
         let oldinput: XmlParserInputPtr = (*ctxt).input;
         let oldinput_tab = replace(&mut (*ctxt).input_tab, Vec::with_capacity(5));
         let oldcharset = (*ctxt).charset;
@@ -350,9 +335,7 @@ pub unsafe fn xml_sax2_external_subset(
         (*ctxt).input = null_mut();
         xml_push_input(ctxt, input);
 
-        /*
-         * On the fly encoding conversion if needed
-         */
+        // On the fly encoding conversion if needed
         if (*(*ctxt).input).length >= 4 {
             let input = from_raw_parts((*(*ctxt).input).cur, 4);
             let enc = detect_encoding(input);
@@ -360,14 +343,9 @@ pub unsafe fn xml_sax2_external_subset(
         }
 
         if (*input).filename.is_none() {
-            let canonic = xml_canonic_path(system_id);
-            if !canonic.is_null() {
-                (*input).filename = Some(
-                    CStr::from_ptr(canonic as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-                xml_free(canonic as _);
+            if let Some(system_id) = system_id {
+                let canonic = canonic_path(system_id);
+                (*input).filename = Some(canonic.into_owned());
             }
         }
         (*input).line = 1;
@@ -376,14 +354,10 @@ pub unsafe fn xml_sax2_external_subset(
         (*input).cur = (*(*ctxt).input).cur;
         (*input).free = None;
 
-        /*
-         * let's parse that entity knowing it's an external subset.
-         */
+        // let's parse that entity knowing it's an external subset.
         xml_parse_external_subset(ctxt, external_id, system_id);
 
-        /*
-         * Free up the external entities
-         */
+        // Free up the external entities
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).input_tab.len() > 1 {
             xml_pop_input(ctxt);
@@ -404,15 +378,13 @@ pub unsafe fn xml_sax2_external_subset(
 
         xml_free_input_stream((*ctxt).input);
 
-        /*
-         * Restore the parsing context of the main entity
-         */
+        // Restore the parsing context of the main entity
         (*ctxt).input = oldinput;
         (*ctxt).input_tab = oldinput_tab;
         (*ctxt).charset = oldcharset;
         (*ctxt).encoding = oldencoding;
         (*ctxt).progressive = oldprogressive;
-        /* (*ctxt).wellFormed = oldwellFormed; */
+        // (*ctxt).wellFormed = oldwellFormed;
     }
 }
 
@@ -562,11 +534,9 @@ pub unsafe fn xml_sax2_get_parameter_entity(
 #[doc(alias = "xmlSAX2ResolveEntity")]
 pub unsafe fn xml_sax2_resolve_entity(
     ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
-    let mut base: *const c_char = null();
-
     if ctx.is_none() {
         return null_mut();
     }
@@ -575,39 +545,18 @@ pub unsafe fn xml_sax2_resolve_entity(
         let lock = ctx.lock();
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
-    // temporary use.
-    // Currently, filename is Option<String> and base is *const c_char.
-    // Even if we make c-string pointer in if statement, it does not alive sufficient term.
-    // So, make dummy out of if statement.
-    #[allow(unused_assignments)]
-    let mut dummy = c"".to_owned();
-    if !(*ctxt).input.is_null() {
-        if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
-            dummy = CString::new(filename).unwrap();
-            base = dummy.as_ptr();
-        }
-    }
-    if base.is_null() {
-        if let Some(dir) = (*ctxt).directory.as_deref() {
-            dummy = CString::new(dir).unwrap();
-            base = dummy.as_ptr();
-        }
-    }
+    let base = if !(*ctxt).input.is_null() {
+        (*(*ctxt).input)
+            .filename
+            .as_deref()
+            .or((*ctxt).directory.as_deref())
+            .map(|b| b.to_owned())
+    } else {
+        (*ctxt).directory.as_deref().map(|d| d.to_owned())
+    };
 
-    let uri: *mut XmlChar = xml_build_uri(system_id, base as _);
-    let ret: XmlParserInputPtr = xml_load_external_entity(
-        (!uri.is_null())
-            .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-            .as_deref(),
-        (!public_id.is_null())
-            .then(|| CStr::from_ptr(public_id as *const i8).to_string_lossy())
-            .as_deref(),
-        ctxt,
-    );
-    if !uri.is_null() {
-        xml_free(uri as _);
-    }
-    ret
+    let uri = system_id.zip(base).and_then(|(s, b)| build_uri(s, &b));
+    xml_load_external_entity(uri.as_deref(), public_id, ctxt)
 }
 
 /// Handle a parser warning

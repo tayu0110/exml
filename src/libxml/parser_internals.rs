@@ -5458,10 +5458,10 @@ pub(crate) unsafe extern "C" fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
 ///
 /// `[31] extSubsetDecl ::= (markupdecl | conditionalSect | PEReference | S) *`
 #[doc(alias = "xmlParseExternalSubset")]
-pub unsafe extern "C" fn xml_parse_external_subset(
+pub unsafe fn xml_parse_external_subset(
     ctxt: XmlParserCtxtPtr,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     (*ctxt).detect_sax2();
     (*ctxt).grow();
@@ -5482,9 +5482,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     if (*ctxt).content_bytes().starts_with(b"<?xml") {
         xml_parse_text_decl(ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
-            /*
-             * The XML REC instructs us to stop parsing right here
-             */
+            // The XML REC instructs us to stop parsing right here
             (*ctxt).halt();
             return;
         }
@@ -5498,16 +5496,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
         (*(*ctxt).my_doc).properties = XmlDocProperties::XmlDocInternal as i32;
     }
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_null() {
-        xml_create_int_subset(
-            (*ctxt).my_doc,
-            None,
-            (!external_id.is_null())
-                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                .as_deref(),
-            (!system_id.is_null())
-                .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
-                .as_deref(),
-        );
+        xml_create_int_subset((*ctxt).my_doc, None, external_id, system_id);
     }
 
     (*ctxt).instate = XmlParserInputState::XmlParserDTD;

@@ -4433,9 +4433,7 @@ pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlD
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDocument")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
-    use std::ffi::CString;
-
+pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     use crate::{libxml::parser::xml_parse_dtd, uri::build_uri};
 
     let mut ret: i32;
@@ -4469,19 +4467,8 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
         } else {
             None
         };
-        let sys_id = sys_id.map(|s| CString::new(s).unwrap());
-        let external_id = (*(*doc).int_subset)
-            .external_id
-            .as_deref()
-            .map(|e| CString::new(e).unwrap());
-        (*doc).ext_subset = xml_parse_dtd(
-            external_id
-                .as_ref()
-                .map_or(null_mut(), |e| e.as_ptr() as *const u8),
-            sys_id
-                .as_ref()
-                .map_or(null_mut(), |s| s.as_ptr() as *const u8),
-        );
+        let external_id = (*(*doc).int_subset).external_id.as_deref();
+        (*doc).ext_subset = xml_parse_dtd(external_id, sys_id.as_deref());
         if (*doc).ext_subset.is_null() {
             if let Some(system_id) = (*(*doc).int_subset).system_id.as_deref() {
                 xml_err_valid!(
@@ -4495,11 +4482,7 @@ pub unsafe extern "C" fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDo
                     ctxt,
                     XmlParserErrors::XmlDTDLoadError,
                     "Could not load the external subset \"{}\"\n",
-                    external_id
-                        .as_ref()
-                        .map(|e| e.to_string_lossy())
-                        .as_deref()
-                        .unwrap()
+                    external_id.unwrap()
                 );
             }
             return 0;

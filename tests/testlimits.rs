@@ -686,8 +686,8 @@ fn internal_subset_callback(
 fn external_subset_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
-    _external_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _external_id: Option<&str>,
+    _system_id: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -702,8 +702,8 @@ fn external_subset_callback(
 #[doc(alias = "resolveEntityCallback")]
 fn resolve_entity_callback(
     _ctx: Option<GenericErrorContext>,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()

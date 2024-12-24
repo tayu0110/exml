@@ -675,71 +675,54 @@ unsafe fn internal_subset_debug(
     }
 }
 
-/**
- * externalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- */
+/// Does this document has an external subset
+#[doc(alias = "externalSubsetDebug")]
 unsafe fn external_subset_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     increment_callbacks_counter();
     sax_debug!(
         "SAX.externalSubset({},",
         CStr::from_ptr(name as _).to_string_lossy()
     );
-    if external_id.is_null() {
+    if let Some(external_id) = external_id {
+        sax_debug!(" {external_id},");
+    } else {
         sax_debug!(" ,");
-    } else {
-        sax_debug!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        sax_debugln!(" )");
+    if let Some(system_id) = system_id {
+        sax_debugln!(" {system_id})");
     } else {
-        sax_debugln!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        sax_debugln!(" )");
     }
 }
 
-/**
- * resolveEntityDebug:
- * @ctxt:  An XML parser context
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * Special entity resolver, better left to the parser, it has
- * more context than the application layer.
- * The default behaviour is to NOT resolve the entities, in that case
- * the ENTITY_REF nodes are built in the structure (and the parameter
- * values).
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// Special entity resolver, better left to the parser, it has
+/// more context than the application layer.
+/// The default behaviour is to NOT resolve the entities, in that case
+/// the ENTITY_REF nodes are built in the structure (and the parameter values).
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "resolveEntityDebug")]
 unsafe fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     increment_callbacks_counter();
     /* xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx; */
 
     sax_debug!("SAX.resolveEntity(");
-    if !public_id.is_null() {
-        sax_debug!(
-            "{}",
-            CStr::from_ptr(public_id as *mut c_char).to_string_lossy()
-        );
+    if let Some(public_id) = public_id {
+        sax_debug!("{public_id}");
     } else {
         sax_debug!(" ");
     }
-    if !system_id.is_null() {
-        sax_debugln!(
-            ", {})",
-            CStr::from_ptr(system_id as *mut c_char).to_string_lossy()
-        );
+    if let Some(system_id) = system_id {
+        sax_debugln!(", {system_id})");
     } else {
         sax_debugln!(", )");
     }

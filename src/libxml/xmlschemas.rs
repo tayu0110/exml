@@ -30645,8 +30645,8 @@ unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
 unsafe fn external_subset_split(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30666,8 +30666,8 @@ unsafe fn external_subset_split(
 
 unsafe fn resolve_entity_split(
     ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -31068,9 +31068,7 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
         return null_mut();
     }
 
-    /*
-     * We only allow to plug into SAX2 event streams
-     */
+    // We only allow to plug into SAX2 event streams
     let old_sax: XmlSAXHandlerPtr = *sax;
     if !old_sax.is_null() && (*old_sax).initialized != XML_SAX2_MAGIC as u32 {
         return null_mut();
@@ -31083,9 +31081,7 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
         return null_mut();
     }
 
-    /*
-     * everything seems right allocate the local data needed for that layer
-     */
+    // everything seems right allocate the local data needed for that layer
     let ret: XmlSchemaSAXPlugPtr =
         xml_malloc(size_of::<XmlSchemaSAXPlugStruct>()) as XmlSchemaSAXPlugPtr;
     if ret.is_null() {
@@ -31098,15 +31094,11 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
     (*ret).user_sax_ptr = sax;
     (*ret).user_sax = old_sax;
     if old_sax.is_null() {
-        /*
-         * go direct, no need for the split block and functions.
-         */
+        // go direct, no need for the split block and functions.
         (*ret).schemas_sax.start_element_ns = Some(xml_schema_sax_handle_start_element_ns);
         (*ret).schemas_sax.end_element_ns = Some(xml_schema_sax_handle_end_element_ns);
-        /*
-         * Note that we use the same text-function for both, to prevent
-         * the parser from testing for ignorable whitespace.
-         */
+        // Note that we use the same text-function for both, to prevent
+        // the parser from testing for ignorable whitespace.
         (*ret).schemas_sax.ignorable_whitespace = Some(xml_schema_sax_handle_text);
         (*ret).schemas_sax.characters = Some(xml_schema_sax_handle_text);
 
@@ -31116,11 +31108,9 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
         (*ret).user_data = Some(GenericErrorContext::new(ctxt));
         *user_data = (*ret).user_data.clone();
     } else {
-        /*
-         * for each callback unused by Schemas initialize it to the Split
-         * routine only if non NULL in the user block, this can speed up
-         * things at the SAX level.
-         */
+        // for each callback unused by Schemas initialize it to the Split
+        // routine only if non NULL in the user block, this can speed up
+        // things at the SAX level.
         if (*old_sax).internal_subset.is_some() {
             (*ret).schemas_sax.internal_subset = Some(internal_subset_split);
         }
@@ -31185,12 +31175,9 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
             (*ret).schemas_sax.external_subset = Some(external_subset_split);
         }
 
-        /*
-         * the 6 schemas callback have to go to the splitter functions
-         * Note that we use the same text-function for ignorableWhitespace
-         * if possible, to prevent the parser from testing for ignorable
-         * whitespace.
-         */
+        // the 6 schemas callback have to go to the splitter functions
+        // Note that we use the same text-function for ignorableWhitespace
+        // if possible, to prevent the parser from testing for ignorable whitespace.
         (*ret).schemas_sax.characters = Some(characters_split);
         if (*old_sax).ignorable_whitespace.is_some()
             && (*old_sax).ignorable_whitespace != (*old_sax).characters
@@ -31209,9 +31196,7 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
         *user_data = Some(GenericErrorContext::new(ret));
     }
 
-    /*
-     * plug the pointers back.
-     */
+    // plug the pointers back.
     *sax = addr_of_mut!((*ret).schemas_sax);
     (*ctxt).sax = *sax;
     (*ctxt).flags |= XML_SCHEMA_VALID_CTXT_FLAG_STREAM;

@@ -2426,7 +2426,12 @@ pub unsafe fn xml_shell_validate(
     if dtd.is_null() || *dtd.add(0) == 0 {
         res = xml_validate_document(addr_of_mut!(vctxt), (*ctxt).doc);
     } else {
-        let subset: XmlDtdPtr = xml_parse_dtd(null_mut(), dtd as *mut XmlChar);
+        let subset: XmlDtdPtr = xml_parse_dtd(
+            None,
+            (!dtd.is_null())
+                .then(|| CStr::from_ptr(dtd as *const i8).to_string_lossy())
+                .as_deref(),
+        );
         if !subset.is_null() {
             res = xml_validate_dtd(addr_of_mut!(vctxt), (*ctxt).doc, subset);
 

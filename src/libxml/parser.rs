@@ -1724,8 +1724,8 @@ pub struct XmlSAXLocator {
 #[doc(alias = "resolveEntitySAXFunc")]
 pub type ResolveEntitySAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    publicId: *const XmlChar,
-    systemId: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr;
 /// Callback on internal subset declaration.
 #[doc(alias = "internalSubsetSAXFunc")]
@@ -1741,8 +1741,8 @@ pub type InternalSubsetSAXFunc = unsafe fn(
 pub type ExternalSubsetSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    ExternalID: *const XmlChar,
-    SystemID: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 );
 
 /// Get an entity by name.
@@ -3150,15 +3150,11 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         (*(*ctxt).my_doc).compression = (*(*ctxt).input).buf.as_ref().unwrap().borrow().compressed;
     }
 
-    /*
-     * The Misc part of the Prolog
-     */
+    // The Misc part of the Prolog
     xml_parse_misc(ctxt);
 
-    /*
-     * Then possibly doc type declaration(s) and more Misc
-     * (doctypedecl Misc*)?
-     */
+    // Then possibly doc type declaration(s) and more Misc
+    // (doctypedecl Misc*)?
     (*ctxt).grow();
     if (*ctxt).content_bytes().starts_with(b"<!DOCTYPE") {
         (*ctxt).in_subset = 1;
@@ -3171,17 +3167,21 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
             }
         }
 
-        /*
-         * Create and update the external subset.
-         */
+        // Create and update the external subset.
         (*ctxt).in_subset = 2;
         if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
             if let Some(external_subset) = (*(*ctxt).sax).external_subset {
                 external_subset(
                     (*ctxt).user_data.clone(),
                     (*ctxt).int_sub_name,
-                    (*ctxt).ext_sub_system,
-                    (*ctxt).ext_sub_uri,
+                    (!(*ctxt).ext_sub_system.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*ctxt).ext_sub_system as *const i8).to_string_lossy()
+                        })
+                        .as_deref(),
+                    (!(*ctxt).ext_sub_uri.is_null())
+                        .then(|| CStr::from_ptr((*ctxt).ext_sub_uri as *const i8).to_string_lossy())
+                        .as_deref(),
                 );
             }
         }
@@ -3196,9 +3196,7 @@ pub unsafe extern "C" fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         xml_parse_misc(ctxt);
     }
 
-    /*
-     * Time to start parsing the tree itself
-     */
+    // Time to start parsing the tree itself
     (*ctxt).grow();
     if (*ctxt).current_byte() != b'<' {
         xml_fatal_err_msg(
@@ -3743,17 +3741,17 @@ pub unsafe fn xml_parse_entity(filename: Option<&str>) -> XmlDocPtr {
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 #[doc(alias = "xmlSAXParseDTD")]
 #[cfg(feature = "libxml_valid")]
-pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
+pub(crate) unsafe fn xml_sax_parse_dtd(
     sax: XmlSAXHandlerPtr,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlDtdPtr {
     use std::slice::from_raw_parts;
 
     let mut ret: XmlDtdPtr = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
 
-    if external_id.is_null() && system_id.is_null() {
+    if external_id.is_none() && system_id.is_none() {
         return null_mut();
     }
 
@@ -3762,43 +3760,31 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
         return null_mut();
     }
 
-    /* We are loading a DTD */
+    // We are loading a DTD
     (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
 
-    /*
-     * Canonicalise the system ID
-     */
-    let system_id_canonic: *mut XmlChar = xml_canonic_path(system_id);
-    if !system_id.is_null() && system_id_canonic.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    }
+    // Canonicalise the system ID
+    let system_id_canonic = system_id.map(|s| canonic_path(s));
 
-    /*
-     * Ask the Entity resolver to load the damn thing
-     */
+    // Ask the Entity resolver to load the damn thing
 
     if !(*ctxt).sax.is_null() {
         if let Some(f) = (*(*ctxt).sax).resolve_entity {
-            input = f((*ctxt).user_data.clone(), external_id, system_id_canonic);
+            input = f(
+                (*ctxt).user_data.clone(),
+                external_id,
+                system_id_canonic.as_deref(),
+            );
         }
     }
     if input.is_null() {
         xml_free_parser_ctxt(ctxt);
-        if !system_id_canonic.is_null() {
-            xml_free(system_id_canonic as _);
-        }
         return null_mut();
     }
 
-    /*
-     * plug some encoding conversion routines here.
-     */
+    // plug some encoding conversion routines here.
     if xml_push_input(ctxt, input) < 0 {
         xml_free_parser_ctxt(ctxt);
-        if !system_id_canonic.is_null() {
-            xml_free(system_id_canonic as _);
-        }
         return null_mut();
     }
     if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
@@ -3808,16 +3794,9 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
     }
 
     if (*input).filename.is_none() {
-        if !system_id_canonic.is_null() {
-            (*input).filename = Some(
-                CStr::from_ptr(system_id_canonic as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(system_id_canonic as _);
+        if let Some(canonic) = system_id_canonic {
+            (*input).filename = Some(canonic.into_owned());
         }
-    } else {
-        xml_free(system_id_canonic as _);
     }
     (*input).line = 1;
     (*input).col = 1;
@@ -3825,9 +3804,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
     (*input).cur = (*(*ctxt).input).cur;
     (*input).free = None;
 
-    /*
-     * let's parse that entity knowing it's an external subset.
-     */
+    // let's parse that entity knowing it's an external subset.
     (*ctxt).in_subset = 2;
     (*ctxt).my_doc = xml_new_doc(Some("1.0"));
     if (*ctxt).my_doc.is_null() {
@@ -3839,12 +3816,8 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
     (*(*ctxt).my_doc).ext_subset = xml_new_dtd(
         (*ctxt).my_doc,
         c"none".as_ptr() as _,
-        (!external_id.is_null())
-            .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-            .as_deref(),
-        (!system_id.is_null())
-            .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
-            .as_deref(),
+        external_id,
+        system_id,
     );
     xml_parse_external_subset(ctxt, external_id, system_id);
 
@@ -3876,10 +3849,7 @@ pub(crate) unsafe extern "C" fn xml_sax_parse_dtd(
 /// Returns the resulting xmlDtdPtr or NULL in case of error.
 #[doc(alias = "xmlParseDTD")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_parse_dtd(
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
-) -> XmlDtdPtr {
+pub unsafe fn xml_parse_dtd(external_id: Option<&str>, system_id: Option<&str>) -> XmlDtdPtr {
     xml_sax_parse_dtd(null_mut(), external_id, system_id)
 }
 
@@ -3956,11 +3926,9 @@ pub unsafe fn xml_io_parse_dtd(
     if matches!(enc, XmlCharEncoding::None)
         && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4
     {
-        /*
-         * Get the 4 first bytes and decode the charset
-         * if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
-         * plug some encoding conversion routines.
-         */
+        // Get the 4 first bytes and decode the charset
+        // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
+        // plug some encoding conversion routines.
         start[0] = (*ctxt).current_byte();
         start[1] = (*ctxt).nth_byte(1);
         start[2] = (*ctxt).nth_byte(2);
@@ -3971,7 +3939,7 @@ pub unsafe fn xml_io_parse_dtd(
         }
     }
 
-    xml_parse_external_subset(ctxt, c"none".as_ptr() as _, c"none".as_ptr() as _);
+    xml_parse_external_subset(ctxt, Some("none"), Some("none"));
 
     if !(*ctxt).my_doc.is_null() {
         if (*ctxt).well_formed != 0 {
@@ -9938,9 +9906,7 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         if (*ctxt).current_byte() == b'[' {
                             (*ctxt).instate = XmlParserInputState::XmlParserDTD;
                         } else {
-                            /*
-                             * Create and update the external subset.
-                             */
+                            // Create and update the external subset.
                             (*ctxt).in_subset = 2;
                             if !(*ctxt).sax.is_null()
                                 && (*ctxt).disable_sax == 0
@@ -9949,8 +9915,18 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                 ((*(*ctxt).sax).external_subset.unwrap())(
                                     (*ctxt).user_data.clone(),
                                     (*ctxt).int_sub_name,
-                                    (*ctxt).ext_sub_system,
-                                    (*ctxt).ext_sub_uri,
+                                    (!(*ctxt).ext_sub_system.is_null())
+                                        .then(|| {
+                                            CStr::from_ptr((*ctxt).ext_sub_system as *const i8)
+                                                .to_string_lossy()
+                                        })
+                                        .as_deref(),
+                                    (!(*ctxt).ext_sub_uri.is_null())
+                                        .then(|| {
+                                            CStr::from_ptr((*ctxt).ext_sub_uri as *const i8)
+                                                .to_string_lossy()
+                                        })
+                                        .as_deref(),
                                 );
                             }
                             (*ctxt).in_subset = 0;
@@ -9998,8 +9974,18 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                         ((*(*ctxt).sax).external_subset.unwrap())(
                             (*ctxt).user_data.clone(),
                             (*ctxt).int_sub_name,
-                            (*ctxt).ext_sub_system,
-                            (*ctxt).ext_sub_uri,
+                            (!(*ctxt).ext_sub_system.is_null())
+                                .then(|| {
+                                    CStr::from_ptr((*ctxt).ext_sub_system as *const i8)
+                                        .to_string_lossy()
+                                })
+                                .as_deref(),
+                            (!(*ctxt).ext_sub_uri.is_null())
+                                .then(|| {
+                                    CStr::from_ptr((*ctxt).ext_sub_uri as *const i8)
+                                        .to_string_lossy()
+                                })
+                                .as_deref(),
                         );
                     }
                     (*ctxt).in_subset = 0;
@@ -13483,38 +13469,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_parse_dtd() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let external_id = gen_const_xml_char_ptr(n_external_id, 0);
-                    let system_id = gen_const_xml_char_ptr(n_system_id, 1);
-
-                    let ret_val = xml_parse_dtd(external_id as *const XmlChar, system_id);
-                    desret_xml_dtd_ptr(ret_val);
-                    des_const_xml_char_ptr(n_external_id, external_id, 0);
-                    des_const_xml_char_ptr(n_system_id, system_id, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlParseDTD",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_external_id);
-                        eprintln!(" {}", n_system_id);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlParseDTD()");
-        }
-    }
-
-    #[test]
     fn test_xml_parse_doc() {
         #[cfg(feature = "sax1")]
         unsafe {
@@ -13823,43 +13777,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlRecoverDoc()");
-        }
-    }
-
-    #[test]
-    fn test_xml_saxparse_dtd() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_sax in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let sax = gen_xml_saxhandler_ptr(n_sax, 0);
-                        let external_id = gen_const_xml_char_ptr(n_external_id, 1);
-                        let system_id = gen_const_xml_char_ptr(n_system_id, 2);
-
-                        let ret_val = xml_sax_parse_dtd(sax, external_id, system_id);
-                        desret_xml_dtd_ptr(ret_val);
-                        des_xml_saxhandler_ptr(n_sax, sax, 0);
-                        des_const_xml_char_ptr(n_external_id, external_id, 1);
-                        des_const_xml_char_ptr(n_system_id, system_id, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSAXParseDTD",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_sax);
-                            eprint!(" {}", n_external_id);
-                            eprintln!(" {}", n_system_id);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAXParseDTD()");
         }
     }
 

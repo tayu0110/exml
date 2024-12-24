@@ -878,17 +878,13 @@ unsafe fn internal_subset_debug(
     }
 }
 
-/**
- * externalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- */
+/// Does this document has an external subset
+#[doc(alias = "externalSubsetDebug")]
 unsafe fn external_subset_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -898,51 +894,44 @@ unsafe fn external_subset_debug(
         "SAX.externalSubset({},",
         CStr::from_ptr(name as _).to_string_lossy()
     );
-    if external_id.is_null() {
+    if let Some(external_id) = external_id {
+        print!(" {external_id},");
+    } else {
         print!(" ,");
-    } else {
-        print!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        println!(" )");
+    if let Some(system_id) = system_id {
+        println!(" {system_id})");
     } else {
-        println!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        println!(" )");
     }
 }
 
-/**
- * resolveEntityDebug:
- * @ctxt:  An XML parser context
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * Special entity resolver, better left to the parser, it has
- * more context than the application layer.
- * The default behaviour is to NOT resolve the entities, in that case
- * the ENTITY_REF nodes are built in the structure (and the parameter
- * values).
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// Special entity resolver, better left to the parser, it has
+/// more context than the application layer.
+/// The default behaviour is to NOT resolve the entities, in that case
+/// the ENTITY_REF nodes are built in the structure (and the parameter values).
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "resolveEntityDebug")]
 unsafe fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return null_mut();
     }
-    /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
+    // let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr;
 
     print!("SAX.resolveEntity(");
-    if !public_id.is_null() {
-        print!("{}", CStr::from_ptr(public_id as _).to_string_lossy());
+    if let Some(public_id) = public_id {
+        print!("{public_id}");
     } else {
         print!(" ");
     }
-    if !system_id.is_null() {
-        println!(", {})", CStr::from_ptr(system_id as _).to_string_lossy());
+    if let Some(system_id) = system_id {
+        println!(", {system_id})");
     } else {
         println!(", )");
     }
@@ -2962,15 +2951,16 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             start_timer();
         }
         if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-            dtd = xml_parse_dtd(null_mut(), dtd_valid.as_ptr() as _);
+            dtd = xml_parse_dtd(None, Some(dtd_valid.to_string_lossy().as_ref()));
         } else {
             dtd = xml_parse_dtd(
                 DTDVALIDFPI
                     .lock()
                     .unwrap()
                     .as_ref()
-                    .map_or(null_mut(), |d| d.as_ptr() as *mut u8),
-                null_mut(),
+                    .map(|d| d.to_string_lossy())
+                    .as_deref(),
+                None,
             );
         }
         if TIMING != 0 && REPEAT == 0 {
