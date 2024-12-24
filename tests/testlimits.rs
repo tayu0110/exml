@@ -674,9 +674,9 @@ fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 #[doc(alias = "internalSubsetCallback")]
 fn internal_subset_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _external_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _name: Option<&str>,
+    _external_id: Option<&str>,
+    _system_id: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

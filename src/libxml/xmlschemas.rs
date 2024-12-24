@@ -30585,9 +30585,9 @@ unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _nam
 // All those functions just bounces to the user provided SAX handlers
 unsafe fn internal_subset_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();

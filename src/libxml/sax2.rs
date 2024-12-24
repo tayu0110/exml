@@ -255,9 +255,9 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
 #[doc(alias = "xmlSAX2InternalSubset")]
 pub unsafe fn xml_sax2_internal_subset(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     if ctx.is_none() {
         return;
@@ -280,16 +280,8 @@ pub unsafe fn xml_sax2_internal_subset(
         xml_free_dtd(dtd);
         (*(*ctxt).my_doc).int_subset = null_mut();
     }
-    (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
-        (*ctxt).my_doc,
-        name,
-        (!external_id.is_null())
-            .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-            .as_deref(),
-        (!system_id.is_null())
-            .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
-            .as_deref(),
-    );
+    (*(*ctxt).my_doc).int_subset =
+        xml_create_int_subset((*ctxt).my_doc, name, external_id, system_id);
     if (*(*ctxt).my_doc).int_subset.is_null() {
         xml_sax2_err_memory(ctxt, "xmlSAX2InternalSubset");
     }

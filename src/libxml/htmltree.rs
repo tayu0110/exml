@@ -138,7 +138,7 @@ pub unsafe extern "C" fn html_new_doc_no_dtd(
     if !external_id.is_null() || !uri.is_null() {
         xml_create_int_subset(
             cur,
-            c"html".as_ptr() as _,
+            Some("html"),
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                 .as_deref(),

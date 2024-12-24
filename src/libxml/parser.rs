@@ -1731,9 +1731,9 @@ pub type ResolveEntitySAXFunc = unsafe fn(
 #[doc(alias = "internalSubsetSAXFunc")]
 pub type InternalSubsetSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    ExternalID: *const XmlChar,
-    SystemID: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 );
 
 /// Callback on external subset declaration.

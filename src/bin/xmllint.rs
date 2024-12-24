@@ -853,35 +853,28 @@ unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int 
     0
 }
 
-/**
- * internalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- */
+/// Does this document has an internal subset
+#[doc(alias = "internalSubsetDebug")]
 unsafe fn internal_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.internalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if external_id.is_null() {
+    print!("SAX.internalSubset({},", name.unwrap_or("(null)"));
+    if let Some(external_id) = external_id {
+        print!(" {external_id},");
+    } else {
         print!(" ,");
-    } else {
-        print!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        println!(" )");
+    if let Some(system_id) = system_id {
+        println!(" {system_id})");
     } else {
-        println!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        println!(" )");
     }
 }
 

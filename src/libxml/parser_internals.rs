@@ -4554,19 +4554,15 @@ pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
 /// `[ VC: Root Element Type ]`  
 /// The Name in the document type declaration must match the element type of the root element.
 #[doc(alias = "xmlParseDocTypeDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
     let mut external_id: *mut XmlChar = null_mut();
 
-    /*
-     * We know that '<!DOCTYPE' has been detected.
-     */
+    // We know that '<!DOCTYPE' has been detected.
     (*ctxt).advance(9);
 
     (*ctxt).skip_blanks();
 
-    /*
-     * Parse the DOCTYPE name.
-     */
+    // Parse the DOCTYPE name.
     let name: *const XmlChar = xml_parse_name(ctxt);
     if name.is_null() {
         xml_fatal_err_msg(
@@ -4579,9 +4575,7 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
 
     (*ctxt).skip_blanks();
 
-    /*
-     * Check for SystemID and ExternalID
-     */
+    // Check for SystemID and ExternalID
     let uri: *mut XmlChar = xml_parse_external_id(ctxt, addr_of_mut!(external_id), 1);
 
     if !uri.is_null() || !external_id.is_null() {
@@ -4592,29 +4586,34 @@ pub(crate) unsafe extern "C" fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) 
 
     (*ctxt).skip_blanks();
 
-    /*
-     * Create and update the internal subset.
-     */
+    // Create and update the internal subset.
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(internal_subset) = (*(*ctxt).sax).internal_subset {
-            internal_subset((*ctxt).user_data.clone(), name, external_id, uri);
+            internal_subset(
+                (*ctxt).user_data.clone(),
+                (!name.is_null())
+                    .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!external_id.is_null())
+                    .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!uri.is_null())
+                    .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                    .as_deref(),
+            );
         }
     }
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return;
     }
 
-    /*
-     * Is there any internal subset declarations ?
-     * they are handled separately in xmlParseInternalSubset()
-     */
+    // Is there any internal subset declarations ?
+    // they are handled separately in xmlParseInternalSubset()
     if (*ctxt).current_byte() == b'[' {
         return;
     }
 
-    /*
-     * We should be at the end of the DOCTYPE declaration.
-     */
+    // We should be at the end of the DOCTYPE declaration.
     if (*ctxt).current_byte() != b'>' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrDoctypeNotFinished, None);
     }
@@ -5501,7 +5500,7 @@ pub unsafe extern "C" fn xml_parse_external_subset(
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).int_subset.is_null() {
         xml_create_int_subset(
             (*ctxt).my_doc,
-            null(),
+            None,
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                 .as_deref(),

@@ -7888,19 +7888,15 @@ unsafe extern "C" fn html_parse_external_id(
 ///
 /// `[28] doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' (markupdecl | PEReference | S)* ']' S?)? '>'`
 #[doc(alias = "htmlParseDocTypeDecl")]
-unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
+unsafe fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
     let mut external_id: *mut XmlChar = null_mut();
 
-    /*
-     * We know that '<!DOCTYPE' has been detected.
-     */
+    // We know that '<!DOCTYPE' has been detected.
     (*ctxt).advance(9);
 
     SKIP_BLANKS!(ctxt);
 
-    /*
-     * Parse the DOCTYPE name.
-     */
+    // Parse the DOCTYPE name.
     let name: *const XmlChar = html_parse_name(ctxt);
     if name.is_null() {
         html_parse_err(
@@ -7928,7 +7924,7 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
             None,
             None,
         );
-        /* Ignore bogus content */
+        // Ignore bogus content
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0
             && (*ctxt).current_byte() != b'>'
@@ -7948,9 +7944,15 @@ unsafe extern "C" fn html_parse_doc_type_decl(ctxt: HtmlParserCtxtPtr) {
     {
         ((*(*ctxt).sax).internal_subset.unwrap())(
             (*ctxt).user_data.clone(),
-            name,
-            external_id,
-            uri,
+            (!name.is_null())
+                .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
+                .as_deref(),
+            (!external_id.is_null())
+                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                .as_deref(),
+            (!uri.is_null())
+                .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                .as_deref(),
         );
     }
 
@@ -9633,7 +9635,7 @@ pub unsafe extern "C" fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,
-                c"html".as_ptr() as _,
+                Some("html"),
                 Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
                 Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
             );
@@ -11037,9 +11039,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
         if (*ctxt).name_tab.is_empty()
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            /*
-             * SAX: end of the document processing.
-             */
+            // SAX: end of the document processing.
             (*ctxt).instate = XmlParserInputState::XmlParserEOF;
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_document.is_some() {
                 ((*(*ctxt).sax).end_document.unwrap())((*ctxt).user_data.clone());
@@ -11058,7 +11058,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
         if dtd.is_null() {
             (*(*ctxt).my_doc).int_subset = xml_create_int_subset(
                 (*ctxt).my_doc,
-                c"html".as_ptr() as _,
+                Some("html"),
                 Some("-//W3C//DTD HTML 4.0 Transitional//EN"),
                 Some("http://www.w3.org/TR/REC-html40/loose.dtd"),
             );

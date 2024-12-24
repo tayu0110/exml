@@ -652,35 +652,26 @@ unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     0
 }
 
-/**
- * internalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- */
+/// Does this document has an internal subset
+#[doc(alias = "internalSubsetDebug")]
 unsafe fn internal_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    mut name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     increment_callbacks_counter();
-    if name.is_null() {
-        name = c"(null)".as_ptr() as _;
-    }
-    sax_debug!(
-        "SAX.internalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if external_id.is_null() {
+    let name = name.unwrap_or("(null)");
+    sax_debug!("SAX.internalSubset({name},");
+    if let Some(external_id) = external_id {
+        sax_debug!(" {external_id},");
+    } else {
         sax_debug!(" ,");
-    } else {
-        sax_debug!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        sax_debugln!(" )");
+    if let Some(system_id) = system_id {
+        sax_debugln!(" {system_id})");
     } else {
-        sax_debugln!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        sax_debugln!(" )");
     }
 }
 
@@ -1991,9 +1982,9 @@ thread_local! {
 #[cfg(feature = "libxml_push")]
 unsafe fn internal_subset_bnd(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     use exml::libxml::sax2::xml_sax2_internal_subset;
 

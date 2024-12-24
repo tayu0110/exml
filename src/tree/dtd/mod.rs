@@ -231,7 +231,7 @@ impl NodeCommon for XmlDtd {
 #[doc(alias = "xmlCreateIntSubset")]
 pub unsafe fn xml_create_int_subset(
     doc: XmlDocPtr,
-    name: *const XmlChar,
+    name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) -> XmlDtdPtr {
@@ -239,9 +239,7 @@ pub unsafe fn xml_create_int_subset(
         return null_mut();
     }
 
-    /*
-     * Allocate a new DTD and fill the fields.
-     */
+    // Allocate a new DTD and fill the fields.
     let cur: XmlDtdPtr = xml_malloc(size_of::<XmlDtd>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building internal subset");
@@ -251,8 +249,9 @@ pub unsafe fn xml_create_int_subset(
     std::ptr::write(&mut *cur, XmlDtd::default());
     (*cur).typ = XmlElementType::XmlDTDNode;
 
-    if !name.is_null() {
-        (*cur).name = xml_strdup(name);
+    if let Some(name) = name {
+        let name = CString::new(name).unwrap();
+        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
         if (*cur).name.is_null() {
             xml_tree_err_memory("building internal subset");
             xml_free(cur as _);
