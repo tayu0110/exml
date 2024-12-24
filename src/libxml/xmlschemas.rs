@@ -30202,14 +30202,14 @@ pub unsafe extern "C" fn xml_schema_valid_ctxt_get_parser_ctxt(
 }
 
 // Interface to insert Schemas SAX validation in a SAX stream
-pub type XmlSchemaSplitSAXDataPtr = *mut XmlSchemaSplitSAXData;
-#[repr(C)]
-pub struct XmlSchemaSplitSAXData {
-    user_sax: XmlSAXHandlerPtr,
-    user_data: *mut c_void,
-    ctxt: XmlSchemaValidCtxtPtr,
-    schemas_sax: XmlSAXHandlerPtr,
-}
+// pub type XmlSchemaSplitSAXDataPtr = *mut XmlSchemaSplitSAXData;
+// #[repr(C)]
+// pub struct XmlSchemaSplitSAXData {
+//     user_sax: XmlSAXHandlerPtr,
+//     user_data: *mut c_void,
+//     ctxt: XmlSchemaValidCtxtPtr,
+//     schemas_sax: XmlSAXHandlerPtr,
+// }
 
 const XML_SAX_PLUG_MAGIC: u32 = 0xdc43ba21;
 
