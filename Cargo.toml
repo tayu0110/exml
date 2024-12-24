@@ -23,7 +23,6 @@ url = "2.5.4"
 default = [
     "c14n",
     "catalog",
-    "ftp",
     "html",
     "http",
     "sax1",

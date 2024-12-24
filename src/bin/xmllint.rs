@@ -3639,7 +3639,7 @@ fn main() {
             if arg == "-maxmem" || arg == "--maxmem" {
                 let Some(next) = args.next() else {
                     eprintln!("maxmem: missing integer value");
-                    exit(XmllintReturnCode::ErrUnclass as i32);
+                    exit(XmllintReturnCode::ErrUnclass as i32)
                 };
 
                 match next.parse::<usize>() {

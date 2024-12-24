@@ -2,7 +2,7 @@
     "rust-analyzer.cargo.features": [
         "c14n",
         "catalog",
-        "ftp",
+        // "ftp",
         "html",
         "http",
         "sax1",
