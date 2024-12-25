@@ -69,12 +69,12 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
     tree::{
-        xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2, xml_split_qname3,
-        NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
-        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
-        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
-        XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+        split_qname2, xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2,
+        xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
+        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
+        XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID,
+        XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -992,10 +992,10 @@ unsafe fn xml_err_valid_node(
 ///
 /// Returns null_mut() if not, otherwise the entity
 #[doc(alias = "xmlAddElementDecl")]
-pub unsafe extern "C" fn xml_add_element_decl(
+pub unsafe fn xml_add_element_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
-    name: *const XmlChar,
+    mut name: &str,
     typ: XmlElementTypeVal,
     content: XmlElementContentPtr,
 ) -> XmlElementPtr {
@@ -1006,12 +1006,7 @@ pub unsafe extern "C" fn xml_add_element_decl(
     if dtd.is_null() {
         return null_mut();
     }
-    if name.is_null() {
-        return null_mut();
-    }
 
-    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-    let mut name = CString::new(name.as_ref()).unwrap();
     match typ {
         XmlElementTypeVal::XmlElementTypeEmpty => {
             if !content.is_null() {
@@ -1064,15 +1059,10 @@ pub unsafe extern "C" fn xml_add_element_decl(
     }
 
     // check if name is a QName
-    let mut ns = null_mut();
-    let uqname: *mut XmlChar = xml_split_qname2(name.as_ptr() as *const u8, addr_of_mut!(ns));
-    if !uqname.is_null() {
-        name = CString::new(
-            CStr::from_ptr(uqname as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        )
-        .unwrap();
+    let mut ns = None;
+    if let Some((prefix, localname)) = split_qname2(name) {
+        ns = Some(prefix);
+        name = localname;
     }
 
     // Create the Element table if needed.
@@ -1088,21 +1078,18 @@ pub unsafe extern "C" fn xml_add_element_decl(
     }
     if table.is_null() {
         xml_verr_memory(ctxt, Some("xmlAddElementDecl: Table creation failed!\n"));
-        if !uqname.is_null() {
-            xml_free(uqname as _);
-        }
-        if !ns.is_null() {
-            xml_free(ns as _);
-        }
         return null_mut();
     }
 
     // lookup old attributes inserted on an undefined element in the internal subset.
     if !(*dtd).doc.is_null() && !(*(*dtd).doc).int_subset.is_null() {
+        let name = CString::new(name).unwrap();
+        let ns = ns.map(|ns| CString::new(ns).unwrap());
         ret = xml_hash_lookup2(
             (*(*(*dtd).doc).int_subset).elements as _,
             name.as_ptr() as *const u8,
-            ns,
+            ns.as_deref()
+                .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
         ) as _;
         if !ret.is_null() && matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             old_attributes = (*ret).attributes;
@@ -1110,53 +1097,45 @@ pub unsafe extern "C" fn xml_add_element_decl(
             xml_hash_remove_entry2(
                 (*(*(*dtd).doc).int_subset).elements as _,
                 name.as_ptr() as *const u8,
-                ns,
+                ns.as_deref()
+                    .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
                 None,
             );
             xml_free_element(ret);
         }
     }
 
+    let cname = CString::new(name).unwrap();
+    let cns = ns.map(|ns| CString::new(ns).unwrap());
+
     // The element may already be present if one of its attribute was registered first
-    ret = xml_hash_lookup2(table, name.as_ptr() as *const u8, ns) as _;
+    ret = xml_hash_lookup2(
+        table,
+        cname.as_ptr() as *const u8,
+        cns.as_deref()
+            .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
+    ) as _;
     if !ret.is_null() {
         if !matches!((*ret).etype, XmlElementTypeVal::XmlElementTypeUndefined) {
             #[cfg(feature = "libxml_valid")]
             {
-                let name = name.to_string_lossy();
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
-                    Some(&name),
+                    Some(name),
                     None,
                     None,
                 );
             }
-            if !uqname.is_null() {
-                xml_free(uqname as _);
-            }
-            if !ns.is_null() {
-                xml_free(ns as _);
-            }
             return null_mut();
-        }
-        if !ns.is_null() {
-            xml_free(ns as _);
-            // ns = null_mut();
         }
     } else {
         ret = xml_malloc(size_of::<XmlElement>()) as XmlElementPtr;
         if ret.is_null() {
             xml_verr_memory(ctxt as _, Some("malloc failed"));
-            if !uqname.is_null() {
-                xml_free(uqname as _);
-            }
-            if !ns.is_null() {
-                xml_free(ns as _);
-            }
             return null_mut();
         }
         memset(ret as _, 0, size_of::<XmlElement>());
@@ -1164,34 +1143,33 @@ pub unsafe extern "C" fn xml_add_element_decl(
         (*ret).typ = XmlElementType::XmlElementDecl;
 
         // fill the structure.
-        (*ret).name = Some(Box::new(name.to_string_lossy().into_owned()));
-        (*ret).prefix = (!ns.is_null()).then(|| {
-            CStr::from_ptr(ns as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
+        (*ret).name = Some(Box::new(name.to_owned()));
+        (*ret).prefix = ns.map(|ns| ns.to_owned());
 
         // Validity Check:
         // Insertion must not fail
-        if xml_hash_add_entry2(table, name.as_ptr() as *const u8, ns, ret as _) != 0 {
+        if xml_hash_add_entry2(
+            table,
+            cname.as_ptr() as *const u8,
+            cns.as_deref()
+                .map_or(null_mut(), |ns| ns.as_ptr() as *const u8),
+            ret as _,
+        ) != 0
+        {
             #[cfg(feature = "libxml_valid")]
             {
-                let name = name.to_string_lossy();
                 // The element is already defined in this DTD.
                 xml_err_valid_node(
                     ctxt,
                     dtd as XmlNodePtr,
                     XmlParserErrors::XmlDTDElemRedefined,
                     format!("Redefinition of element {name}\n").as_str(),
-                    Some(&name),
+                    Some(name),
                     None,
                     None,
                 );
             }
             xml_free_element(ret);
-            if !uqname.is_null() {
-                xml_free(uqname as _);
-            }
             return null_mut();
         }
         // For new element, may have attributes from earlier
@@ -1223,12 +1201,6 @@ pub unsafe extern "C" fn xml_add_element_decl(
     } else {
         (*dtd).children = NodePtr::from_ptr(ret as *mut XmlNode);
         (*dtd).last = (*dtd).children;
-    }
-    if !uqname.is_null() {
-        xml_free(uqname as _);
-    }
-    if !ns.is_null() {
-        xml_free(ns as _);
     }
     ret
 }
@@ -8424,79 +8396,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_xml_add_element_decl() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_type in 0..GEN_NB_XML_ELEMENT_TYPE_VAL {
-                            for n_content in 0..GEN_NB_XML_ELEMENT_CONTENT_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                                let dtd = gen_xml_dtd_ptr(n_dtd, 1);
-                                let name = gen_const_xml_char_ptr(n_name, 2);
-                                let typ = gen_xml_element_type_val(n_type, 3);
-                                let content = gen_xml_element_content_ptr(n_content, 4);
-
-                                let ret_val = xml_add_element_decl(ctxt, dtd, name, typ, content);
-                                desret_xml_element_ptr(ret_val);
-                                des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_xml_dtd_ptr(n_dtd, dtd, 1);
-                                des_const_xml_char_ptr(n_name, name, 2);
-                                des_xml_element_type_val(n_type, typ, 3);
-                                des_xml_element_content_ptr(n_content, content, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlAddElementDecl",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlAddElementDecl()"
-                                    );
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_dtd);
-                                    eprint!(" {}", n_name);
-                                    eprint!(" {}", n_type);
-                                    eprintln!(" {}", n_content);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_add_id() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_add_notation_decl() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_add_ref() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_copy_attribute_table() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_copy_doc_element_content() {
         unsafe {
             let mut leaks = 0;
@@ -8557,30 +8456,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_copy_element_table() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_copy_enumeration() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_copy_notation_table() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_create_enumeration() {
-
-        /* missing type support */
     }
 
     #[test]
@@ -8891,12 +8766,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_get_refs() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_is_id() {
         unsafe {
             let mut leaks = 0;
@@ -9072,12 +8941,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_new_valid_ctxt() {
-
-        /* missing type support */
     }
 
     #[test]

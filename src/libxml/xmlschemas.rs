@@ -30765,7 +30765,7 @@ unsafe fn attribute_decl_split(
 
 unsafe fn element_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     content: XmlElementContentPtr,
 ) {

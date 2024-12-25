@@ -859,7 +859,7 @@ pub unsafe fn xml_sax2_attribute_decl(
 #[doc(alias = "xmlSAX2ElementDecl")]
 pub unsafe fn xml_sax2_element_decl(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     content: XmlElementContentPtr,
 ) {
@@ -894,7 +894,6 @@ pub unsafe fn xml_sax2_element_decl(
             content,
         );
     } else {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,

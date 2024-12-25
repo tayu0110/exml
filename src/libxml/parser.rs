@@ -1774,7 +1774,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
 #[doc(alias = "elementDeclSAXFunc")]
 pub type ElementDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     content: XmlElementContentPtr,
 );
@@ -12168,7 +12168,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
 ///
 /// Returns the type of the element, or -1 in case of error
 #[doc(alias = "xmlParseElementDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
+pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
     let mut ret: i32 = -1;
     let mut content: XmlElementContentPtr = null_mut();
@@ -12178,7 +12178,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
     }
     (*ctxt).advance(2);
 
-    /* GROW; done in the caller */
+    // GROW; done in the caller
     if (*ctxt).content_bytes().starts_with(b"ELEMENT") {
         let inputid: i32 = (*(*ctxt).input).id;
 
@@ -12209,25 +12209,19 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
         }
         if (*ctxt).content_bytes().starts_with(b"EMPTY") {
             (*ctxt).advance(5);
-            /*
-             * Element must always be empty.
-             */
+            // Element must always be empty.
             ret = XmlElementTypeVal::XmlElementTypeEmpty as i32;
         } else if (*ctxt).current_byte() == b'A'
             && (*ctxt).nth_byte(1) == b'N'
             && (*ctxt).nth_byte(2) == b'Y'
         {
             (*ctxt).advance(3);
-            /*
-             * Element is a generic container.
-             */
+            // Element is a generic container.
             ret = XmlElementTypeVal::XmlElementTypeAny as i32;
         } else if (*ctxt).current_byte() == b'(' {
             ret = xml_parse_element_content_decl(ctxt, name, addr_of_mut!(content));
         } else {
-            /*
-             * [ WFC: PEs in Internal Subset ] error handling.
-             */
+            // [ WFC: PEs in Internal Subset ] error handling.
             if (*ctxt).current_byte() == b'%'
                 && (*ctxt).external == 0
                 && (*ctxt).input_tab.len() == 1
@@ -12271,19 +12265,18 @@ pub(crate) unsafe extern "C" fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -
                 if !content.is_null() {
                     (*content).parent = null_mut();
                 }
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 ((*(*ctxt).sax).element_decl.unwrap())(
                     (*ctxt).user_data.clone(),
-                    name,
+                    &name,
                     ret,
                     content,
                 );
                 if !content.is_null() && (*content).parent.is_null() {
-                    /*
-                     * this is a trick: if xmlAddElementDecl is called,
-                     * instead of copying the full tree it is plugged directly
-                     * if called from the parser. Avoid duplicating the
-                     * interfaces or change the API/ABI
-                     */
+                    // this is a trick: if xmlAddElementDecl is called,
+                    // instead of copying the full tree it is plugged directly
+                    // if called from the parser. Avoid duplicating the
+                    // interfaces or change the API/ABI
                     xml_free_doc_element_content((*ctxt).my_doc, content);
                 }
             } else if !content.is_null() {

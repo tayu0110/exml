@@ -758,7 +758,7 @@ fn attribute_decl_callback(
 #[doc(alias = "elementDeclCallback")]
 fn element_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
+    _name: &str,
     _typ: i32,
     _content: XmlElementContentPtr,
 ) {

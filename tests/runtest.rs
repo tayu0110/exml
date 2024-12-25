@@ -802,27 +802,16 @@ unsafe fn attribute_decl_debug(
     xml_free_enumeration(tree);
 }
 
-/**
- * elementDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the element name
- * @type:  the element type
- * @content: the element value (without processing).
- *
- * An element definition has been parsed
- */
+/// An element definition has been parsed
+#[doc(alias = "elementDeclDebug")]
 unsafe fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     _content: XmlElementContentPtr,
 ) {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.elementDecl({}, {}, ...)",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        typ
-    );
+    sax_debugln!("SAX.elementDecl({name}, {}, ...)", typ);
 }
 
 /// What to do when a notation declaration has been parsed.
