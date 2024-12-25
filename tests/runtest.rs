@@ -782,22 +782,21 @@ unsafe fn attribute_decl_debug(
     name: &str,
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
-    default_value: *const XmlChar,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
     increment_callbacks_counter();
-    if default_value.is_null() {
+    if let Some(default_value) = default_value {
         sax_debugln!(
-            "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
+            "SAX.attributeDecl({elem}, {name}, {}, {}, {default_value}, ...)",
             typ as i32,
             def as i32,
         );
     } else {
         sax_debugln!(
-            "SAX.attributeDecl({elem}, {name}, {}, {}, {}, ...)",
+            "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
             typ as i32,
             def as i32,
-            CStr::from_ptr(default_value as _).to_string_lossy(),
         );
     }
     xml_free_enumeration(tree);

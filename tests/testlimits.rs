@@ -748,7 +748,7 @@ fn attribute_decl_callback(
     _name: &str,
     _typ: XmlAttributeType,
     _def: XmlAttributeDefault,
-    _default_value: *const XmlChar,
+    _default_value: Option<&str>,
     _tree: XmlEnumerationPtr,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));

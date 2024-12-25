@@ -1766,7 +1766,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
     fullname: &str,
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
-    defaultValue: *const XmlChar,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 );
 
@@ -11619,7 +11619,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
 ///
 /// `[53] AttDef ::= S Name S AttType S DefaultDecl`
 #[doc(alias = "xmlParseAttributeListDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
     let elem_name: *const XmlChar;
     let mut attr_name: *const XmlChar;
     let mut tree: XmlEnumerationPtr;
@@ -11728,7 +11728,9 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                         &CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
                         typ,
                         def,
-                        default_value,
+                        (!default_value.is_null())
+                            .then(|| CStr::from_ptr(default_value as *const i8).to_string_lossy())
+                            .as_deref(),
                         tree,
                     );
                 }

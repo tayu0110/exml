@@ -763,7 +763,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     fullname: &str,
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
-    default_value: *const XmlChar,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
     let attr: XmlAttributePtr;

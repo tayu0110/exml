@@ -30739,7 +30739,7 @@ unsafe fn attribute_decl_split(
     name: &str,
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
-    default_value: *const XmlChar,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
     let ctx = ctx.unwrap();

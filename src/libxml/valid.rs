@@ -1848,7 +1848,7 @@ unsafe extern "C" fn xml_validate_nmtoken_value_internal(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeValueInternal")]
 #[cfg(feature = "libxml_valid")]
-unsafe extern "C" fn xml_validate_attribute_value_internal(
+unsafe fn xml_validate_attribute_value_internal(
     doc: XmlDocPtr,
     typ: XmlAttributeType,
     value: *const XmlChar,
@@ -2158,7 +2158,7 @@ pub unsafe fn xml_add_attribute_decl(
     ns: *const XmlChar,
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
-    mut default_value: *const XmlChar,
+    mut default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) -> XmlAttributePtr {
     let mut ret: XmlAttributePtr;
@@ -2196,9 +2196,14 @@ pub unsafe fn xml_add_attribute_decl(
                                                          //     return null_mut();
                                                          // }
         }
-        if !default_value.is_null()
-            && xml_validate_attribute_value_internal((*dtd).doc, typ, default_value) == 0
-        {
+        if let Some(def) = default_value.filter(|&default_value| {
+            let default_value = CString::new(default_value).unwrap();
+            xml_validate_attribute_value_internal(
+                (*dtd).doc,
+                typ,
+                default_value.as_ptr() as *const u8,
+            ) == 0
+        }) {
             xml_err_valid_node(
                 ctxt,
                 dtd as XmlNodePtr,
@@ -2206,13 +2211,9 @@ pub unsafe fn xml_add_attribute_decl(
                 format!("Attribute {elem} of {name}: invalid default value\n").as_str(),
                 Some(elem),
                 Some(name),
-                Some(
-                    CStr::from_ptr(default_value as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                ),
+                Some(def),
             );
-            default_value = null_mut();
+            default_value = None;
             if !ctxt.is_null() {
                 (*ctxt).valid = 0;
             }
@@ -2299,11 +2300,12 @@ pub unsafe fn xml_add_attribute_decl(
     }
     (*ret).def = def;
     (*ret).tree = tree;
-    if !default_value.is_null() {
+    if let Some(default_value) = default_value {
+        let default_value = CString::new(default_value).unwrap();
         if !dict.is_null() {
-            (*ret).default_value = xml_dict_lookup(dict, default_value, -1);
+            (*ret).default_value = xml_dict_lookup(dict, default_value.as_ptr() as *const u8, -1);
         } else {
-            (*ret).default_value = xml_strdup(default_value);
+            (*ret).default_value = xml_strdup(default_value.as_ptr() as *const u8);
         }
     }
 
