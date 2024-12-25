@@ -2966,7 +2966,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     if ent.is_null()
                                         || !matches!(
                                             (*ent).etype,
-                                            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+                                            XmlEntityType::XmlExternalGeneralUnparsedEntity
                                         )
                                     {
                                         ret = 4;

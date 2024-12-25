@@ -29,7 +29,7 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use libc::{memset, size_t, snprintf, strchr};
+use libc::{size_t, snprintf, strchr};
 
 use crate::{
     buf::libxml_api::{
@@ -56,8 +56,9 @@ use super::{chvalid::xml_is_char, dict::XmlDictRef, hash::CVoidWrapper};
 
 /// The different valid entity types.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlEntityType {
+    #[default]
     XmlInternalGeneralEntity = 1,
     XmlExternalGeneralParsedEntity = 2,
     XmlExternalGeneralUnparsedEntity = 3,
@@ -94,6 +95,7 @@ impl TryFrom<i32> for XmlEntityType {
 /// the value and the linkind data needed for the linking in the hash table.
 pub type XmlEntityPtr = *mut XmlEntity;
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlEntity {
     pub(crate) _private: AtomicPtr<c_void>,  /* application data */
     pub(crate) typ: XmlElementType,          /* XML_ENTITY_DECL, must be second ! */
@@ -108,7 +110,7 @@ pub struct XmlEntity {
     pub(crate) orig: AtomicPtr<XmlChar>, /* content without ref substitution */
     pub(crate) content: AtomicPtr<XmlChar>, /* content or ndata if unparsed */
     pub(crate) length: i32,              /* the content length */
-    pub(crate) etype: Option<XmlEntityType>, /* The entity type */
+    pub(crate) etype: XmlEntityType,     /* The entity type */
     pub(crate) external_id: AtomicPtr<XmlChar>, /* External identifier for PUBLIC */
     pub(crate) system_id: AtomicPtr<XmlChar>, /* URI for a SYSTEM or PUBLIC Entity */
 
@@ -190,7 +192,7 @@ unsafe fn xml_entities_err_memory(extra: &str) {
 unsafe fn xml_create_entity(
     dict: XmlDictPtr,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -200,12 +202,12 @@ unsafe fn xml_create_entity(
         xml_entities_err_memory("xmlCreateEntity: malloc failed");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlEntity>());
+    std::ptr::write(&mut *ret, XmlEntity::default());
     (*ret).typ = XmlElementType::XmlEntityDecl;
 
     // fill the structure.
     let name = CString::new(name).unwrap();
-    (*ret).etype = typ.try_into().ok();
+    (*ret).etype = typ;
     if dict.is_null() {
         (*ret).name = AtomicPtr::new(xml_strdup(name.as_ptr() as *const u8) as _);
         if let Some(external_id) = external_id {
@@ -258,7 +260,7 @@ unsafe fn xml_create_entity(
 pub unsafe fn xml_new_entity(
     doc: XmlDocPtr,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -372,7 +374,7 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
 unsafe fn xml_add_entity(
     dtd: XmlDtdPtr,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -388,16 +390,16 @@ unsafe fn xml_add_entity(
         dict = (*(*dtd).doc).dict;
     }
 
-    match XmlEntityType::try_from(typ) {
-        Ok(XmlEntityType::XmlInternalGeneralEntity)
-        | Ok(XmlEntityType::XmlExternalGeneralParsedEntity)
-        | Ok(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+    match typ {
+        XmlEntityType::XmlInternalGeneralEntity
+        | XmlEntityType::XmlExternalGeneralParsedEntity
+        | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
             predef = xml_get_predefined_entity(name);
             if !predef.is_null() {
                 let mut valid: i32 = 0;
 
-                /* 4.6 Predefined Entities */
-                if typ == XmlEntityType::XmlInternalGeneralEntity as i32 {
+                // 4.6 Predefined Entities
+                if typ == XmlEntityType::XmlInternalGeneralEntity {
                     if let Some(content) = content {
                         let c = *(*predef).content.load(Ordering::Relaxed).add(0);
                         if content.as_bytes() == [c]
@@ -437,8 +439,7 @@ unsafe fn xml_add_entity(
             }
             table = (*dtd).entities;
         }
-        Ok(XmlEntityType::XmlInternalParameterEntity)
-        | Ok(XmlEntityType::XmlExternalParameterEntity) => {
+        XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity => {
             if (*dtd).pentities.is_none() {
                 let dict = XmlDictRef::from_raw(dict);
                 let table = XmlHashTable::with_capacity_dict(0, dict);
@@ -446,7 +447,7 @@ unsafe fn xml_add_entity(
             }
             table = (*dtd).pentities;
         }
-        Ok(XmlEntityType::XmlInternalPredefinedEntity) => {
+        XmlEntityType::XmlInternalPredefinedEntity => {
             return null_mut();
         }
         _ => {}
@@ -475,7 +476,7 @@ unsafe fn xml_add_entity(
 pub unsafe fn xml_add_doc_entity(
     doc: XmlDocPtr,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -521,7 +522,7 @@ pub unsafe fn xml_add_doc_entity(
 pub unsafe fn xml_add_dtd_entity(
     doc: XmlDocPtr,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     external_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -575,7 +576,7 @@ static mut XML_ENTITY_LT: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"<".as_ptr() as _),
     content: AtomicPtr::new(c"<".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -597,7 +598,7 @@ static mut XML_ENTITY_GT: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c">".as_ptr() as _),
     content: AtomicPtr::new(c">".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -619,7 +620,7 @@ static mut XML_ENTITY_AMP: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"&".as_ptr() as _),
     content: AtomicPtr::new(c"&".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -641,7 +642,7 @@ static mut XML_ENTITY_QUOT: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"\"".as_ptr() as _),
     content: AtomicPtr::new(c"\"".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -663,7 +664,7 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"'".as_ptr() as _),
     content: AtomicPtr::new(c"'".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -1238,7 +1239,7 @@ extern "C" fn xml_copy_entity(ent: XmlEntityPtr) -> XmlEntityPtr {
             xml_entities_err_memory("xmlCopyEntity:: malloc failed");
             return null_mut();
         }
-        memset(cur as _, 0, size_of::<XmlEntity>());
+        std::ptr::write(&mut *cur, XmlEntity::default());
         (*cur).typ = XmlElementType::XmlEntityDecl;
 
         (*cur).etype = (*ent).etype;
@@ -1362,7 +1363,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
         return;
     }
     match (*ent).etype {
-        Some(XmlEntityType::XmlInternalGeneralEntity) => {
+        XmlEntityType::XmlInternalGeneralEntity => {
             xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             xml_buf_ccat(buf, c" ".as_ptr() as _);
@@ -1373,7 +1374,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+        XmlEntityType::XmlExternalGeneralParsedEntity => {
             xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
@@ -1387,7 +1388,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+        XmlEntityType::XmlExternalGeneralUnparsedEntity => {
             xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
@@ -1410,7 +1411,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlInternalParameterEntity) => {
+        XmlEntityType::XmlInternalParameterEntity => {
             xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             xml_buf_ccat(buf, c" ".as_ptr() as _);
@@ -1421,7 +1422,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlExternalParameterEntity) => {
+        XmlEntityType::XmlExternalParameterEntity => {
             xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {

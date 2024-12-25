@@ -962,10 +962,8 @@ impl XmlParserCtxt {
 
                     // Add to sizeentities when parsing an external entity for the first time.
                     let ent: XmlEntityPtr = (*self.input).entity;
-                    if matches!(
-                        (*ent).etype,
-                        Some(XmlEntityType::XmlExternalParameterEntity)
-                    ) && (*ent).flags & XML_ENT_PARSED as i32 == 0
+                    if matches!((*ent).etype, XmlEntityType::XmlExternalParameterEntity)
+                        && (*ent).flags & XML_ENT_PARSED as i32 == 0
                     {
                         (*ent).flags |= XML_ENT_PARSED as i32;
 
@@ -1745,7 +1743,7 @@ pub type GetParameterEntitySAXFunc =
 pub type EntityDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     public_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -5779,10 +5777,8 @@ pub(crate) unsafe extern "C" fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, 
      */
     consumed = (*input).parent_consumed;
     if entity.is_null()
-        || (matches!(
-            (*entity).etype,
-            Some(XmlEntityType::XmlExternalParameterEntity)
-        ) && (*entity).flags & XML_ENT_PARSED as i32 == 0)
+        || (matches!((*entity).etype, XmlEntityType::XmlExternalParameterEntity)
+            && (*entity).flags & XML_ENT_PARSED as i32 == 0)
     {
         consumed = consumed.saturating_add((*input).consumed);
         consumed = consumed.saturating_add((*input).cur.offset_from((*input).base) as _);
@@ -6146,7 +6142,7 @@ unsafe fn xml_parse_string_entity_ref(
     // unparsed entity
     else if matches!(
         (*ent).etype,
-        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+        XmlEntityType::XmlExternalGeneralUnparsedEntity
     ) {
         xml_fatal_err_msg_str!(
             ctxt,
@@ -6161,10 +6157,8 @@ unsafe fn xml_parse_string_entity_ref(
     else if matches!(
         (*ctxt).instate,
         XmlParserInputState::XmlParserAttributeValue
-    ) && matches!(
-        (*ent).etype,
-        Some(XmlEntityType::XmlExternalGeneralParsedEntity)
-    ) {
+    ) && matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity)
+    {
         xml_fatal_err_msg_str!(
             ctxt,
             XmlParserErrors::XmlErrEntityIsExternal,
@@ -6179,10 +6173,8 @@ unsafe fn xml_parse_string_entity_ref(
     else if matches!(
         (*ctxt).instate,
         XmlParserInputState::XmlParserAttributeValue
-    ) && !matches!(
-        (*ent).etype,
-        Some(XmlEntityType::XmlInternalPredefinedEntity)
-    ) {
+    ) && !matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
+    {
         if (*ent).flags & XML_ENT_CHECKED_LT as i32 == 0 {
             if !(*ent).content.load(Ordering::Relaxed).is_null()
                 && !xml_strchr((*ent).content.load(Ordering::Relaxed), b'<').is_null()
@@ -6203,8 +6195,8 @@ unsafe fn xml_parse_string_entity_ref(
     // Internal check, no parameter entities here ...
     else {
         match (*ent).etype {
-            Some(XmlEntityType::XmlInternalParameterEntity)
-            | Some(XmlEntityType::XmlExternalParameterEntity) => {
+            XmlEntityType::XmlInternalParameterEntity
+            | XmlEntityType::XmlExternalParameterEntity => {
                 xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrEntityIsParameter,
@@ -6334,8 +6326,7 @@ unsafe extern "C" fn xml_parse_string_pereference(
         // Internal checking in case the entity quest barfed
         if !matches!(
             (*entity).etype,
-            Some(XmlEntityType::XmlInternalParameterEntity)
-                | Some(XmlEntityType::XmlExternalParameterEntity)
+            XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity
         ) {
             xml_warning_msg!(
                 ctxt,
@@ -6395,8 +6386,8 @@ unsafe extern "C" fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: Xml
         || entity.is_null()
         || !matches!(
             (*entity).etype,
-            Some(XmlEntityType::XmlExternalParameterEntity)
-                | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
+            XmlEntityType::XmlExternalParameterEntity
+                | XmlEntityType::XmlExternalGeneralParsedEntity
         )
         || !(*entity).content.load(Ordering::Relaxed).is_null()
     {
@@ -6592,10 +6583,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities_int(
                     }
                     ent = xml_parse_string_entity_ref(ctxt, addr_of_mut!(str));
                     if !ent.is_null()
-                        && matches!(
-                            (*ent).etype,
-                            Some(XmlEntityType::XmlInternalPredefinedEntity)
-                        )
+                        && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                     {
                         if !(*ent).content.load(Ordering::Relaxed).is_null() {
                             COPY_BUF!(
@@ -6914,10 +6902,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                     } else {
                         ent = xml_parse_entity_ref(ctxt);
                         if !ent.is_null()
-                            && matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            )
+                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
                             if len + 10 > buf_size {
                                 grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
@@ -6941,10 +6926,7 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                                 len += 1;
                             }
                         } else if !ent.is_null() && (*ctxt).replace_entities != 0 {
-                            if !matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            ) {
+                            if !matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity) {
                                 if xml_parser_entity_check(ctxt, (*ent).length as _) != 0 {
                                     break 'error;
                                 }
@@ -7000,10 +6982,8 @@ unsafe extern "C" fn xml_parse_att_value_complex(
                              * when entities are not substituted. They're
                              * often expanded later.
                              */
-                            if !matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            ) && !(*ent).content.load(Ordering::Relaxed).is_null()
+                            if !matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
+                                && !(*ent).content.load(Ordering::Relaxed).is_null()
                             {
                                 if (*ent).flags & XML_ENT_CHECKED as i32 == 0 {
                                     let old_copy: u64 = (*ctxt).sizeentcopy;
@@ -11316,7 +11296,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         ent(
                             (*ctxt).user_data.clone(),
                             &name,
-                            XmlEntityType::XmlInternalParameterEntity as i32,
+                            XmlEntityType::XmlInternalParameterEntity,
                             None,
                             None,
                             Some(&CStr::from_ptr(value as *const i8).to_string_lossy()),
@@ -11350,7 +11330,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                                 ent(
                                     (*ctxt).user_data.clone(),
                                     &name,
-                                    XmlEntityType::XmlExternalParameterEntity as i32,
+                                    XmlEntityType::XmlExternalParameterEntity,
                                     (!literal.is_null())
                                         .then(|| {
                                             CStr::from_ptr(literal as *const i8).to_string_lossy()
@@ -11374,7 +11354,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     ent(
                         (*ctxt).user_data.clone(),
                         &name,
-                        XmlEntityType::XmlInternalGeneralEntity as i32,
+                        XmlEntityType::XmlInternalGeneralEntity,
                         None,
                         None,
                         (!value.is_null())
@@ -11416,7 +11396,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                 xml_sax2_entity_decl(
                     Some(GenericErrorContext::new(ctxt)),
                     &name,
-                    XmlEntityType::XmlInternalGeneralEntity as i32,
+                    XmlEntityType::XmlInternalGeneralEntity,
                     None,
                     None,
                     (!value.is_null())
@@ -11490,7 +11470,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         ent(
                             (*ctxt).user_data.clone(),
                             &name,
-                            XmlEntityType::XmlExternalGeneralParsedEntity as i32,
+                            XmlEntityType::XmlExternalGeneralParsedEntity,
                             (!literal.is_null())
                                 .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
                                 .as_deref(),
@@ -11536,7 +11516,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     xml_sax2_entity_decl(
                         Some(GenericErrorContext::new(ctxt)),
                         &name,
-                        XmlEntityType::XmlExternalGeneralParsedEntity as i32,
+                        XmlEntityType::XmlExternalGeneralParsedEntity,
                         (!literal.is_null())
                             .then(|| CStr::from_ptr(literal as *const i8).to_string_lossy())
                             .as_deref(),

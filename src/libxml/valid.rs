@@ -4116,7 +4116,7 @@ unsafe fn xml_validate_attribute_value2(
                 ret = 0;
             } else if !matches!(
                 (*ent).etype,
-                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+                XmlEntityType::XmlExternalGeneralUnparsedEntity
             ) {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
@@ -4172,7 +4172,7 @@ unsafe fn xml_validate_attribute_value2(
                     ret = 0;
                 } else if !matches!(
                     (*ent).etype,
-                    Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+                    XmlEntityType::XmlExternalGeneralUnparsedEntity
                 ) {
                     let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     xml_err_valid_node(
@@ -4346,7 +4346,7 @@ extern "C" fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCt
     unsafe {
         if matches!(
             (*cur).etype,
-            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+            XmlEntityType::XmlExternalGeneralUnparsedEntity
         ) {
             let notation: *mut XmlChar = (*cur).content.load(Ordering::Relaxed) as _;
 

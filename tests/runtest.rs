@@ -37,7 +37,7 @@ use exml::{
         XmlInputCallback,
     },
     libxml::{
-        entities::XmlEntityPtr,
+        entities::{XmlEntityPtr, XmlEntityType},
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
         htmlparser::{
             html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
@@ -759,7 +759,7 @@ unsafe fn get_parameter_entity_debug(
 fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     public_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -767,7 +767,7 @@ fn entity_decl_debug(
     increment_callbacks_counter();
     sax_debugln!(
         "SAX.entityDecl({name}, {}, {}, {}, {})",
-        typ,
+        typ as i32,
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
         content.unwrap_or("(null)")

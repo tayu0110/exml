@@ -39,7 +39,7 @@ use exml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
-        entities::{xml_encode_entities_reentrant, XmlEntityPtr},
+        entities::{xml_encode_entities_reentrant, XmlEntityPtr, XmlEntityType},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
@@ -969,7 +969,7 @@ unsafe fn get_parameter_entity_debug(
 unsafe fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: c_int,
+    typ: XmlEntityType,
     mut public_id: Option<&str>,
     mut system_id: Option<&str>,
     mut content: Option<&str>,
@@ -980,7 +980,7 @@ unsafe fn entity_decl_debug(
     }
     println!(
         "SAX.entityDecl({name}, {}, {}, {}, {})",
-        typ,
+        typ as i32,
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
         content.unwrap_or("(null)")

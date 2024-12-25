@@ -19,7 +19,7 @@ use exml::{
     },
     io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
-        entities::XmlEntityPtr,
+        entities::{XmlEntityPtr, XmlEntityType},
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_sax_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
@@ -732,7 +732,7 @@ fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str)
 fn entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: &str,
-    _typ: i32,
+    _typ: XmlEntityType,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
     _content: Option<&str>,

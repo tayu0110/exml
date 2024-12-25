@@ -688,22 +688,22 @@ impl XmlDebugCtxt<'_> {
         }
         if self.check == 0 {
             match ent.etype {
-                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                XmlEntityType::XmlInternalGeneralEntity => {
                     writeln!(self.output, ", internal");
                 }
-                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                XmlEntityType::XmlExternalGeneralParsedEntity => {
                     writeln!(self.output, ", external parsed");
                 }
-                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                     writeln!(self.output, ", unparsed");
                 }
-                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                XmlEntityType::XmlInternalParameterEntity => {
                     writeln!(self.output, ", parameter");
                 }
-                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                XmlEntityType::XmlExternalParameterEntity => {
                     writeln!(self.output, ", external parameter");
                 }
-                Some(XmlEntityType::XmlInternalPredefinedEntity) => {
+                XmlEntityType::XmlInternalPredefinedEntity => {
                     writeln!(self.output, ", predefined");
                 }
                 _ => unreachable!(),
@@ -814,22 +814,22 @@ impl XmlDebugCtxt<'_> {
         };
         if self.check == 0 {
             match ent.etype {
-                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                XmlEntityType::XmlInternalGeneralEntity => {
                     write!(self.output, "INTERNAL_GENERAL_ENTITY ");
                 }
-                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                XmlEntityType::XmlExternalGeneralParsedEntity => {
                     write!(self.output, "EXTERNAL_GENERAL_PARSED_ENTITY ");
                 }
-                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                     write!(self.output, "EXTERNAL_GENERAL_UNPARSED_ENTITY ");
                 }
-                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                XmlEntityType::XmlInternalParameterEntity => {
                     write!(self.output, "INTERNAL_PARAMETER_ENTITY ");
                 }
-                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                XmlEntityType::XmlExternalParameterEntity => {
                     write!(self.output, "EXTERNAL_PARAMETER_ENTITY ");
                 }
-                Some(e) => {
+                e => {
                     write!(self.output, "ENTITY_{} ! ", e as i32);
                 }
                 _ => unreachable!(),
@@ -1327,22 +1327,22 @@ impl XmlDebugCtxt<'_> {
         if self.check == 0 {
             write!(self.output, "{} : ", cur.name().unwrap());
             match cur.etype {
-                Some(XmlEntityType::XmlInternalGeneralEntity) => {
+                XmlEntityType::XmlInternalGeneralEntity => {
                     write!(self.output, "INTERNAL GENERAL, ");
                 }
-                Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+                XmlEntityType::XmlExternalGeneralParsedEntity => {
                     write!(self.output, "EXTERNAL PARSED, ");
                 }
-                Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                     write!(self.output, "EXTERNAL UNPARSED, ");
                 }
-                Some(XmlEntityType::XmlInternalParameterEntity) => {
+                XmlEntityType::XmlInternalParameterEntity => {
                     write!(self.output, "INTERNAL PARAMETER, ");
                 }
-                Some(XmlEntityType::XmlExternalParameterEntity) => {
+                XmlEntityType::XmlExternalParameterEntity => {
                     write!(self.output, "EXTERNAL PARAMETER, ");
                 }
-                Some(e) => {
+                e => {
                     xml_debug_err!(
                         self,
                         XmlParserErrors::XmlCheckEntityType,

@@ -671,12 +671,12 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             return;
         }
         match (*ent).etype {
-            Some(XmlEntityType::XmlInternalParameterEntity)
-            | Some(XmlEntityType::XmlExternalParameterEntity)
-            | Some(XmlEntityType::XmlInternalPredefinedEntity) => return,
-            Some(XmlEntityType::XmlInternalGeneralEntity)
-            | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
-            | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
+            XmlEntityType::XmlInternalParameterEntity
+            | XmlEntityType::XmlExternalParameterEntity
+            | XmlEntityType::XmlInternalPredefinedEntity => return,
+            XmlEntityType::XmlInternalGeneralEntity
+            | XmlEntityType::XmlExternalGeneralParsedEntity
+            | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
             _ => unreachable!(),
         }
         let external_id = (*ent).external_id.load(Ordering::Relaxed);
@@ -685,7 +685,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
         let ret: XmlEntityPtr = xml_add_doc_entity(
             doc,
             &(*ent).name().unwrap(),
-            (*ent).etype.map_or(0, |e| e as i32),
+            (*ent).etype,
             (!external_id.is_null())
                 .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
                 .as_deref(),
@@ -708,12 +708,12 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             if !prev.is_null() {
                 let error = || {
                     match (*ent).etype {
-                        Some(XmlEntityType::XmlInternalParameterEntity)
-                        | Some(XmlEntityType::XmlExternalParameterEntity)
-                        | Some(XmlEntityType::XmlInternalPredefinedEntity)
-                        | Some(XmlEntityType::XmlInternalGeneralEntity)
-                        | Some(XmlEntityType::XmlExternalGeneralParsedEntity) => return,
-                        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
+                        XmlEntityType::XmlInternalParameterEntity
+                        | XmlEntityType::XmlExternalParameterEntity
+                        | XmlEntityType::XmlInternalPredefinedEntity
+                        | XmlEntityType::XmlInternalGeneralEntity
+                        | XmlEntityType::XmlExternalGeneralParsedEntity => return,
+                        XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
                         _ => unreachable!(),
                     }
                     xml_xinclude_err!(

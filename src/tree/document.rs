@@ -252,10 +252,7 @@ impl XmlDoc {
                             CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
                         );
                         if ent.is_null()
-                            && matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            )
+                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
                             if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
                                 // goto out;
@@ -548,10 +545,7 @@ impl XmlDoc {
                             CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
                         );
                         if !ent.is_null()
-                            && matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            )
+                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
                             if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
                                 // goto out;

@@ -148,6 +148,8 @@ use crate::{
     uri::build_uri,
 };
 
+use super::entities::XmlEntityType;
+
 /// This error codes are obsolete; not used any more.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30711,7 +30713,7 @@ unsafe fn get_parameter_entity_split(ctx: Option<GenericErrorContext>, name: &st
 unsafe fn entity_decl_split(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     public_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,

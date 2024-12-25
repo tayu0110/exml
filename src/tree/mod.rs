@@ -1882,16 +1882,16 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         if matches!((*cur).element_type(), XmlElementType::XmlEntityDecl) {
             let tmp: XmlEntityPtr = cur as _;
             match (*tmp).etype {
-                Some(XmlEntityType::XmlInternalGeneralEntity)
-                | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
-                | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                XmlEntityType::XmlInternalGeneralEntity
+                | XmlEntityType::XmlExternalGeneralParsedEntity
+                | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                     q = (*ret).get_entity((*tmp).name.load(Ordering::Relaxed)) as _;
                 }
-                Some(XmlEntityType::XmlInternalParameterEntity)
-                | Some(XmlEntityType::XmlExternalParameterEntity) => {
+                XmlEntityType::XmlInternalParameterEntity
+                | XmlEntityType::XmlExternalParameterEntity => {
                     q = (*ret).get_parameter_entity((*tmp).name.load(Ordering::Relaxed)) as _;
                 }
-                Some(XmlEntityType::XmlInternalPredefinedEntity) => {}
+                XmlEntityType::XmlInternalPredefinedEntity => {}
                 _ => unreachable!(),
             }
         } else if matches!((*cur).element_type(), XmlElementType::XmlElementDecl) {

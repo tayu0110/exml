@@ -594,7 +594,7 @@ macro_rules! xml_warn_msg {
 pub unsafe fn xml_sax2_entity_decl(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: XmlEntityType,
     public_id: Option<&str>,
     system_id: Option<&str>,
     content: Option<&str>,
@@ -1014,7 +1014,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         ent = xml_add_doc_entity(
             (*ctxt).my_doc,
             name,
-            XmlEntityType::XmlExternalGeneralUnparsedEntity as i32,
+            XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
             system_id,
             notation_name,
@@ -1055,7 +1055,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
         ent = xml_add_dtd_entity(
             (*ctxt).my_doc,
             name,
-            XmlEntityType::XmlExternalGeneralUnparsedEntity as i32,
+            XmlEntityType::XmlExternalGeneralUnparsedEntity,
             public_id,
             system_id,
             notation_name,
