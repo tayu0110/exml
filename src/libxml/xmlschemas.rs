@@ -142,8 +142,8 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
-        XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
+        XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -30738,7 +30738,7 @@ unsafe fn attribute_decl_split(
     elem: &str,
     name: &str,
     typ: XmlAttributeType,
-    def: i32,
+    def: XmlAttributeDefault,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {

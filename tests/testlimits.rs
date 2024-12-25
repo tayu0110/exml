@@ -33,8 +33,8 @@ use exml::{
         xmlstring::XmlChar,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlEnumerationPtr,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
+        XmlElementContentPtr, XmlElementType, XmlEnumerationPtr,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -747,7 +747,7 @@ fn attribute_decl_callback(
     _elem: &str,
     _name: &str,
     _typ: XmlAttributeType,
-    _def: i32,
+    _def: XmlAttributeDefault,
     _default_value: *const XmlChar,
     _tree: XmlEnumerationPtr,
 ) {

@@ -2609,25 +2609,23 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
 /// returns: XML_ATTRIBUTE_NONE, XML_ATTRIBUTE_REQUIRED, XML_ATTRIBUTE_IMPLIED
 ///  or XML_ATTRIBUTE_FIXED.
 #[doc(alias = "xmlParseDefaultDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_default_decl(
+pub(crate) unsafe fn xml_parse_default_decl(
     ctxt: XmlParserCtxtPtr,
     value: *mut *mut XmlChar,
-) -> i32 {
-    let mut val: i32;
-
+) -> XmlAttributeDefault {
     *value = null_mut();
     if (*ctxt).content_bytes().starts_with(b"#REQUIRED") {
         (*ctxt).advance(9);
-        return XmlAttributeDefault::XmlAttributeRequired as i32;
+        return XmlAttributeDefault::XmlAttributeRequired;
     }
     if (*ctxt).content_bytes().starts_with(b"#IMPLIED") {
         (*ctxt).advance(8);
-        return XmlAttributeDefault::XmlAttributeImplied as i32;
+        return XmlAttributeDefault::XmlAttributeImplied;
     }
-    val = XmlAttributeDefault::XmlAttributeNone as i32;
+    let mut val = XmlAttributeDefault::XmlAttributeNone;
     if (*ctxt).content_bytes().starts_with(b"#FIXED") {
         (*ctxt).advance(6);
-        val = XmlAttributeDefault::XmlAttributeFixed as i32;
+        val = XmlAttributeDefault::XmlAttributeFixed;
         if (*ctxt).skip_blanks() == 0 {
             xml_fatal_err_msg(
                 ctxt,

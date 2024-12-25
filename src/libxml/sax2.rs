@@ -762,7 +762,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     elem: &str,
     fullname: &str,
     typ: XmlAttributeType,
-    def: i32,
+    def: XmlAttributeDefault,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
@@ -805,7 +805,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             prefix,
             typ,
-            XmlAttributeDefault::try_from(def).unwrap(),
+            def,
             default_value,
             tree,
         );
@@ -817,7 +817,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             prefix,
             typ,
-            XmlAttributeDefault::try_from(def).unwrap(),
+            def,
             default_value,
             tree,
         );

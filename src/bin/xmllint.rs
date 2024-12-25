@@ -93,8 +93,8 @@ use exml::{
     },
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
-        NodeCommon, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlEnumerationPtr, XmlNodePtr,
+        NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
+        XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     SYSCONFDIR,
@@ -995,7 +995,7 @@ unsafe fn attribute_decl_debug(
     elem: &str,
     name: &str,
     typ: XmlAttributeType,
-    def: c_int,
+    def: XmlAttributeDefault,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
 ) {
@@ -1006,13 +1006,13 @@ unsafe fn attribute_decl_debug(
     if default_value.is_null() {
         println!(
             "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
-            typ as i32, def
+            typ as i32, def as i32
         );
     } else {
         println!(
             "SAX.attributeDecl({elem}, {name}, {}, {}, {}, ...)",
             typ as i32,
-            def,
+            def as i32,
             CStr::from_ptr(default_value as _).to_string_lossy()
         );
     }

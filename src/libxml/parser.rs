@@ -1765,7 +1765,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
     elem: &str,
     fullname: &str,
     typ: XmlAttributeType,
-    def: i32,
+    def: XmlAttributeDefault,
     defaultValue: *const XmlChar,
     tree: XmlEnumerationPtr,
 );
@@ -11695,16 +11695,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                 break;
             }
 
-            let def: i32 = xml_parse_default_decl(ctxt, addr_of_mut!(default_value));
-            if def <= 0 {
-                if !default_value.is_null() {
-                    xml_free(default_value as _);
-                }
-                if !tree.is_null() {
-                    xml_free_enumeration(tree);
-                }
-                break;
-            }
+            let def = xml_parse_default_decl(ctxt, addr_of_mut!(default_value));
             if typ != XmlAttributeType::XmlAttributeCDATA && !default_value.is_null() {
                 xml_attr_normalize_space(default_value, default_value);
             }
@@ -11747,8 +11738,8 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
 
             if (*ctxt).sax2 != 0
                 && !default_value.is_null()
-                && def != XmlAttributeDefault::XmlAttributeImplied as i32
-                && def != XmlAttributeDefault::XmlAttributeRequired as i32
+                && def != XmlAttributeDefault::XmlAttributeImplied
+                && def != XmlAttributeDefault::XmlAttributeRequired
             {
                 xml_add_def_attrs(ctxt, elem_name, attr_name, default_value);
             }
