@@ -769,7 +769,7 @@ fn element_decl_callback(
 #[doc(alias = "notationDeclCallback")]
 fn notation_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
+    _name: &str,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
 ) {

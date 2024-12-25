@@ -336,16 +336,13 @@ unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
 pub unsafe fn xml_add_notation_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
-    name: *const XmlChar,
+    name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) -> XmlNotationPtr {
     let mut table: XmlNotationTablePtr;
 
     if dtd.is_null() {
-        return null_mut();
-    }
-    if name.is_null() {
         return null_mut();
     }
     if public_id.is_none() && system_id.is_none() {
@@ -377,11 +374,7 @@ pub unsafe fn xml_add_notation_decl(
     std::ptr::write(&mut *ret, XmlNotation::default());
 
     // fill the structure.
-    (*ret).name = Some(
-        CStr::from_ptr(name as *const i8)
-            .to_string_lossy()
-            .into_owned(),
-    );
+    (*ret).name = Some(name.to_owned());
     if let Some(system_id) = system_id {
         (*ret).system_id = Some(system_id.to_owned());
     }
@@ -391,7 +384,8 @@ pub unsafe fn xml_add_notation_decl(
 
     // Validity Check:
     // Check the DTD for previous declarations of the ATTLIST
-    if xml_hash_add_entry(table, name, ret as _) != 0 {
+    let name = CString::new(name).unwrap();
+    if xml_hash_add_entry(table, name.as_ptr() as *const u8, ret as _) != 0 {
         #[cfg(feature = "libxml_valid")]
         {
             xml_err_valid!(

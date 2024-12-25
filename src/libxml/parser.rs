@@ -1753,7 +1753,7 @@ pub type EntityDeclSAXFunc = unsafe fn(
 #[doc(alias = "notationDeclSAXFunc")]
 pub type NotationDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 );
@@ -11150,8 +11150,8 @@ pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotStarted, None);
             return;
         }
-        if !xml_strchr(name, b':').is_null() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        if name.contains(':') {
             xml_ns_err!(
                 ctxt,
                 XmlParserErrors::XmlNsErrColon,
@@ -11185,7 +11185,7 @@ pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
                 if let Some(not) = (*(*ctxt).sax).notation_decl {
                     not(
                         (*ctxt).user_data.clone(),
-                        name,
+                        &name,
                         (!pubid.is_null())
                             .then(|| CStr::from_ptr(pubid as *const i8).to_string_lossy())
                             .as_deref(),

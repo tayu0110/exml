@@ -30780,7 +30780,7 @@ unsafe fn element_decl_split(
 
 unsafe fn notation_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) {

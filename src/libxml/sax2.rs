@@ -923,7 +923,7 @@ pub unsafe fn xml_sax2_element_decl(
 #[doc(alias = "xmlSAX2NotationDecl")]
 pub unsafe fn xml_sax2_notation_decl(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) {
@@ -942,7 +942,6 @@ pub unsafe fn xml_sax2_notation_decl(
     }
 
     if public_id.is_none() && system_id.is_none() {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,
@@ -967,7 +966,6 @@ pub unsafe fn xml_sax2_notation_decl(
             system_id,
         );
     } else {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,

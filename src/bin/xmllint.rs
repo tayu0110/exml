@@ -1051,7 +1051,7 @@ unsafe fn element_decl_debug(
 #[doc(alias = "notationDeclDebug")]
 unsafe fn notation_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) {
@@ -1060,8 +1060,7 @@ unsafe fn notation_decl_debug(
         return;
     }
     println!(
-        "SAX.notationDecl({}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
+        "SAX.notationDecl({name}, {}, {})",
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
     );
