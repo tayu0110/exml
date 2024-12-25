@@ -30737,7 +30737,7 @@ unsafe fn attribute_decl_split(
     ctx: Option<GenericErrorContext>,
     elem: &str,
     name: &str,
-    typ: i32,
+    typ: XmlAttributeType,
     def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,

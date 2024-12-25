@@ -761,7 +761,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     ctx: Option<GenericErrorContext>,
     elem: &str,
     fullname: &str,
-    typ: i32,
+    typ: XmlAttributeType,
     def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
@@ -782,7 +782,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         return;
     }
 
-    if fullname == "xml:id" && typ != XmlAttributeType::XmlAttributeID as i32 {
+    if fullname == "xml:id" && typ != XmlAttributeType::XmlAttributeID {
         // Raise the error but keep the validity flag
         let tmp: i32 = (*ctxt).valid;
         xml_err_valid!(
@@ -804,7 +804,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             elem,
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             prefix,
-            XmlAttributeType::try_from(typ).unwrap(),
+            typ,
             XmlAttributeDefault::try_from(def).unwrap(),
             default_value,
             tree,
@@ -816,7 +816,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             elem,
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
             prefix,
-            XmlAttributeType::try_from(typ).unwrap(),
+            typ,
             XmlAttributeDefault::try_from(def).unwrap(),
             default_value,
             tree,

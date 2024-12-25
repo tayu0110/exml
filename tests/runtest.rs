@@ -66,8 +66,8 @@ use exml::{
         xmlstring::XmlChar,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr, XmlNodePtr,
+        xml_free_doc, NodeCommon, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementContentPtr,
+        XmlElementType, XmlEnumerationPtr, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -780,7 +780,7 @@ unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
     elem: &str,
     name: &str,
-    typ: i32,
+    typ: XmlAttributeType,
     def: i32,
     default_value: *const XmlChar,
     tree: XmlEnumerationPtr,
@@ -789,13 +789,13 @@ unsafe fn attribute_decl_debug(
     if default_value.is_null() {
         sax_debugln!(
             "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
-            typ,
+            typ as i32,
             def,
         );
     } else {
         sax_debugln!(
             "SAX.attributeDecl({elem}, {name}, {}, {}, {}, ...)",
-            typ,
+            typ as i32,
             def,
             CStr::from_ptr(default_value as _).to_string_lossy(),
         );

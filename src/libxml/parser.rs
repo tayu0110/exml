@@ -1764,7 +1764,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     elem: &str,
     fullname: &str,
-    typ: i32,
+    typ: XmlAttributeType,
     def: i32,
     defaultValue: *const XmlChar,
     tree: XmlEnumerationPtr,
@@ -11735,7 +11735,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                             .to_string_lossy()
                             .as_ref(),
                         &CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
-                        typ as i32,
+                        typ,
                         def,
                         default_value,
                         tree,
