@@ -3298,14 +3298,13 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl(
 ///
 /// returns: the type of element content XML_ELEMENT_TYPE_xxx
 #[doc(alias = "xmlParseElementContentDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
+pub(crate) unsafe fn xml_parse_element_content_decl(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
     result: *mut XmlElementContentPtr,
-) -> i32 {
+) -> Option<XmlElementTypeVal> {
     let tree: XmlElementContentPtr;
     let inputid: i32 = (*(*ctxt).input).id;
-    let res: i32;
 
     *result = null_mut();
 
@@ -3317,24 +3316,24 @@ pub(crate) unsafe extern "C" fn xml_parse_element_content_decl(
             "xmlParseElementContentDecl : {} '(' expected\n",
             name
         );
-        return -1;
+        return None;
     }
     (*ctxt).skip_char();
     (*ctxt).grow();
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        return -1;
+        return None;
     }
     (*ctxt).skip_blanks();
-    if (*ctxt).content_bytes().starts_with(b"#PCDATA") {
+    let res = if (*ctxt).content_bytes().starts_with(b"#PCDATA") {
         tree = xml_parse_element_mixed_content_decl(ctxt, inputid);
-        res = XmlElementTypeVal::XmlElementTypeMixed as i32;
+        XmlElementTypeVal::XmlElementTypeMixed
     } else {
         tree = xml_parse_element_children_content_decl_priv(ctxt, inputid, 1);
-        res = XmlElementTypeVal::XmlElementTypeElement as i32;
-    }
+        XmlElementTypeVal::XmlElementTypeElement
+    };
     (*ctxt).skip_blanks();
     *result = tree;
-    res
+    Some(res)
 }
 
 /// Parse an entitiy reference. Always consumes '&'.

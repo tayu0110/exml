@@ -67,7 +67,7 @@ use exml::{
     },
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlEnumerationPtr, XmlNodePtr,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -807,11 +807,14 @@ unsafe fn attribute_decl_debug(
 unsafe fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
 ) {
     increment_callbacks_counter();
-    sax_debugln!("SAX.elementDecl({name}, {}, ...)", typ);
+    sax_debugln!(
+        "SAX.elementDecl({name}, {}, ...)",
+        typ.map_or(-1, |t| t as i32)
+    );
 }
 
 /// What to do when a notation declaration has been parsed.

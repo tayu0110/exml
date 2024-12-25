@@ -143,7 +143,8 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -30766,7 +30767,7 @@ unsafe fn attribute_decl_split(
 unsafe fn element_decl_split(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) {
     let ctx = ctx.unwrap();

@@ -94,7 +94,7 @@ use exml::{
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
         NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
+        XmlElementContentPtr, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     SYSCONFDIR,
@@ -1022,14 +1022,17 @@ unsafe fn attribute_decl_debug(
 unsafe fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: c_int,
+    typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!("SAX.elementDecl({name}, {}, ...)", typ);
+    println!(
+        "SAX.elementDecl({name}, {}, ...)",
+        typ.map_or(-1, |t| t as i32)
+    );
 }
 
 /// What to do when a notation declaration has been parsed.

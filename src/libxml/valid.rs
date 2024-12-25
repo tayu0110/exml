@@ -996,7 +996,7 @@ pub unsafe fn xml_add_element_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
     mut name: &str,
-    typ: XmlElementTypeVal,
+    typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) -> XmlElementPtr {
     let mut ret: XmlElementPtr;
@@ -1008,7 +1008,7 @@ pub unsafe fn xml_add_element_decl(
     }
 
     match typ {
-        XmlElementTypeVal::XmlElementTypeEmpty => {
+        Some(XmlElementTypeVal::XmlElementTypeEmpty) => {
             if !content.is_null() {
                 xml_err_valid!(
                     ctxt,
@@ -1018,7 +1018,7 @@ pub unsafe fn xml_add_element_decl(
                 return null_mut();
             }
         }
-        XmlElementTypeVal::XmlElementTypeAny => {
+        Some(XmlElementTypeVal::XmlElementTypeAny) => {
             if !content.is_null() {
                 xml_err_valid!(
                     ctxt,
@@ -1028,7 +1028,7 @@ pub unsafe fn xml_add_element_decl(
                 return null_mut();
             }
         }
-        XmlElementTypeVal::XmlElementTypeMixed => {
+        Some(XmlElementTypeVal::XmlElementTypeMixed) => {
             if content.is_null() {
                 xml_err_valid!(
                     ctxt,
@@ -1038,7 +1038,7 @@ pub unsafe fn xml_add_element_decl(
                 return null_mut();
             }
         }
-        XmlElementTypeVal::XmlElementTypeElement => {
+        Some(XmlElementTypeVal::XmlElementTypeElement) => {
             if content.is_null() {
                 xml_err_valid!(
                     ctxt,
@@ -1178,7 +1178,7 @@ pub unsafe fn xml_add_element_decl(
     }
 
     // Finish to fill the structure.
-    (*ret).etype = typ;
+    (*ret).etype = typ.unwrap();
     // Avoid a stupid copy when called by the parser
     // and flag it by setting a special parent value
     // so the parser doesn't unallocate it.

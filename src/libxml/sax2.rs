@@ -860,7 +860,7 @@ pub unsafe fn xml_sax2_attribute_decl(
 pub unsafe fn xml_sax2_element_decl(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) {
     let elem: XmlElementPtr;
@@ -882,7 +882,7 @@ pub unsafe fn xml_sax2_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).int_subset,
             name,
-            XmlElementTypeVal::try_from(typ).unwrap(),
+            typ,
             content,
         );
     } else if (*ctxt).in_subset == 2 {
@@ -890,7 +890,7 @@ pub unsafe fn xml_sax2_element_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).ext_subset,
             name,
-            XmlElementTypeVal::try_from(typ).unwrap(),
+            typ,
             content,
         );
     } else {

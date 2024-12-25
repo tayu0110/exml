@@ -1775,7 +1775,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
 pub type ElementDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: &str,
-    typ: i32,
+    typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 );
 
@@ -12170,11 +12170,10 @@ pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl_priv(
 #[doc(alias = "xmlParseElementDecl")]
 pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
-    let mut ret: i32 = -1;
     let mut content: XmlElementContentPtr = null_mut();
 
     if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'!' {
-        return ret;
+        return -1;
     }
     (*ctxt).advance(2);
 
@@ -12207,19 +12206,19 @@ pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
                 "Space required after the element name\n",
             );
         }
-        if (*ctxt).content_bytes().starts_with(b"EMPTY") {
+        let ret = if (*ctxt).content_bytes().starts_with(b"EMPTY") {
             (*ctxt).advance(5);
             // Element must always be empty.
-            ret = XmlElementTypeVal::XmlElementTypeEmpty as i32;
+            Some(XmlElementTypeVal::XmlElementTypeEmpty)
         } else if (*ctxt).current_byte() == b'A'
             && (*ctxt).nth_byte(1) == b'N'
             && (*ctxt).nth_byte(2) == b'Y'
         {
             (*ctxt).advance(3);
             // Element is a generic container.
-            ret = XmlElementTypeVal::XmlElementTypeAny as i32;
+            Some(XmlElementTypeVal::XmlElementTypeAny)
         } else if (*ctxt).current_byte() == b'(' {
-            ret = xml_parse_element_content_decl(ctxt, name, addr_of_mut!(content));
+            xml_parse_element_content_decl(ctxt, name, addr_of_mut!(content))
         } else {
             // [ WFC: PEs in Internal Subset ] error handling.
             if (*ctxt).current_byte() == b'%'
@@ -12239,7 +12238,7 @@ pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
                 );
             }
             return -1;
-        }
+        };
 
         (*ctxt).skip_blanks();
 
@@ -12283,8 +12282,9 @@ pub(crate) unsafe fn xml_parse_element_decl(ctxt: XmlParserCtxtPtr) -> i32 {
                 xml_free_doc_element_content((*ctxt).my_doc, content);
             }
         }
+        return ret.map_or(-1, |ret| ret as i32);
     }
-    ret
+    -1
 }
 
 /// Parse markup declarations. Always consumes '<!' or '<?'.
