@@ -745,7 +745,7 @@ fn entity_decl_callback(
 fn attribute_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _elem: &str,
-    _name: *const XmlChar,
+    _name: &str,
     _typ: i32,
     _def: i32,
     _default_value: *const XmlChar,

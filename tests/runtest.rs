@@ -779,7 +779,7 @@ fn entity_decl_debug(
 unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
     elem: &str,
-    name: *const XmlChar,
+    name: &str,
     typ: i32,
     def: i32,
     default_value: *const XmlChar,
@@ -788,15 +788,13 @@ unsafe fn attribute_decl_debug(
     increment_callbacks_counter();
     if default_value.is_null() {
         sax_debugln!(
-            "SAX.attributeDecl({elem}, {}, {}, {}, NULL, ...)",
-            CStr::from_ptr(name as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
             typ,
             def,
         );
     } else {
         sax_debugln!(
-            "SAX.attributeDecl({elem}, {}, {}, {}, {}, ...)",
-            CStr::from_ptr(name as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {name}, {}, {}, {}, ...)",
             typ,
             def,
             CStr::from_ptr(default_value as _).to_string_lossy(),

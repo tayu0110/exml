@@ -760,7 +760,7 @@ macro_rules! xml_err_valid {
 pub unsafe fn xml_sax2_attribute_decl(
     ctx: Option<GenericErrorContext>,
     elem: &str,
-    fullname: *const XmlChar,
+    fullname: &str,
     typ: i32,
     def: i32,
     default_value: *const XmlChar,
@@ -782,9 +782,7 @@ pub unsafe fn xml_sax2_attribute_decl(
         return;
     }
 
-    if xml_str_equal(fullname, c"xml:id".as_ptr() as _)
-        && typ != XmlAttributeType::XmlAttributeID as i32
-    {
+    if fullname == "xml:id" && typ != XmlAttributeType::XmlAttributeID as i32 {
         // Raise the error but keep the validity flag
         let tmp: i32 = (*ctxt).valid;
         xml_err_valid!(
@@ -795,7 +793,9 @@ pub unsafe fn xml_sax2_attribute_decl(
         (*ctxt).valid = tmp;
     }
     // TODO: optimize name/prefix allocation
-    let name: *mut XmlChar = xml_split_qname(ctxt, fullname, &raw mut prefix as _);
+    let fullname = CString::new(fullname).unwrap();
+    let name: *mut XmlChar =
+        xml_split_qname(ctxt, fullname.as_ptr() as *const u8, &raw mut prefix as _);
     (*ctxt).vctxt.valid = 1;
     if (*ctxt).in_subset == 1 {
         attr = xml_add_attribute_decl(

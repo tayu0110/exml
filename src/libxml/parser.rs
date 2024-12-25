@@ -1763,7 +1763,7 @@ pub type NotationDeclSAXFunc = unsafe fn(
 pub type AttributeDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     elem: &str,
-    fullname: *const XmlChar,
+    fullname: &str,
     typ: i32,
     def: i32,
     defaultValue: *const XmlChar,
@@ -11734,7 +11734,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute_list_decl(ctxt: XmlParserCtx
                         CStr::from_ptr(elem_name as *const i8)
                             .to_string_lossy()
                             .as_ref(),
-                        attr_name,
+                        &CStr::from_ptr(attr_name as *const i8).to_string_lossy(),
                         typ as i32,
                         def,
                         default_value,
