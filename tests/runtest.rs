@@ -756,26 +756,21 @@ unsafe fn get_parameter_entity_debug(
 
 /// An entity definition has been parsed
 #[doc(alias = "entityDeclDebug")]
-unsafe fn entity_decl_debug(
+fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     typ: i32,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    mut content: *mut XmlChar,
+    content: Option<&str>,
 ) {
-    let nullstr: *const XmlChar = c"(null)".as_ptr() as _;
-    /* not all libraries handle printing null pointers nicely */
-    if content.is_null() {
-        content = nullstr as *mut XmlChar;
-    }
     increment_callbacks_counter();
     sax_debugln!(
         "SAX.entityDecl({name}, {}, {}, {}, {})",
         typ,
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
-        CStr::from_ptr(content as _).to_string_lossy(),
+        content.unwrap_or("(null)")
     );
 }
 
@@ -859,24 +854,19 @@ unsafe fn notation_decl_debug(
 
 /// What to do when an unparsed entity declaration is parsed
 #[doc(alias = "unparsedEntityDeclDebug")]
-unsafe fn unparsed_entity_decl_debug(
+fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    mut notation_name: *const XmlChar,
+    notation_name: Option<&str>,
 ) {
-    let nullstr: *const XmlChar = c"(null)".as_ptr() as _;
-
-    if notation_name.is_null() {
-        notation_name = nullstr;
-    }
     increment_callbacks_counter();
     sax_debugln!(
         "SAX.unparsedEntityDecl({name}, {}, {}, {})",
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
-        CStr::from_ptr(notation_name as *mut c_char).to_string_lossy()
+        notation_name.unwrap_or("(null)")
     );
 }
 
@@ -1121,15 +1111,8 @@ fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     sax_debug!("SAX.error: {}", msg);
 }
 
-/**
- * fatalErrorDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a fatalError messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a fatalError messages, gives file, line, position and extra parameters.
+#[doc(alias = "fatalErrorDebug")]
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
     sax_debug!("SAX.fatalError: {msg}");

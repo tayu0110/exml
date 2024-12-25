@@ -972,13 +972,8 @@ unsafe fn entity_decl_debug(
     typ: c_int,
     mut public_id: Option<&str>,
     mut system_id: Option<&str>,
-    mut content: *mut XmlChar,
+    mut content: Option<&str>,
 ) {
-    let nullstr: &CStr = c"(null)";
-    /* not all libraries handle printing null pointers nicely */
-    if content.is_null() {
-        content = nullstr.as_ptr() as _;
-    }
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
@@ -988,7 +983,7 @@ unsafe fn entity_decl_debug(
         typ,
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
-        CStr::from_ptr(content as _).to_string_lossy()
+        content.unwrap_or("(null)")
     );
 }
 
@@ -1086,13 +1081,8 @@ unsafe fn unparsed_entity_decl_debug(
     name: &str,
     mut public_id: Option<&str>,
     mut system_id: Option<&str>,
-    mut notation_name: *const XmlChar,
+    mut notation_name: Option<&str>,
 ) {
-    let nullstr: &CStr = c"(null)";
-
-    if notation_name.is_null() {
-        notation_name = nullstr.as_ptr() as _;
-    }
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
@@ -1101,7 +1091,7 @@ unsafe fn unparsed_entity_decl_debug(
         "SAX.unparsedEntityDecl({name}, {}, {}, {})",
         public_id.unwrap_or("(null)"),
         system_id.unwrap_or("(null)"),
-        CStr::from_ptr(notation_name as _).to_string_lossy()
+        notation_name.unwrap_or("(null)")
     );
 }
 

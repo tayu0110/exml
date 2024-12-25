@@ -681,6 +681,7 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
         }
         let external_id = (*ent).external_id.load(Ordering::Relaxed);
         let system_id = (*ent).system_id.load(Ordering::Relaxed);
+        let content = (*ent).content.load(Ordering::Relaxed);
         let ret: XmlEntityPtr = xml_add_doc_entity(
             doc,
             &(*ent).name().unwrap(),
@@ -691,7 +692,9 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             (!system_id.is_null())
                 .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
                 .as_deref(),
-            (*ent).content.load(Ordering::Relaxed),
+            (!content.is_null())
+                .then(|| CStr::from_ptr(content as *const i8).to_string_lossy())
+                .as_deref(),
         );
         if !ret.is_null() {
             if !(*ent).uri.load(Ordering::Relaxed).is_null() {

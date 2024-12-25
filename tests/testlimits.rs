@@ -735,7 +735,7 @@ fn entity_decl_callback(
     _typ: i32,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
-    _content: *mut XmlChar,
+    _content: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -783,7 +783,7 @@ fn unparsed_entity_decl_callback(
     _name: &str,
     _public_id: Option<&str>,
     _system_id: Option<&str>,
-    _notation_name: *const XmlChar,
+    _notation_name: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

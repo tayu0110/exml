@@ -44,10 +44,7 @@ use crate::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xml_free, xml_malloc},
         hash::{xml_hash_create, xml_hash_scan, XmlHashTable},
-        xmlstring::{
-            xml_str_equal, xml_strcasecmp, xml_strchr, xml_strdup, xml_strlen, xml_strndup,
-            xml_strstr, XmlChar,
-        },
+        xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
     tree::{
         xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
@@ -196,7 +193,7 @@ unsafe fn xml_create_entity(
     typ: i32,
     external_id: Option<&str>,
     system_id: Option<&str>,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     let ret: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
     if ret.is_null() {
@@ -234,9 +231,10 @@ unsafe fn xml_create_entity(
             (*ret).system_id = AtomicPtr::new(null_mut());
         }
     }
-    if !content.is_null() {
-        (*ret).length = xml_strlen(content);
-        (*ret).content = AtomicPtr::new(xml_strndup(content, (*ret).length));
+    if let Some(content) = content {
+        (*ret).length = content.len() as i32;
+        let content = CString::new(content).unwrap();
+        (*ret).content = AtomicPtr::new(xml_strndup(content.as_ptr() as *const u8, (*ret).length));
     } else {
         (*ret).length = 0;
         (*ret).content = AtomicPtr::new(null_mut());
@@ -263,7 +261,7 @@ pub unsafe fn xml_new_entity(
     typ: i32,
     external_id: Option<&str>,
     system_id: Option<&str>,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     if !doc.is_null() && !(*doc).int_subset.is_null() {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
@@ -377,7 +375,7 @@ unsafe fn xml_add_entity(
     typ: i32,
     external_id: Option<&str>,
     system_id: Option<&str>,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     let mut dict: XmlDictPtr = null_mut();
     let mut table = None;
@@ -399,29 +397,26 @@ unsafe fn xml_add_entity(
                 let mut valid: i32 = 0;
 
                 /* 4.6 Predefined Entities */
-                if typ == XmlEntityType::XmlInternalGeneralEntity as i32 && !content.is_null() {
-                    let c: i32 = *(*predef).content.load(Ordering::Relaxed).add(0) as _;
-
-                    if (*content.add(0) as i32 == c && *content.add(1) == 0)
-                        && (c == b'>' as i32 || c == b'\'' as i32 || c == b'"' as i32)
-                    {
-                        valid = 1;
-                    } else if *content.add(0) == b'&' && *content.add(1) == b'#' {
-                        if *content.add(2) == b'x' {
-                            let hex: *mut XmlChar = c"0123456789ABCDEF".as_ptr() as _;
-                            let refe = [
-                                *hex.add(c as usize / 16 % 16),
-                                *hex.add(c as usize % 16),
-                                b';',
-                                0,
-                            ];
-                            if xml_strcasecmp(content.add(3) as _, refe.as_ptr()) == 0 {
-                                valid = 1;
-                            }
-                        } else {
-                            let refe = [b'0' + (c / 10 % 10) as u8, b'0' + (c % 10) as u8, b';', 0];
-                            if xml_str_equal(content.add(2) as _, refe.as_ptr()) {
-                                valid = 1;
+                if typ == XmlEntityType::XmlInternalGeneralEntity as i32 {
+                    if let Some(content) = content {
+                        let c = *(*predef).content.load(Ordering::Relaxed).add(0);
+                        if content.as_bytes() == [c]
+                            && (content == ">" || content == "\'" || content == "\"")
+                        {
+                            valid = 1;
+                        } else if let Some(content) = content.strip_prefix("&#") {
+                            if content.starts_with('x') {
+                                let hex = b"0123456789ABCDEF";
+                                let refe = [hex[c as usize >> 4], hex[c as usize & 0xF], b';'];
+                                if content.as_bytes()[1..].eq_ignore_ascii_case(&refe) {
+                                    valid = 1;
+                                }
+                            } else {
+                                let refe =
+                                    [b'0' + (c / 10 % 10) as u8, b'0' + (c % 10) as u8, b';'];
+                                if content.as_bytes() == refe {
+                                    valid = 1;
+                                }
                             }
                         }
                     }
@@ -483,7 +478,7 @@ pub unsafe fn xml_add_doc_entity(
     typ: i32,
     external_id: Option<&str>,
     system_id: Option<&str>,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     if doc.is_null() {
         xml_entities_err(
@@ -529,7 +524,7 @@ pub unsafe fn xml_add_dtd_entity(
     typ: i32,
     external_id: Option<&str>,
     system_id: Option<&str>,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     if doc.is_null() {
         xml_entities_err(

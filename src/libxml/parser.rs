@@ -1748,7 +1748,7 @@ pub type EntityDeclSAXFunc = unsafe fn(
     typ: i32,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    content: *mut XmlChar,
+    content: Option<&str>,
 );
 
 /// What to do when a notation declaration has been parsed.
@@ -1788,7 +1788,7 @@ pub type UnparsedEntityDeclSAXFunc = unsafe fn(
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    notation_name: *const XmlChar,
+    notation_name: Option<&str>,
 );
 
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator.
@@ -11319,7 +11319,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             XmlEntityType::XmlInternalParameterEntity as i32,
                             None,
                             None,
-                            value,
+                            Some(&CStr::from_ptr(value as *const i8).to_string_lossy()),
                         );
                     }
                 }
@@ -11359,7 +11359,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                                     (!uri.is_null())
                                         .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                                         .as_deref(),
-                                    null_mut(),
+                                    None,
                                 );
                             }
                         }
@@ -11377,7 +11377,9 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         XmlEntityType::XmlInternalGeneralEntity as i32,
                         None,
                         None,
-                        value,
+                        (!value.is_null())
+                            .then(|| CStr::from_ptr(value as *const i8).to_string_lossy())
+                            .as_deref(),
                     );
                 }
             }
@@ -11417,7 +11419,9 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                     XmlEntityType::XmlInternalGeneralEntity as i32,
                     None,
                     None,
-                    value,
+                    (!value.is_null())
+                        .then(|| CStr::from_ptr(value as *const i8).to_string_lossy())
+                        .as_deref(),
                 );
             }
         } else {
@@ -11474,7 +11478,9 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             (!uri.is_null())
                                 .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                                 .as_deref(),
-                            ndata,
+                            (!ndata.is_null())
+                                .then(|| CStr::from_ptr(ndata as *const i8).to_string_lossy())
+                                .as_deref(),
                         );
                     }
                 }
@@ -11491,7 +11497,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                             (!uri.is_null())
                                 .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                                 .as_deref(),
-                            null_mut(),
+                            None,
                         );
                     }
                 }
@@ -11537,7 +11543,7 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
                         (!uri.is_null())
                             .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
                             .as_deref(),
-                        null_mut(),
+                        None,
                     );
                 }
             }

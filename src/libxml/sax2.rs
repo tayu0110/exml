@@ -597,7 +597,7 @@ pub unsafe fn xml_sax2_entity_decl(
     typ: i32,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    content: *mut XmlChar,
+    content: Option<&str>,
 ) {
     let ent: XmlEntityPtr;
 
@@ -998,7 +998,7 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    notation_name: *const XmlChar,
+    notation_name: Option<&str>,
 ) {
     let ent: XmlEntityPtr;
     if ctx.is_none() {

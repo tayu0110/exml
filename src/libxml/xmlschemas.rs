@@ -30714,7 +30714,7 @@ unsafe fn entity_decl_split(
     typ: i32,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    content: *mut XmlChar,
+    content: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30801,7 +30801,7 @@ unsafe fn unparsed_entity_decl_split(
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
-    notation_name: *const XmlChar,
+    notation_name: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
