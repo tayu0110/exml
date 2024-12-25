@@ -924,8 +924,8 @@ pub unsafe fn xml_sax2_element_decl(
 pub unsafe fn xml_sax2_notation_decl(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let nota: XmlNotationPtr;
 
@@ -941,7 +941,7 @@ pub unsafe fn xml_sax2_notation_decl(
         return;
     }
 
-    if public_id.is_null() && system_id.is_null() {
+    if public_id.is_none() && system_id.is_none() {
         let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,

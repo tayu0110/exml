@@ -333,12 +333,12 @@ unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
 ///
 /// Returns null_mut() if not, otherwise the entity
 #[doc(alias = "xmlAddNotationDecl")]
-pub unsafe extern "C" fn xml_add_notation_decl(
+pub unsafe fn xml_add_notation_decl(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
     name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlNotationPtr {
     let mut table: XmlNotationTablePtr;
 
@@ -348,13 +348,11 @@ pub unsafe extern "C" fn xml_add_notation_decl(
     if name.is_null() {
         return null_mut();
     }
-    if public_id.is_null() && system_id.is_null() {
+    if public_id.is_none() && system_id.is_none() {
         return null_mut();
     }
 
-    /*
-     * Create the Notation table if needed.
-     */
+    // Create the Notation table if needed.
     table = (*dtd).notations as XmlNotationTablePtr;
     if table.is_null() {
         let mut dict: XmlDictPtr = null_mut();
@@ -378,27 +376,17 @@ pub unsafe extern "C" fn xml_add_notation_decl(
     memset(ret as _, 0, size_of::<XmlNotation>());
     std::ptr::write(&mut *ret, XmlNotation::default());
 
-    /*
-     * fill the structure.
-     */
+    // fill the structure.
     (*ret).name = Some(
         CStr::from_ptr(name as *const i8)
             .to_string_lossy()
             .into_owned(),
     );
-    if !system_id.is_null() {
-        (*ret).system_id = Some(
-            CStr::from_ptr(system_id as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
+    if let Some(system_id) = system_id {
+        (*ret).system_id = Some(system_id.to_owned());
     }
-    if !public_id.is_null() {
-        (*ret).public_id = Some(
-            CStr::from_ptr(public_id as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
+    if let Some(public_id) = public_id {
+        (*ret).public_id = Some(public_id.to_owned());
     }
 
     // Validity Check:

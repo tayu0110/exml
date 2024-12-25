@@ -1047,20 +1047,13 @@ unsafe fn element_decl_debug(
     );
 }
 
-/**
- * notationDeclDebug:
- * @ctxt:  An XML parser context
- * @name: The name of the notation
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * What to do when a notation declaration has been parsed.
- */
+/// What to do when a notation declaration has been parsed.
+#[doc(alias = "notationDeclDebug")]
 unsafe fn notation_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1069,8 +1062,8 @@ unsafe fn notation_decl_debug(
     println!(
         "SAX.notationDecl({}, {}, {})",
         CStr::from_ptr(name as _).to_string_lossy(),
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy()
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
     );
 }
 

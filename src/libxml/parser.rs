@@ -1754,8 +1754,8 @@ pub type EntityDeclSAXFunc = unsafe fn(
 pub type NotationDeclSAXFunc = unsafe fn(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    publicId: *const XmlChar,
-    systemId: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 );
 
 /// An attribute definition has been parsed.
@@ -5771,10 +5771,7 @@ pub(crate) unsafe extern "C" fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, 
     let input: XmlParserInputPtr = (*ctxt).input;
     let entity: XmlEntityPtr = (*input).entity;
 
-    /*
-     * Compute total consumed bytes so far, including input streams of
-     * external entities.
-     */
+    // Compute total consumed bytes so far, including input streams of external entities.
     consumed = (*input).parent_consumed;
     if entity.is_null()
         || (matches!((*entity).etype, XmlEntityType::XmlExternalParameterEntity)
@@ -5785,17 +5782,13 @@ pub(crate) unsafe extern "C" fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, 
     }
     consumed = consumed.saturating_add((*ctxt).sizeentities);
 
-    /*
-     * Add extra cost and some fixed cost.
-     */
+    // Add extra cost and some fixed cost.
     (*ctxt).sizeentcopy = (*ctxt).sizeentcopy.saturating_add(extra);
     (*ctxt).sizeentcopy = (*ctxt).sizeentcopy.saturating_add(XML_ENT_FIXED_COST as _);
 
-    /*
-     * It's important to always use saturation arithmetic when tracking
-     * entity sizes to make the size checks reliable. If "sizeentcopy"
-     * overflows, we have to abort.
-     */
+    // It's important to always use saturation arithmetic when tracking
+    // entity sizes to make the size checks reliable. If "sizeentcopy"
+    // overflows, we have to abort.
     if (*ctxt).sizeentcopy > XML_PARSER_ALLOWED_EXPANSION as u64
         && ((*ctxt).sizeentcopy == u64::MAX
             || (*ctxt).sizeentcopy / XML_PARSER_NON_LINEAR as u64 > consumed)
@@ -11130,7 +11123,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pubid_literal(ctxt: XmlParserCtxtPtr) 
 ///
 /// See the NOTE on xmlParseExternalID().
 #[doc(alias = "xmlParseNotationDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) {
     let name: *const XmlChar;
     let mut pubid: *mut XmlChar = null_mut();
     let systemid: *mut XmlChar;
@@ -11190,7 +11183,16 @@ pub(crate) unsafe extern "C" fn xml_parse_notation_decl(ctxt: XmlParserCtxtPtr) 
             (*ctxt).skip_char();
             if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                 if let Some(not) = (*(*ctxt).sax).notation_decl {
-                    not((*ctxt).user_data.clone(), name, pubid, systemid);
+                    not(
+                        (*ctxt).user_data.clone(),
+                        name,
+                        (!pubid.is_null())
+                            .then(|| CStr::from_ptr(pubid as *const i8).to_string_lossy())
+                            .as_deref(),
+                        (!systemid.is_null())
+                            .then(|| CStr::from_ptr(systemid as *const i8).to_string_lossy())
+                            .as_deref(),
+                    );
                 }
             }
         } else {

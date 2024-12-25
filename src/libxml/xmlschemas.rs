@@ -30781,8 +30781,8 @@ unsafe fn element_decl_split(
 unsafe fn notation_decl_split(
     ctx: Option<GenericErrorContext>,
     name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();

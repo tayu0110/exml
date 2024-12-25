@@ -770,8 +770,8 @@ fn element_decl_callback(
 fn notation_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _name: *const XmlChar,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
