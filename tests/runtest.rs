@@ -886,23 +886,15 @@ unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     sax_debugln!("SAX.endDocument()");
 }
 
-/**
- * startElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementDebug")]
 unsafe fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     atts: *mut *const XmlChar,
 ) {
     increment_callbacks_counter();
-    sax_debug!(
-        "SAX.startElement({}",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy()
-    );
+    sax_debug!("SAX.startElement({name}");
     if !atts.is_null() {
         let mut i = 0;
         while !(*atts.add(i)).is_null() {
@@ -1292,27 +1284,19 @@ static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * htmlstartElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "htmlstartElementDebug")]
 #[cfg(feature = "html")]
 unsafe fn htmlstart_element_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     atts: *mut *const XmlChar,
 ) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
-    sax_debug!(
-        "SAX.startElement({}",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy()
-    );
+    sax_debug!("SAX.startElement({name}");
     if !atts.is_null() {
         let mut i = 0;
         while !(*atts.add(i)).is_null() {
@@ -1934,19 +1918,13 @@ unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
 #[cfg(feature = "libxml_push")]
 unsafe fn start_element_bnd(
     ctx: Option<GenericErrorContext>,
-    xname: *const XmlChar,
+    xname: &str,
     atts: *mut *const XmlChar,
 ) {
     use exml::libxml::sax2::xml_sax2_start_element;
 
-    let name: *const c_char = xname as *const c_char;
-
-    /* Some elements might be created automatically. */
-    if strcmp(name, c"html".as_ptr()) != 0
-        && strcmp(name, c"body".as_ptr()) != 0
-        && strcmp(name, c"head".as_ptr()) != 0
-        && strcmp(name, c"p".as_ptr()) != 0
-    {
+    // Some elements might be created automatically.
+    if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
         PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     }
     xml_sax2_start_element(ctx, xname, atts);

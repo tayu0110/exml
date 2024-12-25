@@ -1119,26 +1119,18 @@ unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     println!("SAX.endDocument()");
 }
 
-/**
- * startElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementDebug")]
 unsafe fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
     atts: *mut *const XmlChar,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.startElement({}",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    print!("SAX.startElement({name}");
     if !atts.is_null() {
         for i in (0..).step_by(2).take_while(|&i| !(*atts.add(i)).is_null()) {
             print!(

@@ -2999,7 +2999,7 @@ macro_rules! CONSTQSTR {
 #[doc(alias = "xmlTextReaderStartElement")]
 unsafe fn xml_text_reader_start_element(
     ctx: Option<GenericErrorContext>,
-    fullname: *const XmlChar,
+    fullname: &str,
     atts: *mut *const XmlChar,
 ) {
     let ctxt = {

@@ -1804,7 +1804,7 @@ pub type EndDocumentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>);
 /// Called when an opening tag has been processed.
 #[doc(alias = "startElementSAXFunc")]
 pub type StartElementSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: *const XmlChar, atts: *mut *const XmlChar);
+    unsafe fn(ctx: Option<GenericErrorContext>, name: &str, atts: *mut *const XmlChar);
 
 /// Called when the end of an element has been detected.
 #[doc(alias = "endElementSAXFunc")]

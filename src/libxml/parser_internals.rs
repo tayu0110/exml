@@ -4675,7 +4675,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
 /// Returns the element name parsed
 #[doc(alias = "xmlParseStartTag")]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
+pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     use crate::libxml::parser::xml_err_attribute_dup;
 
     let mut attname: *const XmlChar;
@@ -4699,11 +4699,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
         return null_mut();
     }
 
-    /*
-     * Now parse the attributes, it ends up with the ending
-     *
-     * (S Attribute)* S?
-     */
+    // Now parse the attributes, it ends up with the ending
+    //
+    // (S Attribute)* S?
     (*ctxt).skip_blanks();
     (*ctxt).grow();
 
@@ -4735,11 +4733,10 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
                         break 'failed;
                     }
                 }
-                /*
-                 * Add the pair to atts
-                 */
+                // Add the pair to atts
                 if atts.is_null() {
-                    maxatts = 22; /* allow for 10 attrs by default */
+                    // allow for 10 attrs by default
+                    maxatts = 22;
                     atts = xml_malloc(maxatts as usize * size_of::<*mut XmlChar>())
                         as *mut *const XmlChar;
                     if atts.is_null() {
@@ -4798,21 +4795,20 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *
         (*ctxt).grow();
     }
 
-    /*
-     * SAX: Start of Element !
-     */
+    // SAX: Start of Element !
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(elem) = (*(*ctxt).sax).start_element {
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             if nbatts > 0 {
-                elem((*ctxt).user_data.clone(), name, atts);
+                elem((*ctxt).user_data.clone(), &name, atts);
             } else {
-                elem((*ctxt).user_data.clone(), name, null_mut());
+                elem((*ctxt).user_data.clone(), &name, null_mut());
             }
         }
     }
 
     if !atts.is_null() {
-        /* Free only the content strings */
+        // Free only the content strings
         for i in (1..nbatts).step_by(2) {
             if !(*atts.add(i as usize)).is_null() {
                 xml_free(*atts.add(i as usize) as _);

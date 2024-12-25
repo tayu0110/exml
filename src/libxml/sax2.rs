@@ -2065,7 +2065,7 @@ unsafe fn xml_check_defaulted_attributes(
 ))]
 pub unsafe fn xml_sax2_start_element(
     ctx: Option<GenericErrorContext>,
-    fullname: *const XmlChar,
+    fullname: &str,
     atts: *mut *const XmlChar,
 ) {
     use crate::libxml::parser_internals::XML_VCTXT_DTD_VALIDATED;
@@ -2078,7 +2078,7 @@ pub unsafe fn xml_sax2_start_element(
     let mut value: *const XmlChar;
     let mut i: i32;
 
-    if ctx.is_none() || fullname.is_null() {
+    if ctx.is_none() {
         return;
     }
     let ctxt = {
@@ -2091,9 +2091,7 @@ pub unsafe fn xml_sax2_start_element(
     }
     parent = (*ctxt).node;
 
-    /*
-     * First check on validity:
-     */
+    // First check on validity:
     if (*ctxt).validate != 0
         && (*(*ctxt).my_doc).ext_subset.is_null()
         && ((*(*ctxt).my_doc).int_subset.is_null()
@@ -2110,21 +2108,18 @@ pub unsafe fn xml_sax2_start_element(
         (*ctxt).validate = 0;
     }
 
+    let fullname = CString::new(fullname).unwrap();
     if (*ctxt).html != 0 {
         prefix = null_mut();
-        name = xml_strdup(fullname);
+        name = xml_strdup(fullname.as_ptr() as *const u8);
     } else {
-        /*
-         * Split the full name into a namespace prefix and the tag name
-         */
-        name = xml_split_qname(ctxt, fullname, addr_of_mut!(prefix));
+        // Split the full name into a namespace prefix and the tag name
+        name = xml_split_qname(ctxt, fullname.as_ptr() as *const u8, addr_of_mut!(prefix));
     }
 
-    /*
-     * Note : the namespace resolution is deferred until the end of the
-     *        attributes parsing, since local namespace can be defined as
-     *        an attribute at this level.
-     */
+    // Note : the namespace resolution is deferred until the end of the
+    //        attributes parsing, since local namespace can be defined as
+    //        an attribute at this level.
     let ret: XmlNodePtr = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), name, null_mut());
     if ret.is_null() {
         if !prefix.is_null() {
@@ -2149,9 +2144,7 @@ pub unsafe fn xml_sax2_start_element(
         }
     }
 
-    /*
-     * We are parsing a new node.
-     */
+    // We are parsing a new node.
     if (*ctxt).node_push(ret) < 0 {
         (*ret).unlink();
         xml_free_node(ret);
@@ -2270,9 +2263,7 @@ pub unsafe fn xml_sax2_start_element(
                     );
                 }
 
-                /*
-                 * Next ones
-                 */
+                // Next ones
                 att = *atts.add(i as usize);
                 i += 1;
                 value = *atts.add(i as usize);
@@ -2283,10 +2274,8 @@ pub unsafe fn xml_sax2_start_element(
 
     #[cfg(feature = "libxml_valid")]
     {
-        /*
-         * If it's the Document root, finish the DTD validation and
-         * check the document root element for validity
-         */
+        // If it's the Document root, finish the DTD validation and
+        // check the document root element for validity
         if (*ctxt).validate != 0 && (*ctxt).vctxt.flags & XML_VCTXT_DTD_VALIDATED as u32 == 0 {
             let chk: i32 = xml_validate_dtd_final(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
             if chk <= 0 {

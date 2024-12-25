@@ -6466,7 +6466,7 @@ unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlCh
 /// called when a new tag has been detected and generates the
 /// appropriates implicit tags if missing
 #[doc(alias = "htmlCheckImplied")]
-unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
+unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     if (*ctxt).options & HtmlParserOption::HtmlParseNoimplied as i32 != 0 {
         return;
     }
@@ -6479,11 +6479,7 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
     if (*ctxt).name_tab.is_empty() {
         html_name_push(ctxt, c"html".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())(
-                (*ctxt).user_data.clone(),
-                c"html".as_ptr() as _,
-                null_mut(),
-            );
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "html", null_mut());
         }
     }
     if xml_str_equal(newtag, c"body".as_ptr() as _) || xml_str_equal(newtag, c"head".as_ptr() as _)
@@ -6499,27 +6495,20 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
             || xml_str_equal(newtag, c"base".as_ptr() as _))
     {
         if (*ctxt).html >= 3 {
-            /* we already saw or generated an <head> before */
+            // we already saw or generated an <head> before
             return;
         }
-        /*
-         * dropped OBJECT ... i you put it first BODY will be
-         * assumed !
-         */
+        // dropped OBJECT ... i you put it first BODY will be assumed !
         html_name_push(ctxt, c"head".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())(
-                (*ctxt).user_data.clone(),
-                c"head".as_ptr() as _,
-                null_mut(),
-            );
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "head", null_mut());
         }
     } else if !xml_str_equal(newtag, c"noframes".as_ptr() as _)
         && !xml_str_equal(newtag, c"frame".as_ptr() as _)
         && !xml_str_equal(newtag, c"frameset".as_ptr() as _)
     {
         if (*ctxt).html >= 10 {
-            /* we already saw or generated a <body> before */
+            // we already saw or generated a <body> before
             return;
         }
         for i in 0..(*ctxt).name_tab.len() {
@@ -6533,11 +6522,7 @@ unsafe extern "C" fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const 
 
         html_name_push(ctxt, c"body".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())(
-                (*ctxt).user_data.clone(),
-                c"body".as_ptr() as _,
-                null_mut(),
-            );
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "body", null_mut());
         }
     }
 }
@@ -7065,7 +7050,7 @@ unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const 
 ///
 /// Returns 0 in case of success, -1 in case of error and 1 if discarded
 #[doc(alias = "htmlParseStartTag")]
-unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
+unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut attname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
     let mut atts: *mut *const XmlChar;
@@ -7239,8 +7224,7 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             if !attvalue.is_null() {
                 xml_free(attvalue as _);
             }
-            /* Dump the bogus attribute string up to the next blank or
-             * the end of the tag. */
+            // Dump the bogus attribute string up to the next blank or the end of the tag.
             while (*ctxt).current_byte() != 0
                 && !xml_is_blank_char((*ctxt).current_byte() as u32)
                 && (*ctxt).current_byte() != b'>'
@@ -7254,25 +7238,22 @@ unsafe extern "C" fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         SKIP_BLANKS!(ctxt);
     }
 
-    /*
-     * Handle specific association to the META tag
-     */
+    // Handle specific association to the META tag
     if meta != 0 && nbatts != 0 {
         html_check_meta(ctxt, atts);
     }
 
-    /*
-     * SAX: Start of Element !
-     */
+    // SAX: Start of Element !
     if discardtag == 0 {
         html_name_push(ctxt, name);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             if nbatts != 0 {
-                ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), name, atts);
+                ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), &name, atts);
             } else {
                 ((*(*ctxt).sax).start_element.unwrap())(
                     (*ctxt).user_data.clone(),
-                    name,
+                    &name,
                     null_mut(),
                 );
             }
@@ -8336,11 +8317,7 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_check_implied(ctxt, c"p".as_ptr() as _);
         html_name_push(ctxt, c"p".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())(
-                (*ctxt).user_data.clone(),
-                c"p".as_ptr() as _,
-                null_mut(),
-            );
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", null_mut());
         }
         return 1;
     }
@@ -8353,11 +8330,7 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
             html_check_implied(ctxt, c"p".as_ptr() as _);
             html_name_push(ctxt, c"p".as_ptr() as _);
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-                ((*(*ctxt).sax).start_element.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    c"p".as_ptr() as _,
-                    null_mut(),
-                );
+                ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", null_mut());
             }
             return 1;
         }
