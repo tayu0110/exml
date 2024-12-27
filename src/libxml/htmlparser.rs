@@ -6396,13 +6396,14 @@ unsafe fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
 
 /// Close all remaining tags at the end of the stream
 #[doc(alias = "htmlAutoCloseOnEnd")]
-unsafe extern "C" fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
+unsafe fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).name_tab.is_empty() {
         return;
     }
     for _ in (0..(*ctxt).name_tab.len()).rev() {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
+            let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
     }
@@ -6421,7 +6422,8 @@ unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const Xml
         && html_check_auto_close(newtag, (*ctxt).name) != 0
     {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
+            let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
     }
@@ -6436,7 +6438,8 @@ unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const Xml
             || xml_str_equal((*ctxt).name, c"html".as_ptr() as _))
     {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
+            let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
     }
@@ -7295,7 +7298,8 @@ unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *
                     );
                 }
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                    ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
+                    let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+                    ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                 }
                 html_name_pop(ctxt);
             }
@@ -7421,7 +7425,8 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             oldname = (*ctxt).name;
             if !oldname.is_null() && xml_str_equal(oldname, name) {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                    ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                    ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                 }
                 html_node_info_pop(ctxt);
                 html_name_pop(ctxt);
@@ -8773,7 +8778,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
 ///
 /// `[41] Attribute ::= Name Eq AttValue`
 #[doc(alias = "htmlParseElement")]
-pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
+pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     let mut node_info: HtmlParserNodeInfo = unsafe { zeroed() };
     let mut oldptr: *const XmlChar;
 
@@ -8792,7 +8797,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         return;
     }
 
-    /* Capture start position */
+    // Capture start position
     if (*ctxt).record_info != 0 {
         node_info.begin_pos = (*(*ctxt).input).consumed
             + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
@@ -8808,9 +8813,7 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         return;
     }
 
-    /*
-     * Lookup the info for that element.
-     */
+    // Lookup the info for that element.
     let info: *const HtmlElemDesc = html_tag_lookup(name);
     if info.is_null() {
         let name = CStr::from_ptr(name as *const i8).to_string_lossy();
@@ -8823,13 +8826,12 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         );
     }
 
-    /*
-     * Check for an Empty Element labeled the XML/SGML way
-     */
+    // Check for an Empty Element labeled the XML/SGML way
     if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
         return;
@@ -8867,7 +8869,8 @@ pub(crate) unsafe extern "C" fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     // Check for an Empty Element from DTD definition
     if !info.is_null() && (*info).empty != 0 {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
         return;
@@ -9160,7 +9163,8 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
         return;
@@ -9194,7 +9198,8 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     // Check for an Empty Element from DTD definition
     if !info.is_null() && (*info).empty != 0 {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
         return;
@@ -10570,7 +10575,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
                     (*ctxt).advance(2);
                     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                     }
                     html_name_pop(ctxt);
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10606,7 +10612,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 // Check for an Empty Element from DTD definition
                 if !info.is_null() && (*info).empty != 0 {
                     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                     }
                     html_name_pop(ctxt);
                 }

@@ -3029,7 +3029,7 @@ unsafe fn xml_text_reader_start_element(
 
 /// called when an ending tag has been processed.
 #[doc(alias = "xmlTextReaderEndElement")]
-unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname: *const XmlChar) {
+unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname: &str) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
         let lock = ctx.lock();

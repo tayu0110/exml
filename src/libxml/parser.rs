@@ -1810,7 +1810,7 @@ pub type StartElementSAXFunc =
 
 /// Called when the end of an element has been detected.
 #[doc(alias = "endElementSAXFunc")]
-pub type EndElementSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: *const XmlChar);
+pub type EndElementSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str);
 
 /// Handle an attribute that has been read by the parser.
 /// The default handling is to convert the attribute into an
@@ -8968,7 +8968,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
 /// `[NS 9] ETag ::= '</' QName S? '>'`
 #[doc(alias = "xmlParseEndTag1")]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
+pub(crate) unsafe fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
     let mut name: *const XmlChar;
 
     (*ctxt).grow();
@@ -9011,7 +9011,9 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line:
 
     // SAX: End of Tag
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() && (*ctxt).disable_sax == 0 {
-        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), (*ctxt).name);
+        let name = (*ctxt).name;
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
     }
 
     (*ctxt).name_pop();
@@ -9494,9 +9496,10 @@ unsafe extern "C" fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: 
                                 && (*(*ctxt).sax).end_element.is_some()
                                 && (*ctxt).disable_sax == 0
                             {
+                                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                                 ((*(*ctxt).sax).end_element.unwrap())(
                                     (*ctxt).user_data.clone(),
-                                    name,
+                                    &name,
                                 );
                             }
                         }

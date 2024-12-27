@@ -904,19 +904,11 @@ unsafe fn start_element_debug(
     sax_debugln!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
-unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
+unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.endElement({})",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy()
-    );
+    sax_debugln!("SAX.endElement({name})");
 }
 
 /**
@@ -1921,7 +1913,7 @@ unsafe fn start_element_bnd(
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
     /*pushBoundaryCount++;*/
 
     use exml::libxml::sax2::xml_sax2_end_element;

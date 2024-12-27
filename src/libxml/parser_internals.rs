@@ -4789,7 +4789,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
 /// `[NS 9] ETag ::= '</' QName S? '>'`
 #[doc(alias = "xmlParseEndTag")]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe extern "C" fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
     xml_parse_end_tag1(ctxt, 0);
 }
 
@@ -4798,7 +4798,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
 ///
 /// Always consumes '<'.
 #[doc(alias = "xmlParseElementStart")]
-pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
+pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
     let mut prefix: *const XmlChar = null_mut();
     let mut uri: *const XmlChar = null_mut();
@@ -4819,7 +4819,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         return -1;
     }
 
-    /* Capture start position */
+    // Capture start position
     if (*ctxt).record_info != 0 {
         node_info.begin_pos = (*(*ctxt).input).consumed
             + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
@@ -4871,11 +4871,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
     );
     let cur: XmlNodePtr = (*ctxt).node;
 
-    /*
-     * [ VC: Root Element Type ]
-     * The Name in the document type declaration must match the element
-     * type of the root element.
-     */
+    // [ VC: Root Element Type ]
+    // The Name in the document type declaration must match the element type of the root element.
     #[cfg(feature = "libxml_valid")]
     if (*ctxt).validate != 0
         && (*ctxt).well_formed != 0
@@ -4886,9 +4883,7 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
         (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt), (*ctxt).my_doc);
     }
 
-    /*
-     * Check for an Empty Element.
-     */
+    // Check for an Empty Element.
     if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
         if (*ctxt).sax2 != 0 {
@@ -4909,7 +4904,8 @@ pub(crate) unsafe extern "C" fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) 
                 && (*(*ctxt).sax).end_element.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
+                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
             }
         }
         (*ctxt).name_pop();

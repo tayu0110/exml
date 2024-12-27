@@ -2235,7 +2235,7 @@ pub unsafe fn xml_sax2_start_element(
     feature = "libxml_writer",
     feature = "libxml_legacy"
 ))]
-pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
+pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str) {
     if ctx.is_none() {
         return;
     }

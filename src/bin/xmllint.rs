@@ -1140,22 +1140,14 @@ unsafe fn start_element_debug(
     println!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
-unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
+unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.endElement({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.endElement({name})");
 }
 
 /**
