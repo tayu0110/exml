@@ -1032,7 +1032,7 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 #[allow(clippy::too_many_arguments)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
     nb_namespaces: i32,
@@ -1042,10 +1042,7 @@ unsafe fn start_element_ns_debug(
     attributes: *mut *const XmlChar,
 ) {
     increment_callbacks_counter();
-    sax_debug!(
-        "SAX.startElementNs({}",
-        CStr::from_ptr(localname as *mut c_char).to_string_lossy()
-    );
+    sax_debug!("SAX.startElementNs({localname}");
     if prefix.is_null() {
         sax_debug!(", NULL");
     } else {
@@ -1817,7 +1814,7 @@ unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
 #[cfg(feature = "libxml_push")]
 unsafe fn start_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
     nb_namespaces: i32,

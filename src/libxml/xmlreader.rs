@@ -3049,7 +3049,7 @@ unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_text_reader_start_element_ns(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
     nb_namespaces: i32,

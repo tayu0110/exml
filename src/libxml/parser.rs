@@ -1885,9 +1885,9 @@ pub const XML_SAX2_MAGIC: usize = 0xDEEDBEAF;
 #[doc(alias = "startElementNsSAX2Func")]
 pub type StartElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
-    URI: *const XmlChar,
+    uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
     nb_attributes: i32,
@@ -1902,7 +1902,7 @@ pub type EndElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
     prefix: *const XmlChar,
-    URI: *const XmlChar,
+    uri: *const XmlChar,
 );
 
 pub type XmlSAXHandlerPtr = *mut XmlSAXHandler;
@@ -7807,7 +7807,7 @@ unsafe fn grow_attrs(
 ///
 /// Returns the element name parsed
 #[doc(alias = "xmlParseStartTag2")]
-pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
+pub(crate) unsafe fn xml_parse_start_tag2(
     ctxt: XmlParserCtxtPtr,
     pref: *mut *const XmlChar,
     uri: *mut *const XmlChar,
@@ -8307,10 +8307,13 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             && (*(*ctxt).sax).start_element_ns.is_some()
             && (*ctxt).disable_sax == 0
         {
+            let localname = &CStr::from_ptr(localname as *const i8)
+                .to_string_lossy()
+                .into_owned();
             if nb_ns > 0 {
                 ((*(*ctxt).sax).start_element_ns.unwrap())(
                     (*ctxt).user_data.clone(),
-                    localname,
+                    localname.as_str(),
                     prefix,
                     nsname,
                     nb_ns,
@@ -8322,7 +8325,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             } else {
                 ((*(*ctxt).sax).start_element_ns.unwrap())(
                     (*ctxt).user_data.clone(),
-                    localname,
+                    localname.as_str(),
                     prefix,
                     nsname,
                     0,

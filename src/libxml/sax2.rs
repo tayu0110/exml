@@ -2260,9 +2260,7 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
         }
     }
 
-    /*
-     * end of parsing of this node.
-     */
+    // end of parsing of this node.
     (*ctxt).node_pop();
 }
 
@@ -2273,7 +2271,7 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn xml_sax2_start_element_ns(
     ctx: Option<GenericErrorContext>,
-    mut localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     // I want to rename to `uri`, but it also appears as a local variable....
     orig_uri: *const XmlChar,
@@ -2300,9 +2298,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         *lock.downcast_ref::<XmlParserCtxtPtr>().unwrap()
     };
     let parent: XmlNodePtr = (*ctxt).node;
-    /*
-     * First check on validity:
-     */
+    // First check on validity:
     if (*ctxt).validate != 0
         && (*(*ctxt).my_doc).ext_subset.is_null()
         && ((*(*ctxt).my_doc).int_subset.is_null()
@@ -2320,15 +2316,10 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     // Take care of the rare case of an undefined namespace prefix
+    let localname = CString::new(localname).unwrap();
+    let localname = localname.as_ptr() as *const u8;
     if !prefix.is_null() && orig_uri.is_null() {
-        if (*ctxt).dict_names != 0 {
-            let fullname: *const XmlChar = xml_dict_qlookup((*ctxt).dict, prefix, localname);
-            if !fullname.is_null() {
-                localname = fullname;
-            }
-        } else {
-            lname = xml_build_qname(localname, prefix, null_mut(), 0);
-        }
+        lname = xml_build_qname(localname, prefix, null_mut(), 0);
     }
     // allocate the node
     if !(*ctxt).free_elems.is_null() {
@@ -2339,19 +2330,15 @@ pub unsafe fn xml_sax2_start_element_ns(
         (*ret).doc = (*ctxt).my_doc;
         (*ret).typ = XmlElementType::XmlElementNode;
 
-        if (*ctxt).dict_names != 0 {
-            (*ret).name = localname;
+        if lname.is_null() {
+            (*ret).name = xml_strdup(localname);
         } else {
-            if lname.is_null() {
-                (*ret).name = xml_strdup(localname);
-            } else {
-                (*ret).name = lname;
-            }
-            if (*ret).name.is_null() {
-                xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
-                xml_free(ret as _);
-                return;
-            }
+            (*ret).name = lname;
+        }
+        if (*ret).name.is_null() {
+            xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
+            xml_free(ret as _);
+            return;
         }
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
@@ -2359,9 +2346,7 @@ pub unsafe fn xml_sax2_start_element_ns(
             xml_register_node_default_value(ret);
         }
     } else {
-        if (*ctxt).dict_names != 0 {
-            ret = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), localname as _, null_mut());
-        } else if lname.is_null() {
+        if lname.is_null() {
             ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), localname, null_mut());
         } else {
             ret = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), lname, null_mut());
@@ -2382,9 +2367,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     if parent.is_null() {
         (*(*ctxt).my_doc).add_child(ret as XmlNodePtr);
     }
-    /*
-     * Build the namespace list
-     */
+    // Build the namespace list
     i = 0;
     for _ in 0..nb_namespaces {
         pref = *namespaces.add(i as usize);
@@ -2404,11 +2387,9 @@ pub unsafe fn xml_sax2_start_element_ns(
                 (*ret).ns = ns;
             }
         } else {
-            /*
-             * any out of memory error would already have been raised
-             * but we can't be guaranteed it's the actual error due to the
-             * API, best is to skip in this case
-             */
+            // any out of memory error would already have been raised
+            // but we can't be guaranteed it's the actual error due to the
+            // API, best is to skip in this case
             continue;
         }
         #[cfg(feature = "libxml_valid")]

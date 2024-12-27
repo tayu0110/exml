@@ -1316,20 +1316,12 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 // xmlSAXHandlerPtr debugSAXHandler = &debugSAXHandlerStruct;
 
-/*
- * SAX2 specific callbacks
- */
-/**
- * startElementNsDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementNsDebug")]
 #[allow(clippy::too_many_arguments)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
     nb_namespaces: c_int,
@@ -1342,10 +1334,7 @@ unsafe fn start_element_ns_debug(
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.startElementNs({}",
-        CStr::from_ptr(localname as _).to_string_lossy()
-    );
+    print!("SAX.startElementNs({localname}");
     if prefix.is_null() {
         print!(", NULL");
     } else {

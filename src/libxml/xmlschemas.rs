@@ -24483,7 +24483,8 @@ unsafe extern "C" fn xml_schema_get_fresh_attr_info(
     iattr
 }
 
-unsafe extern "C" fn xml_schema_validator_push_attribute(
+#[allow(clippy::too_many_arguments)]
+unsafe fn xml_schema_validator_push_attribute(
     vctxt: XmlSchemaValidCtxtPtr,
     attr_node: XmlNodePtr,
     node_line: i32,
@@ -24510,9 +24511,7 @@ unsafe extern "C" fn xml_schema_validator_push_attribute(
     if owned_names != 0 {
         (*attr).flags |= XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES;
     }
-    /*
-     * Evaluate if it's an XSI attribute.
-     */
+    // Evaluate if it's an XSI attribute.
     if !ns_name.is_null() {
         if xml_str_equal(local_name, c"nil".as_ptr() as _) {
             if xml_str_equal((*attr).ns_name, XML_SCHEMA_INSTANCE_NS.as_ptr() as _) {
@@ -30235,7 +30234,7 @@ pub struct XmlSchemaSAXPlugStruct {
 #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_sax_handle_start_element_ns(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     _prefix: *const XmlChar,
     uri: *const XmlChar,
     nb_namespaces: i32,
@@ -30249,19 +30248,13 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
     let mut ret: i32;
 
-    /*
-     * SAX VAL TODO: What to do with nb_defaulted?
-     */
-    /*
-     * Skip elements if inside a "skip" wildcard or invalid.
-     */
+    // SAX VAL TODO: What to do with nb_defaulted?
+    // Skip elements if inside a "skip" wildcard or invalid.
     (*vctxt).depth += 1;
     if (*vctxt).skip_depth != -1 && (*vctxt).depth >= (*vctxt).skip_depth {
         return;
     }
-    /*
-     * Push the element.
-     */
+    // Push the element.
     if xml_schema_validator_push_elem(vctxt) == -1 {
         VERROR_INT!(
             vctxt,
@@ -30274,25 +30267,18 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         return;
     }
     let ielem: XmlSchemaNodeInfoPtr = (*vctxt).inode;
-    /*
-     * TODO: Is this OK?
-     */
+    // TODO: Is this OK?
     (*ielem).node_line = xml_sax2_get_line_number((*vctxt).parser_ctxt as _);
-    (*ielem).local_name = localname;
+    let localname = CString::new(localname).unwrap();
+    (*ielem).local_name = localname.as_ptr() as *const u8;
     (*ielem).ns_name = uri;
     (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
-    /*
-     * Register namespaces on the elem info.
-     */
+    // Register namespaces on the elem info.
     if nb_namespaces != 0 {
-        /*
-         * Although the parser builds its own namespace list,
-         * we have no access to it, so we'll use an own one.
-         */
+        // Although the parser builds its own namespace list,
+        // we have no access to it, so we'll use an own one.
         for (_, j) in (0..nb_namespaces).zip((0..).step_by(2)) {
-            /*
-             * Store prefix and namespace name.
-             */
+            // Store prefix and namespace name.
             if (*ielem).ns_bindings.is_null() {
                 (*ielem).ns_bindings = xml_malloc(10 * size_of::<*const XmlChar>()) as _;
                 if (*ielem).ns_bindings.is_null() {
@@ -30331,9 +30317,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 .ns_bindings
                 .add((*ielem).nb_ns_bindings as usize * 2) = *namespaces.add(j as usize);
             if *(*namespaces.add(j as usize + 1)).add(0) == 0 {
-                /*
-                 * Handle xmlns="".
-                 */
+                // Handle xmlns="".
                 *(*ielem)
                     .ns_bindings
                     .add((*ielem).nb_ns_bindings as usize * 2 + 1) = null_mut();
@@ -30346,25 +30330,20 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
             (*ielem).nb_ns_bindings += 1;
         }
     }
-    /*
-     * Register attributes.
-     * SAX VAL TODO: We are not adding namespace declaration
-     * attributes yet.
-     */
+    // Register attributes.
+    // SAX VAL TODO: We are not adding namespace declaration attributes yet.
     if nb_attributes != 0 {
         let mut value_len: i32;
         let mut k: i32;
         let mut value: *mut XmlChar;
 
         for (_, j) in (0..nb_attributes).zip((0..).step_by(5)) {
-            /*
-             * Duplicate the value, changing any &#38; to a literal ampersand.
-             *
-             * libxml2 differs from normal SAX here in that it escapes all ampersands
-             * as &#38; instead of delivering the raw converted string. Changing the
-             * behavior at this point would break applications that use this API, so
-             * we are forced to work around it.
-             */
+            // Duplicate the value, changing any &#38; to a literal ampersand.
+            //
+            // libxml2 differs from normal SAX here in that it escapes all ampersands
+            // as &#38; instead of delivering the raw converted string. Changing the
+            // behavior at this point would break applications that use this API, so
+            // we are forced to work around it.
             value_len =
                 (*attributes.add(j as usize + 4)).offset_from(*attributes.add(j as usize + 3)) as _;
             value = xml_malloc_atomic(value_len as usize + 1) as _;
@@ -30399,9 +30378,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                     break;
                 }
             }
-            /*
-             * TODO: Set the node line.
-             */
+            // TODO: Set the node line.
             ret = xml_schema_validator_push_attribute(
                 vctxt,
                 null_mut(),
@@ -30425,9 +30402,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
             }
         }
     }
-    /*
-     * Validate the element.
-     */
+    // Validate the element.
     ret = xml_schema_validate_elem(vctxt);
     if ret != 0 && ret == -1 {
         VERROR_INT!(
@@ -30967,7 +30942,7 @@ unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
 #[allow(clippy::too_many_arguments)]
 unsafe fn start_element_ns_split(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
     nb_namespaces: i32,
