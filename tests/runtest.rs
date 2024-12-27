@@ -965,12 +965,9 @@ fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
 
 /// A comment has been parsed.
 #[doc(alias = "commentDebug")]
-unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.comment({})",
-        CStr::from_ptr(value as _).to_string_lossy()
-    );
+    sax_debugln!("SAX.comment({value})");
 }
 
 /// Display and format a warning messages, gives file, line, position and extra parameters.
@@ -1779,7 +1776,7 @@ unsafe fn processing_instruction_bnd(
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: &str) {
     use exml::libxml::sax2::xml_sax2_comment;
 
     let ctxt = {

@@ -1839,7 +1839,7 @@ pub type ProcessingInstructionSAXFunc =
 
 /// A comment has been parsed.
 #[doc(alias = "commentSAXFunc")]
-pub type CommentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: *const XmlChar);
+pub type CommentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: &str);
 
 /// Called when a pcdata block has been parsed.
 #[doc(alias = "cdataBlockSAXFunc")]
@@ -4089,7 +4089,7 @@ pub unsafe fn xml_parse_in_node_context(
     (*ctxt).input_id = 2;
     (*ctxt).instate = XmlParserInputState::XmlParserContent;
 
-    let fake: XmlNodePtr = xml_new_doc_comment((*node).doc, null_mut());
+    let fake: XmlNodePtr = xml_new_doc_comment((*node).doc, "");
     if fake.is_null() {
         xml_free_parser_ctxt(ctxt);
         return XmlParserErrors::XmlErrNoMemory;
@@ -4098,9 +4098,7 @@ pub unsafe fn xml_parse_in_node_context(
 
     if (*node).element_type() == XmlElementType::XmlElementNode {
         (*ctxt).node_push(node);
-        /*
-         * initialize the SAX2 namespaces stack
-         */
+        // initialize the SAX2 namespaces stack
         cur = node;
         while !cur.is_null() && (*cur).element_type() == XmlElementType::XmlElementNode {
             let mut ns: XmlNsPtr = (*cur).ns_def;
@@ -4127,9 +4125,7 @@ pub unsafe fn xml_parse_in_node_context(
     }
 
     if (*ctxt).validate != 0 || (*ctxt).replace_entities != 0 {
-        /*
-         * ID/IDREF registration will be done in xmlValidateElement below
-         */
+        // ID/IDREF registration will be done in xmlValidateElement below
         (*ctxt).loadsubset |= XML_SKIP_IDS as i32;
     }
 

@@ -30873,7 +30873,7 @@ unsafe fn processing_instruction_split(
     }
 }
 
-unsafe fn comment_split(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+unsafe fn comment_split(ctx: Option<GenericErrorContext>, value: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();

@@ -1212,22 +1212,14 @@ unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     println!("SAX.pcdata({value:20}, {})", value.len());
 }
 
-/**
- * commentDebug:
- * @ctxt:  An XML parser context
- * @value:  the comment content
- *
- * A comment has been parsed.
- */
-unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+/// A comment has been parsed.
+#[doc(alias = "commentDebug")]
+unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.comment({})",
-        CStr::from_ptr(value as _).to_string_lossy()
-    );
+    println!("SAX.comment({value})");
 }
 
 /**

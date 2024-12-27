@@ -8033,7 +8033,10 @@ unsafe extern "C" fn html_parse_comment(ctxt: HtmlParserCtxtPtr) {
                 && (*(*ctxt).sax).comment.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data.clone(), buf);
+                ((*(*ctxt).sax).comment.unwrap())(
+                    (*ctxt).user_data.clone(),
+                    &CStr::from_ptr(buf as *const i8).to_string_lossy(),
+                );
             }
             xml_free(buf as _);
             (*ctxt).instate = state;

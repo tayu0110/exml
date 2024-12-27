@@ -845,7 +845,7 @@ fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
 
 /// A comment has been parsed.
 #[doc(alias = "commentCallback")]
-fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar) {
+fn comment_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 

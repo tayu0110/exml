@@ -2062,7 +2062,10 @@ unsafe extern "C" fn xml_parse_comment_complex(
                 && (*(*ctxt).sax).comment.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data.clone(), buf);
+                ((*(*ctxt).sax).comment.unwrap())(
+                    (*ctxt).user_data.clone(),
+                    &CStr::from_ptr(buf as *const i8).to_string_lossy(),
+                );
             }
         }
         xml_free(buf as _);
@@ -2084,7 +2087,7 @@ unsafe extern "C" fn xml_parse_comment_complex(
 ///
 /// `[15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'`
 #[doc(alias = "xmlParseComment")]
-pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     let mut buf: *mut XmlChar = null_mut();
     let mut size: usize = XML_PARSER_BUFFER_SIZE;
     let mut len: usize = 0;
@@ -2097,9 +2100,7 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     let mut nbchar: usize;
     let mut ccol: i32;
 
-    /*
-     * Check that there is a comment right here.
-     */
+    // Check that there is a comment right here.
     if (*ctxt).current_byte() != b'<' || NXT!(ctxt, 1) != b'!' {
         return;
     }
@@ -2113,10 +2114,8 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
     (*ctxt).advance(2);
     (*ctxt).grow();
 
-    /*
-     * Accelerated common case where input don't need to be
-     * modified before passing it to the handler.
-     */
+    // Accelerated common case where input don't need to be
+    // modified before passing it to the handler.
     input = (*(*ctxt).input).cur;
     while {
         if *input == 0xA {
@@ -2151,9 +2150,7 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                 continue 'get_more;
             }
             nbchar = input.offset_from((*(*ctxt).input).cur) as _;
-            /*
-             * save current set of data
-             */
+            // save current set of data
             if nbchar > 0 && !(*ctxt).sax.is_null() && (*(*ctxt).sax).comment.is_some() {
                 if buf.is_null() {
                     if *input == b'-' && *input.add(1) == b'-' {
@@ -2233,12 +2230,12 @@ pub(crate) unsafe extern "C" fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
                             && (*ctxt).disable_sax == 0
                         {
                             if !buf.is_null() {
-                                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data.clone(), buf);
-                            } else {
                                 ((*(*ctxt).sax).comment.unwrap())(
                                     (*ctxt).user_data.clone(),
-                                    c"".as_ptr() as _,
+                                    &CStr::from_ptr(buf as *const i8).to_string_lossy(),
                                 );
+                            } else {
+                                ((*(*ctxt).sax).comment.unwrap())((*ctxt).user_data.clone(), "");
                             }
                         }
                         if !buf.is_null() {

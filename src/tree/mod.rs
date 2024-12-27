@@ -2367,10 +2367,7 @@ pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
-pub unsafe extern "C" fn xml_new_doc_comment(
-    doc: XmlDocPtr,
-    content: *const XmlChar,
-) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_comment(doc: XmlDocPtr, content: &str) -> XmlNodePtr {
     let cur: XmlNodePtr = xml_new_comment(content);
     if !cur.is_null() {
         (*cur).doc = doc;
@@ -2383,10 +2380,8 @@ pub unsafe extern "C" fn xml_new_doc_comment(
 /// Creation of a new node containing a comment.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewComment")]
-pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr {
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_comment(content: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building comment");
@@ -2396,9 +2391,8 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
     (*cur).typ = XmlElementType::XmlCommentNode;
 
     (*cur).name = XML_STRING_COMMENT.as_ptr() as _;
-    if !content.is_null() {
-        (*cur).content = xml_strdup(content);
-    }
+    let content = CString::new(content).unwrap();
+    (*cur).content = xml_strdup(content.as_ptr() as *const u8);
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -6457,61 +6451,6 @@ mod tests {
                                 }
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_comment() {
-        unsafe {
-            let mut leaks = 0;
-            for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let content = gen_const_xml_char_ptr(n_content, 0);
-
-                let ret_val = xml_new_comment(content as *const XmlChar);
-                desret_xml_node_ptr(ret_val);
-                des_const_xml_char_ptr(n_content, content, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNewComment",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNewComment()");
-                    eprintln!(" {}", n_content);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_comment() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    let ret_val = xml_new_doc_comment(doc, content);
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewDocComment",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocComment()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_content);
                     }
                 }
             }

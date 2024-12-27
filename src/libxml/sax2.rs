@@ -3164,7 +3164,7 @@ pub unsafe fn xml_sax2_processing_instruction(
 
 /// A xmlSAX2Comment has been parsed.
 #[doc(alias = "xmlSAX2Comment")]
-pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+pub unsafe fn xml_sax2_comment(ctx: Option<GenericErrorContext>, value: &str) {
     if ctx.is_none() {
         return;
     }
