@@ -2282,7 +2282,7 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
 /// Creation of a processing instruction element.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocPI")]
-pub unsafe fn xml_new_doc_pi(doc: XmlDocPtr, name: &str, content: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_pi(doc: XmlDocPtr, name: &str, content: Option<&str>) -> XmlNodePtr {
     // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
@@ -2294,8 +2294,9 @@ pub unsafe fn xml_new_doc_pi(doc: XmlDocPtr, name: &str, content: *const XmlChar
 
     let name = CString::new(name).unwrap();
     (*cur).name = xml_strdup(name.as_ptr() as *const u8);
-    if !content.is_null() {
-        (*cur).content = xml_strdup(content);
+    if let Some(content) = content {
+        let content = CString::new(content).unwrap();
+        (*cur).content = xml_strdup(content.as_ptr() as *const u8);
     }
     (*cur).doc = doc;
 
@@ -2313,7 +2314,7 @@ pub unsafe fn xml_new_doc_pi(doc: XmlDocPtr, name: &str, content: *const XmlChar
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
-pub unsafe fn xml_new_pi(name: &str, content: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> XmlNodePtr {
     xml_new_doc_pi(null_mut(), name, content)
 }
 

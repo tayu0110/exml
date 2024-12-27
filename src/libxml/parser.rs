@@ -1835,7 +1835,7 @@ pub type IgnorableWhitespaceSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>
 /// A processing instruction has been parsed.
 #[doc(alias = "processingInstructionSAXFunc")]
 pub type ProcessingInstructionSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, target: &str, data: *const XmlChar);
+    unsafe fn(ctx: Option<GenericErrorContext>, target: &str, data: Option<&str>);
 
 /// A comment has been parsed.
 #[doc(alias = "commentSAXFunc")]

@@ -1189,17 +1189,14 @@ unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
     target: &str,
-    data: *const XmlChar,
+    data: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    if !data.is_null() {
-        println!(
-            "SAX.processingInstruction({target}, {})",
-            CStr::from_ptr(data as _).to_string_lossy()
-        );
+    if let Some(data) = data {
+        println!("SAX.processingInstruction({target}, {data})");
     } else {
         println!("SAX.processingInstruction({target}, NULL)");
     }

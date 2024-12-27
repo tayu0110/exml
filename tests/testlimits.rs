@@ -832,7 +832,7 @@ fn ignorable_whitespace_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
 fn processing_instruction_callback(
     _ctx: Option<GenericErrorContext>,
     _target: &str,
-    _data: *const XmlChar,
+    _data: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

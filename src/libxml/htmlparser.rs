@@ -8112,7 +8112,7 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
                         (*ctxt).user_data.clone(),
                         &target,
-                        null_mut(),
+                        None,
                     );
                 }
                 (*ctxt).instate = state;
@@ -8197,7 +8197,9 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
                         (*ctxt).user_data.clone(),
                         &target,
-                        buf,
+                        (!buf.is_null())
+                            .then(|| CStr::from_ptr(buf as *const i8).to_string_lossy())
+                            .as_deref(),
                     );
                 }
             }

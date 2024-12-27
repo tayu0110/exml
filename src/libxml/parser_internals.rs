@@ -2473,7 +2473,7 @@ pub(crate) unsafe fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
                         (*ctxt).user_data.clone(),
                         &target,
-                        null(),
+                        None,
                     );
                 }
                 if !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -2561,7 +2561,13 @@ pub(crate) unsafe fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 // SAX: PI detected.
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(pi) = (*(*ctxt).sax).processing_instruction {
-                        pi((*ctxt).user_data.clone(), &target, buf);
+                        pi(
+                            (*ctxt).user_data.clone(),
+                            &target,
+                            (!buf.is_null())
+                                .then(|| CStr::from_ptr(buf as *const i8).to_string_lossy())
+                                .as_deref(),
+                        );
                     }
                 }
             }

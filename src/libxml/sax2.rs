@@ -3119,7 +3119,7 @@ pub unsafe fn xml_sax2_ignorable_whitespace(_ctx: Option<GenericErrorContext>, _
 pub unsafe fn xml_sax2_processing_instruction(
     ctx: Option<GenericErrorContext>,
     target: &str,
-    data: *const XmlChar,
+    data: Option<&str>,
 ) {
     if ctx.is_none() {
         return;

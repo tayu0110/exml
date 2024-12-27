@@ -941,14 +941,11 @@ fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
     target: &str,
-    data: *const XmlChar,
+    data: Option<&str>,
 ) {
     increment_callbacks_counter();
-    if !data.is_null() {
-        sax_debugln!(
-            "SAX.processingInstruction({target}, {})",
-            CStr::from_ptr(data as *mut c_char).to_string_lossy(),
-        );
+    if let Some(data) = data {
+        sax_debugln!("SAX.processingInstruction({target}, {data})");
     } else {
         sax_debugln!("SAX.processingInstruction({target}, NULL)");
     }
@@ -1773,7 +1770,7 @@ unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
 unsafe fn processing_instruction_bnd(
     ctx: Option<GenericErrorContext>,
     target: &str,
-    data: *const XmlChar,
+    data: Option<&str>,
 ) {
     use exml::libxml::sax2::xml_sax2_processing_instruction;
 
