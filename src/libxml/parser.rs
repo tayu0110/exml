@@ -1847,17 +1847,17 @@ pub type CDATABlockSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, value: 
 
 /// Display and format a warning messages, callback.
 #[doc(alias = "warningSAXFunc")]
-pub type WarningSAXFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type WarningSAXFunc = unsafe fn(ctx: *mut c_void, msg: &str);
 
 /// Display and format an error messages, callback.
 #[doc(alias = "errorSAXFunc")]
-pub type ErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type ErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: &str);
 
 /// Display and format fatal error messages, callback.
 /// # Note
 /// so far fatalError() SAX callbacks are not used, error() get all the callbacks for errors.
 #[doc(alias = "fatalErrorSAXFunc")]
-pub type FatalErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
+pub type FatalErrorSAXFunc = unsafe fn(ctx: *mut c_void, msg: &str);
 
 /// Is this document tagged standalone?
 ///
