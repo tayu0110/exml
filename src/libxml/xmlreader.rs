@@ -3050,7 +3050,7 @@ unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname
 unsafe fn xml_text_reader_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,

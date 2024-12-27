@@ -27306,44 +27306,33 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
 
                                     !ns.is_null()
                                 } {}
-                                let prefix = CString::new(prefix).unwrap();
                                 ns = xml_new_ns(
                                     (*vctxt).validation_root,
                                     (*iattr).ns_name,
-                                    prefix.as_ptr() as *const u8,
+                                    Some(&prefix),
                                 );
                             }
-                            /*
-                             * TODO:
-                             * http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html
-                             * If we have QNames: do we need to ensure there's a
-                             * prefix defined for the QName?
-                             */
+                            // TODO:
+                            // http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html
+                            // If we have QNames: do we need to ensure there's a
+                            // prefix defined for the QName?
                             xml_new_ns_prop(def_attr_owner_elem, ns, (*iattr).local_name, value);
                         }
                         if !norm_value.is_null() {
                             xml_free(norm_value as _);
                         }
                     }
-                    /*
-                     * Go directly to IDC evaluation.
-                     */
+                    // Go directly to IDC evaluation.
                     break 'eval_idcs;
                 }
-                /*
-                 * Validate the value.
-                 */
+                // Validate the value.
                 if !(*vctxt).value.is_null() {
-                    /*
-                     * Free last computed value; just for safety reasons.
-                     */
+                    // Free last computed value; just for safety reasons.
                     xml_schema_free_value((*vctxt).value);
                     (*vctxt).value = null_mut();
                 }
-                /*
-                 * Note that the attribute *use* can be unavailable, if
-                 * the attribute was a wild attribute.
-                 */
+                // Note that the attribute *use* can be unavailable,
+                // if the attribute was a wild attribute.
                 if (*(*iattr).decl).flags & XML_SCHEMAS_ATTR_FIXED != 0
                     || (!(*iattr).using.is_null()
                         && (*(*iattr).using).flags & XML_SCHEMAS_ATTR_FIXED != 0)
@@ -30235,7 +30224,7 @@ pub struct XmlSchemaSAXPlugStruct {
 unsafe fn xml_schema_sax_handle_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    _prefix: *const XmlChar,
+    _prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
@@ -30943,7 +30932,7 @@ unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
 unsafe fn start_element_ns_split(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,

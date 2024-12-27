@@ -1033,7 +1033,7 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
@@ -1043,13 +1043,10 @@ unsafe fn start_element_ns_debug(
 ) {
     increment_callbacks_counter();
     sax_debug!("SAX.startElementNs({localname}");
-    if prefix.is_null() {
-        sax_debug!(", NULL");
+    if let Some(prefix) = prefix {
+        sax_debug!(", {prefix}");
     } else {
-        sax_debug!(
-            ", {}",
-            CStr::from_ptr(prefix as *mut c_char).to_string_lossy()
-        );
+        sax_debug!(", NULL");
     }
     if uri.is_null() {
         sax_debug!(", NULL");
@@ -1815,7 +1812,7 @@ unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
 unsafe fn start_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,

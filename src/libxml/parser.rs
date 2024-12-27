@@ -1886,7 +1886,7 @@ pub const XML_SAX2_MAGIC: usize = 0xDEEDBEAF;
 pub type StartElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: i32,
     namespaces: *mut *const XmlChar,
@@ -8314,7 +8314,9 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                 ((*(*ctxt).sax).start_element_ns.unwrap())(
                     (*ctxt).user_data.clone(),
                     localname.as_str(),
-                    prefix,
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
                     nsname,
                     nb_ns,
                     &raw mut (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * nb_ns as usize],
@@ -8326,7 +8328,9 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                 ((*(*ctxt).sax).start_element_ns.unwrap())(
                     (*ctxt).user_data.clone(),
                     localname.as_str(),
-                    prefix,
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
                     nsname,
                     0,
                     null_mut(),

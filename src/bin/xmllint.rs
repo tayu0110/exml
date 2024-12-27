@@ -1322,7 +1322,7 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
     nb_namespaces: c_int,
     namespaces: *mut *const XmlChar,
@@ -1335,10 +1335,10 @@ unsafe fn start_element_ns_debug(
         return;
     }
     print!("SAX.startElementNs({localname}");
-    if prefix.is_null() {
-        print!(", NULL");
+    if let Some(prefix) = prefix {
+        print!(", {prefix}");
     } else {
-        print!(", {}", CStr::from_ptr(prefix as _).to_string_lossy());
+        print!(", NULL");
     }
     if uri.is_null() {
         print!(", NULL");
