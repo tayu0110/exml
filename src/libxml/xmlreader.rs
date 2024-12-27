@@ -1232,7 +1232,7 @@ impl XmlTextReader {
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
                 (*self.ctxt).valid &= xml_validate_push_element(
                     addr_of_mut!((*self.ctxt).vctxt),
                     (*self.ctxt).my_doc,
@@ -1296,7 +1296,7 @@ impl XmlTextReader {
             && !self.ctxt.is_null()
             && (*self.ctxt).validate == 1
         {
-            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
                 (*self.ctxt).valid &= xml_validate_pop_element(
                     addr_of_mut!((*self.ctxt).vctxt),
                     (*self.ctxt).my_doc,
@@ -1641,7 +1641,7 @@ impl XmlTextReader {
             if name == "xmlns" {
                 ns = (*self.node).ns_def;
                 while !ns.is_null() {
-                    if (*ns).prefix.is_null() {
+                    if (*ns).prefix().is_none() {
                         return Some(
                             CStr::from_ptr((*ns).href as *const i8)
                                 .to_string_lossy()
@@ -1660,12 +1660,7 @@ impl XmlTextReader {
         if prefix == "xmlns" {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if !(*ns).prefix.is_null()
-                    && CStr::from_ptr((*ns).prefix as *const i8)
-                        .to_string_lossy()
-                        .as_ref()
-                        == localname
-                {
+                if (*ns).prefix().as_deref() == Some(localname) {
                     ret = Some(
                         CStr::from_ptr((*ns).href as *const i8)
                             .to_string_lossy()
@@ -1701,7 +1696,7 @@ impl XmlTextReader {
         local_name: &str,
         namespace_uri: Option<&str>,
     ) -> Option<String> {
-        use std::ffi::{CStr, CString};
+        use std::ffi::CStr;
 
         use crate::tree::NodeCommon;
 
@@ -1719,12 +1714,10 @@ impl XmlTextReader {
 
         if namespace_uri == Some("http://www.w3.org/2000/xmlns/") {
             let prefix = (local_name != "xmlns").then_some(local_name);
-            let localname = CString::new(local_name).unwrap();
             let mut ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if (prefix.is_none() && (*ns).prefix.is_null())
-                    || (!(*ns).prefix.is_null()
-                        && xml_str_equal((*ns).prefix, localname.as_ptr() as *const u8))
+                if (prefix.is_none() && (*ns).prefix().is_none())
+                    || (*ns).prefix().as_deref() == Some(local_name)
                 {
                     return Some(
                         CStr::from_ptr((*ns).href as *const i8)
@@ -1932,8 +1925,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
-        use std::ffi::CStr;
-
         use crate::tree::{split_qname2, NodeCommon};
 
         let mut ns: XmlNsPtr;
@@ -1953,7 +1944,7 @@ impl XmlTextReader {
             if name == "xmlns" {
                 ns = (*self.node).ns_def;
                 while !ns.is_null() {
-                    if (*ns).prefix.is_null() {
+                    if (*ns).prefix().is_none() {
                         self.curnode = ns as XmlNodePtr;
                         return 1;
                     }
@@ -1968,7 +1959,7 @@ impl XmlTextReader {
                 //   - same attribute names
                 //   - and the attribute carrying that namespace
                 if (*prop).name().as_deref() == Some(name)
-                    && ((*prop).ns.is_null() || (*(*prop).ns).prefix.is_null())
+                    && ((*prop).ns.is_null() || (*(*prop).ns).prefix().is_none())
                 {
                     self.curnode = prop as XmlNodePtr;
                     return 1;
@@ -1982,12 +1973,7 @@ impl XmlTextReader {
         if prefix == "xmlns" {
             ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if !(*ns).prefix.is_null()
-                    && CStr::from_ptr((*ns).prefix as *const i8)
-                        .to_string_lossy()
-                        .as_ref()
-                        == localname
-                {
+                if (*ns).prefix().as_deref() == Some(localname) {
                     self.curnode = ns as XmlNodePtr;
                     return 1;
                 }
@@ -2002,10 +1988,7 @@ impl XmlTextReader {
                 //   - and the attribute carrying that namespace
                 if (*prop).name().as_deref() == Some(localname)
                     && !(*prop).ns.is_null()
-                    && CStr::from_ptr((*(*prop).ns).prefix as *const i8)
-                        .to_string_lossy()
-                        .as_ref()
-                        == prefix
+                    && (*(*prop).ns).prefix().as_deref() == Some(prefix)
                 {
                     self.curnode = prop as XmlNodePtr;
                     return 1;
@@ -2023,8 +2006,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttributeNs")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute_ns(&mut self, local_name: &str, namespace_uri: &str) -> i32 {
-        use std::ffi::CString;
-
         use crate::tree::NodeCommon;
 
         let mut ns: XmlNsPtr;
@@ -2037,14 +2018,12 @@ impl XmlTextReader {
         }
         let node: XmlNodePtr = self.node;
 
-        let clocal_name = CString::new(local_name).unwrap();
         if namespace_uri == "http://www.w3.org/2000/xmlns/" {
             let prefix = (local_name != "xmlns").then_some(local_name);
             ns = (*self.node).ns_def;
             while !ns.is_null() {
-                if (prefix.is_none() && (*ns).prefix.is_null())
-                    || (!(*ns).prefix.is_null()
-                        && xml_str_equal((*ns).prefix, clocal_name.as_ptr() as *const u8))
+                if (prefix.is_none() && (*ns).prefix().is_none())
+                    || (*ns).prefix().as_deref() == Some(local_name)
                 {
                     self.curnode = ns as XmlNodePtr;
                     return 1;
@@ -2054,15 +2033,13 @@ impl XmlTextReader {
             return 0;
         }
 
-        let cns = CString::new(namespace_uri).unwrap();
         let mut prop = (*node).properties;
         while !prop.is_null() {
             // One need to have
             //   - same attribute names
             //   - and the attribute carrying that namespace
-            if xml_str_equal((*prop).name, clocal_name.as_ptr() as *const u8)
-                && (!(*prop).ns.is_null()
-                    && xml_str_equal((*(*prop).ns).href, cns.as_ptr() as *const u8))
+            if (*prop).name().as_deref() == Some(local_name)
+                && (!(*prop).ns.is_null() && (*(*prop).ns).href().as_deref() == Some(namespace_uri))
             {
                 self.curnode = prop as XmlNodePtr;
                 return 1;
@@ -2529,14 +2506,10 @@ impl XmlTextReader {
         };
         if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
             let ns: XmlNsPtr = node as XmlNsPtr;
-            if (*ns).prefix.is_null() {
-                return Some("xmlns".to_owned());
+            if let Some(prefix) = (*ns).prefix() {
+                return Some(prefix.into_owned());
             } else {
-                return Some(
-                    CStr::from_ptr((*ns).prefix as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
+                return Some("xmlns".to_owned());
             }
         }
         if !matches!(
@@ -2572,7 +2545,7 @@ impl XmlTextReader {
         };
         match (*node).element_type() {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-                if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
+                if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
                     return (!(*node).name.is_null()).then(|| {
                         CStr::from_ptr((*node).name as *const i8)
                             .to_string_lossy()
@@ -2580,14 +2553,10 @@ impl XmlTextReader {
                     });
                 }
 
-                let mut ret = xml_strdup((*(*node).ns).prefix);
-                ret = xml_strcat(ret, c":".as_ptr() as _);
-                ret = xml_strcat(ret, (*node).name);
-                let res = CStr::from_ptr(ret as *const i8)
-                    .to_string_lossy()
-                    .into_owned();
-                xml_free(ret as _);
-                Some(res)
+                let mut ret = (*(*node).ns).prefix().unwrap().into_owned();
+                ret.push(':');
+                ret.push_str((*node).name().unwrap().as_ref());
+                Some(ret)
             }
             XmlElementType::XmlTextNode => Some("#text".to_owned()),
             XmlElementType::XmlCDATASectionNode => Some("#cdata-section".to_owned()),
@@ -2624,15 +2593,11 @@ impl XmlTextReader {
                 let ns: XmlNsPtr = node as XmlNsPtr;
 
                 let mut ret = "xmlns".to_owned();
-                if (*ns).prefix.is_null() {
+                let Some(prefix) = (*ns).prefix() else {
                     return Some(ret);
-                }
+                };
                 ret.push(':');
-                ret.push_str(
-                    CStr::from_ptr((*ns).prefix as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
+                ret.push_str(&prefix);
                 Some(ret)
             }
             XmlElementType::XmlElementDecl
@@ -2688,8 +2653,6 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderPrefix")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn prefix(&self) -> Option<String> {
-        use std::ffi::CStr;
-
         use crate::tree::NodeCommon;
 
         if self.node.is_null() {
@@ -2702,9 +2665,7 @@ impl XmlTextReader {
         };
         if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
             let ns: XmlNsPtr = node as XmlNsPtr;
-            if (*ns).prefix.is_null() {
-                return None;
-            }
+            (*ns).prefix()?;
             return Some("xmlns".to_owned());
         }
         if !matches!(
@@ -2713,12 +2674,10 @@ impl XmlTextReader {
         ) {
             return None;
         }
-        if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-            return Some(
-                CStr::from_ptr((*(*node).ns).prefix as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
+        if !(*node).ns.is_null() {
+            if let Some(prefix) = (*(*node).ns).prefix() {
+                return Some(prefix.into_owned());
+            }
         }
         None
     }
@@ -4099,9 +4058,7 @@ pub unsafe extern "C" fn xml_text_reader_const_base_uri(
 /// Returns the local name or NULL if not available, the string will be deallocated with the reader.
 #[doc(alias = "xmlTextReaderConstLocalName")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_local_name(
-    reader: &mut XmlTextReader,
-) -> *const XmlChar {
+pub unsafe fn xml_text_reader_const_local_name(reader: &mut XmlTextReader) -> *const XmlChar {
     use crate::tree::NodeCommon;
 
     if reader.node.is_null() {
@@ -4147,7 +4104,7 @@ pub unsafe extern "C" fn xml_text_reader_const_name(reader: &mut XmlTextReader) 
     };
     match (*node).element_type() {
         XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {
-            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
                 return (*node).name;
             }
             CONSTQSTR!(reader, (*(*node).ns).prefix, (*node).name)
@@ -4243,7 +4200,7 @@ pub unsafe extern "C" fn xml_text_reader_const_prefix(
     };
     if (*node).element_type() == XmlElementType::XmlNamespaceDecl {
         let ns: XmlNsPtr = node as XmlNsPtr;
-        if (*ns).prefix.is_null() {
+        if (*ns).prefix().is_none() {
             return null_mut();
         }
         return CONSTSTR!(reader, c"xmlns".as_ptr() as _);

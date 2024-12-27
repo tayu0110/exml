@@ -273,7 +273,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
         return;
     }
     if matches!((*cur).element_type(), XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
-        if xml_str_equal((*cur).prefix, c"xml".as_ptr() as _) {
+        if (*cur).prefix().as_deref() == Some("xml") {
             return;
         }
 
@@ -283,14 +283,10 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
             buf.write_bytes(b" ");
         }
 
-        /* Within the context of an element attributes */
-        if !(*cur).prefix.is_null() {
+        // Within the context of an element attributes
+        if let Some(prefix) = (*cur).prefix() {
             buf.write_bytes(b"xmlns:");
-            buf.write_str(
-                CStr::from_ptr((*cur).prefix as _)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
+            buf.write_str(&prefix);
         } else {
             buf.write_bytes(b"xmlns");
         }
@@ -369,7 +365,7 @@ unsafe extern "C" fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr:
 
 /// Dump an XML attribute
 #[doc(alias = "xmlAttrDumpOutput")]
-unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
+unsafe fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
     if cur.is_null() {
         return;
     }
@@ -379,13 +375,11 @@ unsafe extern "C" fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr)
     } else {
         buf.write_bytes(b" ");
     }
-    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-        buf.write_str(
-            CStr::from_ptr((*(*cur).ns).prefix as _)
-                .to_string_lossy()
-                .as_ref(),
-        );
-        buf.write_bytes(b":");
+    if !(*cur).ns.is_null() {
+        if let Some(prefix) = (*(*cur).ns).prefix() {
+            buf.write_str(&prefix);
+            buf.write_bytes(b":");
+        }
     }
 
     buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -481,13 +475,11 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                     xml_node_dump_output_internal(ctxt, cur);
                 } else {
                     (*ctxt).buf.borrow_mut().write_bytes(b"<");
-                    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                        (*ctxt).buf.borrow_mut().write_str(
-                            CStr::from_ptr((*(*cur).ns).prefix as _)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
-                        (*ctxt).buf.borrow_mut().write_bytes(b":");
+                    if !(*cur).ns.is_null() {
+                        if let Some(prefix) = (*(*cur).ns).prefix() {
+                            (*ctxt).buf.borrow_mut().write_str(&prefix);
+                            (*ctxt).buf.borrow_mut().write_bytes(b":");
+                        }
                     }
 
                     (*ctxt)
@@ -543,13 +535,11 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                             xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
                         }
                         (*ctxt).buf.borrow_mut().write_bytes(b"></");
-                        if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                            (*ctxt).buf.borrow_mut().write_str(
-                                CStr::from_ptr((*(*cur).ns).prefix as _)
-                                    .to_string_lossy()
-                                    .as_ref(),
-                            );
-                            (*ctxt).buf.borrow_mut().write_bytes(b":");
+                        if !(*cur).ns.is_null() {
+                            if let Some(prefix) = (*(*cur).ns).prefix() {
+                                (*ctxt).buf.borrow_mut().write_str(&prefix);
+                                (*ctxt).buf.borrow_mut().write_bytes(b":");
+                            }
                         }
 
                         (*ctxt)
@@ -733,13 +723,11 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
                 }
 
                 (*ctxt).buf.borrow_mut().write_bytes(b"</");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                    (*ctxt).buf.borrow_mut().write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
-                    (*ctxt).buf.borrow_mut().write_bytes(b":");
+                if !(*cur).ns.is_null() {
+                    if let Some(prefix) = (*(*cur).ns).prefix() {
+                        (*ctxt).buf.borrow_mut().write_str(&prefix);
+                        (*ctxt).buf.borrow_mut().write_bytes(b":");
+                    }
                 }
 
                 (*ctxt)
@@ -865,8 +853,8 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
         } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"lang".as_ptr() as _) {
             lang = cur;
         } else if !(*cur).ns.is_null()
-            && xml_str_equal((*cur).name, c"lang".as_ptr() as _)
-            && xml_str_equal((*(*cur).ns).prefix, c"xml".as_ptr() as _)
+            && (*cur).name().as_deref() == Some("lang")
+            && (*(*cur).ns).prefix().as_deref() == Some("xml")
         {
             xml_lang = cur;
         } else if (*cur).ns.is_null()
@@ -1110,13 +1098,11 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 }
 
                 (*ctxt).buf.borrow_mut().write_bytes(b"<");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                    (*ctxt).buf.borrow_mut().write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
-                    (*ctxt).buf.borrow_mut().write_bytes(b":");
+                if !(*cur).ns.is_null() {
+                    if let Some(prefix) = (*(*cur).ns).prefix() {
+                        (*ctxt).buf.borrow_mut().write_str(&prefix);
+                        (*ctxt).buf.borrow_mut().write_bytes(b":");
+                    }
                 }
 
                 (*ctxt)
@@ -1215,12 +1201,10 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     parent = cur;
                     cur = children.as_ptr();
                     continue;
-                } else if ((*cur).ns.is_null() || (*(*cur).ns).prefix.is_null())
+                } else if ((*cur).ns.is_null() || (*(*cur).ns).prefix().is_none())
                     && (xhtml_is_empty(cur) == 1 && addmeta == 0)
                 {
-                    /*
-                     * C.2. Empty Elements
-                     */
+                    // C.2. Empty Elements
                     (*ctxt).buf.borrow_mut().write_bytes(b" />");
                 } else {
                     if addmeta == 1 {
@@ -1253,17 +1237,13 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                     } else {
                         (*ctxt).buf.borrow_mut().write_bytes(b">");
                     }
-                    /*
-                     * C.3. Element Minimization and Empty Element Content
-                     */
+                    // C.3. Element Minimization and Empty Element Content
                     (*ctxt).buf.borrow_mut().write_bytes(b"</");
-                    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                        (*ctxt).buf.borrow_mut().write_str(
-                            CStr::from_ptr((*(*cur).ns).prefix as _)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
-                        (*ctxt).buf.borrow_mut().write_bytes(b":");
+                    if !(*cur).ns.is_null() {
+                        if let Some(prefix) = (*(*cur).ns).prefix() {
+                            (*ctxt).buf.borrow_mut().write_str(&prefix);
+                            (*ctxt).buf.borrow_mut().write_bytes(b":");
+                        }
                     }
 
                     (*ctxt)
@@ -1287,9 +1267,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                         (*ctxt).escape,
                     );
                 } else {
-                    /*
-                     * Disable escaping, needed for XSLT
-                     */
+                    // Disable escaping, needed for XSLT
 
                     (*ctxt).buf.borrow_mut().write_str(
                         CStr::from_ptr((*cur).content as _)
@@ -1415,13 +1393,11 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
                 }
 
                 (*ctxt).buf.borrow_mut().write_bytes(b"</");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                    (*ctxt).buf.borrow_mut().write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
-                    (*ctxt).buf.borrow_mut().write_bytes(b":");
+                if !(*cur).ns.is_null() {
+                    if let Some(prefix) = (*(*cur).ns).prefix() {
+                        (*ctxt).buf.borrow_mut().write_str(&prefix);
+                        (*ctxt).buf.borrow_mut().write_bytes(b":");
+                    }
                 }
 
                 (*ctxt)

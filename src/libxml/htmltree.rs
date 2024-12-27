@@ -995,13 +995,11 @@ unsafe extern "C" fn html_attr_dump_output(
         return;
     }
     buf.write_str(" ");
-    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-        buf.write_str(
-            CStr::from_ptr((*(*cur).ns).prefix as _)
-                .to_string_lossy()
-                .as_ref(),
-        );
-        buf.write_str(":");
+    if !(*cur).ns.is_null() {
+        if let Some(prefix) = (*(*cur).ns).prefix() {
+            buf.write_str(&prefix);
+            buf.write_str(":");
+        }
     }
 
     buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -1118,9 +1116,7 @@ pub unsafe fn html_node_dump_format_output(
                     break 'to_break;
                 }
 
-                /*
-                 * Get specific HTML info for that node.
-                 */
+                // Get specific HTML info for that node.
                 if (*cur).ns.is_null() {
                     info = html_tag_lookup((*cur).name);
                 } else {
@@ -1128,13 +1124,11 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 buf.write_str("<");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                    buf.write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
-                    buf.write_str(":");
+                if !(*cur).ns.is_null() {
+                    if let Some(prefix) = (*(*cur).ns).prefix() {
+                        buf.write_str(&prefix);
+                        buf.write_str(":");
+                    }
                 }
 
                 buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -1176,13 +1170,11 @@ pub unsafe fn html_node_dump_format_output(
                     buf.write_str(">");
                 } else {
                     buf.write_str("></");
-                    if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                        buf.write_str(
-                            CStr::from_ptr((*(*cur).ns).prefix as _)
-                                .to_string_lossy()
-                                .as_ref(),
-                        );
-                        buf.write_str(":");
+                    if !(*cur).ns.is_null() {
+                        if let Some(prefix) = (*(*cur).ns).prefix() {
+                            buf.write_str(&prefix);
+                            buf.write_str(":");
+                        }
                     }
 
                     buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
@@ -1320,13 +1312,11 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 buf.write_str("</");
-                if !(*cur).ns.is_null() && !(*(*cur).ns).prefix.is_null() {
-                    buf.write_str(
-                        CStr::from_ptr((*(*cur).ns).prefix as _)
-                            .to_string_lossy()
-                            .as_ref(),
-                    );
-                    buf.write_str(":");
+                if !(*cur).ns.is_null() {
+                    if let Some(prefix) = (*(*cur).ns).prefix() {
+                        buf.write_str(&prefix);
+                        buf.write_str(":");
+                    }
                 }
 
                 buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());

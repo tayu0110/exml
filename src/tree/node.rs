@@ -847,8 +847,6 @@ impl XmlNode {
     #[doc(alias = "xmlGetNodePath")]
     #[cfg(feature = "libxml_tree")]
     pub unsafe fn get_node_path(&self) -> Option<String> {
-        use crate::libxml::xmlstring::xml_str_equal;
-
         let mut occur: i32;
         let mut generic: i32;
 
@@ -876,12 +874,8 @@ impl XmlNode {
                 generic = 0;
                 sep = "/";
                 if !current.ns.is_null() {
-                    name = if !(*current.ns).prefix.is_null() {
-                        Cow::Owned(format!(
-                            "{}:{}",
-                            CStr::from_ptr((*current.ns).prefix as *const i8).to_string_lossy(),
-                            current.name().unwrap(),
-                        ))
+                    name = if let Some(prefix) = (*current.ns).prefix() {
+                        Cow::Owned(format!("{prefix}:{}", current.name().unwrap(),))
                     } else {
                         // We cannot express named elements in the default
                         // namespace, so use "*".
@@ -902,7 +896,7 @@ impl XmlNode {
                                 && (now.ns == current.ns
                                     || (!now.ns.is_null()
                                         && !current.ns.is_null()
-                                        && xml_str_equal((*current.ns).prefix, (*now.ns).prefix)))))
+                                        && (*current.ns).prefix() == (*now.ns).prefix()))))
                     {
                         occur += 1;
                     }
@@ -917,10 +911,7 @@ impl XmlNode {
                                     && (now.ns == current.ns
                                         || (!now.ns.is_null()
                                             && !current.ns.is_null()
-                                            && (xml_str_equal(
-                                                (*current.ns).prefix,
-                                                (*now.ns).prefix,
-                                            ))))))
+                                            && (*current.ns).prefix() == (*now.ns).prefix()))))
                         {
                             occur += 1;
                         }
@@ -1033,13 +1024,8 @@ impl XmlNode {
             } else if matches!(current.element_type(), XmlElementType::XmlAttributeNode) {
                 sep = "/@";
                 if !current.ns.is_null() {
-                    name = if !(*current.ns).prefix.is_null() {
-                        format!(
-                            "{}:{}",
-                            CStr::from_ptr((*current.ns).prefix as *const i8).to_string_lossy(),
-                            current.name().unwrap()
-                        )
-                        .into()
+                    name = if let Some(prefix) = (*current.ns).prefix() {
+                        format!("{prefix}:{}", current.name().unwrap()).into()
                     } else {
                         format!("{}", current.name().unwrap()).into()
                     };
@@ -1432,9 +1418,7 @@ impl XmlNode {
                         let ns_name = CString::new(ns_name).unwrap();
                         for cur in ns_list {
                             if xml_str_equal((*cur).href, ns_name.as_ptr() as *const u8) {
-                                let prefix = (!(*cur).prefix.is_null()).then(|| {
-                                    CStr::from_ptr((*cur).prefix as *const i8).to_string_lossy()
-                                });
+                                let prefix = (*cur).prefix();
                                 attr_decl = (*(*doc).int_subset).get_qattr_desc(
                                     CStr::from_ptr(elem_qname as *const i8)
                                         .to_string_lossy()
@@ -1560,8 +1544,6 @@ impl XmlNode {
     #[doc(alias = "xmlGetNsList")]
     #[cfg(any(feature = "libxml_tree", feature = "xpath", feature = "schema"))]
     pub unsafe fn get_ns_list(&self, _doc: *const XmlDoc) -> Option<Vec<XmlNsPtr>> {
-        use crate::libxml::xmlstring::xml_str_equal;
-
         let mut cur: XmlNsPtr;
 
         if matches!(self.element_type(), XmlElementType::XmlNamespaceDecl) {
@@ -1575,9 +1557,7 @@ impl XmlNode {
                 cur = (*node).ns_def;
                 'b: while !cur.is_null() {
                     for i in 0..ret.len() {
-                        if ((*cur).prefix == (*ret[i]).prefix)
-                            || xml_str_equal((*cur).prefix, (*ret[i]).prefix)
-                        {
+                        if (*cur).prefix() == (*ret[i]).prefix() {
                             cur = (*cur).next;
                             continue 'b;
                         }
@@ -2796,16 +2776,12 @@ impl XmlNode {
             if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
                 cur = (*node).ns_def;
                 while !cur.is_null() {
-                    if (*cur).prefix.is_null() && namespace.is_none() && !(*cur).href.is_null() {
+                    if (*cur).prefix().is_none() && namespace.is_none() && !(*cur).href.is_null() {
                         return cur;
                     }
-                    if !(*cur).prefix.is_null()
-                        && !(*cur).href.is_null()
-                        && namespace
-                            .filter(|&n| {
-                                n == CStr::from_ptr((*cur).prefix as *const i8).to_string_lossy()
-                            })
-                            .is_some()
+                    if (*cur).href().is_some()
+                        && (*cur).prefix().is_some()
+                        && namespace == (*cur).prefix().as_deref()
                     {
                         return cur;
                     }
@@ -2814,18 +2790,15 @@ impl XmlNode {
                 if orig != node {
                     cur = (*node).ns;
                     if !cur.is_null() {
-                        if (*cur).prefix.is_null() && namespace.is_none() && !(*cur).href.is_null()
+                        if (*cur).prefix().is_none()
+                            && namespace.is_none()
+                            && !(*cur).href.is_null()
                         {
                             return cur;
                         }
-                        if !(*cur).prefix.is_null()
-                            && !(*cur).href.is_null()
-                            && namespace
-                                .filter(|&n| {
-                                    n == CStr::from_ptr((*cur).prefix as *const i8)
-                                        .to_string_lossy()
-                                })
-                                .is_some()
+                        if (*cur).prefix().is_some()
+                            && (*cur).href().is_some()
+                            && namespace == (*cur).prefix().as_deref()
                         {
                             return cur;
                         }
@@ -2873,9 +2846,7 @@ impl XmlNode {
                     return null_mut();
                 }
             }
-            /*
-            	* Return the XML namespace declaration held by the doc.
-            	*/
+            // Return the XML namespace declaration held by the doc.
             if (*doc).old_ns.is_null() {
                 return (*doc).ensure_xmldecl();
             } else {
@@ -2899,7 +2870,7 @@ impl XmlNode {
                 while !cur.is_null() {
                     if !(*cur).href.is_null()
                         && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
-                        && (!is_attr || !(*cur).prefix.is_null())
+                        && (!is_attr || (*cur).prefix().is_some())
                         && xml_ns_in_scope(doc, orig, node, (*cur).prefix) == 1
                     {
                         return cur;
@@ -2911,7 +2882,7 @@ impl XmlNode {
                     if !cur.is_null()
                         && !(*cur).href.is_null()
                         && xml_str_equal((*cur).href, href.as_ptr() as *const u8)
-                        && (!is_attr || !(*cur).prefix.is_null())
+                        && (!is_attr || (*cur).prefix().is_some())
                         && xml_ns_in_scope(doc, orig, node, (*cur).prefix) == 1
                     {
                         return cur;

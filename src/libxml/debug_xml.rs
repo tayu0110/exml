@@ -48,7 +48,7 @@ use super::{
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,
-    xmlstring::{xml_str_equal, xml_strchr, xml_strstr, XmlChar},
+    xmlstring::{xml_strchr, xml_strstr, XmlChar},
 };
 
 /// Handle a debug error.
@@ -138,34 +138,34 @@ impl XmlDebugCtxt<'_> {
     unsafe fn ns_check_scope(&mut self, node: &impl NodeCommon, ns: XmlNsPtr) {
         let ret: i32 = xml_ns_check_scope(node, ns);
         if ret == -2 {
-            if (*ns).prefix.is_null() {
+            if let Some(prefix) = (*ns).prefix() {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsScope,
+                    "Reference to namespace '{}' not in scope\n",
+                    prefix
+                );
+            } else {
                 xml_debug_err!(
                     self,
                     XmlParserErrors::XmlCheckNsScope,
                     "Reference to default namespace not in scope\n",
                 );
-            } else {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNsScope,
-                    "Reference to namespace '{}' not in scope\n",
-                    CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
-                );
             }
         }
         if ret == -3 {
-            if (*ns).prefix.is_null() {
-                xml_debug_err!(
-                    self,
-                    XmlParserErrors::XmlCheckNsAncestor,
-                    "Reference to default namespace not on ancestor\n",
-                );
-            } else {
+            if let Some(prefix) = (*ns).prefix() {
                 xml_debug_err!(
                     self,
                     XmlParserErrors::XmlCheckNsAncestor,
                     "Reference to namespace '{}' not on ancestor\n",
-                    CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
+                    prefix
+                );
+            } else {
+                xml_debug_err!(
+                    self,
+                    XmlParserErrors::XmlCheckNsAncestor,
+                    "Reference to default namespace not on ancestor\n",
                 );
             }
         }
@@ -761,12 +761,12 @@ impl XmlDebugCtxt<'_> {
             return;
         }
         if ns.href.is_null() {
-            if !ns.prefix.is_null() {
+            if let Some(prefix) = ns.prefix() {
                 xml_debug_err!(
                     self,
                     XmlParserErrors::XmlCheckNoHref,
                     "Incomplete namespace {} href=NULL\n",
-                    CStr::from_ptr(ns.prefix as *const i8).to_string_lossy()
+                    prefix
                 );
             } else {
                 xml_debug_err!(
@@ -776,8 +776,7 @@ impl XmlDebugCtxt<'_> {
                 );
             }
         } else if self.check == 0 {
-            if !ns.prefix.is_null() {
-                let prefix = CStr::from_ptr(ns.prefix as *const i8).to_string_lossy();
+            if let Some(prefix) = ns.prefix() {
                 write!(self.output, "namespace {prefix} href=");
             } else {
                 write!(self.output, "default namespace href=");
@@ -927,11 +926,10 @@ impl XmlDebugCtxt<'_> {
                     self.dump_spaces();
                     write!(self.output, "ELEMENT ");
                     let node = node.as_node().unwrap();
-                    if !node.as_ref().ns.is_null() && !(*node.as_ref().ns).prefix.is_null() {
-                        let prefix = (*node.as_ref().ns).prefix;
-                        self.dump_string(Some(
-                            &CStr::from_ptr(prefix as *const i8).to_string_lossy(),
-                        ));
+                    if !node.as_ref().ns.is_null() {
+                        if let Some(prefix) = (*node.as_ref().ns).prefix() {
+                            self.dump_string(Some(&prefix));
+                        }
                         write!(self.output, ":");
                     }
                     self.dump_string(node.as_ref().name().as_deref());
@@ -1501,7 +1499,7 @@ unsafe fn xml_ns_check_scope(node: &impl NodeCommon, ns: XmlNsPtr) -> i32 {
                 if cur == ns {
                     return 1;
                 }
-                if xml_str_equal((*cur).prefix, (*ns).prefix) {
+                if (*cur).prefix() == (*ns).prefix() {
                     return -2;
                 }
                 cur = (*cur).next;
@@ -1732,10 +1730,10 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodeP
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
             if !(*node).name.is_null() {
-                if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-                    let prefix =
-                        CStr::from_ptr((*(*node).ns).prefix as *const i8).to_string_lossy();
-                    write!(output, "{prefix}:");
+                if !(*node).ns.is_null() {
+                    if let Some(prefix) = (*(*node).ns).prefix() {
+                        write!(output, "{prefix}:");
+                    }
                 }
                 let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
                 write!(output, "{name}");
@@ -1782,11 +1780,10 @@ pub unsafe fn xml_ls_one_node<'a>(output: &mut (impl Write + 'a), node: XmlNodeP
             let ns: XmlNsPtr = node as XmlNsPtr;
 
             let href = CStr::from_ptr((*ns).href as *const i8).to_string_lossy();
-            if (*ns).prefix.is_null() {
-                write!(output, "default -> {href}");
-            } else {
-                let prefix = CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy();
+            if let Some(prefix) = (*ns).prefix() {
                 write!(output, "{prefix} -> {href}");
+            } else {
+                write!(output, "default -> {href}");
             }
         }
         _ => {
@@ -2474,9 +2471,10 @@ pub unsafe fn xml_shell_du(
             for _ in 0..indent {
                 write!((*ctxt).output, "  ");
             }
-            if !(*node).ns.is_null() && !(*(*node).ns).prefix.is_null() {
-                let prefix = CStr::from_ptr((*(*node).ns).prefix as *const i8).to_string_lossy();
-                write!((*ctxt).output, "{prefix}:");
+            if !(*node).ns.is_null() {
+                if let Some(prefix) = (*(*node).ns).prefix() {
+                    write!((*ctxt).output, "{prefix}:");
+                }
             }
             let name = CStr::from_ptr((*node).name as *const i8).to_string_lossy();
             writeln!((*ctxt).output, "{name}");
@@ -2851,10 +2849,11 @@ unsafe fn xml_shell_register_root_namespaces(
     }
     ns = (*root).ns_def;
     while !ns.is_null() {
-        if (*ns).prefix.is_null() {
-            xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, (*ns).href);
+        if let Some(prefix) = (*ns).prefix() {
+            let prefix = CString::new(prefix.as_ref()).unwrap();
+            xml_xpath_register_ns((*ctxt).pctxt, prefix.as_ptr() as *const u8, (*ns).href);
         } else {
-            xml_xpath_register_ns((*ctxt).pctxt, (*ns).prefix, (*ns).href);
+            xml_xpath_register_ns((*ctxt).pctxt, c"defaultns".as_ptr() as _, (*ns).href);
         }
         ns = (*ns).next;
     }
@@ -2984,17 +2983,13 @@ pub unsafe fn xml_shell<'a>(
         }
         prompt[prompt.len() - 1] = 0;
 
-        /*
-         * Get a new command line
-         */
+        // Get a new command line
         cmdline = ((*ctxt).input)(prompt.as_mut_ptr() as _);
         if cmdline.is_null() {
             break;
         }
 
-        /*
-         * Parse the command itself
-         */
+        // Parse the command itself
         cur = cmdline;
         while *cur == b' ' as i8 || *cur == b'\t' as i8 {
             cur = cur.add(1);
@@ -3017,9 +3012,7 @@ pub unsafe fn xml_shell<'a>(
             continue;
         }
 
-        /*
-         * Parse the argument
-         */
+        // Parse the argument
         while *cur == b' ' as i8 || *cur == b'\t' as i8 {
             cur = cur.add(1);
         }
@@ -3034,9 +3027,7 @@ pub unsafe fn xml_shell<'a>(
         }
         arg[i as usize] = 0;
 
-        /*
-         * start interpreting the command
-         */
+        // start interpreting the command
         if strcmp(command.as_mut_ptr(), c"exit".as_ptr()) == 0 {
             break;
         }

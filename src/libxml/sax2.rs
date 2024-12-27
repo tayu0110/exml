@@ -2187,7 +2187,7 @@ pub unsafe fn xml_sax2_start_element(
         // is unbound on a parent we simply keep it NULL
         if !ns.is_null()
             && !(*ns).href.is_null()
-            && (*(*ns).href.add(0) != 0 || !(*ns).prefix.is_null())
+            && (*(*ns).href.add(0) != 0 || (*ns).prefix().is_some())
         {
             (*ret).set_ns(ns);
         }

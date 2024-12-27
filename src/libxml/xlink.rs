@@ -202,10 +202,7 @@ pub unsafe extern "C" fn xlink_is_link(mut doc: XmlDocPtr, node: XmlNodePtr) -> 
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
                 } else {
-                    let buf = format!(
-                        "{}:external-linkset",
-                        CStr::from_ptr((*xlink).prefix as *const i8).to_string_lossy()
-                    );
+                    let buf = format!("{}:external-linkset", (*xlink).prefix().unwrap());
                     if role == buf {
                         // ret = XlinkType::XlinkTypeExtendedSet;
                     }
