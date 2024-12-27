@@ -1817,8 +1817,7 @@ pub type EndElementSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &
 /// DOM subtree and past it in a new xmlAttr element added to
 /// the element.
 #[doc(alias = "attributeSAXFunc")]
-pub type AttributeSAXFunc =
-    unsafe fn(ctx: *mut c_void, name: *const XmlChar, value: *const XmlChar);
+pub type AttributeSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>, name: &str, value: &str);
 
 /// Called when an entity reference is detected.
 #[doc(alias = "referenceSAXFunc")]
