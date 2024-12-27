@@ -1383,7 +1383,7 @@ macro_rules! xml_ns_err_msg {
 unsafe fn xml_sax2_attribute_internal(
     ctx: Option<GenericErrorContext>,
     fullname: &str,
-    mut value: *const XmlChar,
+    value: Option<&str>,
     prefix: *const XmlChar,
 ) {
     use super::htmltree::html_is_boolean_attr;
@@ -1392,6 +1392,8 @@ unsafe fn xml_sax2_attribute_internal(
     let mut ns: *mut XmlChar = null_mut();
     let nval: *mut XmlChar;
     let namespace: XmlNsPtr;
+    let value = value.map(|v| CString::new(v).unwrap());
+    let mut value = value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8);
 
     let ctxt = {
         let ctx = ctx.unwrap();
@@ -1892,12 +1894,10 @@ unsafe fn xml_check_defaulted_attributes(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
     prefix: *const XmlChar,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
     let mut elem_decl: XmlElementPtr;
-    let mut att: *const XmlChar;
     let mut internal: i32 = 1;
-    let mut i: i32;
 
     elem_decl = xml_get_dtd_qelement_desc((*(*ctxt).my_doc).int_subset, name, prefix);
     if elem_decl.is_null() {
@@ -1947,19 +1947,12 @@ unsafe fn xml_check_defaulted_attributes(
                         }
 
                         // Check that the attribute is not declared in the serialization
-                        att = null_mut();
-                        if !atts.is_null() {
-                            i = 0;
-                            att = *atts.add(i as usize);
-                            while !att.is_null() {
-                                if xml_str_equal(att, fulln) {
-                                    break;
-                                }
-                                i += 2;
-                                att = *atts.add(i as usize);
-                            }
-                        }
-                        if att.is_null() {
+                        if !atts.iter().any(|(att, _)| {
+                            att.as_str()
+                                == CStr::from_ptr(fulln as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref()
+                        }) {
                             let fulln = CStr::from_ptr(fulln as *const i8).to_string_lossy();
                             xml_err_valid!(
                                 ctxt,
@@ -1988,8 +1981,7 @@ unsafe fn xml_check_defaulted_attributes(
                     //  - there isn't already an attribute definition
                     //    in the internal subset overriding it.
                     if (*attr).prefix.as_deref() == Some("xmlns")
-                        || ((*attr).prefix.is_none()
-                            && xml_str_equal((*attr).name, c"xmlns".as_ptr() as _))
+                        || ((*attr).prefix.is_none() && (*attr).name().as_deref() == Some("xmlns"))
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
                         let pre = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
@@ -2013,25 +2005,23 @@ unsafe fn xml_check_defaulted_attributes(
                             }
 
                             // Check that the attribute is not declared in the serialization
-                            att = null_mut();
-                            if !atts.is_null() {
-                                i = 0;
-                                att = *atts.add(i as usize);
-                                while !att.is_null() {
-                                    if xml_str_equal(att, fulln) {
-                                        break;
-                                    }
-                                    i += 2;
-                                    att = *atts.add(i as usize);
-                                }
-                            }
-                            if att.is_null() {
+                            if !atts.iter().any(|(att, _)| {
+                                att.as_str()
+                                    == CStr::from_ptr(fulln as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref()
+                            }) {
+                                let value = (*attr).default_value;
                                 xml_sax2_attribute_internal(
                                     Some(GenericErrorContext::new(ctxt)),
                                     CStr::from_ptr(fulln as *const i8)
                                         .to_string_lossy()
                                         .as_ref(),
-                                    (*attr).default_value,
+                                    (!value.is_null())
+                                        .then(|| {
+                                            CStr::from_ptr(value as *const i8).to_string_lossy()
+                                        })
+                                        .as_deref(),
                                     prefix,
                                 );
                             }
@@ -2066,7 +2056,7 @@ unsafe fn xml_check_defaulted_attributes(
 pub unsafe fn xml_sax2_start_element(
     ctx: Option<GenericErrorContext>,
     fullname: &str,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
     use crate::libxml::parser_internals::XML_VCTXT_DTD_VALIDATED;
 
@@ -2074,9 +2064,6 @@ pub unsafe fn xml_sax2_start_element(
     let mut ns: XmlNsPtr;
     let name: *mut XmlChar;
     let mut prefix: *mut XmlChar = null_mut();
-    let mut att: *const XmlChar;
-    let mut value: *const XmlChar;
-    let mut i: i32;
 
     if ctx.is_none() {
         return;
@@ -2170,31 +2157,9 @@ pub unsafe fn xml_sax2_start_element(
         }
 
         // process all the attributes whose name start with "xmlns"
-        if !atts.is_null() {
-            i = 0;
-            att = *atts.add(i as usize);
-            i += 1;
-            value = *atts.add(i as usize);
-            i += 1;
-            while !att.is_null() && !value.is_null() {
-                if (*att.add(0) == b'x')
-                    && (*att.add(1) == b'm')
-                    && (*att.add(2) == b'l')
-                    && (*att.add(3) == b'n')
-                    && (*att.add(4) == b's')
-                {
-                    xml_sax2_attribute_internal(
-                        ctx.clone(),
-                        CStr::from_ptr(att as *const i8).to_string_lossy().as_ref(),
-                        value,
-                        prefix,
-                    );
-                }
-
-                att = *atts.add(i as usize);
-                i += 1;
-                value = *atts.add(i as usize);
-                i += 1;
+        for (att, value) in atts {
+            if att.starts_with("xmlns") {
+                xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), prefix);
             }
         }
 
@@ -2228,46 +2193,14 @@ pub unsafe fn xml_sax2_start_element(
     }
 
     // process all the other attributes
-    if !atts.is_null() {
-        i = 0;
-        att = *atts.add(i as usize);
-        i += 1;
-        value = *atts.add(i as usize);
-        i += 1;
-        if (*ctxt).html != 0 {
-            while !att.is_null() {
-                xml_sax2_attribute_internal(
-                    ctx.clone(),
-                    CStr::from_ptr(att as *const i8).to_string_lossy().as_ref(),
-                    value,
-                    null_mut(),
-                );
-                att = *atts.add(i as usize);
-                i += 1;
-                value = *atts.add(i as usize);
-                i += 1;
-            }
-        } else {
-            while !att.is_null() && !value.is_null() {
-                if (*att.add(0) != b'x')
-                    || (*att.add(1) != b'm')
-                    || (*att.add(2) != b'l')
-                    || (*att.add(3) != b'n')
-                    || (*att.add(4) != b's')
-                {
-                    xml_sax2_attribute_internal(
-                        ctx.clone(),
-                        CStr::from_ptr(att as *const i8).to_string_lossy().as_ref(),
-                        value,
-                        null_mut(),
-                    );
-                }
-
-                // Next ones
-                att = *atts.add(i as usize);
-                i += 1;
-                value = *atts.add(i as usize);
-                i += 1;
+    if (*ctxt).html != 0 {
+        for (att, value) in atts {
+            xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), null_mut());
+        }
+    } else {
+        for (att, value) in atts {
+            if !att.starts_with("xmlns") {
+                xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), null_mut());
             }
         }
     }

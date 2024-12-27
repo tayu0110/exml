@@ -891,22 +891,14 @@ unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
 unsafe fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
     increment_callbacks_counter();
     sax_debug!("SAX.startElement({name}");
-    if !atts.is_null() {
-        let mut i = 0;
-        while !(*atts.add(i)).is_null() {
-            sax_debug!(
-                ", {}='",
-                CStr::from_ptr(*atts.add(i) as _).to_string_lossy()
-            );
-            i += 1;
-            if !(*atts.add(i)).is_null() {
-                sax_debug!("{}'", CStr::from_ptr(*atts.add(i) as _).to_string_lossy());
-            }
-            i += 1;
+    for (key, value) in atts {
+        sax_debug!(", {key}='");
+        if let Some(value) = value {
+            sax_debug!("{value}'");
         }
     }
     sax_debugln!(")");
@@ -1290,43 +1282,37 @@ static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 unsafe fn htmlstart_element_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
-    use std::ffi::c_uchar;
-
     use exml::libxml::htmlparser::html_encode_entities;
 
     sax_debug!("SAX.startElement({name}");
-    if !atts.is_null() {
-        let mut i = 0;
-        while !(*atts.add(i)).is_null() {
-            sax_debug!(", {}", CStr::from_ptr(*atts.add(i) as _).to_string_lossy());
-            i += 1;
-            if !(*atts.add(i)).is_null() {
-                let mut output: [c_uchar; 40] = [0; 40];
-                let mut att: *const c_uchar = *atts.add(i);
-                let mut outlen: usize;
-                let mut attlen: usize;
-                sax_debug!("='");
-                while {
-                    attlen = strlen(att as *mut c_char);
-                    attlen > 0
-                } {
-                    outlen = output.len() - 1;
-                    html_encode_entities(
-                        output.as_mut_ptr(),
-                        addr_of_mut!(outlen) as _,
-                        att,
-                        addr_of_mut!(attlen) as _,
-                        b'\'' as _,
-                    );
-                    output[outlen] = 0;
-                    sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
-                    att = att.add(attlen);
-                }
-                sax_debug!("'");
+    for (key, value) in atts {
+        sax_debug!(", {key}");
+        if let Some(value) = value {
+            let value = CString::new(value.as_str()).unwrap();
+            let mut output: [u8; 40] = [0; 40];
+            let mut att = value.as_ptr() as *const u8;
+            let mut outlen: usize;
+            let mut attlen: usize;
+            sax_debug!("='");
+            while {
+                attlen = strlen(att as *mut c_char);
+                attlen > 0
+            } {
+                outlen = output.len() - 1;
+                html_encode_entities(
+                    output.as_mut_ptr(),
+                    addr_of_mut!(outlen) as _,
+                    att,
+                    addr_of_mut!(attlen) as _,
+                    b'\'' as _,
+                );
+                output[outlen] = 0;
+                sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
+                att = att.add(attlen);
             }
-            i += 1;
+            sax_debug!("'");
         }
     }
     sax_debugln!(")");
@@ -1595,6 +1581,10 @@ unsafe fn sax_parse_test(
 
         if compare_files(temp.as_str(), result.unwrap()) != 0 {
             eprintln!("Got a difference for {filename}",);
+            let mut content = String::new();
+            let mut temp = File::open(temp.as_str()).unwrap();
+            temp.read_to_string(&mut content).unwrap();
+            eprint!("{content}");
             ret = 1;
         }
     }
@@ -1919,7 +1909,7 @@ unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
 unsafe fn start_element_bnd(
     ctx: Option<GenericErrorContext>,
     xname: &str,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
     use exml::libxml::sax2::xml_sax2_start_element;
 

@@ -3000,7 +3000,7 @@ macro_rules! CONSTQSTR {
 unsafe fn xml_text_reader_start_element(
     ctx: Option<GenericErrorContext>,
     fullname: &str,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();

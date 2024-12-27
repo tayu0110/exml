@@ -49,7 +49,7 @@ use std::{
     io::Read,
     mem::{size_of, size_of_val},
     ops::DerefMut,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
     str::{from_utf8, from_utf8_unchecked},
@@ -578,7 +578,7 @@ pub struct XmlParserCtxt {
     pub(crate) recovery: i32,    /* run in recovery mode */
     pub(crate) progressive: i32, /* is this a progressive parsing */
     pub(crate) dict: XmlDictPtr, /* dictionary for the parser */
-    pub(crate) atts: *mut *const XmlChar, /* array for the attributes callbacks */
+    pub(crate) atts: Vec<(String, Option<String>)>, /* array for the attributes callbacks */
     pub(crate) maxatts: i32,     /* the size of the array */
     pub(crate) docdict: i32,     /* use strings from dict to build tree */
 
@@ -1646,7 +1646,7 @@ impl Default for XmlParserCtxt {
             recovery: 0,
             progressive: 0,
             dict: null_mut(),
-            atts: null_mut(),
+            atts: vec![],
             maxatts: 0,
             docdict: 0,
             str_xml: null(),
@@ -1802,9 +1802,11 @@ pub type StartDocumentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>);
 #[doc(alias = "endDocumentSAXFunc")]
 pub type EndDocumentSAXFunc = unsafe fn(ctx: Option<GenericErrorContext>);
 /// Called when an opening tag has been processed.
+///
+/// The elements of `atts` are `(attribute_name, attribute_value)`.
 #[doc(alias = "startElementSAXFunc")]
 pub type StartElementSAXFunc =
-    unsafe fn(ctx: Option<GenericErrorContext>, name: &str, atts: *mut *const XmlChar);
+    unsafe fn(ctx: Option<GenericErrorContext>, name: &str, atts: &[(String, Option<String>)]);
 
 /// Called when the end of an element has been detected.
 #[doc(alias = "endElementSAXFunc")]
@@ -4737,14 +4739,14 @@ unsafe fn xml_init_sax_parser_ctxt(
     }
 
     (*ctxt).maxatts = 0;
-    (*ctxt).atts = null_mut();
-    /* Allocate the Input stack */
+    (*ctxt).atts = vec![];
+    // Allocate the Input stack
     (*ctxt).input_tab.shrink_to(5);
     while {
         input = (*ctxt).input_pop();
         !input.is_null()
     } {
-        /* Non consuming */
+        // Non consuming
         xml_free_input_stream(input);
     }
     (*ctxt).input = null_mut();
@@ -4914,9 +4916,6 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if !(*ctxt).vctxt.node_tab.is_null() {
         xml_free((*ctxt).vctxt.node_tab as _);
     }
-    if !(*ctxt).atts.is_null() {
-        xml_free((*ctxt).atts as _);
-    }
     if !(*ctxt).dict.is_null() {
         xml_dict_free((*ctxt).dict);
     }
@@ -4955,6 +4954,7 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     {
         (*ctxt).catalogs = None;
     }
+    drop_in_place(ctxt);
     xml_free(ctxt as _);
 }
 
@@ -7752,49 +7752,44 @@ pub(crate) unsafe fn xml_err_attribute_dup(
     }
 }
 
-unsafe extern "C" fn xml_ctxt_grow_attrs(ctxt: XmlParserCtxtPtr, nr: i32) -> i32 {
-    let atts: *mut *const XmlChar;
-    let attallocs: *mut i32;
-    let maxatts: i32;
-
-    if nr + 5 > (*ctxt).maxatts {
-        maxatts = if (*ctxt).maxatts == 0 {
-            55
-        } else {
-            (nr + 5) * 2
-        };
-        atts = xml_malloc(maxatts as usize * size_of::<*const XmlChar>()) as _;
-        if atts.is_null() {
+unsafe fn grow_attrs(
+    ctxt: XmlParserCtxtPtr,
+    atts: &mut *mut *const u8,
+    attallocs: &mut *mut i32,
+    maxatts: &mut i32,
+    nr: i32,
+) -> i32 {
+    if nr + 5 > *maxatts {
+        let newmaxatts = if *maxatts == 0 { 55 } else { (nr + 5) * 2 };
+        let newatts =
+            xml_malloc(newmaxatts as usize * size_of::<*const XmlChar>()) as *mut *const u8;
+        if newatts.is_null() {
             // goto mem_error;
             xml_err_memory(ctxt, None);
             return -1;
         }
-        attallocs = xml_realloc(
-            (*ctxt).attallocs as _,
-            (maxatts as usize / 5) * size_of::<i32>(),
+        *attallocs = xml_realloc(
+            *attallocs as _,
+            (newmaxatts as usize / 5) * size_of::<i32>(),
         ) as _;
         if attallocs.is_null() {
-            xml_free(atts as _);
+            xml_free(newatts as _);
             // goto mem_error;
             xml_err_memory(ctxt, None);
             return -1;
         }
-        if (*ctxt).maxatts > 0 {
+        if *maxatts > 0 {
             memcpy(
-                atts as _,
-                (*ctxt).atts as _,
-                (*ctxt).maxatts as usize * size_of::<*const XmlChar>(),
+                newatts as _,
+                *atts as _,
+                *maxatts as usize * size_of::<*const XmlChar>(),
             );
         }
-        xml_free((*ctxt).atts as _);
-        (*ctxt).atts = atts;
-        (*ctxt).attallocs = attallocs;
-        (*ctxt).maxatts = maxatts;
+        xml_free(*atts as _);
+        *atts = newatts;
+        *maxatts = newmaxatts;
     }
-    (*ctxt).maxatts
-    // mem_error:
-    //     xml_err_memory(ctxt, None);
-    //     return -1;
+    *maxatts
 }
 
 /// Parse a start tag. Always consumes '<'.
@@ -7832,8 +7827,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     let mut aprefix: *const XmlChar = null();
     let mut nsname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
-    let mut atts: *mut *const XmlChar = (*ctxt).atts;
-    let mut maxatts: i32 = (*ctxt).maxatts;
+    let mut atts: *mut *const XmlChar = null_mut();
+    let mut attallocs: *mut i32 = null_mut();
+    let mut maxatts: i32 = 0;
 
     if (*ctxt).current_byte() != b'<' {
         return null_mut();
@@ -8066,27 +8062,22 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     }
                 } else {
                     // Add the pair to atts
-                    if atts.is_null() || nbatts + 5 > maxatts {
-                        if xml_ctxt_grow_attrs(ctxt, nbatts + 5) < 0 {
-                            break 'next_attr;
-                        }
-
-                        maxatts = (*ctxt).maxatts;
-                        atts = (*ctxt).atts;
+                    if (atts.is_null() || nbatts + 5 > maxatts)
+                        && grow_attrs(ctxt, &mut atts, &mut attallocs, &mut maxatts, nbatts + 5) < 0
+                    {
+                        break 'next_attr;
                     }
 
-                    *(*ctxt).attallocs.add(nratts as usize) = alloc;
+                    *attallocs.add(nratts as usize) = alloc;
                     nratts += 1;
                     *atts.add(nbatts as usize) = attname;
                     nbatts += 1;
                     *atts.add(nbatts as usize) = aprefix;
                     nbatts += 1;
-                    /*
-                     * The namespace URI field is used temporarily to point at the
-                     * base of the current input buffer for non-alloced attributes.
-                     * When the input buffer is reallocated, all the pointers become
-                     * invalid, but they can be reconstructed later.
-                     */
+                    // The namespace URI field is used temporarily to point at the
+                    // base of the current input buffer for non-alloced attributes.
+                    // When the input buffer is reallocated, all the pointers become
+                    // invalid, but they can be reconstructed later.
                     if alloc != 0 {
                         *atts.add(nbatts as usize) = null_mut();
                         nbatts += 1;
@@ -8099,9 +8090,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     attvalue = attvalue.add(len as usize);
                     *atts.add(nbatts as usize) = attvalue;
                     nbatts += 1;
-                    /*
-                     * tag if some deallocation is needed
-                     */
+                    // tag if some deallocation is needed
                     if alloc != 0 {
                         attval = 1;
                     }
@@ -8145,13 +8134,10 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
             break 'done;
         }
 
-        /* Reconstruct attribute value pointers. */
+        // Reconstruct attribute value pointers.
         for (i, _) in (0..).step_by(5).zip(0..nratts) {
             if !(*atts.add(i + 2)).is_null() {
-                /*
-                 * Arithmetic on dangling pointers is technically undefined
-                 * behavior, but well...
-                 */
+                // Arithmetic on dangling pointers is technically undefined behavior, but well...
                 let old: *const XmlChar = *atts.add(i + 2);
                 *atts.add(i + 2) = null_mut(); /* Reset repurposed namespace URI */
                 *atts.add(i + 3) = (*(*ctxt).input)
@@ -8175,13 +8161,9 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                     attname = *(*defaults).values.as_ptr().add(5 * i);
                     aprefix = *(*defaults).values.as_ptr().add(5 * i + 1);
 
-                    /*
-                     * special work for namespaces defaulted defs
-                     */
+                    // special work for namespaces defaulted defs
                     if attname == (*ctxt).str_xmlns && aprefix.is_null() {
-                        /*
-                         * check that it's not a defined namespace
-                         */
+                        // check that it's not a defined namespace
                         for j in 1..=nb_ns {
                             if (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * j as usize].is_null() {
                                 continue 'b;
@@ -8197,9 +8179,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             nb_ns += 1;
                         }
                     } else if aprefix == (*ctxt).str_xmlns {
-                        /*
-                         * check that it's not a defined namespace
-                         */
+                        // check that it's not a defined namespace
                         for j in 1..=nb_ns {
                             if (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * j as usize] == attname {
                                 continue 'b;
@@ -8214,9 +8194,7 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             nb_ns += 1;
                         }
                     } else {
-                        /*
-                         * check that it's not a defined attribute
-                         */
+                        // check that it's not a defined attribute
                         for j in (0..nbatts).step_by(5) {
                             if attname == *atts.add(j as usize)
                                 && aprefix == *atts.add(j as usize + 1)
@@ -8225,13 +8203,12 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
                             }
                         }
 
-                        if atts.is_null() || nbatts + 5 > maxatts {
-                            if xml_ctxt_grow_attrs(ctxt, nbatts + 5) < 0 {
-                                localname = null_mut();
-                                break 'done;
-                            }
-                            maxatts = (*ctxt).maxatts;
-                            atts = (*ctxt).atts;
+                        if (atts.is_null() || nbatts + 5 > maxatts)
+                            && grow_attrs(ctxt, &mut atts, &mut attallocs, &mut maxatts, nbatts + 5)
+                                < 0
+                        {
+                            localname = null_mut();
+                            break 'done;
                         }
                         *atts.add(nbatts as usize) = attname;
                         nbatts += 1;
@@ -8367,15 +8344,20 @@ pub(crate) unsafe extern "C" fn xml_parse_start_tag2(
     }
 
     //  done:
-    /*
-     * Free up attribute allocated strings if needed
-     */
+    // Free up attribute allocated strings if needed
     if attval != 0 {
         for (i, j) in (3..).step_by(5).zip(0..nratts) {
-            if *(*ctxt).attallocs.add(j as usize) != 0 && !(*atts.add(i)).is_null() {
+            if *attallocs.add(j as usize) != 0 && !(*atts.add(i)).is_null() {
                 xml_free(*atts.add(i) as _);
             }
         }
+    }
+
+    if !atts.is_null() {
+        xml_free(atts as _);
+    }
+    if !attallocs.is_null() {
+        xml_free(attallocs as _);
     }
 
     localname

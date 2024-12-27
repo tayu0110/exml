@@ -1124,25 +1124,17 @@ unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
 unsafe fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    atts: *mut *const XmlChar,
+    atts: &[(String, Option<String>)],
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
     print!("SAX.startElement({name}");
-    if !atts.is_null() {
-        for i in (0..).step_by(2).take_while(|&i| !(*atts.add(i)).is_null()) {
-            print!(
-                ", {}='",
-                CStr::from_ptr(*atts.add(i) as _).to_string_lossy()
-            );
-            if !(*atts.add(i + 1)).is_null() {
-                print!(
-                    "{}'",
-                    CStr::from_ptr(*atts.add(i + 1) as _).to_string_lossy()
-                );
-            }
+    for (key, value) in atts {
+        print!(", {key}='");
+        if let Some(value) = value {
+            print!("{value}'");
         }
     }
     println!(")");

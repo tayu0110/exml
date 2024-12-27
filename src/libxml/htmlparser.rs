@@ -23,7 +23,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, CStr, CString},
+    ffi::{c_char, CStr},
     io::Read,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
@@ -32,9 +32,7 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use libc::{
-    bsearch, memcpy, memset, ptrdiff_t, size_t, snprintf, strcat, strcmp, strcpy, strlen, INT_MAX,
-};
+use libc::{bsearch, memcpy, memset, ptrdiff_t, size_t, snprintf, strcmp, strlen, INT_MAX};
 
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
@@ -6479,7 +6477,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     if (*ctxt).name_tab.is_empty() {
         html_name_push(ctxt, c"html".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "html", null_mut());
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "html", &[]);
         }
     }
     if xml_str_equal(newtag, c"body".as_ptr() as _) || xml_str_equal(newtag, c"head".as_ptr() as _)
@@ -6501,7 +6499,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
         // dropped OBJECT ... i you put it first BODY will be assumed !
         html_name_push(ctxt, c"head".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "head", null_mut());
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "head", &[]);
         }
     } else if !xml_str_equal(newtag, c"noframes".as_ptr() as _)
         && !xml_str_equal(newtag, c"frame".as_ptr() as _)
@@ -6522,7 +6520,7 @@ unsafe fn html_check_implied(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
 
         html_name_push(ctxt, c"body".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "body", null_mut());
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "body", &[]);
         }
     }
 }
@@ -6963,74 +6961,46 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
 /// Checks an http-equiv attribute from a Meta tag to detect the encoding
 /// If a new encoding is detected the parser is switched to decode it and pass UTF8
 #[doc(alias = "htmlCheckEncoding")]
-unsafe extern "C" fn html_check_encoding(ctxt: HtmlParserCtxtPtr, attvalue: *const XmlChar) {
-    let mut encoding: *const XmlChar;
-
-    if attvalue.is_null() {
+unsafe fn html_check_encoding(ctxt: HtmlParserCtxtPtr, attvalue: &str) {
+    let mut encoding = attvalue;
+    let Some(pos) = attvalue
+        .as_bytes()
+        .windows(7)
+        .position(|v| v.eq_ignore_ascii_case(b"charset"))
+    else {
         return;
-    }
-
-    encoding = xml_strcasestr(attvalue, c"charset".as_ptr() as _);
-    if !encoding.is_null() {
-        encoding = encoding.add(7);
-    }
-    // skip blank
-    if !encoding.is_null() && xml_is_blank_char(*encoding as u32) {
-        encoding = xml_strcasestr(attvalue, c"=".as_ptr() as _);
-    }
-    if !encoding.is_null() && *encoding == b'=' {
-        encoding = encoding.add(1);
-        html_check_encoding_direct(
-            ctxt,
-            Some(
-                CStr::from_ptr(encoding as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ),
-        );
+    };
+    encoding = &encoding[pos + 7..];
+    encoding = encoding.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    if let Some(encoding) = encoding.strip_prefix('=') {
+        html_check_encoding_direct(ctxt, Some(encoding));
     }
 }
 
 /// Checks an attributes from a Meta tag
 #[doc(alias = "htmlCheckMeta")]
-unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const XmlChar) {
-    let mut i: usize;
-    let mut att: *const XmlChar;
-    let mut value: *const XmlChar;
+unsafe fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: &[(String, Option<String>)]) {
     let mut http: i32 = 0;
-    let mut content: *const XmlChar = null();
 
-    if ctxt.is_null() || atts.is_null() {
+    if ctxt.is_null() {
         return;
     }
 
-    i = 0;
-    att = *atts.add(i);
-    i += 1;
-    while !att.is_null() {
-        value = *atts.add(i);
-        i += 1;
-        if !value.is_null()
-            && xml_strcasecmp(att, c"http-equiv".as_ptr() as _) == 0
-            && xml_strcasecmp(value, c"Content-Type".as_ptr() as _) == 0
+    let mut content = None;
+    for (att, value) in atts {
+        if value
+            .as_deref()
+            .map_or(false, |v| v.eq_ignore_ascii_case("Content-Type"))
+            && att.eq_ignore_ascii_case("http-equiv")
         {
             http = 1;
-        } else if !value.is_null() && xml_strcasecmp(att, c"charset".as_ptr() as _) == 0 {
-            html_check_encoding_direct(
-                ctxt,
-                Some(
-                    CStr::from_ptr(value as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                ),
-            );
-        } else if !value.is_null() && xml_strcasecmp(att, c"content".as_ptr() as _) == 0 {
-            content = value;
+        } else if value.is_some() && att.eq_ignore_ascii_case("charset") {
+            html_check_encoding_direct(ctxt, value.as_deref());
+        } else if value.is_some() && att.eq_ignore_ascii_case("content") {
+            content = value.as_deref();
         }
-        att = *atts.add(i);
-        i += 1;
     }
-    if http != 0 && !content.is_null() {
+    if let Some(content) = content.filter(|_| http != 0) {
         html_check_encoding(ctxt, content);
     }
 }
@@ -7053,9 +7023,6 @@ unsafe extern "C" fn html_check_meta(ctxt: HtmlParserCtxtPtr, atts: *mut *const 
 unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut attname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
-    let mut atts: *mut *const XmlChar;
-    let mut nbatts: i32 = 0;
-    let mut maxatts: i32;
     let mut meta: i32 = 0;
     let mut discardtag: i32 = 0;
 
@@ -7076,9 +7043,6 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         return -1;
     }
     (*ctxt).skip_char();
-
-    atts = (*ctxt).atts;
-    maxatts = (*ctxt).maxatts;
 
     (*ctxt).grow();
     let name: *const XmlChar = html_parse_html_name(ctxt);
@@ -7162,10 +7126,13 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         (*ctxt).grow();
         attname = html_parse_attribute(ctxt, addr_of_mut!(attvalue));
         if !attname.is_null() {
+            let attname = CStr::from_ptr(attname as *const i8)
+                .to_string_lossy()
+                .into_owned();
             // Well formedness requires at most one declaration of an attribute
-            for i in (0..nbatts).step_by(2) {
-                if xml_str_equal(*atts.add(i as usize), attname) {
-                    let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+            for i in 0..(*ctxt).atts.len() {
+                let (name, _) = &(*ctxt).atts[i];
+                if name.as_str() == attname {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
@@ -7183,43 +7150,13 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             }
 
             // Add the pair to atts
-            if atts.is_null() {
-                maxatts = 22; /* allow for 10 attrs by default */
-                atts = xml_malloc(maxatts as usize * size_of::<*mut XmlChar>()) as _;
-                if atts.is_null() {
-                    html_err_memory(ctxt, None);
-                    if !attvalue.is_null() {
-                        xml_free(attvalue as _);
-                    }
-                    // goto failed;
-                    SKIP_BLANKS!(ctxt);
-                    continue 'failed;
-                }
-                (*ctxt).atts = atts;
-                (*ctxt).maxatts = maxatts;
-            } else if nbatts + 4 > maxatts {
-                maxatts *= 2;
-                let n: *mut *const XmlChar =
-                    xml_realloc(atts as _, maxatts as usize * size_of::<*const XmlChar>()) as _;
-                if n.is_null() {
-                    html_err_memory(ctxt, None);
-                    if !attvalue.is_null() {
-                        xml_free(attvalue as _);
-                    }
-                    // goto failed;
-                    SKIP_BLANKS!(ctxt);
-                    continue 'failed;
-                }
-                atts = n;
-                (*ctxt).atts = atts;
-                (*ctxt).maxatts = maxatts;
-            }
-            *atts.add(nbatts as usize) = attname;
-            nbatts += 1;
-            *atts.add(nbatts as usize) = attvalue;
-            nbatts += 1;
-            *atts.add(nbatts as usize) = null_mut();
-            *atts.add(nbatts as usize + 1) = null_mut();
+            let value = (!attvalue.is_null()).then(|| {
+                CStr::from_ptr(attvalue as *const i8)
+                    .to_string_lossy()
+                    .into_owned()
+            });
+            (*ctxt).atts.push((attname, value));
+            xml_free(attvalue as _);
         } else {
             if !attvalue.is_null() {
                 xml_free(attvalue as _);
@@ -7239,8 +7176,8 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     }
 
     // Handle specific association to the META tag
-    if meta != 0 && nbatts != 0 {
-        html_check_meta(ctxt, atts);
+    if meta != 0 && !(*ctxt).atts.is_empty() {
+        html_check_meta(ctxt, &(*ctxt).atts);
     }
 
     // SAX: Start of Element !
@@ -7248,26 +7185,15 @@ unsafe fn html_parse_start_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_name_push(ctxt, name);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            if nbatts != 0 {
-                ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), &name, atts);
-            } else {
-                ((*(*ctxt).sax).start_element.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    &name,
-                    null_mut(),
-                );
-            }
+            ((*(*ctxt).sax).start_element.unwrap())(
+                (*ctxt).user_data.clone(),
+                &name,
+                &(*ctxt).atts,
+            );
         }
     }
 
-    if !atts.is_null() {
-        for i in (1..nbatts).step_by(2) {
-            if !(*atts.add(i as usize)).is_null() {
-                xml_free(*atts.add(i as usize) as _);
-            }
-        }
-    }
-
+    (*ctxt).atts.clear();
     discardtag
 }
 
@@ -8317,7 +8243,7 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
         html_check_implied(ctxt, c"p".as_ptr() as _);
         html_name_push(ctxt, c"p".as_ptr() as _);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", null_mut());
+            ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", &[]);
         }
         return 1;
     }
@@ -8330,7 +8256,7 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
             html_check_implied(ctxt, c"p".as_ptr() as _);
             html_name_push(ctxt, c"p".as_ptr() as _);
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).start_element.is_some() {
-                ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", null_mut());
+                ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", &[]);
             }
             return 1;
         }
@@ -9735,10 +9661,6 @@ pub unsafe fn html_create_file_parser_ctxt(
     filename: &str,
     encoding: Option<&str>,
 ) -> HtmlParserCtxtPtr {
-    /* htmlCharEncoding enc; */
-    let content: *mut XmlChar;
-    let content_line: *mut XmlChar = c"charset=".as_ptr() as _;
-
     let ctxt: HtmlParserCtxtPtr = html_new_parser_ctxt();
     if ctxt.is_null() {
         return null_mut();
@@ -9759,14 +9681,8 @@ pub unsafe fn html_create_file_parser_ctxt(
         let l = encoding.len();
 
         if l < 1000 {
-            content = xml_malloc_atomic(xml_strlen(content_line) as usize + l + 1) as _;
-            if !content.is_null() {
-                let encoding = CString::new(encoding).unwrap();
-                strcpy(content as _, content_line as _);
-                strcat(content as _, encoding.as_ptr());
-                html_check_encoding(ctxt, content);
-                xml_free(content as _);
-            }
+            let content = format!("charset={encoding}");
+            html_check_encoding(ctxt, &content);
         }
     }
 

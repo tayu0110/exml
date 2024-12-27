@@ -4680,9 +4680,6 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
 
     let mut attname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
-    let mut atts: *mut *const XmlChar = (*ctxt).atts;
-    let mut nbatts: i32 = 0;
-    let mut maxatts: i32 = (*ctxt).maxatts;
 
     if (*ctxt).current_byte() != b'<' {
         return null_mut();
@@ -4705,6 +4702,7 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
     (*ctxt).skip_blanks();
     (*ctxt).grow();
 
+    let mut atts: Vec<(String, Option<String>)> = vec![];
     while (*ctxt).current_byte() != b'>'
         && ((*ctxt).current_byte() != b'/' || NXT!(ctxt, 1) != b'>')
         && xml_is_char((*ctxt).current_byte() as u32)
@@ -4721,57 +4719,29 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
         }
 
         'failed: {
+            let attname = CStr::from_ptr(attname as *const i8)
+                .to_string_lossy()
+                .into_owned();
             if !attvalue.is_null() {
                 // [ WFC: Unique Att Spec ]
                 // No attribute name may appear more than once in the same
                 // start-tag or empty-element tag.
-                for i in (0..nbatts).step_by(2) {
-                    if xml_str_equal(*atts.add(i as usize) as _, attname as _) {
-                        let loc = CStr::from_ptr(attname as *const i8).to_string_lossy();
-                        xml_err_attribute_dup(ctxt, None, &loc);
+                for (att, _) in &atts {
+                    if att.as_str() == attname {
+                        xml_err_attribute_dup(ctxt, None, &attname);
                         xml_free(attvalue as _);
                         break 'failed;
                     }
                 }
                 // Add the pair to atts
-                if atts.is_null() {
-                    // allow for 10 attrs by default
-                    maxatts = 22;
-                    atts = xml_malloc(maxatts as usize * size_of::<*mut XmlChar>())
-                        as *mut *const XmlChar;
-                    if atts.is_null() {
-                        xml_err_memory(ctxt, None);
-                        if !attvalue.is_null() {
-                            xml_free(attvalue as _);
-                        }
-                        break 'failed;
-                    }
-                    (*ctxt).atts = atts;
-                    (*ctxt).maxatts = maxatts;
-                } else if nbatts + 4 > maxatts {
-                    maxatts *= 2;
-                    let n: *mut *const XmlChar =
-                        xml_realloc(atts as _, maxatts as usize * size_of::<*const XmlChar>())
-                            as *mut *const XmlChar;
-                    if n.is_null() {
-                        xml_err_memory(ctxt, None);
-                        if !attvalue.is_null() {
-                            xml_free(attvalue as _);
-                        }
-                        break 'failed;
-                    }
-                    atts = n;
-                    (*ctxt).atts = atts;
-                    (*ctxt).maxatts = maxatts;
-                }
-
-                *atts.add(nbatts as usize) = attname;
-                nbatts += 1;
-                *atts.add(nbatts as usize) = attvalue;
-                nbatts += 1;
-                *atts.add(nbatts as usize) = null_mut();
-                *atts.add(nbatts as usize + 1) = null_mut();
-            } else if !attvalue.is_null() {
+                atts.push((
+                    attname,
+                    Some(
+                        CStr::from_ptr(attvalue as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    ),
+                ));
                 xml_free(attvalue as _);
             }
         }
@@ -4799,22 +4769,14 @@ pub(crate) unsafe fn xml_parse_start_tag(ctxt: XmlParserCtxtPtr) -> *const XmlCh
     if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         if let Some(elem) = (*(*ctxt).sax).start_element {
             let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-            if nbatts > 0 {
-                elem((*ctxt).user_data.clone(), &name, atts);
+            if !atts.is_empty() {
+                elem((*ctxt).user_data.clone(), &name, atts.as_slice());
             } else {
-                elem((*ctxt).user_data.clone(), &name, null_mut());
+                elem((*ctxt).user_data.clone(), &name, &[]);
             }
         }
     }
 
-    if !atts.is_null() {
-        // Free only the content strings
-        for i in (1..nbatts).step_by(2) {
-            if !(*atts.add(i as usize)).is_null() {
-                xml_free(*atts.add(i as usize) as _);
-            }
-        }
-    }
     name
 }
 
