@@ -47,7 +47,7 @@ use crate::{
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
             xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
-            xml_free_parser_ctxt, xml_parse_chunk, CdataBlockSAXFunc, CharactersSAXFunc,
+            xml_free_parser_ctxt, xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc,
             EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc,
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserMode,
             XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
@@ -231,7 +231,7 @@ pub struct XmlTextReader {
     start_element_ns: Option<StartElementNsSAX2Func>, /* idem */
     end_element_ns: Option<EndElementNsSAX2Func>,     /* idem */
     characters: Option<CharactersSAXFunc>,
-    cdata_block: Option<CdataBlockSAXFunc>,
+    cdata_block: Option<CDATABlockSAXFunc>,
     base: u32,            /* base of the segment in the input */
     cur: u32,             /* current position in the input */
     node: XmlNodePtr,     /* current node */
@@ -3117,11 +3117,7 @@ unsafe fn xml_text_reader_end_element_ns(
 
 /// Receiving some chars from the parser.
 #[doc(alias = "xmlTextReaderCharacters")]
-unsafe fn xml_text_reader_characters(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn xml_text_reader_characters(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
         let lock = ctx.lock();
@@ -3131,18 +3127,14 @@ unsafe fn xml_text_reader_characters(
 
     if !reader.is_null() {
         if let Some(characters) = (*reader).characters {
-            characters(ctx, ch, len);
+            characters(ctx, ch);
         }
     }
 }
 
 /// Called when a pcdata block has been parsed
 #[doc(alias = "xmlTextReaderCDataBlock")]
-unsafe fn xml_text_reader_cdata_block(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn xml_text_reader_cdata_block(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
         let lock = ctx.lock();
@@ -3152,7 +3144,7 @@ unsafe fn xml_text_reader_cdata_block(
 
     if !reader.is_null() {
         if let Some(cdata_block) = (*reader).cdata_block {
-            cdata_block(ctx, ch, len);
+            cdata_block(ctx, ch);
         }
     }
 }

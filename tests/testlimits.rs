@@ -810,7 +810,7 @@ fn end_document_callback(_ctx: Option<GenericErrorContext>) {
 /// receiving some chars from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "charactersCallback")]
-fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _len: i32) {
+fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
@@ -823,11 +823,7 @@ fn reference_callback(_ctx: Option<GenericErrorContext>, _name: &str) {
 /// receiving some ignorable whitespaces from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "ignorableWhitespaceCallback")]
-fn ignorable_whitespace_callback(
-    _ctx: Option<GenericErrorContext>,
-    _ch: *const XmlChar,
-    _len: i32,
-) {
+fn ignorable_whitespace_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
@@ -843,7 +839,7 @@ fn processing_instruction_callback(
 
 /// called when a pcdata block has been parsed
 #[doc(alias = "cdataBlockCallback")]
-fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar, _len: i32) {
+fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 

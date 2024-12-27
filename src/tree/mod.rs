@@ -2421,14 +2421,8 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
 /// Creation of a new node containing a CDATA block.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCDataBlock")]
-pub unsafe extern "C" fn xml_new_cdata_block(
-    doc: XmlDocPtr,
-    content: *const XmlChar,
-    len: i32,
-) -> XmlNodePtr {
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_cdata_block(doc: XmlDocPtr, content: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building CDATA");
@@ -2437,10 +2431,7 @@ pub unsafe extern "C" fn xml_new_cdata_block(
     std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlCDATASectionNode;
     (*cur).doc = doc;
-
-    if !content.is_null() {
-        (*cur).content = xml_strndup(content, len);
-    }
+    (*cur).content = xml_strndup(content.as_ptr(), content.len() as i32);
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -2791,11 +2782,7 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
 ///
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlTextConcat")]
-pub unsafe extern "C" fn xml_text_concat(
-    node: XmlNodePtr,
-    content: *const XmlChar,
-    len: i32,
-) -> i32 {
+pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
     if node.is_null() {
         return -1;
     }
@@ -2813,9 +2800,9 @@ pub unsafe extern "C" fn xml_text_concat(
             && !(*(*node).doc).dict.is_null()
             && xml_dict_owns((*(*node).doc).dict, (*node).content) != 0)
     {
-        (*node).content = xml_strncat_new((*node).content, content, len);
+        (*node).content = xml_strncat_new((*node).content, content.as_ptr(), content.len() as i32);
     } else {
-        (*node).content = xml_strncat((*node).content, content, len);
+        (*node).content = xml_strncat((*node).content, content.as_ptr(), content.len() as i32);
     }
     (*node).properties = null_mut();
     if (*node).content.is_null() {
@@ -6443,44 +6430,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_cdata_block() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let content = gen_const_xml_char_ptr(n_content, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !content.is_null() && len > xml_strlen(content) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_new_cdata_block(doc, content, len);
-                        desret_xml_node_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_content, content, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewCDataBlock",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewCDataBlock()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_content);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_child() {
         #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
@@ -7278,44 +7227,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName3()");
                         eprint!(" {}", n_name);
                         eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_concat() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_xml_node_ptr(n_node, 0);
-                        let content = gen_const_xml_char_ptr(n_content, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !content.is_null() && len > xml_strlen(content) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_text_concat(node, content, len);
-                        desret_int(ret_val);
-                        des_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_content, content, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextConcat",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlTextConcat()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_content);
-                            eprintln!(" {}", n_len);
-                        }
                     }
                 }
             }

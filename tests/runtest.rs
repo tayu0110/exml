@@ -851,37 +851,24 @@ fn unparsed_entity_decl_debug(
     );
 }
 
-/**
- * setDocumentLocatorDebug:
- * @ctxt:  An XML parser context
- * @loc: A SAX Locator
- *
- * Receive the document locator at startup, actually xmlDefaultSAXLocator
- * Everything is available on the context, so this is useless in our case.
- */
+/// Receive the document locator at startup, actually xmlDefaultSAXLocator
+/// Everything is available on the context, so this is useless in our case.
+#[doc(alias = "setDocumentLocatorDebug")]
 unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     increment_callbacks_counter();
     sax_debugln!("SAX.setDocumentLocator()");
 }
 
-/**
- * startDocumentDebug:
- * @ctxt:  An XML parser context
- *
- * called when the document start being processed.
- */
-unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
+/// called when the document start being processed.
+#[doc(alias = "startDocumentDebug")]
+fn start_document_debug(_ctx: Option<GenericErrorContext>) {
     increment_callbacks_counter();
     sax_debugln!("SAX.startDocument()");
 }
 
-/**
- * endDocumentDebug:
- * @ctxt:  An XML parser context
- *
- * called when the document end has been detected.
- */
-unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
+/// called when the document end has been detected.
+#[doc(alias = "endDocumentDebug")]
+fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     increment_callbacks_counter();
     sax_debugln!("SAX.endDocument()");
 }
@@ -906,87 +893,51 @@ unsafe fn start_element_debug(
 
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementDebug")]
-unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
+fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     increment_callbacks_counter();
     sax_debugln!("SAX.endElement({name})");
 }
 
-/**
- * charactersDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @len: the number of XmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
-unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "charactersDebug")]
+fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
-    for (i, o) in output.iter_mut().take(len.min(30) as usize).enumerate() {
-        *o = *ch.add(i);
-    }
-    output[len.clamp(0, 30) as usize] = 0;
+    let slen = ch.len().min(30);
+    output[..slen].copy_from_slice(&ch.as_bytes()[..slen]);
+    output[slen] = 0;
 
     sax_debug!("SAX.characters(");
-    SAX_DEBUG.with_borrow_mut(|f| {
-        f.as_mut()
-            .unwrap()
-            .write_all(&output[..len.clamp(0, 30) as usize])
-            .ok()
-    });
-    sax_debugln!(", {len})");
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&output[..slen]).ok());
+    sax_debugln!(", {})", ch.len());
 }
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceDebug")]
-unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
+fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     increment_callbacks_counter();
     sax_debugln!("SAX.reference({name})");
 }
 
-/**
- * ignorableWhitespaceDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @start: the first c_char in the string
- * @len: the number of XmlChar
- *
- * receiving some ignorable whitespaces from the parser.
- * Question: how much at a time ???
- */
-unsafe fn ignorable_whitespace_debug(
-    _ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+/// receiving some ignorable whitespaces from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "ignorableWhitespaceDebug")]
+fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
-    for i in 0..len.min(30) {
-        output[i as usize] = *ch.add(i as usize);
-    }
-    output[len.clamp(0, 30) as usize] = 0;
+    let slen = ch.len().min(30);
+    output[..slen].copy_from_slice(&ch.as_bytes()[..slen]);
+    output[slen] = 0;
     sax_debug!("SAX.ignorableWhitespace(");
-    SAX_DEBUG.with_borrow_mut(|f| {
-        f.as_mut()
-            .unwrap()
-            .write_all(&output[..len.clamp(0, 30) as usize])
-            .ok()
-    });
-    sax_debugln!(", {len})");
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&output[..slen]).ok());
+    sax_debugln!(", {})", ch.len());
 }
 
-/**
- * processingInstructionDebug:
- * @ctxt:  An XML parser context
- * @target:  the target name
- * @data: the PI data's
- * @len: the number of XmlChar
- *
- * A processing instruction has been parsed.
- */
+/// A processing instruction has been parsed.
+#[doc(alias = "processingInstructionDebug")]
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
     target: *const XmlChar,
@@ -1007,30 +958,20 @@ unsafe fn processing_instruction_debug(
     }
 }
 
-/**
- * cdataBlockDebug:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
-unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32) {
+/// called when a pcdata block has been parsed
+#[doc(alias = "cdataBlockDebug")]
+fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     increment_callbacks_counter();
-    let value = CStr::from_ptr(value as *mut c_char).to_bytes();
+    let len = value.len();
     let l = value.len().min(20);
+    let value = &value.as_bytes()[..l];
     sax_debug!("SAX.pcdata(");
-    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(value).ok());
     sax_debugln!(", {len})");
 }
 
-/**
- * commentDebug:
- * @ctxt:  An XML parser context
- * @value:  the comment content
- *
- * A comment has been parsed.
- */
+/// A comment has been parsed.
+#[doc(alias = "commentDebug")]
 unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
     increment_callbacks_counter();
     sax_debugln!(
@@ -1039,30 +980,16 @@ unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar
     );
 }
 
-/**
- * warningDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a warning messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a warning messages, gives file, line, position and extra parameters.
+#[doc(alias = "warningDebug")]
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
 
     SAX_DEBUG.with_borrow_mut(|f| write!(f.as_mut().unwrap(), "SAX.warning: {}", msg).ok());
 }
 
-/**
- * errorDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a error messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a error messages, gives file, line, position and extra parameters.
+#[doc(alias = "errorDebug")]
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
     sax_debug!("SAX.error: {}", msg);
@@ -1110,13 +1037,8 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * startElementNsDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementNsDebug")]
 #[allow(clippy::too_many_arguments)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
@@ -1197,13 +1119,8 @@ unsafe fn start_element_ns_debug(
     sax_debugln!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
 unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: *const XmlChar,
@@ -1310,29 +1227,25 @@ unsafe fn htmlstart_element_debug(
     sax_debugln!(")");
 }
 
-/**
- * htmlcharactersDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @len: the number of XmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "htmlcharactersDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
+    let len = ch.len();
     let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: i32 = len;
+    let mut inlen: i32 = len as i32;
     let mut outlen: usize = 30;
+    let ch = CString::new(ch).unwrap();
 
     html_encode_entities(
         output.as_mut_ptr(),
         addr_of_mut!(outlen) as _,
-        ch,
+        ch.as_ptr() as *const u8,
         addr_of_mut!(inlen),
         0,
     );
@@ -1345,29 +1258,25 @@ unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const Xml
     );
 }
 
-/**
- * htmlcdataDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @len: the number of XmlChar
- *
- * receiving some cdata chars from the parser.
- * Question: how much at a time ???
- */
+/// receiving some cdata chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "htmlcdataDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
+    let len = ch.len();
     let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: i32 = len;
+    let mut inlen: i32 = len as i32;
     let mut outlen: usize = 30;
+    let ch = CString::new(ch).unwrap();
 
     html_encode_entities(
         output.as_mut_ptr(),
         addr_of_mut!(outlen) as _,
-        ch,
+        ch.as_ptr() as *const u8,
         addr_of_mut!(inlen),
         0,
     );
@@ -1416,16 +1325,10 @@ static DEBUG_HTMLSAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * saxParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the SAX API and check for errors.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the SAX API and check for errors.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "saxParseTest")]
 unsafe fn sax_parse_test(
     filename: &str,
     result: Option<String>,
@@ -1853,21 +1756,21 @@ unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: &str) {
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
     use exml::libxml::sax2::xml_sax2_characters;
 
     PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
-    xml_sax2_characters(ctx, ch, len);
+    xml_sax2_characters(ctx, ch);
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
     use exml::libxml::sax2::xml_sax2_cdata_block;
 
     PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
-    xml_sax2_cdata_block(ctx, ch, len);
+    xml_sax2_cdata_block(ctx, ch);
 }
 
 #[cfg(feature = "libxml_push")]

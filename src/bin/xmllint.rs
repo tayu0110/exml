@@ -1150,35 +1150,16 @@ unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     println!("SAX.endElement({name})");
 }
 
-/**
- * charactersDebug:
- * @ctxt:  An XML parser context
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
-unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
-    let mut out: [c_char; 40] = [0; 40];
-
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "charactersDebug")]
+unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
 
-    let mut i = 0;
-    while i < len as usize && i < 30 {
-        out[i] = *ch.add(i) as _;
-        i += 1;
-    }
-    out[i] = 0;
-
-    println!(
-        "SAX.characters({}, {})",
-        CStr::from_ptr(out.as_ptr()).to_string_lossy(),
-        len
-    );
+    println!("SAX.characters({ch:30}, {})", ch.len());
 }
 
 /// called when an entity reference is detected.
@@ -1191,50 +1172,20 @@ unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     println!("SAX.reference({name})");
 }
 
-/**
- * ignorableWhitespaceDebug:
- * @ctxt:  An XML parser context
- * @ch:  a xmlChar string
- * @start: the first c_char in the string
- * @len: the number of xmlChar
- *
- * receiving some ignorable whitespaces from the parser.
- * Question: how much at a time ???
- */
-unsafe fn ignorable_whitespace_debug(
-    _ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: c_int,
-) {
-    let mut out: [c_char; 40] = [0; 40];
-
+/// receiving some ignorable whitespaces from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "ignorableWhitespaceDebug")]
+unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
 
-    let mut i = 0;
-    while i < len as usize && i < 30 {
-        out[i] = *ch.add(i) as _;
-        i += 1;
-    }
-    out[i] = 0;
-    println!(
-        "SAX.ignorableWhitespace({}, {})",
-        CStr::from_ptr(out.as_ptr()).to_string_lossy(),
-        len
-    );
+    println!("SAX.ignorableWhitespace({ch:30}, {})", ch.len());
 }
 
-/**
- * processingInstructionDebug:
- * @ctxt:  An XML parser context
- * @target:  the target name
- * @data: the PI data's
- * @len: the number of xmlChar
- *
- * A processing instruction has been parsed.
- */
+/// A processing instruction has been parsed.
+#[doc(alias = "processingInstructionDebug")]
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
     target: *const XmlChar,
@@ -1258,24 +1209,14 @@ unsafe fn processing_instruction_debug(
     }
 }
 
-/**
- * cdataBlockDebug:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
-unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int) {
+/// called when a pcdata block has been parsed
+#[doc(alias = "cdataBlockDebug")]
+unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.pcdata({:20}, {})",
-        CStr::from_ptr(value as _).to_string_lossy(),
-        len
-    );
+    println!("SAX.pcdata({value:20}, {})", value.len());
 }
 
 /**

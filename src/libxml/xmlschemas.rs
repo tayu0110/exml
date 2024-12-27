@@ -30495,11 +30495,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
 }
 
 // Process text content.
-unsafe fn xml_schema_sax_handle_text(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn xml_schema_sax_handle_text(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
@@ -30513,11 +30509,13 @@ unsafe fn xml_schema_sax_handle_text(
     if (*(*vctxt).inode).flags & XML_SCHEMA_ELEM_INFO_EMPTY != 0 {
         (*(*vctxt).inode).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
     }
+    let len = ch.len();
+    let ch = CString::new(ch).unwrap();
     if xml_schema_vpush_text(
         vctxt,
         XmlElementType::XmlTextNode as i32,
-        ch,
-        len,
+        ch.as_ptr() as *const u8,
+        len as i32,
         XML_SCHEMA_PUSH_TEXT_VOLATILE,
         null_mut(),
     ) == -1
@@ -30533,11 +30531,7 @@ unsafe fn xml_schema_sax_handle_text(
 }
 
 // Process CDATA content.
-unsafe fn xml_schema_sax_handle_cdata_section(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn xml_schema_sax_handle_cdata_section(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
@@ -30551,11 +30545,13 @@ unsafe fn xml_schema_sax_handle_cdata_section(
     if (*(*vctxt).inode).flags & XML_SCHEMA_ELEM_INFO_EMPTY != 0 {
         (*(*vctxt).inode).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
     }
+    let len = ch.len();
+    let ch = CString::new(ch).unwrap();
     if xml_schema_vpush_text(
         vctxt,
         XmlElementType::XmlCDATASectionNode as i32,
-        ch,
-        len,
+        ch.as_ptr() as *const u8,
+        len as i32,
         XML_SCHEMA_PUSH_TEXT_VOLATILE,
         null_mut(),
     ) == -1
@@ -30908,7 +30904,7 @@ fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
 }
 
 // Those are function where both the user handler and the schemas handler need to be called.
-unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -30916,18 +30912,14 @@ unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar,
         return;
     }
     if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).characters.is_some() {
-        (*(*ctxt).user_sax).characters.unwrap()((*ctxt).user_data.clone(), ch, len);
+        (*(*ctxt).user_sax).characters.unwrap()((*ctxt).user_data.clone(), ch);
     }
     if !(*ctxt).ctxt.is_null() {
-        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch, len);
+        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch);
     }
 }
 
-unsafe fn ignorable_whitespace_split(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn ignorable_whitespace_split(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -30935,14 +30927,14 @@ unsafe fn ignorable_whitespace_split(
         return;
     }
     if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).ignorable_whitespace.is_some() {
-        (*(*ctxt).user_sax).ignorable_whitespace.unwrap()((*ctxt).user_data.clone(), ch, len);
+        (*(*ctxt).user_sax).ignorable_whitespace.unwrap()((*ctxt).user_data.clone(), ch);
     }
     if !(*ctxt).ctxt.is_null() {
-        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch, len);
+        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch);
     }
 }
 
-unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32) {
+unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
@@ -30950,14 +30942,10 @@ unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: *const XmlC
         return;
     }
     if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).cdata_block.is_some() {
-        (*(*ctxt).user_sax).cdata_block.unwrap()((*ctxt).user_data.clone(), value, len);
+        (*(*ctxt).user_sax).cdata_block.unwrap()((*ctxt).user_data.clone(), value);
     }
     if !(*ctxt).ctxt.is_null() {
-        xml_schema_sax_handle_cdata_section(
-            Some(GenericErrorContext::new((*ctxt).ctxt)),
-            value,
-            len,
-        );
+        xml_schema_sax_handle_cdata_section(Some(GenericErrorContext::new((*ctxt).ctxt)), value);
     }
 }
 

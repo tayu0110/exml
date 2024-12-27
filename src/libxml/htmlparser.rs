@@ -29,6 +29,7 @@ use std::{
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
+    str::from_utf8,
     sync::atomic::{AtomicI32, Ordering},
 };
 
@@ -7499,7 +7500,7 @@ unsafe extern "C" fn html_parse_html_name_non_invasive(ctxt: HtmlParserCtxtPtr) 
 ///   as CDATA but SGML allows entities references in attributes so their
 ///   processing is identical as other attributes
 #[doc(alias = "htmlParseScript")]
-unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
+unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
     let mut buf: [XmlChar; HTML_PARSER_BIG_BUFFER_SIZE + 5] = [0; HTML_PARSER_BIG_BUFFER_SIZE + 5];
     let mut nbchar: i32 = 0;
     let mut cur: i32;
@@ -7508,17 +7509,15 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
     cur = CUR_CHAR!(ctxt, l);
     while cur != 0 {
         if cur == b'<' as i32 && NXT!(ctxt, 1) == b'/' {
-            /*
-             * One should break here, the specification is clear:
-             * Authors should therefore escape "</" within the content.
-             * Escape mechanisms are specific to each scripting or
-             * style sheet language.
-             *
-             * In recovery mode, only break if end tag match the
-             * current tag, effectively ignoring all tags inside the
-             * script/style block and treating the entire block as
-             * CDATA.
-             */
+            // One should break here, the specification is clear:
+            // Authors should therefore escape "</" within the content.
+            // Escape mechanisms are specific to each scripting or
+            // style sheet language.
+            //
+            // In recovery mode, only break if end tag match the
+            // current tag, effectively ignoring all tags inside the
+            // script/style block and treating the entire block as
+            // CDATA.
             if (*ctxt).recovery != 0 {
                 if xml_strncasecmp(
                     (*ctxt).name,
@@ -7556,13 +7555,12 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
         NEXTL!(ctxt, l);
         if nbchar >= HTML_PARSER_BIG_BUFFER_SIZE as i32 {
             buf[nbchar as usize] = 0;
+            let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
             if let Some(cdata_block) = (*(*ctxt).sax).cdata_block {
-                /*
-                 * Insert as CDATA, which is the same as HTML_PRESERVE_NODE
-                 */
-                cdata_block((*ctxt).user_data.clone(), buf.as_ptr(), nbchar as _);
+                // Insert as CDATA, which is the same as HTML_PRESERVE_NODE
+                cdata_block((*ctxt).user_data.clone(), s);
             } else if let Some(characters) = (*(*ctxt).sax).characters {
-                characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar as _);
+                characters((*ctxt).user_data.clone(), s);
             }
             nbchar = 0;
             (*ctxt).shrink();
@@ -7576,13 +7574,12 @@ unsafe extern "C" fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
 
     if nbchar != 0 && !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
         buf[nbchar as usize] = 0;
+        let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
         if let Some(cdata_block) = (*(*ctxt).sax).cdata_block {
-            /*
-             * Insert as CDATA, which is the same as HTML_PRESERVE_NODE
-             */
-            cdata_block((*ctxt).user_data.clone(), buf.as_ptr(), nbchar as _);
+            // Insert as CDATA, which is the same as HTML_PRESERVE_NODE
+            cdata_block((*ctxt).user_data.clone(), s);
         } else if let Some(characters) = (*(*ctxt).sax).characters {
-            characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar as _);
+            characters((*ctxt).user_data.clone(), s);
         }
     }
 }
@@ -8272,7 +8269,7 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
 /// Parse and handle entity references in content,
 /// this will end-up in a call to character() since this is either a CharRef, or a predefined entity.
 #[doc(alias = "htmlParseReference")]
-unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
+unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
     let ent: *const HtmlEntityDesc;
     let mut out: [XmlChar; 6] = [0; 6];
     let mut name: *const XmlChar = null();
@@ -8316,33 +8313,25 @@ unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
 
         html_check_paragraph(ctxt);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).characters.is_some() {
-            ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), out.as_ptr(), i);
+            let s = from_utf8(&out[..i as usize]).expect("Internal Error");
+            ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), s);
         }
     } else {
         ent = html_parse_entity_ref(ctxt, addr_of_mut!(name));
         if name.is_null() {
             html_check_paragraph(ctxt);
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).characters.is_some() {
-                ((*(*ctxt).sax).characters.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    c"&".as_ptr() as _,
-                    1,
-                );
+                ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), "&");
             }
             return;
         }
         if ent.is_null() || (*ent).value == 0 {
             html_check_paragraph(ctxt);
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).characters.is_some() {
+                ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), "&");
                 ((*(*ctxt).sax).characters.unwrap())(
                     (*ctxt).user_data.clone(),
-                    c"&".as_ptr() as _,
-                    1,
-                );
-                ((*(*ctxt).sax).characters.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    name,
-                    xml_strlen(name),
+                    &CStr::from_ptr(name as *const i8).to_string_lossy(),
                 );
                 /* (*(*ctxt).sax).characters((*ctxt).userData,  c";".as_ptr() as _, 1); */
             }
@@ -8378,7 +8367,8 @@ unsafe extern "C" fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
 
             html_check_paragraph(ctxt);
             if !(*ctxt).sax.is_null() && (*(*ctxt).sax).characters.is_some() {
-                ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), out.as_ptr(), i);
+                let s = from_utf8(&out[..i as usize]).expect("Internal Error");
+                ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), s);
             }
         }
     }
@@ -8561,22 +8551,21 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
         if nbchar >= HTML_PARSER_BIG_BUFFER_SIZE as i32 {
             buf[nbchar as usize] = 0;
 
-            /*
-             * Ok the segment is to be consumed as chars.
-             */
+            // Ok the segment is to be consumed as chars.
             if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
+                let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
                 if are_blanks(ctxt, buf.as_ptr(), nbchar) != 0 {
                     if (*ctxt).keep_blanks != 0 {
                         if let Some(characters) = (*(*ctxt).sax).characters {
-                            characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
+                            characters((*ctxt).user_data.clone(), s);
                         }
                     } else if let Some(ignorable_whitespace) = (*(*ctxt).sax).ignorable_whitespace {
-                        ignorable_whitespace((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
+                        ignorable_whitespace((*ctxt).user_data.clone(), s);
                     }
                 } else {
                     html_check_paragraph(ctxt);
                     if let Some(characters) = (*(*ctxt).sax).characters {
-                        characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
+                        characters((*ctxt).user_data.clone(), s);
                     }
                 }
             }
@@ -8591,22 +8580,21 @@ unsafe extern "C" fn html_parse_char_data_internal(ctxt: HtmlParserCtxtPtr, read
     if nbchar != 0 {
         buf[nbchar as usize] = 0;
 
-        /*
-         * Ok the segment is to be consumed as chars.
-         */
+        // Ok the segment is to be consumed as chars.
         if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
+            let s = from_utf8(&buf[..nbchar as usize]).expect("Internal Error");
             if are_blanks(ctxt, buf.as_ptr(), nbchar) != 0 {
                 if (*ctxt).keep_blanks != 0 {
                     if let Some(characters) = (*(*ctxt).sax).characters {
-                        characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
+                        characters((*ctxt).user_data.clone(), s);
                     }
                 } else if let Some(ignorable_whitespace) = (*(*ctxt).sax).ignorable_whitespace {
-                    ignorable_whitespace((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
+                    ignorable_whitespace((*ctxt).user_data.clone(), s);
                 }
             } else {
                 html_check_paragraph(ctxt);
                 if let Some(characters) = (*(*ctxt).sax).characters {
-                    characters((*ctxt).user_data.clone(), buf.as_ptr(), nbchar);
+                    characters((*ctxt).user_data.clone(), s);
                 }
             }
         }
@@ -8740,11 +8728,7 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
                 && (*ctxt).disable_sax == 0
                 && (*(*ctxt).sax).characters.is_some()
             {
-                ((*(*ctxt).sax).characters.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    c"<".as_ptr() as _,
-                    1,
-                );
+                ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), "<");
             }
             (*ctxt).skip_char();
         }
@@ -9370,11 +9354,7 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 && (*ctxt).disable_sax == 0
                 && (*(*ctxt).sax).characters.is_some()
             {
-                ((*(*ctxt).sax).characters.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    c"<".as_ptr() as _,
-                    1,
-                );
+                ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), "<");
             }
             (*ctxt).skip_char();
         }
@@ -10632,11 +10612,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     chr[0] = (*ctxt).token as _;
                     html_check_paragraph(ctxt);
                     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).characters.is_some() {
-                        ((*(*ctxt).sax).characters.unwrap())(
-                            (*ctxt).user_data.clone(),
-                            chr.as_ptr(),
-                            1,
-                        );
+                        let s = from_utf8(&chr[..1]).expect("Internal Error");
+                        ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), s);
                     }
                     (*ctxt).token = 0;
                     (*ctxt).check_index = 0;
@@ -10646,24 +10623,21 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                     if cur != b'<' && cur != b'&' {
                         if !(*ctxt).sax.is_null() {
                             chr[0] = cur;
+                            let s = from_utf8(&chr[..1]).expect("Internal Error");
                             if xml_is_blank_char(cur as u32) {
                                 if (*ctxt).keep_blanks != 0 {
                                     if let Some(characters) = (*(*ctxt).sax).characters {
-                                        characters((*ctxt).user_data.clone(), chr.as_ptr(), 1);
+                                        characters((*ctxt).user_data.clone(), s);
                                     }
                                 } else if let Some(ignorable_whitespace) =
                                     (*(*ctxt).sax).ignorable_whitespace
                                 {
-                                    ignorable_whitespace(
-                                        (*ctxt).user_data.clone(),
-                                        chr.as_ptr(),
-                                        1,
-                                    );
+                                    ignorable_whitespace((*ctxt).user_data.clone(), s);
                                 }
                             } else {
                                 html_check_paragraph(ctxt);
                                 if let Some(characters) = (*(*ctxt).sax).characters {
-                                    characters((*ctxt).user_data.clone(), chr.as_ptr(), 1);
+                                    characters((*ctxt).user_data.clone(), s);
                                 }
                             }
                         }
@@ -10768,11 +10742,7 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                         && (*ctxt).disable_sax == 0
                         && (*(*ctxt).sax).characters.is_some()
                     {
-                        ((*(*ctxt).sax).characters.unwrap())(
-                            (*ctxt).user_data.clone(),
-                            c"<".as_ptr() as _,
-                            1,
-                        );
+                        ((*(*ctxt).sax).characters.unwrap())((*ctxt).user_data.clone(), "<");
                     }
                     (*ctxt).skip_char();
                 } else {

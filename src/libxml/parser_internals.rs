@@ -26,7 +26,7 @@ use std::mem::{size_of, zeroed};
 use std::ptr::{addr_of_mut, null, null_mut};
 use std::rc::Rc;
 use std::slice::from_raw_parts;
-use std::str::from_utf8_mut;
+use std::str::{from_utf8, from_utf8_mut};
 use std::sync::atomic::Ordering;
 
 #[cfg(feature = "libxml_legacy")]
@@ -3780,7 +3780,7 @@ unsafe extern "C" fn xml_add_entity_reference(
 ///
 /// `[67] Reference ::= EntityRef | CharRef`
 #[doc(alias = "xmlParseReference")]
-pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     let val: *mut XmlChar;
     let mut was_checked: i32;
     let mut list: XmlNodePtr = null_mut();
@@ -3790,9 +3790,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         return;
     }
 
-    /*
-     * Simple case of a CharRef
-     */
+    // Simple case of a CharRef
     if NXT!(ctxt, 1) == b'#' {
         let mut i: i32 = 0;
         let mut out: [XmlChar; 16] = [0; 16];
@@ -3811,7 +3809,8 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 out[1] = 0;
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(characters) = (*(*ctxt).sax).characters {
-                        characters((*ctxt).user_data.clone(), out.as_ptr() as _, 1);
+                        let s = from_utf8(&out[..1]).expect("Internal Error");
+                        characters((*ctxt).user_data.clone(), s);
                     }
                 }
             } else {
@@ -3838,23 +3837,20 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 }
             }
         } else {
-            /*
-             * Just encode the value in UTF-8
-             */
+            // Just encode the value in UTF-8
             COPY_BUF!(0, out.as_mut_ptr(), i, value);
             out[i as usize] = 0;
             if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                 if let Some(characters) = (*(*ctxt).sax).characters {
-                    characters((*ctxt).user_data.clone(), out.as_ptr() as _, i);
+                    let s = from_utf8(&out[..i as usize]).expect("Internal Error");
+                    characters((*ctxt).user_data.clone(), s);
                 }
             }
         }
         return;
     }
 
-    /*
-     * We are seeing an entity reference
-     */
+    // We are seeing an entity reference
     let ent: XmlEntityPtr = xml_parse_entity_ref(ctxt);
     if ent.is_null() {
         return;
@@ -3864,7 +3860,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     }
     was_checked = (*ent).flags & XML_ENT_PARSED as i32;
 
-    /* special case of predefined entities */
+    // special case of predefined entities
     if (*ent).name.load(Ordering::Relaxed).is_null()
         || matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
     {
@@ -3872,27 +3868,25 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
         if val.is_null() {
             return;
         }
-        /*
-         * inline the entity.
-         */
+        // inline the entity.
         if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
             if let Some(characters) = (*(*ctxt).sax).characters {
-                characters((*ctxt).user_data.clone(), val, xml_strlen(val));
+                characters(
+                    (*ctxt).user_data.clone(),
+                    &CStr::from_ptr(val as *const i8).to_string_lossy(),
+                );
             }
         }
         return;
     }
 
-    /*
-     * The first reference to the entity trigger a parsing phase
-     * where the (*ent).children is filled with the result from
-     * the parsing.
-     * Note: external parsed entities will not be loaded, it is not
-     * required for a non-validating parser, unless the parsing option
-     * of validating, or substituting entities were given. Doing so is
-     * far more secure as the parser will only process data coming from
-     * the document entity by default.
-     */
+    // The first reference to the entity trigger a parsing phase
+    // where the (*ent).children is filled with the result from the parsing.
+    // Note: external parsed entities will not be loaded, it is not
+    // required for a non-validating parser, unless the parsing option
+    // of validating, or substituting entities were given. Doing so is
+    // far more secure as the parser will only process data coming from
+    // the document entity by default.
     if (*ent).flags & XML_ENT_PARSED as i32 == 0
         && (!matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity)
             || (*ctxt).options
@@ -3902,11 +3896,9 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     {
         let oldsizeentcopy: u64 = (*ctxt).sizeentcopy;
 
-        /*
-         * This is a bit hackish but this seems the best
-         * way to make sure both SAX and DOM entity support
-         * behaves okay.
-         */
+        // This is a bit hackish but this seems the best
+        // way to make sure both SAX and DOM entity support
+        // behaves okay.
         let user_data = if (*ctxt)
             .user_data
             .as_ref()
@@ -3918,7 +3910,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             (*ctxt).user_data.clone()
         };
 
-        /* Avoid overflow as much as possible */
+        // Avoid overflow as much as possible
         (*ctxt).sizeentcopy = 0;
 
         if (*ent).flags & XML_ENT_EXPANDING as i32 != 0 {
@@ -3929,12 +3921,9 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
         (*ent).flags |= XML_ENT_EXPANDING as i32;
 
-        /*
-         * Check that this entity is well formed
-         * 4.3.2: An internal general parsed entity is well-formed
-         * if its replacement text matches the production labeled
-         * content.
-         */
+        // Check that this entity is well formed
+        // 4.3.2: An internal general parsed entity is well-formed
+        // if its replacement text matches the production labeled content.
         if matches!((*ent).etype, XmlEntityType::XmlInternalGeneralEntity) {
             (*ctxt).depth += 1;
             ret = xml_parse_balanced_chunk_memory_internal(
@@ -4042,28 +4031,21 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
             list = null_mut();
         }
 
-        /* Prevent entity from being parsed and expanded twice (Bug 760367). */
+        // Prevent entity from being parsed and expanded twice (Bug 760367).
         was_checked = 0;
     }
 
-    /*
-     * Now that the entity content has been gathered
-     * provide it to the application, this can take different forms based
-     * on the parsing modes.
-     */
+    // Now that the entity content has been gathered
+    // provide it to the application, this can take different forms based
+    // on the parsing modes.
     if (*ent).children.load(Ordering::Relaxed).is_null() {
-        /*
-         * Probably running in SAX mode and the callbacks don't
-         * build the entity content. So unless we already went
-         * though parsing for first checking go though the entity
-         * content to generate callbacks associated to the entity
-         */
+        // Probably running in SAX mode and the callbacks don't
+        // build the entity content. So unless we already went
+        // though parsing for first checking go though the entity
+        // content to generate callbacks associated to the entity
         if was_checked != 0 {
-            /*
-             * This is a bit hackish but this seems the best
-             * way to make sure both SAX and DOM entity support
-             * behaves okay.
-             */
+            // This is a bit hackish but this seems the best
+            // way to make sure both SAX and DOM entity support behaves okay.
             let user_data = if (*ctxt)
                 .user_data
                 .as_ref()
@@ -4106,7 +4088,7 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 );
                 (*ctxt).depth -= 1;
 
-                /* Undo the change to sizeentities */
+                // Undo the change to sizeentities
                 (*ctxt).sizeentities = oldsizeentities;
             } else {
                 ret = XmlParserErrors::XmlErrEntityPEInternal;
@@ -4213,12 +4195,10 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 let mut next: XmlNodePtr;
                 let mut first_child: XmlNodePtr = null_mut();
 
-                /*
-                 * Copy the entity child list and make it the new
-                 * entity child list. The goal is to make sure any
-                 * ID or REF referenced will be the one from the
-                 * document content and not the entity copy.
-                 */
+                // Copy the entity child list and make it the new
+                // entity child list. The goal is to make sure any
+                // ID or REF referenced will be the one from the
+                // document content and not the entity copy.
                 cur = (*ent).children.load(Ordering::Relaxed) as _;
                 (*ent).children.store(null_mut(), Ordering::Relaxed);
                 let last: XmlNodePtr = (*ent).last.load(Ordering::Relaxed) as _;
@@ -4250,11 +4230,9 @@ pub(crate) unsafe extern "C" fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     xml_add_entity_reference(ent, first_child, nw);
                 }
             } else {
-                /*
-                 * the name change is to avoid coalescing of the
-                 * node with a possible previous text one which
-                 * would make (*ent).children a dangling pointer
-                 */
+                // the name change is to avoid coalescing of the
+                // node with a possible previous text one which
+                // would make (*ent).children a dangling pointer
                 let nbktext: *const XmlChar =
                     xml_dict_lookup((*ctxt).dict, c"nbktext".as_ptr() as _, -1);
                 if matches!(
