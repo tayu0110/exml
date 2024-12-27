@@ -2282,15 +2282,7 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
 /// Creation of a processing instruction element.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocPI")]
-pub unsafe extern "C" fn xml_new_doc_pi(
-    doc: XmlDocPtr,
-    name: *const XmlChar,
-    content: *const XmlChar,
-) -> XmlNodePtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
+pub unsafe fn xml_new_doc_pi(doc: XmlDocPtr, name: &str, content: *const XmlChar) -> XmlNodePtr {
     // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
@@ -2300,11 +2292,8 @@ pub unsafe extern "C" fn xml_new_doc_pi(
     std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlPINode;
 
-    if !doc.is_null() && !(*doc).dict.is_null() {
-        (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
-    } else {
-        (*cur).name = xml_strdup(name);
-    }
+    let name = CString::new(name).unwrap();
+    (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     if !content.is_null() {
         (*cur).content = xml_strdup(content);
     }
@@ -2324,7 +2313,7 @@ pub unsafe extern "C" fn xml_new_doc_pi(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
-pub unsafe extern "C" fn xml_new_pi(name: *const XmlChar, content: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_pi(name: &str, content: *const XmlChar) -> XmlNodePtr {
     xml_new_doc_pi(null_mut(), name, content)
 }
 
@@ -6639,41 +6628,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_doc_pi() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        let ret_val = xml_new_doc_pi(doc, name, content);
-                        desret_xml_node_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewDocPI",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocPI()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_content);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_doc_prop() {
         unsafe {
             let mut leaks = 0;
@@ -6996,36 +6950,6 @@ mod tests {
                                 eprintln!(" {}", n_value);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_pi() {
-        unsafe {
-            let mut leaks = 0;
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let name = gen_const_xml_char_ptr(n_name, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    let ret_val = xml_new_pi(name as *const XmlChar, content);
-                    desret_xml_node_ptr(ret_val);
-                    des_const_xml_char_ptr(n_name, name, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewPI",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewPI()");
-                        eprint!(" {}", n_name);
-                        eprintln!(" {}", n_content);
                     }
                 }
             }

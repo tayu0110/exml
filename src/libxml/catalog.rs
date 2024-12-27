@@ -199,7 +199,7 @@ const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/c
 /// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
 /// The specific XML Catalog Processing Instruction name.
-pub(crate) const XML_CATALOG_PI: &CStr = c"oasis-xml-catalog";
+pub(crate) const XML_CATALOG_PI: &str = "oasis-xml-catalog";
 
 /// The API is voluntarily limited to general cataloging.
 #[repr(C)]

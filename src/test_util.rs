@@ -1312,9 +1312,9 @@ unsafe extern "C" fn free_api_doc() {
     API_NS.set(null_mut());
 }
 
-pub(crate) unsafe extern "C" fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
+pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
     if no == 0 {
-        return xml_new_pi(c"test".as_ptr() as _, null_mut());
+        return xml_new_pi("test", null_mut());
     }
     if no == 1 {
         return get_api_root();

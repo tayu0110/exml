@@ -1188,7 +1188,7 @@ unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str
 #[doc(alias = "processingInstructionDebug")]
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
-    target: *const XmlChar,
+    target: &str,
     data: *const XmlChar,
 ) {
     CALLBACKS += 1;
@@ -1197,15 +1197,11 @@ unsafe fn processing_instruction_debug(
     }
     if !data.is_null() {
         println!(
-            "SAX.processingInstruction({}, {})",
-            CStr::from_ptr(target as _).to_string_lossy(),
+            "SAX.processingInstruction({target}, {})",
             CStr::from_ptr(data as _).to_string_lossy()
         );
     } else {
-        println!(
-            "SAX.processingInstruction({}, NULL)",
-            CStr::from_ptr(target as _).to_string_lossy()
-        );
+        println!("SAX.processingInstruction({target}, NULL)");
     }
 }
 

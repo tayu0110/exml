@@ -2431,7 +2431,7 @@ unsafe fn xml_parse_catalog_pi(ctxt: XmlParserCtxtPtr, catalog: *const XmlChar) 
 ///
 /// The processing is transferred to SAX once parsed.
 #[doc(alias = "xmlParsePI")]
-pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
     let mut len: usize = 0;
     let mut size: usize = XML_PARSER_BUFFER_SIZE;
@@ -2448,17 +2448,13 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
         let inputid: i32 = (*(*ctxt).input).id;
         state = (*ctxt).instate;
         (*ctxt).instate = XmlParserInputState::XmlParserPI;
-        /*
-         * this is a Processing Instruction.
-         */
+        // this is a Processing Instruction.
         (*ctxt).advance(2);
 
-        /*
-         * Parse the target name and check for special support like
-         * namespace.
-         */
+        // Parse the target name and check for special support like namespace.
         target = xml_parse_pi_target(ctxt);
         if !target.is_null() {
+            let target = CStr::from_ptr(target as *const i8).to_string_lossy();
             if (*ctxt).current_byte() == b'?' && NXT!(ctxt, 1) == b'>' {
                 if inputid != (*(*ctxt).input).id {
                     xml_fatal_err_msg(
@@ -2469,16 +2465,14 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 }
                 (*ctxt).advance(2);
 
-                /*
-                 * SAX: PI detected.
-                 */
+                // SAX: PI detected.
                 if !(*ctxt).sax.is_null()
                     && (*ctxt).disable_sax == 0
                     && (*(*ctxt).sax).processing_instruction.is_some()
                 {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
                         (*ctxt).user_data.clone(),
-                        target,
+                        &target,
                         null(),
                     );
                 }
@@ -2494,7 +2488,6 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 return;
             }
             if (*ctxt).skip_blanks() == 0 {
-                let target = CStr::from_ptr(target as *const i8).to_string_lossy();
                 xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -2518,7 +2511,6 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 }
                 COPY_BUF!(l, buf, len, cur);
                 if len > max_length {
-                    let target = CStr::from_ptr(target as *const i8).to_string_lossy();
                     xml_fatal_err_msg_str!(
                         ctxt,
                         XmlParserErrors::XmlErrPINotFinished,
@@ -2538,7 +2530,6 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 return;
             }
             if cur != '?' {
-                let target = CStr::from_ptr(target as *const i8).to_string_lossy();
                 xml_fatal_err_msg_str!(
                     ctxt,
                     XmlParserErrors::XmlErrPINotFinished,
@@ -2559,7 +2550,7 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                 if matches!(
                     state,
                     XmlParserInputState::XmlParserMisc | XmlParserInputState::XmlParserStart
-                ) && xml_str_equal(target, XML_CATALOG_PI.as_ptr() as _)
+                ) && target == XML_CATALOG_PI
                 {
                     let allow: XmlCatalogAllow = xml_catalog_get_defaults();
                     if matches!(allow, XmlCatalogAllow::Document | XmlCatalogAllow::All) {
@@ -2567,12 +2558,10 @@ pub(crate) unsafe extern "C" fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
                     }
                 }
 
-                /*
-                 * SAX: PI detected.
-                 */
+                // SAX: PI detected.
                 if !(*ctxt).sax.is_null() && (*ctxt).disable_sax == 0 {
                     if let Some(pi) = (*(*ctxt).sax).processing_instruction {
-                        pi((*ctxt).user_data.clone(), target, buf);
+                        pi((*ctxt).user_data.clone(), &target, buf);
                     }
                 }
             }

@@ -8077,7 +8077,7 @@ unsafe extern "C" fn html_skip_bogus_comment(ctxt: HtmlParserCtxtPtr) {
 ///
 /// `[16] PI ::= b'<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'`
 #[doc(alias = "xmlParsePI")]
-unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
+unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
     let mut buf: *mut XmlChar;
     let mut len: i32 = 0;
     let mut size: i32 = HTML_PARSER_BUFFER_SIZE as i32;
@@ -8094,30 +8094,24 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
     if RAW!(ctxt) == b'<' && NXT!(ctxt, 1) == b'?' {
         state = (*ctxt).instate;
         (*ctxt).instate = XmlParserInputState::XmlParserPI;
-        /*
-         * this is a Processing Instruction.
-         */
+        // this is a Processing Instruction.
         (*ctxt).advance(2);
 
-        /*
-         * Parse the target name and check for special support like
-         * namespace.
-         */
+        // Parse the target name and check for special support like namespace.
         target = html_parse_name(ctxt);
         if !target.is_null() {
+            let target = CStr::from_ptr(target as *const i8).to_string_lossy();
             if RAW!(ctxt) == b'>' {
                 (*ctxt).advance(1);
 
-                /*
-                 * SAX: PI detected.
-                 */
+                // SAX: PI detected.
                 if !(*ctxt).sax.is_null()
                     && (*ctxt).disable_sax == 0
                     && (*(*ctxt).sax).processing_instruction.is_some()
                 {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
                         (*ctxt).user_data.clone(),
-                        target,
+                        &target,
                         null_mut(),
                     );
                 }
@@ -8132,7 +8126,6 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
             }
             cur = (*ctxt).current_byte() as _;
             if !xml_is_blank_char(cur as u32) {
-                let target = CStr::from_ptr(target as *const i8).to_string_lossy();
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrSpaceRequired,
@@ -8166,7 +8159,6 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                     );
                 }
                 if len > max_length {
-                    let target = CStr::from_ptr(target as *const i8).to_string_lossy();
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrPINotFinished,
@@ -8187,7 +8179,6 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 return;
             }
             if cur != b'>' as i32 {
-                let target = CStr::from_ptr(target as *const i8).to_string_lossy();
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrPINotFinished,
@@ -8205,7 +8196,7 @@ unsafe extern "C" fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
                 {
                     ((*(*ctxt).sax).processing_instruction.unwrap())(
                         (*ctxt).user_data.clone(),
-                        target,
+                        &target,
                         buf,
                     );
                 }

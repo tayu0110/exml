@@ -30855,7 +30855,7 @@ unsafe fn end_document_split(ctx: Option<GenericErrorContext>) {
 
 unsafe fn processing_instruction_split(
     ctx: Option<GenericErrorContext>,
-    target: *const XmlChar,
+    target: &str,
     data: *const XmlChar,
 ) {
     let ctx = ctx.unwrap();
