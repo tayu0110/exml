@@ -4856,6 +4856,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     // Check for an Empty Element.
     if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
+        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
         if (*ctxt).sax2 != 0 {
             if !(*ctxt).sax.is_null()
                 && (*(*ctxt).sax).end_element_ns.is_some()
@@ -4863,7 +4864,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
             {
                 ((*(*ctxt).sax).end_element_ns.unwrap())(
                     (*ctxt).user_data.clone(),
-                    name,
+                    &name,
                     prefix,
                     uri,
                 );
@@ -4874,7 +4875,6 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
                 && (*(*ctxt).sax).end_element.is_some()
                 && (*ctxt).disable_sax == 0
             {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
             }
         }

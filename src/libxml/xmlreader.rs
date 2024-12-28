@@ -3056,7 +3056,7 @@ unsafe fn xml_text_reader_start_element_ns(
 #[doc(alias = "xmlTextReaderEndElementNs")]
 unsafe fn xml_text_reader_end_element_ns(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
 ) {

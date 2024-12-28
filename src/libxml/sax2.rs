@@ -2918,7 +2918,7 @@ unsafe fn xml_sax2_attribute_ns(
 #[doc(alias = "xmlSAX2EndElementNs")]
 pub unsafe fn xml_sax2_end_element_ns(
     ctx: Option<GenericErrorContext>,
-    _localname: *const XmlChar,
+    _localname: &str,
     _prefix: *const XmlChar,
     _uri: *const XmlChar,
 ) {

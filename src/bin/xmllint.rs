@@ -1387,16 +1387,11 @@ unsafe fn start_element_ns_debug(
     println!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
 unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
 ) {
@@ -1404,10 +1399,7 @@ unsafe fn end_element_ns_debug(
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.endElementNs({}",
-        CStr::from_ptr(localname as _).to_string_lossy()
-    );
+    print!("SAX.endElementNs({localname}");
     if prefix.is_null() {
         print!(", NULL");
     } else {

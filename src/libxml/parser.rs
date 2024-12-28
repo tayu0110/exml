@@ -1900,7 +1900,7 @@ pub type StartElementNsSAX2Func = unsafe fn(
 #[doc(alias = "endElementNsSAX2Func")]
 pub type EndElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
 );
@@ -8955,9 +8955,10 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
     // SAX: End of Tag
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element_ns.is_some() && (*ctxt).disable_sax == 0
     {
+        let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
         ((*(*ctxt).sax).end_element_ns.unwrap())(
             (*ctxt).user_data.clone(),
-            (*ctxt).name,
+            &name,
             tag.prefix,
             tag.uri,
         );
@@ -9471,9 +9472,10 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 && (*(*ctxt).sax).end_element_ns.is_some()
                                 && (*ctxt).disable_sax == 0
                             {
+                                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                                 ((*(*ctxt).sax).end_element_ns.unwrap())(
                                     (*ctxt).user_data.clone(),
-                                    name,
+                                    &name,
                                     prefix,
                                     uri,
                                 );

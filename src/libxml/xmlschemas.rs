@@ -30413,7 +30413,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
 
 unsafe fn xml_schema_sax_handle_end_element_ns(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     _prefix: *const XmlChar,
     uri: *const XmlChar,
 ) {
@@ -30421,9 +30421,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
 
-    /*
-     * Skip elements if inside a "skip" wildcard or if invalid.
-     */
+    // Skip elements if inside a "skip" wildcard or if invalid.
     if (*vctxt).skip_depth != -1 {
         if (*vctxt).depth > (*vctxt).skip_depth {
             (*vctxt).depth -= 1;
@@ -30432,11 +30430,12 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
             (*vctxt).skip_depth = -1;
         }
     }
-    /*
-     * SAX VAL TODO: Just a temporary check.
-     */
-    if !xml_str_equal((*(*vctxt).inode).local_name, localname)
-        || !xml_str_equal((*(*vctxt).inode).ns_name, uri)
+    // SAX VAL TODO: Just a temporary check.
+    let localname = CString::new(localname).unwrap();
+    if !xml_str_equal(
+        (*(*vctxt).inode).local_name,
+        localname.as_ptr() as *const u8,
+    ) || !xml_str_equal((*(*vctxt).inode).ns_name, uri)
     {
         VERROR_INT!(vctxt, "xmlSchemaSAXHandleEndElementNs", "elem pop mismatch");
     }
@@ -30976,7 +30975,7 @@ unsafe fn start_element_ns_split(
 
 unsafe fn end_element_ns_split(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
+    localname: &str,
     prefix: *const XmlChar,
     uri: *const XmlChar,
 ) {

@@ -889,7 +889,7 @@ fn start_element_ns_callback(
 #[doc(alias = "endElementCallback")]
 fn end_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
-    _localname: *const XmlChar,
+    _localname: &str,
     _prefix: *const XmlChar,
     _uri: *const XmlChar,
 ) {
