@@ -20,6 +20,7 @@
 //
 // daniel@veillard.com
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::ffi::{c_char, CStr, CString};
 use std::mem::{size_of, zeroed};
@@ -3591,13 +3592,13 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     }
     (*ctxt).dict = (*oldctxt).dict;
     (*ctxt).input_id = (*oldctxt).input_id;
-    (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-    (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-    (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+    (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
+    (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
+    (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
 
-    /* propagate namespaces down the entity */
-    for i in (0..(*oldctxt).ns_tab.len()).step_by(2) {
-        (*ctxt).ns_push((*oldctxt).ns_tab[i], (*oldctxt).ns_tab[i + 1]);
+    // propagate namespaces down the entity
+    for (pre, loc) in &(*oldctxt).ns_tab {
+        (*ctxt).ns_push(pre.as_deref(), loc);
     }
 
     let oldsax: XmlSAXHandlerPtr = (*ctxt).sax;
@@ -4771,7 +4772,6 @@ pub(crate) unsafe fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
 pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
     let mut prefix: *const XmlChar = null_mut();
-    let mut uri: *const XmlChar = null_mut();
     let mut node_info: XmlParserNodeInfo = unsafe { zeroed() };
     let mut tlen: i32 = 0;
     let ns_nr = (*ctxt).ns_tab.len();
@@ -4803,15 +4803,11 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     }
 
     let line: i32 = (*(*ctxt).input).line;
+    let mut uri = None;
     #[cfg(feature = "sax1")]
     {
         if (*ctxt).sax2 != 0 {
-            name = xml_parse_start_tag2(
-                ctxt,
-                addr_of_mut!(prefix),
-                addr_of_mut!(uri),
-                addr_of_mut!(tlen),
-            );
+            name = xml_parse_start_tag2(ctxt, addr_of_mut!(prefix), &mut uri, addr_of_mut!(tlen));
         } else {
             name = xml_parse_start_tag(ctxt);
         }
@@ -4832,10 +4828,12 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
         (*ctxt).space_pop();
         return -1;
     }
+    let curi = uri.as_deref().map(|uri| CString::new(uri).unwrap());
     (*ctxt).name_ns_push(
         name,
         prefix,
-        uri,
+        curi.as_deref()
+            .map_or(null(), |uri| uri.as_ptr() as *const u8),
         line,
         (*ctxt).ns_tab.len() as i32 - ns_nr as i32,
     );
@@ -4868,9 +4866,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
                     (!prefix.is_null())
                         .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                         .as_deref(),
-                    (!uri.is_null())
-                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                        .as_deref(),
+                    uri.as_deref(),
                 );
             }
         } else {

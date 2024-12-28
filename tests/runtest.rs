@@ -1030,16 +1030,15 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
 #[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     increment_callbacks_counter();
     sax_debug!("SAX.startElementNs({localname}");
@@ -1048,57 +1047,31 @@ unsafe fn start_element_ns_debug(
     } else {
         sax_debug!(", NULL");
     }
-    if uri.is_null() {
-        sax_debug!(", NULL");
+    if let Some(uri) = uri {
+        sax_debug!(", '{uri}'");
     } else {
-        sax_debug!(
-            ", '{}'",
-            CStr::from_ptr(uri as *mut c_char).to_string_lossy()
-        );
+        sax_debug!(", NULL");
     }
-    sax_debug!(", {}", nb_namespaces);
+    sax_debug!(", {}", namespaces.len());
 
-    if !namespaces.is_null() {
-        let mut i = 0;
-        while i < nb_namespaces as usize * 2 {
-            sax_debug!(", xmlns");
-            if !(*namespaces.add(i)).is_null() {
-                sax_debug!(
-                    ":{}",
-                    CStr::from_ptr(*namespaces.add(i) as _).to_string_lossy()
-                );
-            }
-            i += 1;
-            sax_debug!(
-                "='{}'",
-                CStr::from_ptr(*namespaces.add(i) as _).to_string_lossy()
-            );
-            i += 1;
+    for (pre, loc) in namespaces {
+        sax_debug!(", xmlns");
+        if let Some(pre) = pre.as_deref() {
+            sax_debug!(":{pre}");
         }
+        sax_debug!("='{loc}'");
     }
-    sax_debug!(", {}, {}", nb_attributes, nb_defaulted);
-    if !attributes.is_null() {
-        for i in (0..nb_attributes as usize * 5).step_by(5) {
-            if !(*attributes.add(i + 1)).is_null() {
-                sax_debug!(
-                    ", {}:{}='",
-                    CStr::from_ptr(*attributes.add(i + 1) as _).to_string_lossy(),
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            } else {
-                sax_debug!(
-                    ", {}='",
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            }
-            let value = CStr::from_ptr(*attributes.add(i + 3) as _).to_bytes();
-            let l = value.len().min(4);
-            SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
-            sax_debug!(
-                "...', {}",
-                (*attributes.add(i + 4)).offset_from(*attributes.add(i + 3))
-            );
+    sax_debug!(", {}, {}", attributes.len(), nb_defaulted);
+    for attr in attributes {
+        if let Some(pre) = attr.1.as_deref() {
+            sax_debug!(", {pre}:{}='", attr.0);
+        } else {
+            sax_debug!(", {}='", attr.0);
         }
+        let value = attr.3.as_bytes();
+        let l = value.len().min(4);
+        SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
+        sax_debug!("...', {}", attr.3.len(),);
     }
     sax_debugln!(")");
 }
@@ -1300,6 +1273,135 @@ static DEBUG_HTMLSAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
+/// If test is passed, return `true`, otherwise return `false`.
+fn sax_compare_file(temp: impl AsRef<Path>, result: impl AsRef<Path>) -> bool {
+    let mut temp_file = File::open(temp.as_ref()).unwrap();
+    let mut result_file = File::open(result.as_ref()).unwrap();
+
+    let mut tbuf = String::new();
+    temp_file.read_to_string(&mut tbuf).ok();
+    let mut rbuf = String::new();
+    result_file.read_to_string(&mut rbuf).ok();
+
+    // If the contents of both files are exactly same, it is fine.
+    if tbuf == rbuf {
+        return true;
+    }
+
+    let mut tbuf = tbuf.lines();
+    let mut rbuf = rbuf.lines();
+    while let (Some(t), Some(r)) = (tbuf.next(), rbuf.next()) {
+        if t == r {
+            continue;
+        }
+
+        let start_element_ns = "SAX.startElementNs(";
+        if let (Some(t), Some(r)) = (
+            t.strip_prefix(start_element_ns),
+            r.strip_prefix(start_element_ns),
+        ) {
+            // The original libxml2 might pass a direct reference to the input buffer as an attribute value without allocation or copying.
+            // Therefore, if its length are too short, the string that includes the buffer follows to the attribute value may be shown.
+            let mut t = t.to_owned();
+            let mut r = r.to_owned();
+            while !t.ends_with(')') {
+                let Some(next) = tbuf.next() else {
+                    return false;
+                };
+                t.push('\n');
+                t.push_str(next);
+            }
+            while !r.ends_with(')') {
+                let Some(next) = rbuf.next() else {
+                    return false;
+                };
+                r.push('\n');
+                r.push_str(next);
+            }
+            fn trim_before_attribute(s: &str) -> Option<&str> {
+                let (_, s) = s.split_once(',')?; // tag name
+                let (_, s) = s.split_once(',')?; // prefix
+                let (_, s) = s.split_once(',')?; // namespace url
+                let (num_namespaces, mut s) = s.split_once(',')?;
+                eprintln!("num_namespaces: {num_namespaces}");
+                let num_namespaces = num_namespaces.trim().parse::<usize>().ok()?;
+                for _ in 0..num_namespaces {
+                    let (_, rem) = s.split_once(',')?; // namespace decls
+                    s = rem;
+                }
+                let (_, s) = s.split_once(',')?; // the number of attributes
+                Some(s.split_once(", ")?.1) // the number of defaulted and space
+            }
+            let (Some(mut tattr), Some(mut rattr)) =
+                (trim_before_attribute(&t), trim_before_attribute(&r))
+            else {
+                eprintln!("SAX compare failed:\n{t}\n{r}");
+                return false;
+            };
+            if t[..t.len() - tattr.len()] != r[..r.len() - rattr.len()] {
+                eprintln!(
+                    "SAX compare failed:\n{}\n{}",
+                    &t[..t.len() - tattr.len()],
+                    &r[..r.len() - rattr.len()]
+                );
+                return false;
+            }
+            while !tattr.is_empty() {
+                if let Some((attname, trem)) = tattr.split_once('\'') {
+                    let Some((att, rrem)) = rattr.split_once('\'') else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    if attname != att {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    }
+                    let (Some((tatt, trem)), Some((ratt, rrem))) =
+                        (trem.split_once(", "), rrem.split_once(", "))
+                    else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    eprintln!("trem: {trem:?}, rrem: {rrem:?}");
+                    let (Some((tlen, trem)), Some((rlen, rrem))) = (
+                        trem.split_once(',').or_else(|| trem.split_once(')')),
+                        rrem.split_once(',').or_else(|| trem.split_once(')')),
+                    ) else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    if tlen != rlen {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    }
+                    let (Ok(tlen), Ok(rlen)) = (tlen.parse::<usize>(), rlen.parse::<usize>())
+                    else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    if tatt[..tlen.min(tatt.len())] != ratt[..rlen.min(ratt.len())] {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    }
+                    tattr = trem;
+                    rattr = rrem;
+                } else {
+                    eprintln!("SAX compare failed:\n{t}\n{r}");
+                    return false;
+                }
+            }
+            if rattr.is_empty() {
+                continue;
+            }
+        }
+
+        eprintln!("SAX compare failed:\n{t}\n{r}");
+        return false;
+    }
+
+    tbuf.next().is_none() && rbuf.next().is_none()
+}
+
 /// Parse a file using the SAX API and check for errors.
 ///
 /// Returns 0 in case of success, an error code otherwise
@@ -1449,7 +1551,9 @@ unsafe fn sax_parse_test(
             ret = 0;
         }
 
-        if compare_files(temp.as_str(), result.unwrap()) != 0 {
+        if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0
+            && !sax_compare_file(temp.as_str(), result.unwrap())
+        {
             eprintln!("Got a difference for {filename}",);
             let mut content = String::new();
             let mut temp = File::open(temp.as_str()).unwrap();
@@ -1798,18 +1902,17 @@ unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
     xml_sax2_end_element(ctx, name);
 }
 
-#[allow(clippy::too_many_arguments)]
 #[cfg(feature = "libxml_push")]
+#[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     use exml::libxml::sax2::xml_sax2_start_element_ns;
 
@@ -1819,9 +1922,7 @@ unsafe fn start_element_ns_bnd(
         localname,
         prefix,
         uri,
-        nb_namespaces,
         namespaces,
-        nb_attributes,
         nb_defaulted,
         attributes,
     );
@@ -4370,7 +4471,9 @@ unsafe fn c14n_run_test(
     result_file: *const c_char,
 ) -> i32 {
     use exml::{
-        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
+        globals::{
+            get_last_error, set_load_ext_dtd_default_value, set_substitute_entities_default_value,
+        },
         libxml::{
             c14n::xml_c14n_doc_dump_memory,
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
@@ -4395,6 +4498,8 @@ unsafe fn c14n_run_test(
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {
+        let last_error = get_last_error();
+        eprintln!("last_error: {last_error:?}");
         eprintln!("Error: unable to parse file \"{xml_filename}\"");
         return -1;
     }

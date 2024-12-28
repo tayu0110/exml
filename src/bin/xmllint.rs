@@ -1319,16 +1319,15 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
 #[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: c_int,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     nb_defaulted: c_int,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1340,49 +1339,28 @@ unsafe fn start_element_ns_debug(
     } else {
         print!(", NULL");
     }
-    if uri.is_null() {
-        print!(", NULL");
+    if let Some(uri) = uri {
+        print!(", '{uri}'");
     } else {
-        print!(", '{}'", CStr::from_ptr(uri as _).to_string_lossy());
+        print!(", NULL");
     }
-    print!(", {}", nb_namespaces);
+    print!(", {}", namespaces.len());
 
-    if !namespaces.is_null() {
-        for i in (0..nb_namespaces as usize * 2).step_by(2) {
-            print!(", xmlns");
-            if !(*namespaces.add(i)).is_null() {
-                print!(
-                    ":{}",
-                    CStr::from_ptr(*namespaces.add(i) as _).to_string_lossy()
-                );
-            }
-            print!(
-                "='{}'",
-                CStr::from_ptr(*namespaces.add(i + 1) as _).to_string_lossy()
-            );
+    for (pre, loc) in namespaces {
+        print!(", xmlns");
+        if let Some(pre) = pre.as_deref() {
+            print!(":{pre}");
         }
+        print!("='{loc}'");
     }
-    print!(", {}, {}", nb_attributes, nb_defaulted);
-    if !attributes.is_null() {
-        for i in (0..nb_attributes as usize * 5).step_by(5) {
-            if !(*attributes.add(i + 1)).is_null() {
-                print!(
-                    ", {}:{}='",
-                    CStr::from_ptr(*attributes.add(i + 1) as _).to_string_lossy(),
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            } else {
-                print!(
-                    ", {}='",
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            }
-            print!(
-                "{:4}...', {}",
-                CStr::from_ptr(*attributes.add(i + 3) as _).to_string_lossy(),
-                (*attributes.add(i + 4)).offset_from(*attributes.add(i + 3))
-            );
+    print!(", {}, {}", attributes.len(), nb_defaulted);
+    for attr in attributes {
+        if let Some(prefix) = attr.1.as_deref() {
+            print!(", {prefix}:{}='", attr.0);
+        } else {
+            print!(", {}='", attr.0);
         }
+        print!("{}...', {}", attr.3, attr.3.len());
     }
     println!(")");
 }

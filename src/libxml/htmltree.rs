@@ -1065,16 +1065,12 @@ pub unsafe fn html_node_dump_format_output(
             parser::xml_init_parser,
             parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
             xmlsave::xml_ns_list_dump_output,
-            xmlstring::xml_strcmp,
         },
         tree::NodePtr,
     };
 
-    use super::htmlparser::HtmlElemDesc;
-
     let mut parent: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let mut info: *const HtmlElemDesc;
 
     xml_init_parser();
 
@@ -1117,11 +1113,11 @@ pub unsafe fn html_node_dump_format_output(
                 }
 
                 // Get specific HTML info for that node.
-                if (*cur).ns.is_null() {
-                    info = html_tag_lookup((*cur).name);
+                let info = if (*cur).ns.is_null() {
+                    html_tag_lookup((*cur).name().as_deref().unwrap())
                 } else {
-                    info = null_mut();
-                }
+                    None
+                };
 
                 buf.write_str("<");
                 if !(*cur).ns.is_null() {
@@ -1141,13 +1137,12 @@ pub unsafe fn html_node_dump_format_output(
                     attr = (*attr).next;
                 }
 
-                if !info.is_null() && (*info).empty != 0 {
+                if info.map_or(false, |info| info.empty != 0) {
                     buf.write_str(">");
                 } else if let Some(children) = (*cur).children() {
                     buf.write_str(">");
                     if format != 0
-                        && !info.is_null()
-                        && (*info).isinline == 0
+                        && info.map_or(false, |info| info.isinline == 0)
                         && !matches!(
                             children.element_type(),
                             HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
@@ -1155,18 +1150,16 @@ pub unsafe fn html_node_dump_format_output(
                         && (*cur).children() != (*cur).last()
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
-                    /* p, pre, param */
                     {
+                        /* p, pre, param */
                         buf.write_str("\n");
                     }
                     parent = cur;
                     cur = children.as_ptr();
                     continue 'main;
-                } else if !info.is_null()
-                    && (*info).save_end_tag != 0
-                    && xml_strcmp((*info).name as _, c"html".as_ptr() as _) != 0
-                    && xml_strcmp((*info).name as _, c"body".as_ptr() as _) != 0
-                {
+                } else if info.map_or(false, |info| {
+                    info.save_end_tag != 0 && info.name != "html" && info.name != "body"
+                }) {
                     buf.write_str(">");
                 } else {
                     buf.write_str("></");
@@ -1183,8 +1176,7 @@ pub unsafe fn html_node_dump_format_output(
 
                 if (format != 0
                     && (*cur).next.is_some()
-                    && !info.is_null()
-                    && (*info).isinline == 0)
+                    && info.map_or(false, |info| info.isinline == 0))
                     && (!matches!(
                         (*cur).next.unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
@@ -1290,15 +1282,14 @@ pub unsafe fn html_node_dump_format_output(
             ) {
                 buf.write_str("\n");
             } else {
-                if format != 0 && (*cur).ns.is_null() {
-                    info = html_tag_lookup((*cur).name);
+                let info = if format != 0 && (*cur).ns.is_null() {
+                    html_tag_lookup((*cur).name().as_deref().unwrap())
                 } else {
-                    info = null_mut();
-                }
+                    None
+                };
 
                 if format != 0
-                    && !info.is_null()
-                    && (*info).isinline == 0
+                    && info.map_or(false, |info| info.isinline == 0)
                     && !matches!(
                         (*cur).last().unwrap().element_type(),
                         HTML_TEXT_NODE | HTML_ENTITY_REF_NODE
@@ -1306,8 +1297,8 @@ pub unsafe fn html_node_dump_format_output(
                     && (*cur).children() != (*cur).last()
                     && !(*cur).name.is_null()
                     && *(*cur).name.add(0) != b'p'
-                /* p, pre, param */
                 {
+                    /* p, pre, param */
                     buf.write_str("\n");
                 }
 
@@ -1323,8 +1314,7 @@ pub unsafe fn html_node_dump_format_output(
                 buf.write_str(">");
 
                 if (format != 0
-                    && !info.is_null()
-                    && (*info).isinline == 0
+                    && info.map_or(false, |info| info.isinline == 0)
                     && (*cur).next.is_some())
                     && (!matches!(
                         (*cur).next.unwrap().element_type(),

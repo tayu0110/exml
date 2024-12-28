@@ -47,7 +47,7 @@ use crate::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_create_dict,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
@@ -30221,16 +30221,15 @@ pub struct XmlSchemaSAXPlugStruct {
 }
 
 #[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn xml_schema_sax_handle_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     _prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     _nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30260,86 +30259,28 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
     (*ielem).node_line = xml_sax2_get_line_number((*vctxt).parser_ctxt as _);
     let localname = CString::new(localname).unwrap();
     (*ielem).local_name = localname.as_ptr() as *const u8;
-    (*ielem).ns_name = uri;
+    let uri = uri.map(|u| CString::new(u).unwrap());
+    (*ielem).ns_name = uri.as_deref().map_or(null(), |u| u.as_ptr() as *const u8);
     (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
     // Register namespaces on the elem info.
-    if nb_namespaces != 0 {
-        // Although the parser builds its own namespace list,
-        // we have no access to it, so we'll use an own one.
-        for (_, j) in (0..nb_namespaces).zip((0..).step_by(2)) {
-            // Store prefix and namespace name.
+    // Although the parser builds its own namespace list,
+    // we have no access to it, so we'll use an own one.
+    let namespaces = namespaces
+        .iter()
+        .map(|(pre, loc)| {
+            let pre = pre.as_deref().map(|p| CString::new(p).unwrap());
+            let loc = CString::new(loc.as_str()).unwrap();
+            (pre, loc)
+        })
+        .collect::<Vec<_>>(); // temporary workaround.
+    for (pre, href) in &namespaces {
+        // Store prefix and namespace name.
+        if (*ielem).ns_bindings.is_null() {
+            (*ielem).ns_bindings = xml_malloc(10 * size_of::<*const XmlChar>()) as _;
             if (*ielem).ns_bindings.is_null() {
-                (*ielem).ns_bindings = xml_malloc(10 * size_of::<*const XmlChar>()) as _;
-                if (*ielem).ns_bindings.is_null() {
-                    xml_schema_verr_memory(
-                        vctxt,
-                        "allocating namespace bindings for SAX validation",
-                        null_mut(),
-                    );
-                    // goto internal_error;
-                    (*vctxt).err = -1;
-                    (*(*vctxt).parser_ctxt).stop();
-                    return;
-                }
-                (*ielem).nb_ns_bindings = 0;
-                (*ielem).size_ns_bindings = 5;
-            } else if (*ielem).size_ns_bindings <= (*ielem).nb_ns_bindings {
-                (*ielem).size_ns_bindings *= 2;
-                (*ielem).ns_bindings = xml_realloc(
-                    (*ielem).ns_bindings as *mut c_void,
-                    (*ielem).size_ns_bindings as usize * 2 * size_of::<*const XmlChar>(),
-                ) as _;
-                if (*ielem).ns_bindings.is_null() {
-                    xml_schema_verr_memory(
-                        vctxt,
-                        "re-allocating namespace bindings for SAX validation",
-                        null_mut(),
-                    );
-                    // goto internal_error;
-                    (*vctxt).err = -1;
-                    (*(*vctxt).parser_ctxt).stop();
-                    return;
-                }
-            }
-
-            *(*ielem)
-                .ns_bindings
-                .add((*ielem).nb_ns_bindings as usize * 2) = *namespaces.add(j as usize);
-            if *(*namespaces.add(j as usize + 1)).add(0) == 0 {
-                // Handle xmlns="".
-                *(*ielem)
-                    .ns_bindings
-                    .add((*ielem).nb_ns_bindings as usize * 2 + 1) = null_mut();
-            } else {
-                *(*ielem)
-                    .ns_bindings
-                    .add((*ielem).nb_ns_bindings as usize * 2 + 1) =
-                    *namespaces.add(j as usize + 1);
-            }
-            (*ielem).nb_ns_bindings += 1;
-        }
-    }
-    // Register attributes.
-    // SAX VAL TODO: We are not adding namespace declaration attributes yet.
-    if nb_attributes != 0 {
-        let mut value_len: i32;
-        let mut k: i32;
-        let mut value: *mut XmlChar;
-
-        for (_, j) in (0..nb_attributes).zip((0..).step_by(5)) {
-            // Duplicate the value, changing any &#38; to a literal ampersand.
-            //
-            // libxml2 differs from normal SAX here in that it escapes all ampersands
-            // as &#38; instead of delivering the raw converted string. Changing the
-            // behavior at this point would break applications that use this API, so
-            // we are forced to work around it.
-            value_len =
-                (*attributes.add(j as usize + 4)).offset_from(*attributes.add(j as usize + 3)) as _;
-            value = xml_malloc_atomic(value_len as usize + 1) as _;
-            if value.is_null() {
                 xml_schema_verr_memory(
                     vctxt,
-                    "allocating string for decoded attribute",
+                    "allocating namespace bindings for SAX validation",
                     null_mut(),
                 );
                 // goto internal_error;
@@ -30347,48 +30288,85 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 (*(*vctxt).parser_ctxt).stop();
                 return;
             }
-            k = 0;
-            for l in 0.. {
-                if k < value_len - 4
-                    && *(*attributes.add(j as usize + 3)).add(k as usize) == b'&'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 1) == b'#'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 2) == b'3'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 3) == b'8'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 4) == b';'
-                {
-                    *value.add(l as usize) = b'&';
-                    k += 5;
-                } else {
-                    *value.add(l as usize) = *(*attributes.add(j as usize + 3)).add(k as usize);
-                    k += 1;
-                }
-                if k >= value_len {
-                    *value.add(l as usize) = b'\0';
-                    break;
-                }
-            }
-            // TODO: Set the node line.
-            ret = xml_schema_validator_push_attribute(
-                vctxt,
-                null_mut(),
-                (*ielem).node_line,
-                *attributes.add(j as usize),
-                *attributes.add(j as usize + 2),
-                0,
-                value,
-                1,
-            );
-            if ret == -1 {
-                VERROR_INT!(
+            (*ielem).nb_ns_bindings = 0;
+            (*ielem).size_ns_bindings = 5;
+        } else if (*ielem).size_ns_bindings <= (*ielem).nb_ns_bindings {
+            (*ielem).size_ns_bindings *= 2;
+            (*ielem).ns_bindings = xml_realloc(
+                (*ielem).ns_bindings as *mut c_void,
+                (*ielem).size_ns_bindings as usize * 2 * size_of::<*const XmlChar>(),
+            ) as _;
+            if (*ielem).ns_bindings.is_null() {
+                xml_schema_verr_memory(
                     vctxt,
-                    "xmlSchemaSAXHandleStartElementNs",
-                    "calling xmlSchemaValidatorPushAttribute()"
+                    "re-allocating namespace bindings for SAX validation",
+                    null_mut(),
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
                 (*(*vctxt).parser_ctxt).stop();
                 return;
             }
+        }
+
+        *(*ielem)
+            .ns_bindings
+            .add((*ielem).nb_ns_bindings as usize * 2) =
+            pre.as_deref().map_or(null(), |p| p.as_ptr() as *const u8);
+        if !href.is_empty() {
+            // Handle xmlns="".
+            *(*ielem)
+                .ns_bindings
+                .add((*ielem).nb_ns_bindings as usize * 2 + 1) = null_mut();
+        } else {
+            *(*ielem)
+                .ns_bindings
+                .add((*ielem).nb_ns_bindings as usize * 2 + 1) = href.as_ptr() as *const u8;
+        }
+        (*ielem).nb_ns_bindings += 1;
+    }
+    // Register attributes.
+    // SAX VAL TODO: We are not adding namespace declaration attributes yet.
+    let attributes = attributes
+        .iter()
+        .map(|attr| {
+            let loc = CString::new(attr.0.as_str()).unwrap();
+            let pre = attr.1.as_deref().map(|pre| CString::new(pre).unwrap());
+            let url = attr.2.as_deref().map(|url| CString::new(url).unwrap());
+            // Duplicate the value, changing any &#38; to a literal ampersand.
+            //
+            // libxml2 differs from normal SAX here in that it escapes all ampersands
+            // as &#38; instead of delivering the raw converted string. Changing the
+            // behavior at this point would break applications that use this API, so
+            // we are forced to work around it.
+            let val = CString::new(attr.3.replace("&#38;", "&").as_str()).unwrap();
+            (loc, pre, url, val)
+        })
+        .collect::<Vec<_>>();
+    for attr in &attributes {
+        // TODO: Set the node line.
+        ret = xml_schema_validator_push_attribute(
+            vctxt,
+            null_mut(),
+            (*ielem).node_line,
+            attr.0.as_ptr() as *const u8,
+            attr.2
+                .as_deref()
+                .map_or(null(), |ns_name| ns_name.as_ptr() as *const u8),
+            0,
+            attr.3.as_ptr() as *mut u8,
+            1,
+        );
+        if ret == -1 {
+            VERROR_INT!(
+                vctxt,
+                "xmlSchemaSAXHandleStartElementNs",
+                "calling xmlSchemaValidatorPushAttribute()"
+            );
+            // goto internal_error;
+            (*vctxt).err = -1;
+            (*(*vctxt).parser_ctxt).stop();
+            return;
         }
     }
     // Validate the element.
@@ -30403,6 +30381,11 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         (*vctxt).err = -1;
         (*(*vctxt).parser_ctxt).stop();
     }
+
+    // `namespaces` must live until this point at least.
+    // It must not be dropped before execute `xml_schema_validate_elem`.
+    drop(namespaces);
+    drop(attributes);
 
     // exit:
     // internal_error:
@@ -30931,16 +30914,15 @@ unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
 }
 
 #[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_split(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30954,9 +30936,7 @@ unsafe fn start_element_ns_split(
             localname,
             prefix,
             uri,
-            nb_namespaces,
             namespaces,
-            nb_attributes,
             nb_defaulted,
             attributes,
         );
@@ -30967,9 +30947,7 @@ unsafe fn start_element_ns_split(
             localname,
             prefix,
             uri,
-            nb_namespaces,
             namespaces,
-            nb_attributes,
             nb_defaulted,
             attributes,
         );

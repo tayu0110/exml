@@ -3006,16 +3006,15 @@ unsafe fn xml_text_reader_end_element(ctx: Option<GenericErrorContext>, fullname
 /// Called when an opening tag has been processed.
 #[doc(alias = "xmlTextReaderStartElementNs")]
 #[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn xml_text_reader_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();
@@ -3031,9 +3030,7 @@ unsafe fn xml_text_reader_start_element_ns(
                 localname,
                 prefix,
                 uri,
-                nb_namespaces,
                 namespaces,
-                nb_attributes,
                 nb_defaulted,
                 attributes,
             );

@@ -44,8 +44,9 @@
 
 use std::{
     any::type_name,
+    borrow::Cow,
     cell::RefCell,
-    ffi::{c_char, c_void, CStr},
+    ffi::{c_char, c_void, CStr, CString},
     io::Read,
     mem::{size_of, size_of_val},
     ops::DerefMut,
@@ -122,7 +123,7 @@ use crate::{
             xml_sax2_entity_decl, xml_sax2_get_entity, xml_sax2_ignorable_whitespace,
             xml_sax_version,
         },
-        uri::{xml_canonic_path, xml_free_uri, xml_parse_uri, XmlURIPtr},
+        uri::{xml_canonic_path, xml_free_uri, xml_parse_uri},
         valid::{
             xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
             xml_new_doc_element_content, xml_validate_root, XmlValidCtxt,
@@ -139,7 +140,7 @@ use crate::{
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
-    uri::canonic_path,
+    uri::{canonic_path, XmlURI},
     xpath::xml_init_xpath_internal,
 };
 
@@ -474,23 +475,12 @@ pub enum XmlParserMode {
 }
 
 #[repr(C)]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(crate) struct XmlStartTag {
-    pub(crate) prefix: *const XmlChar,
-    pub(crate) uri: *const XmlChar,
+    pub(crate) prefix: Option<String>,
+    pub(crate) uri: Option<String>,
     pub(crate) line: i32,
     pub(crate) ns_nr: i32,
-}
-
-impl Default for XmlStartTag {
-    fn default() -> Self {
-        Self {
-            prefix: null(),
-            uri: null(),
-            line: 0,
-            ns_nr: 0,
-        }
-    }
 }
 
 /// The parser context.
@@ -547,7 +537,7 @@ pub struct XmlParserCtxt {
     pub(crate) directory: Option<String>, /* the data directory */
 
     // Node name stack
-    pub(crate) name: *const XmlChar, /* Current parsed Node */
+    pub(crate) name: Option<String>, /* Current parsed Node */
     pub(crate) name_tab: Vec<*const XmlChar>, /* array of nodes */
 
     nb_chars: i64,                             /* unused */
@@ -583,15 +573,15 @@ pub struct XmlParserCtxt {
     pub(crate) docdict: i32,     /* use strings from dict to build tree */
 
     // pre-interned strings
-    pub(crate) str_xml: *const XmlChar,
-    pub(crate) str_xmlns: *const XmlChar,
-    pub(crate) str_xml_ns: *const XmlChar,
+    pub(crate) str_xml: Option<Cow<'static, str>>,
+    pub(crate) str_xmlns: Option<Cow<'static, str>>,
+    pub(crate) str_xml_ns: Option<Cow<'static, str>>,
 
     // Everything below is used only by the new SAX mode
-    pub(crate) sax2: i32,                   /* operating in the new SAX mode */
-    pub(crate) ns_tab: Vec<*const XmlChar>, /* the array of prefix/namespace name */
-    pub(crate) attallocs: *mut i32,         /* which attribute were allocated */
-    pub(crate) push_tab: Vec<XmlStartTag>,  /* array of data for push */
+    pub(crate) sax2: i32, /* operating in the new SAX mode */
+    pub(crate) ns_tab: Vec<(Option<String>, String)>, /* the array of prefix/namespace name */
+    pub(crate) attallocs: *mut i32, /* which attribute were allocated */
+    pub(crate) push_tab: Vec<XmlStartTag>, /* array of data for push */
     pub(crate) atts_default: Option<XmlHashTableRef<'static, XmlDefAttrsPtr>>, /* defaulted attributes if any */
     pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>, /* non-CDATA attributes if any */
     pub(crate) ns_well_formed: i32, /* is the document XML Namespace okay */
@@ -1172,7 +1162,11 @@ impl XmlParserCtxt {
     /// Returns -1 in case of error, the index in the stack otherwise
     #[doc(alias = "namePush")]
     pub(crate) fn name_push(&mut self, value: *const XmlChar) -> i32 {
-        self.name = value;
+        self.name = (!value.is_null()).then(|| unsafe {
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         self.name_tab.push(value);
         self.name_tab.len() as i32 - 1
     }
@@ -1183,7 +1177,12 @@ impl XmlParserCtxt {
     #[doc(alias = "namePop")]
     pub(crate) fn name_pop(&mut self) -> *const XmlChar {
         let res = self.name_tab.pop().unwrap_or(null_mut());
-        self.name = *self.name_tab.last().unwrap_or(&null());
+        let name = *self.name_tab.last().unwrap_or(&null());
+        self.name = (!name.is_null()).then(|| unsafe {
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         res
     }
 
@@ -1218,13 +1217,25 @@ impl XmlParserCtxt {
         line: i32,
         ns_nr: i32,
     ) -> i32 {
-        self.name = value;
+        self.name = (!value.is_null()).then(|| unsafe {
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         self.name_tab.push(value);
         self.push_tab
             .resize(self.name_tab.len(), XmlStartTag::default());
         let res = self.name_tab.len() - 1;
-        self.push_tab[res].prefix = prefix;
-        self.push_tab[res].uri = uri;
+        self.push_tab[res].prefix = (!prefix.is_null()).then(|| unsafe {
+            CStr::from_ptr(prefix as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
+        self.push_tab[res].uri = (!uri.is_null()).then(|| unsafe {
+            CStr::from_ptr(uri as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         self.push_tab[res].line = line;
         self.push_tab[res].ns_nr = ns_nr;
         res as i32
@@ -1237,7 +1248,12 @@ impl XmlParserCtxt {
     #[cfg(feature = "libxml_push")]
     pub(crate) fn name_ns_pop(&mut self) -> *const XmlChar {
         let res = self.name_tab.pop().unwrap_or(null_mut());
-        self.name = *self.name_tab.last().unwrap_or(&null());
+        let name = *self.name_tab.last().unwrap_or(&null());
+        self.name = (!name.is_null()).then(|| unsafe {
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
         res
     }
 
@@ -1245,21 +1261,21 @@ impl XmlParserCtxt {
     ///
     /// Returns -1 in case of error, -2 if the namespace should be discarded and the index in the stack otherwise.
     #[doc(alias = "nsPush")]
-    pub(crate) fn ns_push(&mut self, prefix: *const XmlChar, url: *const XmlChar) -> i32 {
+    pub(crate) fn ns_push(&mut self, prefix: Option<&str>, url: &str) -> i32 {
         if self.options & XmlParserOption::XmlParseNsclean as i32 != 0 {
-            for i in (0..self.ns_tab.len() - 1).rev().step_by(2) {
-                if self.ns_tab[i] == prefix {
-                    /* in scope */
-                    if self.ns_tab[i + 1] == url {
+            for (pre, href) in self.ns_tab.iter().rev() {
+                if pre.as_deref() == prefix {
+                    // in scope
+                    if href.as_str() == url {
                         return -2;
                     }
-                    /* out of scope keep it */
+                    // out of scope keep it
                     break;
                 }
             }
         }
-        self.ns_tab.push(prefix);
-        self.ns_tab.push(url);
+        self.ns_tab
+            .push((prefix.map(|p| p.to_owned()), url.to_owned()));
         self.ns_tab.len() as i32
     }
 
@@ -1300,12 +1316,9 @@ impl XmlParserCtxt {
             self.sax2 = 1;
         }
 
-        self.str_xml = xml_dict_lookup(self.dict, c"xml".as_ptr() as _, 3);
-        self.str_xmlns = xml_dict_lookup(self.dict, c"xmlns".as_ptr() as _, 5);
-        self.str_xml_ns = xml_dict_lookup(self.dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
-        if self.str_xml.is_null() || self.str_xmlns.is_null() || self.str_xml_ns.is_null() {
-            xml_err_memory(self, None);
-        }
+        self.str_xml = Some(Cow::Borrowed("xml"));
+        self.str_xmlns = Some(Cow::Borrowed("xmlns"));
+        self.str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
     }
 
     /// Applies the options to the parser context
@@ -1621,7 +1634,7 @@ impl Default for XmlParserCtxt {
             instate: XmlParserInputState::default(),
             token: 0,
             directory: None,
-            name: null(),
+            name: None,
             name_tab: vec![],
             nb_chars: 0,
             check_index: 0,
@@ -1649,9 +1662,9 @@ impl Default for XmlParserCtxt {
             atts: vec![],
             maxatts: 0,
             docdict: 0,
-            str_xml: null(),
-            str_xml_ns: null(),
-            str_xmlns: null(),
+            str_xml: None,
+            str_xml_ns: None,
+            str_xmlns: None,
             sax2: 0,
             ns_tab: vec![],
             attallocs: null_mut(),
@@ -1887,12 +1900,10 @@ pub type StartElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
     nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 );
 
 /// SAX2 callback when an element end has been detected by the parser.
@@ -3954,22 +3965,19 @@ pub unsafe fn xml_parse_balanced_chunk_memory(
 //
 // Returns the namespace name or NULL if not bound
 #[doc(alias = "xmlGetNamespace")]
-unsafe extern "C" fn xml_get_namespace(
-    ctxt: XmlParserCtxtPtr,
-    prefix: *const XmlChar,
-) -> *const XmlChar {
-    if prefix == (*ctxt).str_xml {
-        return (*ctxt).str_xml_ns;
+unsafe fn xml_get_namespace(ctxt: XmlParserCtxtPtr, prefix: Option<&str>) -> Option<String> {
+    if prefix == (*ctxt).str_xml.as_deref() {
+        return (*ctxt).str_xml_ns.as_deref().map(|ns| ns.to_owned());
     }
-    for i in (0..(*ctxt).ns_tab.len().saturating_sub(1)).rev().step_by(2) {
-        if (*ctxt).ns_tab[i] == prefix {
-            if prefix.is_null() && (*(*ctxt).ns_tab[i + 1]) == 0 {
-                return null_mut();
+    for (pre, href) in (*ctxt).ns_tab.iter().rev() {
+        if pre.as_deref() == prefix {
+            if prefix.is_none() && href.is_empty() {
+                return None;
             }
-            return (*ctxt).ns_tab[i + 1];
+            return Some(href.clone());
         }
     }
-    null_mut()
+    None
 }
 
 /// Parse a well-balanced chunk of an XML document
@@ -4102,20 +4110,10 @@ pub unsafe fn xml_parse_in_node_context(
         cur = node;
         while !cur.is_null() && (*cur).element_type() == XmlElementType::XmlElementNode {
             let mut ns: XmlNsPtr = (*cur).ns_def;
-            let mut iprefix: *const XmlChar;
-            let mut ihref: *const XmlChar;
 
             while !ns.is_null() {
-                if !(*ctxt).dict.is_null() {
-                    iprefix = xml_dict_lookup((*ctxt).dict, (*ns).prefix, -1);
-                    ihref = xml_dict_lookup((*ctxt).dict, (*ns).href, -1);
-                } else {
-                    iprefix = (*ns).prefix;
-                    ihref = (*ns).href;
-                }
-
-                if xml_get_namespace(ctxt, iprefix).is_null() {
-                    (*ctxt).ns_push(iprefix, ihref);
+                if xml_get_namespace(ctxt, (*ns).prefix().as_deref()).is_none() {
+                    (*ctxt).ns_push((*ns).prefix().as_deref(), &(*ns).href().unwrap());
                     nsnr += 1;
                 }
                 ns = (*ns).next as _;
@@ -4259,9 +4257,9 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         xml_dict_free((*ctxt).dict);
         (*ctxt).dict = (*doc).dict;
         xml_dict_reference((*ctxt).dict);
-        (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-        (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-        (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+        (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
+        (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
+        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
         (*ctxt).dict_names = 1;
     } else {
         (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNodict as i32, None);
@@ -4508,9 +4506,9 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
             xml_dict_free((*ctxt).dict);
         }
         (*ctxt).dict = (*oldctxt).dict;
-        (*ctxt).str_xml = xml_dict_lookup((*ctxt).dict, c"xml".as_ptr() as _, 3);
-        (*ctxt).str_xmlns = xml_dict_lookup((*ctxt).dict, c"xmlns".as_ptr() as _, 5);
-        (*ctxt).str_xml_ns = xml_dict_lookup((*ctxt).dict, XML_XML_NAMESPACE.as_ptr() as _, 36);
+        (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
+        (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
+        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
         (*ctxt).dict_names = (*oldctxt).dict_names;
         (*ctxt).atts_default = (*oldctxt).atts_default;
         (*ctxt).atts_special = (*oldctxt).atts_special;
@@ -4753,17 +4751,17 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).token = 0;
     (*ctxt).directory = None;
 
-    /* Allocate the Node stack */
+    // Allocate the Node stack
     (*ctxt).node_tab.clear();
     (*ctxt).node_tab.shrink_to(10);
     (*ctxt).node = null_mut();
 
-    /* Allocate the Name stack */
+    // Allocate the Name stack
     (*ctxt).name_tab.clear();
     (*ctxt).name_tab.shrink_to(10);
-    (*ctxt).name = null_mut();
+    (*ctxt).name = None;
 
-    /* Allocate the space stack */
+    // Allocate the space stack
     (*ctxt).space_tab.clear();
     (*ctxt).space_tab.shrink_to(10);
     (*ctxt).space_tab.push(-1);
@@ -7154,7 +7152,7 @@ macro_rules! GROW_PARSE_ATT_VALUE_INTERNAL {
 /// Returns the AttValue parsed or NULL. The value has to be freed by the
 ///     caller if it was copied, this can be detected by val[*len] == 0.
 #[doc(alias = "xmlParseAttValueInternal")]
-pub(crate) unsafe extern "C" fn xml_parse_att_value_internal(
+pub(crate) unsafe fn xml_parse_att_value_internal(
     ctxt: XmlParserCtxtPtr,
     len: *mut i32,
     alloc: *mut i32,
@@ -7180,11 +7178,8 @@ pub(crate) unsafe extern "C" fn xml_parse_att_value_internal(
     }
     (*ctxt).instate = XmlParserInputState::XmlParserAttributeValue;
 
-    /*
-     * try to handle in this routine the most common case where no
-     * allocation of a new string is required and where content is
-     * pure ASCII.
-     */
+    // try to handle in this routine the most common case where no
+    // allocation of a new string is required and where content is pure ASCII.
     let limit: XmlChar = *input;
     input = input.add(1);
     col += 1;
@@ -7194,9 +7189,7 @@ pub(crate) unsafe extern "C" fn xml_parse_att_value_internal(
         GROW_PARSE_ATT_VALUE_INTERNAL!(ctxt, input, start, end);
     }
     if normalize != 0 {
-        /*
-         * Skip any leading spaces
-         */
+        // Skip any leading spaces
         while input < end
             && *input != limit
             && (*input == 0x20 || *input == 0x9 || *input == 0xA || *input == 0xD)
@@ -7250,9 +7243,7 @@ pub(crate) unsafe extern "C" fn xml_parse_att_value_internal(
             }
         }
         last = input;
-        /*
-         * skip the trailing blanks
-         */
+        // skip the trailing blanks
         while *last.sub(1) == 0x20 && last > start {
             last = last.sub(1);
         }
@@ -7475,7 +7466,7 @@ unsafe extern "C" fn xml_attr_normalize_space2(
 
 /// Returns the attribute name, and the value in *value, .
 #[doc(alias = "xmlParseAttribute2")]
-unsafe extern "C" fn xml_parse_attribute2(
+unsafe fn xml_parse_attribute2(
     ctxt: XmlParserCtxtPtr,
     pref: *const XmlChar,
     elem: *const XmlChar,
@@ -7517,9 +7508,7 @@ unsafe extern "C" fn xml_parse_attribute2(
         }
     }
 
-    /*
-     * read the value
-     */
+    // read the value
     (*ctxt).skip_blanks();
 
     if (*ctxt).current_byte() == b'=' {
@@ -7530,12 +7519,10 @@ unsafe extern "C" fn xml_parse_attribute2(
             return null_mut();
         }
         if normalize != 0 {
-            /*
-             * Sometimes a second normalisation pass for spaces is needed
-             * but that only happens if charrefs or entities references
-             * have been used in the attribute value, i.e. the attribute
-             * value have been extracted in an allocated string already.
-             */
+            // Sometimes a second normalisation pass for spaces is needed
+            // but that only happens if charrefs or entities references
+            // have been used in the attribute value, i.e. the attribute
+            // value have been extracted in an allocated string already.
             if *alloc != 0 {
                 let val2: *const XmlChar = xml_attr_normalize_space2(ctxt, val, len);
                 if !val2.is_null() && val2 != val {
@@ -7556,7 +7543,9 @@ unsafe extern "C" fn xml_parse_attribute2(
         return name;
     }
 
-    if *prefix == (*ctxt).str_xml {
+    if (!(*prefix).is_null()).then(|| CStr::from_ptr(*prefix as *const i8).to_string_lossy())
+        == (*ctxt).str_xml
+    {
         // Check that xml:lang conforms to the specification
         // No more registered as an error, just generate a warning now
         // since this was deprecated in XML second edition
@@ -7810,18 +7799,14 @@ unsafe fn grow_attrs(
 pub(crate) unsafe fn xml_parse_start_tag2(
     ctxt: XmlParserCtxtPtr,
     pref: *mut *const XmlChar,
-    uri: *mut *const XmlChar,
+    uri: &mut Option<String>,
     tlen: *mut i32,
 ) -> *const XmlChar {
     let mut localname: *const XmlChar;
     let mut prefix: *const XmlChar = null();
     let mut attname: *const XmlChar;
     let mut aprefix: *const XmlChar = null();
-    let mut nsname: *const XmlChar;
     let mut attvalue: *mut XmlChar = null_mut();
-    let mut atts: *mut *const XmlChar = null_mut();
-    let mut attallocs: *mut i32 = null_mut();
-    let mut maxatts: i32 = 0;
 
     if (*ctxt).current_byte() != b'<' {
         return null_mut();
@@ -7830,11 +7815,8 @@ pub(crate) unsafe fn xml_parse_start_tag2(
 
     let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
     let inputid: i32 = (*(*ctxt).input).id;
-    let mut nbatts: i32 = 0;
-    let mut nratts: i32 = 0;
     let mut nbdef: i32 = 0;
-    let mut nb_ns: i32 = 0;
-    let mut attval: i32 = 0;
+    let mut nb_ns = 0usize;
     // /* Forget any namespaces added during an earlier parse of this element. */
     // (*ctxt).ns_tab.len() = ns_nr;
 
@@ -7854,6 +7836,8 @@ pub(crate) unsafe fn xml_parse_start_tag2(
     // (S Attribute)* S?
     (*ctxt).skip_blanks();
     (*ctxt).grow();
+
+    let mut atts = vec![];
 
     'done: {
         while ((*ctxt).current_byte() != b'>'
@@ -7889,9 +7873,9 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                     len = xml_strlen(attvalue);
                 }
 
-                if attname == (*ctxt).str_xmlns && aprefix.is_null() {
+                let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+                if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_null() {
                     let url: *const XmlChar = xml_dict_lookup((*ctxt).dict, attvalue, len);
-                    let uri: XmlURIPtr;
 
                     if url.is_null() {
                         xml_err_memory(ctxt, Some("dictionary allocation failure"));
@@ -7901,19 +7885,10 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                         localname = null_mut();
                         break 'done;
                     }
-                    if *url != 0 {
-                        uri = xml_parse_uri(url as _);
-                        if uri.is_null() {
-                            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
-                            xml_ns_err!(
-                                ctxt,
-                                XmlParserErrors::XmlWarNsURI,
-                                "xmlns: '{}' is not a valid URI\n",
-                                url
-                            );
-                        } else {
-                            if (*uri).scheme.is_null() {
-                                let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                    let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                    if !url.is_empty() {
+                        if let Some(uri) = XmlURI::parse(url.as_ref()) {
+                            if uri.scheme.is_none() {
                                 xml_ns_warn!(
                                     ctxt,
                                     XmlParserErrors::XmlWarNsURIRelative,
@@ -7921,10 +7896,16 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                                     url
                                 );
                             }
-                            xml_free_uri(uri);
+                        } else {
+                            xml_ns_err!(
+                                ctxt,
+                                XmlParserErrors::XmlWarNsURI,
+                                "xmlns: '{}' is not a valid URI\n",
+                                url
+                            );
                         }
-                        if url == (*ctxt).str_xml_ns {
-                            if attname != (*ctxt).str_xml {
+                        if Some(url.as_ref()) == (*ctxt).str_xml_ns.as_deref() {
+                            if Some(attname) != (*ctxt).str_xml {
                                 xml_ns_err!(
                                     ctxt,
                                     XmlParserErrors::XmlNsErrXmlNamespace,
@@ -7933,9 +7914,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                             }
                             break 'next_attr;
                         }
-                        if len == 29
-                            && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _)
-                        {
+                        if len == 29 && url == "http://www.w3.org/2000/xmlns/" {
                             xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
@@ -7946,23 +7925,26 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                     }
 
                     // check that it's not a defined namespace
-                    let mut j = 1;
-                    while j <= nb_ns {
-                        if (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * j as usize].is_null() {
-                            break;
-                        }
-                        j += 1;
-                    }
-                    if j <= nb_ns {
-                        let loc = CStr::from_ptr(attname as *const i8).to_string_lossy();
-                        xml_err_attribute_dup(ctxt, None, &loc);
-                    } else if (*ctxt).ns_push(null_mut(), url) > 0 {
+                    if (*ctxt)
+                        .ns_tab
+                        .iter()
+                        .rev()
+                        .take(nb_ns)
+                        .any(|(pre, _)| pre.is_none())
+                    {
+                        xml_err_attribute_dup(ctxt, None, &attname);
+                    } else if (*ctxt).ns_push(None, &url) > 0 {
                         nb_ns += 1;
                     }
-                } else if aprefix == (*ctxt).str_xmlns {
+                } else if (!aprefix.is_null())
+                    .then(|| CStr::from_ptr(aprefix as *const i8).to_string_lossy())
+                    == (*ctxt).str_xmlns
+                {
                     let url: *const XmlChar = xml_dict_lookup((*ctxt).dict, attvalue, len);
+                    let url = (!url.is_null())
+                        .then(|| CStr::from_ptr(url as *const i8).to_string_lossy());
 
-                    if attname == (*ctxt).str_xml {
+                    if Some(attname.as_ref()) == (*ctxt).str_xml.as_deref() {
                         if url != (*ctxt).str_xml_ns {
                             xml_ns_err!(
                                 ctxt,
@@ -7974,7 +7956,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                         break 'next_attr;
                     }
                     if url == (*ctxt).str_xml_ns {
-                        if attname != (*ctxt).str_xml {
+                        if Some(attname) != (*ctxt).str_xml {
                             xml_ns_err!(
                                 ctxt,
                                 XmlParserErrors::XmlNsErrXmlNamespace,
@@ -7983,7 +7965,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                         }
                         break 'next_attr;
                     }
-                    if attname == (*ctxt).str_xmlns {
+                    if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() {
                         xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
@@ -7991,9 +7973,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                         );
                         break 'next_attr;
                     }
-                    if len == 29
-                        && xml_str_equal(url, c"http://www.w3.org/2000/xmlns/".as_ptr() as _)
-                    {
+                    if len == 29 && url.as_deref() == Some("http://www.w3.org/2000/xmlns/") {
                         xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
@@ -8001,8 +7981,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                         );
                         break 'next_attr;
                     }
-                    if url.is_null() || *url.add(0) == 0 {
-                        let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
+                    let Some(url) = url.filter(|url| !url.is_empty()) else {
                         xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrXmlNamespace,
@@ -8010,22 +7989,9 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                             attname
                         );
                         break 'next_attr;
-                    }
-                    let uri: XmlURIPtr = xml_parse_uri(url as _);
-                    if uri.is_null() {
-                        let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
-                        let url = CStr::from_ptr(url as *const i8).to_string_lossy();
-                        xml_ns_err!(
-                            ctxt,
-                            XmlParserErrors::XmlWarNsURI,
-                            "xmlns:{}: '{}' is not a valid URI\n",
-                            attname,
-                            url
-                        );
-                    } else {
-                        if (*ctxt).pedantic != 0 && (*uri).scheme.is_null() {
-                            let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
-                            let url = CStr::from_ptr(url as *const i8).to_string_lossy();
+                    };
+                    if let Some(uri) = XmlURI::parse(url.as_ref()) {
+                        if (*ctxt).pedantic != 0 && uri.scheme.is_none() {
                             xml_ns_warn!(
                                 ctxt,
                                 XmlParserErrors::XmlWarNsURIRelative,
@@ -8034,58 +8000,45 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                                 url
                             );
                         }
-                        xml_free_uri(uri);
+                    } else {
+                        xml_ns_err!(
+                            ctxt,
+                            XmlParserErrors::XmlWarNsURI,
+                            "xmlns:{}: '{}' is not a valid URI\n",
+                            attname,
+                            url
+                        );
                     }
                     // check that it's not a defined namespace
-                    let mut j = 1;
-                    while j <= nb_ns {
-                        if (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * j as usize] == attname {
-                            break;
-                        }
-                        j += 1;
-                    }
-                    if j <= nb_ns {
+                    if (*ctxt)
+                        .ns_tab
+                        .iter()
+                        .take(nb_ns)
+                        .any(|(pre, _)| pre.as_deref() == Some(&attname))
+                    {
                         let pre = (!aprefix.is_null())
                             .then(|| CStr::from_ptr(aprefix as *const i8).to_string_lossy());
-                        let loc = CStr::from_ptr(attname as *const i8).to_string_lossy();
-                        xml_err_attribute_dup(ctxt, pre.as_deref(), &loc);
-                    } else if (*ctxt).ns_push(attname, url) > 0 {
+                        xml_err_attribute_dup(ctxt, pre.as_deref(), &attname);
+                    } else if (*ctxt).ns_push(Some(&attname), &url) > 0 {
                         nb_ns += 1;
                     }
                 } else {
                     // Add the pair to atts
-                    if (atts.is_null() || nbatts + 5 > maxatts)
-                        && grow_attrs(ctxt, &mut atts, &mut attallocs, &mut maxatts, nbatts + 5) < 0
-                    {
-                        break 'next_attr;
-                    }
+                    let aprefix = (!aprefix.is_null()).then(|| {
+                        CStr::from_ptr(aprefix as *const i8)
+                            .to_string_lossy()
+                            .into_owned()
+                    });
+                    let value = {
+                        let slice = from_raw_parts(attvalue, len as usize);
+                        let res = String::from_utf8_lossy(slice).into_owned();
 
-                    *attallocs.add(nratts as usize) = alloc;
-                    nratts += 1;
-                    *atts.add(nbatts as usize) = attname;
-                    nbatts += 1;
-                    *atts.add(nbatts as usize) = aprefix;
-                    nbatts += 1;
-                    // The namespace URI field is used temporarily to point at the
-                    // base of the current input buffer for non-alloced attributes.
-                    // When the input buffer is reallocated, all the pointers become
-                    // invalid, but they can be reconstructed later.
-                    if alloc != 0 {
-                        *atts.add(nbatts as usize) = null_mut();
-                        nbatts += 1;
-                    } else {
-                        *atts.add(nbatts as usize) = (*(*ctxt).input).base;
-                        nbatts += 1;
-                    }
-                    *atts.add(nbatts as usize) = attvalue;
-                    nbatts += 1;
-                    attvalue = attvalue.add(len as usize);
-                    *atts.add(nbatts as usize) = attvalue;
-                    nbatts += 1;
-                    // tag if some deallocation is needed
-                    if alloc != 0 {
-                        attval = 1;
-                    }
+                        if alloc != 0 {
+                            xml_free(attvalue as _);
+                        }
+                        res
+                    };
+                    atts.push((attname.into_owned(), aprefix, None, value));
                     attvalue = null_mut(); /* moved into atts */
                 }
             }
@@ -8126,22 +8079,6 @@ pub(crate) unsafe fn xml_parse_start_tag2(
             break 'done;
         }
 
-        // Reconstruct attribute value pointers.
-        for (i, _) in (0..).step_by(5).zip(0..nratts) {
-            if !(*atts.add(i + 2)).is_null() {
-                // Arithmetic on dangling pointers is technically undefined behavior, but well...
-                let old: *const XmlChar = *atts.add(i + 2);
-                *atts.add(i + 2) = null_mut(); /* Reset repurposed namespace URI */
-                *atts.add(i + 3) = (*(*ctxt).input)
-                    .base
-                    .add((*atts.add(i + 3)).offset_from(old) as _); /* value */
-                *atts.add(i + 4) = (*(*ctxt).input)
-                    .base
-                    .add((*atts.add(i + 4)).offset_from(old) as _);
-                /* valuend */
-            }
-        }
-
         // The attributes defaulting
         if let Some(atts_default) = (*ctxt).atts_default {
             let defaults = atts_default.lookup2(
@@ -8152,71 +8089,66 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                 'b: for i in 0..(*defaults).nb_attrs as usize {
                     attname = *(*defaults).values.as_ptr().add(5 * i);
                     aprefix = *(*defaults).values.as_ptr().add(5 * i + 1);
+                    let attname = CStr::from_ptr(attname as *const i8).to_string_lossy();
 
                     // special work for namespaces defaulted defs
-                    if attname == (*ctxt).str_xmlns && aprefix.is_null() {
+                    if Some(attname.as_ref()) == (*ctxt).str_xmlns.as_deref() && aprefix.is_null() {
                         // check that it's not a defined namespace
-                        for j in 1..=nb_ns {
-                            if (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * j as usize].is_null() {
-                                continue 'b;
-                            }
+                        if (*ctxt).ns_tab.iter().any(|(pre, _)| pre.is_none()) {
+                            continue;
                         }
 
-                        nsname = xml_get_namespace(ctxt, null_mut());
-                        if nsname != *(*defaults).values.as_ptr().add(5 * i + 2)
-                            && (*ctxt)
-                                .ns_push(null_mut(), *(*defaults).values.as_ptr().add(5 * i + 2))
-                                > 0
-                        {
+                        let nsname = xml_get_namespace(ctxt, None);
+                        let def = CStr::from_ptr(
+                            *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
+                        )
+                        .to_string_lossy();
+                        if nsname.as_deref() != Some(&def) && (*ctxt).ns_push(None, &def) > 0 {
                             nb_ns += 1;
                         }
-                    } else if aprefix == (*ctxt).str_xmlns {
+                    } else if (!aprefix.is_null())
+                        .then(|| CStr::from_ptr(aprefix as *const i8).to_string_lossy())
+                        == (*ctxt).str_xmlns
+                    {
                         // check that it's not a defined namespace
-                        for j in 1..=nb_ns {
-                            if (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * j as usize] == attname {
-                                continue 'b;
-                            }
+                        if (*ctxt)
+                            .ns_tab
+                            .iter()
+                            .any(|(pre, _)| pre.as_deref() == Some(&attname))
+                        {
+                            continue 'b;
                         }
 
-                        nsname = xml_get_namespace(ctxt, attname);
-                        if nsname != *(*defaults).values.as_ptr().add(5 * i + 2)
-                            && (*ctxt).ns_push(attname, *(*defaults).values.as_ptr().add(5 * i + 2))
-                                > 0
+                        let nsname = xml_get_namespace(ctxt, Some(&attname));
+                        let def = CStr::from_ptr(
+                            *(*defaults).values.as_ptr().add(5 * i + 2) as *const i8
+                        )
+                        .to_string_lossy();
+                        if nsname.as_deref() != Some(&def)
+                            && (*ctxt).ns_push(Some(&attname), &def) > 0
                         {
                             nb_ns += 1;
                         }
                     } else {
+                        let aprefix = (!aprefix.is_null()).then(|| {
+                            CStr::from_ptr(aprefix as *const i8)
+                                .to_string_lossy()
+                                .into_owned()
+                        });
+
                         // check that it's not a defined attribute
-                        for j in (0..nbatts).step_by(5) {
-                            if attname == *atts.add(j as usize)
-                                && aprefix == *atts.add(j as usize + 1)
-                            {
-                                continue 'b;
-                            }
+                        if atts.iter().any(|att| att.0 == attname && att.1 == aprefix) {
+                            continue 'b;
                         }
 
-                        if (atts.is_null() || nbatts + 5 > maxatts)
-                            && grow_attrs(ctxt, &mut atts, &mut attallocs, &mut maxatts, nbatts + 5)
-                                < 0
-                        {
-                            localname = null_mut();
-                            break 'done;
-                        }
-                        *atts.add(nbatts as usize) = attname;
-                        nbatts += 1;
-                        *atts.add(nbatts as usize) = aprefix;
-                        nbatts += 1;
-                        if aprefix.is_null() {
-                            *atts.add(nbatts as usize) = null_mut();
-                            nbatts += 1;
-                        } else {
-                            *atts.add(nbatts as usize) = xml_get_namespace(ctxt, aprefix);
-                            nbatts += 1;
-                        }
-                        *atts.add(nbatts as usize) = *(*defaults).values.as_ptr().add(5 * i + 2);
-                        nbatts += 1;
-                        *atts.add(nbatts as usize) = *(*defaults).values.as_ptr().add(5 * i + 3);
-                        nbatts += 1;
+                        let uri = aprefix
+                            .as_deref()
+                            .and_then(|p| xml_get_namespace(ctxt, Some(p)));
+                        let value1 = *(*defaults).values.as_ptr().add(5 * i + 2);
+                        let value2 = *(*defaults).values.as_ptr().add(5 * i + 3);
+                        let len = value2.offset_from(value1).unsigned_abs();
+                        let value = from_utf8(from_raw_parts(value1, len)).unwrap().to_owned();
+                        atts.push((attname.as_ref().to_owned(), aprefix, uri, value));
                         if (*ctxt).standalone == 1
                             && !(*(*defaults).values.as_ptr().add(5 * i + 4)).is_null()
                         {
@@ -8224,7 +8156,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                                 ctxt,
                                 XmlParserErrors::XmlDTDStandaloneDefaulted,
                                 "standalone: attribute {} on {} defaulted from external subset\n",
-                                CStr::from_ptr(attname as *const i8).to_string_lossy(),
+                                attname,
                                 CStr::from_ptr(localname as *const i8).to_string_lossy()
                             );
                         }
@@ -8235,13 +8167,13 @@ pub(crate) unsafe fn xml_parse_start_tag2(
         }
 
         // The attributes checkings
-        for i in (0..nbatts as usize).step_by(5) {
+        for i in 0..atts.len() {
             // The default namespace does not apply to attribute names.
-            if !(*atts.add(i + 1)).is_null() {
-                nsname = xml_get_namespace(ctxt, *atts.add(i + 1));
-                if nsname.is_null() {
-                    let pre = CStr::from_ptr(*atts.add(i + 1) as *const i8).to_string_lossy();
-                    let loc = CStr::from_ptr(*atts.add(i) as *const i8).to_string_lossy();
+            let nsname = if atts[i].1.is_some() {
+                let nsname = xml_get_namespace(ctxt, atts[i].1.as_deref());
+                if nsname.is_none() {
+                    let pre = atts[i].1.as_deref().unwrap();
+                    let loc = atts[i].0.as_str();
                     let localname = CStr::from_ptr(localname as *const i8).to_string_lossy();
                     xml_ns_err!(
                         ctxt,
@@ -8252,28 +8184,25 @@ pub(crate) unsafe fn xml_parse_start_tag2(
                         localname
                     );
                 }
-                *atts.add(i + 2) = nsname;
+                atts[i].2 = nsname;
+                atts[i].2.as_deref()
             } else {
-                nsname = null_mut();
-            }
+                None
+            };
             // [ WFC: Unique Att Spec ]
             // No attribute name may appear more than once in the same
             // start-tag or empty-element tag.
             // As extended by the Namespace in XML REC.
-            for j in (0..i).step_by(5) {
-                if *atts.add(i) == *atts.add(j) {
-                    if *atts.add(i + 1) == *atts.add(j + 1) {
-                        let pre = *atts.add(i + 1);
-                        let pre = (!pre.is_null())
-                            .then(|| CStr::from_ptr(pre as *const i8).to_string_lossy());
-                        let loc = *atts.add(i);
-                        let loc = CStr::from_ptr(loc as *const i8).to_string_lossy();
-                        xml_err_attribute_dup(ctxt, pre.as_deref(), loc.as_ref());
+            for j in 0..i {
+                if atts[i].0 == atts[j].0 {
+                    if atts[i].1 == atts[j].1 {
+                        let pre = atts[i].1.as_deref();
+                        let loc = atts[i].0.as_str();
+                        xml_err_attribute_dup(ctxt, pre, loc);
                         break;
                     }
-                    if !nsname.is_null() && *atts.add(j + 2) == nsname {
-                        let loc = CStr::from_ptr(*atts.add(i) as *const i8).to_string_lossy();
-                        let nsname = CStr::from_ptr(nsname as *const i8).to_string_lossy();
+                    if let Some(nsname) = nsname.filter(|&a| Some(a) == atts[j].2.as_deref()) {
+                        let loc = atts[i].0.as_str();
                         xml_ns_err!(
                             ctxt,
                             XmlParserErrors::XmlNsErrAttributeRedefined,
@@ -8287,8 +8216,13 @@ pub(crate) unsafe fn xml_parse_start_tag2(
             }
         }
 
-        nsname = xml_get_namespace(ctxt, prefix);
-        if !prefix.is_null() && nsname.is_null() {
+        let nsname = xml_get_namespace(
+            ctxt,
+            (!prefix.is_null())
+                .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                .as_deref(),
+        );
+        if !prefix.is_null() && nsname.is_none() {
             let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
             let localname = CStr::from_ptr(localname as *const i8).to_string_lossy();
             xml_ns_err!(
@@ -8300,7 +8234,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
             );
         }
         *pref = prefix;
-        *uri = nsname;
+        *uri = nsname.clone();
 
         // SAX: Start of Element !
         if !(*ctxt).sax.is_null()
@@ -8310,55 +8244,21 @@ pub(crate) unsafe fn xml_parse_start_tag2(
             let localname = &CStr::from_ptr(localname as *const i8)
                 .to_string_lossy()
                 .into_owned();
-            if nb_ns > 0 {
-                ((*(*ctxt).sax).start_element_ns.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    localname.as_str(),
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                    nsname,
-                    nb_ns,
-                    &raw mut (*ctxt).ns_tab[(*ctxt).ns_tab.len() - 2 * nb_ns as usize],
-                    nbatts / 5,
-                    nbdef,
-                    atts,
-                );
-            } else {
-                ((*(*ctxt).sax).start_element_ns.unwrap())(
-                    (*ctxt).user_data.clone(),
-                    localname.as_str(),
-                    (!prefix.is_null())
-                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
-                        .as_deref(),
-                    nsname,
-                    0,
-                    null_mut(),
-                    nbatts / 5,
-                    nbdef,
-                    atts,
-                );
-            }
+            ((*(*ctxt).sax).start_element_ns.unwrap())(
+                (*ctxt).user_data.clone(),
+                localname.as_str(),
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+                nsname.as_deref(),
+                &(*ctxt).ns_tab[(*ctxt).ns_tab.len() - nb_ns..],
+                nbdef,
+                &atts,
+            );
         }
     }
 
     //  done:
-    // Free up attribute allocated strings if needed
-    if attval != 0 {
-        for (i, j) in (3..).step_by(5).zip(0..nratts) {
-            if *attallocs.add(j as usize) != 0 && !(*atts.add(i)).is_null() {
-                xml_free(*atts.add(i) as _);
-            }
-        }
-    }
-
-    if !atts.is_null() {
-        xml_free(atts as _);
-    }
-    if !attallocs.is_null() {
-        xml_free(attallocs as _);
-    }
-
     localname
 }
 
@@ -8888,9 +8788,7 @@ unsafe extern "C" fn xml_parse_qname_and_compare(
             return 1 as *const XmlChar;
         }
     }
-    /*
-     * all strings coms from the dictionary, equality can be done directly
-     */
+    // all strings coms from the dictionary, equality can be done directly
     let ret: *const XmlChar = xml_parse_qname(ctxt, addr_of_mut!(prefix2));
     if ret == name && prefix == prefix2 as _ {
         return 1 as *const XmlChar;
@@ -8916,10 +8814,17 @@ pub(crate) unsafe fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTa
     }
     (*ctxt).advance(2);
 
-    if tag.prefix.is_null() {
-        name = xml_parse_name_and_compare(ctxt, (*ctxt).name as _);
+    let context_name = (*ctxt).name.as_deref().unwrap();
+    let context_name = CString::new(context_name).unwrap();
+    if let Some(prefix) = tag.prefix.as_deref() {
+        let prefix = CString::new(prefix).unwrap();
+        name = xml_parse_qname_and_compare(
+            ctxt,
+            context_name.as_ptr() as *mut u8,
+            prefix.as_ptr() as _,
+        );
     } else {
-        name = xml_parse_qname_and_compare(ctxt, (*ctxt).name as _, tag.prefix as _);
+        name = xml_parse_name_and_compare(ctxt, context_name.as_ptr() as *mut u8);
     }
 
     // We should definitely be at the ending "S? '>'" part
@@ -8944,7 +8849,7 @@ pub(crate) unsafe fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTa
             ctxt,
             XmlParserErrors::XmlErrTagNameMismatch,
             "Opening and ending tag mismatch: {} line {} and {}\n",
-            CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy(),
+            (*ctxt).name.as_deref().unwrap(),
             tag.line,
             CStr::from_ptr(name as *const i8).to_string_lossy()
         );
@@ -8953,16 +8858,11 @@ pub(crate) unsafe fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTa
     // SAX: End of Tag
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element_ns.is_some() && (*ctxt).disable_sax == 0
     {
-        let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
-        let prefix = (!tag.prefix.is_null())
-            .then(|| CStr::from_ptr(tag.prefix as *const i8).to_string_lossy());
-        let uri =
-            (!tag.uri.is_null()).then(|| CStr::from_ptr(tag.uri as *const i8).to_string_lossy());
         ((*(*ctxt).sax).end_element_ns.unwrap())(
             (*ctxt).user_data.clone(),
-            &name,
-            prefix.as_deref(),
-            uri.as_deref(),
+            (*ctxt).name.as_deref().unwrap(),
+            tag.prefix.as_deref(),
+            tag.uri.as_deref(),
         );
     }
 
@@ -8995,7 +8895,9 @@ pub(crate) unsafe fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
     }
     (*ctxt).advance(2);
 
-    name = xml_parse_name_and_compare(ctxt, (*ctxt).name as _);
+    let context_name = (*ctxt).name.as_deref().unwrap();
+    let context_name = CString::new(context_name).unwrap();
+    name = xml_parse_name_and_compare(ctxt, context_name.as_ptr() as *mut u8);
 
     // We should definitely be at the ending "S? '>'" part
     (*ctxt).grow();
@@ -9016,7 +8918,7 @@ pub(crate) unsafe fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
             ctxt,
             XmlParserErrors::XmlErrTagNameMismatch,
             "Opening and ending tag mismatch: {} line {} and {}\n",
-            CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy(),
+            (*ctxt).name.as_deref().unwrap(),
             line,
             CStr::from_ptr(name as *const i8).to_string_lossy()
         );
@@ -9024,9 +8926,10 @@ pub(crate) unsafe fn xml_parse_end_tag1(ctxt: XmlParserCtxtPtr, line: i32) {
 
     // SAX: End of Tag
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() && (*ctxt).disable_sax == 0 {
-        let name = (*ctxt).name;
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-        ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
+        ((*(*ctxt).sax).end_element.unwrap())(
+            (*ctxt).user_data.clone(),
+            (*ctxt).name.as_deref().unwrap(),
+        );
     }
 
     (*ctxt).name_pop();
@@ -9389,7 +9292,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                 XmlParserInputState::XmlParserStartTag => {
                     let name: *const XmlChar;
                     let mut prefix: *const XmlChar = null_mut();
-                    let mut uri: *const XmlChar = null_mut();
+                    let mut uri = None;
                     let line: i32 = (*(*ctxt).input).line;
                     let ns_nr = (*ctxt).ns_tab.len();
 
@@ -9422,7 +9325,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             name = xml_parse_start_tag2(
                                 ctxt,
                                 &raw mut prefix,
-                                &raw mut uri,
+                                &mut uri,
                                 &raw mut tlen,
                             );
                         } else {
@@ -9483,9 +9386,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                             CStr::from_ptr(prefix as *const i8).to_string_lossy()
                                         })
                                         .as_deref(),
-                                    (!uri.is_null())
-                                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                                        .as_deref(),
+                                    uri.as_deref(),
                                 );
                             }
                             if (*ctxt).ns_tab.len() - ns_nr > 0 {
@@ -9529,10 +9430,12 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             (*ctxt).node_pop();
                             (*ctxt).space_pop();
                         }
+                        let uri = uri.map(|uri| CString::new(uri).unwrap());
                         (*ctxt).name_ns_push(
                             name,
                             prefix,
-                            uri,
+                            uri.as_deref()
+                                .map_or(null(), |uri| uri.as_ptr() as *const u8),
                             line,
                             (*ctxt).ns_tab.len() as i32 - ns_nr as i32,
                         );
@@ -10451,7 +10354,7 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).node = null_mut();
 
     (*ctxt).name_tab.clear();
-    (*ctxt).name = null_mut();
+    (*ctxt).name = None;
 
     (*ctxt).ns_tab.clear();
 

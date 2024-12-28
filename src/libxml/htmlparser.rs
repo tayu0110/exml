@@ -23,7 +23,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     io::Read,
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
@@ -57,8 +57,8 @@ use crate::{
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         uri::xml_canonic_path,
         xmlstring::{
-            xml_str_equal, xml_strcasecmp, xml_strcasestr, xml_strcmp, xml_strdup, xml_strlen,
-            xml_strncasecmp, xml_strndup, XmlChar,
+            xml_str_equal, xml_strcasestr, xml_strcmp, xml_strlen, xml_strncasecmp, xml_strndup,
+            XmlChar,
         },
     },
     tree::{
@@ -92,7 +92,7 @@ pub type HtmlElemDescPtr = *mut HtmlElemDesc;
 // and XHTML 1.0 (which share the same structure).
 #[repr(C)]
 pub struct HtmlElemDesc {
-    pub(crate) name: *const c_char,  /* The tag name */
+    pub(crate) name: &'static str,   /* The tag name */
     pub(crate) start_tag: c_char,    /* Whether the start tag can be implied */
     pub(crate) end_tag: c_char,      /* Whether the end tag can be implied */
     pub(crate) save_end_tag: c_char, /* Whether the end tag should be saved */
@@ -102,19 +102,18 @@ pub struct HtmlElemDesc {
     pub(crate) isinline: c_char,     /* is this a block 0 or inline 1 element */
     pub(crate) desc: *const c_char,  /* the description */
 
-    /* NRK Jan.2003
-     * New fields encapsulating HTML structure
-     *
-     * Bugs:
-     *	This is a very limited representation.  It fails to tell us when
-     *	an element *requires* subelements (we only have whether they're
-     *	allowed or not), and it doesn't tell us where CDATA and PCDATA
-     *	are allowed.  Some element relationships are not fully represented:
-     *	these are flagged with the word MODIFIER
-     */
-    pub(crate) subelts: *mut *const c_char, /* allowed sub-elements of this element */
-    pub(crate) defaultsubelt: *const c_char, /* subelement for suggested auto-repair
-                                            if necessary or null_mut() */
+    // NRK Jan.2003
+    // New fields encapsulating HTML structure
+    //
+    // Bugs:
+    //     This is a very limited representation.  It fails to tell us when
+    //     an element *requires* subelements (we only have whether they're
+    //     allowed or not), and it doesn't tell us where CDATA and PCDATA
+    //     are allowed.  Some element relationships are not fully represented:
+    //     these are flagged with the word MODIFIER
+    pub(crate) subelts: &'static [&'static str], /* allowed sub-elements of this element */
+    pub(crate) defaultsubelt: *const c_char,     /* subelement for suggested auto-repair
+                                                 if necessary or null_mut() */
     pub(crate) attrs_opt: *mut *const c_char, /* Optional Attributes */
     pub(crate) attrs_depr: *mut *const c_char, /* Additional deprecated attributes */
     pub(crate) attrs_req: *mut *const c_char, /* Required attributes */
@@ -129,118 +128,81 @@ pub struct HtmlEntityDesc {
     desc: *const c_char, /* the description */
 }
 
-const HTML_FLOW: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    null(),
+const HTML_FLOW: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
 ];
-const HTML_INLINE: &[*const c_char] = &[
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    null(),
+const HTML_INLINE: &[&str] = &[
+    "tt", "i", "b", "u", "s", "strike", "big", "small", "em", "strong", "dfn", "code", "samp",
+    "kbd", "var", "cite", "abbr", "acronym", "a", "img", "applet", "embed", "object", "font",
+    "basefont", "br", "script", "map", "q", "sub", "sup", "span", "bdo", "iframe", "input",
+    "select", "textarea", "label", "button",
 ];
 
 // placeholders: elts with content but no subelements
-const HTML_PCDATA: &[*const c_char] = &[null()];
-const HTML_CDATA: &[*const c_char] = HTML_PCDATA;
+const HTML_PCDATA: &[&str] = &[];
+const HTML_CDATA: &[&str] = HTML_PCDATA;
 
 const HTML_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
@@ -316,116 +278,78 @@ const ALT_ATTR: &[*const c_char] = &[c"alt".as_ptr() as _, null()];
 const SRC_ALT_ATTRS: &[*const c_char] = &[c"src".as_ptr() as _, c"alt".as_ptr() as _, null()];
 const HREF_ATTRS: &[*const c_char] = &[c"href".as_ptr() as _, null()];
 const CLEAR_ATTRS: &[*const c_char] = &[c"clear".as_ptr() as _, null()];
-const INLINE_P: &[*const c_char] = &[
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"p".as_ptr() as _,
-    null(),
+const INLINE_P: &[&str] = &[
+    "tt", "i", "b", "u", "s", "strike", "big", "small", "em", "strong", "dfn", "code", "samp",
+    "kbd", "var", "cite", "abbr", "acronym", "a", "img", "applet", "embed", "object", "font",
+    "basefont", "br", "script", "map", "q", "sub", "sup", "span", "bdo", "iframe", "input",
+    "select", "textarea", "label", "button", "p",
 ];
 
-const FLOW_PARAM: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"param".as_ptr() as _,
-    null(),
+const FLOW_PARAM: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
+    "param",
 ];
 const APPLET_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
@@ -480,73 +404,72 @@ const QUOTE_ATTRS: &[*const c_char] = &[
     c"cite".as_ptr() as _,
     null(),
 ];
-const BODY_CONTENTS: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"ins".as_ptr() as _,
-    c"del".as_ptr() as _,
-    null(),
+const BODY_CONTENTS: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
+    "ins",
+    "del",
 ];
 const BODY_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
@@ -628,7 +551,7 @@ const COL_ATTRS: &[*const c_char] = &[
     c"valign".as_ptr() as _,
     null(),
 ];
-const COL_ELT: &[*const c_char] = &[c"col".as_ptr() as _, null()];
+const COL_ELT: &[&str] = &["col"];
 const EDIT_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
     c"class".as_ptr() as _,
@@ -668,74 +591,74 @@ const COMPACT_ATTRS: &[*const c_char] = &[
     c"compact".as_ptr() as _,
     null(),
 ];
-const DL_CONTENTS: &[*const c_char] = &[c"dt".as_ptr() as _, c"dd".as_ptr() as _, null()];
+const DL_CONTENTS: &[&str] = &["dt", "dd"];
 const COMPACT_ATTR: &[*const c_char] = &[c"compact".as_ptr() as _, null()];
 const LABEL_ATTR: &[*const c_char] = &[c"label".as_ptr() as _, null()];
-const FIELDSET_CONTENTS: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"legend".as_ptr() as _,
+const FIELDSET_CONTENTS: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
+    "legend",
 ];
 const FONT_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
@@ -749,69 +672,68 @@ const FONT_ATTRS: &[*const c_char] = &[
     c"face".as_ptr() as _,
     null(),
 ];
-const FORM_CONTENTS: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    null(),
+const FORM_CONTENTS: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
+    "pre",
+    "p",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
 ];
 const FORM_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
@@ -864,28 +786,15 @@ const FRAMESET_ATTRS: &[*const c_char] = &[
     c"onunload".as_ptr() as _,
     null(),
 ];
-const FRAMESET_CONTENTS: &[*const c_char] = &[
-    c"frameset".as_ptr() as _,
-    c"frame".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    null(),
-];
+const FRAMESET_CONTENTS: &[&str] = &["frameset", "frame", "noframes"];
 const HEAD_ATTRS: &[*const c_char] = &[
     c"lang".as_ptr() as _,
     c"dir".as_ptr() as _,
     c"profile".as_ptr() as _,
     null(),
 ];
-const HEAD_CONTENTS: &[*const c_char] = &[
-    c"title".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"base".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"style".as_ptr() as _,
-    c"meta".as_ptr() as _,
-    c"link".as_ptr() as _,
-    c"object".as_ptr() as _,
-    null(),
+const HEAD_CONTENTS: &[&str] = &[
+    "title", "isindex", "base", "script", "style", "meta", "link", "object",
 ];
 const HR_DEPR: &[*const c_char] = &[
     c"align".as_ptr() as _,
@@ -895,12 +804,7 @@ const HR_DEPR: &[*const c_char] = &[
     null(),
 ];
 const VERSION_ATTR: &[*const c_char] = &[c"version".as_ptr() as _, null()];
-const HTML_CONTENT: &[*const c_char] = &[
-    c"head".as_ptr() as _,
-    c"body".as_ptr() as _,
-    c"frameset".as_ptr() as _,
-    null(),
-];
+const HTML_CONTENT: &[&str] = &["head", "body", "frameset"];
 const IFRAME_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
     c"class".as_ptr() as _,
@@ -1081,63 +985,61 @@ const LINK_ATTRS: &[*const c_char] = &[
     c"media".as_ptr() as _,
     null(),
 ];
-const MAP_CONTENTS: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"area".as_ptr() as _,
-    null(),
+const MAP_CONTENTS: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "area",
 ];
 const NAME_ATTR: &[*const c_char] = &[c"name".as_ptr() as _, null()];
 const ACTION_ATTR: &[*const c_char] = &[c"action".as_ptr() as _, null()];
-const BLOCKLI_ELT: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"li".as_ptr() as _,
-    null(),
+const BLOCKLI_ELT: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "li",
 ];
 const META_ATTRS: &[*const c_char] = &[
     c"lang".as_ptr() as _,
@@ -1150,139 +1052,137 @@ const META_ATTRS: &[*const c_char] = &[
 ];
 const CONTENT_ATTR: &[*const c_char] = &[c"content".as_ptr() as _, null()];
 const TYPE_ATTR: &[*const c_char] = &[c"type".as_ptr() as _, null()];
-const NOFRAMES_CONTENT: &[*const c_char] = &[
-    c"body".as_ptr() as _,
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    null(),
+const NOFRAMES_CONTENT: &[&str] = &[
+    "body",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
 ];
-const OBJECT_CONTENTS: &[*const c_char] = &[
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"ul".as_ptr() as _,
-    c"ol".as_ptr() as _,
-    c"dir".as_ptr() as _,
-    c"menu".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"dl".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"isindex".as_ptr() as _,
-    c"hr".as_ptr() as _,
-    c"table".as_ptr() as _,
-    c"fieldset".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"img".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"embed".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"basefont".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"sub".as_ptr() as _,
-    c"sup".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"input".as_ptr() as _,
-    c"select".as_ptr() as _,
-    c"textarea".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"param".as_ptr() as _,
-    null(),
+const OBJECT_CONTENTS: &[&str] = &[
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "ul",
+    "ol",
+    "dir",
+    "menu",
+    "pre",
+    "p",
+    "dl",
+    "div",
+    "center",
+    "noscript",
+    "noframes",
+    "blockquote",
+    "form",
+    "isindex",
+    "hr",
+    "table",
+    "fieldset",
+    "address",
+    "tt",
+    "i",
+    "b",
+    "u",
+    "s",
+    "strike",
+    "big",
+    "small",
+    "em",
+    "strong",
+    "dfn",
+    "code",
+    "samp",
+    "kbd",
+    "var",
+    "cite",
+    "abbr",
+    "acronym",
+    "a",
+    "img",
+    "applet",
+    "embed",
+    "object",
+    "font",
+    "basefont",
+    "br",
+    "script",
+    "map",
+    "q",
+    "sub",
+    "sup",
+    "span",
+    "bdo",
+    "iframe",
+    "input",
+    "select",
+    "textarea",
+    "label",
+    "button",
+    "param",
 ];
 const OBJECT_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
@@ -1328,7 +1228,7 @@ const OL_ATTRS: &[*const c_char] = &[
     c"start".as_ptr() as _,
     null(),
 ];
-const OPTION_ELT: &[*const c_char] = &[c"option".as_ptr() as _, null()];
+const OPTION_ELT: &[&str] = &["option"];
 const OPTGROUP_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
     c"class".as_ptr() as _,
@@ -1378,32 +1278,9 @@ const PARAM_ATTRS: &[*const c_char] = &[
     null(),
 ];
 const WIDTH_ATTR: &[*const c_char] = &[c"width".as_ptr() as _, null()];
-const PRE_CONTENT: &[*const c_char] = &[
-    c"em".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"var".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"a".as_ptr() as _,
-    c"br".as_ptr() as _,
-    c"script".as_ptr() as _,
-    c"map".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    null(),
+const PRE_CONTENT: &[&str] = &[
+    "em", "strong", "dfn", "code", "samp", "kbd", "var", "cite", "abbr", "acronym", "tt", "i", "b",
+    "u", "s", "strike", "a", "br", "script", "map", "q", "span", "bdo", "iframe",
 ];
 const SCRIPT_ATTRS: &[*const c_char] = &[
     c"charset".as_ptr() as _,
@@ -1414,8 +1291,7 @@ const SCRIPT_ATTRS: &[*const c_char] = &[
     null(),
 ];
 const LANGUAGE_ATTR: &[*const c_char] = &[c"language".as_ptr() as _, null()];
-const SELECT_CONTENT: &[*const c_char] =
-    &[c"optgroup".as_ptr() as _, c"option".as_ptr() as _, null()];
+const SELECT_CONTENT: &[&str] = &["optgroup", "option"];
 const SELECT_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
     c"class".as_ptr() as _,
@@ -1476,17 +1352,10 @@ const TABLE_ATTRS: &[*const c_char] = &[
     null(),
 ];
 const TABLE_DEPR: &[*const c_char] = &[c"align".as_ptr() as _, c"bgcolor".as_ptr() as _, null()];
-const TABLE_CONTENTS: &[*const c_char] = &[
-    c"caption".as_ptr() as _,
-    c"col".as_ptr() as _,
-    c"colgroup".as_ptr() as _,
-    c"thead".as_ptr() as _,
-    c"tfoot".as_ptr() as _,
-    c"tbody".as_ptr() as _,
-    c"tr".as_ptr() as _,
-    null(),
+const TABLE_CONTENTS: &[&str] = &[
+    "caption", "col", "colgroup", "thead", "tfoot", "tbody", "tr",
 ];
-const TR_ELT: &[*const c_char] = &[c"tr".as_ptr() as _, null()];
+const TR_ELT: &[&str] = &["tr"];
 const TALIGN_ATTRS: &[*const c_char] = &[
     c"id".as_ptr() as _,
     c"class".as_ptr() as _,
@@ -1571,15 +1440,15 @@ const TEXTAREA_ATTRS: &[*const c_char] = &[
     c"onchange".as_ptr() as _,
     null(),
 ];
-const TR_CONTENTS: &[*const c_char] = &[c"th".as_ptr() as _, c"td".as_ptr() as _, null()];
+const TR_CONTENTS: &[&str] = &["th", "td"];
 const BGCOLOR_ATTR: &[*const c_char] = &[c"bgcolor".as_ptr() as _, null()];
-const LI_ELT: &[*const c_char] = &[c"li".as_ptr() as _, null()];
+const LI_ELT: &[&str] = &["li"];
 const UL_DEPR: &[*const c_char] = &[c"type".as_ptr() as _, c"compact".as_ptr() as _, null()];
 const DIR_ATTR: &[*const c_char] = &[c"dir".as_ptr() as _, null()];
 
 const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
     HtmlElemDesc {
-        name: c"a".as_ptr() as _,
+        name: "a",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1588,14 +1457,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"anchor ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: A_ATTRS.as_ptr() as _,
         attrs_depr: TARGET_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"abbr".as_ptr() as _,
+        name: "abbr",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1604,14 +1473,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"abbreviated form".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"acronym".as_ptr() as _,
+        name: "acronym",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1620,14 +1489,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"address".as_ptr() as _,
+        name: "address",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1636,14 +1505,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"information on author ".as_ptr() as _,
-        subelts: INLINE_P.as_ptr() as _,
+        subelts: INLINE_P,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"applet".as_ptr() as _,
+        name: "applet",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1652,14 +1521,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 2,
         desc: c"java applet ".as_ptr() as _,
-        subelts: FLOW_PARAM.as_ptr() as _,
+        subelts: FLOW_PARAM,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: APPLET_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"area".as_ptr() as _,
+        name: "area",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -1668,14 +1537,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"client-side image map area ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: AREA_ATTRS.as_ptr() as _,
         attrs_depr: TARGET_ATTR.as_ptr() as _,
         attrs_req: ALT_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"b".as_ptr() as _,
+        name: "b",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -1684,14 +1553,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"bold text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"base".as_ptr() as _,
+        name: "base",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -1700,14 +1569,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"document base uri ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: TARGET_ATTR.as_ptr() as _,
         attrs_req: HREF_ATTRS.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"basefont".as_ptr() as _,
+        name: "basefont",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -1716,14 +1585,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 1,
         desc: c"base font size ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: BASEFONT_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"bdo".as_ptr() as _,
+        name: "bdo",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1732,14 +1601,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"i18n bidi over-ride ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: CORE_I18N_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: DIR_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"big".as_ptr() as _,
+        name: "big",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -1748,14 +1617,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"large text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"blockquote".as_ptr() as _,
+        name: "blockquote",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1764,14 +1633,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"long quotation ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: QUOTE_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"body".as_ptr() as _,
+        name: "body",
         start_tag: 1,
         end_tag: 1,
         save_end_tag: 0,
@@ -1780,14 +1649,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"document body ".as_ptr() as _,
-        subelts: BODY_CONTENTS.as_ptr() as _,
+        subelts: BODY_CONTENTS,
         defaultsubelt: c"div".as_ptr() as _,
         attrs_opt: BODY_ATTRS.as_ptr() as _,
         attrs_depr: BODY_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"br".as_ptr() as _,
+        name: "br",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -1796,14 +1665,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"forced line break ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: CORE_ATTRS.as_ptr() as _,
         attrs_depr: CLEAR_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"button".as_ptr() as _,
+        name: "button",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1812,14 +1681,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 2,
         desc: c"push button ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: BUTTON_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"caption".as_ptr() as _,
+        name: "caption",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1828,14 +1697,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table caption ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"center".as_ptr() as _,
+        name: "center",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -1844,14 +1713,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 0,
         desc: c"shorthand for div align=center ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: HTML_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"cite".as_ptr() as _,
+        name: "cite",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1860,14 +1729,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"citation".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"code".as_ptr() as _,
+        name: "code",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1876,14 +1745,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"computer code fragment".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"col".as_ptr() as _,
+        name: "col",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -1892,14 +1761,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table column ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: COL_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"colgroup".as_ptr() as _,
+        name: "colgroup",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -1908,14 +1777,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table column group ".as_ptr() as _,
-        subelts: COL_ELT.as_ptr() as _,
+        subelts: COL_ELT,
         defaultsubelt: c"col".as_ptr() as _,
         attrs_opt: COL_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"dd".as_ptr() as _,
+        name: "dd",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -1924,14 +1793,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"definition description ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"del".as_ptr() as _,
+        name: "del",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1940,14 +1809,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 2,
         desc: c"deleted text ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: EDIT_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"dfn".as_ptr() as _,
+        name: "dfn",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1956,14 +1825,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"instance definition".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"dir".as_ptr() as _,
+        name: "dir",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1972,14 +1841,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 0,
         desc: c"directory list".as_ptr() as _,
-        subelts: BLOCKLI_ELT.as_ptr() as _,
+        subelts: BLOCKLI_ELT,
         defaultsubelt: c"li".as_ptr() as _,
         attrs_opt: null_mut(),
         attrs_depr: COMPACT_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"div".as_ptr() as _,
+        name: "div",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -1988,14 +1857,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"generic language/style container".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"dl".as_ptr() as _,
+        name: "dl",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2004,14 +1873,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"definition list ".as_ptr() as _,
-        subelts: DL_CONTENTS.as_ptr() as _,
+        subelts: DL_CONTENTS,
         defaultsubelt: c"dd".as_ptr() as _,
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: COMPACT_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"dt".as_ptr() as _,
+        name: "dt",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2020,14 +1889,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"definition term ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"em".as_ptr() as _,
+        name: "em",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2036,14 +1905,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"emphasis".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"embed".as_ptr() as _,
+        name: "embed",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2052,14 +1921,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 1,
         desc: c"generic embedded object ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: EMBED_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"fieldset".as_ptr() as _,
+        name: "fieldset",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2068,14 +1937,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"form control group ".as_ptr() as _,
-        subelts: FIELDSET_CONTENTS.as_ptr() as _,
+        subelts: FIELDSET_CONTENTS,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"font".as_ptr() as _,
+        name: "font",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2084,14 +1953,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 1,
         desc: c"local change to font ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: FONT_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"form".as_ptr() as _,
+        name: "form",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2100,14 +1969,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"interactive form ".as_ptr() as _,
-        subelts: FORM_CONTENTS.as_ptr() as _,
+        subelts: FORM_CONTENTS,
         defaultsubelt: c"fieldset".as_ptr() as _,
         attrs_opt: FORM_ATTRS.as_ptr() as _,
         attrs_depr: TARGET_ATTR.as_ptr() as _,
         attrs_req: ACTION_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"frame".as_ptr() as _,
+        name: "frame",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2116,14 +1985,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 2,
         isinline: 0,
         desc: c"subwindow ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: FRAME_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"frameset".as_ptr() as _,
+        name: "frameset",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2132,14 +2001,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 2,
         isinline: 0,
         desc: c"window subdivision".as_ptr() as _,
-        subelts: FRAMESET_CONTENTS.as_ptr() as _,
+        subelts: FRAMESET_CONTENTS,
         defaultsubelt: c"noframes".as_ptr() as _,
         attrs_opt: null_mut(),
         attrs_depr: FRAMESET_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"h1".as_ptr() as _,
+        name: "h1",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2148,14 +2017,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"heading ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"h2".as_ptr() as _,
+        name: "h2",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2164,14 +2033,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"heading ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"h3".as_ptr() as _,
+        name: "h3",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2180,14 +2049,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"heading ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"h4".as_ptr() as _,
+        name: "h4",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2196,14 +2065,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"heading ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"h5".as_ptr() as _,
+        name: "h5",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2212,14 +2081,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"heading ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"h6".as_ptr() as _,
+        name: "h6",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2228,14 +2097,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"heading ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"head".as_ptr() as _,
+        name: "head",
         start_tag: 1,
         end_tag: 1,
         save_end_tag: 0,
@@ -2244,14 +2113,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"document head ".as_ptr() as _,
-        subelts: HEAD_CONTENTS.as_ptr() as _,
+        subelts: HEAD_CONTENTS,
         defaultsubelt: null_mut(),
         attrs_opt: HEAD_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"hr".as_ptr() as _,
+        name: "hr",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2260,14 +2129,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"horizontal rule ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: HR_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"html".as_ptr() as _,
+        name: "html",
         start_tag: 1,
         end_tag: 1,
         save_end_tag: 0,
@@ -2276,14 +2145,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"document root element ".as_ptr() as _,
-        subelts: HTML_CONTENT.as_ptr() as _,
+        subelts: HTML_CONTENT,
         defaultsubelt: null_mut(),
         attrs_opt: I18N_ATTRS.as_ptr() as _,
         attrs_depr: VERSION_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"i".as_ptr() as _,
+        name: "i",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2292,14 +2161,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"italic text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"iframe".as_ptr() as _,
+        name: "iframe",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2308,14 +2177,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 2,
         desc: c"inline subwindow ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: IFRAME_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"img".as_ptr() as _,
+        name: "img",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2324,14 +2193,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"embedded image ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: IMG_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: SRC_ALT_ATTRS.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"input".as_ptr() as _,
+        name: "input",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2340,14 +2209,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"form control ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: INPUT_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"ins".as_ptr() as _,
+        name: "ins",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2356,14 +2225,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 2,
         desc: c"inserted text".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: EDIT_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"isindex".as_ptr() as _,
+        name: "isindex",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2372,14 +2241,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 0,
         desc: c"single line prompt ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: PROMPT_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"kbd".as_ptr() as _,
+        name: "kbd",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2388,14 +2257,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"text to be entered by the user".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"label".as_ptr() as _,
+        name: "label",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2404,14 +2273,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"form field label text ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: LABEL_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"legend".as_ptr() as _,
+        name: "legend",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2420,14 +2289,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"fieldset legend ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: LEGEND_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"li".as_ptr() as _,
+        name: "li",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 1,
@@ -2436,14 +2305,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"list item ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"link".as_ptr() as _,
+        name: "link",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2452,14 +2321,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"a media-independent link ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: LINK_ATTRS.as_ptr() as _,
         attrs_depr: TARGET_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"map".as_ptr() as _,
+        name: "map",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2468,14 +2337,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 2,
         desc: c"client-side image map ".as_ptr() as _,
-        subelts: MAP_CONTENTS.as_ptr() as _,
+        subelts: MAP_CONTENTS,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: NAME_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"menu".as_ptr() as _,
+        name: "menu",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2484,14 +2353,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 0,
         desc: c"menu list ".as_ptr() as _,
-        subelts: BLOCKLI_ELT.as_ptr() as _,
+        subelts: BLOCKLI_ELT,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: COMPACT_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"meta".as_ptr() as _,
+        name: "meta",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2500,14 +2369,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"generic metainformation ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: META_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: CONTENT_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"noframes".as_ptr() as _,
+        name: "noframes",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2516,14 +2385,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 2,
         isinline: 0,
         desc: c"alternate content container for non frame-based rendering ".as_ptr() as _,
-        subelts: NOFRAMES_CONTENT.as_ptr() as _,
+        subelts: NOFRAMES_CONTENT,
         defaultsubelt: c"body".as_ptr() as _,
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"noscript".as_ptr() as _,
+        name: "noscript",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2532,14 +2401,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"alternate content container for non script-based rendering ".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: c"div".as_ptr() as _,
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"object".as_ptr() as _,
+        name: "object",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2548,14 +2417,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 2,
         desc: c"generic embedded object ".as_ptr() as _,
-        subelts: OBJECT_CONTENTS.as_ptr() as _,
+        subelts: OBJECT_CONTENTS,
         defaultsubelt: c"div".as_ptr() as _,
         attrs_opt: OBJECT_ATTRS.as_ptr() as _,
         attrs_depr: OBJECT_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"ol".as_ptr() as _,
+        name: "ol",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2564,14 +2433,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"ordered list ".as_ptr() as _,
-        subelts: LI_ELT.as_ptr() as _,
+        subelts: LI_ELT,
         defaultsubelt: c"li".as_ptr() as _,
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: OL_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"optgroup".as_ptr() as _,
+        name: "optgroup",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2580,14 +2449,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"option group ".as_ptr() as _,
-        subelts: OPTION_ELT.as_ptr() as _,
+        subelts: OPTION_ELT,
         defaultsubelt: c"option".as_ptr() as _,
         attrs_opt: OPTGROUP_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: LABEL_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"option".as_ptr() as _,
+        name: "option",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2596,14 +2465,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"selectable choice ".as_ptr() as _,
-        subelts: HTML_PCDATA.as_ptr() as _,
+        subelts: HTML_PCDATA,
         defaultsubelt: null_mut(),
         attrs_opt: OPTION_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"p".as_ptr() as _,
+        name: "p",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2612,14 +2481,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"paragraph ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: ALIGN_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"param".as_ptr() as _,
+        name: "param",
         start_tag: 0,
         end_tag: 2,
         save_end_tag: 2,
@@ -2628,14 +2497,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"named property value ".as_ptr() as _,
-        subelts: null_mut(),
+        subelts: &[],
         defaultsubelt: null_mut(),
         attrs_opt: PARAM_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: NAME_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"pre".as_ptr() as _,
+        name: "pre",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2644,14 +2513,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"preformatted text ".as_ptr() as _,
-        subelts: PRE_CONTENT.as_ptr() as _,
+        subelts: PRE_CONTENT,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: WIDTH_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"q".as_ptr() as _,
+        name: "q",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2660,14 +2529,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"short inline quotation ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: QUOTE_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"s".as_ptr() as _,
+        name: "s",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2676,14 +2545,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 1,
         desc: c"strike-through text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: HTML_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"samp".as_ptr() as _,
+        name: "samp",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2692,14 +2561,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"sample program output, scripts, etc.".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"script".as_ptr() as _,
+        name: "script",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2708,14 +2577,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 2,
         desc: c"script statements ".as_ptr() as _,
-        subelts: HTML_CDATA.as_ptr() as _,
+        subelts: HTML_CDATA,
         defaultsubelt: null_mut(),
         attrs_opt: SCRIPT_ATTRS.as_ptr() as _,
         attrs_depr: LANGUAGE_ATTR.as_ptr() as _,
         attrs_req: TYPE_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"select".as_ptr() as _,
+        name: "select",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2724,14 +2593,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"option selector ".as_ptr() as _,
-        subelts: SELECT_CONTENT.as_ptr() as _,
+        subelts: SELECT_CONTENT,
         defaultsubelt: null_mut(),
         attrs_opt: SELECT_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"small".as_ptr() as _,
+        name: "small",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2740,14 +2609,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"small text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"span".as_ptr() as _,
+        name: "span",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2756,14 +2625,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"generic language/style container ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"strike".as_ptr() as _,
+        name: "strike",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2772,14 +2641,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 1,
         desc: c"strike-through text".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: HTML_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"strong".as_ptr() as _,
+        name: "strong",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2788,14 +2657,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"strong emphasis".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"style".as_ptr() as _,
+        name: "style",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2804,14 +2673,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"style info ".as_ptr() as _,
-        subelts: HTML_CDATA.as_ptr() as _,
+        subelts: HTML_CDATA,
         defaultsubelt: null_mut(),
         attrs_opt: STYLE_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: TYPE_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"sub".as_ptr() as _,
+        name: "sub",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2820,14 +2689,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"subscript".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"sup".as_ptr() as _,
+        name: "sup",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2836,14 +2705,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"superscript ".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"table".as_ptr() as _,
+        name: "table",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2852,14 +2721,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"".as_ptr() as _,
-        subelts: TABLE_CONTENTS.as_ptr() as _,
+        subelts: TABLE_CONTENTS,
         defaultsubelt: c"tr".as_ptr() as _,
         attrs_opt: TABLE_ATTRS.as_ptr() as _,
         attrs_depr: TABLE_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"tbody".as_ptr() as _,
+        name: "tbody",
         start_tag: 1,
         end_tag: 0,
         save_end_tag: 0,
@@ -2868,14 +2737,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table body ".as_ptr() as _,
-        subelts: TR_ELT.as_ptr() as _,
+        subelts: TR_ELT,
         defaultsubelt: c"tr".as_ptr() as _,
         attrs_opt: TALIGN_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"td".as_ptr() as _,
+        name: "td",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2884,14 +2753,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table data cell".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: TH_TD_ATTR.as_ptr() as _,
         attrs_depr: TH_TD_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"textarea".as_ptr() as _,
+        name: "textarea",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2900,14 +2769,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"multi-line text field ".as_ptr() as _,
-        subelts: HTML_PCDATA.as_ptr() as _,
+        subelts: HTML_PCDATA,
         defaultsubelt: null_mut(),
         attrs_opt: TEXTAREA_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: ROWS_COLS_ATTR.as_ptr() as _,
     },
     HtmlElemDesc {
-        name: c"tfoot".as_ptr() as _,
+        name: "tfoot",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2916,14 +2785,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table footer ".as_ptr() as _,
-        subelts: TR_ELT.as_ptr() as _,
+        subelts: TR_ELT,
         defaultsubelt: c"tr".as_ptr() as _,
         attrs_opt: TALIGN_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"th".as_ptr() as _,
+        name: "th",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2932,14 +2801,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table header cell".as_ptr() as _,
-        subelts: HTML_FLOW.as_ptr() as _,
+        subelts: HTML_FLOW,
         defaultsubelt: null_mut(),
         attrs_opt: TH_TD_ATTR.as_ptr() as _,
         attrs_depr: TH_TD_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"thead".as_ptr() as _,
+        name: "thead",
         start_tag: 0,
         end_tag: 1,
         save_end_tag: 0,
@@ -2948,14 +2817,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table header ".as_ptr() as _,
-        subelts: TR_ELT.as_ptr() as _,
+        subelts: TR_ELT,
         defaultsubelt: c"tr".as_ptr() as _,
         attrs_opt: TALIGN_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"title".as_ptr() as _,
+        name: "title",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2964,14 +2833,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"document title ".as_ptr() as _,
-        subelts: HTML_PCDATA.as_ptr() as _,
+        subelts: HTML_PCDATA,
         defaultsubelt: null_mut(),
         attrs_opt: I18N_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"tr".as_ptr() as _,
+        name: "tr",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -2980,14 +2849,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"table row ".as_ptr() as _,
-        subelts: TR_CONTENTS.as_ptr() as _,
+        subelts: TR_CONTENTS,
         defaultsubelt: c"td".as_ptr() as _,
         attrs_opt: TALIGN_ATTRS.as_ptr() as _,
         attrs_depr: BGCOLOR_ATTR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"tt".as_ptr() as _,
+        name: "tt",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -2996,14 +2865,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"teletype or monospaced text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"u".as_ptr() as _,
+        name: "u",
         start_tag: 0,
         end_tag: 3,
         save_end_tag: 0,
@@ -3012,14 +2881,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 1,
         isinline: 1,
         desc: c"underlined text style".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: null_mut(),
         attrs_depr: HTML_ATTRS.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"ul".as_ptr() as _,
+        name: "ul",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -3028,14 +2897,14 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 0,
         desc: c"unordered list ".as_ptr() as _,
-        subelts: LI_ELT.as_ptr() as _,
+        subelts: LI_ELT,
         defaultsubelt: c"li".as_ptr() as _,
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: UL_DEPR.as_ptr() as _,
         attrs_req: null_mut(),
     },
     HtmlElemDesc {
-        name: c"var".as_ptr() as _,
+        name: "var",
         start_tag: 0,
         end_tag: 0,
         save_end_tag: 0,
@@ -3044,7 +2913,7 @@ const HTML40_ELEMENT_TABLE: &[HtmlElemDesc] = &[
         dtd: 0,
         isinline: 1,
         desc: c"instance of a variable or program argument".as_ptr() as _,
-        subelts: HTML_INLINE.as_ptr() as _,
+        subelts: HTML_INLINE,
         defaultsubelt: null_mut(),
         attrs_opt: HTML_ATTRS.as_ptr() as _,
         attrs_depr: null_mut(),
@@ -4344,29 +4213,16 @@ const HTML40_ENTITIES_TABLE: &[HtmlEntityDesc] = &[
 #[deprecated = "This is a no-op"]
 pub unsafe extern "C" fn html_init_auto_close() {}
 
-unsafe extern "C" fn html_compare_tags(key: *const c_void, member: *const c_void) -> i32 {
-    let tag: *const XmlChar = key as *const XmlChar;
-    let desc: *const HtmlElemDesc = member as *const HtmlElemDesc;
-
-    xml_strcasecmp(tag, (*desc).name as _)
-}
-
 /// Lookup the HTML tag in the ElementTable
 ///
 /// Returns the related htmlElemDescPtr or null_mut() if not found.
 #[doc(alias = "htmlTagLookup")]
-pub unsafe extern "C" fn html_tag_lookup(tag: *const XmlChar) -> *const HtmlElemDesc {
-    if tag.is_null() {
-        return null();
-    }
-
-    bsearch(
-        tag as _,
-        HTML40_ELEMENT_TABLE.as_ptr() as _,
-        HTML40_ELEMENT_TABLE.len(),
-        size_of::<HtmlElemDesc>(),
-        Some(html_compare_tags),
-    ) as _
+pub unsafe fn html_tag_lookup(tag: &str) -> Option<&'static HtmlElemDesc> {
+    let tag = tag.to_ascii_lowercase();
+    HTML40_ELEMENT_TABLE
+        .binary_search_by(|desc| desc.name.to_ascii_lowercase().cmp(&tag))
+        .ok()
+        .and_then(|pos| HTML40_ELEMENT_TABLE.get(pos))
 }
 
 /// Lookup the given entity in EntitiesTable
@@ -5445,10 +5301,11 @@ unsafe extern "C" fn html_compare_start_close(vkey: *const c_void, member: *cons
 ///
 /// Returns 0 if no, 1 if yes.
 #[doc(alias = "htmlCheckAutoClose")]
-unsafe extern "C" fn html_check_auto_close(newtag: *const XmlChar, oldtag: *const XmlChar) -> i32 {
+unsafe fn html_check_auto_close(newtag: *const XmlChar, oldtag: Option<&str>) -> i32 {
     let mut key: HtmlStartCloseEntry = unsafe { zeroed() };
 
-    key.old_tag = oldtag as *const c_char;
+    let oldtag = oldtag.map(|t| CString::new(t).unwrap());
+    key.old_tag = oldtag.as_deref().map_or(null(), |t| t.as_ptr());
     key.new_tag = newtag as *const c_char;
     let res: *mut c_void = bsearch(
         addr_of_mut!(key) as _,
@@ -5477,7 +5334,13 @@ pub unsafe extern "C" fn html_auto_close_tag(
     if xml_str_equal(name, (*elem).name) {
         return 0;
     }
-    if html_check_auto_close((*elem).name, name) != 0 {
+    if html_check_auto_close(
+        (*elem).name,
+        (!name.is_null())
+            .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
+            .as_deref(),
+    ) != 0
+    {
         return 1;
     }
     let mut child = (*elem).children().map_or(null_mut(), |c| c.as_ptr());
@@ -6391,7 +6254,12 @@ unsafe extern "C" fn html_parse_html_name(ctxt: HtmlParserCtxtPtr) -> *const Xml
 #[doc(alias = "htmlnamePop")]
 unsafe fn html_name_pop(ctxt: HtmlParserCtxtPtr) -> *const XmlChar {
     let res = (*ctxt).name_tab.pop().unwrap_or(null());
-    (*ctxt).name = *(*ctxt).name_tab.last().unwrap_or(&null());
+    let name = *(*ctxt).name_tab.last().unwrap_or(&null());
+    (*ctxt).name = (!name.is_null()).then(|| {
+        CStr::from_ptr(name as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    });
     res
 }
 
@@ -6403,8 +6271,8 @@ unsafe fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
     }
     for _ in (0..(*ctxt).name_tab.len()).rev() {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
+            let name = (*ctxt).name.as_deref().unwrap();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
         }
         html_name_pop(ctxt);
     }
@@ -6417,14 +6285,16 @@ unsafe fn html_auto_close_on_end(ctxt: HtmlParserCtxtPtr) {
 /// If newtag is NULL this mean we are at the end of the resource
 /// and we should check
 #[doc(alias = "htmlAutoClose")]
-unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
+unsafe fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     while !newtag.is_null()
-        && !(*ctxt).name.is_null()
-        && html_check_auto_close(newtag, (*ctxt).name) != 0
+        && (*ctxt)
+            .name
+            .as_deref()
+            .map_or(false, |name| html_check_auto_close(newtag, Some(name)) != 0)
     {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
+            let name = (*ctxt).name.as_deref().unwrap();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
         }
         html_name_pop(ctxt);
     }
@@ -6433,14 +6303,13 @@ unsafe extern "C" fn html_auto_close(ctxt: HtmlParserCtxtPtr, newtag: *const Xml
         return;
     }
     while newtag.is_null()
-        && !(*ctxt).name.is_null()
-        && (xml_str_equal((*ctxt).name, c"head".as_ptr() as _)
-            || xml_str_equal((*ctxt).name, c"body".as_ptr() as _)
-            || xml_str_equal((*ctxt).name, c"html".as_ptr() as _))
+        && (*ctxt).name.as_deref().map_or(false, |name| {
+            name == "head" || name == "body" || name == "html"
+        })
     {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
-            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
+            let name = (*ctxt).name.as_deref().unwrap();
+            ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
         }
         html_name_pop(ctxt);
     }
@@ -6452,14 +6321,18 @@ static HTML_OMITTED_DEFAULT_VALUE: AtomicI32 = AtomicI32::new(1);
 ///
 /// Returns -1 in case of error, the index in the stack otherwise
 #[doc(alias = "htmlnamePush")]
-unsafe extern "C" fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> i32 {
+unsafe fn html_name_push(ctxt: HtmlParserCtxtPtr, value: *const XmlChar) -> i32 {
     if (*ctxt).html < 3 && xml_str_equal(value, c"head".as_ptr() as _) {
         (*ctxt).html = 3;
     }
     if (*ctxt).html < 10 && xml_str_equal(value, c"body".as_ptr() as _) {
         (*ctxt).html = 10;
     }
-    (*ctxt).name = value;
+    (*ctxt).name = (!value.is_null()).then(|| {
+        CStr::from_ptr(value as *const i8)
+            .to_string_lossy()
+            .into_owned()
+    });
     (*ctxt).name_tab.push(value);
     (*ctxt).name_tab.len() as i32 - 1
 }
@@ -7278,41 +7151,40 @@ unsafe extern "C" fn html_get_end_priority(name: *const XmlChar) -> i32 {
 
 /// The HTML DTD allows an ending tag to implicitly close other tags.
 #[doc(alias = "htmlAutoCloseOnClose")]
-unsafe extern "C" fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
-    let mut info: *const HtmlElemDesc;
-
+unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlChar) {
     let priority: i32 = html_get_end_priority(newtag);
 
     for i in (0..(*ctxt).name_tab.len()).rev() {
         if xml_str_equal(newtag, (*ctxt).name_tab[i]) {
-            while !xml_str_equal(newtag, (*ctxt).name) {
-                info = html_tag_lookup((*ctxt).name);
-                if !info.is_null() && (*info).end_tag == 3 {
-                    let newtag = CStr::from_ptr(newtag as *const i8).to_string_lossy();
-                    let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+            let newtag = CStr::from_ptr(newtag as *const i8).to_string_lossy();
+            while Some(newtag.as_ref()) != (*ctxt).name.as_deref() {
+                let info = (*ctxt)
+                    .name
+                    .as_deref()
+                    .and_then(|name| html_tag_lookup(name));
+                if info.filter(|info| info.end_tag == 3).is_some() {
+                    let name = (*ctxt).name.as_deref().unwrap();
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrTagNameMismatch,
                         format!("Opening and ending tag mismatch: {newtag} and {name}\n").as_str(),
                         Some(&newtag),
-                        Some(&name),
+                        Some(name),
                     );
                 }
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                    let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
-                    ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
+                    let name = (*ctxt).name.as_deref().unwrap();
+                    ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), name);
                 }
                 html_name_pop(ctxt);
             }
 
             return;
         }
-        /*
-         * A misplaced endtag can only close elements with lower
-         * or equal priority, so if we find an element with higher
-         * priority before we find an element with
-         * matching name, we just ignore this endtag
-         */
+        // A misplaced endtag can only close elements with lower
+        // or equal priority, so if we find an element with higher
+        // priority before we find an element with
+        // matching name, we just ignore this endtag
         if html_get_end_priority((*ctxt).name_tab[i]) > priority {
             return;
         }
@@ -7349,9 +7221,7 @@ unsafe extern "C" fn html_node_info_pop(ctxt: HtmlParserCtxtPtr) -> *mut HtmlPar
 ///
 /// Returns 1 if the current level should be closed.
 #[doc(alias = "htmlParseEndTag")]
-unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
-    let oldname: *const XmlChar;
-
+unsafe fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
     let ret: i32;
 
     if (*ctxt).current_byte() != b'<' || NXT!(ctxt, 1) != b'/' {
@@ -7380,7 +7250,7 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
             None,
             None,
         );
-        /* Skip to next '>' */
+        // Skip to next '>'
         #[allow(clippy::while_immutable_condition)]
         while (*ctxt).current_byte() != 0 && (*ctxt).current_byte() != b'>' {
             (*ctxt).skip_char();
@@ -7408,25 +7278,27 @@ unsafe extern "C" fn html_parse_end_tag(ctxt: HtmlParserCtxtPtr) -> i32 {
 
             html_auto_close_on_close(ctxt, name);
 
+            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             // Well formedness constraints, opening and closing must match.
             // With the exception that the autoclose may have popped stuff out of the stack.
-            if !(*ctxt).name.is_null() && !xml_str_equal((*ctxt).name, name) {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                let ctxt_name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+            if let Some(ctxt_name) = (*ctxt)
+                .name
+                .as_deref()
+                .filter(|&ctxt_name| ctxt_name != name)
+            {
                 html_parse_err(
                     ctxt,
                     XmlParserErrors::XmlErrTagNameMismatch,
                     format!("Opening and ending tag mismatch: {name} and {ctxt_name}\n").as_str(),
                     Some(&name),
-                    Some(&ctxt_name),
+                    Some(ctxt_name),
                 );
             }
 
             // SAX: End of Tag
-            oldname = (*ctxt).name;
-            if !oldname.is_null() && xml_str_equal(oldname, name) {
+            let oldname = (*ctxt).name.as_deref();
+            if oldname.map_or(false, |oldname| oldname == name) {
                 if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                     ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                 }
                 html_node_info_pop(ctxt);
@@ -7519,27 +7391,29 @@ unsafe fn html_parse_script(ctxt: HtmlParserCtxtPtr) {
             // script/style block and treating the entire block as
             // CDATA.
             if (*ctxt).recovery != 0 {
+                let context_name = (*ctxt).name.as_deref().unwrap();
+                let context_name = CString::new(context_name).unwrap();
                 if xml_strncasecmp(
-                    (*ctxt).name,
+                    context_name.as_ptr() as *const u8,
                     (*(*ctxt).input).cur.add(2),
-                    xml_strlen((*ctxt).name),
+                    xml_strlen(context_name.as_ptr() as *const u8),
                 ) == 0
                 {
-                    break; /* while */
+                    break;
                 } else {
-                    let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+                    let name = (*ctxt).name.as_deref().unwrap();
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrTagNameMismatch,
                         format!("Element {name} embeds close tag\n").as_str(),
-                        Some(&name),
+                        Some(name),
                         None,
                     );
                 }
             } else if (NXT!(ctxt, 2) >= b'A' && NXT!(ctxt, 2) <= b'Z')
                 || (NXT!(ctxt, 2) >= b'a' && NXT!(ctxt, 2) <= b'z')
             {
-                break; /* while */
+                break;
             }
         }
         if xml_is_char(cur as u32) {
@@ -8224,19 +8098,19 @@ unsafe fn html_parse_pi(ctxt: HtmlParserCtxtPtr) {
 // CDATA content and where a p element will be implied
 //
 // TODO: extend that list by reading the HTML SGML DTD on implied paragraph
-const HTML_NO_CONTENT_ELEMENTS: &[*const c_char] = &[c"html".as_ptr(), c"head".as_ptr()];
+const HTML_NO_CONTENT_ELEMENTS: &[&str] = &["html", "head"];
 
 /// Check whether a p element need to be implied before inserting
 /// characters in the current element.
 ///
 /// Returns 1 if a paragraph has been inserted, 0 if not and -1 in case of error.
 #[doc(alias = "htmlCheckParagraph")]
-unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
+unsafe fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
-    let tag: *const XmlChar = (*ctxt).name;
-    if tag.is_null() {
+    let tag = (*ctxt).name.as_deref();
+    let Some(tag) = tag else {
         html_auto_close(ctxt, c"p".as_ptr() as _);
         html_check_implied(ctxt, c"p".as_ptr() as _);
         html_name_push(ctxt, c"p".as_ptr() as _);
@@ -8244,12 +8118,12 @@ unsafe extern "C" fn html_check_paragraph(ctxt: HtmlParserCtxtPtr) -> i32 {
             ((*(*ctxt).sax).start_element.unwrap())((*ctxt).user_data.clone(), "p", &[]);
         }
         return 1;
-    }
+    };
     if HTML_OMITTED_DEFAULT_VALUE.load(Ordering::Relaxed) == 0 {
         return 0;
     }
     for &elem in HTML_NO_CONTENT_ELEMENTS {
-        if xml_str_equal(tag, elem as _) {
+        if tag == elem {
             html_auto_close(ctxt, c"p".as_ptr() as _);
             html_check_implied(ctxt, c"p".as_ptr() as _);
             html_name_push(ctxt, c"p".as_ptr() as _);
@@ -8375,60 +8249,60 @@ unsafe fn html_parse_reference(ctxt: HtmlParserCtxtPtr) {
 // NOTE: it might be more appropriate to integrate this information
 // into the html40ElementTable array but I don't want to risk any
 // binary incompatibility
-const ALLOW_PCDATA: &[*const c_char] = &[
-    c"a".as_ptr() as _,
-    c"abbr".as_ptr() as _,
-    c"acronym".as_ptr() as _,
-    c"address".as_ptr() as _,
-    c"applet".as_ptr() as _,
-    c"b".as_ptr() as _,
-    c"bdo".as_ptr() as _,
-    c"big".as_ptr() as _,
-    c"blockquote".as_ptr() as _,
-    c"body".as_ptr() as _,
-    c"button".as_ptr() as _,
-    c"caption".as_ptr() as _,
-    c"center".as_ptr() as _,
-    c"cite".as_ptr() as _,
-    c"code".as_ptr() as _,
-    c"dd".as_ptr() as _,
-    c"del".as_ptr() as _,
-    c"dfn".as_ptr() as _,
-    c"div".as_ptr() as _,
-    c"dt".as_ptr() as _,
-    c"em".as_ptr() as _,
-    c"font".as_ptr() as _,
-    c"form".as_ptr() as _,
-    c"h1".as_ptr() as _,
-    c"h2".as_ptr() as _,
-    c"h3".as_ptr() as _,
-    c"h4".as_ptr() as _,
-    c"h5".as_ptr() as _,
-    c"h6".as_ptr() as _,
-    c"i".as_ptr() as _,
-    c"iframe".as_ptr() as _,
-    c"ins".as_ptr() as _,
-    c"kbd".as_ptr() as _,
-    c"label".as_ptr() as _,
-    c"legend".as_ptr() as _,
-    c"li".as_ptr() as _,
-    c"noframes".as_ptr() as _,
-    c"noscript".as_ptr() as _,
-    c"object".as_ptr() as _,
-    c"p".as_ptr() as _,
-    c"pre".as_ptr() as _,
-    c"q".as_ptr() as _,
-    c"s".as_ptr() as _,
-    c"samp".as_ptr() as _,
-    c"small".as_ptr() as _,
-    c"span".as_ptr() as _,
-    c"strike".as_ptr() as _,
-    c"strong".as_ptr() as _,
-    c"td".as_ptr() as _,
-    c"th".as_ptr() as _,
-    c"tt".as_ptr() as _,
-    c"u".as_ptr() as _,
-    c"var".as_ptr() as _,
+const ALLOW_PCDATA: &[&str] = &[
+    "a",
+    "abbr",
+    "acronym",
+    "address",
+    "applet",
+    "b",
+    "bdo",
+    "big",
+    "blockquote",
+    "body",
+    "button",
+    "caption",
+    "center",
+    "cite",
+    "code",
+    "dd",
+    "del",
+    "dfn",
+    "div",
+    "dt",
+    "em",
+    "font",
+    "form",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "i",
+    "iframe",
+    "ins",
+    "kbd",
+    "label",
+    "legend",
+    "li",
+    "noframes",
+    "noscript",
+    "object",
+    "p",
+    "pre",
+    "q",
+    "s",
+    "samp",
+    "small",
+    "span",
+    "strike",
+    "strong",
+    "td",
+    "th",
+    "tt",
+    "u",
+    "var",
 ];
 
 /// Is this a sequence of blank chars that one can ignore ?
@@ -8451,18 +8325,18 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
     if (*ctxt).current_byte() != b'<' {
         return 0;
     }
-    if (*ctxt).name.is_null() {
+    let Some(name) = (*ctxt).name.as_deref() else {
+        return 1;
+    };
+    if name == "html" {
         return 1;
     }
-    if xml_str_equal((*ctxt).name, c"html".as_ptr() as _) {
-        return 1;
-    }
-    if xml_str_equal((*ctxt).name, c"head".as_ptr() as _) {
+    if name == "head" {
         return 1;
     }
 
     /* Only strip CDATA children of the body tag for strict HTML DTDs */
-    if xml_str_equal((*ctxt).name, c"body".as_ptr() as _) && !(*ctxt).my_doc.is_null() {
+    if name == "body" && !(*ctxt).my_doc.is_null() {
         dtd = (*(*ctxt).my_doc).get_int_subset();
         if !dtd.is_null()
             && (*dtd)
@@ -8491,10 +8365,10 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
         {
             return 0;
         }
-        /* keep ws in constructs like ...<b> </b>...
-        for all tags "b" allowing PCDATA */
+        // keep ws in constructs like ...<b> </b>...
+        // for all tags "b" allowing PCDATA
         for &pcdata in ALLOW_PCDATA {
-            if xml_str_equal((*ctxt).name, pcdata as _) {
+            if name == pcdata {
                 return 0;
             }
         }
@@ -8504,7 +8378,7 @@ unsafe extern "C" fn are_blanks(ctxt: HtmlParserCtxtPtr, str: *const XmlChar, le
         /* keep ws in constructs like <p><b>xy</b> <i>z</i><p>
         for all tags "p" allowing PCDATA */
         for &pcdata in ALLOW_PCDATA {
-            if xml_str_equal((*last_child).name, pcdata as _) {
+            if (*last_child).name().as_deref() == Some(pcdata) {
                 return 0;
             }
         }
@@ -8609,10 +8483,10 @@ unsafe extern "C" fn html_parse_char_data(ctxt: HtmlParserCtxtPtr) {
 /// Parse a content: comment, sub-element, reference or text.
 /// Kept for compatibility with old code
 #[doc(alias = "htmlParseContent")]
-unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
+unsafe fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
     let mut name: *const XmlChar;
 
-    let current_node: *mut XmlChar = xml_strdup((*ctxt).name);
+    let current_node = (*ctxt).name.clone();
     let depth = (*ctxt).name_tab.len();
     loop {
         (*ctxt).grow();
@@ -8621,16 +8495,11 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
             break;
         }
 
-        /*
-         * Our tag or one of it's parent or children is ending.
-         */
+        // Our tag or one of it's parent or children is ending.
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
             if html_parse_end_tag(ctxt) != 0
-                && (!current_node.is_null() || (*ctxt).name_tab.is_empty())
+                && (current_node.is_some() || (*ctxt).name_tab.is_empty())
             {
-                if !current_node.is_null() {
-                    xml_free(current_node as _);
-                }
                 return;
             }
             continue; /* while */
@@ -8654,35 +8523,26 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
                     (*ctxt).skip_char();
                 }
 
-                if !current_node.is_null() {
-                    xml_free(current_node as _);
-                }
                 return;
             }
 
-            if !(*ctxt).name.is_null() && html_check_auto_close(name, (*ctxt).name) == 1 {
+            if (*ctxt).name.is_some() && html_check_auto_close(name, (*ctxt).name.as_deref()) == 1 {
                 html_auto_close(ctxt, name);
                 continue;
             }
         }
 
-        /*
-         * Has this node been popped out during parsing of
-         * the next element
-         */
+        // Has this node been popped out during parsing of the next element
         if !(*ctxt).name_tab.is_empty()
             && depth >= (*ctxt).name_tab.len()
-            && !xml_str_equal(current_node, (*ctxt).name)
+            && current_node != (*ctxt).name
         {
-            if !current_node.is_null() {
-                xml_free(current_node as _);
-            }
             return;
         }
 
         if (*ctxt).current_byte() != 0
-            && (xml_str_equal(current_node as _, c"script".as_ptr() as _)
-                || xml_str_equal(current_node as _, c"style".as_ptr() as _))
+            && (current_node.as_deref() == Some("script")
+                || current_node.as_deref() == Some("style"))
         {
             // Handle SCRIPT/STYLE separately
             html_parse_script(ctxt);
@@ -8746,9 +8606,6 @@ unsafe extern "C" fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
         (*ctxt).shrink();
         (*ctxt).grow();
     }
-    if !current_node.is_null() {
-        xml_free(current_node as _);
-    }
 }
 
 /// Parse an HTML element, this is highly recursive
@@ -8785,18 +8642,17 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
 
     let failed: i32 = html_parse_start_tag(ctxt);
-    let name: *const XmlChar = (*ctxt).name;
-    if failed == -1 || name.is_null() {
+    let name = (*ctxt).name.clone();
+    let Some(name) = name.filter(|_| failed != -1) else {
         if (*ctxt).current_byte() == b'>' {
             (*ctxt).skip_char();
         }
         return;
-    }
+    };
 
     // Lookup the info for that element.
-    let info: *const HtmlElemDesc = html_tag_lookup(name);
-    if info.is_null() {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    let info = html_tag_lookup(&name);
+    if info.is_none() {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLUnknownTag,
@@ -8810,7 +8666,6 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
@@ -8820,17 +8675,16 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).current_byte() == b'>' {
         (*ctxt).skip_char();
     } else {
-        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrGtRequired,
-            format!("Couldn't find end of Start Tag {n}\n").as_str(),
-            Some(&n),
+            format!("Couldn't find end of Start Tag {name}\n").as_str(),
+            Some(&name),
             None,
         );
 
         // end of parsing of this node.
-        if xml_str_equal(name, (*ctxt).name) {
+        if Some(name.as_str()) == (*ctxt).name.as_deref() {
             (*ctxt).node_pop();
             html_name_pop(ctxt);
         }
@@ -8847,9 +8701,8 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
 
     // Check for an Empty Element from DTD definition
-    if !info.is_null() && (*info).empty != 0 {
+    if info.map_or(false, |info| info.empty != 0) {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
@@ -8857,7 +8710,7 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
 
     // Parse the content of the element:
-    let current_node: *mut XmlChar = xml_strdup((*ctxt).name);
+    let current_node = (*ctxt).name.clone();
     let depth = (*ctxt).name_tab.len();
     #[allow(clippy::while_immutable_condition)]
     while (*ctxt).current_byte() != 0 {
@@ -8872,7 +8725,7 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
 
     // Capture end position and add node
-    if !current_node.is_null() && (*ctxt).record_info != 0 {
+    if current_node.is_some() && (*ctxt).record_info != 0 {
         node_info.end_pos = (*(*ctxt).input).consumed
             + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
         node_info.end_line = (*(*ctxt).input).line as _;
@@ -8881,10 +8734,6 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
     }
     if (*ctxt).current_byte() == 0 {
         html_auto_close_on_end(ctxt);
-    }
-
-    if !current_node.is_null() {
-        xml_free(current_node as _);
     }
 }
 
@@ -8950,7 +8799,7 @@ unsafe fn html_init_parser_ctxt(
     /* Allocate the Name stack */
     (*ctxt).name_tab.clear();
     (*ctxt).name_tab.shrink_to(10);
-    (*ctxt).name = null_mut();
+    (*ctxt).name = None;
 
     (*ctxt).node_info_tab = null_mut();
     (*ctxt).node_info_nr = 0;
@@ -9118,18 +8967,16 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     }
 
     let failed: i32 = html_parse_start_tag(ctxt);
-    let name: *const XmlChar = (*ctxt).name;
-    if failed == -1 || name.is_null() {
+    let Some(name) = (*ctxt).name.clone().filter(|_| failed != -1) else {
         if (*ctxt).current_byte() == b'>' {
             (*ctxt).skip_char();
         }
         return;
-    }
+    };
 
     // Lookup the info for that element.
-    let info: *const HtmlElemDesc = html_tag_lookup(name);
-    if info.is_null() {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    let info = html_tag_lookup(&name);
+    if info.is_none() {
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlHTMLUnknownTag,
@@ -9143,7 +8990,6 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
         (*ctxt).advance(2);
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
@@ -9153,17 +8999,16 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     if (*ctxt).current_byte() == b'>' {
         (*ctxt).skip_char();
     } else {
-        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
         html_parse_err(
             ctxt,
             XmlParserErrors::XmlErrGtRequired,
-            format!("Couldn't find end of Start Tag {n}\n").as_str(),
-            Some(&n),
+            format!("Couldn't find end of Start Tag {name}\n").as_str(),
+            Some(name.as_str()),
             None,
         );
 
         // end of parsing of this node.
-        if xml_str_equal(name, (*ctxt).name) {
+        if Some(name.as_str()) == (*ctxt).name.as_deref() {
             (*ctxt).node_pop();
             html_name_pop(ctxt);
         }
@@ -9176,9 +9021,8 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     }
 
     // Check for an Empty Element from DTD definition
-    if !info.is_null() && (*info).empty != 0 {
+    if info.map_or(false, |info| info.empty != 0) {
         if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
         }
         html_name_pop(ctxt);
@@ -9193,20 +9037,14 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
 /// Parse a content: comment, sub-element, reference or text.
 /// New version for non recursive htmlParseElementInternal
 #[doc(alias = "htmlParseContentInternal")]
-unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
-    let mut current_node: *mut XmlChar;
+unsafe fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
     let mut name: *const XmlChar;
-
     let mut depth = (*ctxt).name_tab.len();
-    if depth == 0 {
-        current_node = null_mut();
+    let mut current_node = if depth == 0 {
+        None
     } else {
-        current_node = xml_strdup((*ctxt).name);
-        if current_node.is_null() {
-            html_err_memory(ctxt, None);
-            return;
-        }
-    }
+        (*ctxt).name.clone()
+    };
     loop {
         (*ctxt).grow();
 
@@ -9214,26 +9052,16 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
             break;
         }
 
-        /*
-         * Our tag or one of it's parent or children is ending.
-         */
+        // Our tag or one of it's parent or children is ending.
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'/' {
             if html_parse_end_tag(ctxt) != 0
-                && (!current_node.is_null() || (*ctxt).name_tab.is_empty())
+                && (current_node.is_some() || (*ctxt).name_tab.is_empty())
             {
-                if !current_node.is_null() {
-                    xml_free(current_node as _);
-                }
-
                 depth = (*ctxt).name_tab.len();
                 if depth == 0 {
-                    current_node = null_mut();
+                    current_node = None;
                 } else {
-                    current_node = xml_strdup((*ctxt).name);
-                    if current_node.is_null() {
-                        html_err_memory(ctxt, None);
-                        break;
-                    }
+                    current_node = (*ctxt).name.clone();
                 }
             }
             continue; /* while */
@@ -9258,20 +9086,13 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
                 }
 
                 html_parser_finish_element_parsing(ctxt);
-                if !current_node.is_null() {
-                    xml_free(current_node as _);
-                }
 
-                current_node = xml_strdup((*ctxt).name);
-                if current_node.is_null() {
-                    html_err_memory(ctxt, None);
-                    break;
-                }
+                current_node = (*ctxt).name.clone();
                 depth = (*ctxt).name_tab.len();
                 continue;
             }
 
-            if !(*ctxt).name.is_null() && html_check_auto_close(name, (*ctxt).name) == 1 {
+            if (*ctxt).name.is_some() && html_check_auto_close(name, (*ctxt).name.as_deref()) == 1 {
                 html_auto_close(ctxt, name);
                 continue;
             }
@@ -9280,25 +9101,18 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
         // Has this node been popped out during parsing of the next element
         if !(*ctxt).name_tab.is_empty()
             && depth >= (*ctxt).name_tab.len()
-            && !xml_str_equal(current_node, (*ctxt).name)
+            && current_node != (*ctxt).name
         {
             html_parser_finish_element_parsing(ctxt);
-            if !current_node.is_null() {
-                xml_free(current_node as _);
-            }
 
-            current_node = xml_strdup((*ctxt).name);
-            if current_node.is_null() {
-                html_err_memory(ctxt, None);
-                break;
-            }
+            current_node = (*ctxt).name.clone();
             depth = (*ctxt).name_tab.len();
             continue;
         }
 
         if (*ctxt).current_byte() != 0
-            && (xml_str_equal(current_node as _, c"script".as_ptr() as _)
-                || xml_str_equal(current_node as _, c"style".as_ptr() as _))
+            && (current_node.as_deref() == Some("script")
+                || current_node.as_deref() == Some("style"))
         {
             // Handle SCRIPT/STYLE separately
             html_parse_script(ctxt);
@@ -9335,15 +9149,8 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
         // Third case :  a sub-element.
         else if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1).is_ascii_alphabetic() {
             html_parse_element_internal(ctxt);
-            if !current_node.is_null() {
-                xml_free(current_node as _);
-            }
 
-            current_node = xml_strdup((*ctxt).name);
-            if current_node.is_null() {
-                html_err_memory(ctxt, None);
-                break;
-            }
+            current_node = (*ctxt).name.clone();
             depth = (*ctxt).name_tab.len();
         } else if (*ctxt).current_byte() == b'<' {
             if !(*ctxt).sax.is_null()
@@ -9371,9 +9178,6 @@ unsafe extern "C" fn html_parse_content_internal(ctxt: HtmlParserCtxtPtr) {
 
         (*ctxt).shrink();
         (*ctxt).grow();
-    }
-    if !current_node.is_null() {
-        xml_free(current_node as _);
     }
 }
 
@@ -10526,18 +10330,16 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 }
 
                 let failed: i32 = html_parse_start_tag(ctxt);
-                let name: *const XmlChar = (*ctxt).name;
-                if failed == -1 || name.is_null() {
+                let Some(name) = (*ctxt).name.clone().filter(|_| failed != -1) else {
                     if (*ctxt).current_byte() == b'>' {
                         (*ctxt).skip_char();
                     }
                     break 'to_break;
-                }
+                };
 
                 // Lookup the info for that element.
-                let info: *const HtmlElemDesc = html_tag_lookup(name);
-                if info.is_null() {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+                let info = html_tag_lookup(&name);
+                if info.is_none() {
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlHTMLUnknownTag,
@@ -10551,7 +10353,6 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 if (*ctxt).current_byte() == b'/' && NXT!(ctxt, 1) == b'>' {
                     (*ctxt).advance(2);
                     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                     }
                     html_name_pop(ctxt);
@@ -10562,17 +10363,16 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 if (*ctxt).current_byte() == b'>' {
                     (*ctxt).skip_char();
                 } else {
-                    let n = CStr::from_ptr(name as *const i8).to_string_lossy();
                     html_parse_err(
                         ctxt,
                         XmlParserErrors::XmlErrGtRequired,
-                        format!("Couldn't find end of Start Tag {n}\n").as_str(),
-                        Some(&n),
+                        format!("Couldn't find end of Start Tag {name}\n").as_str(),
+                        Some(&name),
                         None,
                     );
 
                     // end of parsing of this node.
-                    if xml_str_equal(name, (*ctxt).name) {
+                    if Some(name.as_str()) == (*ctxt).name.as_deref() {
                         (*ctxt).node_pop();
                         html_name_pop(ctxt);
                     }
@@ -10586,9 +10386,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 }
 
                 // Check for an Empty Element from DTD definition
-                if !info.is_null() && (*info).empty != 0 {
+                if info.map_or(false, |info| info.empty != 0) {
                     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element.is_some() {
-                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                         ((*(*ctxt).sax).end_element.unwrap())((*ctxt).user_data.clone(), &name);
                     }
                     html_name_pop(ctxt);
@@ -10649,8 +10448,8 @@ unsafe extern "C" fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate
                 }
                 cur = *(*input).cur.add(0);
                 next = *(*input).cur.add(1);
-                if xml_str_equal((*ctxt).name, c"script".as_ptr() as _)
-                    || xml_str_equal((*ctxt).name, c"style".as_ptr() as _)
+                if (*ctxt).name.as_deref() == Some("script")
+                    || (*ctxt).name.as_deref() == Some("style")
                 {
                     // Handle SCRIPT/STYLE separately
                     if terminate == 0 {
@@ -11080,7 +10879,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     (*ctxt).node = null_mut();
 
     (*ctxt).name_tab.clear();
-    (*ctxt).name = null_mut();
+    (*ctxt).name = None;
 
     (*ctxt).ns_tab.clear();
 
@@ -11496,25 +11295,8 @@ pub unsafe extern "C" fn html_attr_allowed(
 ///
 /// Returns 1 if allowed; 0 otherwise.
 #[doc(alias = "htmlElementAllowedHere")]
-pub unsafe extern "C" fn html_element_allowed_here(
-    parent: *const HtmlElemDesc,
-    elt: *const XmlChar,
-) -> i32 {
-    let mut p: *mut *const c_char;
-
-    if elt.is_null() || parent.is_null() || (*parent).subelts.is_null() {
-        return 0;
-    }
-
-    p = (*parent).subelts;
-    while !(*p).is_null() {
-        if xml_strcmp(*p as _, elt) == 0 {
-            return 1;
-        }
-        p = p.add(1);
-    }
-
-    0
+pub fn html_element_allowed_here(parent: &HtmlElemDesc, elt: &str) -> bool {
+    parent.subelts.iter().any(|&sub| sub == elt)
 }
 
 /// Checks whether an HTML element may be a direct child of a parent element.
@@ -11522,18 +11304,12 @@ pub unsafe extern "C" fn html_element_allowed_here(
 ///
 /// Returns one of htmlStatus::HTML_VALID, htmlStatus::HTML_DEPRECATED, htmlStatus::HTML_INVALID
 #[doc(alias = "htmlElementStatusHere")]
-pub unsafe extern "C" fn html_element_status_here(
-    parent: *const HtmlElemDesc,
-    elt: *const HtmlElemDesc,
-) -> HtmlStatus {
-    if parent.is_null() || elt.is_null() {
-        return HtmlStatus::HtmlInvalid;
-    }
-    if html_element_allowed_here(parent as _, (*elt).name as _) == 0 {
+pub fn html_element_status_here(parent: &HtmlElemDesc, elt: &HtmlElemDesc) -> HtmlStatus {
+    if !html_element_allowed_here(parent, elt.name) {
         return HtmlStatus::HtmlInvalid;
     }
 
-    if (*elt).dtd == 0 {
+    if elt.dtd == 0 {
         HtmlStatus::HtmlValid
     } else {
         HtmlStatus::HtmlDeprecated
@@ -11548,7 +11324,7 @@ pub unsafe extern "C" fn html_element_status_here(
 /// - For Attribute nodes, a return from htmlAttrAllowed
 /// - For other nodes, htmlStatus::HTML_NA (no checks performed)
 #[doc(alias = "htmlNodeStatus")]
-pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
+pub unsafe fn html_node_status(node: HtmlNodePtr, legacy: i32) -> HtmlStatus {
     if node.is_null() {
         return HtmlStatus::HtmlInvalid;
     }
@@ -11556,27 +11332,27 @@ pub unsafe extern "C" fn html_node_status(node: HtmlNodePtr, legacy: i32) -> Htm
     match (*node).element_type() {
         XmlElementType::XmlElementNode => {
             if legacy != 0 {
-                if html_element_allowed_here(
-                    html_tag_lookup((*node).parent().unwrap().name),
-                    (*node).name,
-                ) != 0
+                if html_tag_lookup(&(*node).parent().unwrap().name().unwrap())
+                    .map_or(false, |desc| {
+                        html_element_allowed_here(desc, &(*node).name().unwrap())
+                    })
                 {
                     HtmlStatus::HtmlValid
                 } else {
                     HtmlStatus::HtmlInvalid
                 }
             } else {
-                html_element_status_here(
-                    html_tag_lookup((*node).parent().unwrap().name),
-                    html_tag_lookup((*node).name),
-                )
+                html_tag_lookup(&(*node).parent().unwrap().name().unwrap())
+                    .zip(html_tag_lookup(&(*node).name().unwrap()))
+                    .map(|(par, chi)| html_element_status_here(par, chi))
+                    .unwrap_or(HtmlStatus::HtmlInvalid)
             }
         }
-        XmlElementType::XmlAttributeNode => html_attr_allowed(
-            html_tag_lookup((*node).parent().unwrap().name),
-            (*node).name,
-            legacy,
-        ),
+        XmlElementType::XmlAttributeNode => {
+            html_tag_lookup(&(*node).parent().unwrap().name().unwrap())
+                .map(|desc| html_attr_allowed(desc, (*node).name, legacy))
+                .unwrap_or(HtmlStatus::HtmlInvalid)
+        }
         _ => HtmlStatus::HtmlNa,
     }
 }
@@ -11711,76 +11487,6 @@ mod tests {
             assert!(
                 leaks == 0,
                 "{leaks} Leaks are found in htmlCtxtUseOptions()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_html_element_allowed_here() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_parent in 0..GEN_NB_CONST_HTML_ELEM_DESC_PTR {
-                for n_elt in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let parent = gen_const_html_elem_desc_ptr(n_parent, 0);
-                    let elt = gen_const_xml_char_ptr(n_elt, 1);
-
-                    let ret_val = html_element_allowed_here(parent, elt);
-                    desret_int(ret_val);
-                    des_const_html_elem_desc_ptr(n_parent, parent, 0);
-                    des_const_xml_char_ptr(n_elt, elt, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlElementAllowedHere",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_parent);
-                        eprintln!(" {}", n_elt);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlElementAllowedHere()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_html_element_status_here() {
-        #[cfg(feature = "html")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_parent in 0..GEN_NB_CONST_HTML_ELEM_DESC_PTR {
-                for n_elt in 0..GEN_NB_CONST_HTML_ELEM_DESC_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let parent = gen_const_html_elem_desc_ptr(n_parent, 0);
-                    let elt = gen_const_html_elem_desc_ptr(n_elt, 1);
-
-                    let ret_val = html_element_status_here(parent, elt);
-                    desret_html_status(ret_val);
-                    des_const_html_elem_desc_ptr(n_parent, parent, 0);
-                    des_const_html_elem_desc_ptr(n_elt, elt, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in htmlElementStatusHere",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_parent);
-                        eprintln!(" {}", n_elt);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in htmlElementStatusHere()"
             );
         }
     }
