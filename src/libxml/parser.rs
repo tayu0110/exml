@@ -1902,7 +1902,7 @@ pub type StartElementNsSAX2Func = unsafe fn(
     prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: i32,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 );
 
@@ -7733,46 +7733,6 @@ pub(crate) unsafe fn xml_err_attribute_dup(
     }
 }
 
-unsafe fn grow_attrs(
-    ctxt: XmlParserCtxtPtr,
-    atts: &mut *mut *const u8,
-    attallocs: &mut *mut i32,
-    maxatts: &mut i32,
-    nr: i32,
-) -> i32 {
-    if nr + 5 > *maxatts {
-        let newmaxatts = if *maxatts == 0 { 55 } else { (nr + 5) * 2 };
-        let newatts =
-            xml_malloc(newmaxatts as usize * size_of::<*const XmlChar>()) as *mut *const u8;
-        if newatts.is_null() {
-            // goto mem_error;
-            xml_err_memory(ctxt, None);
-            return -1;
-        }
-        *attallocs = xml_realloc(
-            *attallocs as _,
-            (newmaxatts as usize / 5) * size_of::<i32>(),
-        ) as _;
-        if attallocs.is_null() {
-            xml_free(newatts as _);
-            // goto mem_error;
-            xml_err_memory(ctxt, None);
-            return -1;
-        }
-        if *maxatts > 0 {
-            memcpy(
-                newatts as _,
-                *atts as _,
-                *maxatts as usize * size_of::<*const XmlChar>(),
-            );
-        }
-        xml_free(*atts as _);
-        *atts = newatts;
-        *maxatts = newmaxatts;
-    }
-    *maxatts
-}
-
 /// Parse a start tag. Always consumes '<'.
 ///
 /// This routine is called when running SAX2 parsing
@@ -7815,7 +7775,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
 
     let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
     let inputid: i32 = (*(*ctxt).input).id;
-    let mut nbdef: i32 = 0;
+    let mut nbdef = 0usize;
     let mut nb_ns = 0usize;
     // /* Forget any namespaces added during an earlier parse of this element. */
     // (*ctxt).ns_tab.len() = ns_nr;

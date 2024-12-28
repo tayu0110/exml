@@ -30220,15 +30220,14 @@ pub struct XmlSchemaSAXPlugStruct {
     ctxt: XmlSchemaValidCtxtPtr,
 }
 
-#[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
+// #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_sax_handle_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     _prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    _nb_defaulted: i32,
+    _nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctx = ctx.unwrap();
@@ -30913,15 +30912,13 @@ unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_split(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: i32,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctx = ctx.unwrap();

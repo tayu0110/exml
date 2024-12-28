@@ -1318,15 +1318,13 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
-#[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: c_int,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     CALLBACKS += 1;

@@ -3013,7 +3013,7 @@ unsafe fn xml_text_reader_start_element_ns(
     prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: i32,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctxt = {

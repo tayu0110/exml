@@ -1029,15 +1029,13 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
-#[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: i32,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     increment_callbacks_counter();
@@ -1911,7 +1909,7 @@ unsafe fn start_element_ns_bnd(
     prefix: Option<&str>,
     uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: i32,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     use exml::libxml::sax2::xml_sax2_start_element_ns;

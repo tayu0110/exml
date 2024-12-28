@@ -870,15 +870,13 @@ fn fatal_error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsCallback")]
-#[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
 fn start_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
     _localname: &str,
     _prefix: Option<&str>,
     _uri: Option<&str>,
     _namespaces: &[(Option<String>, String)],
-    _nb_defaulted: i32,
+    _nb_defaulted: usize,
     _attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));

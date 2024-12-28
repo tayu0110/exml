@@ -2268,8 +2268,6 @@ pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str
 /// It provides the namespace information for the element, as well as
 /// the new namespace declarations on the element.
 #[doc(alias = "xmlSAX2StartElementNs")]
-#[allow(clippy::too_many_arguments)]
-// #[allow(clippy::type_complexity)]
 pub unsafe fn xml_sax2_start_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
@@ -2277,7 +2275,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     // I want to rename to `uri`, but it also appears as a local variable....
     orig_uri: Option<&str>,
     namespaces: &[(Option<String>, String)],
-    nb_defaulted: i32,
+    nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ret: XmlNodePtr;
@@ -2430,7 +2428,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     // Insert the defaulted attributes from the DTD only if requested:
     let mut nb_attributes = attributes.len();
     if nb_defaulted != 0 && (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 == 0 {
-        nb_attributes -= nb_defaulted as usize;
+        nb_attributes -= nb_defaulted;
     }
 
     // Search the namespace if it wasn't already found
