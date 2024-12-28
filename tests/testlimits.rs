@@ -891,7 +891,7 @@ fn end_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
     _localname: &str,
     _prefix: Option<&str>,
-    _uri: *const XmlChar,
+    _uri: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

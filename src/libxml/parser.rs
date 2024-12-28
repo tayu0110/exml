@@ -1902,7 +1902,7 @@ pub type EndElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 );
 
 pub type XmlSAXHandlerPtr = *mut XmlSAXHandler;
@@ -8956,11 +8956,13 @@ pub(crate) unsafe fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTa
         let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
         let prefix = (!tag.prefix.is_null())
             .then(|| CStr::from_ptr(tag.prefix as *const i8).to_string_lossy());
+        let uri =
+            (!tag.uri.is_null()).then(|| CStr::from_ptr(tag.uri as *const i8).to_string_lossy());
         ((*(*ctxt).sax).end_element_ns.unwrap())(
             (*ctxt).user_data.clone(),
             &name,
             prefix.as_deref(),
-            tag.uri,
+            uri.as_deref(),
         );
     }
 
@@ -9481,7 +9483,9 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                             CStr::from_ptr(prefix as *const i8).to_string_lossy()
                                         })
                                         .as_deref(),
-                                    uri,
+                                    (!uri.is_null())
+                                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                                        .as_deref(),
                                 );
                             }
                             if (*ctxt).ns_tab.len() - ns_nr > 0 {

@@ -1109,7 +1109,7 @@ unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 ) {
     increment_callbacks_counter();
     sax_debug!("SAX.endElementNs({localname}");
@@ -1118,13 +1118,10 @@ unsafe fn end_element_ns_debug(
     } else {
         sax_debug!(", NULL");
     }
-    if uri.is_null() {
-        sax_debugln!(", NULL)");
+    if let Some(uri) = uri {
+        sax_debugln!(", '{uri}')");
     } else {
-        sax_debugln!(
-            ", '{}')",
-            CStr::from_ptr(uri as *mut c_char).to_string_lossy()
-        );
+        sax_debugln!(", NULL)");
     }
 }
 
@@ -1835,7 +1832,7 @@ unsafe fn end_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 ) {
     use exml::libxml::sax2::xml_sax2_end_element_ns;
     xml_sax2_end_element_ns(ctx, localname, prefix, uri);

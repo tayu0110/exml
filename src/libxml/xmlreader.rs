@@ -3058,7 +3058,7 @@ unsafe fn xml_text_reader_end_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 ) {
     let ctxt = {
         let ctx = ctx.as_ref().unwrap();

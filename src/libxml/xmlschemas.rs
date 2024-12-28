@@ -30415,7 +30415,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     _prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30432,11 +30432,14 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
     }
     // SAX VAL TODO: Just a temporary check.
     let localname = CString::new(localname).unwrap();
+    let uri = uri.map(|u| CString::new(u).unwrap());
     if !xml_str_equal(
         (*(*vctxt).inode).local_name,
         localname.as_ptr() as *const u8,
-    ) || !xml_str_equal((*(*vctxt).inode).ns_name, uri)
-    {
+    ) || !xml_str_equal(
+        (*(*vctxt).inode).ns_name,
+        uri.as_deref().map_or(null(), |u| u.as_ptr() as *const u8),
+    ) {
         VERROR_INT!(vctxt, "xmlSchemaSAXHandleEndElementNs", "elem pop mismatch");
     }
     let res: i32 = xml_schema_validator_pop_elem(vctxt);
@@ -30977,7 +30980,7 @@ unsafe fn end_element_ns_split(
     ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();

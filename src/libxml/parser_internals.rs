@@ -4868,7 +4868,9 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
                     (!prefix.is_null())
                         .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                         .as_deref(),
-                    uri,
+                    (!uri.is_null())
+                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
+                        .as_deref(),
                 );
             }
         } else {

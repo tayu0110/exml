@@ -2920,7 +2920,7 @@ pub unsafe fn xml_sax2_end_element_ns(
     ctx: Option<GenericErrorContext>,
     _localname: &str,
     _prefix: Option<&str>,
-    _uri: *const XmlChar,
+    _uri: Option<&str>,
 ) {
     if ctx.is_none() {
         return;

@@ -1393,7 +1393,7 @@ unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
-    uri: *const XmlChar,
+    uri: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1405,10 +1405,10 @@ unsafe fn end_element_ns_debug(
     } else {
         print!(", NULL");
     }
-    if uri.is_null() {
-        println!(", NULL)");
+    if let Some(uri) = uri {
+        println!(", '{uri}')");
     } else {
-        println!(", '{}')", CStr::from_ptr(uri as _).to_string_lossy());
+        println!(", NULL)");
     }
 }
 
