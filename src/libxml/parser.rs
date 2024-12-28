@@ -1901,7 +1901,7 @@ pub type StartElementNsSAX2Func = unsafe fn(
 pub type EndElementNsSAX2Func = unsafe fn(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
 );
 
@@ -8906,7 +8906,7 @@ unsafe extern "C" fn xml_parse_qname_and_compare(
 ///
 /// `[NS 9] ETag ::= '</' QName S? '>'`
 #[doc(alias = "xmlParseEndTag2")]
-pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTag) {
+pub(crate) unsafe fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: &XmlStartTag) {
     let mut name: *const XmlChar;
 
     (*ctxt).grow();
@@ -8922,9 +8922,7 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
         name = xml_parse_qname_and_compare(ctxt, (*ctxt).name as _, tag.prefix as _);
     }
 
-    /*
-     * We should definitely be at the ending "S? '>'" part
-     */
+    // We should definitely be at the ending "S? '>'" part
     (*ctxt).grow();
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         return;
@@ -8956,10 +8954,12 @@ pub(crate) unsafe extern "C" fn xml_parse_end_tag2(ctxt: XmlParserCtxtPtr, tag: 
     if !(*ctxt).sax.is_null() && (*(*ctxt).sax).end_element_ns.is_some() && (*ctxt).disable_sax == 0
     {
         let name = CStr::from_ptr((*ctxt).name as *const i8).to_string_lossy();
+        let prefix = (!tag.prefix.is_null())
+            .then(|| CStr::from_ptr(tag.prefix as *const i8).to_string_lossy());
         ((*(*ctxt).sax).end_element_ns.unwrap())(
             (*ctxt).user_data.clone(),
             &name,
-            tag.prefix,
+            prefix.as_deref(),
             tag.uri,
         );
     }
@@ -9476,7 +9476,11 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                                 ((*(*ctxt).sax).end_element_ns.unwrap())(
                                     (*ctxt).user_data.clone(),
                                     &name,
-                                    prefix,
+                                    (!prefix.is_null())
+                                        .then(|| {
+                                            CStr::from_ptr(prefix as *const i8).to_string_lossy()
+                                        })
+                                        .as_deref(),
                                     uri,
                                 );
                             }

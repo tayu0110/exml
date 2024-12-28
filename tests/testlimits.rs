@@ -890,7 +890,7 @@ fn start_element_ns_callback(
 fn end_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
     _localname: &str,
-    _prefix: *const XmlChar,
+    _prefix: Option<&str>,
     _uri: *const XmlChar,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));

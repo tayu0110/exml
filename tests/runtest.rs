@@ -1108,18 +1108,15 @@ unsafe fn start_element_ns_debug(
 unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
 ) {
     increment_callbacks_counter();
     sax_debug!("SAX.endElementNs({localname}");
-    if prefix.is_null() {
-        sax_debug!(", NULL");
+    if let Some(prefix) = prefix {
+        sax_debug!(", {prefix}");
     } else {
-        sax_debug!(
-            ", {}",
-            CStr::from_ptr(prefix as *mut c_char).to_string_lossy()
-        );
+        sax_debug!(", NULL");
     }
     if uri.is_null() {
         sax_debugln!(", NULL)");
@@ -1837,24 +1834,18 @@ unsafe fn start_element_ns_bnd(
 unsafe fn end_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
 ) {
     use exml::libxml::sax2::xml_sax2_end_element_ns;
     xml_sax2_end_element_ns(ctx, localname, prefix, uri);
 }
 
-/**
- * pushBoundaryTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Test whether the push parser detects boundaries between syntactical
- * elements correctly.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Test whether the push parser detects boundaries between syntactical
+/// elements correctly.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "pushBoundaryTest")]
 #[cfg(feature = "libxml_push")]
 unsafe fn push_boundary_test(
     filename: &str,
@@ -1886,12 +1877,10 @@ unsafe fn push_boundary_test(
     let mut consumed: u64;
     let cfilename = CString::new(filename).unwrap();
 
-    /*
-     * If the parser made progress, check that exactly one construct was
-     * processed and that the input buffer is (almost) empty.
-     * Since we use a chunk size of 1, this tests whether content is
-     * processed as early as possible.
-     */
+    // If the parser made progress, check that exactly one construct was
+    // processed and that the input buffer is (almost) empty.
+    // Since we use a chunk size of 1, this tests whether content is
+    // processed as early as possible.
 
     NB_TESTS.set(NB_TESTS.get() + 1);
 
@@ -1920,9 +1909,7 @@ unsafe fn push_boundary_test(
     bnd_sax.processing_instruction = Some(processing_instruction_bnd);
     bnd_sax.comment = Some(comment_bnd);
 
-    /*
-     * load the document in memory and work from there.
-     */
+    // load the document in memory and work from there.
     if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;

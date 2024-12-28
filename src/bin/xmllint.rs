@@ -1392,7 +1392,7 @@ unsafe fn start_element_ns_debug(
 unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
 ) {
     CALLBACKS += 1;
@@ -1400,10 +1400,10 @@ unsafe fn end_element_ns_debug(
         return;
     }
     print!("SAX.endElementNs({localname}");
-    if prefix.is_null() {
-        print!(", NULL");
+    if let Some(prefix) = prefix {
+        print!(", {prefix}");
     } else {
-        print!(", {}", CStr::from_ptr(prefix as _).to_string_lossy());
+        print!(", NULL");
     }
     if uri.is_null() {
         println!(", NULL)");

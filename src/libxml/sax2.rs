@@ -2919,7 +2919,7 @@ unsafe fn xml_sax2_attribute_ns(
 pub unsafe fn xml_sax2_end_element_ns(
     ctx: Option<GenericErrorContext>,
     _localname: &str,
-    _prefix: *const XmlChar,
+    _prefix: Option<&str>,
     _uri: *const XmlChar,
 ) {
     if ctx.is_none() {

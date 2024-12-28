@@ -30414,7 +30414,7 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
 unsafe fn xml_schema_sax_handle_end_element_ns(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    _prefix: *const XmlChar,
+    _prefix: Option<&str>,
     uri: *const XmlChar,
 ) {
     let ctx = ctx.unwrap();
@@ -30976,7 +30976,7 @@ unsafe fn start_element_ns_split(
 unsafe fn end_element_ns_split(
     ctx: Option<GenericErrorContext>,
     localname: &str,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     uri: *const XmlChar,
 ) {
     let ctx = ctx.unwrap();
