@@ -4178,10 +4178,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                     }
                     cur = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
                 }
-                #[cfg(feature = "libxml_legacy")]
-                if matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
-                    xml_add_entity_reference(ent, first_child, nw);
-                }
             } else if list.is_null() || !(*ctxt).input_tab.is_empty() {
                 let mut nw: XmlNodePtr;
                 let mut cur: XmlNodePtr;
@@ -4217,10 +4213,6 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
                 }
                 if (*ent).owner == 0 {
                     (*ent).owner = 1;
-                }
-                #[cfg(feature = "libxml_legacy")]
-                if matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity) {
-                    xml_add_entity_reference(ent, first_child, nw);
                 }
             } else {
                 // the name change is to avoid coalescing of the

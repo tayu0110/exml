@@ -22,8 +22,6 @@ pub mod parser_internals;
 pub mod pattern;
 #[cfg(feature = "schema")]
 pub mod relaxng;
-#[cfg(feature = "libxml_legacy")]
-pub mod sax;
 pub mod sax2;
 #[cfg(feature = "schema")]
 pub mod schemas_internals;
