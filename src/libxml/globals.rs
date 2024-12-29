@@ -38,7 +38,7 @@ use libc::{free, malloc, memset, realloc};
 #[cfg(feature = "libxml_legacy")]
 use crate::libxml::sax::{inithtmlDefaultSAXHandler, initxmlDefaultSAXHandler};
 use crate::{
-    error::{parser_error, parser_warning, XmlError},
+    error::XmlError,
     globals::reset_last_error,
     libxml::{
         parser::{XmlSAXHandlerV1, XmlSAXLocator},
@@ -50,11 +50,8 @@ use crate::{
 use super::{
     parser::xml_init_parser,
     sax2::{
-        xml_sax2_cdata_block, xml_sax2_characters, xml_sax2_comment, xml_sax2_end_document,
-        xml_sax2_end_element, xml_sax2_get_column_number, xml_sax2_get_entity,
-        xml_sax2_get_line_number, xml_sax2_get_public_id, xml_sax2_get_system_id,
-        xml_sax2_ignorable_whitespace, xml_sax2_internal_subset, xml_sax2_processing_instruction,
-        xml_sax2_set_document_locator, xml_sax2_start_document, xml_sax2_start_element,
+        xml_sax2_get_column_number, xml_sax2_get_line_number, xml_sax2_get_public_id,
+        xml_sax2_get_system_id,
     },
     threads::{
         xml_cleanup_mutex, xml_get_global_state, xml_init_mutex, xml_mutex_lock, xml_mutex_unlock,
@@ -516,60 +513,6 @@ pub fn set_xml_mem_strdup(mem_strdup: Option<XmlStrdupFunc>) {
         (*xml_get_global_state()).xml_mem_strdup = mem_strdup;
     }
 }
-
-/// Default old SAX v1 handler for HTML, builds the DOM tree
-#[doc(alias = "htmlDefaultSAXHandler")]
-#[deprecated = "This handler is unused and will be removed from future versions."]
-#[cfg(all(feature = "html", feature = "sax1"))]
-static mut _HTML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
-    internal_subset: Some(xml_sax2_internal_subset),
-    is_standalone: None,
-    has_internal_subset: None,
-    has_external_subset: None,
-    resolve_entity: None,
-    get_entity: Some(xml_sax2_get_entity),
-    entity_decl: None,
-    notation_decl: None,
-    attribute_decl: None,
-    element_decl: None,
-    unparsed_entity_decl: None,
-    set_document_locator: Some(xml_sax2_set_document_locator),
-    start_document: Some(xml_sax2_start_document),
-    end_document: Some(xml_sax2_end_document),
-    start_element: Some(xml_sax2_start_element),
-    end_element: Some(xml_sax2_end_element),
-    reference: None,
-    characters: Some(xml_sax2_characters),
-    ignorable_whitespace: Some(xml_sax2_ignorable_whitespace),
-    processing_instruction: Some(xml_sax2_processing_instruction),
-    comment: Some(xml_sax2_comment),
-    warning: Some(parser_warning),
-    error: Some(parser_error),
-    fatal_error: Some(parser_error),
-    get_parameter_entity: None,
-    cdata_block: Some(xml_sax2_cdata_block),
-    external_subset: None,
-    initialized: 1,
-};
-
-#[cfg(feature = "html")]
-mod __globals_internal_for_html {
-    use super::*;
-
-    #[deprecated]
-    pub unsafe extern "C" fn __html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
-        if IS_MAIN_THREAD!() != 0 {
-            addr_of_mut!(_HTML_DEFAULT_SAXHANDLER)
-        } else {
-            addr_of_mut!((*xml_get_global_state()).html_default_sax_handler)
-        }
-    }
-    pub unsafe extern "C" fn html_default_sax_handler() -> *mut XmlSAXHandlerV1 {
-        __html_default_sax_handler()
-    }
-}
-#[cfg(feature = "html")]
-pub use __globals_internal_for_html::*;
 
 #[deprecated]
 pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSAXLocator {
