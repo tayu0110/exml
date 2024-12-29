@@ -2032,40 +2032,6 @@ pub struct XmlSAXHandler {
     pub serror: Option<StructuredError>,
 }
 
-pub type XmlSAXHandlerV1Ptr = *mut XmlSAXHandlerV1;
-#[repr(C)]
-#[derive(Debug, Default)]
-pub struct XmlSAXHandlerV1 {
-    pub(crate) internal_subset: Option<InternalSubsetSAXFunc>,
-    pub(crate) is_standalone: Option<IsStandaloneSAXFunc>,
-    pub(crate) has_internal_subset: Option<HasInternalSubsetSAXFunc>,
-    pub(crate) has_external_subset: Option<HasExternalSubsetSAXFunc>,
-    pub(crate) resolve_entity: Option<ResolveEntitySAXFunc>,
-    pub(crate) get_entity: Option<GetEntitySAXFunc>,
-    pub(crate) entity_decl: Option<EntityDeclSAXFunc>,
-    pub(crate) notation_decl: Option<NotationDeclSAXFunc>,
-    pub(crate) attribute_decl: Option<AttributeDeclSAXFunc>,
-    pub(crate) element_decl: Option<ElementDeclSAXFunc>,
-    pub(crate) unparsed_entity_decl: Option<UnparsedEntityDeclSAXFunc>,
-    pub(crate) set_document_locator: Option<SetDocumentLocatorSAXFunc>,
-    pub(crate) start_document: Option<StartDocumentSAXFunc>,
-    pub(crate) end_document: Option<EndDocumentSAXFunc>,
-    pub(crate) start_element: Option<StartElementSAXFunc>,
-    pub(crate) end_element: Option<EndElementSAXFunc>,
-    pub(crate) reference: Option<ReferenceSAXFunc>,
-    pub(crate) characters: Option<CharactersSAXFunc>,
-    pub(crate) ignorable_whitespace: Option<IgnorableWhitespaceSAXFunc>,
-    pub(crate) processing_instruction: Option<ProcessingInstructionSAXFunc>,
-    pub(crate) comment: Option<CommentSAXFunc>,
-    pub(crate) warning: Option<GenericError>,
-    pub(crate) error: Option<GenericError>,
-    pub(crate) fatal_error: Option<GenericError>, /* unused error() get all the errors */
-    pub(crate) get_parameter_entity: Option<GetParameterEntitySAXFunc>,
-    pub(crate) cdata_block: Option<CDATABlockSAXFunc>,
-    pub(crate) external_subset: Option<ExternalSubsetSAXFunc>,
-    pub(crate) initialized: u32,
-}
-
 /// External entity loaders types.
 ///
 /// Returns the entity input parser.
@@ -4786,11 +4752,13 @@ unsafe fn xml_init_sax_parser_ctxt(
         xml_sax_version((*ctxt).sax, 2);
         (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
     } else {
-        if (*sax).initialized == XML_SAX2_MAGIC as u32 {
-            memcpy((*ctxt).sax as _, sax as _, size_of::<XmlSAXHandler>());
-        } else {
-            memset((*ctxt).sax as _, 0, size_of::<XmlSAXHandler>());
-            memcpy((*ctxt).sax as _, sax as _, size_of::<XmlSAXHandlerV1>());
+        memcpy((*ctxt).sax as _, sax as _, size_of::<XmlSAXHandler>());
+        if (*sax).initialized != XML_SAX2_MAGIC as u32 {
+            // These fields won't used in SAX1 handling.
+            (*(*ctxt).sax)._private = AtomicPtr::new(null_mut());
+            (*(*ctxt).sax).start_element_ns = None;
+            (*(*ctxt).sax).end_element_ns = None;
+            (*(*ctxt).sax).serror = None;
         }
         (*ctxt).user_data = if user_data.is_some() {
             user_data

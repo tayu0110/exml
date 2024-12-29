@@ -39,7 +39,7 @@ use crate::{
     error::XmlError,
     globals::reset_last_error,
     libxml::{
-        parser::{XmlSAXHandlerV1, XmlSAXLocator},
+        parser::XmlSAXLocator,
         xmlmemory::{XmlFreeFunc, XmlMallocFunc, XmlReallocFunc, XmlStrdupFunc},
     },
     tree::{XmlBufferAllocationScheme, XmlNodePtr, BASE_BUFFER_SIZE, __XML_REGISTER_CALLBACKS},
@@ -84,10 +84,6 @@ pub struct XmlGlobalState {
     pub(crate) xml_parser_version: *const c_char,
 
     pub(crate) xml_default_sax_locator: XmlSAXLocator,
-    pub(crate) xml_default_sax_handler: XmlSAXHandlerV1,
-    #[allow(unused)]
-    pub(crate) docb_default_sax_handler: XmlSAXHandlerV1, /* unused */
-    pub(crate) html_default_sax_handler: XmlSAXHandlerV1,
 
     pub(crate) xml_free: Option<XmlFreeFunc>,
     pub(crate) xml_malloc: Option<XmlMallocFunc>,
