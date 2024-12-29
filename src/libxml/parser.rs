@@ -497,80 +497,132 @@ pub(crate) struct XmlStartTag {
 pub type XmlParserCtxtPtr = *mut XmlParserCtxt;
 #[repr(C)]
 pub struct XmlParserCtxt {
-    pub sax: *mut XmlSAXHandler,                       /* The SAX handler */
-    pub(crate) user_data: Option<GenericErrorContext>, /* For SAX interface only, used by DOM build */
-    pub my_doc: XmlDocPtr,                             /* the document being built */
-    pub well_formed: i32,                              /* is the document well formed */
-    pub(crate) replace_entities: i32,                  /* shall we replace entities ? */
-    pub(crate) version: Option<String>,                /* the XML version string */
-    pub encoding: Option<String>,                      /* the declared encoding, if any */
-    pub(crate) standalone: i32,                        /* standalone document */
-    pub(crate) html: i32,                              /* an HTML(1) document
-                                                        * 3 is HTML after <head>
-                                                        * 10 is HTML after <body>
-                                                        */
+    // The SAX handler
+    pub sax: *mut XmlSAXHandler,
+    // For SAX interface only, used by DOM build
+    pub(crate) user_data: Option<GenericErrorContext>,
+    // the document being built
+    pub my_doc: XmlDocPtr,
+    // is the document well formed
+    pub well_formed: i32,
+    // shall we replace entities ?
+    pub(crate) replace_entities: i32,
+    // the XML version string
+    pub(crate) version: Option<String>,
+    // the declared encoding, if any
+    pub encoding: Option<String>,
+    // standalone document
+    pub(crate) standalone: i32,
+    // an HTML(1) document
+    //  3 is HTML after <head>
+    //  10 is HTML after <body>
+    pub(crate) html: i32,
 
     // Input stream stack
-    pub input: XmlParserInputPtr,          /* Current input stream */
-    pub input_tab: Vec<XmlParserInputPtr>, /* stack of inputs */
+    // Current input stream
+    pub input: XmlParserInputPtr,
+    // stack of inputs
+    pub input_tab: Vec<XmlParserInputPtr>,
 
     // Node analysis stack only used for DOM building
-    pub(crate) node: XmlNodePtr,          /* Current parsed Node */
-    pub(crate) node_tab: Vec<XmlNodePtr>, /* array of nodes */
+    // Current parsed Node
+    pub(crate) node: XmlNodePtr,
+    // array of nodes
+    pub(crate) node_tab: Vec<XmlNodePtr>,
 
-    pub(crate) record_info: i32, /* Whether node info should be kept */
-    pub(crate) node_seq: XmlParserNodeInfoSeq, /* info about each node parsed */
+    // Whether node info should be kept
+    pub(crate) record_info: i32,
+    // info about each node parsed
+    pub(crate) node_seq: XmlParserNodeInfoSeq,
 
-    pub err_no: i32, /* error code */
+    // error code
+    pub err_no: i32,
 
-    pub(crate) has_external_subset: i32, /* reference and external subset */
-    pub(crate) has_perefs: i32,          /* the internal subset has PE refs */
-    pub(crate) external: i32,            /* are we parsing an external entity */
+    // reference and external subset
+    pub(crate) has_external_subset: i32,
+    // the internal subset has PE refs
+    pub(crate) has_perefs: i32,
+    // are we parsing an external entity
+    pub(crate) external: i32,
 
-    pub valid: i32,           /* is the document valid */
-    pub(crate) validate: i32, /* shall we try to validate ? */
-    pub vctxt: XmlValidCtxt,  /* The validity context */
+    // is the document valid
+    pub valid: i32,
+    // shall we try to validate ?
+    pub(crate) validate: i32,
+    // The validity context
+    pub vctxt: XmlValidCtxt,
 
-    pub instate: XmlParserInputState, /* current type of input */
-    pub(crate) token: i32,            /* next char look-ahead */
+    // current type of input
+    pub instate: XmlParserInputState,
+    // next char look-ahead
+    pub(crate) token: i32,
 
-    pub(crate) directory: Option<String>, /* the data directory */
+    // the data directory
+    pub(crate) directory: Option<String>,
 
     // Node name stack
-    pub(crate) name: Option<String>, /* Current parsed Node */
-    pub(crate) name_tab: Vec<*const XmlChar>, /* array of nodes */
+    // Current parsed Node
+    pub(crate) name: Option<String>,
+    // array of nodes
+    pub(crate) name_tab: Vec<*const XmlChar>,
 
-    nb_chars: i64,                             /* unused */
-    pub(crate) check_index: i64,               /* used by progressive parsing lookup */
-    pub(crate) keep_blanks: i32,               /* ugly but ... */
-    pub(crate) disable_sax: i32,               /* SAX callbacks are disabled */
-    pub in_subset: i32,                        /* Parsing is in int 1/ext 2 subset */
-    pub(crate) int_sub_name: Option<String>,   /* name of subset */
-    pub(crate) ext_sub_uri: Option<String>,    /* URI of external subset */
-    pub(crate) ext_sub_system: Option<String>, /* SYSTEM ID of external subset */
+    // unused
+    nb_chars: i64,
+    // used by progressive parsing lookup
+    pub(crate) check_index: i64,
+    // ugly but ...
+    pub(crate) keep_blanks: i32,
+    // SAX callbacks are disabled
+    pub(crate) disable_sax: i32,
+    // Parsing is in int 1/ext 2 subset
+    pub in_subset: i32,
+    // name of subset
+    pub(crate) int_sub_name: Option<String>,
+    // URI of external subset
+    pub(crate) ext_sub_uri: Option<String>,
+    // SYSTEM ID of external subset
+    pub(crate) ext_sub_system: Option<String>,
 
     // xml:space values
-    pub(crate) space_tab: Vec<i32>, /* array of space infos */
+    // array of space infos
+    pub(crate) space_tab: Vec<i32>,
 
-    pub(crate) depth: i32, /* to prevent entity substitution loops */
-    pub(crate) entity: XmlParserInputPtr, /* used to check entities boundaries */
-    pub charset: XmlCharEncoding, /* encoding of the in-memory content
-                           actually an xmlCharEncoding */
-    pub(crate) nodelen: i32,          /* Those two fields are there to */
-    pub(crate) nodemem: i32,          /* Speed up large node parsing */
-    pub(crate) pedantic: i32,         /* signal pedantic warnings */
-    pub(crate) _private: *mut c_void, /* For user data, libxml won't touch it */
+    // to prevent entity substitution loops
+    pub(crate) depth: i32,
+    // used to check entities boundaries
+    pub(crate) entity: XmlParserInputPtr,
+    // encoding of the in-memory content
+    // actually an xmlCharEncoding
+    pub charset: XmlCharEncoding,
 
-    pub(crate) loadsubset: i32,  /* should the external subset be loaded */
-    pub(crate) linenumbers: i32, /* set line number in element content */
+    // Those two fields are there to
+    pub(crate) nodelen: i32,
+    // Speed up large node parsing
+    pub(crate) nodemem: i32,
+    // signal pedantic warnings
+    pub(crate) pedantic: i32,
+    // For user data, libxml won't touch it
+    pub(crate) _private: *mut c_void,
+
+    // should the external subset be loaded
+    pub(crate) loadsubset: i32,
+    // set line number in element content
+    pub(crate) linenumbers: i32,
+    // document's own catalog
     #[cfg(feature = "catalog")]
-    pub(crate) catalogs: Option<XmlCatalogEntry>, /* document's own catalog */
-    pub(crate) recovery: i32,    /* run in recovery mode */
-    pub(crate) progressive: i32, /* is this a progressive parsing */
-    pub(crate) dict: XmlDictPtr, /* dictionary for the parser */
-    pub(crate) atts: Vec<(String, Option<String>)>, /* array for the attributes callbacks */
-    pub(crate) maxatts: i32,     /* the size of the array */
-    pub(crate) docdict: i32,     /* use strings from dict to build tree */
+    pub(crate) catalogs: Option<XmlCatalogEntry>,
+    // run in recovery mode
+    pub(crate) recovery: i32,
+    // is this a progressive parsing
+    pub(crate) progressive: i32,
+    // dictionary for the parser
+    pub(crate) dict: XmlDictPtr,
+    // array for the attributes callbacks
+    pub(crate) atts: Vec<(String, Option<String>)>,
+    // the size of the array
+    pub(crate) maxatts: i32,
+    // use strings from dict to build tree
+    pub(crate) docdict: i32,
 
     // pre-interned strings
     pub(crate) str_xml: Option<Cow<'static, str>>,
@@ -578,40 +630,65 @@ pub struct XmlParserCtxt {
     pub(crate) str_xml_ns: Option<Cow<'static, str>>,
 
     // Everything below is used only by the new SAX mode
-    pub(crate) sax2: i32, /* operating in the new SAX mode */
-    pub(crate) ns_tab: Vec<(Option<String>, String)>, /* the array of prefix/namespace name */
-    pub(crate) attallocs: *mut i32, /* which attribute were allocated */
-    pub(crate) push_tab: Vec<XmlStartTag>, /* array of data for push */
-    pub(crate) atts_default: Option<XmlHashTableRef<'static, XmlDefAttrsPtr>>, /* defaulted attributes if any */
-    pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>, /* non-CDATA attributes if any */
-    pub(crate) ns_well_formed: i32, /* is the document XML Namespace okay */
-    pub(crate) options: i32,        /* Extra options */
+    // operating in the new SAX mode
+    pub(crate) sax2: i32,
+    // the array of prefix/namespace name
+    pub(crate) ns_tab: Vec<(Option<String>, String)>,
+    // which attribute were allocated
+    pub(crate) attallocs: *mut i32,
+    // array of data for push
+    pub(crate) push_tab: Vec<XmlStartTag>,
+    // defaulted attributes if any
+    pub(crate) atts_default: Option<XmlHashTableRef<'static, XmlDefAttrsPtr>>,
+    // non-CDATA attributes if any
+    pub(crate) atts_special: Option<XmlHashTableRef<'static, XmlAttributeType>>,
+    // is the document XML Namespace okay
+    pub(crate) ns_well_formed: i32,
+    // Extra options
+    pub(crate) options: i32,
 
     // Those fields are needed only for streaming parsing so far
-    pub(crate) dict_names: i32,    /* Use dictionary names for the tree */
-    pub(crate) free_elems_nr: i32, /* number of freed element nodes */
-    pub(crate) free_elems: XmlNodePtr, /* List of freed element nodes */
-    pub(crate) free_attrs_nr: i32, /* number of freed attributes nodes */
-    pub(crate) free_attrs: XmlAttrPtr, /* List of freed attributes nodes */
+    // Use dictionary names for the tree
+    pub(crate) dict_names: i32,
+    // number of freed element nodes
+    pub(crate) free_elems_nr: i32,
+    // List of freed element nodes
+    pub(crate) free_elems: XmlNodePtr,
+    // number of freed attributes nodes
+    pub(crate) free_attrs_nr: i32,
+    // List of freed attributes nodes
+    pub(crate) free_attrs: XmlAttrPtr,
 
     // the complete error information for the last error.
     pub last_error: XmlError,
-    pub(crate) parse_mode: XmlParserMode, /* the parser mode */
-    pub(crate) nbentities: u64,           /* unused */
-    pub sizeentities: u64,                /* size of parsed entities */
+    // the parser mode
+    pub(crate) parse_mode: XmlParserMode,
+    // unused
+    pub(crate) nbentities: u64,
+    // size of parsed entities
+    pub sizeentities: u64,
 
     // for use by HTML non-recursive parser
-    pub(crate) node_info: *mut XmlParserNodeInfo, /* Current NodeInfo */
-    pub(crate) node_info_nr: i32,                 /* Depth of the parsing stack */
-    pub(crate) node_info_max: i32,                /* Max depth of the parsing stack */
-    pub(crate) node_info_tab: *mut XmlParserNodeInfo, /* array of nodeInfos */
+    // Current NodeInfo
+    pub(crate) node_info: *mut XmlParserNodeInfo,
+    // Depth of the parsing stack
+    pub(crate) node_info_nr: i32,
+    // Max depth of the parsing stack
+    pub(crate) node_info_max: i32,
+    // array of nodeInfos
+    pub(crate) node_info_tab: *mut XmlParserNodeInfo,
 
-    pub(crate) input_id: i32, /* we need to label inputs */
-    pub sizeentcopy: u64,     /* volume of entity copy */
+    // we need to label inputs
+    pub(crate) input_id: i32,
+    // volume of entity copy
+    pub sizeentcopy: u64,
 
-    pub(crate) end_check_state: i32, /* quote state for push parser */
-    pub nb_errors: u16,              /* number of errors */
-    pub(crate) nb_warnings: u16,     /* number of warnings */
+    // quote state for push parser
+    pub(crate) end_check_state: i32,
+    // number of errors
+    pub nb_errors: u16,
+    // number of warnings
+    pub(crate) nb_warnings: u16,
 }
 
 impl XmlParserCtxt {
