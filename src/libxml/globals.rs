@@ -619,10 +619,6 @@ static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
     initialized: 1,
 };
 
-pub unsafe extern "C" fn xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
-    __xml_default_sax_handler()
-}
-
 #[deprecated]
 pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSAXLocator {
     if IS_MAIN_THREAD!() != 0 {

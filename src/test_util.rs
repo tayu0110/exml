@@ -1036,12 +1036,12 @@ pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
 pub(crate) fn des_xml_feature(_no: i32, _val: Option<XmlFeature>, _nr: i32) {}
 
 #[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
-pub(crate) unsafe fn gen_xml_saxhandler_ptr(no: i32, _nr: i32) -> XmlSAXHandlerPtr {
-    #[cfg(feature = "sax1")]
-    if no == 0 {
-        use crate::libxml::globals::xml_default_sax_handler;
-        return xml_default_sax_handler() as _;
-    }
+pub(crate) unsafe fn gen_xml_saxhandler_ptr(_no: i32, _nr: i32) -> XmlSAXHandlerPtr {
+    // #[cfg(feature = "sax1")]
+    // if no == 0 {
+    //     use crate::libxml::globals::xml_default_sax_handler;
+    //     return xml_default_sax_handler() as _;
+    // }
     null_mut()
 }
 

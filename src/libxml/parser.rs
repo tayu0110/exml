@@ -98,8 +98,8 @@ use crate::{
         },
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
-            xml_cleanup_globals_internal, xml_default_sax_handler, xml_default_sax_locator,
-            xml_free, xml_init_globals_internal, xml_malloc, xml_malloc_atomic, xml_realloc,
+            xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
+            xml_init_globals_internal, xml_malloc, xml_malloc_atomic, xml_realloc,
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
@@ -3445,9 +3445,7 @@ pub unsafe fn xml_sax_user_parse_file(
     if ctxt.is_null() {
         return -1;
     }
-    if (*ctxt).sax != xml_default_sax_handler() as XmlSAXHandlerPtr {
-        xml_free((*ctxt).sax as _);
-    }
+    xml_free((*ctxt).sax as _);
     (*ctxt).sax = sax;
     (*ctxt).detect_sax2();
 
@@ -3495,9 +3493,7 @@ pub unsafe fn xml_sax_user_parse_memory(
     if ctxt.is_null() {
         return -1;
     }
-    if (*ctxt).sax != xml_default_sax_handler() as XmlSAXHandlerPtr {
-        xml_free((*ctxt).sax as _);
-    }
+    xml_free((*ctxt).sax as _);
     (*ctxt).sax = sax;
     (*ctxt).detect_sax2();
 
@@ -4938,7 +4934,7 @@ pub unsafe extern "C" fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
 /// Free all the memory used by a parser context. However the parsed
 /// document in (*ctxt).myDoc is not freed.
 #[doc(alias = "xmlFreeParserCtxt")]
-pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
+pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     let mut input: XmlParserInputPtr;
 
     if ctxt.is_null() {
@@ -4967,17 +4963,8 @@ pub unsafe extern "C" fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     (*ctxt).encoding = None;
     (*ctxt).ext_sub_uri = None;
     (*ctxt).ext_sub_system = None;
-    #[cfg(feature = "sax1")]
-    {
-        if !(*ctxt).sax.is_null() && (*ctxt).sax != xml_default_sax_handler() as _ {
-            xml_free((*ctxt).sax as _);
-        }
-    }
-    #[cfg(not(feature = "sax1"))]
-    {
-        if !(*ctxt).sax.is_null() {
-            xml_free((*ctxt).sax as _);
-        }
+    if !(*ctxt).sax.is_null() {
+        xml_free((*ctxt).sax as _);
     }
     (*ctxt).directory = None;
     if !(*ctxt).vctxt.node_tab.is_null() {
