@@ -50,15 +50,11 @@ use crate::{
 use super::{
     parser::xml_init_parser,
     sax2::{
-        xml_sax2_attribute_decl, xml_sax2_cdata_block, xml_sax2_characters, xml_sax2_comment,
-        xml_sax2_element_decl, xml_sax2_end_document, xml_sax2_end_element, xml_sax2_entity_decl,
-        xml_sax2_external_subset, xml_sax2_get_column_number, xml_sax2_get_entity,
-        xml_sax2_get_line_number, xml_sax2_get_parameter_entity, xml_sax2_get_public_id,
-        xml_sax2_get_system_id, xml_sax2_has_external_subset, xml_sax2_has_internal_subset,
-        xml_sax2_ignorable_whitespace, xml_sax2_internal_subset, xml_sax2_is_standalone,
-        xml_sax2_notation_decl, xml_sax2_processing_instruction, xml_sax2_reference,
-        xml_sax2_resolve_entity, xml_sax2_set_document_locator, xml_sax2_start_document,
-        xml_sax2_start_element, xml_sax2_unparsed_entity_decl,
+        xml_sax2_cdata_block, xml_sax2_characters, xml_sax2_comment, xml_sax2_end_document,
+        xml_sax2_end_element, xml_sax2_get_column_number, xml_sax2_get_entity,
+        xml_sax2_get_line_number, xml_sax2_get_public_id, xml_sax2_get_system_id,
+        xml_sax2_ignorable_whitespace, xml_sax2_internal_subset, xml_sax2_processing_instruction,
+        xml_sax2_set_document_locator, xml_sax2_start_document, xml_sax2_start_element,
     },
     threads::{
         xml_cleanup_mutex, xml_get_global_state, xml_init_mutex, xml_mutex_lock, xml_mutex_unlock,
@@ -574,50 +570,6 @@ mod __globals_internal_for_html {
 }
 #[cfg(feature = "html")]
 pub use __globals_internal_for_html::*;
-
-#[deprecated]
-pub unsafe extern "C" fn __xml_default_sax_handler() -> *mut XmlSAXHandlerV1 {
-    if IS_MAIN_THREAD!() != 0 {
-        addr_of_mut!(_XML_DEFAULT_SAXHANDLER)
-    } else {
-        addr_of_mut!((*xml_get_global_state()).xml_default_sax_handler)
-    }
-}
-
-/// Default SAX version1 handler for XML, builds the DOM tree
-#[doc(alias = "xmlDefaultSAXHandler")]
-#[deprecated = "This handler is unused and will be removed from future versions"]
-#[cfg(feature = "sax1")]
-static mut _XML_DEFAULT_SAXHANDLER: XmlSAXHandlerV1 = XmlSAXHandlerV1 {
-    internal_subset: Some(xml_sax2_internal_subset),
-    is_standalone: Some(xml_sax2_is_standalone),
-    has_internal_subset: Some(xml_sax2_has_internal_subset),
-    has_external_subset: Some(xml_sax2_has_external_subset),
-    resolve_entity: Some(xml_sax2_resolve_entity),
-    get_entity: Some(xml_sax2_get_entity),
-    entity_decl: Some(xml_sax2_entity_decl),
-    notation_decl: Some(xml_sax2_notation_decl),
-    attribute_decl: Some(xml_sax2_attribute_decl),
-    element_decl: Some(xml_sax2_element_decl),
-    unparsed_entity_decl: Some(xml_sax2_unparsed_entity_decl),
-    set_document_locator: Some(xml_sax2_set_document_locator),
-    start_document: Some(xml_sax2_start_document),
-    end_document: Some(xml_sax2_end_document),
-    start_element: Some(xml_sax2_start_element),
-    end_element: Some(xml_sax2_end_element),
-    reference: Some(xml_sax2_reference),
-    characters: Some(xml_sax2_characters),
-    ignorable_whitespace: Some(xml_sax2_characters),
-    processing_instruction: Some(xml_sax2_processing_instruction),
-    comment: Some(xml_sax2_comment),
-    warning: Some(parser_warning),
-    error: Some(parser_error),
-    fatal_error: Some(parser_error),
-    get_parameter_entity: Some(xml_sax2_get_parameter_entity),
-    cdata_block: Some(xml_sax2_cdata_block),
-    external_subset: Some(xml_sax2_external_subset),
-    initialized: 1,
-};
 
 #[deprecated]
 pub unsafe extern "C" fn __xml_default_sax_locator() -> *mut XmlSAXLocator {
