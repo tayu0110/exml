@@ -45,6 +45,10 @@ use libc::{
 };
 use url::Url;
 
+#[cfg(feature = "catalog")]
+use crate::libxml::catalog::{
+    xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
+};
 #[cfg(feature = "ftp")]
 use crate::libxml::nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read};
 use crate::{
@@ -54,9 +58,6 @@ use crate::{
         __xml_simple_oom_error,
     },
     libxml::{
-        catalog::{
-            xml_catalog_get_defaults, xml_catalog_resolve, xml_catalog_resolve_uri, XmlCatalogAllow,
-        },
         parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
     },
@@ -575,7 +576,7 @@ pub unsafe fn xml_no_net_external_entity_loader(
     let resource =
         xml_resolve_resource_from_catalog(url, id, ctxt).or_else(|| url.map(|u| u.to_owned()));
     #[cfg(not(feature = "catalog"))]
-    let mut resource = url;
+    let resource = url.map(|u| u.to_owned());
 
     if let Some(resource) = resource.as_deref().filter(|rsrc| {
         (rsrc.len() >= 6 && rsrc[..6].eq_ignore_ascii_case("ftp://"))

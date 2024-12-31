@@ -35,9 +35,10 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 use crate::error::{XmlParserErrors, __xml_raise_error};
 use crate::hash::XmlHashTableRef;
 use crate::io::__xml_loader_err;
+#[cfg(feature = "catalog")]
+use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::uri::build_uri;
-#[cfg(feature = "catalog")]
 use crate::{
     encoding::{
         detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding,
@@ -47,7 +48,6 @@ use crate::{
     globals::{get_parser_debug_entities, GenericErrorContext},
     io::{xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
-        catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI},
         chvalid::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
             xml_is_extender, xml_is_ideographic,

@@ -9,11 +9,12 @@ use std::{
 
 use libc::snprintf;
 
+#[cfg(feature = "catalog")]
+use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr};
 use crate::{
     buf::XmlBuf,
     io::XmlOutputBuffer,
     libxml::{
-        catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr},
         debug_xml::XmlShellCtxtPtr,
         entities::{XmlEntitiesTablePtr, XmlEntityPtr},
         globals::xml_free,

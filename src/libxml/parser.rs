@@ -59,6 +59,8 @@ use std::{
 
 use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, strlen, strncmp, strstr};
 
+#[cfg(feature = "catalog")]
+use crate::libxml::catalog::{xml_catalog_cleanup, XmlCatalogEntry};
 use crate::{
     buf::{
         libxml_api::{
@@ -89,7 +91,6 @@ use crate::{
         xml_parser_get_directory, XmlParserInputBuffer,
     },
     libxml::{
-        catalog::xml_catalog_cleanup,
         dict::{
             __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_create, xml_dict_free,
             xml_dict_lookup, xml_dict_reference, xml_dict_set_limit, XmlDictPtr,
@@ -143,7 +144,6 @@ use crate::{
 };
 
 use super::{
-    catalog::XmlCatalogEntry,
     chvalid::{
         xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         xml_is_pubid_char,
@@ -4794,7 +4794,10 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
     (*ctxt).charset = XmlCharEncoding::UTF8;
-    (*ctxt).catalogs = None;
+    #[cfg(feature = "catalog")]
+    {
+        (*ctxt).catalogs = None;
+    }
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
     (*ctxt).input_id = 1;
@@ -10057,7 +10060,10 @@ pub unsafe extern "C" fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
     (*ctxt).depth = 0;
     (*ctxt).charset = XmlCharEncoding::UTF8;
-    (*ctxt).catalogs = None;
+    #[cfg(feature = "catalog")]
+    {
+        (*ctxt).catalogs = None;
+    }
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
     xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));

@@ -26,6 +26,8 @@ use std::{
 };
 
 use const_format::concatcp;
+#[cfg(feature = "catalog")]
+use exml::libxml::catalog::xml_load_catalogs;
 use exml::{
     encoding::{add_encoding_alias, XmlCharEncoding},
     error::generic_error_default,
@@ -37,7 +39,6 @@ use exml::{
     io::{xml_no_net_external_entity_loader, XmlParserInputBuffer},
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
-        catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
         entities::{xml_encode_entities_reentrant, XmlEntityPtr, XmlEntityType},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
@@ -3564,15 +3565,19 @@ fn main() {
                     | XmlParserOption::XmlParseDtdattr as i32
                     | XmlParserOption::XmlParseDtdload as i32;
             } else if cfg!(feature = "catalog") && (arg == "-catalogs" || arg == "--catalogs") {
-                CATALOGS += 1;
+                #[cfg(feature = "catalog")]
+                {
+                    CATALOGS += 1;
+                }
             } else if cfg!(feature = "catalog") && (arg == "-nocatalogs" || arg == "--nocatalogs") {
-                NOCATALOGS += 1;
+                #[cfg(feature = "catalog")]
+                {
+                    NOCATALOGS += 1;
+                }
             } else if arg == "-encode" || arg == "--encode" {
                 *ENCODING.lock().unwrap() =
                     Some(args.next().expect("--encode: Encoding is not specified"));
-                /*
-                 * OK it's for testing purposes
-                 */
+                // OK it's for testing purposes
                 add_encoding_alias("UTF-8", "DVEnc");
             } else if arg == "-noblanks" || arg == "--noblanks" {
                 NOBLANKS = 1;

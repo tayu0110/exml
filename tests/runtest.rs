@@ -72,7 +72,9 @@ use exml::{
     xpath::XmlXPathObjectPtr,
     SYSCONFDIR,
 };
-use libc::{free, malloc, memcpy, pthread_t, size_t, snprintf, strcmp, strlen};
+#[cfg(feature = "catalog")]
+use libc::pthread_t;
+use libc::{free, malloc, memcpy, size_t, snprintf, strcmp, strlen};
 
 /// pseudo flag for the unification of HTML and XML tests
 const XML_PARSE_HTML: i32 = 1 << 24;
