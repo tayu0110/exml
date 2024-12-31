@@ -24,7 +24,7 @@ use libc::memset;
 
 use crate::libxml::{
     globals::{xml_free, xml_malloc},
-    xmlstring::{xml_str_equal, xml_strdup, XmlChar},
+    xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
 };
 
 use super::{
@@ -46,6 +46,18 @@ pub struct XmlNs {
     pub prefix: *const XmlChar,       /* prefix for the namespace */
     pub(crate) _private: *mut c_void, /* application data */
     pub(crate) context: *mut XmlDoc,  /* normally an xmlDoc */
+}
+
+impl XmlNs {
+    pub unsafe fn prefix(&self) -> Option<Cow<'_, str>> {
+        let prefix = self.prefix;
+        (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+    }
+
+    pub unsafe fn href(&self) -> Option<Cow<'_, str>> {
+        let href = self.href;
+        (!href.is_null()).then(|| CStr::from_ptr(href as *const i8).to_string_lossy())
+    }
 }
 
 impl Default for XmlNs {
@@ -107,33 +119,25 @@ impl NodeCommon for XmlNs {
 ///
 /// Returns a new namespace pointer or NULL
 #[doc(alias = "xmlNewNs")]
-pub unsafe fn xml_new_ns(
-    node: XmlNodePtr,
-    href: *const XmlChar,
-    prefix: *const XmlChar,
-) -> XmlNsPtr {
+pub unsafe fn xml_new_ns(node: XmlNodePtr, href: *const XmlChar, prefix: Option<&str>) -> XmlNsPtr {
     if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         return null_mut();
     }
 
-    if !prefix.is_null() && xml_str_equal(prefix, c"xml".as_ptr() as _) {
+    if prefix == Some("xml") {
         /* xml namespace is predefined, no need to add it */
         if xml_str_equal(href, XML_XML_NAMESPACE.as_ptr() as _) {
             return null_mut();
         }
 
-        /*
-         * Problem, this is an attempt to bind xml prefix to a wrong
-         * namespace, which breaks
-         * Namespace constraint: Reserved Prefixes and Namespace Names
-         * from XML namespace. But documents authors may not care in
-         * their context so let's proceed.
-         */
+        // Problem, this is an attempt to bind xml prefix to a wrong
+        // namespace, which breaks
+        // Namespace constraint: Reserved Prefixes and Namespace Names
+        // from XML namespace. But documents authors may not care in
+        // their context so let's proceed.
     }
 
-    /*
-     * Allocate a new Namespace and fill the fields.
-     */
+    // Allocate a new Namespace and fill the fields.
     let cur: XmlNsPtr = xml_malloc(size_of::<XmlNs>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building namespace");
@@ -145,14 +149,12 @@ pub unsafe fn xml_new_ns(
     if !href.is_null() {
         (*cur).href = xml_strdup(href);
     }
-    if !prefix.is_null() {
-        (*cur).prefix = xml_strdup(prefix);
+    if let Some(prefix) = prefix {
+        (*cur).prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
     }
 
-    /*
-     * Add it at the end to preserve parsing order ...
-     * and checks for existing use of the prefix
-     */
+    // Add it at the end to preserve parsing order ...
+    // and checks for existing use of the prefix
     if !node.is_null() {
         if (*node).ns_def.is_null() {
             (*node).ns_def = cur;

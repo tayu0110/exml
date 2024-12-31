@@ -671,21 +671,30 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
             return;
         }
         match (*ent).etype {
-            Some(XmlEntityType::XmlInternalParameterEntity)
-            | Some(XmlEntityType::XmlExternalParameterEntity)
-            | Some(XmlEntityType::XmlInternalPredefinedEntity) => return,
-            Some(XmlEntityType::XmlInternalGeneralEntity)
-            | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
-            | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
+            XmlEntityType::XmlInternalParameterEntity
+            | XmlEntityType::XmlExternalParameterEntity
+            | XmlEntityType::XmlInternalPredefinedEntity => return,
+            XmlEntityType::XmlInternalGeneralEntity
+            | XmlEntityType::XmlExternalGeneralParsedEntity
+            | XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
             _ => unreachable!(),
         }
+        let external_id = (*ent).external_id.load(Ordering::Relaxed);
+        let system_id = (*ent).system_id.load(Ordering::Relaxed);
+        let content = (*ent).content.load(Ordering::Relaxed);
         let ret: XmlEntityPtr = xml_add_doc_entity(
             doc,
-            (*ent).name.load(Ordering::Relaxed),
-            (*ent).etype.map_or(0, |e| e as i32),
-            (*ent).external_id.load(Ordering::Relaxed),
-            (*ent).system_id.load(Ordering::Relaxed),
-            (*ent).content.load(Ordering::Relaxed),
+            &(*ent).name().unwrap(),
+            (*ent).etype,
+            (!external_id.is_null())
+                .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
+                .as_deref(),
+            (!system_id.is_null())
+                .then(|| CStr::from_ptr(system_id as *const i8).to_string_lossy())
+                .as_deref(),
+            (!content.is_null())
+                .then(|| CStr::from_ptr(content as *const i8).to_string_lossy())
+                .as_deref(),
         );
         if !ret.is_null() {
             if !(*ent).uri.load(Ordering::Relaxed).is_null() {
@@ -695,16 +704,16 @@ extern "C" fn xml_xinclude_merge_entity(ent: XmlEntityPtr, vdata: *mut c_void) {
                 );
             }
         } else {
-            prev = xml_get_doc_entity(doc, (*ent).name.load(Ordering::Relaxed));
+            prev = xml_get_doc_entity(doc, &(*ent).name().unwrap());
             if !prev.is_null() {
                 let error = || {
                     match (*ent).etype {
-                        Some(XmlEntityType::XmlInternalParameterEntity)
-                        | Some(XmlEntityType::XmlExternalParameterEntity)
-                        | Some(XmlEntityType::XmlInternalPredefinedEntity)
-                        | Some(XmlEntityType::XmlInternalGeneralEntity)
-                        | Some(XmlEntityType::XmlExternalGeneralParsedEntity) => return,
-                        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {}
+                        XmlEntityType::XmlInternalParameterEntity
+                        | XmlEntityType::XmlExternalParameterEntity
+                        | XmlEntityType::XmlInternalPredefinedEntity
+                        | XmlEntityType::XmlInternalGeneralEntity
+                        | XmlEntityType::XmlExternalGeneralParsedEntity => return,
+                        XmlEntityType::XmlExternalGeneralUnparsedEntity => {}
                         _ => unreachable!(),
                     }
                     xml_xinclude_err!(
@@ -802,7 +811,7 @@ unsafe extern "C" fn xml_xinclude_merge_entities(
         if cur.is_null() {
             return -1;
         }
-        target = xml_create_int_subset(doc, (*cur).name, None, None);
+        target = xml_create_int_subset(doc, (*cur).name().as_deref(), None, None);
         if target.is_null() {
             return -1;
         }

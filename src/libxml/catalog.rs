@@ -199,7 +199,7 @@ const XML_SGML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/sgml/c
 /// The namespace for the XML Catalogs elements.
 pub(crate) const XML_CATALOGS_NAMESPACE: &CStr = c"urn:oasis:names:tc:entity:xmlns:xml:catalog";
 /// The specific XML Catalog Processing Instruction name.
-pub(crate) const XML_CATALOG_PI: &CStr = c"oasis-xml-catalog";
+pub(crate) const XML_CATALOG_PI: &str = "oasis-xml-catalog";
 
 /// The API is voluntarily limited to general cataloging.
 #[repr(C)]
@@ -1947,14 +1947,14 @@ impl XmlCatalogEntry {
         }
         let dtd: XmlDtdPtr = xml_new_dtd(
             doc,
-            c"catalog".as_ptr() as _,
+            Some("catalog"),
             Some("-//OASIS//DTD Entity Resolution XML Catalog V1.0//EN"),
             Some("http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd"),
         );
 
         (*doc).add_child(dtd as _);
 
-        let ns: XmlNsPtr = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, null_mut());
+        let ns: XmlNsPtr = xml_new_ns(null_mut(), XML_CATALOGS_NAMESPACE.as_ptr() as _, None);
         if ns.is_null() {
             xml_free_doc(doc);
             return -1;

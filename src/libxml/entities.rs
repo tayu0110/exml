@@ -29,7 +29,7 @@ use std::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
-use libc::{memset, size_t, snprintf, strchr};
+use libc::{size_t, snprintf, strchr};
 
 use crate::{
     buf::libxml_api::{
@@ -44,10 +44,7 @@ use crate::{
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{xml_free, xml_malloc},
         hash::{xml_hash_create, xml_hash_scan, XmlHashTable},
-        xmlstring::{
-            xml_str_equal, xml_strcasecmp, xml_strchr, xml_strdup, xml_strlen, xml_strndup,
-            xml_strstr, XmlChar,
-        },
+        xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
     tree::{
         xml_free_node_list, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
@@ -59,8 +56,9 @@ use super::{chvalid::xml_is_char, dict::XmlDictRef, hash::CVoidWrapper};
 
 /// The different valid entity types.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlEntityType {
+    #[default]
     XmlInternalGeneralEntity = 1,
     XmlExternalGeneralParsedEntity = 2,
     XmlExternalGeneralUnparsedEntity = 3,
@@ -97,6 +95,7 @@ impl TryFrom<i32> for XmlEntityType {
 /// the value and the linkind data needed for the linking in the hash table.
 pub type XmlEntityPtr = *mut XmlEntity;
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlEntity {
     pub(crate) _private: AtomicPtr<c_void>,  /* application data */
     pub(crate) typ: XmlElementType,          /* XML_ENTITY_DECL, must be second ! */
@@ -111,7 +110,7 @@ pub struct XmlEntity {
     pub(crate) orig: AtomicPtr<XmlChar>, /* content without ref substitution */
     pub(crate) content: AtomicPtr<XmlChar>, /* content or ndata if unparsed */
     pub(crate) length: i32,              /* the content length */
-    pub(crate) etype: Option<XmlEntityType>, /* The entity type */
+    pub(crate) etype: XmlEntityType,     /* The entity type */
     pub(crate) external_id: AtomicPtr<XmlChar>, /* External identifier for PUBLIC */
     pub(crate) system_id: AtomicPtr<XmlChar>, /* URI for a SYSTEM or PUBLIC Entity */
 
@@ -190,42 +189,54 @@ unsafe fn xml_entities_err_memory(extra: &str) {
 
 /// internal routine doing the entity node structures allocations
 #[doc(alias = "xmlCreateEntity")]
-unsafe extern "C" fn xml_create_entity(
+unsafe fn xml_create_entity(
     dict: XmlDictPtr,
-    name: *const XmlChar,
-    typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     let ret: XmlEntityPtr = xml_malloc(size_of::<XmlEntity>()) as XmlEntityPtr;
     if ret.is_null() {
         xml_entities_err_memory("xmlCreateEntity: malloc failed");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlEntity>());
+    std::ptr::write(&mut *ret, XmlEntity::default());
     (*ret).typ = XmlElementType::XmlEntityDecl;
 
-    /*
-     * fill the structure.
-     */
-    (*ret).etype = typ.try_into().ok();
+    // fill the structure.
+    let name = CString::new(name).unwrap();
+    (*ret).etype = typ;
     if dict.is_null() {
-        (*ret).name = AtomicPtr::new(xml_strdup(name) as _);
-        if !external_id.is_null() {
-            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id) as _);
+        (*ret).name = AtomicPtr::new(xml_strdup(name.as_ptr() as *const u8) as _);
+        if let Some(external_id) = external_id {
+            let external_id = CString::new(external_id).unwrap();
+            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
         }
-        if !system_id.is_null() {
-            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id) as _);
+        if let Some(system_id) = system_id {
+            let system_id = CString::new(system_id).unwrap();
+            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
         }
     } else {
-        (*ret).name = AtomicPtr::new(xml_dict_lookup(dict, name, -1) as _);
-        (*ret).external_id = AtomicPtr::new(xml_strdup(external_id) as _);
-        (*ret).system_id = AtomicPtr::new(xml_strdup(system_id) as _);
+        (*ret).name = AtomicPtr::new(xml_dict_lookup(dict, name.as_ptr() as *const u8, -1) as _);
+        if let Some(external_id) = external_id {
+            let external_id = CString::new(external_id).unwrap();
+            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
+        } else {
+            (*ret).external_id = AtomicPtr::new(null_mut());
+        }
+        if let Some(system_id) = system_id {
+            let system_id = CString::new(system_id).unwrap();
+            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
+        } else {
+            (*ret).system_id = AtomicPtr::new(null_mut());
+        }
     }
-    if !content.is_null() {
-        (*ret).length = xml_strlen(content);
-        (*ret).content = AtomicPtr::new(xml_strndup(content, (*ret).length));
+    if let Some(content) = content {
+        (*ret).length = content.len() as i32;
+        let content = CString::new(content).unwrap();
+        (*ret).content = AtomicPtr::new(xml_strndup(content.as_ptr() as *const u8, (*ret).length));
     } else {
         (*ret).length = 0;
         (*ret).content = AtomicPtr::new(null_mut());
@@ -246,13 +257,13 @@ unsafe extern "C" fn xml_create_entity(
 ///
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlNewEntity")]
-pub unsafe extern "C" fn xml_new_entity(
+pub unsafe fn xml_new_entity(
     doc: XmlDocPtr,
-    name: *const XmlChar,
-    typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     if !doc.is_null() && !(*doc).int_subset.is_null() {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
@@ -284,7 +295,7 @@ macro_rules! xml_entities_warn {
     };
     ($code:expr, $msg:literal, $str1:expr) => {
         let msg = format!($msg, $str1);
-        xml_entities_warn!(@inner $code, &msg, Some($str1.into()));
+        xml_entities_warn!(@inner $code, &msg, Some($str1.to_owned().into()));
     };
     (@inner $code:expr, $msg:expr, $str1:expr) => {
         __xml_raise_error!(
@@ -360,21 +371,18 @@ unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
 
 /// Register a new entity for an entities table.
 #[doc(alias = "xmlAddEntity")]
-unsafe extern "C" fn xml_add_entity(
+unsafe fn xml_add_entity(
     dtd: XmlDtdPtr,
-    name: *const XmlChar,
-    typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     let mut dict: XmlDictPtr = null_mut();
     let mut table = None;
     let predef: XmlEntityPtr;
 
-    if name.is_null() {
-        return null_mut();
-    }
     if dtd.is_null() {
         return null_mut();
     }
@@ -382,39 +390,35 @@ unsafe extern "C" fn xml_add_entity(
         dict = (*(*dtd).doc).dict;
     }
 
-    let name = CString::new(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref()).unwrap();
-    match XmlEntityType::try_from(typ) {
-        Ok(XmlEntityType::XmlInternalGeneralEntity)
-        | Ok(XmlEntityType::XmlExternalGeneralParsedEntity)
-        | Ok(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
-            predef = xml_get_predefined_entity(name.as_ptr() as *const u8);
+    match typ {
+        XmlEntityType::XmlInternalGeneralEntity
+        | XmlEntityType::XmlExternalGeneralParsedEntity
+        | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
+            predef = xml_get_predefined_entity(name);
             if !predef.is_null() {
                 let mut valid: i32 = 0;
 
-                /* 4.6 Predefined Entities */
-                if typ == XmlEntityType::XmlInternalGeneralEntity as i32 && !content.is_null() {
-                    let c: i32 = *(*predef).content.load(Ordering::Relaxed).add(0) as _;
-
-                    if (*content.add(0) as i32 == c && *content.add(1) == 0)
-                        && (c == b'>' as i32 || c == b'\'' as i32 || c == b'"' as i32)
-                    {
-                        valid = 1;
-                    } else if *content.add(0) == b'&' && *content.add(1) == b'#' {
-                        if *content.add(2) == b'x' {
-                            let hex: *mut XmlChar = c"0123456789ABCDEF".as_ptr() as _;
-                            let refe = [
-                                *hex.add(c as usize / 16 % 16),
-                                *hex.add(c as usize % 16),
-                                b';',
-                                0,
-                            ];
-                            if xml_strcasecmp(content.add(3) as _, refe.as_ptr()) == 0 {
-                                valid = 1;
-                            }
-                        } else {
-                            let refe = [b'0' + (c / 10 % 10) as u8, b'0' + (c % 10) as u8, b';', 0];
-                            if xml_str_equal(content.add(2) as _, refe.as_ptr()) {
-                                valid = 1;
+                // 4.6 Predefined Entities
+                if typ == XmlEntityType::XmlInternalGeneralEntity {
+                    if let Some(content) = content {
+                        let c = *(*predef).content.load(Ordering::Relaxed).add(0);
+                        if content.as_bytes() == [c]
+                            && (content == ">" || content == "\'" || content == "\"")
+                        {
+                            valid = 1;
+                        } else if let Some(content) = content.strip_prefix("&#") {
+                            if content.starts_with('x') {
+                                let hex = b"0123456789ABCDEF";
+                                let refe = [hex[c as usize >> 4], hex[c as usize & 0xF], b';'];
+                                if content.as_bytes()[1..].eq_ignore_ascii_case(&refe) {
+                                    valid = 1;
+                                }
+                            } else {
+                                let refe =
+                                    [b'0' + (c / 10 % 10) as u8, b'0' + (c % 10) as u8, b';'];
+                                if content.as_bytes() == refe {
+                                    valid = 1;
+                                }
                             }
                         }
                     }
@@ -423,7 +427,7 @@ unsafe extern "C" fn xml_add_entity(
                     xml_entities_warn!(
                         XmlParserErrors::XmlErrEntityProcessing,
                         "xmlAddEntity: invalid redeclaration of predefined entity '{}'",
-                        name.to_string_lossy().into_owned()
+                        name
                     );
                     return null_mut();
                 }
@@ -435,8 +439,7 @@ unsafe extern "C" fn xml_add_entity(
             }
             table = (*dtd).entities;
         }
-        Ok(XmlEntityType::XmlInternalParameterEntity)
-        | Ok(XmlEntityType::XmlExternalParameterEntity) => {
+        XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity => {
             if (*dtd).pentities.is_none() {
                 let dict = XmlDictRef::from_raw(dict);
                 let table = XmlHashTable::with_capacity_dict(0, dict);
@@ -444,7 +447,7 @@ unsafe extern "C" fn xml_add_entity(
             }
             table = (*dtd).pentities;
         }
-        Ok(XmlEntityType::XmlInternalPredefinedEntity) => {
+        XmlEntityType::XmlInternalPredefinedEntity => {
             return null_mut();
         }
         _ => {}
@@ -452,20 +455,13 @@ unsafe extern "C" fn xml_add_entity(
     let Some(mut table) = table else {
         return null_mut();
     };
-    let ret: XmlEntityPtr = xml_create_entity(
-        dict,
-        name.as_ptr() as *const u8,
-        typ,
-        external_id,
-        system_id,
-        content,
-    );
+    let ret: XmlEntityPtr = xml_create_entity(dict, name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
 
-    if table.add_entry(&name, ret).is_err() {
+    if table.add_entry(&CString::new(name).unwrap(), ret).is_err() {
         // entity was already defined at another level.
         xml_free_entity(ret);
         return null_mut();
@@ -477,13 +473,13 @@ unsafe extern "C" fn xml_add_entity(
 ///
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlAddDocEntity")]
-pub unsafe extern "C" fn xml_add_doc_entity(
+pub unsafe fn xml_add_doc_entity(
     doc: XmlDocPtr,
-    name: *const XmlChar,
-    typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     if doc.is_null() {
         xml_entities_err(
@@ -523,13 +519,13 @@ pub unsafe extern "C" fn xml_add_doc_entity(
 ///
 /// Returns a pointer to the entity or NULL in case of error
 #[doc(alias = "xmlAddDtdEntity")]
-pub unsafe extern "C" fn xml_add_dtd_entity(
+pub unsafe fn xml_add_dtd_entity(
     doc: XmlDocPtr,
-    name: *const XmlChar,
-    typ: i32,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) -> XmlEntityPtr {
     if doc.is_null() {
         xml_entities_err(
@@ -551,9 +547,7 @@ pub unsafe extern "C" fn xml_add_dtd_entity(
         return null_mut();
     }
 
-    /*
-     * Link it to the DTD
-     */
+    // Link it to the DTD
     (*ret).parent = dtd.into();
     (*ret).doc = (*dtd).doc.into();
     if let Some(mut last) = (*dtd).last {
@@ -582,7 +576,7 @@ static mut XML_ENTITY_LT: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"<".as_ptr() as _),
     content: AtomicPtr::new(c"<".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -604,7 +598,7 @@ static mut XML_ENTITY_GT: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c">".as_ptr() as _),
     content: AtomicPtr::new(c">".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -626,7 +620,7 @@ static mut XML_ENTITY_AMP: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"&".as_ptr() as _),
     content: AtomicPtr::new(c"&".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -648,7 +642,7 @@ static mut XML_ENTITY_QUOT: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"\"".as_ptr() as _),
     content: AtomicPtr::new(c"\"".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -670,7 +664,7 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
     orig: AtomicPtr::new(c"'".as_ptr() as _),
     content: AtomicPtr::new(c"'".as_ptr() as _),
     length: 1,
-    etype: Some(XmlEntityType::XmlInternalPredefinedEntity),
+    etype: XmlEntityType::XmlInternalPredefinedEntity,
     external_id: AtomicPtr::new(null_mut()),
     system_id: AtomicPtr::new(null_mut()),
     nexte: AtomicPtr::new(null_mut()),
@@ -684,37 +678,15 @@ static mut XML_ENTITY_APOS: XmlEntity = XmlEntity {
 ///
 /// Returns NULL if not, otherwise the entity
 #[doc(alias = "xmlGetPredefinedEntity")]
-pub unsafe extern "C" fn xml_get_predefined_entity(name: *const XmlChar) -> XmlEntityPtr {
-    if name.is_null() {
-        return null_mut();
+pub unsafe fn xml_get_predefined_entity(name: &str) -> XmlEntityPtr {
+    match name {
+        "lt" => addr_of_mut!(XML_ENTITY_LT),
+        "gt" => addr_of_mut!(XML_ENTITY_GT),
+        "amp" => addr_of_mut!(XML_ENTITY_AMP),
+        "apos" => addr_of_mut!(XML_ENTITY_APOS),
+        "quot" => addr_of_mut!(XML_ENTITY_QUOT),
+        _ => null_mut(),
     }
-    match *name.add(0) {
-        b'l' => {
-            if xml_str_equal(name, c"lt".as_ptr() as _) {
-                return addr_of_mut!(XML_ENTITY_LT);
-            }
-        }
-        b'g' => {
-            if xml_str_equal(name, c"gt".as_ptr() as _) {
-                return addr_of_mut!(XML_ENTITY_GT);
-            }
-        }
-        b'a' => {
-            if xml_str_equal(name, c"amp".as_ptr() as _) {
-                return addr_of_mut!(XML_ENTITY_AMP);
-            }
-            if xml_str_equal(name, c"apos".as_ptr() as _) {
-                return addr_of_mut!(XML_ENTITY_APOS);
-            }
-        }
-        b'q' => {
-            if xml_str_equal(name, c"quot".as_ptr() as _) {
-                return addr_of_mut!(XML_ENTITY_QUOT);
-            }
-        }
-        _ => {}
-    }
-    null_mut()
 }
 
 /// Do an entity lookup in the table.
@@ -724,10 +696,10 @@ pub unsafe extern "C" fn xml_get_predefined_entity(name: *const XmlChar) -> XmlE
 #[doc(alias = "xmlGetEntityFromTable")]
 unsafe fn xml_get_entity_from_table(
     table: XmlHashTableRef<'static, XmlEntityPtr>,
-    name: *const XmlChar,
+    name: &str,
 ) -> XmlEntityPtr {
     table
-        .lookup(CStr::from_ptr(name as *const i8))
+        .lookup(&CString::new(name).unwrap())
         .map_or(null_mut(), |p| *p)
 }
 
@@ -737,10 +709,7 @@ unsafe fn xml_get_entity_from_table(
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDocEntity")]
-pub unsafe extern "C" fn xml_get_doc_entity(
-    doc: *const XmlDoc,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+pub unsafe fn xml_get_doc_entity(doc: *const XmlDoc, name: &str) -> XmlEntityPtr {
     if !doc.is_null() {
         if !(*doc).int_subset.is_null() {
             if let Some(table) = (*(*doc).int_subset).entities {
@@ -768,7 +737,7 @@ pub unsafe extern "C" fn xml_get_doc_entity(
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetDtdEntity")]
-pub unsafe extern "C" fn xml_get_dtd_entity(doc: XmlDocPtr, name: *const XmlChar) -> XmlEntityPtr {
+pub unsafe fn xml_get_dtd_entity(doc: XmlDocPtr, name: &str) -> XmlEntityPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -785,10 +754,7 @@ pub unsafe extern "C" fn xml_get_dtd_entity(doc: XmlDocPtr, name: *const XmlChar
 ///
 /// Returns A pointer to the entity structure or NULL if not found.
 #[doc(alias = "xmlGetParameterEntity")]
-pub unsafe extern "C" fn xml_get_parameter_entity(
-    doc: XmlDocPtr,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+pub unsafe fn xml_get_parameter_entity(doc: XmlDocPtr, name: &str) -> XmlEntityPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -1273,7 +1239,7 @@ extern "C" fn xml_copy_entity(ent: XmlEntityPtr) -> XmlEntityPtr {
             xml_entities_err_memory("xmlCopyEntity:: malloc failed");
             return null_mut();
         }
-        memset(cur as _, 0, size_of::<XmlEntity>());
+        std::ptr::write(&mut *cur, XmlEntity::default());
         (*cur).typ = XmlElementType::XmlEntityDecl;
 
         (*cur).etype = (*ent).etype;
@@ -1397,7 +1363,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
         return;
     }
     match (*ent).etype {
-        Some(XmlEntityType::XmlInternalGeneralEntity) => {
+        XmlEntityType::XmlInternalGeneralEntity => {
             xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             xml_buf_ccat(buf, c" ".as_ptr() as _);
@@ -1408,7 +1374,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlExternalGeneralParsedEntity) => {
+        XmlEntityType::XmlExternalGeneralParsedEntity => {
             xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
@@ -1422,7 +1388,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+        XmlEntityType::XmlExternalGeneralUnparsedEntity => {
             xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
@@ -1445,7 +1411,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlInternalParameterEntity) => {
+        XmlEntityType::XmlInternalParameterEntity => {
             xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             xml_buf_ccat(buf, c" ".as_ptr() as _);
@@ -1456,7 +1422,7 @@ pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr)
             }
             xml_buf_ccat(buf, c">\n".as_ptr() as _);
         }
-        Some(XmlEntityType::XmlExternalParameterEntity) => {
+        XmlEntityType::XmlExternalParameterEntity => {
             xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
             xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
@@ -1506,134 +1472,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_add_doc_entity() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_type in 0..GEN_NB_INT {
-                        for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                                    let name = gen_const_xml_char_ptr(n_name, 1);
-                                    let typ = gen_int(n_type, 2);
-                                    let external_id = gen_const_xml_char_ptr(n_external_id, 3);
-                                    let system_id = gen_const_xml_char_ptr(n_system_id, 4);
-                                    let content = gen_const_xml_char_ptr(n_content, 5);
-
-                                    let ret_val = xml_add_doc_entity(
-                                        doc,
-                                        name,
-                                        typ,
-                                        external_id,
-                                        system_id,
-                                        content,
-                                    );
-                                    desret_xml_entity_ptr(ret_val);
-                                    des_xml_doc_ptr(n_doc, doc, 0);
-                                    des_const_xml_char_ptr(n_name, name, 1);
-                                    des_int(n_type, typ, 2);
-                                    des_const_xml_char_ptr(n_external_id, external_id, 3);
-                                    des_const_xml_char_ptr(n_system_id, system_id, 4);
-                                    des_const_xml_char_ptr(n_content, content, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlAddDocEntity",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        eprint!(" {}", n_doc);
-                                        eprint!(" {}", n_name);
-                                        eprint!(" {}", n_type);
-                                        eprint!(" {}", n_system_id);
-                                        eprint!(" {}", n_system_id);
-                                        eprintln!(" {}", n_content);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlAddDocEntity()");
-        }
-    }
-
-    #[test]
-    fn test_xml_add_dtd_entity() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_type in 0..GEN_NB_INT {
-                        for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                                    let name = gen_const_xml_char_ptr(n_name, 1);
-                                    let typ = gen_int(n_type, 2);
-                                    let external_id = gen_const_xml_char_ptr(n_external_id, 3);
-                                    let system_id = gen_const_xml_char_ptr(n_system_id, 4);
-                                    let content = gen_const_xml_char_ptr(n_content, 5);
-
-                                    let ret_val = xml_add_dtd_entity(
-                                        doc,
-                                        name,
-                                        typ,
-                                        external_id,
-                                        system_id,
-                                        content,
-                                    );
-                                    desret_xml_entity_ptr(ret_val);
-                                    des_xml_doc_ptr(n_doc, doc, 0);
-                                    des_const_xml_char_ptr(n_name, name, 1);
-                                    des_int(n_type, typ, 2);
-                                    des_const_xml_char_ptr(n_external_id, external_id, 3);
-                                    des_const_xml_char_ptr(n_system_id, system_id, 4);
-                                    des_const_xml_char_ptr(n_content, content, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlAddDtdEntity",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        eprint!(" {}", n_doc);
-                                        eprint!(" {}", n_name);
-                                        eprint!(" {}", n_type);
-                                        eprint!(" {}", n_external_id);
-                                        eprint!(" {}", n_system_id);
-                                        eprintln!(" {}", n_content);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlAddDtdEntity()");
-        }
-    }
-
-    #[test]
-    fn test_xml_copy_entities_table() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_create_entities_table() {
-
-        /* missing type support */
-    }
 
     #[test]
     fn test_xml_dump_entities_table() {
@@ -1765,223 +1603,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlEncodeSpecialChars()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_get_doc_entity() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_get_doc_entity(doc, name);
-                    desret_xml_entity_ptr(ret_val);
-                    des_const_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetDocEntity",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlGetDocEntity()");
-        }
-    }
-
-    #[test]
-    fn test_xml_get_dtd_entity() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_get_dtd_entity(doc, name);
-                    desret_xml_entity_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetDtdEntity",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlGetDtdEntity()");
-        }
-    }
-
-    #[test]
-    fn test_xml_get_parameter_entity() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_get_parameter_entity(doc, name);
-                    desret_xml_entity_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlGetParameterEntity",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlGetParameterEntity()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_get_predefined_entity() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let name = gen_const_xml_char_ptr(n_name, 0);
-
-                let ret_val = xml_get_predefined_entity(name as *const XmlChar);
-                desret_xml_entity_ptr(ret_val);
-                des_const_xml_char_ptr(n_name, name, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlGetPredefinedEntity",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_name);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlGetPredefinedEntity()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_new_entity() {
-        unsafe {
-            let mut leaks = 0;
-
-            let n_doc = 2;
-            let n_name = 2;
-            let n_type = 1;
-            let n_external_id = 0;
-            let n_system_id = 0;
-            let n_content = 0;
-            let mem_base = xml_mem_blocks();
-            let doc = gen_xml_doc_ptr(n_doc, 0);
-            let name = gen_const_xml_char_ptr(n_name, 1);
-            let typ = gen_int(n_type, 2);
-            let external_id = gen_const_xml_char_ptr(n_external_id, 3);
-            let system_id = gen_const_xml_char_ptr(n_system_id, 4);
-            let content = gen_const_xml_char_ptr(n_content, 5);
-
-            let ret_val = xml_new_entity(doc, name, typ, external_id, system_id, content);
-            desret_xml_entity_ptr(ret_val);
-            des_xml_doc_ptr(n_doc, doc, 0);
-            des_const_xml_char_ptr(n_name, name, 1);
-            des_int(n_type, typ, 2);
-            des_const_xml_char_ptr(n_external_id, external_id, 3);
-            des_const_xml_char_ptr(n_system_id, system_id, 4);
-            des_const_xml_char_ptr(n_content, content, 5);
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprint!(
-                    "Leak of {} blocks found in xmlNewEntity",
-                    xml_mem_blocks() - mem_base
-                );
-                eprint!(" {}", n_doc);
-                eprint!(" {}", n_name);
-                eprint!(" {}", n_type);
-                eprint!(" {}", n_external_id);
-                eprint!(" {}", n_system_id);
-                eprintln!(" {}", n_content);
-            }
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_type in 0..GEN_NB_INT {
-                        for n_external_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_system_id in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                                    let name = gen_const_xml_char_ptr(n_name, 1);
-                                    let typ = gen_int(n_type, 2);
-                                    let external_id = gen_const_xml_char_ptr(n_external_id, 3);
-                                    let system_id = gen_const_xml_char_ptr(n_system_id, 4);
-                                    let content = gen_const_xml_char_ptr(n_content, 5);
-
-                                    let ret_val = xml_new_entity(
-                                        doc,
-                                        name,
-                                        typ,
-                                        external_id,
-                                        system_id,
-                                        content,
-                                    );
-                                    desret_xml_entity_ptr(ret_val);
-                                    des_xml_doc_ptr(n_doc, doc, 0);
-                                    des_const_xml_char_ptr(n_name, name, 1);
-                                    des_int(n_type, typ, 2);
-                                    des_const_xml_char_ptr(n_external_id, external_id, 3);
-                                    des_const_xml_char_ptr(n_system_id, system_id, 4);
-                                    des_const_xml_char_ptr(n_content, content, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlNewEntity",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        eprint!(" {}", n_doc);
-                                        eprint!(" {}", n_name);
-                                        eprint!(" {}", n_type);
-                                        eprint!(" {}", n_external_id);
-                                        eprint!(" {}", n_system_id);
-                                        eprintln!(" {}", n_content);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewEntity()");
         }
     }
 }

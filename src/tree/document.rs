@@ -247,12 +247,12 @@ impl XmlDoc {
                     if cur != q {
                         // Predefined entities don't generate nodes
                         val = xml_strndup(q, cur.offset_from(q) as _);
-                        ent = xml_get_doc_entity(self, val);
+                        ent = xml_get_doc_entity(
+                            self,
+                            CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
+                        );
                         if ent.is_null()
-                            && matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            )
+                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
                             if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
                                 // goto out;
@@ -291,7 +291,10 @@ impl XmlDoc {
                             }
 
                             // Create a new REFERENCE_REF node
-                            node = xml_new_reference(self, val);
+                            node = xml_new_reference(
+                                self,
+                                &CStr::from_ptr(val as *const i8).to_string_lossy(),
+                            );
                             if node.is_null() {
                                 // goto out;
                                 xml_buf_free(buf);
@@ -537,12 +540,12 @@ impl XmlDoc {
                     if cur != q {
                         // Predefined entities don't generate nodes
                         val = xml_strndup(q, cur.offset_from(q) as _);
-                        ent = xml_get_doc_entity(self, val);
+                        ent = xml_get_doc_entity(
+                            self,
+                            CStr::from_ptr(val as *const i8).to_string_lossy().as_ref(),
+                        );
                         if !ent.is_null()
-                            && matches!(
-                                (*ent).etype,
-                                Some(XmlEntityType::XmlInternalPredefinedEntity)
-                            )
+                            && matches!((*ent).etype, XmlEntityType::XmlInternalPredefinedEntity)
                         {
                             if xml_buf_cat(buf, (*ent).content.load(Ordering::Relaxed)) != 0 {
                                 // goto out;
@@ -572,7 +575,10 @@ impl XmlDoc {
                             }
 
                             // Create a new REFERENCE_REF node
-                            node = xml_new_reference(self, val);
+                            node = xml_new_reference(
+                                self,
+                                &CStr::from_ptr(val as *const i8).to_string_lossy(),
+                            );
                             if node.is_null() {
                                 if !val.is_null() {
                                     xml_free(val as _);

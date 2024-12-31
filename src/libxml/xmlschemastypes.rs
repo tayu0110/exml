@@ -2952,15 +2952,21 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
 
                                     strip = xml_schema_strip(value);
                                     if !strip.is_null() {
-                                        ent = xml_get_doc_entity((*node).doc, strip);
+                                        ent = xml_get_doc_entity(
+                                            (*node).doc,
+                                            &CStr::from_ptr(strip as *const i8).to_string_lossy(),
+                                        );
                                         xml_free(strip as _);
                                     } else {
-                                        ent = xml_get_doc_entity((*node).doc, value);
+                                        ent = xml_get_doc_entity(
+                                            (*node).doc,
+                                            &CStr::from_ptr(value as *const i8).to_string_lossy(),
+                                        );
                                     }
                                     if ent.is_null()
                                         || !matches!(
                                             (*ent).etype,
-                                            Some(XmlEntityType::XmlExternalGeneralUnparsedEntity)
+                                            XmlEntityType::XmlExternalGeneralUnparsedEntity
                                         )
                                     {
                                         ret = 4;

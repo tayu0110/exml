@@ -1502,7 +1502,7 @@ unsafe extern "C" fn xml_schematron_format_report(
                 }
             }
 
-            if (*node).ns.is_null() || (*(*node).ns).prefix.is_null() {
+            if (*node).ns.is_null() || (*(*node).ns).prefix().is_none() {
                 ret = xml_strcat(ret, (*node).name);
             } else {
                 ret = xml_strcat(ret, (*(*node).ns).prefix);

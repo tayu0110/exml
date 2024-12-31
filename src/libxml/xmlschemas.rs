@@ -25,7 +25,7 @@ use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
     fmt::Write as _,
-    mem::size_of,
+    mem::{size_of, take},
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
     rc::Rc,
@@ -47,7 +47,7 @@ use crate::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         entities::XmlEntityPtr,
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_create_dict,
             xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_scan, XmlHashTablePtr,
@@ -142,11 +142,14 @@ use crate::{
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
-        XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
+        XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
+
+use super::entities::XmlEntityType;
 
 /// This error codes are obsolete; not used any more.
 #[repr(C)]
@@ -1226,7 +1229,7 @@ pub struct XmlSchemaValidCtxt {
     doc: XmlDocPtr,
     input: Option<Rc<RefCell<XmlParserInputBuffer>>>,
     enc: XmlCharEncoding,
-    sax: XmlSAXHandlerPtr,
+    // sax: XmlSAXHandlerPtr,
     parser_ctxt: XmlParserCtxtPtr,
     user_data: *mut c_void, /* TODO: What is this for? */
     filename: *mut c_char,
@@ -2364,11 +2367,11 @@ unsafe extern "C" fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) 
     }
 }
 
-unsafe extern "C" fn xml_schema_lookup_namespace(
+unsafe fn xml_schema_lookup_namespace(
     vctxt: XmlSchemaValidCtxtPtr,
     prefix: *const XmlChar,
 ) -> *const XmlChar {
-    if !(*vctxt).sax.is_null() {
+    if !(*vctxt).parser_ctxt.is_null() && (*(*vctxt).parser_ctxt).sax.is_some() {
         let mut inode: XmlSchemaNodeInfoPtr;
 
         for i in (0..=(*vctxt).depth).rev() {
@@ -2379,10 +2382,8 @@ unsafe extern "C" fn xml_schema_lookup_namespace(
                         || (!prefix.is_null()
                             && xml_str_equal(prefix, *(*inode).ns_bindings.add(j as usize)))
                     {
-                        /*
-                         * Note that the namespace bindings are already
-                         * in a string dict.
-                         */
+                        // Note that the namespace bindings are already
+                        // in a string dict.
                         return *(*inode).ns_bindings.add(j as usize + 1);
                     }
                 }
@@ -24480,7 +24481,8 @@ unsafe extern "C" fn xml_schema_get_fresh_attr_info(
     iattr
 }
 
-unsafe extern "C" fn xml_schema_validator_push_attribute(
+#[allow(clippy::too_many_arguments)]
+unsafe fn xml_schema_validator_push_attribute(
     vctxt: XmlSchemaValidCtxtPtr,
     attr_node: XmlNodePtr,
     node_line: i32,
@@ -24507,9 +24509,7 @@ unsafe extern "C" fn xml_schema_validator_push_attribute(
     if owned_names != 0 {
         (*attr).flags |= XML_SCHEMA_NODE_INFO_FLAG_OWNED_NAMES;
     }
-    /*
-     * Evaluate if it's an XSI attribute.
-     */
+    // Evaluate if it's an XSI attribute.
     if !ns_name.is_null() {
         if xml_str_equal(local_name, c"nil".as_ptr() as _) {
             if xml_str_equal((*attr).ns_name, XML_SCHEMA_INSTANCE_NS.as_ptr() as _) {
@@ -27304,44 +27304,33 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
 
                                     !ns.is_null()
                                 } {}
-                                let prefix = CString::new(prefix).unwrap();
                                 ns = xml_new_ns(
                                     (*vctxt).validation_root,
                                     (*iattr).ns_name,
-                                    prefix.as_ptr() as *const u8,
+                                    Some(&prefix),
                                 );
                             }
-                            /*
-                             * TODO:
-                             * http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html
-                             * If we have QNames: do we need to ensure there's a
-                             * prefix defined for the QName?
-                             */
+                            // TODO:
+                            // http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html
+                            // If we have QNames: do we need to ensure there's a
+                            // prefix defined for the QName?
                             xml_new_ns_prop(def_attr_owner_elem, ns, (*iattr).local_name, value);
                         }
                         if !norm_value.is_null() {
                             xml_free(norm_value as _);
                         }
                     }
-                    /*
-                     * Go directly to IDC evaluation.
-                     */
+                    // Go directly to IDC evaluation.
                     break 'eval_idcs;
                 }
-                /*
-                 * Validate the value.
-                 */
+                // Validate the value.
                 if !(*vctxt).value.is_null() {
-                    /*
-                     * Free last computed value; just for safety reasons.
-                     */
+                    // Free last computed value; just for safety reasons.
                     xml_schema_free_value((*vctxt).value);
                     (*vctxt).value = null_mut();
                 }
-                /*
-                 * Note that the attribute *use* can be unavailable, if
-                 * the attribute was a wild attribute.
-                 */
+                // Note that the attribute *use* can be unavailable,
+                // if the attribute was a wild attribute.
                 if (*(*iattr).decl).flags & XML_SCHEMAS_ATTR_FIXED != 0
                     || (!(*iattr).using.is_null()
                         && (*(*iattr).using).flags & XML_SCHEMAS_ATTR_FIXED != 0)
@@ -29811,16 +29800,14 @@ unsafe extern "C" fn xml_schema_idc_free_matcher_list(mut matcher: XmlSchemaIDCM
 /// Free the resources associated to the schema validation context;
 /// leaves some fields alive intended for reuse of the context.
 #[doc(alias = "xmlSchemaClearValidCtxt")]
-unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
+unsafe fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
     if vctxt.is_null() {
         return;
     }
 
-    /*
-     * TODO: Should we clear the flags?
-     *   Might be problematic if one reuses the context
-     *   and assumes that the options remain the same.
-     */
+    // TODO: Should we clear the flags?
+    //   Might be problematic if one reuses the context
+    //   and assumes that the options remain the same.
     (*vctxt).flags = 0;
     (*vctxt).validation_root = null_mut();
     (*vctxt).doc = null_mut();
@@ -29834,9 +29821,7 @@ unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
         xml_schema_free_value((*vctxt).value);
         (*vctxt).value = null_mut();
     }
-    /*
-     * Augmented IDC information.
-     */
+    // Augmented IDC information.
     if !(*vctxt).aidcs.is_null() {
         let mut cur: XmlSchemaIDCAugPtr = (*vctxt).aidcs;
         let mut next: XmlSchemaIDCAugPtr;
@@ -29873,22 +29858,16 @@ unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
         (*vctxt).size_idc_keys = 0;
     }
 
-    /*
-     * Note that we won't delete the XPath state pool here.
-     */
+    // Note that we won't delete the XPath state pool here.
     if !(*vctxt).xpath_states.is_null() {
         xml_schema_free_idc_state_obj_list((*vctxt).xpath_states);
         (*vctxt).xpath_states = null_mut();
     }
-    /*
-     * Attribute info.
-     */
+    // Attribute info.
     if (*vctxt).nb_attr_infos != 0 {
         xml_schema_clear_attr_infos(vctxt);
     }
-    /*
-     * Element info.
-     */
+    // Element info.
     if !(*vctxt).elem_infos.is_null() {
         let mut ei: XmlSchemaNodeInfoPtr;
 
@@ -29901,12 +29880,10 @@ unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
         }
     }
     xml_schema_item_list_clear((*vctxt).node_qnames);
-    /* Recreate the dict. */
+    // Recreate the dict.
     xml_dict_free((*vctxt).dict);
-    /*
-     * TODO: Is is save to recreate it? Do we have a scenario
-     * where the user provides the dict?
-     */
+    // TODO: Is is save to recreate it? Do we have a scenario
+    // where the user provides the dict?
     (*vctxt).dict = xml_dict_create();
 
     if !(*vctxt).filename.is_null() {
@@ -29914,10 +29891,8 @@ unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
         (*vctxt).filename = null_mut();
     }
 
-    /*
-     * Note that some cleanup functions can move items to the cache,
-     * so the cache shouldn't be freed too early.
-     */
+    // Note that some cleanup functions can move items to the cache,
+    // so the cache shouldn't be freed too early.
     if !(*vctxt).idc_matcher_cache.is_null() {
         let mut matcher: XmlSchemaIDCMatcherPtr = (*vctxt).idc_matcher_cache;
         let mut tmp: XmlSchemaIDCMatcherPtr;
@@ -29931,7 +29906,7 @@ unsafe extern "C" fn xml_schema_clear_valid_ctxt(vctxt: XmlSchemaValidCtxtPtr) {
     }
 }
 
-unsafe extern "C" fn xml_schema_post_run(vctxt: XmlSchemaValidCtxtPtr) {
+unsafe fn xml_schema_post_run(vctxt: XmlSchemaValidCtxtPtr) {
     if (*vctxt).xsi_assemble != 0 && !(*vctxt).schema.is_null() {
         xml_schema_free((*vctxt).schema);
         (*vctxt).schema = null_mut();
@@ -29939,7 +29914,7 @@ unsafe extern "C" fn xml_schema_post_run(vctxt: XmlSchemaValidCtxtPtr) {
     xml_schema_clear_valid_ctxt(vctxt);
 }
 
-unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+unsafe fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
 
     if xml_schema_pre_run(vctxt) < 0 {
@@ -29951,21 +29926,15 @@ unsafe extern "C" fn xml_schema_vstart(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     #[cfg(not(feature = "libxml_reader"))]
     let f = false;
     if !(*vctxt).doc.is_null() {
-        /*
-         * Tree validation.
-         */
+        // Tree validation.
         ret = xml_schema_vdoc_walk(vctxt);
     } else if f {
-        /*
-         * XML Reader validation.
-         */
+        // XML Reader validation.
         // #ifdef XML_SCHEMA_READER_ENABLED
         //     ret = xmlSchemaVReaderWalk(vctxt);
         // #endif
-    } else if !(*vctxt).sax.is_null() && !(*vctxt).parser_ctxt.is_null() {
-        /*
-         * SAX validation.
-         */
+    } else if !(*vctxt).parser_ctxt.is_null() && (*(*vctxt).parser_ctxt).sax.is_some() {
+        // SAX validation.
         ret = xml_parse_document((*vctxt).parser_ctxt);
     } else {
         VERROR_INT!(vctxt, "xmlSchemaVStart", "no instance to validate");
@@ -30078,7 +30047,7 @@ pub unsafe fn xml_schema_validate_stream(
     ctxt: XmlSchemaValidCtxtPtr,
     input: XmlParserInputBuffer,
     enc: XmlCharEncoding,
-    sax: XmlSAXHandlerPtr,
+    sax: Option<Box<XmlSAXHandler>>,
     user_data: Option<GenericErrorContext>,
 ) -> i32 {
     let mut plug: XmlSchemaSAXPlugPtr = null_mut();
@@ -30086,28 +30055,23 @@ pub unsafe fn xml_schema_validate_stream(
 
     let mut ret: i32;
 
-    if ctxt.is_null()
-    // || input.is_null()
-    {
+    if ctxt.is_null() {
         return -1;
     }
 
-    /*
-     * prepare the parser
-     */
-    if !sax.is_null() {
-        pctxt = xml_new_sax_parser_ctxt(sax, user_data);
-        if pctxt.is_null() {
+    // prepare the parser
+    if sax.is_some() {
+        let Ok(new) = xml_new_sax_parser_ctxt(sax, user_data) else {
             return -1;
-        }
+        };
+        pctxt = new;
     } else {
         pctxt = xml_new_parser_ctxt();
         if pctxt.is_null() {
             return -1;
         }
-        /* We really want (*pctxt).sax to be NULL here. */
-        xml_free((*pctxt).sax as _);
-        (*pctxt).sax = null_mut();
+        // We really want (*pctxt).sax to be NULL here.
+        (*pctxt).sax = None;
     }
     (*pctxt).linenumbers = 1;
     xml_schema_validate_set_locator(ctxt, Some(xml_schema_validate_stream_locator), pctxt as _);
@@ -30122,21 +30086,15 @@ pub unsafe fn xml_schema_validate_stream(
         (*ctxt).parser_ctxt = pctxt;
         (*ctxt).input = Some(Rc::clone(&input));
 
-        /*
-         * Plug the validation and launch the parsing
-         */
-        plug = xml_schema_sax_plug(
-            ctxt,
-            addr_of_mut!((*pctxt).sax),
-            addr_of_mut!((*pctxt).user_data),
-        );
+        // Plug the validation and launch the parsing
+        plug = xml_schema_sax_plug(ctxt, &mut (*pctxt).sax, addr_of_mut!((*pctxt).user_data));
         if plug.is_null() {
             ret = -1;
             // goto done;
         } else {
             (*ctxt).input = Some(input);
             (*ctxt).enc = enc;
-            (*ctxt).sax = (*pctxt).sax;
+            // (*ctxt).sax = (*pctxt).sax;
             (*ctxt).flags |= XML_SCHEMA_VALID_CTXT_FLAG_STREAM;
             ret = xml_schema_vstart(ctxt);
 
@@ -30151,12 +30109,12 @@ pub unsafe fn xml_schema_validate_stream(
 
     // done:
     (*ctxt).parser_ctxt = null_mut();
-    (*ctxt).sax = null_mut();
+    // (*ctxt).sax = null_mut();
     (*ctxt).input = None;
     if !plug.is_null() {
         xml_schema_sax_unplug(plug);
     }
-    /* cleanup */
+    // cleanup
     if !pctxt.is_null() {
         xml_free_parser_ctxt(pctxt);
     }
@@ -30169,7 +30127,7 @@ pub unsafe fn xml_schema_validate_stream(
 /// Returns 0 if the document is valid, a positive error code
 /// number otherwise and -1 in case of an internal or API error.
 #[doc(alias = "xmlSchemaValidateFile")]
-pub unsafe extern "C" fn xml_schema_validate_file(
+pub unsafe fn xml_schema_validate_file(
     ctxt: XmlSchemaValidCtxtPtr,
     filename: *const c_char,
     _options: i32,
@@ -30184,7 +30142,7 @@ pub unsafe extern "C" fn xml_schema_validate_file(
     ) else {
         return -1;
     };
-    let ret: i32 = xml_schema_validate_stream(ctxt, input, XmlCharEncoding::None, null_mut(), None);
+    let ret: i32 = xml_schema_validate_stream(ctxt, input, XmlCharEncoding::None, None, None);
     ret
 }
 
@@ -30192,23 +30150,13 @@ pub unsafe extern "C" fn xml_schema_validate_file(
 ///
 /// Returns the parser context of the schema validation context or NULL in case of error.
 #[doc(alias = "xmlSchemaValidCtxtGetParserCtxt")]
-pub unsafe extern "C" fn xml_schema_valid_ctxt_get_parser_ctxt(
+pub unsafe fn xml_schema_valid_ctxt_get_parser_ctxt(
     ctxt: XmlSchemaValidCtxtPtr,
 ) -> XmlParserCtxtPtr {
     if ctxt.is_null() {
         return null_mut();
     }
     (*ctxt).parser_ctxt
-}
-
-// Interface to insert Schemas SAX validation in a SAX stream
-pub type XmlSchemaSplitSAXDataPtr = *mut XmlSchemaSplitSAXData;
-#[repr(C)]
-pub struct XmlSchemaSplitSAXData {
-    user_sax: XmlSAXHandlerPtr,
-    user_data: *mut c_void,
-    ctxt: XmlSchemaValidCtxtPtr,
-    schemas_sax: XmlSAXHandlerPtr,
 }
 
 const XML_SAX_PLUG_MAGIC: u32 = 0xdc43ba21;
@@ -30220,7 +30168,7 @@ pub struct XmlSchemaSAXPlugStruct {
 
     /* the original callbacks information */
     user_sax_ptr: *mut XmlSAXHandlerPtr,
-    user_sax: XmlSAXHandlerPtr,
+    user_sax: Option<Box<XmlSAXHandler>>,
     user_data_ptr: *mut Option<GenericErrorContext>,
     user_data: Option<GenericErrorContext>,
 
@@ -30229,36 +30177,28 @@ pub struct XmlSchemaSAXPlugStruct {
     ctxt: XmlSchemaValidCtxtPtr,
 }
 
-#[allow(clippy::too_many_arguments)]
+// #[allow(clippy::too_many_arguments)]
 unsafe fn xml_schema_sax_handle_start_element_ns(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    _prefix: *const XmlChar,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
-    _nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    localname: &str,
+    _prefix: Option<&str>,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
+    _nb_defaulted: usize,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
     let mut ret: i32;
 
-    /*
-     * SAX VAL TODO: What to do with nb_defaulted?
-     */
-    /*
-     * Skip elements if inside a "skip" wildcard or invalid.
-     */
+    // SAX VAL TODO: What to do with nb_defaulted?
+    // Skip elements if inside a "skip" wildcard or invalid.
     (*vctxt).depth += 1;
     if (*vctxt).skip_depth != -1 && (*vctxt).depth >= (*vctxt).skip_depth {
         return;
     }
-    /*
-     * Push the element.
-     */
+    // Push the element.
     if xml_schema_validator_push_elem(vctxt) == -1 {
         VERROR_INT!(
             vctxt,
@@ -30271,104 +30211,32 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         return;
     }
     let ielem: XmlSchemaNodeInfoPtr = (*vctxt).inode;
-    /*
-     * TODO: Is this OK?
-     */
+    // TODO: Is this OK?
     (*ielem).node_line = xml_sax2_get_line_number((*vctxt).parser_ctxt as _);
-    (*ielem).local_name = localname;
-    (*ielem).ns_name = uri;
+    let localname = CString::new(localname).unwrap();
+    (*ielem).local_name = localname.as_ptr() as *const u8;
+    let uri = uri.map(|u| CString::new(u).unwrap());
+    (*ielem).ns_name = uri.as_deref().map_or(null(), |u| u.as_ptr() as *const u8);
     (*ielem).flags |= XML_SCHEMA_ELEM_INFO_EMPTY;
-    /*
-     * Register namespaces on the elem info.
-     */
-    if nb_namespaces != 0 {
-        /*
-         * Although the parser builds its own namespace list,
-         * we have no access to it, so we'll use an own one.
-         */
-        for (_, j) in (0..nb_namespaces).zip((0..).step_by(2)) {
-            /*
-             * Store prefix and namespace name.
-             */
+    // Register namespaces on the elem info.
+    // Although the parser builds its own namespace list,
+    // we have no access to it, so we'll use an own one.
+    let namespaces = namespaces
+        .iter()
+        .map(|(pre, loc)| {
+            let pre = pre.as_deref().map(|p| CString::new(p).unwrap());
+            let loc = CString::new(loc.as_str()).unwrap();
+            (pre, loc)
+        })
+        .collect::<Vec<_>>(); // temporary workaround.
+    for (pre, href) in &namespaces {
+        // Store prefix and namespace name.
+        if (*ielem).ns_bindings.is_null() {
+            (*ielem).ns_bindings = xml_malloc(10 * size_of::<*const XmlChar>()) as _;
             if (*ielem).ns_bindings.is_null() {
-                (*ielem).ns_bindings = xml_malloc(10 * size_of::<*const XmlChar>()) as _;
-                if (*ielem).ns_bindings.is_null() {
-                    xml_schema_verr_memory(
-                        vctxt,
-                        "allocating namespace bindings for SAX validation",
-                        null_mut(),
-                    );
-                    // goto internal_error;
-                    (*vctxt).err = -1;
-                    (*(*vctxt).parser_ctxt).stop();
-                    return;
-                }
-                (*ielem).nb_ns_bindings = 0;
-                (*ielem).size_ns_bindings = 5;
-            } else if (*ielem).size_ns_bindings <= (*ielem).nb_ns_bindings {
-                (*ielem).size_ns_bindings *= 2;
-                (*ielem).ns_bindings = xml_realloc(
-                    (*ielem).ns_bindings as *mut c_void,
-                    (*ielem).size_ns_bindings as usize * 2 * size_of::<*const XmlChar>(),
-                ) as _;
-                if (*ielem).ns_bindings.is_null() {
-                    xml_schema_verr_memory(
-                        vctxt,
-                        "re-allocating namespace bindings for SAX validation",
-                        null_mut(),
-                    );
-                    // goto internal_error;
-                    (*vctxt).err = -1;
-                    (*(*vctxt).parser_ctxt).stop();
-                    return;
-                }
-            }
-
-            *(*ielem)
-                .ns_bindings
-                .add((*ielem).nb_ns_bindings as usize * 2) = *namespaces.add(j as usize);
-            if *(*namespaces.add(j as usize + 1)).add(0) == 0 {
-                /*
-                 * Handle xmlns="".
-                 */
-                *(*ielem)
-                    .ns_bindings
-                    .add((*ielem).nb_ns_bindings as usize * 2 + 1) = null_mut();
-            } else {
-                *(*ielem)
-                    .ns_bindings
-                    .add((*ielem).nb_ns_bindings as usize * 2 + 1) =
-                    *namespaces.add(j as usize + 1);
-            }
-            (*ielem).nb_ns_bindings += 1;
-        }
-    }
-    /*
-     * Register attributes.
-     * SAX VAL TODO: We are not adding namespace declaration
-     * attributes yet.
-     */
-    if nb_attributes != 0 {
-        let mut value_len: i32;
-        let mut k: i32;
-        let mut value: *mut XmlChar;
-
-        for (_, j) in (0..nb_attributes).zip((0..).step_by(5)) {
-            /*
-             * Duplicate the value, changing any &#38; to a literal ampersand.
-             *
-             * libxml2 differs from normal SAX here in that it escapes all ampersands
-             * as &#38; instead of delivering the raw converted string. Changing the
-             * behavior at this point would break applications that use this API, so
-             * we are forced to work around it.
-             */
-            value_len =
-                (*attributes.add(j as usize + 4)).offset_from(*attributes.add(j as usize + 3)) as _;
-            value = xml_malloc_atomic(value_len as usize + 1) as _;
-            if value.is_null() {
                 xml_schema_verr_memory(
                     vctxt,
-                    "allocating string for decoded attribute",
+                    "allocating namespace bindings for SAX validation",
                     null_mut(),
                 );
                 // goto internal_error;
@@ -30376,44 +30244,19 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 (*(*vctxt).parser_ctxt).stop();
                 return;
             }
-            k = 0;
-            for l in 0.. {
-                if k < value_len - 4
-                    && *(*attributes.add(j as usize + 3)).add(k as usize) == b'&'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 1) == b'#'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 2) == b'3'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 3) == b'8'
-                    && *(*attributes.add(j as usize + 3)).add(k as usize + 4) == b';'
-                {
-                    *value.add(l as usize) = b'&';
-                    k += 5;
-                } else {
-                    *value.add(l as usize) = *(*attributes.add(j as usize + 3)).add(k as usize);
-                    k += 1;
-                }
-                if k >= value_len {
-                    *value.add(l as usize) = b'\0';
-                    break;
-                }
-            }
-            /*
-             * TODO: Set the node line.
-             */
-            ret = xml_schema_validator_push_attribute(
-                vctxt,
-                null_mut(),
-                (*ielem).node_line,
-                *attributes.add(j as usize),
-                *attributes.add(j as usize + 2),
-                0,
-                value,
-                1,
-            );
-            if ret == -1 {
-                VERROR_INT!(
+            (*ielem).nb_ns_bindings = 0;
+            (*ielem).size_ns_bindings = 5;
+        } else if (*ielem).size_ns_bindings <= (*ielem).nb_ns_bindings {
+            (*ielem).size_ns_bindings *= 2;
+            (*ielem).ns_bindings = xml_realloc(
+                (*ielem).ns_bindings as *mut c_void,
+                (*ielem).size_ns_bindings as usize * 2 * size_of::<*const XmlChar>(),
+            ) as _;
+            if (*ielem).ns_bindings.is_null() {
+                xml_schema_verr_memory(
                     vctxt,
-                    "xmlSchemaSAXHandleStartElementNs",
-                    "calling xmlSchemaValidatorPushAttribute()"
+                    "re-allocating namespace bindings for SAX validation",
+                    null_mut(),
                 );
                 // goto internal_error;
                 (*vctxt).err = -1;
@@ -30421,10 +30264,68 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
                 return;
             }
         }
+
+        *(*ielem)
+            .ns_bindings
+            .add((*ielem).nb_ns_bindings as usize * 2) =
+            pre.as_deref().map_or(null(), |p| p.as_ptr() as *const u8);
+        if !href.is_empty() {
+            // Handle xmlns="".
+            *(*ielem)
+                .ns_bindings
+                .add((*ielem).nb_ns_bindings as usize * 2 + 1) = null_mut();
+        } else {
+            *(*ielem)
+                .ns_bindings
+                .add((*ielem).nb_ns_bindings as usize * 2 + 1) = href.as_ptr() as *const u8;
+        }
+        (*ielem).nb_ns_bindings += 1;
     }
-    /*
-     * Validate the element.
-     */
+    // Register attributes.
+    // SAX VAL TODO: We are not adding namespace declaration attributes yet.
+    let attributes = attributes
+        .iter()
+        .map(|attr| {
+            let loc = CString::new(attr.0.as_str()).unwrap();
+            let pre = attr.1.as_deref().map(|pre| CString::new(pre).unwrap());
+            let url = attr.2.as_deref().map(|url| CString::new(url).unwrap());
+            // Duplicate the value, changing any &#38; to a literal ampersand.
+            //
+            // libxml2 differs from normal SAX here in that it escapes all ampersands
+            // as &#38; instead of delivering the raw converted string. Changing the
+            // behavior at this point would break applications that use this API, so
+            // we are forced to work around it.
+            let val = CString::new(attr.3.replace("&#38;", "&").as_str()).unwrap();
+            (loc, pre, url, val)
+        })
+        .collect::<Vec<_>>();
+    for attr in &attributes {
+        // TODO: Set the node line.
+        ret = xml_schema_validator_push_attribute(
+            vctxt,
+            null_mut(),
+            (*ielem).node_line,
+            attr.0.as_ptr() as *const u8,
+            attr.2
+                .as_deref()
+                .map_or(null(), |ns_name| ns_name.as_ptr() as *const u8),
+            0,
+            attr.3.as_ptr() as *mut u8,
+            1,
+        );
+        if ret == -1 {
+            VERROR_INT!(
+                vctxt,
+                "xmlSchemaSAXHandleStartElementNs",
+                "calling xmlSchemaValidatorPushAttribute()"
+            );
+            // goto internal_error;
+            (*vctxt).err = -1;
+            (*(*vctxt).parser_ctxt).stop();
+            return;
+        }
+    }
+    // Validate the element.
     ret = xml_schema_validate_elem(vctxt);
     if ret != 0 && ret == -1 {
         VERROR_INT!(
@@ -30437,6 +30338,11 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
         (*(*vctxt).parser_ctxt).stop();
     }
 
+    // `namespaces` must live until this point at least.
+    // It must not be dropped before execute `xml_schema_validate_elem`.
+    drop(namespaces);
+    drop(attributes);
+
     // exit:
     // internal_error:
     //     (*vctxt).err = -1;
@@ -30446,17 +30352,15 @@ unsafe fn xml_schema_sax_handle_start_element_ns(
 
 unsafe fn xml_schema_sax_handle_end_element_ns(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    _prefix: *const XmlChar,
-    uri: *const XmlChar,
+    localname: &str,
+    _prefix: Option<&str>,
+    uri: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
 
-    /*
-     * Skip elements if inside a "skip" wildcard or if invalid.
-     */
+    // Skip elements if inside a "skip" wildcard or if invalid.
     if (*vctxt).skip_depth != -1 {
         if (*vctxt).depth > (*vctxt).skip_depth {
             (*vctxt).depth -= 1;
@@ -30465,12 +30369,16 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
             (*vctxt).skip_depth = -1;
         }
     }
-    /*
-     * SAX VAL TODO: Just a temporary check.
-     */
-    if !xml_str_equal((*(*vctxt).inode).local_name, localname)
-        || !xml_str_equal((*(*vctxt).inode).ns_name, uri)
-    {
+    // SAX VAL TODO: Just a temporary check.
+    let localname = CString::new(localname).unwrap();
+    let uri = uri.map(|u| CString::new(u).unwrap());
+    if !xml_str_equal(
+        (*(*vctxt).inode).local_name,
+        localname.as_ptr() as *const u8,
+    ) || !xml_str_equal(
+        (*(*vctxt).inode).ns_name,
+        uri.as_deref().map_or(null(), |u| u.as_ptr() as *const u8),
+    ) {
         VERROR_INT!(vctxt, "xmlSchemaSAXHandleEndElementNs", "elem pop mismatch");
     }
     let res: i32 = xml_schema_validator_pop_elem(vctxt);
@@ -30492,11 +30400,7 @@ unsafe fn xml_schema_sax_handle_end_element_ns(
 }
 
 // Process text content.
-unsafe fn xml_schema_sax_handle_text(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn xml_schema_sax_handle_text(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
@@ -30510,11 +30414,13 @@ unsafe fn xml_schema_sax_handle_text(
     if (*(*vctxt).inode).flags & XML_SCHEMA_ELEM_INFO_EMPTY != 0 {
         (*(*vctxt).inode).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
     }
+    let len = ch.len();
+    let ch = CString::new(ch).unwrap();
     if xml_schema_vpush_text(
         vctxt,
         XmlElementType::XmlTextNode as i32,
-        ch,
-        len,
+        ch.as_ptr() as *const u8,
+        len as i32,
         XML_SCHEMA_PUSH_TEXT_VOLATILE,
         null_mut(),
     ) == -1
@@ -30530,11 +30436,7 @@ unsafe fn xml_schema_sax_handle_text(
 }
 
 // Process CDATA content.
-unsafe fn xml_schema_sax_handle_cdata_section(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn xml_schema_sax_handle_cdata_section(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
@@ -30548,11 +30450,13 @@ unsafe fn xml_schema_sax_handle_cdata_section(
     if (*(*vctxt).inode).flags & XML_SCHEMA_ELEM_INFO_EMPTY != 0 {
         (*(*vctxt).inode).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
     }
+    let len = ch.len();
+    let ch = CString::new(ch).unwrap();
     if xml_schema_vpush_text(
         vctxt,
         XmlElementType::XmlCDATASectionNode as i32,
-        ch,
-        len,
+        ch.as_ptr() as *const u8,
+        len as i32,
         XML_SCHEMA_PUSH_TEXT_VOLATILE,
         null_mut(),
     ) == -1
@@ -30567,7 +30471,7 @@ unsafe fn xml_schema_sax_handle_cdata_section(
     }
 }
 
-unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
+unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _name: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let vctxt = *lock.downcast_ref::<XmlSchemaValidCtxtPtr>().unwrap();
@@ -30585,23 +30489,21 @@ unsafe fn xml_schema_sax_handle_reference(ctx: Option<GenericErrorContext>, _nam
 // All those functions just bounces to the user provided SAX handlers
 unsafe fn internal_subset_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).internal_subset.is_some()
-    {
-        (*(*ctxt).user_sax).internal_subset.unwrap()(
-            (*ctxt).user_data.clone(),
-            name,
-            external_id,
-            system_id,
-        );
+    if !ctxt.is_null() {
+        if let Some(internal_subset) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.internal_subset)
+        {
+            internal_subset((*ctxt).user_data.clone(), name, external_id, system_id);
+        }
     }
 }
 
@@ -30609,9 +30511,14 @@ unsafe fn is_standalone_split(ctx: Option<GenericErrorContext>) -> i32 {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).is_standalone.is_some()
-    {
-        return (*(*ctxt).user_sax).is_standalone.unwrap()((*ctxt).user_data.clone());
+    if !ctxt.is_null() {
+        if let Some(is_standalone) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.is_standalone)
+        {
+            return is_standalone((*ctxt).user_data.clone());
+        }
     }
     0
 }
@@ -30620,11 +30527,14 @@ unsafe fn has_internal_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).has_internal_subset.is_some()
-    {
-        return (*(*ctxt).user_sax).has_internal_subset.unwrap()((*ctxt).user_data.clone());
+    if !ctxt.is_null() {
+        if let Some(has_internal_subset) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.has_internal_subset)
+        {
+            return has_internal_subset((*ctxt).user_data.clone());
+        }
     }
     0
 }
@@ -30633,132 +30543,149 @@ unsafe fn has_external_subset_split(ctx: Option<GenericErrorContext>) -> i32 {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).has_external_subset.is_some()
-    {
-        return (*(*ctxt).user_sax).has_external_subset.unwrap()((*ctxt).user_data.clone());
+    if !ctxt.is_null() {
+        if let Some(has_external_subset) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.has_external_subset)
+        {
+            return has_external_subset((*ctxt).user_data.clone());
+        }
     }
     0
 }
 
 unsafe fn external_subset_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).external_subset.is_some()
-    {
-        (*(*ctxt).user_sax).external_subset.unwrap()(
-            (*ctxt).user_data.clone(),
-            name,
-            external_id,
-            system_id,
-        );
+    if !ctxt.is_null() {
+        if let Some(external_subset) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.external_subset)
+        {
+            external_subset((*ctxt).user_data.clone(), name, external_id, system_id);
+        }
     }
 }
 
 unsafe fn resolve_entity_split(
     ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).resolve_entity.is_some()
-    {
-        return (*(*ctxt).user_sax).resolve_entity.unwrap()(
-            (*ctxt).user_data.clone(),
-            public_id,
-            system_id,
-        );
+    if !ctxt.is_null() {
+        if let Some(resolve_entity) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.resolve_entity)
+        {
+            return resolve_entity((*ctxt).user_data.clone(), public_id, system_id);
+        }
     }
     null_mut()
 }
 
-unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: *const XmlChar) -> XmlEntityPtr {
+unsafe fn get_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).get_entity.is_some() {
-        return (*(*ctxt).user_sax).get_entity.unwrap()((*ctxt).user_data.clone(), name);
+    if !ctxt.is_null() {
+        if let Some(get_entity) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.get_entity)
+        {
+            return get_entity((*ctxt).user_data.clone(), name);
+        }
     }
     null_mut()
 }
 
-unsafe fn get_parameter_entity_split(
-    ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+unsafe fn get_parameter_entity_split(ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).get_parameter_entity.is_some()
-    {
-        return (*(*ctxt).user_sax).get_parameter_entity.unwrap()((*ctxt).user_data.clone(), name);
+    if !ctxt.is_null() {
+        if let Some(get_parameter_entity) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.get_parameter_entity)
+        {
+            return get_parameter_entity((*ctxt).user_data.clone(), name);
+        }
     }
     null_mut()
 }
 
 unsafe fn entity_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    typ: i32,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
-    content: *mut XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).entity_decl.is_some() {
-        (*(*ctxt).user_sax).entity_decl.unwrap()(
-            (*ctxt).user_data.clone(),
-            name,
-            typ,
-            public_id,
-            system_id,
-            content,
-        );
+    if !ctxt.is_null() {
+        if let Some(entity_decl) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.entity_decl)
+        {
+            entity_decl(
+                (*ctxt).user_data.clone(),
+                name,
+                typ,
+                public_id,
+                system_id,
+                content,
+            );
+        }
     }
 }
 
 unsafe fn attribute_decl_split(
     ctx: Option<GenericErrorContext>,
     elem: &str,
-    name: *const XmlChar,
-    typ: i32,
-    def: i32,
-    default_value: *const XmlChar,
+    name: &str,
+    typ: XmlAttributeType,
+    def: XmlAttributeDefault,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).attribute_decl.is_some()
-    {
-        (*(*ctxt).user_sax).attribute_decl.unwrap()(
-            (*ctxt).user_data.clone(),
-            elem,
-            name,
-            typ,
-            def,
-            default_value,
-            tree,
-        );
+    if !ctxt.is_null() {
+        if let Some(attribute_decl) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.attribute_decl)
+        {
+            attribute_decl(
+                (*ctxt).user_data.clone(),
+                elem,
+                name,
+                typ,
+                def,
+                default_value,
+                tree,
+            );
+        } else {
+            xml_free_enumeration(tree);
+        }
     } else {
         xml_free_enumeration(tree);
     }
@@ -30766,60 +30693,68 @@ unsafe fn attribute_decl_split(
 
 unsafe fn element_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    typ: i32,
+    name: &str,
+    typ: Option<XmlElementTypeVal>,
     content: XmlElementContentPtr,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).element_decl.is_some()
-    {
-        (*(*ctxt).user_sax).element_decl.unwrap()((*ctxt).user_data.clone(), name, typ, content);
+    if !ctxt.is_null() {
+        if let Some(element_decl) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.element_decl)
+        {
+            element_decl((*ctxt).user_data.clone(), name, typ, content);
+        }
     }
 }
 
 unsafe fn notation_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: &str,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).notation_decl.is_some()
-    {
-        (*(*ctxt).user_sax).notation_decl.unwrap()(
-            (*ctxt).user_data.clone(),
-            name,
-            public_id,
-            system_id,
-        );
+    if !ctxt.is_null() {
+        if let Some(notation_decl) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.notation_decl)
+        {
+            notation_decl((*ctxt).user_data.clone(), name, public_id, system_id);
+        }
     }
 }
 
 unsafe fn unparsed_entity_decl_split(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
-    notation_name: *const XmlChar,
+    name: &str,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
+    notation_name: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).unparsed_entity_decl.is_some()
-    {
-        (*(*ctxt).user_sax).unparsed_entity_decl.unwrap()(
-            (*ctxt).user_data.clone(),
-            name,
-            public_id,
-            system_id,
-            notation_name,
-        );
+    if !ctxt.is_null() {
+        if let Some(unparsed_entity_decl) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.unparsed_entity_decl)
+        {
+            unparsed_entity_decl(
+                (*ctxt).user_data.clone(),
+                name,
+                public_id,
+                system_id,
+                notation_name,
+            );
+        }
     }
 }
 
@@ -30827,11 +30762,14 @@ unsafe fn set_document_locator_split(ctx: Option<GenericErrorContext>, loc: XmlS
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).set_document_locator.is_some()
-    {
-        (*(*ctxt).user_sax).set_document_locator.unwrap()((*ctxt).user_data.clone(), loc);
+    if !ctxt.is_null() {
+        if let Some(set_document_locator) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.set_document_locator)
+        {
+            set_document_locator((*ctxt).user_data.clone(), loc);
+        }
     }
 }
 
@@ -30839,11 +30777,14 @@ unsafe fn start_document_split(ctx: Option<GenericErrorContext>) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).start_document.is_some()
-    {
-        (*(*ctxt).user_sax).start_document.unwrap()((*ctxt).user_data.clone());
+    if !ctxt.is_null() {
+        if let Some(start_document) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.start_document)
+        {
+            start_document((*ctxt).user_data.clone());
+        }
     }
 }
 
@@ -30851,38 +30792,44 @@ unsafe fn end_document_split(ctx: Option<GenericErrorContext>) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).end_document.is_some()
-    {
-        (*(*ctxt).user_sax).end_document.unwrap()((*ctxt).user_data.clone());
+    if !ctxt.is_null() {
+        if let Some(end_document) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.end_document)
+        {
+            end_document((*ctxt).user_data.clone());
+        }
     }
 }
 
 unsafe fn processing_instruction_split(
     ctx: Option<GenericErrorContext>,
-    target: *const XmlChar,
-    data: *const XmlChar,
+    target: &str,
+    data: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null()
-        && !(*ctxt).user_sax.is_null()
-        && (*(*ctxt).user_sax).processing_instruction.is_some()
-    {
-        (*(*ctxt).user_sax).processing_instruction.unwrap()(
-            (*ctxt).user_data.clone(),
-            target,
-            data,
-        );
+    if !ctxt.is_null() {
+        if let Some(processing_instruction) = (*ctxt)
+            .user_sax
+            .as_deref_mut()
+            .and_then(|sax| sax.processing_instruction)
+        {
+            processing_instruction((*ctxt).user_data.clone(), target, data);
+        }
     }
 }
 
-unsafe fn comment_split(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+unsafe fn comment_split(ctx: Option<GenericErrorContext>, value: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).comment.is_some() {
-        (*(*ctxt).user_sax).comment.unwrap()((*ctxt).user_data.clone(), value);
+    if !ctxt.is_null() {
+        if let Some(comment) = (*ctxt).user_sax.as_deref_mut().and_then(|sax| sax.comment) {
+            comment((*ctxt).user_data.clone(), value);
+        }
     }
 }
 
@@ -30908,85 +30855,90 @@ fn fatal_error_split(_ctx: Option<GenericErrorContext>, _msg: &str) {
 }
 
 // Those are function where both the user handler and the schemas handler need to be called.
-unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn characters_split(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).characters.is_some() {
-        (*(*ctxt).user_sax).characters.unwrap()((*ctxt).user_data.clone(), ch, len);
+    if let Some(characters) = (*ctxt)
+        .user_sax
+        .as_deref_mut()
+        .and_then(|sax| sax.characters)
+    {
+        characters((*ctxt).user_data.clone(), ch);
     }
     if !(*ctxt).ctxt.is_null() {
-        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch, len);
+        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch);
     }
 }
 
-unsafe fn ignorable_whitespace_split(
-    ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+unsafe fn ignorable_whitespace_split(ctx: Option<GenericErrorContext>, ch: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).ignorable_whitespace.is_some() {
-        (*(*ctxt).user_sax).ignorable_whitespace.unwrap()((*ctxt).user_data.clone(), ch, len);
+    if let Some(ignorable_whitespace) = (*ctxt)
+        .user_sax
+        .as_deref_mut()
+        .and_then(|sax| sax.ignorable_whitespace)
+    {
+        ignorable_whitespace((*ctxt).user_data.clone(), ch);
     }
     if !(*ctxt).ctxt.is_null() {
-        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch, len);
+        xml_schema_sax_handle_text(Some(GenericErrorContext::new((*ctxt).ctxt)), ch);
     }
 }
 
-unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32) {
+unsafe fn cdata_block_split(ctx: Option<GenericErrorContext>, value: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).cdata_block.is_some() {
-        (*(*ctxt).user_sax).cdata_block.unwrap()((*ctxt).user_data.clone(), value, len);
+    if let Some(cdata_block) = (*ctxt)
+        .user_sax
+        .as_deref_mut()
+        .and_then(|sax| sax.cdata_block)
+    {
+        cdata_block((*ctxt).user_data.clone(), value);
     }
     if !(*ctxt).ctxt.is_null() {
-        xml_schema_sax_handle_cdata_section(
-            Some(GenericErrorContext::new((*ctxt).ctxt)),
-            value,
-            len,
-        );
+        xml_schema_sax_handle_cdata_section(Some(GenericErrorContext::new((*ctxt).ctxt)), value);
     }
 }
 
-unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+unsafe fn reference_split(ctx: Option<GenericErrorContext>, name: &str) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
     let ctxt = *lock.downcast_ref::<XmlSchemaSAXPlugPtr>().unwrap();
     if ctxt.is_null() {
         return;
     }
-    if !ctxt.is_null() && !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).reference.is_some() {
-        (*(*ctxt).user_sax).reference.unwrap()((*ctxt).user_data.clone(), name);
+    if let Some(reference) = (*ctxt)
+        .user_sax
+        .as_deref_mut()
+        .and_then(|sax| sax.reference)
+    {
+        reference((*ctxt).user_data.clone(), name);
     }
     if !(*ctxt).ctxt.is_null() {
         xml_schema_sax_handle_reference((*ctxt).user_data.clone(), name);
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 unsafe fn start_element_ns_split(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
-    nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
+    nb_defaulted: usize,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30994,15 +30946,17 @@ unsafe fn start_element_ns_split(
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).start_element_ns.is_some() {
-        (*(*ctxt).user_sax).start_element_ns.unwrap()(
+    if let Some(start_element_ns) = (*ctxt)
+        .user_sax
+        .as_deref_mut()
+        .and_then(|sax| sax.start_element_ns)
+    {
+        start_element_ns(
             (*ctxt).user_data.clone(),
             localname,
             prefix,
             uri,
-            nb_namespaces,
             namespaces,
-            nb_attributes,
             nb_defaulted,
             attributes,
         );
@@ -31013,9 +30967,7 @@ unsafe fn start_element_ns_split(
             localname,
             prefix,
             uri,
-            nb_namespaces,
             namespaces,
-            nb_attributes,
             nb_defaulted,
             attributes,
         );
@@ -31024,9 +30976,9 @@ unsafe fn start_element_ns_split(
 
 unsafe fn end_element_ns_split(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -31034,13 +30986,12 @@ unsafe fn end_element_ns_split(
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).user_sax.is_null() && (*(*ctxt).user_sax).end_element_ns.is_some() {
-        (*(*ctxt).user_sax).end_element_ns.unwrap()(
-            (*ctxt).user_data.clone(),
-            localname,
-            prefix,
-            uri,
-        );
+    if let Some(end_element_ns) = (*ctxt)
+        .user_sax
+        .as_deref_mut()
+        .and_then(|sax| sax.end_element_ns)
+    {
+        end_element_ns((*ctxt).user_data.clone(), localname, prefix, uri);
     }
     if !(*ctxt).ctxt.is_null() {
         xml_schema_sax_handle_end_element_ns(
@@ -31059,33 +31010,32 @@ unsafe fn end_element_ns_split(
 /// Returns a pointer to a data structure needed to unplug the validation layer
 /// or NULL in case of errors.
 #[doc(alias = "xmlSchemaSAXPlug")]
-pub unsafe extern "C" fn xml_schema_sax_plug(
+pub unsafe fn xml_schema_sax_plug(
     ctxt: XmlSchemaValidCtxtPtr,
-    sax: *mut XmlSAXHandlerPtr,
+    sax: &mut Option<Box<XmlSAXHandler>>,
     user_data: *mut Option<GenericErrorContext>,
 ) -> XmlSchemaSAXPlugPtr {
-    if ctxt.is_null() || sax.is_null() || user_data.is_null() {
+    if ctxt.is_null() || user_data.is_null() {
         return null_mut();
     }
 
-    /*
-     * We only allow to plug into SAX2 event streams
-     */
-    let old_sax: XmlSAXHandlerPtr = *sax;
-    if !old_sax.is_null() && (*old_sax).initialized != XML_SAX2_MAGIC as u32 {
-        return null_mut();
-    }
-    if !old_sax.is_null()
-        && (*old_sax).start_element_ns.is_none()
-        && (*old_sax).end_element_ns.is_none()
-        && ((*old_sax).start_element.is_some() || (*old_sax).end_element.is_some())
+    // We only allow to plug into SAX2 event streams
+    let mut old_sax = sax.take();
+    if old_sax
+        .as_deref()
+        .map_or(false, |sax| sax.initialized != XML_SAX2_MAGIC as u32)
     {
         return null_mut();
     }
+    if old_sax.as_deref().map_or(false, |sax| {
+        sax.start_element_ns.is_none()
+            && sax.end_element_ns.is_none()
+            && (sax.start_element.is_some() || sax.end_element.is_some())
+    }) {
+        return null_mut();
+    }
 
-    /*
-     * everything seems right allocate the local data needed for that layer
-     */
+    // everything seems right allocate the local data needed for that layer
     let ret: XmlSchemaSAXPlugPtr =
         xml_malloc(size_of::<XmlSchemaSAXPlugStruct>()) as XmlSchemaSAXPlugPtr;
     if ret.is_null() {
@@ -31095,105 +31045,81 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
     (*ret).magic = XML_SAX_PLUG_MAGIC as _;
     (*ret).schemas_sax.initialized = XML_SAX2_MAGIC as _;
     (*ret).ctxt = ctxt;
-    (*ret).user_sax_ptr = sax;
-    (*ret).user_sax = old_sax;
-    if old_sax.is_null() {
-        /*
-         * go direct, no need for the split block and functions.
-         */
-        (*ret).schemas_sax.start_element_ns = Some(xml_schema_sax_handle_start_element_ns);
-        (*ret).schemas_sax.end_element_ns = Some(xml_schema_sax_handle_end_element_ns);
-        /*
-         * Note that we use the same text-function for both, to prevent
-         * the parser from testing for ignorable whitespace.
-         */
-        (*ret).schemas_sax.ignorable_whitespace = Some(xml_schema_sax_handle_text);
-        (*ret).schemas_sax.characters = Some(xml_schema_sax_handle_text);
-
-        (*ret).schemas_sax.cdata_block = Some(xml_schema_sax_handle_cdata_section);
-        (*ret).schemas_sax.reference = Some(xml_schema_sax_handle_reference);
-
-        (*ret).user_data = Some(GenericErrorContext::new(ctxt));
-        *user_data = (*ret).user_data.clone();
-    } else {
-        /*
-         * for each callback unused by Schemas initialize it to the Split
-         * routine only if non NULL in the user block, this can speed up
-         * things at the SAX level.
-         */
-        if (*old_sax).internal_subset.is_some() {
+    // (*ret).user_sax_ptr = sax;
+    if let Some(old_sax) = old_sax.as_deref_mut() {
+        // for each callback unused by Schemas initialize it to the Split
+        // routine only if non NULL in the user block, this can speed up
+        // things at the SAX level.
+        if old_sax.internal_subset.is_some() {
             (*ret).schemas_sax.internal_subset = Some(internal_subset_split);
         }
-        if (*old_sax).is_standalone.is_some() {
+        if old_sax.is_standalone.is_some() {
             (*ret).schemas_sax.is_standalone = Some(is_standalone_split);
         }
-        if (*old_sax).has_internal_subset.is_some() {
+        if old_sax.has_internal_subset.is_some() {
             (*ret).schemas_sax.has_internal_subset = Some(has_internal_subset_split);
         }
-        if (*old_sax).has_external_subset.is_some() {
+        if old_sax.has_external_subset.is_some() {
             (*ret).schemas_sax.has_external_subset = Some(has_external_subset_split);
         }
-        if (*old_sax).resolve_entity.is_some() {
+        if old_sax.resolve_entity.is_some() {
             (*ret).schemas_sax.resolve_entity = Some(resolve_entity_split);
         }
-        if (*old_sax).get_entity.is_some() {
+        if old_sax.get_entity.is_some() {
             (*ret).schemas_sax.get_entity = Some(get_entity_split);
         }
-        if (*old_sax).entity_decl.is_some() {
+        if old_sax.entity_decl.is_some() {
             (*ret).schemas_sax.entity_decl = Some(entity_decl_split);
         }
-        if (*old_sax).notation_decl.is_some() {
+        if old_sax.notation_decl.is_some() {
             (*ret).schemas_sax.notation_decl = Some(notation_decl_split);
         }
-        if (*old_sax).attribute_decl.is_some() {
+        if old_sax.attribute_decl.is_some() {
             (*ret).schemas_sax.attribute_decl = Some(attribute_decl_split);
         }
-        if (*old_sax).element_decl.is_some() {
+        if old_sax.element_decl.is_some() {
             (*ret).schemas_sax.element_decl = Some(element_decl_split);
         }
-        if (*old_sax).unparsed_entity_decl.is_some() {
+        if old_sax.unparsed_entity_decl.is_some() {
             (*ret).schemas_sax.unparsed_entity_decl = Some(unparsed_entity_decl_split);
         }
-        if (*old_sax).set_document_locator.is_some() {
+        if old_sax.set_document_locator.is_some() {
             (*ret).schemas_sax.set_document_locator = Some(set_document_locator_split);
         }
-        if (*old_sax).start_document.is_some() {
+        if old_sax.start_document.is_some() {
             (*ret).schemas_sax.start_document = Some(start_document_split);
         }
-        if (*old_sax).end_document.is_some() {
+        if old_sax.end_document.is_some() {
             (*ret).schemas_sax.end_document = Some(end_document_split);
         }
-        if (*old_sax).processing_instruction.is_some() {
+        if old_sax.processing_instruction.is_some() {
             (*ret).schemas_sax.processing_instruction = Some(processing_instruction_split);
         }
-        if (*old_sax).comment.is_some() {
+        if old_sax.comment.is_some() {
             (*ret).schemas_sax.comment = Some(comment_split);
         }
-        if (*old_sax).warning.is_some() {
+        if old_sax.warning.is_some() {
             (*ret).schemas_sax.warning = Some(warning_split);
         }
-        if (*old_sax).error.is_some() {
+        if old_sax.error.is_some() {
             (*ret).schemas_sax.error = Some(error_split);
         }
-        if (*old_sax).fatal_error.is_some() {
+        if old_sax.fatal_error.is_some() {
             (*ret).schemas_sax.fatal_error = Some(fatal_error_split);
         }
-        if (*old_sax).get_parameter_entity.is_some() {
+        if old_sax.get_parameter_entity.is_some() {
             (*ret).schemas_sax.get_parameter_entity = Some(get_parameter_entity_split);
         }
-        if (*old_sax).external_subset.is_some() {
+        if old_sax.external_subset.is_some() {
             (*ret).schemas_sax.external_subset = Some(external_subset_split);
         }
 
-        /*
-         * the 6 schemas callback have to go to the splitter functions
-         * Note that we use the same text-function for ignorableWhitespace
-         * if possible, to prevent the parser from testing for ignorable
-         * whitespace.
-         */
+        // the 6 schemas callback have to go to the splitter functions
+        // Note that we use the same text-function for ignorableWhitespace
+        // if possible, to prevent the parser from testing for ignorable whitespace.
         (*ret).schemas_sax.characters = Some(characters_split);
-        if (*old_sax).ignorable_whitespace.is_some()
-            && (*old_sax).ignorable_whitespace != (*old_sax).characters
+        if old_sax.ignorable_whitespace.is_some()
+            && old_sax.ignorable_whitespace != old_sax.characters
         {
             (*ret).schemas_sax.ignorable_whitespace = Some(ignorable_whitespace_split);
         } else {
@@ -31207,13 +31133,26 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
         (*ret).user_data_ptr = user_data;
         (*ret).user_data = (*user_data).clone();
         *user_data = Some(GenericErrorContext::new(ret));
-    }
+    } else {
+        // go direct, no need for the split block and functions.
+        (*ret).schemas_sax.start_element_ns = Some(xml_schema_sax_handle_start_element_ns);
+        (*ret).schemas_sax.end_element_ns = Some(xml_schema_sax_handle_end_element_ns);
+        // Note that we use the same text-function for both, to prevent
+        // the parser from testing for ignorable whitespace.
+        (*ret).schemas_sax.ignorable_whitespace = Some(xml_schema_sax_handle_text);
+        (*ret).schemas_sax.characters = Some(xml_schema_sax_handle_text);
 
-    /*
-     * plug the pointers back.
-     */
-    *sax = addr_of_mut!((*ret).schemas_sax);
-    (*ctxt).sax = *sax;
+        (*ret).schemas_sax.cdata_block = Some(xml_schema_sax_handle_cdata_section);
+        (*ret).schemas_sax.reference = Some(xml_schema_sax_handle_reference);
+
+        (*ret).user_data = Some(GenericErrorContext::new(ctxt));
+        *user_data = (*ret).user_data.clone();
+    }
+    (*ret).user_sax = old_sax;
+
+    // plug the pointers back.
+    *sax = Some(Box::new(take(&mut (*ret).schemas_sax)));
+    // (*ctxt).sax = *sax;
     (*ctxt).flags |= XML_SCHEMA_VALID_CTXT_FLAG_STREAM;
     xml_schema_pre_run(ctxt);
     ret
@@ -31222,28 +31161,29 @@ pub unsafe extern "C" fn xml_schema_sax_plug(
 /// Unplug a SAX based validation layer in a SAX parsing event flow.
 /// The original pointers used in the call are restored.
 ///
-/// Returns 0 in case of success and -1 in case of failure.
+/// If unplug successfully, return the original SAX handler and user data wrapped `Ok`.  
+/// Otherwise, return `Err`.
+///
+/// - the original SAX handler.
+/// - the original user data.
+/// - 0 in case of success and -1 in case of failure.
 #[doc(alias = "xmlSchemaSAXUnplug")]
-pub unsafe extern "C" fn xml_schema_sax_unplug(plug: XmlSchemaSAXPlugPtr) -> i32 {
-    let user_data: *mut Option<GenericErrorContext>;
-
+pub unsafe fn xml_schema_sax_unplug(
+    plug: XmlSchemaSAXPlugPtr,
+) -> Result<(Option<Box<XmlSAXHandler>>, Option<GenericErrorContext>), i32> {
     if plug.is_null() || (*plug).magic != XML_SAX_PLUG_MAGIC {
-        return -1;
+        return Err(-1);
     }
     (*plug).magic = 0;
 
     xml_schema_post_run((*plug).ctxt);
-    /* restore the data */
-    let sax: *mut XmlSAXHandlerPtr = (*plug).user_sax_ptr;
-    *sax = (*plug).user_sax;
-    if !(*plug).user_sax.is_null() {
-        user_data = (*plug).user_data_ptr;
-        *user_data = (*plug).user_data.clone();
-    }
+    // restore the data
+    let user_sax = (*plug).user_sax.take();
+    let user_data = (*plug).user_data.clone();
 
-    /* free and return */
+    // free and return
     xml_free(plug as _);
-    0
+    Ok((user_sax, user_data))
 }
 
 /// Allows to set a locator function to the validation context,
@@ -31251,7 +31191,7 @@ pub unsafe extern "C" fn xml_schema_sax_unplug(plug: XmlSchemaSAXPlugPtr) -> i32
 /// those are not provided as part of the SAX validation flow
 /// Setting @f to NULL disable the locator.
 #[doc(alias = "xmlSchemaValidateSetLocator")]
-pub unsafe extern "C" fn xml_schema_validate_set_locator(
+pub unsafe fn xml_schema_validate_set_locator(
     vctxt: XmlSchemaValidCtxtPtr,
     f: Option<XmlSchemaValidityLocatorFunc>,
     ctxt: *mut c_void,
@@ -31440,36 +31380,6 @@ mod tests {
     fn test_xml_schema_saxplug() {
 
         /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schema_saxunplug() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_plug in 0..GEN_NB_XML_SCHEMA_SAXPLUG_PTR {
-                let mem_base = xml_mem_blocks();
-                let plug = gen_xml_schema_saxplug_ptr(n_plug, 0);
-
-                let ret_val = xml_schema_sax_unplug(plug);
-                desret_int(ret_val);
-                des_xml_schema_saxplug_ptr(n_plug, plug, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSchemaSAXUnplug",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSchemaSAXUnplug()"
-                    );
-                    eprintln!(" {}", n_plug);
-                }
-            }
-        }
     }
 
     #[test]

@@ -82,14 +82,10 @@ static mut CURSEG: usize = 0;
 static mut CURRENT: AtomicPtr<c_char> = AtomicPtr::new(null_mut());
 static mut RLEN: usize = 0;
 
-/**
- * hugeMatch:
- * @URI: an URI to test
- *
- * Check for a huge query
- *
- * Returns 1 if yes and 0 if another Input module should be used
- */
+/// Check for a huge query
+///
+/// Returns 1 if yes and 0 if another Input module should be used
+#[doc(alias = "hugeMatch")]
 fn huge_match(uri: &str) -> c_int {
     for doc in HUGE_DOC_TABLE {
         if uri == doc.url {
@@ -100,15 +96,11 @@ fn huge_match(uri: &str) -> c_int {
     0
 }
 
-/**
- * hugeOpen:
- * @URI: an URI to test
- *
- * Return a pointer to the huge query handler, in this example simply
- * the current pointer...
- *
- * Returns an Input context or NULL in case or error
- */
+/// Return a pointer to the huge query handler, in this example simply
+/// the current pointer...
+///
+/// Returns an Input context or NULL in case or error
+#[doc(alias = "hugeOpen")]
 unsafe fn huge_open(uri: &str) -> *mut c_void {
     for doc in HUGE_DOC_TABLE {
         if uri == doc.url {
@@ -123,14 +115,10 @@ unsafe fn huge_open(uri: &str) -> *mut c_void {
     null_mut()
 }
 
-/**
- * hugeClose:
- * @context: the read context
- *
- * Close the huge query handler
- *
- * Returns 0 or -1 in case of error
- */
+/// Close the huge query handler
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "hugeClose")]
 unsafe extern "C" fn huge_close(context: *mut c_void) -> c_int {
     if context.is_null() {
         return -1;
@@ -140,16 +128,10 @@ unsafe extern "C" fn huge_close(context: *mut c_void) -> c_int {
 
 const MAX_NODES: usize = 1000;
 
-/**
- * hugeRead:
- * @context: the read context
- * @buffer: where to store data
- * @len: number of bytes to read
- *
- * Implement an huge query read.
- *
- * Returns the number of bytes read or -1 in case of error
- */
+/// Implement an huge query read.
+///
+/// Returns the number of bytes read or -1 in case of error
+#[doc(alias = "hugeRead")]
 unsafe extern "C" fn huge_read(context: *mut c_void, buffer: *mut c_char, mut len: c_int) -> c_int {
     if context.is_null() || buffer.is_null() || len < 0 {
         return -1;
@@ -211,10 +193,8 @@ unsafe fn test_external_entity_loader(
     ret
 }
 
-/*
- * Trapping the error messages at the generic level to grab the equivalent of
- * stderr messages on CLI tools.
- */
+// Trapping the error messages at the generic level to grab the equivalent of
+// stderr messages on CLI tools.
 static mut TEST_ERRORS: [u8; 32769] = [0; 32769];
 static mut TEST_ERRORS_SIZE: usize = 0;
 
@@ -380,9 +360,7 @@ unsafe extern "C" fn initialize_libxml2() {
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
     set_structured_error(Some(test_structured_error_handler), None);
-    /*
-     * register the new I/O handlers
-     */
+    // register the new I/O handlers
     struct HugeTestIO(*mut c_void);
     impl Read for HugeTestIO {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
@@ -423,17 +401,19 @@ unsafe extern "C" fn initialize_libxml2() {
     }
 }
 
-unsafe extern "C" fn init_sax(ctxt: XmlParserCtxtPtr) {
-    (*(*ctxt).sax).start_element_ns = None;
-    (*(*ctxt).sax).end_element_ns = None;
-    (*(*ctxt).sax).characters = None;
-    (*(*ctxt).sax).cdata_block = None;
-    (*(*ctxt).sax).ignorable_whitespace = None;
-    (*(*ctxt).sax).processing_instruction = None;
-    (*(*ctxt).sax).comment = None;
+unsafe fn init_sax(ctxt: XmlParserCtxtPtr) {
+    if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+        sax.start_element_ns = None;
+        sax.end_element_ns = None;
+        sax.characters = None;
+        sax.cdata_block = None;
+        sax.ignorable_whitespace = None;
+        sax.processing_instruction = None;
+        sax.comment = None;
+    }
 }
 
-unsafe extern "C" fn base_filename(filename: *const c_char) -> *const c_char {
+unsafe fn base_filename(filename: *const c_char) -> *const c_char {
     let mut cur: *const c_char;
     if filename.is_null() {
         return null_mut();
@@ -448,7 +428,7 @@ unsafe extern "C" fn base_filename(filename: *const c_char) -> *const c_char {
     cur
 }
 
-unsafe extern "C" fn result_filename(
+unsafe fn result_filename(
     filename: *const c_char,
     mut out: *const c_char,
     mut suffix: *const c_char,
@@ -494,17 +474,10 @@ fn check_test_file(filename: &str) -> c_int {
     }
 }
 
-/**
- * recursiveDetectTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a file loading DTD and replacing entities check it fails for
- * lol cases
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file loading DTD and replacing entities check it fails for lol cases
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "recursiveDetectTest")]
 unsafe fn recursive_detect_test(
     filename: &str,
     _result: *const c_char,
@@ -538,17 +511,11 @@ unsafe fn recursive_detect_test(
     res
 }
 
-/**
- * notRecursiveDetectTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a file loading DTD and replacing entities check it works for
- * good cases
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file loading DTD and replacing entities check it works for
+/// good cases
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "notRecursiveDetectTest")]
 unsafe fn not_recursive_detect_test(
     filename: &str,
     _result: *const c_char,
@@ -580,17 +547,10 @@ unsafe fn not_recursive_detect_test(
     res
 }
 
-/**
- * notRecursiveHugeTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a memory generated file
- * good cases
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a memory generated file good cases
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "notRecursiveHugeTest")]
 unsafe fn not_recursive_huge_test(
     _filename: &str,
     _result: *const c_char,
@@ -619,7 +579,7 @@ unsafe fn not_recursive_huge_test(
         let allowed_expansion: c_ulong = 1000000;
         let f_size: c_ulong = xml_strlen(c"some internal data".as_ptr() as _) as u64;
 
-        ent = xml_get_doc_entity(doc, c"e".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "e");
         let e_size: c_ulong =
             f_size * 2 + xml_strlen(c"&f;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
         if (*ent).expanded_size != e_size {
@@ -631,7 +591,7 @@ unsafe fn not_recursive_huge_test(
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, c"b".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "b");
         if (*ent).expanded_size != e_size {
             eprintln!(
                 "Wrong size for entity b: {} (expected {})",
@@ -641,7 +601,7 @@ unsafe fn not_recursive_huge_test(
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, c"d".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "d");
         let d_size: c_ulong =
             e_size * 2 + xml_strlen(c"&e;".as_ptr() as _) as u64 * 2 + fixed_cost * 2;
         if (*ent).expanded_size != d_size {
@@ -653,7 +613,7 @@ unsafe fn not_recursive_huge_test(
             res = 1;
         }
 
-        ent = xml_get_doc_entity(doc, c"c".as_ptr() as _);
+        ent = xml_get_doc_entity(doc, "c");
         if (*ent).expanded_size != d_size {
             eprintln!(
                 "Wrong size for entity c: {} (expected {})",
@@ -695,17 +655,10 @@ unsafe fn not_recursive_huge_test(
     res
 }
 
-/**
- * notRecursiveHugeTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a memory generated file
- * good cases
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a memory generated file good cases
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "notRecursiveHugeTest")]
 unsafe fn huge_dtd_test(
     _filename: &str,
     _result: *const c_char,
@@ -742,10 +695,8 @@ unsafe fn huge_dtd_test(
 
         let b_size: usize = (a_size + c"&a;".to_bytes().len() + fixed_cost) * 2;
         let c_size: usize = (b_size + c"&b;".to_bytes().len() + fixed_cost) * 2;
-        /*
-         * Internal parameter entites are substitued eagerly and
-         * need different accounting.
-         */
+        // Internal parameter entites are substitued eagerly and
+        // need different accounting.
         let e_size: usize = a_size * 2;
         let f_size: usize = e_size * 2;
         total_size = e_size + f_size + fixed_cost * 4 + (a_size + e_size + f_size + fixed_cost * 3) * (MAX_NODES - 1) * 2 + // internal
@@ -882,7 +833,7 @@ static mut TEST_DESCRIPTIONS: [TestDesc; 11] = [
     },
 ];
 
-unsafe extern "C" fn launch_tests(tst: &TestDesc) -> c_int {
+unsafe fn launch_tests(tst: &TestDesc) -> c_int {
     let mut res: c_int;
     let mut err: c_int = 0;
     let mut result: *mut c_char;

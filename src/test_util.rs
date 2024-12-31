@@ -261,7 +261,7 @@ pub(crate) fn des_xml_xpath_parser_context_ptr(_no: i32, _val: XmlXPathParserCon
 }
 
 #[cfg(feature = "xpath")]
-pub(crate) unsafe extern "C" fn desret_xml_xpath_object_ptr(val: XmlXPathObjectPtr) {
+pub(crate) unsafe fn desret_xml_xpath_object_ptr(val: XmlXPathObjectPtr) {
     use crate::xpath::xml_xpath_free_object;
 
     xml_xpath_free_object(val);
@@ -275,7 +275,7 @@ pub(crate) unsafe fn desret_xml_node_set_ptr(val: Option<Box<crate::xpath::XmlNo
 }
 
 #[cfg(any(feature = "xpath", feature = "schema"))]
-pub(crate) unsafe extern "C" fn gen_double(no: i32, _nr: i32) -> f64 {
+pub(crate) unsafe fn gen_double(no: i32, _nr: i32) -> f64 {
     if no == 0 {
         return 0.0;
     }
@@ -343,10 +343,7 @@ pub(crate) fn gen_xml_xpath_context_ptr(_no: i32, _nr: i32) -> XmlXPathContextPt
 pub(crate) fn des_xml_xpath_context_ptr(_no: i32, _val: XmlXPathContextPtr, _nr: i32) {}
 
 #[cfg(feature = "libxml_writer")]
-pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(
-    no: i32,
-    _nr: i32,
-) -> XmlTextWriterPtr<'static> {
+pub(crate) unsafe fn gen_xml_text_writer_ptr(no: i32, _nr: i32) -> XmlTextWriterPtr<'static> {
     use crate::libxml::xmlwriter::xml_new_text_writer_filename;
 
     if no == 0 {
@@ -356,14 +353,14 @@ pub(crate) unsafe extern "C" fn gen_xml_text_writer_ptr(
 }
 
 #[cfg(feature = "libxml_writer")]
-pub(crate) unsafe extern "C" fn des_xml_text_writer_ptr(_no: i32, val: XmlTextWriterPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_text_writer_ptr(_no: i32, val: XmlTextWriterPtr, _nr: i32) {
     if !val.is_null() {
         xml_free_text_writer(val);
     }
 }
 
 #[cfg(feature = "libxml_writer")]
-pub(crate) unsafe extern "C" fn desret_xml_text_writer_ptr(val: XmlTextWriterPtr) {
+pub(crate) unsafe fn desret_xml_text_writer_ptr(val: XmlTextWriterPtr) {
     xml_free_text_writer(val);
 }
 
@@ -385,7 +382,7 @@ pub(crate) fn gen_unsigned_long(no: i32, _nr: i32) -> u64 {
 pub(crate) fn des_unsigned_long(_no: i32, _val: u64, _nr: i32) {}
 
 #[cfg(feature = "schema")]
-pub(crate) unsafe extern "C" fn gen_unsigned_long_ptr(no: i32, nr: i32) -> *mut u64 {
+pub(crate) unsafe fn gen_unsigned_long_ptr(no: i32, nr: i32) -> *mut u64 {
     LONGTAB.with_borrow_mut(|table| {
         if no == 0 {
             return addr_of_mut!(table[nr as usize]);
@@ -552,7 +549,7 @@ pub(crate) fn gen_xml_schema_valid_ctxt_ptr(_no: i32, _nr: i32) -> XmlSchemaVali
 pub(crate) fn des_xml_schema_valid_ctxt_ptr(_no: i32, _val: XmlSchemaValidCtxtPtr, _nr: i32) {}
 
 #[cfg(feature = "libxml_reader")]
-pub(crate) unsafe extern "C" fn gen_xml_text_reader_ptr(no: i32, _nr: i32) -> XmlTextReaderPtr {
+pub(crate) unsafe fn gen_xml_text_reader_ptr(no: i32, _nr: i32) -> XmlTextReaderPtr {
     use crate::libxml::xmlreader::xml_new_text_reader_filename;
 
     if no == 0 {
@@ -568,7 +565,7 @@ pub(crate) unsafe extern "C" fn gen_xml_text_reader_ptr(no: i32, _nr: i32) -> Xm
 }
 
 #[cfg(feature = "libxml_reader")]
-pub(crate) unsafe extern "C" fn des_xml_text_reader_ptr(_no: i32, val: XmlTextReaderPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_text_reader_ptr(_no: i32, val: XmlTextReaderPtr, _nr: i32) {
     use crate::libxml::xmlreader::xml_free_text_reader;
 
     if !val.is_null() {
@@ -577,7 +574,7 @@ pub(crate) unsafe extern "C" fn des_xml_text_reader_ptr(_no: i32, val: XmlTextRe
 }
 
 #[cfg(feature = "libxml_reader")]
-pub(crate) unsafe extern "C" fn desret_xml_text_reader_ptr(val: XmlTextReaderPtr) {
+pub(crate) unsafe fn desret_xml_text_reader_ptr(val: XmlTextReaderPtr) {
     use crate::libxml::xmlreader::xml_free_text_reader;
 
     xml_free_text_reader(val);
@@ -695,14 +692,14 @@ pub(crate) fn gen_xml_attribute_type(no: i32, _nr: i32) -> XmlAttributeType {
 
 pub(crate) fn des_xml_attribute_type(_no: i32, _val: XmlAttributeType, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn gen_xml_valid_ctxt_ptr(no: i32, _nr: i32) -> XmlValidCtxtPtr {
+pub(crate) unsafe fn gen_xml_valid_ctxt_ptr(no: i32, _nr: i32) -> XmlValidCtxtPtr {
     #[cfg(feature = "libxml_valid")]
     if no == 0 {
         return xml_new_valid_ctxt();
     }
     null_mut()
 }
-pub(crate) unsafe extern "C" fn des_xml_valid_ctxt_ptr(_no: i32, val: XmlValidCtxtPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_valid_ctxt_ptr(_no: i32, val: XmlValidCtxtPtr, _nr: i32) {
     #[cfg(feature = "libxml_valid")]
     if !val.is_null() {
         xml_free_valid_ctxt(val);
@@ -757,7 +754,7 @@ pub(crate) fn gen_xml_uriptr(_no: i32, _nr: i32) -> XmlURIPtr {
 
 pub(crate) fn des_xml_uriptr(_no: i32, _val: XmlURIPtr, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn gen_eaten_name(no: i32, _nr: i32) -> *mut XmlChar {
+pub(crate) unsafe fn gen_eaten_name(no: i32, _nr: i32) -> *mut XmlChar {
     if no == 0 {
         return xml_strdup(c"eaten".as_ptr() as _);
     }
@@ -765,7 +762,7 @@ pub(crate) unsafe extern "C" fn gen_eaten_name(no: i32, _nr: i32) -> *mut XmlCha
 }
 pub(crate) fn des_eaten_name(_no: i32, _val: *mut XmlChar, _nr: i32) {}
 
-unsafe extern "C" fn get_api_ns() -> XmlNsPtr {
+unsafe fn get_api_ns() -> XmlNsPtr {
     get_api_root();
     if !API_ROOT.get().is_null() {
         API_NS.set((*API_ROOT.get()).ns_def);
@@ -773,19 +770,19 @@ unsafe extern "C" fn get_api_ns() -> XmlNsPtr {
     API_NS.get()
 }
 
-pub(crate) unsafe extern "C" fn gen_xml_ns_ptr(no: i32, _nr: i32) -> XmlNsPtr {
+pub(crate) unsafe fn gen_xml_ns_ptr(no: i32, _nr: i32) -> XmlNsPtr {
     if no == 0 {
         return get_api_ns();
     }
     null_mut()
 }
-pub(crate) unsafe extern "C" fn des_xml_ns_ptr(no: i32, _val: XmlNsPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_ns_ptr(no: i32, _val: XmlNsPtr, _nr: i32) {
     if no == 0 {
         free_api_doc();
     }
 }
 
-unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
+unsafe fn get_api_dtd() -> XmlDtdPtr {
     if API_DTD.get().is_null() || (*API_DTD.get()).typ != XmlElementType::XmlDTDNode {
         get_api_doc();
         if !API_DOC.get().is_null()
@@ -803,16 +800,16 @@ unsafe extern "C" fn get_api_dtd() -> XmlDtdPtr {
     API_DTD.get()
 }
 
-pub(crate) unsafe extern "C" fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> XmlDtdPtr {
+pub(crate) unsafe fn gen_xml_dtd_ptr(no: i32, _nr: i32) -> XmlDtdPtr {
     if no == 0 {
-        return xml_new_dtd(null_mut(), c"dtd".as_ptr() as _, Some("foo"), Some("bar"));
+        return xml_new_dtd(null_mut(), Some("dtd"), Some("foo"), Some("bar"));
     }
     if no == 1 {
         return get_api_dtd();
     }
     null_mut()
 }
-pub(crate) unsafe extern "C" fn des_xml_dtd_ptr(no: i32, val: XmlDtdPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_dtd_ptr(no: i32, val: XmlDtdPtr, _nr: i32) {
     if no == 1 {
         free_api_doc();
     } else if !val.is_null() {
@@ -821,7 +818,7 @@ pub(crate) unsafe extern "C" fn des_xml_dtd_ptr(no: i32, val: XmlDtdPtr, _nr: i3
     }
 }
 
-unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
+unsafe fn get_api_attr() -> XmlAttrPtr {
     #[cfg(any(
         feature = "libxml_tree",
         feature = "xinclude",
@@ -865,13 +862,13 @@ unsafe extern "C" fn get_api_attr() -> XmlAttrPtr {
     API_ATTR.get()
 }
 
-pub(crate) unsafe extern "C" fn gen_xml_attr_ptr(no: i32, _nr: i32) -> XmlAttrPtr {
+pub(crate) unsafe fn gen_xml_attr_ptr(no: i32, _nr: i32) -> XmlAttrPtr {
     if no == 0 {
         return get_api_attr();
     }
     null_mut()
 }
-pub(crate) unsafe extern "C" fn des_xml_attr_ptr(no: i32, _val: XmlAttrPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_attr_ptr(no: i32, _val: XmlAttrPtr, _nr: i32) {
     if no == 0 {
         free_api_doc();
     }
@@ -903,7 +900,7 @@ pub(crate) fn des_xml_schematron_valid_ctxt_ptr(
 }
 
 #[cfg(feature = "schema")]
-pub(crate) unsafe extern "C" fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtPtr) {
+pub(crate) unsafe fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchemaParserCtxtPtr) {
     use crate::libxml::xmlschemas::xml_schema_free_parser_ctxt;
 
     xml_schema_free_parser_ctxt(val);
@@ -913,7 +910,7 @@ pub(crate) unsafe extern "C" fn desret_xml_schema_parser_ctxt_ptr(val: XmlSchema
 pub(crate) fn desret_xml_schema_type_ptr(_val: XmlSchemaTypePtr) {}
 
 #[cfg(feature = "schema")]
-pub(crate) unsafe extern "C" fn desret_xml_relaxng_parser_ctxt_ptr(val: XmlRelaxNGParserCtxtPtr) {
+pub(crate) unsafe fn desret_xml_relaxng_parser_ctxt_ptr(val: XmlRelaxNGParserCtxtPtr) {
     use crate::libxml::relaxng::xml_relaxng_free_parser_ctxt;
 
     xml_relaxng_free_parser_ctxt(val);
@@ -989,26 +986,26 @@ pub(crate) fn gen_xml_char(no: i32, _nr: i32) -> XmlChar {
 
 pub(crate) fn des_xml_char(_no: i32, _val: XmlChar, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_node_ptr(val: XmlNodePtr) {
+pub(crate) unsafe fn desret_xml_node_ptr(val: XmlNodePtr) {
     if !val.is_null() && val != API_ROOT.get() && val != API_DOC.get() as XmlNodePtr {
         (*val).unlink();
         xml_free_node(val);
     }
 }
-pub(crate) unsafe extern "C" fn desret_xml_attr_ptr(val: XmlAttrPtr) {
+pub(crate) unsafe fn desret_xml_attr_ptr(val: XmlAttrPtr) {
     if !val.is_null() {
         (*val).unlink();
         xml_free_node(val as XmlNodePtr);
     }
 }
 
-pub(crate) unsafe extern "C" fn desret_xml_element_ptr(val: XmlElementPtr) {
+pub(crate) unsafe fn desret_xml_element_ptr(val: XmlElementPtr) {
     if !val.is_null() {
         (*val).unlink();
     }
 }
 
-pub(crate) unsafe extern "C" fn desret_xml_attribute_ptr(val: XmlAttributePtr) {
+pub(crate) unsafe fn desret_xml_attribute_ptr(val: XmlAttributePtr) {
     if !val.is_null() {
         (*val).unlink();
     }
@@ -1016,7 +1013,7 @@ pub(crate) unsafe extern "C" fn desret_xml_attribute_ptr(val: XmlAttributePtr) {
 
 pub(crate) fn desret_xml_ns_ptr(_val: XmlNsPtr) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_dtd_ptr(val: XmlDtdPtr) {
+pub(crate) unsafe fn desret_xml_dtd_ptr(val: XmlDtdPtr) {
     desret_xml_node_ptr(val as XmlNodePtr);
 }
 
@@ -1039,19 +1036,19 @@ pub(crate) fn gen_xml_feature(no: i32, _nr: i32) -> Option<XmlFeature> {
 pub(crate) fn des_xml_feature(_no: i32, _val: Option<XmlFeature>, _nr: i32) {}
 
 #[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
-pub(crate) unsafe extern "C" fn gen_xml_saxhandler_ptr(no: i32, _nr: i32) -> XmlSAXHandlerPtr {
-    #[cfg(feature = "sax1")]
-    if no == 0 {
-        use crate::libxml::globals::xml_default_sax_handler;
-        return xml_default_sax_handler() as _;
-    }
+pub(crate) unsafe fn gen_xml_saxhandler_ptr(_no: i32, _nr: i32) -> XmlSAXHandlerPtr {
+    // #[cfg(feature = "sax1")]
+    // if no == 0 {
+    //     use crate::libxml::globals::xml_default_sax_handler;
+    //     return xml_default_sax_handler() as _;
+    // }
     null_mut()
 }
 
 #[cfg(any(feature = "sax1", feature = "libxml_valid", feature = "libxml_push"))]
 pub(crate) fn des_xml_saxhandler_ptr(_no: i32, _val: XmlSAXHandlerPtr, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {
+pub(crate) unsafe fn desret_xml_parser_ctxt_ptr(val: XmlParserCtxtPtr) {
     xml_free_parser_ctxt(val);
 }
 
@@ -1063,7 +1060,7 @@ pub(crate) fn des_xml_parser_node_info_seq_ptr(_no: i32, _val: XmlParserNodeInfo
 
 pub(crate) fn desret_const_xml_parser_node_info_ptr(_val: *const XmlParserNodeInfo) {}
 
-pub(crate) unsafe extern "C" fn gen_xml_parser_ctxt_ptr(no: i32, _nr: i32) -> XmlParserCtxtPtr {
+pub(crate) unsafe fn gen_xml_parser_ctxt_ptr(no: i32, _nr: i32) -> XmlParserCtxtPtr {
     if no == 0 {
         return xml_new_parser_ctxt();
     }
@@ -1073,7 +1070,7 @@ pub(crate) unsafe extern "C" fn gen_xml_parser_ctxt_ptr(no: i32, _nr: i32) -> Xm
     null_mut()
 }
 
-pub(crate) unsafe extern "C" fn des_xml_parser_ctxt_ptr(_no: i32, val: XmlParserCtxtPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_parser_ctxt_ptr(_no: i32, val: XmlParserCtxtPtr, _nr: i32) {
     if !val.is_null() {
         xml_free_parser_ctxt(val);
     }
@@ -1158,7 +1155,7 @@ pub(crate) fn gen_const_xml_doc_ptr(_no: i32, _nr: i32) -> *const XmlDoc {
 
 pub(crate) fn des_const_xml_doc_ptr(_no: i32, _val: *const XmlDoc, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_doc_ptr(val: XmlDocPtr) {
+pub(crate) unsafe fn desret_xml_doc_ptr(val: XmlDocPtr) {
     if val != API_DOC.get() {
         xml_free_doc(val);
     }
@@ -1208,7 +1205,7 @@ pub(crate) fn desret_void_ptr(_val: *mut c_void) {}
 
 pub(crate) fn desret_const_char_ptr(_val: *const c_char) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_char_ptr(val: *mut XmlChar) {
+pub(crate) unsafe fn desret_xml_char_ptr(val: *mut XmlChar) {
     if !val.is_null() {
         xml_free(val as _);
     }
@@ -1228,11 +1225,11 @@ pub(crate) fn gen_xml_node_set_ptr(_no: i32, _nr: i32) -> Option<Box<XmlNodeSet>
 #[cfg(feature = "xpath")]
 pub(crate) fn des_xml_node_set_ptr(_no: i32, _val: Option<Box<XmlNodeSet>>, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
+pub(crate) unsafe fn desret_xml_parser_input_ptr(val: XmlParserInputPtr) {
     xml_free_input_stream(val);
 }
 
-pub(crate) unsafe extern "C" fn desret_xml_entity_ptr(val: XmlEntityPtr) {
+pub(crate) unsafe fn desret_xml_entity_ptr(val: XmlEntityPtr) {
     if !val.is_null() {
         (*val).unlink();
         xml_free_node(val as XmlNodePtr);
@@ -1252,16 +1249,12 @@ pub(crate) fn des_xml_char_ptr(_no: i32, _val: *mut XmlChar, _nr: i32) {}
 pub(crate) fn gen_xml_element_content_ptr(_no: i32, _nr: i32) -> XmlElementContentPtr {
     null_mut()
 }
-pub(crate) unsafe extern "C" fn des_xml_element_content_ptr(
-    _no: i32,
-    val: XmlElementContentPtr,
-    _nr: i32,
-) {
+pub(crate) unsafe fn des_xml_element_content_ptr(_no: i32, val: XmlElementContentPtr, _nr: i32) {
     if !val.is_null() {
         xml_free_element_content(val);
     }
 }
-pub(crate) unsafe extern "C" fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
+pub(crate) unsafe fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
     if !val.is_null() {
         xml_free_element_content(val);
     }
@@ -1272,7 +1265,7 @@ pub(crate) fn gen_xml_enumeration_ptr(_no: i32, _nr: i32) -> XmlEnumerationPtr {
 }
 pub(crate) fn des_xml_enumeration_ptr(_no: i32, _val: XmlEnumerationPtr, _nr: i32) {}
 
-unsafe extern "C" fn get_api_root() -> XmlNodePtr {
+unsafe fn get_api_root() -> XmlNodePtr {
     if (API_ROOT.get().is_null())
         || (*API_ROOT.get()).element_type() != XmlElementType::XmlElementNode
     {
@@ -1294,7 +1287,7 @@ unsafe extern "C" fn get_api_root() -> XmlNodePtr {
     API_ROOT.get()
 }
 
-unsafe extern "C" fn get_api_doc() -> XmlDocPtr {
+unsafe fn get_api_doc() -> XmlDocPtr {
     if API_DOC.get().is_null() {
         API_DOC.set(xml_read_memory("<!DOCTYPE root [<!ELEMENT root EMPTY>]><root xmlns:h='http://example.com/' h:foo='bar'/>".as_bytes().to_vec(), Some("root_test"), None, 0));
         API_ROOT.set(null_mut());
@@ -1303,7 +1296,7 @@ unsafe extern "C" fn get_api_doc() -> XmlDocPtr {
     API_DOC.get()
 }
 
-unsafe extern "C" fn free_api_doc() {
+unsafe fn free_api_doc() {
     xml_free_doc(API_DOC.get());
     API_DOC.set(null_mut());
     API_DTD.set(null_mut());
@@ -1312,9 +1305,9 @@ unsafe extern "C" fn free_api_doc() {
     API_NS.set(null_mut());
 }
 
-pub(crate) unsafe extern "C" fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
+pub(crate) unsafe fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePtr {
     if no == 0 {
-        return xml_new_pi(c"test".as_ptr() as _, null_mut());
+        return xml_new_pi("test", None);
     }
     if no == 1 {
         return get_api_root();
@@ -1323,7 +1316,7 @@ pub(crate) unsafe extern "C" fn gen_xml_node_ptr(no: i32, _nr: i32) -> XmlNodePt
     /*     if no == 2 {
     // return((xmlNodePtr) get_api_doc()); */
 }
-pub(crate) unsafe extern "C" fn des_xml_node_ptr(no: i32, val: XmlNodePtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_node_ptr(no: i32, val: XmlNodePtr, _nr: i32) {
     if no == 1 {
         free_api_doc();
     } else if !val.is_null() {
@@ -1336,7 +1329,7 @@ pub(crate) fn gen_unsigned_char_ptr(_no: i32, _nr: i32) -> *mut u8 {
     null_mut()
 }
 
-pub(crate) unsafe extern "C" fn gen_int_ptr(no: i32, nr: i32) -> *mut i32 {
+pub(crate) unsafe fn gen_int_ptr(no: i32, nr: i32) -> *mut i32 {
     INTTAB.with_borrow_mut(|table| {
         if no == 0 {
             addr_of_mut!(table[nr as usize])
@@ -1367,14 +1360,14 @@ pub(crate) fn gen_const_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
 pub(crate) fn des_const_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
+pub(crate) unsafe fn desret_html_parser_ctxt_ptr(val: HtmlParserCtxtPtr) {
     if !val.is_null() {
         html_free_parser_ctxt(val);
     }
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
+pub(crate) unsafe fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPtr {
     use crate::libxml::{htmlparser::html_read_memory, htmltree::html_new_doc};
 
     if no == 0 {
@@ -1387,21 +1380,21 @@ pub(crate) unsafe extern "C" fn gen_html_doc_ptr(no: i32, _nr: i32) -> HtmlDocPt
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn desret_html_doc_ptr(val: HtmlDocPtr) {
+pub(crate) unsafe fn desret_html_doc_ptr(val: HtmlDocPtr) {
     if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
         xml_free_doc(val);
     }
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn gen_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
+pub(crate) unsafe fn gen_html_node_ptr(_no: i32, _nr: i32) -> HtmlNodePtr {
     null_mut()
 }
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
+pub(crate) unsafe fn des_html_node_ptr(_no: i32, _val: HtmlNodePtr, _nr: i32) {}
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
+pub(crate) unsafe fn des_html_doc_ptr(_no: i32, val: HtmlDocPtr, _nr: i32) {
     if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
         xml_free_doc(val);
     }
@@ -1424,7 +1417,7 @@ pub(crate) fn gen_const_xml_char_ptr_ptr(_no: i32, _nr: i32) -> *mut *mut XmlCha
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn gen_html_parser_ctxt_ptr(no: i32, _nr: i32) -> HtmlParserCtxtPtr {
+pub(crate) unsafe fn gen_html_parser_ctxt_ptr(no: i32, _nr: i32) -> HtmlParserCtxtPtr {
     use crate::libxml::htmlparser::html_create_memory_parser_ctxt;
 
     if no == 0 {
@@ -1437,11 +1430,7 @@ pub(crate) unsafe extern "C" fn gen_html_parser_ctxt_ptr(no: i32, _nr: i32) -> H
 }
 
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn des_html_parser_ctxt_ptr(
-    _no: i32,
-    val: HtmlParserCtxtPtr,
-    _nr: i32,
-) {
+pub(crate) unsafe fn des_html_parser_ctxt_ptr(_no: i32, val: HtmlParserCtxtPtr, _nr: i32) {
     if !val.is_null() {
         html_free_parser_ctxt(val);
     }
@@ -1472,7 +1461,7 @@ pub(crate) fn des_userdata(_no: i32, _val: *mut c_void, _nr: i32) {}
 
 static mut CALL_TESTS: i32 = 0;
 
-pub(crate) unsafe extern "C" fn gen_userdata(no: i32, _nr: i32) -> *mut c_void {
+pub(crate) unsafe fn gen_userdata(no: i32, _nr: i32) -> *mut c_void {
     if no == 0 {
         return addr_of_mut!(CALL_TESTS) as _;
     }
@@ -1543,7 +1532,7 @@ pub(crate) unsafe fn gen_xml_output_buffer_ptr(
 #[cfg(feature = "libxml_output")]
 pub(crate) fn des_xml_output_buffer_ptr(_no: i32, _val: XmlOutputBuffer, _nr: i32) {}
 
-pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr {
+pub(crate) unsafe fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr {
     if no == 0 {
         return xml_new_doc(Some("1.0"));
     }
@@ -1561,7 +1550,7 @@ pub(crate) unsafe extern "C" fn gen_xml_doc_ptr(no: i32, _nr: i32) -> XmlDocPtr 
     null_mut()
 }
 
-pub(crate) unsafe extern "C" fn des_xml_doc_ptr(_no: i32, val: XmlDocPtr, _nr: i32) {
+pub(crate) unsafe fn des_xml_doc_ptr(_no: i32, val: XmlDocPtr, _nr: i32) {
     if !val.is_null() && val != API_DOC.get() && (*val).doc != API_DOC.get() {
         xml_free_doc(val);
     }

@@ -8,7 +8,6 @@ use std::{
     ffi::{c_char, CStr, CString},
     fs::{metadata, remove_file, File},
     io::{self, BufRead, BufReader, Read, Write},
-    mem::zeroed,
     os::raw::c_void,
     path::Path,
     ptr::{addr_of_mut, null, null_mut},
@@ -37,7 +36,7 @@ use exml::{
         XmlInputCallback,
     },
     libxml::{
-        entities::XmlEntityPtr,
+        entities::{XmlEntityPtr, XmlEntityType},
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
         htmlparser::{
             html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
@@ -66,8 +65,8 @@ use exml::{
         xmlstring::XmlChar,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlDoc, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr, XmlNodePtr,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -122,10 +121,8 @@ unsafe fn test_external_entity_loader(
     ret
 }
 
-/*
- * Trapping the error messages at the generic level to grab the equivalent of
- * stderr messages on CLI tools.
- */
+// Trapping the error messages at the generic level to grab the equivalent of
+// stderr messages on CLI tools.
 thread_local! {
     static TEST_ERRORS: RefCell<[XmlChar; 32769]> = const { RefCell::new([0; 32769]) };
     static TEST_ERRORS_SIZE: Cell<usize> = const { Cell::new(0) };
@@ -204,9 +201,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
             name = node.as_ref().name;
         }
 
-        /*
-         * Maintain the compatibility with the legacy error handling
-         */
+        // Maintain the compatibility with the legacy error handling
         if !ctxt.is_null() {
             input = (*ctxt).input;
             if !input.is_null() && (*input).filename.is_none() && (*ctxt).input_tab.len() > 1 {
@@ -303,11 +298,8 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 }
 
-unsafe extern "C" fn initialize_libxml2() {
-    /*
-     * This verifies that xmlInitParser doesn't allocate memory with
-     * xmlMalloc
-     */
+unsafe fn initialize_libxml2() {
+    // This verifies that xmlInitParser doesn't allocate memory with xmlMalloc
     set_xml_free(None);
     set_xml_malloc(None);
     set_xml_realloc(None);
@@ -565,9 +557,7 @@ macro_rules! sax_debugln {
     }
 }
 
-/*
- * empty SAX block
- */
+// empty SAX block
 static EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: None,
     is_standalone: None,
@@ -610,145 +600,104 @@ fn increment_callbacks_counter() {
     CALLBACKS.set(CALLBACKS.get() + 1);
 }
 
-/**
- * isStandaloneDebug:
- * @ctxt:  An XML parser context
- *
- * Is this document tagged standalone ?
- *
- * Returns 1 if true
- */
+/// Is this document tagged standalone ?
+///
+/// Returns 1 if true
+#[doc(alias = "isStandaloneDebug")]
 unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.isStandalone()");
     0
 }
 
-/**
- * hasInternalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- *
- * Returns 1 if true
- */
+/// Does this document has an internal subset
+///
+/// Returns 1 if true
+#[doc(alias = "hasInternalSubsetDebug")]
 unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasInternalSubset()");
     0
 }
 
-/**
- * hasExternalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- *
- * Returns 1 if true
- */
+/// Does this document has an external subset
+///
+/// Returns 1 if true
+#[doc(alias = "hasExternalSubsetDebug")]
 unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     increment_callbacks_counter();
     sax_debugln!("SAX.hasExternalSubset()");
     0
 }
 
-/**
- * internalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- */
+/// Does this document has an internal subset
+#[doc(alias = "internalSubsetDebug")]
 unsafe fn internal_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    mut name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     increment_callbacks_counter();
-    if name.is_null() {
-        name = c"(null)".as_ptr() as _;
-    }
-    sax_debug!(
-        "SAX.internalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if external_id.is_null() {
+    let name = name.unwrap_or("(null)");
+    sax_debug!("SAX.internalSubset({name},");
+    if let Some(external_id) = external_id {
+        sax_debug!(" {external_id},");
+    } else {
         sax_debug!(" ,");
-    } else {
-        sax_debug!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        sax_debugln!(" )");
+    if let Some(system_id) = system_id {
+        sax_debugln!(" {system_id})");
     } else {
-        sax_debugln!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        sax_debugln!(" )");
     }
 }
 
-/**
- * externalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- */
+/// Does this document has an external subset
+#[doc(alias = "externalSubsetDebug")]
 unsafe fn external_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     increment_callbacks_counter();
-    sax_debug!(
-        "SAX.externalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if external_id.is_null() {
+    sax_debug!("SAX.externalSubset({},", name.unwrap_or("(null)"));
+    if let Some(external_id) = external_id {
+        sax_debug!(" {external_id},");
+    } else {
         sax_debug!(" ,");
-    } else {
-        sax_debug!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        sax_debugln!(" )");
+    if let Some(system_id) = system_id {
+        sax_debugln!(" {system_id})");
     } else {
-        sax_debugln!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        sax_debugln!(" )");
     }
 }
 
-/**
- * resolveEntityDebug:
- * @ctxt:  An XML parser context
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * Special entity resolver, better left to the parser, it has
- * more context than the application layer.
- * The default behaviour is to NOT resolve the entities, in that case
- * the ENTITY_REF nodes are built in the structure (and the parameter
- * values).
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// Special entity resolver, better left to the parser, it has
+/// more context than the application layer.
+/// The default behaviour is to NOT resolve the entities, in that case
+/// the ENTITY_REF nodes are built in the structure (and the parameter values).
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "resolveEntityDebug")]
 unsafe fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     increment_callbacks_counter();
     /* xmlParserCtxtPtr ctxt = (xmlParserCtxtPtr) ctx; */
 
     sax_debug!("SAX.resolveEntity(");
-    if !public_id.is_null() {
-        sax_debug!(
-            "{}",
-            CStr::from_ptr(public_id as *mut c_char).to_string_lossy()
-        );
+    if let Some(public_id) = public_id {
+        sax_debug!("{public_id}");
     } else {
         sax_debug!(" ");
     }
-    if !system_id.is_null() {
-        sax_debugln!(
-            ", {})",
-            CStr::from_ptr(system_id as *mut c_char).to_string_lossy()
-        );
+    if let Some(system_id) = system_id {
+        sax_debugln!(", {system_id})");
     } else {
         sax_debugln!(", )");
     }
@@ -760,86 +709,46 @@ unsafe fn resolve_entity_debug(
     null_mut()
 }
 
-/**
- * getEntityDebug:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get an entity by name
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
-unsafe fn get_entity_debug(
-    _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+/// Get an entity by name
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "getEntityDebug")]
+unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.getEntity({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    sax_debugln!("SAX.getEntity({name})");
     null_mut()
 }
 
-/**
- * getParameterEntityDebug:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get a parameter entity by name
- *
- * Returns the xmlParserInputPtr
- */
+/// Get a parameter entity by name
+///
+/// Returns the xmlParserInputPtr
+#[doc(alias = "getParameterEntityDebug")]
 unsafe fn get_parameter_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
 ) -> XmlEntityPtr {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.getParameterEntity({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    sax_debugln!("SAX.getParameterEntity({name})");
     null_mut()
 }
 
-/**
- * entityDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the entity name
- * @type:  the entity type
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @content: the entity value (without processing).
- *
- * An entity definition has been parsed
- */
-unsafe fn entity_decl_debug(
+/// An entity definition has been parsed
+#[doc(alias = "entityDeclDebug")]
+fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    typ: i32,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
-    mut content: *mut XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) {
-    let nullstr: *const XmlChar = c"(null)".as_ptr() as _;
-    /* not all libraries handle printing null pointers nicely */
-    if public_id.is_null() {
-        public_id = nullstr;
-    }
-    if system_id.is_null() {
-        system_id = nullstr;
-    }
-    if content.is_null() {
-        content = nullstr as *mut XmlChar;
-    }
     increment_callbacks_counter();
     sax_debugln!(
-        "SAX.entityDecl({}, {}, {}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        typ,
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy(),
-        CStr::from_ptr(content as _).to_string_lossy(),
+        "SAX.entityDecl({name}, {}, {}, {}, {})",
+        typ as i32,
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
+        content.unwrap_or("(null)")
     );
 }
 
@@ -848,375 +757,214 @@ unsafe fn entity_decl_debug(
 unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
     elem: &str,
-    name: *const XmlChar,
-    typ: i32,
-    def: i32,
-    default_value: *const XmlChar,
+    name: &str,
+    typ: XmlAttributeType,
+    def: XmlAttributeDefault,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
     increment_callbacks_counter();
-    if default_value.is_null() {
+    if let Some(default_value) = default_value {
         sax_debugln!(
-            "SAX.attributeDecl({elem}, {}, {}, {}, NULL, ...)",
-            CStr::from_ptr(name as _).to_string_lossy(),
-            typ,
-            def,
+            "SAX.attributeDecl({elem}, {name}, {}, {}, {default_value}, ...)",
+            typ as i32,
+            def as i32,
         );
     } else {
         sax_debugln!(
-            "SAX.attributeDecl({elem}, {}, {}, {}, {}, ...)",
-            CStr::from_ptr(name as _).to_string_lossy(),
-            typ,
-            def,
-            CStr::from_ptr(default_value as _).to_string_lossy(),
+            "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
+            typ as i32,
+            def as i32,
         );
     }
     xml_free_enumeration(tree);
 }
 
-/**
- * elementDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the element name
- * @type:  the element type
- * @content: the element value (without processing).
- *
- * An element definition has been parsed
- */
+/// An element definition has been parsed
+#[doc(alias = "elementDeclDebug")]
 unsafe fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    typ: i32,
+    name: &str,
+    typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
 ) {
     increment_callbacks_counter();
     sax_debugln!(
-        "SAX.elementDecl({}, {}, ...)",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        typ
+        "SAX.elementDecl({name}, {}, ...)",
+        typ.map_or(-1, |t| t as i32)
     );
 }
 
-/**
- * notationDeclDebug:
- * @ctxt:  An XML parser context
- * @name: The name of the notation
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * What to do when a notation declaration has been parsed.
- */
+/// What to do when a notation declaration has been parsed.
+#[doc(alias = "notationDeclDebug")]
 unsafe fn notation_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: &str,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     increment_callbacks_counter();
     sax_debugln!(
-        "SAX.notationDecl({}, {}, {})",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy(),
-        CStr::from_ptr(public_id as *mut c_char).to_string_lossy(),
-        CStr::from_ptr(system_id as *mut c_char).to_string_lossy()
+        "SAX.notationDecl({name}, {}, {})",
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)")
     );
 }
 
-/**
- * unparsedEntityDeclDebug:
- * @ctxt:  An XML parser context
- * @name: The name of the entity
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @notationName: the name of the notation
- *
- * What to do when an unparsed entity declaration is parsed
- */
-unsafe fn unparsed_entity_decl_debug(
+/// What to do when an unparsed entity declaration is parsed
+#[doc(alias = "unparsedEntityDeclDebug")]
+fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
-    mut notation_name: *const XmlChar,
+    name: &str,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
+    notation_name: Option<&str>,
 ) {
-    let nullstr: *const XmlChar = c"(null)".as_ptr() as _;
-
-    if public_id.is_null() {
-        public_id = nullstr;
-    }
-    if system_id.is_null() {
-        system_id = nullstr;
-    }
-    if notation_name.is_null() {
-        notation_name = nullstr;
-    }
     increment_callbacks_counter();
     sax_debugln!(
-        "SAX.unparsedEntityDecl({}, {}, {}, {})",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy(),
-        CStr::from_ptr(public_id as *mut c_char).to_string_lossy(),
-        CStr::from_ptr(system_id as *mut c_char).to_string_lossy(),
-        CStr::from_ptr(notation_name as *mut c_char).to_string_lossy()
+        "SAX.unparsedEntityDecl({name}, {}, {}, {})",
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
+        notation_name.unwrap_or("(null)")
     );
 }
 
-/**
- * setDocumentLocatorDebug:
- * @ctxt:  An XML parser context
- * @loc: A SAX Locator
- *
- * Receive the document locator at startup, actually xmlDefaultSAXLocator
- * Everything is available on the context, so this is useless in our case.
- */
+/// Receive the document locator at startup, actually xmlDefaultSAXLocator
+/// Everything is available on the context, so this is useless in our case.
+#[doc(alias = "setDocumentLocatorDebug")]
 unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     increment_callbacks_counter();
     sax_debugln!("SAX.setDocumentLocator()");
 }
 
-/**
- * startDocumentDebug:
- * @ctxt:  An XML parser context
- *
- * called when the document start being processed.
- */
-unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
+/// called when the document start being processed.
+#[doc(alias = "startDocumentDebug")]
+fn start_document_debug(_ctx: Option<GenericErrorContext>) {
     increment_callbacks_counter();
     sax_debugln!("SAX.startDocument()");
 }
 
-/**
- * endDocumentDebug:
- * @ctxt:  An XML parser context
- *
- * called when the document end has been detected.
- */
-unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
+/// called when the document end has been detected.
+#[doc(alias = "endDocumentDebug")]
+fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     increment_callbacks_counter();
     sax_debugln!("SAX.endDocument()");
 }
 
-/**
- * startElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementDebug")]
 unsafe fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    atts: *mut *const XmlChar,
+    name: &str,
+    atts: &[(String, Option<String>)],
 ) {
     increment_callbacks_counter();
-    sax_debug!(
-        "SAX.startElement({}",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy()
-    );
-    if !atts.is_null() {
-        let mut i = 0;
-        while !(*atts.add(i)).is_null() {
-            sax_debug!(
-                ", {}='",
-                CStr::from_ptr(*atts.add(i) as _).to_string_lossy()
-            );
-            i += 1;
-            if !(*atts.add(i)).is_null() {
-                sax_debug!("{}'", CStr::from_ptr(*atts.add(i) as _).to_string_lossy());
-            }
-            i += 1;
+    sax_debug!("SAX.startElement({name}");
+    for (key, value) in atts {
+        sax_debug!(", {key}='");
+        if let Some(value) = value {
+            sax_debug!("{value}'");
         }
     }
     sax_debugln!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
-unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
+fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.endElement({})",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy()
-    );
+    sax_debugln!("SAX.endElement({name})");
 }
 
-/**
- * charactersDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @len: the number of XmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
-unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "charactersDebug")]
+fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
-    for (i, o) in output.iter_mut().take(len.min(30) as usize).enumerate() {
-        *o = *ch.add(i);
-    }
-    output[len.clamp(0, 30) as usize] = 0;
+    let slen = ch.len().min(30);
+    output[..slen].copy_from_slice(&ch.as_bytes()[..slen]);
+    output[slen] = 0;
 
     sax_debug!("SAX.characters(");
-    SAX_DEBUG.with_borrow_mut(|f| {
-        f.as_mut()
-            .unwrap()
-            .write_all(&output[..len.clamp(0, 30) as usize])
-            .ok()
-    });
-    sax_debugln!(", {len})");
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&output[..slen]).ok());
+    sax_debugln!(", {})", ch.len());
 }
 
-/**
- * referenceDebug:
- * @ctxt:  An XML parser context
- * @name:  The entity name
- *
- * called when an entity reference is detected.
- */
-unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when an entity reference is detected.
+#[doc(alias = "referenceDebug")]
+fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.reference({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    sax_debugln!("SAX.reference({name})");
 }
 
-/**
- * ignorableWhitespaceDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @start: the first c_char in the string
- * @len: the number of XmlChar
- *
- * receiving some ignorable whitespaces from the parser.
- * Question: how much at a time ???
- */
-unsafe fn ignorable_whitespace_debug(
-    _ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: i32,
-) {
+/// receiving some ignorable whitespaces from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "ignorableWhitespaceDebug")]
+fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     let mut output: [u8; 40] = [0; 40];
 
     increment_callbacks_counter();
-    for i in 0..len.min(30) {
-        output[i as usize] = *ch.add(i as usize);
-    }
-    output[len.clamp(0, 30) as usize] = 0;
+    let slen = ch.len().min(30);
+    output[..slen].copy_from_slice(&ch.as_bytes()[..slen]);
+    output[slen] = 0;
     sax_debug!("SAX.ignorableWhitespace(");
-    SAX_DEBUG.with_borrow_mut(|f| {
-        f.as_mut()
-            .unwrap()
-            .write_all(&output[..len.clamp(0, 30) as usize])
-            .ok()
-    });
-    sax_debugln!(", {len})");
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&output[..slen]).ok());
+    sax_debugln!(", {})", ch.len());
 }
 
-/**
- * processingInstructionDebug:
- * @ctxt:  An XML parser context
- * @target:  the target name
- * @data: the PI data's
- * @len: the number of XmlChar
- *
- * A processing instruction has been parsed.
- */
+/// A processing instruction has been parsed.
+#[doc(alias = "processingInstructionDebug")]
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
-    target: *const XmlChar,
-    data: *const XmlChar,
+    target: &str,
+    data: Option<&str>,
 ) {
     increment_callbacks_counter();
-    if !data.is_null() {
-        sax_debugln!(
-            "SAX.processingInstruction({}, {})",
-            CStr::from_ptr(target as *mut c_char).to_string_lossy(),
-            CStr::from_ptr(data as *mut c_char).to_string_lossy(),
-        );
+    if let Some(data) = data {
+        sax_debugln!("SAX.processingInstruction({target}, {data})");
     } else {
-        sax_debugln!(
-            "SAX.processingInstruction({}, NULL)",
-            CStr::from_ptr(target as *mut c_char).to_string_lossy(),
-        );
+        sax_debugln!("SAX.processingInstruction({target}, NULL)");
     }
 }
 
-/**
- * cdataBlockDebug:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
-unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: i32) {
+/// called when a pcdata block has been parsed
+#[doc(alias = "cdataBlockDebug")]
+fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     increment_callbacks_counter();
-    let value = CStr::from_ptr(value as *mut c_char).to_bytes();
+    let len = value.len();
     let l = value.len().min(20);
+    let value = &value.as_bytes()[..l];
     sax_debug!("SAX.pcdata(");
-    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
+    SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(value).ok());
     sax_debugln!(", {len})");
 }
 
-/**
- * commentDebug:
- * @ctxt:  An XML parser context
- * @value:  the comment content
- *
- * A comment has been parsed.
- */
-unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+/// A comment has been parsed.
+#[doc(alias = "commentDebug")]
+unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     increment_callbacks_counter();
-    sax_debugln!(
-        "SAX.comment({})",
-        CStr::from_ptr(value as _).to_string_lossy()
-    );
+    sax_debugln!("SAX.comment({value})");
 }
 
-/**
- * warningDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a warning messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a warning messages, gives file, line, position and extra parameters.
+#[doc(alias = "warningDebug")]
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
 
     SAX_DEBUG.with_borrow_mut(|f| write!(f.as_mut().unwrap(), "SAX.warning: {}", msg).ok());
 }
 
-/**
- * errorDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a error messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a error messages, gives file, line, position and extra parameters.
+#[doc(alias = "errorDebug")]
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
     sax_debug!("SAX.error: {}", msg);
 }
 
-/**
- * fatalErrorDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a fatalError messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a fatalError messages, gives file, line, position and extra parameters.
+#[doc(alias = "fatalErrorDebug")]
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     increment_callbacks_counter();
     sax_debug!("SAX.fatalError: {msg}");
@@ -1257,126 +1005,72 @@ static DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * startElementNsDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
-#[allow(clippy::too_many_arguments)]
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementNsDebug")]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
-    nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
+    nb_defaulted: usize,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     increment_callbacks_counter();
-    sax_debug!(
-        "SAX.startElementNs({}",
-        CStr::from_ptr(localname as *mut c_char).to_string_lossy()
-    );
-    if prefix.is_null() {
-        sax_debug!(", NULL");
+    sax_debug!("SAX.startElementNs({localname}");
+    if let Some(prefix) = prefix {
+        sax_debug!(", {prefix}");
     } else {
-        sax_debug!(
-            ", {}",
-            CStr::from_ptr(prefix as *mut c_char).to_string_lossy()
-        );
-    }
-    if uri.is_null() {
         sax_debug!(", NULL");
-    } else {
-        sax_debug!(
-            ", '{}'",
-            CStr::from_ptr(uri as *mut c_char).to_string_lossy()
-        );
     }
-    sax_debug!(", {}", nb_namespaces);
+    if let Some(uri) = uri {
+        sax_debug!(", '{uri}'");
+    } else {
+        sax_debug!(", NULL");
+    }
+    sax_debug!(", {}", namespaces.len());
 
-    if !namespaces.is_null() {
-        let mut i = 0;
-        while i < nb_namespaces as usize * 2 {
-            sax_debug!(", xmlns");
-            if !(*namespaces.add(i)).is_null() {
-                sax_debug!(
-                    ":{}",
-                    CStr::from_ptr(*namespaces.add(i) as _).to_string_lossy()
-                );
-            }
-            i += 1;
-            sax_debug!(
-                "='{}'",
-                CStr::from_ptr(*namespaces.add(i) as _).to_string_lossy()
-            );
-            i += 1;
+    for (pre, loc) in namespaces {
+        sax_debug!(", xmlns");
+        if let Some(pre) = pre.as_deref() {
+            sax_debug!(":{pre}");
         }
+        sax_debug!("='{loc}'");
     }
-    sax_debug!(", {}, {}", nb_attributes, nb_defaulted);
-    if !attributes.is_null() {
-        for i in (0..nb_attributes as usize * 5).step_by(5) {
-            if !(*attributes.add(i + 1)).is_null() {
-                sax_debug!(
-                    ", {}:{}='",
-                    CStr::from_ptr(*attributes.add(i + 1) as _).to_string_lossy(),
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            } else {
-                sax_debug!(
-                    ", {}='",
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            }
-            let value = CStr::from_ptr(*attributes.add(i + 3) as _).to_bytes();
-            let l = value.len().min(4);
-            SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
-            sax_debug!(
-                "...', {}",
-                (*attributes.add(i + 4)).offset_from(*attributes.add(i + 3))
-            );
+    sax_debug!(", {}, {}", attributes.len(), nb_defaulted);
+    for attr in attributes {
+        if let Some(pre) = attr.1.as_deref() {
+            sax_debug!(", {pre}:{}='", attr.0);
+        } else {
+            sax_debug!(", {}='", attr.0);
         }
+        let value = attr.3.as_bytes();
+        let l = value.len().min(4);
+        SAX_DEBUG.with_borrow_mut(|f| f.as_mut().unwrap().write_all(&value[..l]).ok());
+        sax_debug!("...', {}", attr.3.len(),);
     }
     sax_debugln!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
 unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
 ) {
     increment_callbacks_counter();
-    sax_debug!(
-        "SAX.endElementNs({}",
-        CStr::from_ptr(localname as *mut c_char).to_string_lossy()
-    );
-    if prefix.is_null() {
+    sax_debug!("SAX.endElementNs({localname}");
+    if let Some(prefix) = prefix {
+        sax_debug!(", {prefix}");
+    } else {
         sax_debug!(", NULL");
-    } else {
-        sax_debug!(
-            ", {}",
-            CStr::from_ptr(prefix as *mut c_char).to_string_lossy()
-        );
     }
-    if uri.is_null() {
-        sax_debugln!(", NULL)");
+    if let Some(uri) = uri {
+        sax_debugln!(", '{uri}')");
     } else {
-        sax_debugln!(
-            ", '{}')",
-            CStr::from_ptr(uri as *mut c_char).to_string_lossy()
-        );
+        sax_debugln!(", NULL)");
     }
 }
 
@@ -1415,85 +1109,67 @@ static DEBUG_SAX2_HANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * htmlstartElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "htmlstartElementDebug")]
 #[cfg(feature = "html")]
 unsafe fn htmlstart_element_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    atts: *mut *const XmlChar,
+    name: &str,
+    atts: &[(String, Option<String>)],
 ) {
-    use std::ffi::c_uchar;
-
     use exml::libxml::htmlparser::html_encode_entities;
 
-    sax_debug!(
-        "SAX.startElement({}",
-        CStr::from_ptr(name as *mut c_char).to_string_lossy()
-    );
-    if !atts.is_null() {
-        let mut i = 0;
-        while !(*atts.add(i)).is_null() {
-            sax_debug!(", {}", CStr::from_ptr(*atts.add(i) as _).to_string_lossy());
-            i += 1;
-            if !(*atts.add(i)).is_null() {
-                let mut output: [c_uchar; 40] = [0; 40];
-                let mut att: *const c_uchar = *atts.add(i);
-                let mut outlen: usize;
-                let mut attlen: usize;
-                sax_debug!("='");
-                while {
-                    attlen = strlen(att as *mut c_char);
-                    attlen > 0
-                } {
-                    outlen = output.len() - 1;
-                    html_encode_entities(
-                        output.as_mut_ptr(),
-                        addr_of_mut!(outlen) as _,
-                        att,
-                        addr_of_mut!(attlen) as _,
-                        b'\'' as _,
-                    );
-                    output[outlen] = 0;
-                    sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
-                    att = att.add(attlen);
-                }
-                sax_debug!("'");
+    sax_debug!("SAX.startElement({name}");
+    for (key, value) in atts {
+        sax_debug!(", {key}");
+        if let Some(value) = value {
+            let value = CString::new(value.as_str()).unwrap();
+            let mut output: [u8; 40] = [0; 40];
+            let mut att = value.as_ptr() as *const u8;
+            let mut outlen: usize;
+            let mut attlen: usize;
+            sax_debug!("='");
+            while {
+                attlen = strlen(att as *mut c_char);
+                attlen > 0
+            } {
+                outlen = output.len() - 1;
+                html_encode_entities(
+                    output.as_mut_ptr(),
+                    addr_of_mut!(outlen) as _,
+                    att,
+                    addr_of_mut!(attlen) as _,
+                    b'\'' as _,
+                );
+                output[outlen] = 0;
+                sax_debug!("{}", CStr::from_ptr(output.as_ptr() as _).to_string_lossy());
+                att = att.add(attlen);
             }
-            i += 1;
+            sax_debug!("'");
         }
     }
     sax_debugln!(")");
 }
 
-/**
- * htmlcharactersDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @len: the number of XmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "htmlcharactersDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
+    let len = ch.len();
     let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: i32 = len;
+    let mut inlen: i32 = len as i32;
     let mut outlen: usize = 30;
+    let ch = CString::new(ch).unwrap();
 
     html_encode_entities(
         output.as_mut_ptr(),
         addr_of_mut!(outlen) as _,
-        ch,
+        ch.as_ptr() as *const u8,
         addr_of_mut!(inlen),
         0,
     );
@@ -1506,29 +1182,25 @@ unsafe fn htmlcharacters_debug(_ctx: Option<GenericErrorContext>, ch: *const Xml
     );
 }
 
-/**
- * htmlcdataDebug:
- * @ctxt:  An XML parser context
- * @ch:  a XmlChar string
- * @len: the number of XmlChar
- *
- * receiving some cdata chars from the parser.
- * Question: how much at a time ???
- */
+/// receiving some cdata chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "htmlcdataDebug")]
 #[cfg(feature = "html")]
-unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn htmlcdata_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     use std::ffi::c_uchar;
 
     use exml::libxml::htmlparser::html_encode_entities;
 
+    let len = ch.len();
     let mut output: [c_uchar; 40] = [0; 40];
-    let mut inlen: i32 = len;
+    let mut inlen: i32 = len as i32;
     let mut outlen: usize = 30;
+    let ch = CString::new(ch).unwrap();
 
     html_encode_entities(
         output.as_mut_ptr(),
         addr_of_mut!(outlen) as _,
-        ch,
+        ch.as_ptr() as *const u8,
         addr_of_mut!(inlen),
         0,
     );
@@ -1577,16 +1249,139 @@ static DEBUG_HTMLSAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     serror: None,
 };
 
-/**
- * saxParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the SAX API and check for errors.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// If test is passed, return `true`, otherwise return `false`.
+fn sax_compare_file(temp: impl AsRef<Path>, result: impl AsRef<Path>) -> bool {
+    let mut temp_file = File::open(temp.as_ref()).unwrap();
+    let mut result_file = File::open(result.as_ref()).unwrap();
+
+    let mut tbuf = String::new();
+    temp_file.read_to_string(&mut tbuf).ok();
+    let mut rbuf = String::new();
+    result_file.read_to_string(&mut rbuf).ok();
+
+    // If the contents of both files are exactly same, it is fine.
+    if tbuf == rbuf {
+        return true;
+    }
+
+    let mut tbuf = tbuf.lines();
+    let mut rbuf = rbuf.lines();
+    while let (Some(t), Some(r)) = (tbuf.next(), rbuf.next()) {
+        if t == r {
+            continue;
+        }
+
+        let start_element_ns = "SAX.startElementNs(";
+        if let (Some(t), Some(r)) = (
+            t.strip_prefix(start_element_ns),
+            r.strip_prefix(start_element_ns),
+        ) {
+            // The original libxml2 might pass a direct reference to the input buffer as an attribute value without allocation or copying.
+            // Therefore, if its length are too short, the string that includes the buffer follows to the attribute value may be shown.
+            let mut t = t.to_owned();
+            let mut r = r.to_owned();
+            while !t.ends_with(')') {
+                let Some(next) = tbuf.next() else {
+                    return false;
+                };
+                t.push('\n');
+                t.push_str(next);
+            }
+            while !r.ends_with(')') {
+                let Some(next) = rbuf.next() else {
+                    return false;
+                };
+                r.push('\n');
+                r.push_str(next);
+            }
+            fn trim_before_attribute(s: &str) -> Option<&str> {
+                let (_, s) = s.split_once(',')?; // tag name
+                let (_, s) = s.split_once(',')?; // prefix
+                let (_, s) = s.split_once(',')?; // namespace url
+                let (num_namespaces, mut s) = s.split_once(',')?;
+                // eprintln!("num_namespaces: {num_namespaces}");
+                let num_namespaces = num_namespaces.trim().parse::<usize>().ok()?;
+                for _ in 0..num_namespaces {
+                    let (_, rem) = s.split_once(',')?; // namespace decls
+                    s = rem;
+                }
+                let (_, s) = s.split_once(',')?; // the number of attributes
+                Some(s.split_once(", ")?.1) // the number of defaulted and space
+            }
+            let (Some(mut tattr), Some(mut rattr)) =
+                (trim_before_attribute(&t), trim_before_attribute(&r))
+            else {
+                eprintln!("SAX compare failed:\n{t}\n{r}");
+                return false;
+            };
+            if t[..t.len() - tattr.len()] != r[..r.len() - rattr.len()] {
+                eprintln!(
+                    "SAX compare failed:\n{}\n{}",
+                    &t[..t.len() - tattr.len()],
+                    &r[..r.len() - rattr.len()]
+                );
+                return false;
+            }
+            while !tattr.is_empty() {
+                if let Some((attname, trem)) = tattr.split_once('\'') {
+                    let Some((att, rrem)) = rattr.split_once('\'') else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    if attname != att {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    }
+                    let (Some((tatt, trem)), Some((ratt, rrem))) =
+                        (trem.split_once(", "), rrem.split_once(", "))
+                    else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    // eprintln!("trem: {trem:?}, rrem: {rrem:?}");
+                    let (Some((tlen, trem)), Some((rlen, rrem))) = (
+                        trem.split_once(',').or_else(|| trem.split_once(')')),
+                        rrem.split_once(',').or_else(|| trem.split_once(')')),
+                    ) else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    if tlen != rlen {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    }
+                    let (Ok(tlen), Ok(rlen)) = (tlen.parse::<usize>(), rlen.parse::<usize>())
+                    else {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    };
+                    if tatt[..tlen.min(tatt.len())] != ratt[..rlen.min(ratt.len())] {
+                        eprintln!("SAX compare failed:\n{t}\n{r}");
+                        return false;
+                    }
+                    tattr = trem;
+                    rattr = rrem;
+                } else {
+                    eprintln!("SAX compare failed:\n{t}\n{r}");
+                    return false;
+                }
+            }
+            if rattr.is_empty() {
+                continue;
+            }
+        }
+
+        eprintln!("SAX compare failed:\n{t}\n{r}");
+        return false;
+    }
+
+    tbuf.next().is_none() && rbuf.next().is_none()
+}
+
+/// Parse a file using the SAX API and check for errors.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "saxParseTest")]
 unsafe fn sax_parse_test(
     filename: &str,
     result: Option<String>,
@@ -1619,18 +1414,17 @@ unsafe fn sax_parse_test(
 
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
-        let ctxt: HtmlParserCtxtPtr =
-            html_new_sax_parser_ctxt(&raw const EMPTY_SAXHANDLER_STRUCT, None);
+        let mut sax = XmlSAXHandler::default();
+        std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
+        let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
         html_ctxt_read_file(ctxt, filename, None, options);
         html_free_parser_ctxt(ctxt);
         ret = 0;
     } else {
         let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
-        memcpy(
-            (*ctxt).sax as _,
-            &raw const EMPTY_SAXHANDLER_STRUCT as _,
-            size_of::<XmlSAXHandler>(),
-        );
+        let mut sax = XmlSAXHandler::default();
+        std::ptr::copy(&EMPTY_SAXHANDLER_STRUCT, &mut sax, 1);
+        (*ctxt).sax = Some(Box::new(sax));
         xml_ctxt_use_options(ctxt, options);
         xml_parse_document(ctxt);
         ret = if (*ctxt).well_formed != 0 {
@@ -1669,27 +1463,22 @@ unsafe fn sax_parse_test(
         }
         #[cfg(feature = "html")]
         if options & XML_PARSE_HTML != 0 {
-            let ctxt: HtmlParserCtxtPtr =
-                html_new_sax_parser_ctxt(&raw const DEBUG_HTMLSAXHANDLER_STRUCT, None);
+            let mut sax = XmlSAXHandler::default();
+            std::ptr::copy(&DEBUG_HTMLSAXHANDLER_STRUCT, &mut sax, 1);
+            let ctxt: HtmlParserCtxtPtr = html_new_sax_parser_ctxt(Some(Box::new(sax)), None);
             html_ctxt_read_file(ctxt, filename, None, options);
             html_free_parser_ctxt(ctxt);
             ret = 0;
         } else {
             let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
+            let mut sax = XmlSAXHandler::default();
             if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
-                memcpy(
-                    (*ctxt).sax as _,
-                    &raw const DEBUG_SAXHANDLER_STRUCT as _,
-                    size_of::<XmlSAXHandler>(),
-                );
+                std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
                 options -= XmlParserOption::XmlParseSax1 as i32;
             } else {
-                memcpy(
-                    (*ctxt).sax as _,
-                    &raw const DEBUG_SAX2_HANDLER_STRUCT as _,
-                    size_of::<XmlSAXHandler>(),
-                );
+                std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
             }
+            (*ctxt).sax = Some(Box::new(sax));
             xml_ctxt_use_options(ctxt, options);
             xml_parse_document(ctxt);
             ret = if (*ctxt).well_formed != 0 {
@@ -1732,8 +1521,14 @@ unsafe fn sax_parse_test(
             ret = 0;
         }
 
-        if compare_files(temp.as_str(), result.unwrap()) != 0 {
+        if compare_files(temp.as_str(), result.as_deref().unwrap()) != 0
+            && !sax_compare_file(temp.as_str(), result.unwrap())
+        {
             eprintln!("Got a difference for {filename}",);
+            let mut content = String::new();
+            let mut temp = File::open(temp.as_str()).unwrap();
+            temp.read_to_string(&mut content).unwrap();
+            eprint!("{content}");
             ret = 1;
         }
     }
@@ -1809,17 +1604,11 @@ unsafe fn old_parse_test(
     res
 }
 
-/**
- * pushParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a file using the Push API, then serialize back
- * to check for content.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the Push API, then serialize back
+/// to check for content.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "pushParseTest")]
 #[cfg(feature = "libxml_push")]
 unsafe fn push_parse_test(
     filename: &str,
@@ -1844,9 +1633,7 @@ unsafe fn push_parse_test(
 
     NB_TESTS.set(NB_TESTS.get() + 1);
 
-    /*
-     * load the document in memory and work from there.
-     */
+    // load the document in memory and work from there.
     if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
@@ -1859,7 +1646,7 @@ unsafe fn push_parse_test(
     #[cfg(feature = "html")]
     let ctxt = if options & XML_PARSE_HTML != 0 {
         html_create_push_parser_ctxt(
-            null_mut(),
+            None,
             None,
             base.add(cur as _),
             chunk_size,
@@ -1868,7 +1655,7 @@ unsafe fn push_parse_test(
         )
     } else {
         xml_create_push_parser_ctxt(
-            null_mut(),
+            None,
             None,
             base.add(cur as _),
             chunk_size,
@@ -1876,13 +1663,7 @@ unsafe fn push_parse_test(
         )
     };
     #[cfg(not(feature = "html"))]
-    let ctxt = xml_create_push_parser_ctxt(
-        null_mut(),
-        null_mut(),
-        base.add(cur as _),
-        chunk_size,
-        filename,
-    );
+    let ctxt = xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, filename);
     xml_ctxt_use_options(ctxt, options);
     cur += chunk_size;
     chunk_size = 1024;
@@ -1991,9 +1772,9 @@ thread_local! {
 #[cfg(feature = "libxml_push")]
 unsafe fn internal_subset_bnd(
     ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     use exml::libxml::sax2::xml_sax2_internal_subset;
 
@@ -2002,7 +1783,7 @@ unsafe fn internal_subset_bnd(
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: &str) {
     use exml::libxml::sax2::xml_sax2_reference;
 
     PUSH_BOUNDARY_REF_COUNT.set(PUSH_BOUNDARY_REF_COUNT.get() + 1);
@@ -2010,28 +1791,28 @@ unsafe fn reference_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) 
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn characters_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
     use exml::libxml::sax2::xml_sax2_characters;
 
     PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     PUSH_BOUNDARY_CHARS_COUNT.set(PUSH_BOUNDARY_CHARS_COUNT.get() + 1);
-    xml_sax2_characters(ctx, ch, len);
+    xml_sax2_characters(ctx, ch);
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: i32) {
+unsafe fn cdata_block_bnd(ctx: Option<GenericErrorContext>, ch: &str) {
     use exml::libxml::sax2::xml_sax2_cdata_block;
 
     PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     PUSH_BOUNDARY_CDATA_COUNT.set(PUSH_BOUNDARY_CDATA_COUNT.get() + 1);
-    xml_sax2_cdata_block(ctx, ch, len);
+    xml_sax2_cdata_block(ctx, ch);
 }
 
 #[cfg(feature = "libxml_push")]
 unsafe fn processing_instruction_bnd(
     ctx: Option<GenericErrorContext>,
-    target: *const XmlChar,
-    data: *const XmlChar,
+    target: &str,
+    data: Option<&str>,
 ) {
     use exml::libxml::sax2::xml_sax2_processing_instruction;
 
@@ -2040,7 +1821,7 @@ unsafe fn processing_instruction_bnd(
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: &str) {
     use exml::libxml::sax2::xml_sax2_comment;
 
     let ctxt = {
@@ -2057,44 +1838,37 @@ unsafe fn comment_bnd(ctx: Option<GenericErrorContext>, value: *const XmlChar) {
 #[cfg(feature = "libxml_push")]
 unsafe fn start_element_bnd(
     ctx: Option<GenericErrorContext>,
-    xname: *const XmlChar,
-    atts: *mut *const XmlChar,
+    xname: &str,
+    atts: &[(String, Option<String>)],
 ) {
     use exml::libxml::sax2::xml_sax2_start_element;
 
-    let name: *const c_char = xname as *const c_char;
-
-    /* Some elements might be created automatically. */
-    if strcmp(name, c"html".as_ptr()) != 0
-        && strcmp(name, c"body".as_ptr()) != 0
-        && strcmp(name, c"head".as_ptr()) != 0
-        && strcmp(name, c"p".as_ptr()) != 0
-    {
+    // Some elements might be created automatically.
+    if xname != "html" && xname != "body" && xname != "head" && xname != "p" {
         PUSH_BOUNDARY_COUNT.set(PUSH_BOUNDARY_COUNT.get() + 1);
     }
     xml_sax2_start_element(ctx, xname, atts);
 }
 
 #[cfg(feature = "libxml_push")]
-unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+unsafe fn end_element_bnd(ctx: Option<GenericErrorContext>, name: &str) {
     /*pushBoundaryCount++;*/
 
     use exml::libxml::sax2::xml_sax2_end_element;
     xml_sax2_end_element(ctx, name);
 }
 
-#[allow(clippy::too_many_arguments)]
 #[cfg(feature = "libxml_push")]
+#[allow(clippy::too_many_arguments)]
+// #[allow(clippy::type_complexity)]
 unsafe fn start_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
-    nb_namespaces: i32,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: i32,
-    nb_defaulted: i32,
-    attributes: *mut *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
+    nb_defaulted: usize,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     use exml::libxml::sax2::xml_sax2_start_element_ns;
 
@@ -2104,9 +1878,7 @@ unsafe fn start_element_ns_bnd(
         localname,
         prefix,
         uri,
-        nb_namespaces,
         namespaces,
-        nb_attributes,
         nb_defaulted,
         attributes,
     );
@@ -2115,25 +1887,19 @@ unsafe fn start_element_ns_bnd(
 #[cfg(feature = "libxml_push")]
 unsafe fn end_element_ns_bnd(
     ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
 ) {
     use exml::libxml::sax2::xml_sax2_end_element_ns;
     xml_sax2_end_element_ns(ctx, localname, prefix, uri);
 }
 
-/**
- * pushBoundaryTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Test whether the push parser detects boundaries between syntactical
- * elements correctly.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Test whether the push parser detects boundaries between syntactical
+/// elements correctly.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "pushBoundaryTest")]
 #[cfg(feature = "libxml_push")]
 unsafe fn push_boundary_test(
     filename: &str,
@@ -2152,9 +1918,8 @@ unsafe fn push_boundary_test(
             sax2::{xml_sax2_init_html_default_sax_handler, xml_sax_version},
         },
     };
-    use libc::memset;
 
-    let mut bnd_sax: XmlSAXHandler = unsafe { zeroed() };
+    let mut bnd_sax = XmlSAXHandler::default();
     let mut base: *const c_char = null();
     let mut size: i32 = 0;
     let mut res: i32;
@@ -2165,23 +1930,20 @@ unsafe fn push_boundary_test(
     let mut consumed: u64;
     let cfilename = CString::new(filename).unwrap();
 
-    /*
-     * If the parser made progress, check that exactly one construct was
-     * processed and that the input buffer is (almost) empty.
-     * Since we use a chunk size of 1, this tests whether content is
-     * processed as early as possible.
-     */
+    // If the parser made progress, check that exactly one construct was
+    // processed and that the input buffer is (almost) empty.
+    // Since we use a chunk size of 1, this tests whether content is
+    // processed as early as possible.
 
     NB_TESTS.set(NB_TESTS.get() + 1);
 
-    memset(addr_of_mut!(bnd_sax) as _, 0, size_of::<XmlSAXHandler>());
     #[cfg(feature = "html")]
     if options & XML_PARSE_HTML != 0 {
-        xml_sax2_init_html_default_sax_handler(addr_of_mut!(bnd_sax) as _);
+        xml_sax2_init_html_default_sax_handler(&mut bnd_sax);
         bnd_sax.start_element = Some(start_element_bnd);
         bnd_sax.end_element = Some(end_element_bnd);
     } else {
-        xml_sax_version(addr_of_mut!(bnd_sax) as _, 2);
+        xml_sax_version(&mut bnd_sax, 2);
         bnd_sax.start_element_ns = Some(start_element_ns_bnd);
         bnd_sax.end_element_ns = Some(end_element_ns_bnd);
     }
@@ -2199,9 +1961,7 @@ unsafe fn push_boundary_test(
     bnd_sax.processing_instruction = Some(processing_instruction_bnd);
     bnd_sax.comment = Some(comment_bnd);
 
-    /*
-     * load the document in memory and work from there.
-     */
+    // load the document in memory and work from there.
     if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
@@ -2210,7 +1970,7 @@ unsafe fn push_boundary_test(
     #[cfg(feature = "html")]
     let ctxt = if options & XML_PARSE_HTML != 0 {
         html_create_push_parser_ctxt(
-            addr_of_mut!(bnd_sax) as _,
+            Some(Box::new(bnd_sax)),
             None,
             base,
             1,
@@ -2218,17 +1978,10 @@ unsafe fn push_boundary_test(
             XmlCharEncoding::None,
         )
     } else {
-        xml_create_push_parser_ctxt(
-            addr_of_mut!(bnd_sax) as _,
-            None,
-            base,
-            1,
-            cfilename.as_ptr(),
-        )
+        xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), None, base, 1, cfilename.as_ptr())
     };
     #[cfg(not(feature = "html"))]
-    let ctxt =
-        xml_create_push_parser_ctxt(addr_of_mut!(bnd_sax) as _, null_mut(), base, 1, filename);
+    let ctxt = xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename);
     xml_ctxt_use_options(ctxt, options);
     cur = 1;
     consumed = 0;
@@ -2272,42 +2025,31 @@ unsafe fn push_boundary_test(
         }
         cur += 1;
 
-        /*
-         * Callback check: Check that only a single construct was parsed.
-         */
+        // Callback check: Check that only a single construct was parsed.
         if PUSH_BOUNDARY_REF_COUNT.get() > 0 {
             num_callbacks = 1;
         } else {
             num_callbacks = PUSH_BOUNDARY_COUNT.get();
             if PUSH_BOUNDARY_CHARS_COUNT.get() > 1 {
                 if options & XML_PARSE_HTML != 0 {
-                    /*
-                     * The HTML parser can generate a mix of chars and
-                     * references.
-                     */
+                    // The HTML parser can generate a mix of chars and references.
                     num_callbacks -= PUSH_BOUNDARY_CHARS_COUNT.get() - 1;
                 } else {
-                    /*
-                     * Allow two chars callbacks. This can happen when
-                     * multi-byte chars are split across buffer boundaries.
-                     */
+                    // Allow two chars callbacks. This can happen when
+                    // multi-byte chars are split across buffer boundaries.
                     num_callbacks -= 1;
                 }
             }
             if options & XML_PARSE_HTML != 0 {
-                /*
-                 * Allow multiple cdata callbacks in HTML mode.
-                 */
+                // Allow multiple cdata callbacks in HTML mode.
                 if PUSH_BOUNDARY_CDATA_COUNT.get() > 1 {
                     num_callbacks -= PUSH_BOUNDARY_CDATA_COUNT.get() - 1;
                 }
             }
         }
 
-        /*
-         * Buffer check: If input was consumed, check that the input
-         * buffer is (almost) empty.
-         */
+        // Buffer check: If input was consumed, check that the input
+        // buffer is (almost) empty.
         consumed = (*(*ctxt).input).consumed
             + (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as u64;
         if (*ctxt).instate != XmlParserInputState::XmlParserDTD
@@ -2321,19 +2063,19 @@ unsafe fn push_boundary_test(
             if options & XML_PARSE_HTML != 0
                 && ((*ctxt).instate == XmlParserInputState::XmlParserEndTag)
             {
-                /* Something related to script parsing. */
+                // Something related to script parsing.
                 max = 3;
             } else if is_text != 0 {
                 let c: i32 = *(*(*ctxt).input).cur as i32;
 
-                /* 3 bytes for partial UTF-8 */
+                // 3 bytes for partial UTF-8
                 max = if c == b'<' as i32 || c == b'&' as i32 {
                     1
                 } else {
                     3
                 };
             } else if (*ctxt).instate == XmlParserInputState::XmlParserCDATASection {
-                /* 2 bytes for terminator, 3 bytes for UTF-8 */
+                // 2 bytes for terminator, 3 bytes for UTF-8
                 max = 5;
             }
 
@@ -2418,18 +2160,12 @@ unsafe fn push_boundary_test(
     0
 }
 
-/**
- * memParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a file using the old xmlReadMemory API, then serialize back
- * reparse the result and serialize again, then check for deviation
- * in serialization.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the old xmlReadMemory API, then serialize back
+/// reparse the result and serialize again, then check for deviation
+/// in serialization.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "memParseTest")]
 unsafe fn mem_parse_test(
     filename: &str,
     result: Option<String>,
@@ -2440,9 +2176,7 @@ unsafe fn mem_parse_test(
     let mut size: i32 = 0;
 
     NB_TESTS.set(NB_TESTS.get() + 1);
-    /*
-     * load and parse the memory
-     */
+    // load and parse the memory
     if load_mem(filename, &raw mut base, &raw mut size) != 0 {
         eprintln!("Failed to load {filename}",);
         return -1;
@@ -2471,18 +2205,12 @@ unsafe fn mem_parse_test(
     0
 }
 
-/**
- * noentParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages: unused
- *
- * Parse a file with entity resolution, then serialize back
- * reparse the result and serialize again, then check for deviation
- * in serialization.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file with entity resolution, then serialize back
+/// reparse the result and serialize again, then check for deviation
+/// in serialization.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "noentParseTest")]
 unsafe fn noent_parse_test(
     filename: &str,
     result: Option<String>,
@@ -2524,16 +2252,10 @@ unsafe fn noent_parse_test(
     res
 }
 
-/**
- * errParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the xmlReadFile API and check for errors.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the xmlReadFile API and check for errors.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "errParseTest")]
 unsafe fn err_parse_test(
     filename: &str,
     result: Option<String>,
@@ -2750,16 +2472,10 @@ unsafe fn stream_process_test(
     0
 }
 
-/**
- * streamParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the reader API and check for errors.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the reader API and check for errors.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "streamParseTest")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn stream_parse_test(
     filename: &str,
@@ -2777,16 +2493,10 @@ unsafe fn stream_parse_test(
     ret
 }
 
-/**
- * walkerParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the walker, i.e. a reader built from a atree.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the walker, i.e. a reader built from a atree.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "walkerParseTest")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn walker_parse_test(
     filename: &str,
@@ -2808,16 +2518,10 @@ unsafe fn walker_parse_test(
     ret
 }
 
-/**
- * streamMemParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file using the reader API from memory and check for errors.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file using the reader API from memory and check for errors.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "streamMemParseTest")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn stream_mem_parse_test(
     filename: &str,
@@ -2914,16 +2618,10 @@ unsafe extern "C" fn test_xpath(str: *const c_char, xptr: i32, expr: i32) {
     set_generic_error(None, None);
 }
 
-/**
- * xpathExprTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing XPath standalone expressions and evaluate them
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing XPath standalone expressions and evaluate them
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "xpathExprTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, expr: i32) -> i32 {
     use std::io::{BufRead, BufReader};
@@ -3047,16 +2745,10 @@ unsafe fn xpath_common_test(filename: &str, result: Option<String>, xptr: i32, e
     ret
 }
 
-/**
- * xpathExprTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing XPath standalone expressions and evaluate them
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing XPath standalone expressions and evaluate them
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "xpathExprTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe fn xpath_expr_test(
     filename: &str,
@@ -3067,17 +2759,11 @@ unsafe fn xpath_expr_test(
     xpath_common_test(filename, result, 0, 1)
 }
 
-/**
- * xpathDocTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing XPath expressions and evaluate them against
- * a set of corresponding documents.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing XPath expressions and evaluate them against
+/// a set of corresponding documents.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "xpathDocTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug"))]
 unsafe fn xpath_doc_test(
     filename: &str,
@@ -3148,17 +2834,11 @@ unsafe fn xpath_doc_test(
     ret
 }
 
-/**
- * xptrDocTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing XPath expressions and evaluate them against
- * a set of corresponding documents.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing XPath expressions and evaluate them against
+/// a set of corresponding documents.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "xptrDocTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "xpointer"))]
 unsafe fn xptr_doc_test(
     filename: &str,
@@ -3236,17 +2916,11 @@ unsafe fn xptr_doc_test(
     ret
 }
 
-/**
- * xmlidDocTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing xml:id and check for errors and verify
- * that XPath queries will work on them as expected.
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing xml:id and check for errors and verify
+/// that XPath queries will work on them as expected.
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "xmlidDocTest")]
 #[cfg(all(feature = "xpath", feature = "libxml_debug", feature = "libxml_valid"))]
 unsafe fn xmlid_doc_test(
     filename: &str,
@@ -3417,16 +3091,10 @@ unsafe fn uri_common_test(
     res
 }
 
-/**
- * uriParseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing URI and check for errors
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing URI and check for errors
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "uriParseTest")]
 unsafe fn uri_parse_test(
     filename: &str,
     result: Option<String>,
@@ -3436,17 +3104,11 @@ unsafe fn uri_parse_test(
     uri_common_test(filename, result, err, None)
 }
 
-/**
- * uriBaseTest:
- * @filename: the file to parse
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing URI, compose them against a fixed base and
- * check for errors
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a file containing URI, compose them against a fixed base and
+/// check for errors
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "uriBaseTest")]
 unsafe fn uri_base_test(
     filename: &str,
     result: Option<String>,
@@ -3472,21 +3134,21 @@ const URIP_TEST_URLS: &[&str] = &[
     "urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
 const URIP_RCVS_URLS: &[&str] = &[
-    /* it is an URI the strings must be escaped */
+    // it is an URI the strings must be escaped
     "urip://example.com/a%20b.html",
-    /* check that % escaping is not broken */
+    // check that % escaping is not broken
     "urip://example.com/a%20b.html",
-    /* it's an URI path the strings must be escaped */
+    // it's an URI path the strings must be escaped
     "file:///path/to/a%20b.html",
-    /* check that % escaping is not broken */
+    // check that % escaping is not broken
     "file:///path/to/a%20b.html",
-    /* this is not an URI, this is a path, so this should not be escaped */
+    // this is not an URI, this is a path, so this should not be escaped
     "/path/to/a b.html",
-    /* check that paths with % are not broken */
+    // check that paths with % are not broken
     "/path/to/a%20b.html",
-    /* out of context the encoding can't be guessed byte by byte conversion */
+    // out of context the encoding can't be guessed byte by byte conversion
     // "urip://example.com/r%E9sum%E9.html",
-    /* verify we don't destroy URIs especially the query part */
+    // verify we don't destroy URIs especially the query part
     "urip://example.com/test?a=1&b=2%263&c=4#foo",
 ];
 const URIP_RES: &CStr = c"<list/>";
@@ -3497,14 +3159,10 @@ thread_local! {
     static URIP_RLEN: Cell<usize> = const { Cell::new(0) };
 }
 
-/**
- * uripMatch:
- * @URI: an URI to test
- *
- * Check for an urip: query
- *
- * Returns 1 if yes and 0 if another Input module should be used
- */
+/// Check for an urip: query
+///
+/// Returns 1 if yes and 0 if another Input module should be used
+#[doc(alias = "uripMatch")]
 unsafe fn urip_match(uri: &str) -> i32 {
     const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
     if uri == CATALOG_URL {
@@ -3517,15 +3175,11 @@ unsafe fn urip_match(uri: &str) -> i32 {
     1
 }
 
-/**
- * uripOpen:
- * @URI: an URI to test
- *
- * Return a pointer to the urip: query handler, in this example simply
- * the urip_current pointer...
- *
- * Returns an Input context or NULL in case or error
- */
+/// Return a pointer to the urip: query handler, in this example simply
+/// the urip_current pointer...
+///
+/// Returns an Input context or NULL in case or error
+#[doc(alias = "uripOpen")]
 unsafe fn urip_open(uri: &str) -> *mut c_void {
     const CATALOG_URL: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
     if uri == CATALOG_URL {
@@ -3540,15 +3194,11 @@ unsafe fn urip_open(uri: &str) -> *mut c_void {
     URIP_CUR.get() as _
 }
 
-/**
- * uripClose:
- * @context: the read context
- *
- * Close the urip: query handler
- *
- * Returns 0 or -1 in case of error
- */
-unsafe extern "C" fn urip_close(context: *mut c_void) -> i32 {
+/// Close the urip: query handler
+///
+/// Returns 0 or -1 in case of error
+#[doc(alias = "uripClose")]
+unsafe fn urip_close(context: *mut c_void) -> i32 {
     if context.is_null() {
         return -1;
     }
@@ -3557,17 +3207,11 @@ unsafe extern "C" fn urip_close(context: *mut c_void) -> i32 {
     0
 }
 
-/**
- * uripRead:
- * @context: the read context
- * @buffer: where to store data
- * @len: number of bytes to read
- *
- * Implement an urip: query read.
- *
- * Returns the number of bytes read or -1 in case of error
- */
-unsafe extern "C" fn urip_read(context: *mut c_void, buffer: *mut c_char, mut len: i32) -> i32 {
+/// Implement an urip: query read.
+///
+/// Returns the number of bytes read or -1 in case of error
+#[doc(alias = "uripRead")]
+unsafe fn urip_read(context: *mut c_void, buffer: *mut c_char, mut len: i32) -> i32 {
     let ptr: *const c_char = context as *const c_char;
 
     if context.is_null() || buffer.is_null() || len < 0 {
@@ -3591,17 +3235,11 @@ unsafe fn urip_check_url(url: &str) -> i32 {
     1
 }
 
-/**
- * uriPathTest:
- * @filename: ignored
- * @result: ignored
- * @err: ignored
- *
- * Run a set of tests to check how Path and URI are handled before
- * being passed to the I/O layer
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Run a set of tests to check how Path and URI are handled before
+/// being passed to the I/O layer
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "uriPathTest")]
 unsafe fn uri_path_test(
     _filename: &str,
     _result: Option<String>,
@@ -3757,17 +3395,12 @@ unsafe fn schemas_one_test(
     xml_free_doc(doc);
     ret
 }
-/**
- * schemasTest:
- * @filename: the schemas file
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a file containing URI, compose them against a fixed base and
- * check for errors
- *
- * Returns 0 in case of success, an error code otherwise
- */
+
+/// Parse a file containing URI, compose them against a fixed base and
+/// check for errors
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "schemasTest")]
 #[cfg(feature = "schema")]
 unsafe fn schemas_test(
     filename: &str,
@@ -3796,7 +3429,7 @@ unsafe fn schemas_test(
     let mut globbuf: glob_t = unsafe { zeroed() };
     let mut count: c_char;
 
-    /* first compile the schemas if possible */
+    // first compile the schemas if possible
     let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(cfilename.as_ptr());
     xml_schema_set_parser_errors(
         ctxt,
@@ -3989,16 +3622,11 @@ unsafe fn rng_one_test(
     xml_free_doc(doc);
     ret
 }
-/**
- * rngTest:
- * @filename: the schemas file
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse an RNG schemas and then apply it to the related .xml
- *
- * Returns 0 in case of success, an error code otherwise
- */
+
+/// Parse an RNG schemas and then apply it to the related .xml
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "rngTest")]
 #[cfg(feature = "schema")]
 unsafe fn rng_test(
     filename: &str,
@@ -4027,7 +3655,7 @@ unsafe fn rng_test(
     let mut globbuf: glob_t = unsafe { zeroed() };
     let mut count: c_char;
 
-    /* first compile the schemas if possible */
+    // first compile the schemas if possible
     let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(cfilename.as_ptr());
     xml_relaxng_set_parser_errors(
         ctxt,
@@ -4045,9 +3673,7 @@ unsafe fn rng_test(
     }
     let parse_errors_size = TEST_ERRORS_SIZE.get();
 
-    /*
-     * most of the mess is about the output filenames generated by the Makefile
-     */
+    // * most of the mess is about the output filenames generated by the Makefile
     len = strlen(base);
     if !(5..=499).contains(&len) {
         xml_relaxng_free(schemas);
@@ -4132,16 +3758,10 @@ unsafe fn rng_test(
     ret
 }
 
-/**
- * rngStreamTest:
- * @filename: the schemas file
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a set of files with streaming, applying an RNG schemas
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a set of files with streaming, applying an RNG schemas
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "rngStreamTest")]
 #[cfg(all(feature = "schema", feature = "libxml_reader"))]
 unsafe fn rng_stream_test(
     filename: &str,
@@ -4170,9 +3790,7 @@ unsafe fn rng_stream_test(
     let mut reader: XmlTextReaderPtr;
     let mut disable_err: i32 = 0;
 
-    /*
-     * most of the mess is about the output filenames generated by the Makefile
-     */
+    // most of the mess is about the output filenames generated by the Makefile
     len = strlen(base);
     if !(5..=499).contains(&len) {
         eprintln!("len(base) == {} !", len);
@@ -4182,10 +3800,8 @@ unsafe fn rng_stream_test(
     memcpy(prefix.as_mut_ptr() as _, base as _, len);
     prefix[len] = 0;
 
-    /*
-     * strictly unifying the error messages is nearly impossible this
-     * hack is also done in the Makefile
-     */
+    // strictly unifying the error messages is nearly impossible this
+    // hack is also done in the Makefile
     if strcmp(prefix.as_ptr(), c"tutor10_1".as_ptr()) == 0
         || strcmp(prefix.as_ptr(), c"tutor10_2".as_ptr()) == 0
         || strcmp(prefix.as_ptr(), c"tutor3_2".as_ptr()) == 0
@@ -4293,7 +3909,7 @@ unsafe fn rng_stream_test(
 }
 
 #[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
-unsafe extern "C" fn pattern_node(
+unsafe fn pattern_node(
     out: &mut File,
     reader: XmlTextReaderPtr,
     pattern: *const c_char,
@@ -4368,16 +3984,10 @@ unsafe extern "C" fn pattern_node(
     }
 }
 
-/**
- * patternTest:
- * @filename: the schemas file
- * @result: the file with expected result
- * @err: the file with error messages
- *
- * Parse a set of files with streaming, applying an RNG schemas
- *
- * Returns 0 in case of success, an error code otherwise
- */
+/// Parse a set of files with streaming, applying an RNG schemas
+///
+/// Returns 0 in case of success, an error code otherwise
+#[doc(alias = "patternTest")]
 #[cfg(all(feature = "libxml_pattern", feature = "libxml_reader"))]
 unsafe fn pattern_test(
     filename: &str,
@@ -4665,7 +4275,9 @@ unsafe fn c14n_run_test(
     result_file: *const c_char,
 ) -> i32 {
     use exml::{
-        globals::{set_load_ext_dtd_default_value, set_substitute_entities_default_value},
+        globals::{
+            get_last_error, set_load_ext_dtd_default_value, set_substitute_entities_default_value,
+        },
         libxml::{
             c14n::xml_c14n_doc_dump_memory,
             parser::{XmlParserOption, XML_COMPLETE_ATTRS, XML_DETECT_IDS},
@@ -4690,6 +4302,8 @@ unsafe fn c14n_run_test(
         XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
     );
     if doc.is_null() {
+        let last_error = get_last_error();
+        eprintln!("last_error: {last_error:?}");
         eprintln!("Error: unable to parse file \"{xml_filename}\"");
         return -1;
     }
@@ -5090,7 +4704,7 @@ unsafe fn threads_test(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe extern "C" fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
+unsafe fn test_regexp(output: &mut File, comp: XmlRegexpPtr, value: *const c_char) {
     use exml::libxml::xmlregexp::xml_regexp_exec;
 
     let ret: i32 = xml_regexp_exec(comp, value as _);

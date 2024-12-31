@@ -336,18 +336,20 @@ macro_rules! __xml_loader_err {
             || (*ctxt).disable_sax == 0
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
-            if !ctxt.is_null() && !(*ctxt).sax.is_null() {
-                if (*ctxt).validate != 0 {
-                    channel = (*(*ctxt).sax).error;
-                    level = XmlErrorLevel::XmlErrError;
-                } else {
-                    channel = (*(*ctxt).sax).warning;
-                    level = XmlErrorLevel::XmlErrWarning;
+            if !ctxt.is_null() {
+                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                    if (*ctxt).validate != 0 {
+                        channel = sax.error;
+                        level = XmlErrorLevel::XmlErrError;
+                    } else {
+                        channel = sax.warning;
+                        level = XmlErrorLevel::XmlErrWarning;
+                    }
+                    if sax.initialized == XML_SAX2_MAGIC as u32 {
+                        schannel = sax.serror;
+                    }
+                    data = (*ctxt).user_data.clone();
                 }
-                if (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
-                    schannel = (*(*ctxt).sax).serror;
-                }
-                data = (*ctxt).user_data.clone();
             }
             __xml_raise_error!(
                 schannel,

@@ -39,7 +39,7 @@ use exml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         catalog::xml_load_catalogs,
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
-        entities::{xml_encode_entities_reentrant, XmlEntityPtr},
+        entities::{xml_encode_entities_reentrant, XmlEntityPtr, XmlEntityType},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
@@ -93,7 +93,8 @@ use exml::{
     },
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
-        NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlEnumerationPtr, XmlNodePtr,
+        NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
+        XmlElementContentPtr, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
     SYSCONFDIR,
@@ -272,21 +273,23 @@ unsafe fn xmllint_external_entity_loader(
         }
     }
 
-    if !ctxt.is_null() && !(*ctxt).sax.is_null() {
-        warning = (*(*ctxt).sax).warning;
-        err = (*(*ctxt).sax).error;
-        (*(*ctxt).sax).warning = None;
-        (*(*ctxt).sax).error = None;
+    if !ctxt.is_null() {
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            warning = sax.warning.take();
+            err = sax.error.take();
+        }
     }
 
     if let Some(loader) = DEFAULT_ENTITY_LOADER {
         ret = loader(url, id, ctxt);
         if !ret.is_null() {
-            if warning.is_some() {
-                (*(*ctxt).sax).warning = warning;
-            }
-            if err.is_some() {
-                (*(*ctxt).sax).error = err;
+            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                if warning.is_some() {
+                    sax.warning = warning;
+                }
+                if err.is_some() {
+                    sax.error = err;
+                }
             }
             if LOAD_TRACE != 0 {
                 eprintln!(
@@ -305,11 +308,13 @@ unsafe fn xmllint_external_entity_loader(
             new_url.push_str(lastsegment.unwrap());
             ret = loader(Some(&new_url), id, ctxt);
             if !ret.is_null() {
-                if warning.is_some() {
-                    (*(*ctxt).sax).warning = warning;
-                }
-                if err.is_some() {
-                    (*(*ctxt).sax).error = err;
+                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                    if warning.is_some() {
+                        sax.warning = warning;
+                    }
+                    if err.is_some() {
+                        sax.error = err;
+                    }
                 }
                 if LOAD_TRACE != 0 {
                     eprintln!(
@@ -323,10 +328,14 @@ unsafe fn xmllint_external_entity_loader(
         }
     }
     if err.is_some() {
-        (*(*ctxt).sax).error = err;
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.error = err;
+        }
     }
     if let Some(warning) = warning {
-        (*(*ctxt).sax).warning = Some(warning);
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.warning = Some(warning);
+        }
         if url.is_some() {
             todo!()
             // xml_error_with_format!(
@@ -853,198 +862,137 @@ unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int 
     0
 }
 
-/**
- * internalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- */
+/// Does this document has an internal subset
+#[doc(alias = "internalSubsetDebug")]
 unsafe fn internal_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.internalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if external_id.is_null() {
+    print!("SAX.internalSubset({},", name.unwrap_or("(null)"));
+    if let Some(external_id) = external_id {
+        print!(" {external_id},");
+    } else {
         print!(" ,");
-    } else {
-        print!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        println!(" )");
+    if let Some(system_id) = system_id {
+        println!(" {system_id})");
     } else {
-        println!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        println!(" )");
     }
 }
 
-/**
- * externalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- */
+/// Does this document has an external subset
+#[doc(alias = "externalSubsetDebug")]
 unsafe fn external_subset_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    external_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: Option<&str>,
+    external_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.externalSubset({},",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if external_id.is_null() {
+    print!("SAX.externalSubset({},", name.unwrap_or("(null)"));
+    if let Some(external_id) = external_id {
+        print!(" {external_id},");
+    } else {
         print!(" ,");
-    } else {
-        print!(" {},", CStr::from_ptr(external_id as _).to_string_lossy());
     }
-    if system_id.is_null() {
-        println!(" )");
+    if let Some(system_id) = system_id {
+        println!(" {system_id})");
     } else {
-        println!(" {})", CStr::from_ptr(system_id as _).to_string_lossy());
+        println!(" )");
     }
 }
 
-/**
- * resolveEntityDebug:
- * @ctxt:  An XML parser context
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * Special entity resolver, better left to the parser, it has
- * more context than the application layer.
- * The default behaviour is to NOT resolve the entities, in that case
- * the ENTITY_REF nodes are built in the structure (and the parameter
- * values).
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
+/// Special entity resolver, better left to the parser, it has
+/// more context than the application layer.
+/// The default behaviour is to NOT resolve the entities, in that case
+/// the ENTITY_REF nodes are built in the structure (and the parameter values).
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "resolveEntityDebug")]
 unsafe fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return null_mut();
     }
-    /* let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr; */
+    // let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr;
 
     print!("SAX.resolveEntity(");
-    if !public_id.is_null() {
-        print!("{}", CStr::from_ptr(public_id as _).to_string_lossy());
+    if let Some(public_id) = public_id {
+        print!("{public_id}");
     } else {
         print!(" ");
     }
-    if !system_id.is_null() {
-        println!(", {})", CStr::from_ptr(system_id as _).to_string_lossy());
+    if let Some(system_id) = system_id {
+        println!(", {system_id})");
     } else {
         println!(", )");
     }
     null_mut()
 }
 
-/**
- * getEntityDebug:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get an entity by name
- *
- * Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
- */
-unsafe fn get_entity_debug(
-    _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-) -> XmlEntityPtr {
+/// Get an entity by name
+///
+/// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
+#[doc(alias = "getEntityDebug")]
+unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return null_mut();
     }
-    println!(
-        "SAX.getEntity({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.getEntity({name})");
     null_mut()
 }
 
-/**
- * getParameterEntityDebug:
- * @ctxt:  An XML parser context
- * @name: The entity name
- *
- * Get a parameter entity by name
- *
- * Returns the xmlParserInputPtr
- */
+/// Get a parameter entity by name
+///
+/// Returns the xmlParserInputPtr
+#[doc(alias = "getParameterEntityDebug")]
 unsafe fn get_parameter_entity_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
+    name: &str,
 ) -> XmlEntityPtr {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return null_mut();
     }
-    println!(
-        "SAX.getParameterEntity({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.getParameterEntity({name})");
     null_mut()
 }
 
-/**
- * entityDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the entity name
- * @type:  the entity type
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @content: the entity value (without processing).
- *
- * An entity definition has been parsed
- */
+/// An entity definition has been parsed
+#[doc(alias = "entityDeclDebug")]
 unsafe fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    typ: c_int,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
-    mut content: *mut XmlChar,
+    name: &str,
+    typ: XmlEntityType,
+    mut public_id: Option<&str>,
+    mut system_id: Option<&str>,
+    mut content: Option<&str>,
 ) {
-    let nullstr: &CStr = c"(null)";
-    /* not all libraries handle printing null pointers nicely */
-    if public_id.is_null() {
-        public_id = nullstr.as_ptr() as _;
-    }
-    if system_id.is_null() {
-        system_id = nullstr.as_ptr() as _;
-    }
-    if content.is_null() {
-        content = nullstr.as_ptr() as _;
-    }
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
     println!(
-        "SAX.entityDecl({}, {}, {}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        typ,
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy(),
-        CStr::from_ptr(content as _).to_string_lossy()
+        "SAX.entityDecl({name}, {}, {}, {}, {})",
+        typ as i32,
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
+        content.unwrap_or("(null)")
     );
 }
 
@@ -1053,48 +1001,36 @@ unsafe fn entity_decl_debug(
 unsafe fn attribute_decl_debug(
     _ctx: Option<GenericErrorContext>,
     elem: &str,
-    name: *const XmlChar,
-    typ: c_int,
-    def: c_int,
-    default_value: *const XmlChar,
+    name: &str,
+    typ: XmlAttributeType,
+    def: XmlAttributeDefault,
+    default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    if default_value.is_null() {
+    if let Some(default_value) = default_value {
         println!(
-            "SAX.attributeDecl({elem}, {}, {}, {}, NULL, ...)",
-            CStr::from_ptr(name as _).to_string_lossy(),
-            typ,
-            def
+            "SAX.attributeDecl({elem}, {name}, {}, {}, {default_value}, ...)",
+            typ as i32, def as i32,
         );
     } else {
         println!(
-            "SAX.attributeDecl({elem}, {}, {}, {}, {}, ...)",
-            CStr::from_ptr(name as _).to_string_lossy(),
-            typ,
-            def,
-            CStr::from_ptr(default_value as _).to_string_lossy()
+            "SAX.attributeDecl({elem}, {name}, {}, {}, NULL, ...)",
+            typ as i32, def as i32
         );
     }
     xml_free_enumeration(tree);
 }
 
-/**
- * elementDeclDebug:
- * @ctxt:  An XML parser context
- * @name:  the element name
- * @type:  the element type
- * @content: the element value (without processing).
- *
- * An element definition has been parsed
- */
+/// An element definition has been parsed
+#[doc(alias = "elementDeclDebug")]
 unsafe fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    typ: c_int,
+    name: &str,
+    typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
 ) {
     CALLBACKS += 1;
@@ -1102,77 +1038,48 @@ unsafe fn element_decl_debug(
         return;
     }
     println!(
-        "SAX.elementDecl({}, {}, ...)",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        typ
+        "SAX.elementDecl({name}, {}, ...)",
+        typ.map_or(-1, |t| t as i32)
     );
 }
 
-/**
- * notationDeclDebug:
- * @ctxt:  An XML parser context
- * @name: The name of the notation
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- *
- * What to do when a notation declaration has been parsed.
- */
+/// What to do when a notation declaration has been parsed.
+#[doc(alias = "notationDeclDebug")]
 unsafe fn notation_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    public_id: *const XmlChar,
-    system_id: *const XmlChar,
+    name: &str,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
     println!(
-        "SAX.notationDecl({}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy()
+        "SAX.notationDecl({name}, {}, {})",
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
     );
 }
 
-/**
- * unparsedEntityDeclDebug:
- * @ctxt:  An XML parser context
- * @name: The name of the entity
- * @publicId: The public ID of the entity
- * @systemId: The system ID of the entity
- * @notationName: the name of the notation
- *
- * What to do when an unparsed entity declaration is parsed
- */
+/// What to do when an unparsed entity declaration is parsed
+#[doc(alias = "unparsedEntityDeclDebug")]
 unsafe fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    mut public_id: *const XmlChar,
-    mut system_id: *const XmlChar,
-    mut notation_name: *const XmlChar,
+    name: &str,
+    mut public_id: Option<&str>,
+    mut system_id: Option<&str>,
+    mut notation_name: Option<&str>,
 ) {
-    let nullstr: &CStr = c"(null)";
-
-    if public_id.is_null() {
-        public_id = nullstr.as_ptr() as _;
-    }
-    if system_id.is_null() {
-        system_id = nullstr.as_ptr() as _;
-    }
-    if notation_name.is_null() {
-        notation_name = nullstr.as_ptr() as _;
-    }
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
     println!(
-        "SAX.unparsedEntityDecl({}, {}, {}, {})",
-        CStr::from_ptr(name as _).to_string_lossy(),
-        CStr::from_ptr(public_id as _).to_string_lossy(),
-        CStr::from_ptr(system_id as _).to_string_lossy(),
-        CStr::from_ptr(notation_name as _).to_string_lossy()
+        "SAX.unparsedEntityDecl({name}, {}, {}, {})",
+        public_id.unwrap_or("(null)"),
+        system_id.unwrap_or("(null)"),
+        notation_name.unwrap_or("(null)")
     );
 }
 
@@ -1220,213 +1127,107 @@ unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     println!("SAX.endDocument()");
 }
 
-/**
- * startElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementDebug")]
 unsafe fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
-    name: *const XmlChar,
-    atts: *mut *const XmlChar,
+    name: &str,
+    atts: &[(String, Option<String>)],
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.startElement({}",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
-    if !atts.is_null() {
-        for i in (0..).step_by(2).take_while(|&i| !(*atts.add(i)).is_null()) {
-            print!(
-                ", {}='",
-                CStr::from_ptr(*atts.add(i) as _).to_string_lossy()
-            );
-            if !(*atts.add(i + 1)).is_null() {
-                print!(
-                    "{}'",
-                    CStr::from_ptr(*atts.add(i + 1) as _).to_string_lossy()
-                );
-            }
+    print!("SAX.startElement({name}");
+    for (key, value) in atts {
+        print!(", {key}='");
+        if let Some(value) = value {
+            print!("{value}'");
         }
     }
     println!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
-unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
+unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.endElement({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.endElement({name})");
 }
 
-/**
- * charactersDebug:
- * @ctxt:  An XML parser context
- * @ch:  a xmlChar string
- * @len: the number of xmlChar
- *
- * receiving some chars from the parser.
- * Question: how much at a time ???
- */
-unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: *const XmlChar, len: c_int) {
-    let mut out: [c_char; 40] = [0; 40];
-
+/// receiving some chars from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "charactersDebug")]
+unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
 
-    let mut i = 0;
-    while i < len as usize && i < 30 {
-        out[i] = *ch.add(i) as _;
-        i += 1;
-    }
-    out[i] = 0;
-
-    println!(
-        "SAX.characters({}, {})",
-        CStr::from_ptr(out.as_ptr()).to_string_lossy(),
-        len
-    );
+    println!("SAX.characters({ch:30}, {})", ch.len());
 }
 
-/**
- * referenceDebug:
- * @ctxt:  An XML parser context
- * @name:  The entity name
- *
- * called when an entity reference is detected.
- */
-unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: *const XmlChar) {
+/// called when an entity reference is detected.
+#[doc(alias = "referenceDebug")]
+unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.reference({})",
-        CStr::from_ptr(name as _).to_string_lossy()
-    );
+    println!("SAX.reference({name})");
 }
 
-/**
- * ignorableWhitespaceDebug:
- * @ctxt:  An XML parser context
- * @ch:  a xmlChar string
- * @start: the first c_char in the string
- * @len: the number of xmlChar
- *
- * receiving some ignorable whitespaces from the parser.
- * Question: how much at a time ???
- */
-unsafe fn ignorable_whitespace_debug(
-    _ctx: Option<GenericErrorContext>,
-    ch: *const XmlChar,
-    len: c_int,
-) {
-    let mut out: [c_char; 40] = [0; 40];
-
+/// receiving some ignorable whitespaces from the parser.
+/// Question: how much at a time ???
+#[doc(alias = "ignorableWhitespaceDebug")]
+unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
 
-    let mut i = 0;
-    while i < len as usize && i < 30 {
-        out[i] = *ch.add(i) as _;
-        i += 1;
-    }
-    out[i] = 0;
-    println!(
-        "SAX.ignorableWhitespace({}, {})",
-        CStr::from_ptr(out.as_ptr()).to_string_lossy(),
-        len
-    );
+    println!("SAX.ignorableWhitespace({ch:30}, {})", ch.len());
 }
 
-/**
- * processingInstructionDebug:
- * @ctxt:  An XML parser context
- * @target:  the target name
- * @data: the PI data's
- * @len: the number of xmlChar
- *
- * A processing instruction has been parsed.
- */
+/// A processing instruction has been parsed.
+#[doc(alias = "processingInstructionDebug")]
 unsafe fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
-    target: *const XmlChar,
-    data: *const XmlChar,
+    target: &str,
+    data: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    if !data.is_null() {
-        println!(
-            "SAX.processingInstruction({}, {})",
-            CStr::from_ptr(target as _).to_string_lossy(),
-            CStr::from_ptr(data as _).to_string_lossy()
-        );
+    if let Some(data) = data {
+        println!("SAX.processingInstruction({target}, {data})");
     } else {
-        println!(
-            "SAX.processingInstruction({}, NULL)",
-            CStr::from_ptr(target as _).to_string_lossy()
-        );
+        println!("SAX.processingInstruction({target}, NULL)");
     }
 }
 
-/**
- * cdataBlockDebug:
- * @ctx: the user data (XML parser context)
- * @value:  The pcdata content
- * @len:  the block length
- *
- * called when a pcdata block has been parsed
- */
-unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar, len: c_int) {
+/// called when a pcdata block has been parsed
+#[doc(alias = "cdataBlockDebug")]
+unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.pcdata({:20}, {})",
-        CStr::from_ptr(value as _).to_string_lossy(),
-        len
-    );
+    println!("SAX.pcdata({value:20}, {})", value.len());
 }
 
-/**
- * commentDebug:
- * @ctxt:  An XML parser context
- * @value:  the comment content
- *
- * A comment has been parsed.
- */
-unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: *const XmlChar) {
+/// A comment has been parsed.
+#[doc(alias = "commentDebug")]
+unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    println!(
-        "SAX.comment({})",
-        CStr::from_ptr(value as _).to_string_lossy()
-    );
+    println!("SAX.comment({value})");
 }
 
 /**
@@ -1523,118 +1324,75 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 // xmlSAXHandlerPtr debugSAXHandler = &debugSAXHandlerStruct;
 
-/*
- * SAX2 specific callbacks
- */
-/**
- * startElementNsDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when an opening tag has been processed.
- */
-#[allow(clippy::too_many_arguments)]
+/// called when an opening tag has been processed.
+#[doc(alias = "startElementNsDebug")]
 unsafe fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
-    nb_namespaces: c_int,
-    namespaces: *mut *const XmlChar,
-    nb_attributes: c_int,
-    nb_defaulted: c_int,
-    attributes: *mut *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
+    namespaces: &[(Option<String>, String)],
+    nb_defaulted: usize,
+    attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.startElementNs({}",
-        CStr::from_ptr(localname as _).to_string_lossy()
-    );
-    if prefix.is_null() {
-        print!(", NULL");
+    print!("SAX.startElementNs({localname}");
+    if let Some(prefix) = prefix {
+        print!(", {prefix}");
     } else {
-        print!(", {}", CStr::from_ptr(prefix as _).to_string_lossy());
-    }
-    if uri.is_null() {
         print!(", NULL");
-    } else {
-        print!(", '{}'", CStr::from_ptr(uri as _).to_string_lossy());
     }
-    print!(", {}", nb_namespaces);
+    if let Some(uri) = uri {
+        print!(", '{uri}'");
+    } else {
+        print!(", NULL");
+    }
+    print!(", {}", namespaces.len());
 
-    if !namespaces.is_null() {
-        for i in (0..nb_namespaces as usize * 2).step_by(2) {
-            print!(", xmlns");
-            if !(*namespaces.add(i)).is_null() {
-                print!(
-                    ":{}",
-                    CStr::from_ptr(*namespaces.add(i) as _).to_string_lossy()
-                );
-            }
-            print!(
-                "='{}'",
-                CStr::from_ptr(*namespaces.add(i + 1) as _).to_string_lossy()
-            );
+    for (pre, loc) in namespaces {
+        print!(", xmlns");
+        if let Some(pre) = pre.as_deref() {
+            print!(":{pre}");
         }
+        print!("='{loc}'");
     }
-    print!(", {}, {}", nb_attributes, nb_defaulted);
-    if !attributes.is_null() {
-        for i in (0..nb_attributes as usize * 5).step_by(5) {
-            if !(*attributes.add(i + 1)).is_null() {
-                print!(
-                    ", {}:{}='",
-                    CStr::from_ptr(*attributes.add(i + 1) as _).to_string_lossy(),
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            } else {
-                print!(
-                    ", {}='",
-                    CStr::from_ptr(*attributes.add(i) as _).to_string_lossy()
-                );
-            }
-            print!(
-                "{:4}...', {}",
-                CStr::from_ptr(*attributes.add(i + 3) as _).to_string_lossy(),
-                (*attributes.add(i + 4)).offset_from(*attributes.add(i + 3))
-            );
+    print!(", {}, {}", attributes.len(), nb_defaulted);
+    for attr in attributes {
+        if let Some(prefix) = attr.1.as_deref() {
+            print!(", {prefix}:{}='", attr.0);
+        } else {
+            print!(", {}='", attr.0);
         }
+        print!("{}...', {}", attr.3, attr.3.len());
     }
     println!(")");
 }
 
-/**
- * endElementDebug:
- * @ctxt:  An XML parser context
- * @name:  The element name
- *
- * called when the end of an element has been detected.
- */
+/// called when the end of an element has been detected.
+#[doc(alias = "endElementDebug")]
 unsafe fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
-    localname: *const XmlChar,
-    prefix: *const XmlChar,
-    uri: *const XmlChar,
+    localname: &str,
+    prefix: Option<&str>,
+    uri: Option<&str>,
 ) {
     CALLBACKS += 1;
     if NOOUT != 0 {
         return;
     }
-    print!(
-        "SAX.endElementNs({}",
-        CStr::from_ptr(localname as _).to_string_lossy()
-    );
-    if prefix.is_null() {
+    print!("SAX.endElementNs({localname}");
+    if let Some(prefix) = prefix {
+        print!(", {prefix}");
+    } else {
         print!(", NULL");
-    } else {
-        print!(", {}", CStr::from_ptr(prefix as _).to_string_lossy());
     }
-    if uri.is_null() {
-        println!(", NULL)");
+    if let Some(uri) = uri {
+        println!(", '{uri}')");
     } else {
-        println!(", '{}')", CStr::from_ptr(uri as _).to_string_lossy());
+        println!(", NULL)");
     }
 }
 
@@ -1722,12 +1480,17 @@ unsafe fn test_sax(filename: &str) {
             );
             let cfilename = CString::new(filename).unwrap();
             xml_schema_validate_set_filename(vctxt, cfilename.as_ptr());
+            let handler = {
+                let mut hdl = XmlSAXHandler::default();
+                std::ptr::copy(handler, &mut hdl, 1);
+                hdl
+            };
 
             let ret: c_int = xml_schema_validate_stream(
                 vctxt,
                 buf,
                 XmlCharEncoding::None,
-                handler,
+                Some(Box::new(handler)),
                 Some(GenericErrorContext::new(user_data.as_ptr())),
             );
             if REPEAT == 0 {
@@ -1750,13 +1513,19 @@ unsafe fn test_sax(filename: &str) {
             xml_schema_free_valid_ctxt(vctxt);
         }
     } else {
+        let handler = {
+            let mut hdl = XmlSAXHandler::default();
+            std::ptr::copy(handler, &mut hdl, 1);
+            hdl
+        };
         // Create the parser context amd hook the input
-        let ctxt: XmlParserCtxtPtr =
-            xml_new_sax_parser_ctxt(handler, Some(GenericErrorContext::new(user_data.as_ptr())));
-        if ctxt.is_null() {
+        let Ok(ctxt) = xml_new_sax_parser_ctxt(
+            Some(Box::new(handler)),
+            Some(GenericErrorContext::new(user_data.as_ptr())),
+        ) else {
             PROGRESULT = XmllintReturnCode::ErrMem;
             return;
-        }
+        };
         xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
 
         if !(*ctxt).my_doc.is_null() {
@@ -2358,7 +2127,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 if res > 0 {
                     let filename = filename.map(|f| CString::new(f).unwrap());
                     ctxt = html_create_push_parser_ctxt(
-                        null_mut(),
+                        None,
                         None,
                         chars.as_ptr(),
                         res,
@@ -2449,7 +2218,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                 if res > 0 {
                     ctxt = xml_create_push_parser_ctxt(
-                        null_mut(),
+                        None,
                         None,
                         chars.as_ptr(),
                         res,
@@ -2508,8 +2277,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             ctxt = rectxt;
         }
 
-        (*(*ctxt).sax).error = Some(xml_html_error);
-        (*(*ctxt).sax).warning = Some(xml_html_warning);
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.error = Some(xml_html_error);
+            sax.warning = Some(xml_html_warning);
+        }
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
@@ -2969,15 +2740,16 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             start_timer();
         }
         if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-            dtd = xml_parse_dtd(null_mut(), dtd_valid.as_ptr() as _);
+            dtd = xml_parse_dtd(None, Some(dtd_valid.to_string_lossy().as_ref()));
         } else {
             dtd = xml_parse_dtd(
                 DTDVALIDFPI
                     .lock()
                     .unwrap()
                     .as_ref()
-                    .map_or(null_mut(), |d| d.as_ptr() as *mut u8),
-                null_mut(),
+                    .map(|d| d.to_string_lossy())
+                    .as_deref(),
+                None,
             );
         }
         if TIMING != 0 && REPEAT == 0 {

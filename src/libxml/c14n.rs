@@ -121,7 +121,7 @@ impl XmlC14NVisibleNsStack {
     unsafe fn find(&self, ns: Option<&XmlNs>) -> bool {
         // if the default namespace xmlns="" is not defined yet then we do not want to print it out
         let prefix: *const XmlChar =
-            if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
+            if let Some(prefix) = ns.filter(|ns| ns.prefix().is_some()).map(|ns| ns.prefix) {
                 prefix
             } else {
                 c"".as_ptr() as _
@@ -267,11 +267,9 @@ impl<T> XmlC14NCtx<'_, T> {
     /// Returns 1 on success or 0 on fail.
     #[doc(alias = "xmlC14NPrintNamespaces")]
     unsafe fn print_namespaces(&mut self, ns: &XmlNs) -> i32 {
-        if !ns.prefix.is_null() {
+        if let Some(prefix) = ns.prefix() {
             self.buf.borrow_mut().write_str(" xmlns:");
-            self.buf
-                .borrow_mut()
-                .write_str(CStr::from_ptr(ns.prefix as _).to_string_lossy().as_ref());
+            self.buf.borrow_mut().write_str(&prefix);
             self.buf.borrow_mut().write_str("=");
         } else {
             self.buf.borrow_mut().write_str(" xmlns=");
@@ -343,9 +341,7 @@ impl<T> XmlC14NCtx<'_, T> {
         while !n.is_null() {
             let mut ns = (*n).ns_def;
             while !ns.is_null() {
-                let prefix = (*ns).prefix;
-                let prefix = (!prefix.is_null())
-                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+                let prefix = (*ns).prefix();
                 let tmp = (*cur).search_ns(cur.doc, prefix.as_deref());
 
                 if tmp == ns
@@ -359,7 +355,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if !already_rendered {
                         xml_list_insert(list, ns as _);
                     }
-                    if xml_strlen((*ns).prefix) == 0 {
+                    if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
                     }
                 }
@@ -678,13 +674,11 @@ impl<T> XmlC14NCtx<'_, T> {
             }
             self.buf.borrow_mut().write_str("<");
 
-            if !cur.ns.is_null() && xml_strlen((*cur.ns).prefix as _) > 0 {
-                self.buf.borrow_mut().write_str(
-                    CStr::from_ptr((*cur.ns).prefix as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                self.buf.borrow_mut().write_str(":");
+            if !cur.ns.is_null() {
+                if let Some(prefix) = (*cur.ns).prefix().filter(|pre| !pre.is_empty()) {
+                    self.buf.borrow_mut().write_str(&prefix);
+                    self.buf.borrow_mut().write_str(":");
+                }
             }
 
             self.buf
@@ -724,13 +718,11 @@ impl<T> XmlC14NCtx<'_, T> {
         }
         if visible {
             self.buf.borrow_mut().write_str("</");
-            if !cur.ns.is_null() && xml_strlen((*cur.ns).prefix) > 0 {
-                self.buf.borrow_mut().write_str(
-                    CStr::from_ptr((*cur.ns).prefix as _)
-                        .to_string_lossy()
-                        .as_ref(),
-                );
-                self.buf.borrow_mut().write_str(":");
+            if !cur.ns.is_null() {
+                if let Some(prefix) = (*cur.ns).prefix().filter(|pre| !pre.is_empty()) {
+                    self.buf.borrow_mut().write_str(&prefix);
+                    self.buf.borrow_mut().write_str(":");
+                }
             }
 
             self.buf
@@ -1018,7 +1010,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if !already_rendered {
                         xml_list_insert(list, ns as _);
                     }
-                    if xml_strlen((*ns).prefix) == 0 {
+                    if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
                     }
                 }
@@ -1043,7 +1035,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // TODO: replace `cur` to `Rc<XmlNode>`
                 (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
             }
-            if xml_strlen((*ns).prefix) == 0 {
+            if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                 has_empty_ns = true;
             }
         }
@@ -1065,11 +1057,11 @@ impl<T> XmlC14NCtx<'_, T> {
                 if already_rendered == 0 && visible {
                     xml_list_insert(list, (*attr).ns as _);
                 }
-                if xml_strlen((*(*attr).ns).prefix) == 0 {
+                if (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                     has_empty_ns = true;
                 }
             } else if !(*attr).ns.is_null()
-                && xml_strlen((*(*attr).ns).prefix) == 0
+                && (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0
                 && xml_strlen((*(*attr).ns).href) == 0
             {
                 has_visibly_utilized_empty_ns = true;
@@ -1116,7 +1108,7 @@ impl<T> XmlC14NCtx<'_, T> {
     ) -> i32 {
         // if the default namespace xmlns="" is not defined yet then we do not want to print it out
         let prefix: *const XmlChar =
-            if let Some(prefix) = ns.filter(|ns| !ns.prefix.is_null()).map(|ns| ns.prefix) {
+            if let Some(prefix) = ns.filter(|ns| ns.prefix().is_some()).map(|ns| ns.prefix) {
                 prefix
             } else {
                 c"".as_ptr() as _
@@ -1735,10 +1727,10 @@ extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void)
         if (*attr2).ns.is_null() {
             return 1;
         }
-        if (*(*attr1).ns).prefix.is_null() {
+        if (*(*attr1).ns).prefix().is_none() {
             return -1;
         }
-        if (*(*attr2).ns).prefix.is_null() {
+        if (*(*attr2).ns).prefix().is_none() {
             return 1;
         }
 
@@ -1937,23 +1929,18 @@ extern "C" fn xml_c14n_print_attrs<T>(data: *const c_void, user: *mut c_void) ->
         }
 
         (*ctx).buf.borrow_mut().write_str(" ");
-        if !(*attr).ns.is_null() && xml_strlen((*(*attr).ns).prefix) > 0 {
-            (*ctx).buf.borrow_mut().write_str(
-                CStr::from_ptr((*(*attr).ns).prefix as _)
-                    .to_string_lossy()
-                    .as_ref(),
-            );
-            (*ctx).buf.borrow_mut().write_str(":");
+        if !(*attr).ns.is_null() {
+            if let Some(prefix) = (*(*attr).ns).prefix().filter(|pre| !pre.is_empty()) {
+                (*ctx).buf.borrow_mut().write_str(&prefix);
+                (*ctx).buf.borrow_mut().write_str(":");
+            }
         }
 
-        (*ctx)
-            .buf
-            .borrow_mut()
-            .write_str(CStr::from_ptr((*attr).name as _).to_string_lossy().as_ref());
+        (*ctx).buf.borrow_mut().write_str(&(*attr).name().unwrap());
         (*ctx).buf.borrow_mut().write_str("=\"");
 
         // todo: should we log an error if value==NULL ?
-        if let Some(value) = (*attr).children.and_then(|c| c.get_string((*ctx).doc, 1)) {
+        if let Some(value) = (*attr).children().and_then(|c| c.get_string((*ctx).doc, 1)) {
             let value = CString::new(value).unwrap();
             buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
             if !buffer.is_null() {

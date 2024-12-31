@@ -6,7 +6,7 @@ use std::{
     ffi::{CStr, CString},
     io::{self, Read},
     os::raw::c_void,
-    ptr::{addr_of, null_mut},
+    ptr::null_mut,
     sync::atomic::{AtomicPtr, AtomicU64, AtomicUsize, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -19,7 +19,7 @@ use exml::{
     },
     io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
-        entities::XmlEntityPtr,
+        entities::{XmlEntityPtr, XmlEntityType},
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_sax_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
@@ -33,8 +33,8 @@ use exml::{
         xmlstring::XmlChar,
     },
     tree::{
-        xml_free_doc, NodeCommon, XmlDocPtr, XmlElementContentPtr, XmlElementType,
-        XmlEnumerationPtr,
+        xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -674,9 +674,9 @@ fn has_external_subset_callback(_ctx: Option<GenericErrorContext>) -> i32 {
 #[doc(alias = "internalSubsetCallback")]
 fn internal_subset_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _external_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _name: Option<&str>,
+    _external_id: Option<&str>,
+    _system_id: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -685,9 +685,9 @@ fn internal_subset_callback(
 #[doc(alias = "externalSubsetCallback")]
 fn external_subset_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _external_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _name: Option<&str>,
+    _external_id: Option<&str>,
+    _system_id: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -702,8 +702,8 @@ fn external_subset_callback(
 #[doc(alias = "resolveEntityCallback")]
 fn resolve_entity_callback(
     _ctx: Option<GenericErrorContext>,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
@@ -713,7 +713,7 @@ fn resolve_entity_callback(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityCallback")]
-fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) -> XmlEntityPtr {
+fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
@@ -722,10 +722,7 @@ fn get_entity_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar)
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityCallback")]
-fn get_parameter_entity_callback(
-    _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-) -> XmlEntityPtr {
+fn get_parameter_entity_callback(_ctx: Option<GenericErrorContext>, _name: &str) -> XmlEntityPtr {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
     null_mut()
 }
@@ -734,11 +731,11 @@ fn get_parameter_entity_callback(
 #[doc(alias = "entityDeclCallback")]
 fn entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _typ: i32,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
-    _content: *mut XmlChar,
+    _name: &str,
+    _typ: XmlEntityType,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
+    _content: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -748,10 +745,10 @@ fn entity_decl_callback(
 fn attribute_decl_callback(
     _ctx: Option<GenericErrorContext>,
     _elem: &str,
-    _name: *const XmlChar,
-    _typ: i32,
-    _def: i32,
-    _default_value: *const XmlChar,
+    _name: &str,
+    _typ: XmlAttributeType,
+    _def: XmlAttributeDefault,
+    _default_value: Option<&str>,
     _tree: XmlEnumerationPtr,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
@@ -761,8 +758,8 @@ fn attribute_decl_callback(
 #[doc(alias = "elementDeclCallback")]
 fn element_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _typ: i32,
+    _name: &str,
+    _typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
@@ -772,9 +769,9 @@ fn element_decl_callback(
 #[doc(alias = "notationDeclCallback")]
 fn notation_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
+    _name: &str,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -783,10 +780,10 @@ fn notation_decl_callback(
 #[doc(alias = "unparsedEntityDeclCallback")]
 fn unparsed_entity_decl_callback(
     _ctx: Option<GenericErrorContext>,
-    _name: *const XmlChar,
-    _public_id: *const XmlChar,
-    _system_id: *const XmlChar,
-    _notation_name: *const XmlChar,
+    _name: &str,
+    _public_id: Option<&str>,
+    _system_id: Option<&str>,
+    _notation_name: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -813,24 +810,20 @@ fn end_document_callback(_ctx: Option<GenericErrorContext>) {
 /// receiving some chars from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "charactersCallback")]
-fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: *const XmlChar, _len: i32) {
+fn characters_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceCallback")]
-fn reference_callback(_ctx: Option<GenericErrorContext>, _name: *const XmlChar) {
+fn reference_callback(_ctx: Option<GenericErrorContext>, _name: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// receiving some ignorable whitespaces from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "ignorableWhitespaceCallback")]
-fn ignorable_whitespace_callback(
-    _ctx: Option<GenericErrorContext>,
-    _ch: *const XmlChar,
-    _len: i32,
-) {
+fn ignorable_whitespace_callback(_ctx: Option<GenericErrorContext>, _ch: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
@@ -838,21 +831,21 @@ fn ignorable_whitespace_callback(
 #[doc(alias = "processingInstructionCallback")]
 fn processing_instruction_callback(
     _ctx: Option<GenericErrorContext>,
-    _target: *const XmlChar,
-    _data: *const XmlChar,
+    _target: &str,
+    _data: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// called when a pcdata block has been parsed
 #[doc(alias = "cdataBlockCallback")]
-fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar, _len: i32) {
+fn cdata_block_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
 /// A comment has been parsed.
 #[doc(alias = "commentCallback")]
-fn comment_callback(_ctx: Option<GenericErrorContext>, _value: *const XmlChar) {
+fn comment_callback(_ctx: Option<GenericErrorContext>, _value: &str) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
 
@@ -877,17 +870,14 @@ fn fatal_error_callback(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsCallback")]
-#[allow(clippy::too_many_arguments)]
 fn start_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
-    _localname: *const XmlChar,
-    _prefix: *const XmlChar,
-    _uri: *const XmlChar,
-    _nb_namespaces: i32,
-    _namespaces: *mut *const XmlChar,
-    _nb_attributes: i32,
-    _nb_defaulted: i32,
-    _attributes: *mut *const XmlChar,
+    _localname: &str,
+    _prefix: Option<&str>,
+    _uri: Option<&str>,
+    _namespaces: &[(Option<String>, String)],
+    _nb_defaulted: usize,
+    _attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -896,9 +886,9 @@ fn start_element_ns_callback(
 #[doc(alias = "endElementCallback")]
 fn end_element_ns_callback(
     _ctx: Option<GenericErrorContext>,
-    _localname: *const XmlChar,
-    _prefix: *const XmlChar,
-    _uri: *const XmlChar,
+    _localname: &str,
+    _prefix: Option<&str>,
+    _uri: Option<&str>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }
@@ -948,12 +938,12 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
     NB_TESTS.set(NB_TESTS.get() + 1);
 
     DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
-    let ctxt: XmlParserCtxtPtr =
-        xml_new_sax_parser_ctxt(addr_of!(CALLBACK_SAX2_HANDLER_STRUCT), None);
-    if ctxt.is_null() {
+    let mut sax = XmlSAXHandler::default();
+    std::ptr::copy(&CALLBACK_SAX2_HANDLER_STRUCT, &mut sax, 1);
+    let Ok(ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
         eprintln!("Failed to create parser context");
         return 1;
-    }
+    };
     let filename = CStr::from_ptr(filename).to_string_lossy();
     let filename = filename.as_ref();
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);

@@ -2,7 +2,6 @@ use std::{ffi::CString, ptr::null_mut};
 
 use crate::{
     hash::XmlHashTable,
-    libxml::xmlstring::xml_str_equal,
     tree::{xml_free_node_list, NodeCommon, NodePtr, XmlElementType, XmlNode, XmlNsPtr},
     xpath::xml_xpath_node_set_free_ns,
 };
@@ -92,7 +91,7 @@ impl XmlNodeSet {
                     }
                     if !ns1.as_ref().next.is_null()
                         && (*ns2).next == ns1.as_ref().next
-                        && xml_str_equal(ns1.as_ref().prefix as _, (*ns2).prefix as _)
+                        && ns1.as_ref().prefix() == (*ns2).prefix()
                     {
                         return true;
                     }
@@ -346,7 +345,7 @@ impl XmlNodeSet {
             if node.is_null()
                 && matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl)
                 && (*node).next == NodePtr::from_ptr(node)
-                && xml_str_equal((*ns).prefix as _, (*(node as XmlNsPtr)).prefix)
+                && (*ns).prefix() == (*(node as XmlNsPtr)).prefix()
             {
                 return 0;
             }
@@ -734,7 +733,7 @@ pub(super) unsafe fn xml_xpath_node_set_merge_and_clear(
             } else if matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
                 && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl)
                 && (*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
-                && xml_str_equal((*(n1 as XmlNsPtr)).prefix, (*(n2 as XmlNsPtr)).prefix)
+                && (*(n1 as XmlNsPtr)).prefix() == (*(n2 as XmlNsPtr)).prefix()
             {
                 // Free the namespace node.
                 xml_xpath_node_set_free_ns(n2 as XmlNsPtr);
@@ -821,10 +820,7 @@ pub unsafe fn xml_xpath_node_set_merge(
                 || ((matches!((*n1).element_type(), XmlElementType::XmlNamespaceDecl)
                     && matches!((*n2).element_type(), XmlElementType::XmlNamespaceDecl))
                     && ((*(n1 as XmlNsPtr)).next == (*(n2 as XmlNsPtr)).next
-                        && xml_str_equal(
-                            (*(n1 as XmlNsPtr)).prefix as _,
-                            (*(n2 as XmlNsPtr)).prefix as _,
-                        )))
+                        && (*(n1 as XmlNsPtr)).prefix() == (*(n2 as XmlNsPtr)).prefix()))
             {
                 skip = 1;
                 break;

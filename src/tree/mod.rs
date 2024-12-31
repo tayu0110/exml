@@ -62,8 +62,7 @@ use crate::{
             XmlElementTablePtr, XmlNotationTablePtr,
         },
         xmlstring::{
-            xml_str_equal, xml_strdup, xml_strlen, xml_strncat, xml_strncat_new, xml_strndup,
-            XmlChar,
+            xml_str_equal, xml_strdup, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
         },
     },
 };
@@ -1309,11 +1308,7 @@ pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
 /// @tree or on one of its ancestors then a new prefix is generated.
 /// Returns the (new) namespace definition or null_mut() in case of error
 #[doc(alias = "xmlNewReconciledNs")]
-unsafe extern "C" fn xml_new_reconciled_ns(
-    doc: XmlDocPtr,
-    tree: XmlNodePtr,
-    ns: XmlNsPtr,
-) -> XmlNsPtr {
+unsafe fn xml_new_reconciled_ns(doc: XmlDocPtr, tree: XmlNodePtr, ns: XmlNsPtr) -> XmlNsPtr {
     let mut def: XmlNsPtr;
     let mut counter: i32 = 1;
 
@@ -1323,9 +1318,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
     if ns.is_null() || !matches!((*ns).typ, XmlElementType::XmlNamespaceDecl) {
         return null_mut();
     }
-    /*
-     * Search an existing namespace definition inherited.
-     */
+    // Search an existing namespace definition inherited.
     def = (*tree).search_ns_by_href(
         doc,
         CStr::from_ptr((*ns).href as *const i8)
@@ -1336,40 +1329,21 @@ unsafe extern "C" fn xml_new_reconciled_ns(
         return def;
     }
 
-    /*
-     * Find a close prefix which is not already in use.
-     * Let's strip namespace prefixes longer than 20 chars !
-     */
-    let prefix = if (*ns).prefix.is_null() {
-        Cow::Borrowed("default")
-    } else {
-        Cow::Owned(format!(
-            "{}",
-            CStr::from_ptr((*ns).prefix as *const c_char).to_string_lossy()
-        ))
-    };
-
+    // Find a close prefix which is not already in use.
+    // Let's strip namespace prefixes longer than 20 chars !
+    let prefix = (*ns).prefix().unwrap_or(Cow::Borrowed("default"));
     def = (*tree).search_ns(doc, Some(&prefix));
     while !def.is_null() {
         if counter > 1000 {
             return null_mut();
         }
-        let prefix = if (*ns).prefix.is_null() {
-            format!("default{counter}")
-        } else {
-            format!(
-                "{}{counter}",
-                CStr::from_ptr((*ns).prefix as *const i8).to_string_lossy()
-            )
-        };
+        let prefix = format!("{prefix}{counter}");
         counter += 1;
         def = (*tree).search_ns(doc, Some(&prefix));
     }
 
-    /*
-     * OK, now we are ready to create a new one.
-     */
-    def = xml_new_ns(tree, (*ns).href, prefix.as_ptr());
+    // OK, now we are ready to create a new one.
+    def = xml_new_ns(tree, (*ns).href, Some(&prefix));
     def
 }
 
@@ -1389,7 +1363,7 @@ unsafe extern "C" fn xml_new_reconciled_ns(
 // of the node with values 0 (no) and 1 (yes).  For XInclude,
 // however, we allow a value of 2 to indicate copy properties and
 // namespace info, but don't recurse on children.
-pub(crate) unsafe extern "C" fn xml_static_copy_node(
+pub(crate) unsafe fn xml_static_copy_node(
     node: XmlNodePtr,
     doc: XmlDocPtr,
     parent: XmlNodePtr,
@@ -1468,25 +1442,21 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
         (*ret).line = (*node).line;
     }
     if !parent.is_null() {
-        /*
-         * this is a tricky part for the node register thing:
-         * in case ret does get coalesced in xmlAddChild
-         * the deregister-node callback is called; so we register ret now already
-         */
+        // this is a tricky part for the node register thing:
+        // in case ret does get coalesced in xmlAddChild
+        // the deregister-node callback is called; so we register ret now already
         if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
             xml_register_node_default_value(ret as _);
         }
 
-        /*
-         * Note that since (*ret).parent is already set, xmlAddChild will
-         * return early and not actually insert the node. It will only
-         * coalesce text nodes and unnecessarily call xmlSetTreeDoc.
-         * Assuming that the subtree to be copied always has its text
-         * nodes coalesced, the somewhat confusing call to xmlAddChild
-         * could be removed.
-         */
+        // Note that since (*ret).parent is already set, xmlAddChild will
+        // return early and not actually insert the node. It will only
+        // coalesce text nodes and unnecessarily call xmlSetTreeDoc.
+        // Assuming that the subtree to be copied always has its text
+        // nodes coalesced, the somewhat confusing call to xmlAddChild
+        // could be removed.
         let tmp: XmlNodePtr = (*parent).add_child(ret);
         /* node could have coalesced */
         if tmp != ret {
@@ -1496,7 +1466,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
 
     if extended == 0 {
         //  goto out;
-        /* if parent != null_mut() we already registered the node above */
+        // if parent != null_mut() we already registered the node above
         if parent.is_null() && __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
         // && xmlRegisterNodeDefaultValue.is_some()
         {
@@ -1514,16 +1484,12 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     }
 
     if !(*node).ns.is_null() {
-        let prefix = (*(*node).ns).prefix;
-        let prefix =
-            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+        let prefix = (*(*node).ns).prefix();
         let mut ns = (*ret).search_ns(doc, prefix.as_deref());
         if ns.is_null() {
-            /*
-             * Humm, we are copying an element whose namespace is defined
-             * out of the new tree scope. Search it in the original tree
-             * and add it at the top of the new tree
-             */
+            // Humm, we are copying an element whose namespace is defined
+            // out of the new tree scope. Search it in the original tree
+            // and add it at the top of the new tree
             ns = (*node).search_ns((*node).doc, prefix.as_deref());
             if !ns.is_null() {
                 let mut root: XmlNodePtr = ret;
@@ -1531,14 +1497,12 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
                 while let Some(parent) = (*root).parent() {
                     root = parent.as_ptr();
                 }
-                (*ret).ns = xml_new_ns(root, (*ns).href, (*ns).prefix);
+                (*ret).ns = xml_new_ns(root, (*ns).href, (*ns).prefix().as_deref());
             } else {
                 (*ret).ns = xml_new_reconciled_ns(doc, ret, (*node).ns);
             }
         } else {
-            /*
-             * reference the existing namespace definition in our own tree.
-             */
+            // reference the existing namespace definition in our own tree.
             (*ret).ns = ns;
         }
     }
@@ -1555,7 +1519,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
             // we cannot keep the reference. Try to find it in the
             // target document.
             (*ret).set_children(NodePtr::from_ptr(
-                xml_get_doc_entity(doc, (*ret).name) as *mut XmlNode
+                xml_get_doc_entity(doc, &(*ret).name().unwrap()) as *mut XmlNode,
             ));
         } else {
             (*ret).set_children((*node).children());
@@ -1571,7 +1535,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
                 return null_mut();
             }
 
-            /* Check for coalesced text nodes */
+            // Check for coalesced text nodes
             if (*insert).last() != NodePtr::from_ptr(copy) {
                 if let Some(mut last) = (*insert).last() {
                     (*copy).prev = Some(last);
@@ -1618,7 +1582,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node(
     ret
 }
 
-pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
+pub(crate) unsafe fn xml_static_copy_node_list(
     mut node: XmlNodePtr,
     doc: XmlDocPtr,
     parent: XmlNodePtr,
@@ -1681,7 +1645,7 @@ pub(crate) unsafe extern "C" fn xml_static_copy_node_list(
     //     return null_mut();
 }
 
-unsafe extern "C" fn xml_copy_prop_internal(
+unsafe fn xml_copy_prop_internal(
     doc: XmlDocPtr,
     target: XmlNodePtr,
     cur: XmlAttrPtr,
@@ -1711,9 +1675,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
     (*ret).parent = NodePtr::from_ptr(target);
 
     if !(*cur).ns.is_null() && !target.is_null() {
-        let prefix = (*(*cur).ns).prefix;
-        let prefix =
-            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
+        let prefix = (*(*cur).ns).prefix();
         let mut ns = (*target).search_ns((*target).doc, prefix.as_deref());
         if ns.is_null() {
             // Humm, we are copying an element whose namespace is defined
@@ -1735,7 +1697,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
                     // correct possibly cycling above the document elt
                     root = pred;
                 }
-                (*ret).ns = xml_new_ns(root, (*ns).href, (*ns).prefix);
+                (*ret).ns = xml_new_ns(root, (*ns).href, (*ns).prefix().as_deref());
             }
         } else {
             // we have to find something appropriate here since
@@ -1794,7 +1756,7 @@ unsafe extern "C" fn xml_copy_prop_internal(
 ///
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyProp")]
-pub unsafe extern "C" fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> XmlAttrPtr {
+pub unsafe fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> XmlAttrPtr {
     xml_copy_prop_internal(null_mut(), target, cur)
 }
 
@@ -1802,7 +1764,7 @@ pub unsafe extern "C" fn xml_copy_prop(target: XmlNodePtr, cur: XmlAttrPtr) -> X
 ///
 /// Returns: a new #xmlAttrPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyPropList")]
-pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> XmlAttrPtr {
+pub unsafe fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> XmlAttrPtr {
     let mut ret: XmlAttrPtr = null_mut();
     let mut p: XmlAttrPtr = null_mut();
     let mut q: XmlAttrPtr;
@@ -1834,7 +1796,7 @@ pub unsafe extern "C" fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttr
 /// Returns: a new #xmlDtdPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
+pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     use std::ffi::CString;
 
     use crate::libxml::{
@@ -1853,7 +1815,7 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     }
     let ret: XmlDtdPtr = xml_new_dtd(
         null_mut(),
-        (*dtd).name,
+        (*dtd).name().as_deref(),
         (*dtd).external_id.as_deref(),
         (*dtd).system_id.as_deref(),
     );
@@ -1883,16 +1845,16 @@ pub unsafe extern "C" fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
         if matches!((*cur).element_type(), XmlElementType::XmlEntityDecl) {
             let tmp: XmlEntityPtr = cur as _;
             match (*tmp).etype {
-                Some(XmlEntityType::XmlInternalGeneralEntity)
-                | Some(XmlEntityType::XmlExternalGeneralParsedEntity)
-                | Some(XmlEntityType::XmlExternalGeneralUnparsedEntity) => {
+                XmlEntityType::XmlInternalGeneralEntity
+                | XmlEntityType::XmlExternalGeneralParsedEntity
+                | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
                     q = (*ret).get_entity((*tmp).name.load(Ordering::Relaxed)) as _;
                 }
-                Some(XmlEntityType::XmlInternalParameterEntity)
-                | Some(XmlEntityType::XmlExternalParameterEntity) => {
+                XmlEntityType::XmlInternalParameterEntity
+                | XmlEntityType::XmlExternalParameterEntity => {
                     q = (*ret).get_parameter_entity((*tmp).name.load(Ordering::Relaxed)) as _;
                 }
-                Some(XmlEntityType::XmlInternalPredefinedEntity) => {}
+                XmlEntityType::XmlInternalPredefinedEntity => {}
                 _ => unreachable!(),
             }
         } else if matches!((*cur).element_type(), XmlElementType::XmlElementDecl) {
@@ -2283,15 +2245,7 @@ pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
 /// Creation of a processing instruction element.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocPI")]
-pub unsafe extern "C" fn xml_new_doc_pi(
-    doc: XmlDocPtr,
-    name: *const XmlChar,
-    content: *const XmlChar,
-) -> XmlNodePtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
+pub unsafe fn xml_new_doc_pi(doc: XmlDocPtr, name: &str, content: Option<&str>) -> XmlNodePtr {
     // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
@@ -2301,13 +2255,11 @@ pub unsafe extern "C" fn xml_new_doc_pi(
     std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlPINode;
 
-    if !doc.is_null() && !(*doc).dict.is_null() {
-        (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
-    } else {
-        (*cur).name = xml_strdup(name);
-    }
-    if !content.is_null() {
-        (*cur).content = xml_strdup(content);
+    let name = CString::new(name).unwrap();
+    (*cur).name = xml_strdup(name.as_ptr() as *const u8);
+    if let Some(content) = content {
+        let content = CString::new(content).unwrap();
+        (*cur).content = xml_strdup(content.as_ptr() as *const u8);
     }
     (*cur).doc = doc;
 
@@ -2325,7 +2277,7 @@ pub unsafe extern "C" fn xml_new_doc_pi(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewPI")]
-pub unsafe extern "C" fn xml_new_pi(name: *const XmlChar, content: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> XmlNodePtr {
     xml_new_doc_pi(null_mut(), name, content)
 }
 
@@ -2378,10 +2330,7 @@ pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> 
 /// Creation of a new node containing a comment within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocComment")]
-pub unsafe extern "C" fn xml_new_doc_comment(
-    doc: XmlDocPtr,
-    content: *const XmlChar,
-) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_comment(doc: XmlDocPtr, content: &str) -> XmlNodePtr {
     let cur: XmlNodePtr = xml_new_comment(content);
     if !cur.is_null() {
         (*cur).doc = doc;
@@ -2394,10 +2343,8 @@ pub unsafe extern "C" fn xml_new_doc_comment(
 /// Creation of a new node containing a comment.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewComment")]
-pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr {
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_comment(content: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building comment");
@@ -2407,9 +2354,8 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
     (*cur).typ = XmlElementType::XmlCommentNode;
 
     (*cur).name = XML_STRING_COMMENT.as_ptr() as _;
-    if !content.is_null() {
-        (*cur).content = xml_strdup(content);
-    }
+    let content = CString::new(content).unwrap();
+    (*cur).content = xml_strdup(content.as_ptr() as *const u8);
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -2422,14 +2368,8 @@ pub unsafe extern "C" fn xml_new_comment(content: *const XmlChar) -> XmlNodePtr 
 /// Creation of a new node containing a CDATA block.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCDataBlock")]
-pub unsafe extern "C" fn xml_new_cdata_block(
-    doc: XmlDocPtr,
-    content: *const XmlChar,
-    len: i32,
-) -> XmlNodePtr {
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_cdata_block(doc: XmlDocPtr, content: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building CDATA");
@@ -2438,10 +2378,7 @@ pub unsafe extern "C" fn xml_new_cdata_block(
     std::ptr::write(&mut *cur, XmlNode::default());
     (*cur).typ = XmlElementType::XmlCDATASectionNode;
     (*cur).doc = doc;
-
-    if !content.is_null() {
-        (*cur).content = xml_strndup(content, len);
-    }
+    (*cur).content = xml_strndup(content.as_ptr(), content.len() as i32);
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     //  && xmlRegisterNodeDefaultValue.is_some()
@@ -2454,14 +2391,8 @@ pub unsafe extern "C" fn xml_new_cdata_block(
 /// Creation of a new character reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewCharRef")]
-pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlChar) -> XmlNodePtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_char_ref(doc: XmlDocPtr, name: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building character reference");
@@ -2471,16 +2402,16 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
     (*cur).typ = XmlElementType::XmlEntityRefNode;
 
     (*cur).doc = doc;
-    if *name.add(0) == b'&' {
-        name = name.add(1);
-        let len: i32 = xml_strlen(name);
-        if *name.add(len as usize - 1) == b';' {
-            (*cur).name = xml_strndup(name, len - 1);
+    if let Some(name) = name.strip_prefix('&') {
+        let len = name.len();
+        if let Some(name) = name.strip_suffix(';') {
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32 - 1);
         } else {
-            (*cur).name = xml_strndup(name, len);
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32);
         }
     } else {
-        (*cur).name = xml_strdup(name);
+        let name = CString::new(name).unwrap();
+        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -2494,17 +2425,8 @@ pub unsafe extern "C" fn xml_new_char_ref(doc: XmlDocPtr, mut name: *const XmlCh
 /// Creation of a new reference node.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewReference")]
-pub unsafe extern "C" fn xml_new_reference(
-    doc: *const XmlDoc,
-    mut name: *const XmlChar,
-) -> XmlNodePtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building reference");
@@ -2514,19 +2436,19 @@ pub unsafe extern "C" fn xml_new_reference(
     (*cur).typ = XmlElementType::XmlEntityRefNode;
 
     (*cur).doc = doc as _;
-    if *name.add(0) == b'&' {
-        name = name.add(1);
-        let len: i32 = xml_strlen(name);
-        if *name.add(len as usize - 1) == b';' {
-            (*cur).name = xml_strndup(name, len - 1);
+    if let Some(name) = name.strip_prefix('&') {
+        let len = name.len();
+        if let Some(name) = name.strip_suffix(';') {
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32 - 1);
         } else {
-            (*cur).name = xml_strndup(name, len);
+            (*cur).name = xml_strndup(name.as_ptr(), len as i32);
         }
     } else {
-        (*cur).name = xml_strdup(name);
+        let name = CString::new(name).unwrap();
+        (*cur).name = xml_strdup(name.as_ptr() as *const u8);
     }
 
-    let ent: XmlEntityPtr = xml_get_doc_entity(doc, (*cur).name);
+    let ent: XmlEntityPtr = xml_get_doc_entity(doc, &(*cur).name().unwrap());
     if !ent.is_null() {
         (*cur).content = (*ent).content.load(Ordering::Acquire);
         // The parent pointer in entity is a DTD pointer and thus is NOT
@@ -2807,11 +2729,7 @@ pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -
 ///
 /// Returns -1 in case of error, 0 otherwise
 #[doc(alias = "xmlTextConcat")]
-pub unsafe extern "C" fn xml_text_concat(
-    node: XmlNodePtr,
-    content: *const XmlChar,
-    len: i32,
-) -> i32 {
+pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
     if node.is_null() {
         return -1;
     }
@@ -2829,9 +2747,9 @@ pub unsafe extern "C" fn xml_text_concat(
             && !(*(*node).doc).dict.is_null()
             && xml_dict_owns((*(*node).doc).dict, (*node).content) != 0)
     {
-        (*node).content = xml_strncat_new((*node).content, content, len);
+        (*node).content = xml_strncat_new((*node).content, content.as_ptr(), content.len() as i32);
     } else {
-        (*node).content = xml_strncat((*node).content, content, len);
+        (*node).content = xml_strncat((*node).content, content.as_ptr(), content.len() as i32);
     }
     (*node).properties = null_mut();
     if (*node).content.is_null() {
@@ -3040,7 +2958,7 @@ unsafe extern "C" fn copy_string_for_new_dict_if_needed(
 ///
 /// Returns 1 if true, 0 if false and -1 in case of error.
 #[doc(alias = "xmlNsInScope")]
-unsafe extern "C" fn xml_ns_in_scope(
+unsafe fn xml_ns_in_scope(
     _doc: XmlDocPtr,
     mut node: XmlNodePtr,
     ancestor: XmlNodePtr,
@@ -3060,12 +2978,13 @@ unsafe extern "C" fn xml_ns_in_scope(
         if matches!((*node).element_type(), XmlElementType::XmlElementNode) {
             tst = (*node).ns_def;
             while !tst.is_null() {
-                if (*tst).prefix.is_null() && prefix.is_null() {
+                if (*tst).prefix().is_none() && prefix.is_null() {
                     return 0;
                 }
-                if !(*tst).prefix.is_null()
-                    && !prefix.is_null()
-                    && xml_str_equal((*tst).prefix, prefix)
+                if (*tst).prefix().is_some()
+                    && (*tst).prefix()
+                        == (!prefix.is_null())
+                            .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
                 {
                     return 0;
                 }
@@ -3090,7 +3009,7 @@ pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
     }
 
     match (*cur).element_type() {
-        XML_LOCAL_NAMESPACE => xml_new_ns(null_mut(), (*cur).href, (*cur).prefix),
+        XML_LOCAL_NAMESPACE => xml_new_ns(null_mut(), (*cur).href, (*cur).prefix().as_deref()),
         _ => null_mut(),
     }
 }
@@ -3410,10 +3329,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
 ///
 /// Returns 0 on success, -1 on API or internal errors.
 #[doc(alias = "xmlDOMWrapNSNormGatherInScopeNs")]
-unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
-    map: *mut XmlNsMapPtr,
-    node: XmlNodePtr,
-) -> i32 {
+unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(map: *mut XmlNsMapPtr, node: XmlNodePtr) -> i32 {
     let mut cur: XmlNodePtr;
     let mut ns: XmlNsPtr;
     let mut mi: XmlNsMapItemPtr;
@@ -3425,9 +3341,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
     if node.is_null() || matches!((*node).element_type(), XmlElementType::XmlNamespaceDecl) {
         return -1;
     }
-    /*
-     * Get in-scope ns-decls of @parent.
-     */
+    // Get in-scope ns-decls of @parent.
     cur = node;
     while !cur.is_null() && cur != (*cur).doc as _ {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
@@ -3437,21 +3351,15 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_gather_in_scope_ns(
             loop {
                 shadowed = 0;
                 if XML_NSMAP_NOTEMPTY!(*map) {
-                    /*
-                    	* Skip shadowed prefixes.
-                    	*/
+                    // Skip shadowed prefixes.
                     XML_NSMAP_FOREACH!(*map, mi, {
-                        if (*ns).prefix == (*(*mi).new_ns).prefix
-                            || xml_str_equal((*ns).prefix, (*(*mi).new_ns).prefix)
-                        {
+                        if (*ns).prefix() == (*(*mi).new_ns).prefix() {
                             shadowed = 1;
                             break;
                         }
                     });
                 }
-                /*
-                 * Insert mapping.
-                 */
+                // Insert mapping.
                 mi = xml_dom_wrap_ns_map_add_item(map, 0, null_mut(), ns, XML_TREE_NSMAP_PARENT);
                 if mi.is_null() {
                     return -1;
@@ -3519,10 +3427,10 @@ macro_rules! IS_STR_XML {
 ///
 /// Returns the acquired ns struct or null_mut() in case of an API or internal error.
 #[doc(alias = "xmlDOMWrapStoreNs")]
-unsafe extern "C" fn xml_dom_wrap_store_ns(
+unsafe fn xml_dom_wrap_store_ns(
     doc: XmlDocPtr,
     ns_name: *const XmlChar,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
 ) -> XmlNsPtr {
     let mut ns: XmlNsPtr;
 
@@ -3537,9 +3445,7 @@ unsafe extern "C" fn xml_dom_wrap_store_ns(
         /* Reuse. */
         ns = (*ns).next;
         while !ns.is_null() {
-            if (((*ns).prefix == prefix as _) || xml_str_equal((*ns).prefix, prefix))
-                && xml_str_equal((*ns).href, ns_name)
-            {
+            if (*ns).prefix().as_deref() == prefix && xml_str_equal((*ns).href, ns_name) {
                 return ns;
             }
             if (*ns).next.is_null() {
@@ -3560,10 +3466,7 @@ unsafe extern "C" fn xml_dom_wrap_store_ns(
 ///
 /// Returns the ns-decl if found, null_mut() if not found and on API errors.
 #[doc(alias = "xmlTreeLookupNsListByPrefix")]
-unsafe extern "C" fn xml_tree_nslist_lookup_by_prefix(
-    ns_list: XmlNsPtr,
-    prefix: *const XmlChar,
-) -> XmlNsPtr {
+unsafe fn xml_tree_nslist_lookup_by_prefix(ns_list: XmlNsPtr, prefix: *const XmlChar) -> XmlNsPtr {
     if ns_list.is_null() {
         return null_mut();
     }
@@ -3624,9 +3527,7 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
                 ns = (*cur).ns_def;
                 loop {
                     if prefix == (*ns).prefix || xml_str_equal(prefix, (*ns).prefix) {
-                        /*
-                        	* Disabled namespaces, e.g. xmlns:abc="".
-                        	*/
+                        // Disabled namespaces, e.g. xmlns:abc="".
                         if (*ns).href.is_null() {
                             return 0;
                         }
@@ -3662,7 +3563,7 @@ unsafe extern "C" fn xml_search_ns_by_prefix_strict(
 ///
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlDOMWrapNSNormDeclareNsForced")]
-unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
+unsafe fn xml_dom_wrap_nsnorm_declare_ns_forced(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
     ns_name: *const XmlChar,
@@ -3702,7 +3603,13 @@ unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
             {
                 // goto ns_next_prefix;
             } else {
-                ret = xml_new_ns(null_mut(), ns_name, pref);
+                ret = xml_new_ns(
+                    null_mut(),
+                    ns_name,
+                    (!pref.is_null())
+                        .then(|| CStr::from_ptr(pref as *const i8).to_string_lossy())
+                        .as_deref(),
+                );
                 if ret.is_null() {
                     return null_mut();
                 }
@@ -3750,8 +3657,9 @@ unsafe extern "C" fn xml_dom_wrap_nsnorm_declare_ns_forced(
 /// change the prefix or the new ns-decl.
 ///
 /// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
+#[allow(clippy::too_many_arguments)]
 #[doc(alias = "xmlDOMWrapNSNormAcquireNormalizedNs")]
-unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
+unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     doc: XmlDocPtr,
     elem: XmlNodePtr,
     ns: XmlNsPtr,
@@ -3768,68 +3676,52 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
     }
 
     *ret_ns = null_mut();
-    /*
-     * Handle XML namespace.
-     */
-    if IS_STR_XML!((*ns).prefix) {
-        /*
-        	* Insert XML namespace mapping.
-        	*/
+    // Handle XML namespace.
+    if (*ns).prefix().as_deref() == Some("xml") {
+        // Insert XML namespace mapping.
         *ret_ns = (*doc).ensure_xmldecl();
         if (*ret_ns).is_null() {
             return -1;
         }
         return 0;
     }
-    /*
-     * If the search should be done in ancestors only and no
-     * @elem (the first ancestor) was specified, then skip the search.
-     */
+    // If the search should be done in ancestors only and no
+    // @elem (the first ancestor) was specified, then skip the search.
     if XML_NSMAP_NOTEMPTY!(*ns_map) && !(ancestors_only != 0 && elem.is_null()) {
-        /*
-        	* Try to find an equal ns-name in in-scope ns-decls.
-        	*/
+        // Try to find an equal ns-name in in-scope ns-decls.
         XML_NSMAP_FOREACH!(*ns_map, mi, {
             if ((*mi).depth >= XML_TREE_NSMAP_PARENT) &&
-		        /*
-		        * ancestorsOnly: This should be turned on to gain speed,
-		        * if one knows that the branch itself was already
-		        * ns-wellformed and no stale references existed.
-		        * I.e. it searches in the ancestor axis only.
-		        */
+		        // ancestorsOnly: This should be turned on to gain speed,
+                // if one knows that the branch itself was already
+                // ns-wellformed and no stale references existed.
+                // I.e. it searches in the ancestor axis only.
 		        (ancestors_only == 0 || (*mi).depth == XML_TREE_NSMAP_PARENT) &&
-		        /* Skip shadowed prefixes. */
+		        // Skip shadowed prefixes.
 		        (*mi).shadow_depth == -1 &&
-		        /* Skip xmlns="" or xmlns:foo="". */
+		        // Skip xmlns="" or xmlns:foo="".
 		        (!(*(*mi).new_ns).href.is_null() &&
                 *(*(*mi).new_ns).href.add(0) != 0) &&
-		        /* Ensure a prefix if wanted. */
-		        (prefixed == 0 || !(*(*mi).new_ns).prefix.is_null()) &&
-		        /* Equal ns name */
+		        // Ensure a prefix if wanted.
+		        (prefixed == 0 || (*(*mi).new_ns).prefix().is_some()) &&
+		        // Equal ns name
 		        ((*(*mi).new_ns).href == (*ns).href ||
                 xml_str_equal((*(*mi).new_ns).href, (*ns).href) )
             {
-                /* Set the mapping. */
+                // Set the mapping.
                 (*mi).old_ns = ns;
                 *ret_ns = (*mi).new_ns;
                 return 0;
             }
         });
     }
-    /*
-     * No luck, the namespace is out of scope or shadowed.
-     */
+    // No luck, the namespace is out of scope or shadowed.
     if elem.is_null() {
-        /*
-        	* Store ns-decls in "oldNs" of the document-node.
-        	*/
-        let tmpns: XmlNsPtr = xml_dom_wrap_store_ns(doc, (*ns).href, (*ns).prefix);
+        // Store ns-decls in "oldNs" of the document-node.
+        let tmpns: XmlNsPtr = xml_dom_wrap_store_ns(doc, (*ns).href, (*ns).prefix().as_deref());
         if tmpns.is_null() {
             return -1;
         }
-        /*
-        	* Insert mapping.
-        	*/
+        // Insert mapping.
         if xml_dom_wrap_ns_map_add_item(ns_map, -1, ns, tmpns, XML_TREE_NSMAP_DOC).is_null() {
             xml_free_ns(tmpns);
             return -1;
@@ -3843,18 +3735,13 @@ unsafe extern "C" fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
         }
 
         if !(*ns_map).is_null() {
-            /*
-             * Does it shadow ancestor ns-decls?
-             */
+            // Does it shadow ancestor ns-decls?
             XML_NSMAP_FOREACH!(*ns_map, mi, {
                 if ((*mi).depth < depth)
                     && (*mi).shadow_depth == -1
-                    && ((*ns).prefix == (*(*mi).new_ns).prefix
-                        || xml_str_equal((*ns).prefix, (*(*mi).new_ns).prefix))
+                    && (*ns).prefix() == (*(*mi).new_ns).prefix()
                 {
-                    /*
-                     * Shadows.
-                     */
+                    // Shadows.
                     (*mi).shadow_depth = depth;
                     break;
                 }
@@ -3951,16 +3838,8 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                         XML_NSMAP_FOREACH!(ns_map, mi, {
                                             if (*mi).depth >= XML_TREE_NSMAP_PARENT
                                                 && (*mi).shadow_depth == -1
-                                                && ((*ns).prefix == (*(*mi).new_ns).prefix
-                                                    || xml_str_equal(
-                                                        (*ns).prefix,
-                                                        (*(*mi).new_ns).prefix,
-                                                    ))
-                                                && ((*ns).href == (*(*mi).new_ns).href
-                                                    || xml_str_equal(
-                                                        (*ns).href,
-                                                        (*(*mi).new_ns).href,
-                                                    ))
+                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                                && (*ns).href() == (*(*mi).new_ns).href()
                                             {
                                                 // A redundant ns-decl was found.
                                                 // Add it to the list of redundant ns-decls.
@@ -3987,33 +3866,23 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                         });
                                     }
 
-                                    /*
-                                     * Skip ns-references handling if the referenced
-                                     * ns-decl is declared on the same element.
-                                     */
+                                    // Skip ns-references handling if the referenced
+                                    // ns-decl is declared on the same element.
                                     if !(*cur).ns.is_null() && adoptns != 0 && (*cur).ns == ns {
                                         adoptns = 0;
                                     }
-                                    /*
-                                     * Does it shadow any ns-decl?
-                                     */
+                                    // Does it shadow any ns-decl?
                                     if XML_NSMAP_NOTEMPTY!(ns_map) {
                                         XML_NSMAP_FOREACH!(ns_map, mi, {
                                             if (*mi).depth >= XML_TREE_NSMAP_PARENT
                                                 && (*mi).shadow_depth == -1
-                                                && ((*ns).prefix == (*(*mi).new_ns).prefix
-                                                    || xml_str_equal(
-                                                        (*ns).prefix,
-                                                        (*(*mi).new_ns).prefix,
-                                                    ))
+                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
                                             {
                                                 (*mi).shadow_depth = depth;
                                             }
                                         });
                                     }
-                                    /*
-                                     * Push mapping.
-                                     */
+                                    // Push mapping.
                                     if xml_dom_wrap_ns_map_add_item(
                                         addr_of_mut!(ns_map),
                                         -1,
@@ -4036,9 +3905,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                 if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                                     && !(*cur).properties.is_null()
                                 {
-                                    /*
-                                     * Process attributes.
-                                     */
+                                    // Process attributes.
                                     cur = (*cur).properties as _;
                                     if cur.is_null() {
                                         break 'main;
@@ -4054,9 +3921,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                             if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                                 && !(*cur).properties.is_null()
                             {
-                                /*
-                                 * Process attributes.
-                                 */
+                                // Process attributes.
                                 cur = (*cur).properties as _;
                                 if cur.is_null() {
                                     break 'main;
@@ -4081,9 +3946,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                             }
                             parnsdone = 1;
                         }
-                        /*
-                         * Adjust the reference if this was a redundant ns-decl.
-                         */
+                        // Adjust the reference if this was a redundant ns-decl.
                         if !list_redund.is_null() {
                             for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
                                 if (*cur).ns == *list_redund.add(j) {
@@ -4092,13 +3955,9 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                 }
                             }
                         }
-                        /*
-                         * Adopt ns-references.
-                         */
+                        // Adopt ns-references.
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
-                            /*
-                             * Search for a mapping.
-                             */
+                            // Search for a mapping.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
                                 if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
                                     (*cur).ns = (*mi).new_ns;
@@ -4108,9 +3967,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                         XmlElementType::XmlElementNode
                                     ) && !(*cur).properties.is_null()
                                     {
-                                        /*
-                                         * Process attributes.
-                                         */
+                                        // Process attributes.
                                         cur = (*cur).properties as _;
                                         if cur.is_null() {
                                             break 'main;
@@ -4120,9 +3977,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                                 }
                             });
                         }
-                        /*
-                         * Acquire a normalized ns-decl and add it to the map.
-                         */
+                        // Acquire a normalized ns-decl and add it to the map.
                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                             doc,
                             cur_elem,
@@ -4143,9 +3998,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                         if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                             && !(*cur).properties.is_null()
                         {
-                            /*
-                             * Process attributes.
-                             */
+                            // Process attributes.
                             cur = (*cur).properties as _;
                             if cur.is_null() {
                                 break 'main;
@@ -4161,17 +4014,13 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                             }
                             if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                                 if XML_NSMAP_NOTEMPTY!(ns_map) {
-                                    /*
-                                     * Pop mappings.
-                                     */
+                                    // Pop mappings.
                                     while !(*ns_map).last.is_null()
                                         && (*(*ns_map).last).depth >= depth
                                     {
                                         XML_NSMAP_POP!(ns_map, mi);
                                     }
-                                    /*
-                                     * Unshadow.
-                                     */
+                                    // Unshadow.
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
                                         if (*mi).shadow_depth >= depth {
                                             (*mi).shadow_depth = -1;
@@ -4207,9 +4056,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                         .children()
                         .filter(|_| matches!((*cur).element_type(), XmlElementType::XmlElementNode))
                     {
-                        /*
-                         * Process content of element-nodes only.
-                         */
+                        // Process content of element-nodes only.
                         cur = children.as_ptr();
                         continue;
                     }
@@ -4220,16 +4067,12 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
                         }
                         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                             if XML_NSMAP_NOTEMPTY!(ns_map) {
-                                /*
-                                 * Pop mappings.
-                                 */
+                                // Pop mappings.
                                 while !(*ns_map).last.is_null() && (*(*ns_map).last).depth >= depth
                                 {
                                     XML_NSMAP_POP!(ns_map, mi);
                                 }
-                                /*
-                                 * Unshadow.
-                                 */
+                                // Unshadow.
                                 XML_NSMAP_FOREACH!(ns_map, mi, {
                                     if (*mi).shadow_depth >= depth {
                                         (*mi).shadow_depth = -1;
@@ -4419,31 +4262,22 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                     }
                                     ns = (*cur).ns_def;
                                     while !ns.is_null() {
-                                        /*
-                                         * NOTE: (*ns).prefix and (*ns).href are never in the dict.
-                                         * XML_TREE_ADOPT_STR((*ns).prefix)
-                                         * XML_TREE_ADOPT_STR((*ns).href)
-                                         */
-                                        /*
-                                         * Does it shadow any ns-decl?
-                                         */
+                                        // NOTE: (*ns).prefix and (*ns).href are never in the dict.
+                                        // XML_TREE_ADOPT_STR((*ns).prefix)
+                                        // XML_TREE_ADOPT_STR((*ns).href)
+
+                                        // Does it shadow any ns-decl?
                                         if XML_NSMAP_NOTEMPTY!(ns_map) {
                                             XML_NSMAP_FOREACH!(ns_map, mi, {
                                                 if (*mi).depth >= XML_TREE_NSMAP_PARENT
                                                     && (*mi).shadow_depth == -1
-                                                    && ((*ns).prefix == (*(*mi).new_ns).prefix
-                                                        || xml_str_equal(
-                                                            (*ns).prefix,
-                                                            (*(*mi).new_ns).prefix,
-                                                        ))
+                                                    && (*ns).prefix() == (*(*mi).new_ns).prefix()
                                                 {
                                                     (*mi).shadow_depth = depth;
                                                 }
                                             });
                                         }
-                                        /*
-                                         * Push mapping.
-                                         */
+                                        // Push mapping.
                                         if xml_dom_wrap_ns_map_add_item(
                                             addr_of_mut!(ns_map),
                                             -1,
@@ -4492,23 +4326,17 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 }
 
                                 if !ns_end {
-                                    /*
-                                     * No matching namespace in scope. We need a new one.
-                                     */
+                                    // No matching namespace in scope. We need a new one.
                                     if !ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some() {
-                                        /*
-                                         * User-defined behaviour.
-                                         */
+                                        // User-defined behaviour.
                                         ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                             ctxt,
                                             cur,
                                             (*(*cur).ns).href,
                                             (*(*cur).ns).prefix,
                                         );
-                                        /*
-                                         * Insert mapping if ns is available; it's the users fault
-                                         * if not.
-                                         */
+                                        // Insert mapping if ns is available; it's the users fault
+                                        // if not.
                                         if xml_dom_wrap_ns_map_add_item(
                                             addr_of_mut!(ns_map),
                                             -1,
@@ -4522,12 +4350,10 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                         }
                                         (*cur).ns = ns;
                                     } else {
-                                        /*
-                                         * Acquire a normalized ns-decl and add it to the map.
-                                         */
+                                        // Acquire a normalized ns-decl and add it to the map.
                                         if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                                             dest_doc,
-                                            /* ns-decls on curElem or on (*destDoc).oldNs */
+                                            // ns-decls on curElem or on (*destDoc).oldNs
                                             if !dest_parent.is_null() {
                                                 cur_elem
                                             } else {
@@ -4538,7 +4364,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                             addr_of_mut!(ns_map),
                                             depth,
                                             ancestors_only,
-                                            /* ns-decls must be prefixed for attributes. */
+                                            // ns-decls must be prefixed for attributes.
                                             matches!(
                                                 (*cur).element_type(),
                                                 XmlElementType::XmlAttributeNode
@@ -4601,7 +4427,8 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                 || !(*dest_doc).ext_subset.is_null()
                             {
                                 // Assign new entity-node if available.
-                                let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
+                                let ent: XmlEntityPtr =
+                                    xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                                 if !ent.is_null() {
                                     (*cur).content = (*ent).content.load(Ordering::Relaxed);
                                     (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -4743,25 +4570,21 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
             if !(*cur).ns_def.is_null() {
                 ns = (*cur).ns_def;
                 while !ns.is_null() {
-                    if prefixed != 0 && (*ns).prefix.is_null() {
+                    if prefixed != 0 && (*ns).prefix().is_none() {
                         ns = (*ns).next;
                         continue;
                     }
                     if !prev.is_null() {
-                        /*
-                         * Check the last level of ns-decls for a
-                         * shadowing prefix.
-                         */
+                        // Check the last level of ns-decls for a
+                        // shadowing prefix.
                         prevns = (*prev).ns_def;
                         loop {
-                            if (*prevns).prefix == (*ns).prefix
-                                || (!(*prevns).prefix.is_null()
-                                    && !(*ns).prefix.is_null()
-                                    && xml_str_equal((*prevns).prefix, (*ns).prefix))
+                            if (*prevns).prefix() == (*ns).prefix()
+                                || ((*prevns).prefix().is_some()
+                                    && (*ns).prefix().is_some()
+                                    && (*prevns).prefix() == (*ns).prefix())
                             {
-                                /*
-                                 * Shadowed.
-                                 */
+                                // Shadowed.
                                 break;
                             }
                             prevns = (*prevns).next;
@@ -4775,27 +4598,20 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
                             continue;
                         }
                     }
-                    /*
-                     * Ns-name comparison.
-                     */
+                    // Ns-name comparison.
                     if ns_name == (*ns).href || xml_str_equal(ns_name, (*ns).href) {
-                        /*
-                         * At this point the prefix can only be shadowed,
-                         * if we are the the (at least) 3rd level of
-                         * ns-decls.
-                         */
+                        // At this point the prefix can only be shadowed,
+                        // if we are the the (at least) 3rd level of ns-decls.
                         if !out.is_null() {
                             let ret: i32 = xml_ns_in_scope(doc, node, prev, (*ns).prefix);
                             if ret < 0 {
                                 return -1;
                             }
-                            /*
-                             * TODO: Should we try to find a matching ns-name
-                             * only once? This here keeps on searching.
-                             * I think we should try further since, there might
-                             * be an other matching ns-decl with an unshadowed
-                             * prefix.
-                             */
+                            // TODO: Should we try to find a matching ns-name
+                            // only once? This here keeps on searching.
+                            // I think we should try further since, there might
+                            // be an other matching ns-decl with an unshadowed
+                            // prefix.
                             if ret == 0 {
                                 ns = (*ns).next;
                                 continue;
@@ -4829,7 +4645,7 @@ unsafe extern "C" fn xml_search_ns_by_namespace_strict(
 ///
 /// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
 #[doc(alias = "xmlDOMWrapAdoptAttr")]
-unsafe extern "C" fn xml_dom_wrap_adopt_attr(
+unsafe fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: XmlDocPtr,
     attr: XmlAttrPtr,
@@ -4849,18 +4665,18 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
         let mut ns: XmlNsPtr = null_mut();
 
         if !ctxt.is_null() { /* TODO: User defined. */ }
-        /* XML Namespace. */
-        if IS_STR_XML!((*(*attr).ns).prefix) {
+        // XML Namespace.
+        if (*(*attr).ns).prefix().as_deref() == Some("xml") {
             ns = (*dest_doc).ensure_xmldecl();
         } else if dest_parent.is_null() {
-            /*
-             * Store in @(*destDoc).oldNs.
-             */
-            ns = xml_dom_wrap_store_ns(dest_doc, (*(*attr).ns).href, (*(*attr).ns).prefix);
+            // Store in @(*destDoc).oldNs.
+            ns = xml_dom_wrap_store_ns(
+                dest_doc,
+                (*(*attr).ns).href,
+                (*(*attr).ns).prefix().as_deref(),
+            );
         } else {
-            /*
-             * Declare on @destParent.
-             */
+            // Declare on @destParent.
             if xml_search_ns_by_namespace_strict(
                 dest_doc,
                 dest_parent,
@@ -4892,9 +4708,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
     XML_TREE_ADOPT_STR!((*attr).name, adopt_str, source_doc, dest_doc);
     (*attr).atype = None;
     (*attr).psvi = null_mut();
-    /*
-     * Walk content.
-     */
+    // Walk content.
     let Some(children) = (*attr).children else {
         return 0;
     };
@@ -4916,7 +4730,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_attr(
                 (*cur).set_last(None);
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     // Assign new entity-node if available.
-                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
+                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                     if !ent.is_null() {
                         (*cur).content = (*ent).content.load(Ordering::Relaxed);
                         (*cur).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -5055,7 +4869,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
                 (*node).set_last(None);
                 if !(*dest_doc).int_subset.is_null() || !(*dest_doc).ext_subset.is_null() {
                     // Assign new entity-node if available.
-                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*node).name);
+                    let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, &(*node).name().unwrap());
                     if !ent.is_null() {
                         (*node).content = (*ent).content.load(Ordering::Relaxed);
                         (*node).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -5188,14 +5002,14 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
                     }
                     ns = null_mut();
                     if !ctxt.is_null() {
-                        /*
-                         * User defined.
-                         */
+                        // User defined.
                     } else {
-                        /*
-                         * Add to doc's oldNs.
-                         */
-                        ns = xml_dom_wrap_store_ns(doc, (*(*node).ns).href, (*(*node).ns).prefix);
+                        // Add to doc's oldNs.
+                        ns = xml_dom_wrap_store_ns(
+                            doc,
+                            (*(*node).ns).href,
+                            (*(*node).ns).prefix().as_deref(),
+                        );
                         if ns.is_null() {
                             // goto internal_error;
                             if !list.is_null() {
@@ -5205,9 +5019,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
                         }
                     }
                     if !ns.is_null() {
-                        /*
-                         * Add mapping.
-                         */
+                        // Add mapping.
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
                             addr_of_mut!(list),
                             addr_of_mut!(size_list),
@@ -5555,7 +5367,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 if !(*ns).href.is_null() {
                                     (*clone_ns).href = xml_strdup((*ns).href);
                                 }
-                                if !(*ns).prefix.is_null() {
+                                if (*ns).prefix().is_some() {
                                     (*clone_ns).prefix = xml_strdup((*ns).prefix);
                                 }
 
@@ -5572,16 +5384,9 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                         XML_NSMAP_FOREACH!(ns_map, mi, {
                                             if ((*mi).depth >= XML_TREE_NSMAP_PARENT)
                                                 && (*mi).shadow_depth == -1
-                                                && ((*ns).prefix == (*(*mi).new_ns).prefix
-                                                    || xml_str_equal(
-                                                        (*ns).prefix,
-                                                        (*(*mi).new_ns).prefix,
-                                                    ))
+                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
                                             {
-                                                /*
-                                                 * Mark as shadowed at the current
-                                                 * depth.
-                                                 */
+                                                // Mark as shadowed at the current depth.
                                                 (*mi).shadow_depth = depth;
                                             }
                                         });
@@ -5627,7 +5432,8 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 || !(*dest_doc).ext_subset.is_null()
                             {
                                 // Different doc: Assign new entity-node if available.
-                                let ent: XmlEntityPtr = xml_get_doc_entity(dest_doc, (*cur).name);
+                                let ent: XmlEntityPtr =
+                                    xml_get_doc_entity(dest_doc, &(*cur).name().unwrap());
                                 if !ent.is_null() {
                                     (*clone).content = (*ent).content.load(Ordering::Relaxed);
                                     (*clone).set_children(NodePtr::from_ptr(ent as *mut XmlNode));
@@ -5701,22 +5507,16 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                         }
 
                         if !end_ns_reference {
-                            /*
-                             * No matching namespace in scope. We need a new one.
-                             */
+                            // No matching namespace in scope. We need a new one.
                             if !ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some() {
-                                /*
-                                 * User-defined behaviour.
-                                 */
+                                // User-defined behaviour.
                                 ns = ((*ctxt).get_ns_for_node_func.unwrap())(
                                     ctxt,
                                     cur,
                                     (*(*cur).ns).href,
                                     (*(*cur).ns).prefix,
                                 );
-                                /*
-                                 * Add user's mapping.
-                                 */
+                                // Add user's mapping.
                                 if xml_dom_wrap_ns_map_add_item(
                                     addr_of_mut!(ns_map),
                                     -1,
@@ -5730,12 +5530,10 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 }
                                 (*clone).ns = ns;
                             } else {
-                                /*
-                                 * Acquire a normalized ns-decl and add it to the map.
-                                 */
+                                // Acquire a normalized ns-decl and add it to the map.
                                 if xml_dom_wrap_ns_norm_acquire_normalized_ns(
                                     dest_doc,
-                                    /* ns-decls on curElem or on (*destDoc).oldNs */
+                                    // ns-decls on curElem or on (*destDoc).oldNs
                                     if !dest_parent.is_null() {
                                         cur_elem
                                     } else {
@@ -5745,9 +5543,9 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                     addr_of_mut!(ns),
                                     addr_of_mut!(ns_map),
                                     depth,
-                                    /* if we need to search only in the ancestor-axis */
+                                    // if we need to search only in the ancestor-axis
                                     ancestors_only,
-                                    /* ns-decls must be prefixed for attributes. */
+                                    // ns-decls must be prefixed for attributes.
                                     matches!(
                                         (*cur).element_type(),
                                         XmlElementType::XmlAttributeNode
@@ -5786,13 +5584,9 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                             }
                         }
                     }
-                    /*
-                     **
-                     ** The following will traverse the tree **************************
-                     **
-                     *
-                     * Walk the element's attributes before descending into child-nodes.
-                     */
+                    // The following will traverse the tree **************************
+                    //
+                    // Walk the element's attributes before descending into child-nodes.
                     if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                         && !(*cur).properties.is_null()
                     {
@@ -5816,10 +5610,8 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
 
                 // leave_node:
                 'leave_node: loop {
-                    /*
-                     * At this point we are done with the node, its content
-                     * and an element-nodes's attribute-nodes.
-                     */
+                    // At this point we are done with the node, its content
+                    // and an element-nodes's attribute-nodes.
                     if cur == node {
                         break 'main;
                     }
@@ -5917,7 +5709,11 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{
+        globals::reset_last_error,
+        libxml::{xmlmemory::xml_mem_blocks, xmlstring::xml_strlen},
+        test_util::*,
+    };
 
     use super::*;
 
@@ -6453,75 +6249,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_cdata_block() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let content = gen_const_xml_char_ptr(n_content, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !content.is_null() && len > xml_strlen(content) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_new_cdata_block(doc, content, len);
-                        desret_xml_node_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_content, content, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewCDataBlock",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewCDataBlock()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_content);
-                            eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_char_ref() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_new_char_ref(doc, name);
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewCharRef",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewCharRef()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_child() {
         #[cfg(any(feature = "libxml_tree", feature = "schema"))]
         unsafe {
@@ -6559,61 +6286,6 @@ mod tests {
                                 }
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_comment() {
-        unsafe {
-            let mut leaks = 0;
-            for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let content = gen_const_xml_char_ptr(n_content, 0);
-
-                let ret_val = xml_new_comment(content as *const XmlChar);
-                desret_xml_node_ptr(ret_val);
-                des_const_xml_char_ptr(n_content, content, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNewComment",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNewComment()");
-                    eprintln!(" {}", n_content);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_comment() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_xml_doc_ptr(n_doc, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    let ret_val = xml_new_doc_comment(doc, content);
-                    desret_xml_node_ptr(ret_val);
-                    des_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewDocComment",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocComment()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_content);
                     }
                 }
             }
@@ -6723,41 +6395,6 @@ mod tests {
                                 eprint!(" {}", n_name);
                                 eprintln!(" {}", n_content);
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_pi() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        let ret_val = xml_new_doc_pi(doc, name, content);
-                        desret_xml_node_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewDocPI",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocPI()");
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_content);
                         }
                     }
                 }
@@ -6974,44 +6611,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_ns() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_href in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_xml_node_ptr(n_node, 0);
-                        let href = gen_const_xml_char_ptr(n_href, 1);
-                        let prefix = gen_const_xml_char_ptr(n_prefix, 2);
-
-                        let ret_val = xml_new_ns(node, href, prefix);
-                        if node.is_null() && !ret_val.is_null() {
-                            xml_free_ns(ret_val);
-                        }
-                        desret_xml_ns_ptr(ret_val);
-                        des_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_href, href, 1);
-                        des_const_xml_char_ptr(n_prefix, prefix, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewNs",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewNs()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_href);
-                            eprintln!(" {}", n_prefix);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_ns_prop() {
         unsafe {
             let mut leaks = 0;
@@ -7095,36 +6694,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_pi() {
-        unsafe {
-            let mut leaks = 0;
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let name = gen_const_xml_char_ptr(n_name, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    let ret_val = xml_new_pi(name as *const XmlChar, content);
-                    desret_xml_node_ptr(ret_val);
-                    des_const_xml_char_ptr(n_name, name, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewPI",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewPI()");
-                        eprint!(" {}", n_name);
-                        eprintln!(" {}", n_content);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_prop() {
         #[cfg(any(feature = "libxml_tree", feature = "html", feature = "schema"))]
         unsafe {
@@ -7157,36 +6726,6 @@ mod tests {
                                 eprintln!(" {}", n_value);
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_reference() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_CONST_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let doc = gen_const_xml_doc_ptr(n_doc, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    let ret_val = xml_new_reference(doc, name);
-                    desret_xml_node_ptr(ret_val);
-                    des_const_xml_doc_ptr(n_doc, doc, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewReference",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlNewReference()");
-                        eprint!(" {}", n_doc);
-                        eprintln!(" {}", n_name);
                     }
                 }
             }
@@ -7349,44 +6888,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlSplitQName3()");
                         eprint!(" {}", n_name);
                         eprintln!(" {}", n_len);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_concat() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_len in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let node = gen_xml_node_ptr(n_node, 0);
-                        let content = gen_const_xml_char_ptr(n_content, 1);
-                        let mut len = gen_int(n_len, 2);
-                        if !content.is_null() && len > xml_strlen(content) {
-                            len = 0;
-                        }
-
-                        let ret_val = xml_text_concat(node, content, len);
-                        desret_int(ret_val);
-                        des_xml_node_ptr(n_node, node, 0);
-                        des_const_xml_char_ptr(n_content, content, 1);
-                        des_int(n_len, len, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextConcat",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlTextConcat()");
-                            eprint!(" {}", n_node);
-                            eprint!(" {}", n_content);
-                            eprintln!(" {}", n_len);
-                        }
                     }
                 }
             }
