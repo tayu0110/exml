@@ -423,7 +423,6 @@ macro_rules! CUR_SCHAR {
     feature = "html",
     feature = "sax1",
     feature = "libxml_writer",
-    feature = "libxml_legacy"
 ))]
 pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{

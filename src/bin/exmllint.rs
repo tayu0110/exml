@@ -3027,9 +3027,6 @@ fn show_version(name: &str) {
     if xml_has_feature(Some(XmlFeature::XmlWithHtml)) {
         eprint!("HTML ");
     }
-    if xml_has_feature(Some(XmlFeature::XmlWithLegacy)) {
-        eprint!("Legacy ");
-    }
     if xml_has_feature(Some(XmlFeature::XmlWithC14n)) {
         eprint!("C14N ");
     }

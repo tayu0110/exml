@@ -4975,82 +4975,6 @@ pub unsafe extern "C" fn xml_create_doc_parser_ctxt(cur: *const XmlChar) -> XmlP
     xml_create_memory_parser_ctxt(CStr::from_ptr(cur as *const i8).to_bytes().to_vec())
 }
 
-#[cfg(feature = "libxml_legacy")]
-const XML_FEATURES_LIST: &[*const c_char] = &[
-    c"validate".as_ptr() as _,
-    c"load subset".as_ptr() as _,
-    c"keep blanks".as_ptr() as _,
-    c"disable SAX".as_ptr() as _,
-    c"fetch external entities".as_ptr() as _,
-    c"substitute entities".as_ptr() as _,
-    c"gather line info".as_ptr() as _,
-    c"user data".as_ptr() as _,
-    c"is html".as_ptr() as _,
-    c"is standalone".as_ptr() as _,
-    c"stop parser".as_ptr() as _,
-    c"document".as_ptr() as _,
-    c"is well formed".as_ptr() as _,
-    c"is valid".as_ptr() as _,
-    c"SAX block".as_ptr() as _,
-    c"SAX function internalSubset".as_ptr() as _,
-    c"SAX function isStandalone".as_ptr() as _,
-    c"SAX function hasInternalSubset".as_ptr() as _,
-    c"SAX function hasExternalSubset".as_ptr() as _,
-    c"SAX function resolveEntity".as_ptr() as _,
-    c"SAX function getEntity".as_ptr() as _,
-    c"SAX function entityDecl".as_ptr() as _,
-    c"SAX function notationDecl".as_ptr() as _,
-    c"SAX function attributeDecl".as_ptr() as _,
-    c"SAX function elementDecl".as_ptr() as _,
-    c"SAX function unparsedEntityDecl".as_ptr() as _,
-    c"SAX function setDocumentLocator".as_ptr() as _,
-    c"SAX function startDocument".as_ptr() as _,
-    c"SAX function endDocument".as_ptr() as _,
-    c"SAX function startElement".as_ptr() as _,
-    c"SAX function endElement".as_ptr() as _,
-    c"SAX function reference".as_ptr() as _,
-    c"SAX function characters".as_ptr() as _,
-    c"SAX function ignorableWhitespace".as_ptr() as _,
-    c"SAX function processingInstruction".as_ptr() as _,
-    c"SAX function comment".as_ptr() as _,
-    c"SAX function warning".as_ptr() as _,
-    c"SAX function error".as_ptr() as _,
-    c"SAX function fatalError".as_ptr() as _,
-    c"SAX function getParameterEntity".as_ptr() as _,
-    c"SAX function cdataBlock".as_ptr() as _,
-    c"SAX function externalSubset".as_ptr() as _,
-];
-
-/**
- * xmlGetFeaturesList:
- * @len:  the length of the features name array (input/output)
- * @result:  an array of string to be filled with the features name.
- *
- * Copy at most *@len feature names into the @result array
- *
- * Returns -1 in case or error, or the total number of features,
- *            len is updated with the number of strings copied,
- *            strings must not be deallocated
- */
-#[deprecated]
-#[cfg(feature = "libxml_legacy")]
-pub unsafe extern "C" fn xml_get_features_list(len: *mut i32, result: *mut *const c_char) -> i32 {
-    let ret: i32 = XML_FEATURES_LIST.len() as i32;
-    if len.is_null() || result.is_null() {
-        return ret;
-    }
-    if *len < 0 || *len >= 1000 {
-        return -1;
-    }
-    if *len > ret {
-        *len = ret;
-    }
-    for i in 0..*len {
-        *result.add(i as usize) = XML_FEATURES_LIST[i as usize];
-    }
-    ret
-}
-
 /// Create a parser context for using the XML parser in push mode.
 /// If @buffer and @size are non-NULL, the data is used to detect
 /// the encoding.  The remaining characters will be parsed so they
@@ -10479,7 +10403,7 @@ pub enum XmlFeature {
     XmlWithHttp = 10,
     XmlWithValid = 11,
     XmlWithHtml = 12,
-    XmlWithLegacy = 13,
+    // XmlWithLegacy = 13, // removed
     XmlWithC14n = 14,
     XmlWithCatalog = 15,
     XmlWithXpath = 16,
@@ -10544,9 +10468,6 @@ pub fn xml_has_feature(feature: Option<XmlFeature>) -> bool {
         }
         Some(XmlFeature::XmlWithHtml) => {
             cfg!(feature = "html")
-        }
-        Some(XmlFeature::XmlWithLegacy) => {
-            cfg!(feature = "libxml_legacy")
         }
         Some(XmlFeature::XmlWithC14n) => {
             cfg!(feature = "c14n")

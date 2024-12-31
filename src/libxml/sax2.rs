@@ -1294,12 +1294,7 @@ macro_rules! xml_ns_warn_msg {
 
 /// Handle a namespace error
 #[doc(alias = "xmlNsErrMsg")]
-#[cfg(any(
-    feature = "sax1",
-    feature = "html",
-    feature = "libxml_writer",
-    feature = "libxml_legacy"
-))]
+#[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 macro_rules! xml_ns_err_msg {
     ($ctxt:expr, $error:expr, $msg:literal) => {
         xml_ns_err_msg!(
@@ -1369,12 +1364,7 @@ macro_rules! xml_ns_err_msg {
 /// DOM subtree and past it in a new xmlAttr element added to
 /// the element.
 #[doc(alias = "xmlSAX2AttributeInternal")]
-#[cfg(any(
-    feature = "sax1",
-    feature = "html",
-    feature = "libxml_writer",
-    feature = "libxml_legacy"
-))]
+#[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 unsafe fn xml_sax2_attribute_internal(
     ctx: Option<GenericErrorContext>,
     fullname: &str,
@@ -1876,12 +1866,7 @@ unsafe fn xml_sax2_attribute_internal(
 
 /// Check defaulted attributes from the DTD
 #[doc(alias = "xmlCheckDefaultedAttributes")]
-#[cfg(any(
-    feature = "sax1",
-    feature = "html",
-    feature = "libxml_writer",
-    feature = "libxml_legacy"
-))]
+#[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 unsafe fn xml_check_defaulted_attributes(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
@@ -2039,12 +2024,7 @@ unsafe fn xml_check_defaulted_attributes(
 
 /// called when an opening tag has been processed.
 #[doc(alias = "xmlSAX2StartElement")]
-#[cfg(any(
-    feature = "sax1",
-    feature = "html",
-    feature = "libxml_writer",
-    feature = "libxml_legacy"
-))]
+#[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 pub unsafe fn xml_sax2_start_element(
     ctx: Option<GenericErrorContext>,
     fullname: &str,
@@ -2221,12 +2201,7 @@ pub unsafe fn xml_sax2_start_element(
 
 /// called when the end of an element has been detected.
 #[doc(alias = "xmlSAX2EndElement")]
-#[cfg(any(
-    feature = "sax1",
-    feature = "html",
-    feature = "libxml_writer",
-    feature = "libxml_legacy"
-))]
+#[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 pub unsafe fn xml_sax2_end_element(ctx: Option<GenericErrorContext>, _name: &str) {
     if ctx.is_none() {
         return;
@@ -2803,12 +2778,7 @@ unsafe fn xml_sax2_attribute_ns(
             // Add the xml:id value
             //
             // Open issue: normalization of the value.
-            #[cfg(any(
-                feature = "sax1",
-                feature = "html",
-                feature = "libxml_writer",
-                feature = "libxml_legacy"
-            ))]
+            #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
             {
                 #[cfg(feature = "libxml_valid")]
                 if xml_validate_ncname(content, 1) != 0 {
