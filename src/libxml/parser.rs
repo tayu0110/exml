@@ -150,8 +150,7 @@ use super::{
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
     parser_internals::{
-        xml_err_memory, xml_is_letter, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
-        XML_VCTXT_USE_PCTXT,
+        xml_err_memory, LINE_LEN, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
     },
     sax2::{xml_sax2_end_element, xml_sax2_start_element},
     threads::{
@@ -5076,46 +5075,6 @@ unsafe fn xml_parse_lookup_gt(ctxt: XmlParserCtxtPtr) -> i32 {
     0
 }
 
-// The two following functions are related to the change of accepted
-// characters for Name and NmToken in the Revision 5 of XML-1.0
-// They correspond to the modified production [4] and the new production [4a]
-// changes in that revision. Also note that the macros used for the
-// productions Letter, Digit, CombiningChar and Extender are not needed
-// anymore.
-// We still keep compatibility to pre-revision5 parsing semantic if the
-// new XML_PARSE_OLD10 option is given to the parser.
-unsafe fn xml_is_name_start_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
-    if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
-        // Use the new checks of production [4] [4a] amd [5] of the
-        // Update 5 of XML-1.0
-        if c != b' ' as i32
-            && c != b'>' as i32
-            && c != b'/' as i32  /* accelerators */
-            && ((c >= b'a' as i32 && c <= b'z' as i32)
-                || (c >= b'A' as i32 && c <= b'Z' as i32)
-                || c == b'_' as i32
-                || c == b':' as i32
-                || (0xC0..=0xD6).contains(&c)
-                || (0xD8..=0xF6).contains(&c)
-                || (0xF8..=0x2FF).contains(&c)
-                || (0x370..=0x37D).contains(&c)
-                || (0x37F..=0x1FFF).contains(&c)
-                || (0x200C..=0x200D).contains(&c)
-                || (0x2070..=0x218F).contains(&c)
-                || (0x2C00..=0x2FEF).contains(&c)
-                || (0x3001..=0xD7FF).contains(&c)
-                || (0xF900..=0xFDCF).contains(&c)
-                || (0xFDF0..=0xFFFD).contains(&c)
-                || (0x10000..=0xEFFFF).contains(&c))
-        {
-            return 1;
-        }
-    } else if xml_is_letter(c as u32) || c == b'_' as i32 || c == b':' as i32 {
-        return 1;
-    }
-    0
-}
-
 unsafe fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut len: i32 = 0;
     let mut l: i32 = 0;
@@ -5133,7 +5092,7 @@ unsafe fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     if c == ' '
         || c == '>'
         || c == '/' /* accelerators */
-        || (xml_is_name_start_char(ctxt, c as i32) == 0 || c == ':')
+        || (!c.is_name_start_char(&*ctxt) || c == ':')
     {
         return null_mut();
     }
@@ -5519,7 +5478,7 @@ pub(crate) unsafe fn xml_parse_string_name(
     };
 
     c = CUR_SCHAR!(ctxt, cur, l);
-    if xml_is_name_start_char(ctxt, c) == 0 {
+    if !(c as u32).is_name_start_char(&*ctxt) {
         return null_mut();
     }
 
