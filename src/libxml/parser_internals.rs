@@ -528,10 +528,8 @@ pub unsafe fn xml_create_entity_parser_ctxt(
 unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingHandler> {
     let mut out: [XmlChar; 200] = [0; 200];
 
-    /*
-     * To detect the EBCDIC code page, we convert the first 200 bytes
-     * to EBCDIC-US and try to find the encoding declaration.
-     */
+    // To detect the EBCDIC code page, we convert the first 200 bytes
+    // to EBCDIC-US and try to find the encoding declaration.
     let mut handler = get_encoding_handler(XmlCharEncoding::EBCDIC)?;
     let inlen = (*input).end.offset_from((*input).cur) as usize;
     let outstr = from_utf8_mut(&mut out).ok()?;
@@ -604,13 +602,11 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
         return -1;
     }
 
-    /*
-     * FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-     *
-     * Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
-     * This is mostly useless but Webkit/Chromium relies on this behavior.
-     * See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
-     */
+    // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
+    //
+    // Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
+    // This is mostly useless but Webkit/Chromium relies on this behavior.
+    // See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
     if !(*ctxt).input.is_null()
         && (*(*ctxt).input).consumed == 0
         && !(*(*ctxt).input).cur.is_null()
@@ -620,11 +616,8 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
         )
     {
-        /*
-         * Errata on XML-1.0 June 20 2001
-         * Specific handling of the Byte Order Mark for
-         * UTF-8
-         */
+        // Errata on XML-1.0 June 20 2001
+        // Specific handling of the Byte Order Mark for UTF-8
         if *(*(*ctxt).input).cur.add(0) == 0xEF
             && *(*(*ctxt).input).cur.add(1) == 0xBB
             && *(*(*ctxt).input).cur.add(2) == 0xBF
@@ -643,24 +636,22 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             return -1;
         }
         XmlCharEncoding::None => {
-            /* let's assume it's UTF-8 without the XML decl */
+            // let's assume it's UTF-8 without the XML decl
             (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
         }
         XmlCharEncoding::UTF8 => {
-            /* default encoding, no conversion should be needed */
+            // default encoding, no conversion should be needed
             (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
         }
         XmlCharEncoding::EBCDIC => xml_detect_ebcdic((*ctxt).input),
         _ => get_encoding_handler(enc),
     }) else {
-        /*
-         * Default handlers.
-         */
+        // Default handlers.
         match enc {
             XmlCharEncoding::ASCII => {
-                /* default encoding, no conversion should be needed */
+                // default encoding, no conversion should be needed
                 (*ctxt).charset = XmlCharEncoding::UTF8;
                 return 0;
             }
@@ -693,9 +684,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
     };
     let ret: i32 = (*ctxt).switch_input_encoding((*ctxt).input, handler);
     if ret < 0 || (*ctxt).err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
-        /*
-         * on encoding conversion errors, stop the parser
-         */
+        // on encoding conversion errors, stop the parser
         (*ctxt).stop();
         (*ctxt).err_no = XmlParserErrors::XmlI18NConvFailed as i32;
     }
@@ -706,7 +695,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
 ///
 /// Returns the new input stream
 #[doc(alias = "xmlNewStringInputStream")]
-pub unsafe extern "C" fn xml_new_string_input_stream(
+pub unsafe fn xml_new_string_input_stream(
     ctxt: XmlParserCtxtPtr,
     buffer: *const XmlChar,
 ) -> XmlParserInputPtr {
@@ -975,7 +964,7 @@ pub(crate) unsafe fn xml_fatal_err(
 ///
 /// Returns -1 in case of error or the index in the input stack
 #[doc(alias = "xmlPushInput")]
-pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParserInputPtr) -> i32 {
+pub unsafe fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParserInputPtr) -> i32 {
     if input.is_null() {
         return -1;
     }
@@ -1015,7 +1004,7 @@ pub unsafe extern "C" fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParser
 
 /// Free up an input stream.
 #[doc(alias = "xmlFreeInputStream")]
-pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
+pub unsafe fn xml_free_input_stream(input: XmlParserInputPtr) {
     if input.is_null() {
         return;
     }
@@ -1037,7 +1026,7 @@ pub unsafe extern "C" fn xml_free_input_stream(input: XmlParserInputPtr) {
 ///
 /// Returns the new input stream or NULL in case of error
 #[doc(alias = "xmlNewInputFromFile")]
-pub unsafe extern "C" fn xml_new_input_from_file(
+pub unsafe fn xml_new_input_from_file(
     ctxt: XmlParserCtxtPtr,
     filename: *const c_char,
 ) -> XmlParserInputPtr {
@@ -1123,7 +1112,7 @@ pub unsafe extern "C" fn xml_new_input_from_file(
 ///
 /// Returns the new input stream or NULL
 #[doc(alias = "xmlNewInputStream")]
-pub unsafe extern "C" fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlParserInputPtr {
+pub unsafe fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlParserInputPtr {
     let input: XmlParserInputPtr = xml_malloc(size_of::<XmlParserInput>()) as XmlParserInputPtr;
     if input.is_null() {
         xml_err_memory(ctxt, Some("couldn't allocate a new input stream\n"));
@@ -1136,11 +1125,9 @@ pub unsafe extern "C" fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlPars
     (*input).standalone = -1;
     std::ptr::write(&raw mut (*input).buf, None);
 
-    /*
-     * If the context is NULL the id cannot be initialized, but that
-     * should not happen while parsing which is the situation where
-     * the id is actually needed.
-     */
+    // If the context is NULL the id cannot be initialized, but that
+    // should not happen while parsing which is the situation where
+    // the id is actually needed.
     if !ctxt.is_null() {
         if (*input).id == INT_MAX {
             xml_err_memory(ctxt, Some("Input ID overflow\n"));
@@ -1169,7 +1156,7 @@ macro_rules! CUR_SCHAR {
 ///
 /// Returns the local part, and prefix is updated to get the Prefix if any.
 #[doc(alias = "xmlSplitQName")]
-pub unsafe extern "C" fn xml_split_qname(
+pub unsafe fn xml_split_qname(
     ctxt: XmlParserCtxtPtr,
     name: *const XmlChar,
     prefix: *mut *mut XmlChar,
@@ -1191,7 +1178,7 @@ pub unsafe extern "C" fn xml_split_qname(
         return null_mut();
     }
 
-    /* nasty but well=formed */
+    // nasty but well=formed
     if *cur.add(0) == b':' {
         return xml_strdup(name);
     }
@@ -1199,17 +1186,15 @@ pub unsafe extern "C" fn xml_split_qname(
     c = *cur as _;
     cur = cur.add(1);
     while c != 0 && c != b':' as i32 && len < max {
-        /* tested bigname.xml */
+        // tested bigname.xml
         buf[len as usize] = c as _;
         len += 1;
         c = *cur as _;
         cur = cur.add(1);
     }
     if len >= max {
-        /*
-         * Okay someone managed to make a huge name, so he's ready to pay
-         * for the processing speed.
-         */
+        // Okay someone managed to make a huge name, so he's ready to pay
+        // for the processing speed.
         max = len * 2;
 
         buffer = xml_malloc_atomic(max as usize) as *mut XmlChar;
@@ -1219,7 +1204,7 @@ pub unsafe extern "C" fn xml_split_qname(
         }
         memcpy(buffer as _, buf.as_ptr() as _, len as usize);
         while c != 0 && c != b':' as i32 {
-            /* tested bigname.xml */
+            // tested bigname.xml
             if len + 10 > max {
                 max *= 2;
                 let tmp: *mut XmlChar = xml_realloc(buffer as _, max as usize) as *mut XmlChar;
@@ -1284,17 +1269,15 @@ pub unsafe extern "C" fn xml_split_qname(
         cur = cur.add(1);
 
         while c != 0 && len < max {
-            /* tested bigname2.xml */
+            // tested bigname2.xml
             buf[len as usize] = c as _;
             len += 1;
             c = *cur as _;
             cur = cur.add(1);
         }
         if len >= max {
-            /*
-             * Okay someone managed to make a huge name, so he's ready to pay
-             * for the processing speed.
-             */
+            // Okay someone managed to make a huge name, so he's ready to pay
+            // for the processing speed.
             max = len * 2;
 
             buffer = xml_malloc_atomic(max as usize) as *mut XmlChar;
@@ -1304,7 +1287,7 @@ pub unsafe extern "C" fn xml_split_qname(
             }
             memcpy(buffer as _, buf.as_ptr() as _, len as usize);
             while c != 0 {
-                /* tested bigname2.xml */
+                // tested bigname2.xml
                 if len + 10 > max {
                     max *= 2;
                     let tmp: *mut XmlChar = xml_realloc(buffer as _, max as usize) as *mut XmlChar;
@@ -1333,7 +1316,7 @@ pub unsafe extern "C" fn xml_split_qname(
     ret
 }
 
-unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
+unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut len: i32 = 0;
     let mut l: i32 = 0;
     let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
@@ -1342,15 +1325,11 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         XML_MAX_NAME_LENGTH as i32
     };
 
-    /*
-     * Handler for more complex cases
-     */
+    // Handler for more complex cases
     let c = (*ctxt).current_char(&mut l).unwrap_or('\0');
     if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
-        /*
-         * Use the new checks of production [4] [4a] amd [5] of the
-         * Update 5 of XML-1.0
-         */
+        // Use the new checks of production [4] [4a] amd [5] of the
+        // Update 5 of XML-1.0
         if c == ' '
             || c == '>'
             || c == '/' /* accelerators */
@@ -1447,11 +1426,9 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
         return null_mut();
     }
     if (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) < len as isize {
-        /*
-         * There were a couple of bugs where PERefs lead to to a change
-         * of the buffer. Check the buffer size to avoid passing an invalid
-         * pointer to xmlDictLookup.
-         */
+        // There were a couple of bugs where PERefs lead to to a change
+        // of the buffer. Check the buffer size to avoid passing an invalid
+        // pointer to xmlDictLookup.
         xml_fatal_err(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
@@ -1479,7 +1456,7 @@ unsafe extern "C" fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const Xm
 ///
 /// Returns the Name parsed or NULL
 #[doc(alias = "xmlParseName")]
-pub(crate) unsafe extern "C" fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
+pub(crate) unsafe fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut input: *const XmlChar;
     let ret: *const XmlChar;
     let count: usize;
@@ -1494,9 +1471,7 @@ pub(crate) unsafe extern "C" fn xml_parse_name(ctxt: XmlParserCtxtPtr) -> *const
         return null_mut();
     }
 
-    /*
-     * Accelerator for simple ASCII names
-     */
+    // Accelerator for simple ASCII names
     input = (*(*ctxt).input).cur;
     if (*input >= 0x61 && *input <= 0x7A)
         || (*input >= 0x41 && *input <= 0x5A)
@@ -1543,7 +1518,7 @@ const XML_PARSER_BUFFER_SIZE: usize = 100;
 ///
 /// Returns the Nmtoken parsed or NULL
 #[doc(alias = "xmlParseNmtoken")]
-pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+pub(crate) unsafe fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: [XmlChar; XML_MAX_NAMELEN + 5] = [0; XML_MAX_NAMELEN + 5];
     let mut len: i32 = 0;
     let mut l: i32 = 0;
@@ -1559,10 +1534,8 @@ pub(crate) unsafe extern "C" fn xml_parse_nmtoken(ctxt: XmlParserCtxtPtr) -> *mu
         NEXTL!(ctxt, l);
         c = (*ctxt).current_char(&mut l).unwrap_or('\0');
         if len >= XML_MAX_NAMELEN as i32 {
-            /*
-             * Okay someone managed to make a huge token, so he's ready to pay
-             * for the processing speed.
-             */
+            // Okay someone managed to make a huge token, so he's ready to pay
+            // for the processing speed.
             let mut buffer: *mut XmlChar;
             let mut max: i32 = len * 2;
 
@@ -1834,7 +1807,7 @@ pub(crate) unsafe fn xml_parse_entity_value(
 ///
 /// Returns the AttValue parsed or NULL. The value has to be freed by the caller.
 #[doc(alias = "xmlParseAttValue")]
-pub(crate) unsafe extern "C" fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+pub(crate) unsafe fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     if ctxt.is_null() || (*ctxt).input.is_null() {
         return null_mut();
     }
@@ -1847,7 +1820,7 @@ pub(crate) unsafe extern "C" fn xml_parse_att_value(ctxt: XmlParserCtxtPtr) -> *
 ///
 /// Returns the SystemLiteral parsed or NULL
 #[doc(alias = "xmlParseSystemLiteral")]
-pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+pub(crate) unsafe fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut buf: *mut XmlChar;
     let mut len: i32 = 0;
     let mut size: i32 = XML_PARSER_BUFFER_SIZE as _;
@@ -1918,7 +1891,7 @@ pub(crate) unsafe extern "C" fn xml_parse_system_literal(ctxt: XmlParserCtxtPtr)
 }
 
 #[doc(alias = "xmlParseCharData")]
-pub(crate) unsafe extern "C" fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
+pub(crate) unsafe fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cdata: i32) {
     xml_parse_char_data_internal(ctxt, 0);
 }
 
@@ -1930,7 +1903,7 @@ pub(crate) unsafe extern "C" fn xml_parse_char_data(ctxt: XmlParserCtxtPtr, _cda
 ///
 /// `[15] Comment ::= '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'`
 #[doc(alias = "xmlParseCommentComplex")]
-unsafe extern "C" fn xml_parse_comment_complex(
+unsafe fn xml_parse_comment_complex(
     ctxt: XmlParserCtxtPtr,
     mut buf: *mut XmlChar,
     mut len: usize,
@@ -2297,7 +2270,7 @@ const XML_W3_CPIS: &[*const c_char] = &[
 ///
 /// Returns the PITarget name or NULL
 #[doc(alias = "xmlParsePITarget")]
-pub(crate) unsafe extern "C" fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
+pub(crate) unsafe fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let name: *const XmlChar = xml_parse_name(ctxt);
     if !name.is_null()
         && (*name.add(0) == b'x' || *name.add(0) == b'X')
@@ -3016,10 +2989,8 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             }
         }
 
-        /*
-         * Split the element name into prefix:localname , the string found
-         * are within the DTD and hen not associated to namespace names.
-         */
+        // Split the element name into prefix:localname , the string found
+        // are within the DTD and hen not associated to namespace names.
         name = xml_split_qname3(fullattr, addr_of_mut!(len));
         if name.is_null() {
             name = xml_dict_lookup((*ctxt).dict, fullattr, -1);
@@ -3037,7 +3008,7 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
             .values
             .as_mut_ptr()
             .add(5 * (*defaults).nb_attrs as usize + 1) = prefix;
-        /* intern the string and precompute the end */
+        // intern the string and precompute the end
         len = xml_strlen(value);
         value = xml_dict_lookup((*ctxt).dict, value, len);
         if value.is_null() {
@@ -3071,7 +3042,7 @@ pub(crate) unsafe extern "C" fn xml_add_def_attrs(
 
 /// Register this attribute type
 #[doc(alias = "xmlAddSpecialAttr")]
-pub(crate) unsafe extern "C" fn xml_add_special_attr(
+pub(crate) unsafe fn xml_add_special_attr(
     ctxt: XmlParserCtxtPtr,
     fullname: *const XmlChar,
     fullattr: *const XmlChar,
@@ -3112,7 +3083,7 @@ pub(crate) unsafe extern "C" fn xml_add_special_attr(
 ///
 /// returns: the list of the xmlElementContentPtr describing the element choices
 #[doc(alias = "xmlParseElementMixedContentDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
+pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
     ctxt: XmlParserCtxtPtr,
     inputchk: i32,
 ) -> XmlElementContentPtr {
@@ -3275,11 +3246,11 @@ pub(crate) unsafe extern "C" fn xml_parse_element_mixed_content_decl(
 ///
 /// Returns the tree of xmlElementContentPtr describing the element hierarchy.
 #[doc(alias = "xmlParseElementChildrenContentDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_element_children_content_decl(
+pub(crate) unsafe fn xml_parse_element_children_content_decl(
     ctxt: XmlParserCtxtPtr,
     inputchk: i32,
 ) -> XmlElementContentPtr {
-    /* stub left for API/ABI compat */
+    // stub left for API/ABI compat
     xml_parse_element_children_content_decl_priv(ctxt, inputchk, 1)
 }
 
@@ -4257,7 +4228,7 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 /// Parameter-entity references may only appear in the DTD.
 /// NOTE: misleading but this is handled.
 #[doc(alias = "xmlParsePEReference")]
-pub(crate) unsafe extern "C" fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
     let mut entity: XmlEntityPtr = null_mut();
     let input: XmlParserInputPtr;
 
@@ -4536,7 +4507,7 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
 /// Returns the attribute name, and the value in *value.
 #[doc(alias = "xmlParseAttribute")]
 #[cfg(feature = "sax1")]
-pub(crate) unsafe extern "C" fn xml_parse_attribute(
+pub(crate) unsafe fn xml_parse_attribute(
     ctxt: XmlParserCtxtPtr,
     value: *mut *mut XmlChar,
 ) -> *const XmlChar {
@@ -4554,9 +4525,7 @@ pub(crate) unsafe extern "C" fn xml_parse_attribute(
         return null_mut();
     }
 
-    /*
-     * read the value
-     */
+    // read the value
     (*ctxt).skip_blanks();
     if (*ctxt).current_byte() == b'=' {
         (*ctxt).skip_char();
@@ -5006,7 +4975,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
 ///
 /// `[43] content ::= (element | CharData | Reference | CDSect | PI | Comment)*`
 #[doc(alias = "xmlParseContent")]
-pub unsafe extern "C" fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
+pub unsafe fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
     let name_nr = (*ctxt).name_tab.len();
 
     xml_parse_content_internal(ctxt);
@@ -5117,20 +5086,16 @@ pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<S
             return None;
         }
 
-        /*
-         * UTF-16 encoding match has already taken place at this stage,
-         * more over the little-endian/big-endian selection is already done
-         */
+        // UTF-16 encoding match has already taken place at this stage,
+        // more over the little-endian/big-endian selection is already done
         if let Some(encoding) = encoding.as_deref().filter(|e| {
             let e = e.to_ascii_uppercase();
             e == "UTF-16" || e == "UTF16"
         }) {
-            /*
-             * If no encoding was passed to the parser, that we are
-             * using UTF-16 and no decoder is present i.e. the
-             * document is apparently UTF-8 compatible, then raise an
-             * encoding mismatch fatal error
-             */
+            // If no encoding was passed to the parser, that we are
+            // using UTF-16 and no decoder is present i.e. the
+            // document is apparently UTF-8 compatible, then raise an
+            // encoding mismatch fatal error
             if (*ctxt).encoding.is_none()
                 && (*(*ctxt).input).buf.is_some()
                 && (*(*ctxt).input)
@@ -5149,21 +5114,19 @@ pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<S
             }
             (*ctxt).encoding = Some(encoding.to_owned());
         }
-        /*
-         * UTF-8 encoding is handled natively
-         */
+        // UTF-8 encoding is handled natively
         else if let Some(encoding) = encoding.as_deref().filter(|e| {
             let e = e.to_ascii_uppercase();
             e == "UTF-8" || e == "UTF8"
         }) {
-            /* TODO: Check for encoding mismatch. */
+            // TODO: Check for encoding mismatch.
             (*ctxt).encoding = Some(encoding.to_owned());
         } else if let Some(encoding) = encoding.as_deref() {
             (*(*ctxt).input).encoding = Some(encoding.to_owned());
 
             if let Some(handler) = find_encoding_handler(encoding) {
                 if (*ctxt).switch_to_encoding(handler) < 0 {
-                    /* failed to convert */
+                    // failed to convert
                     (*ctxt).err_no = XmlParserErrors::XmlErrUnsupportedEncoding as i32;
                     return None;
                 }
@@ -5206,7 +5169,7 @@ pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<S
 ///      (A standalone value of -2 means that the XML declaration was found,
 ///       but no value was specified for the standalone attribute).
 #[doc(alias = "xmlParseSDDecl")]
-pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> i32 {
+pub(crate) unsafe fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut standalone: i32 = -2;
 
     (*ctxt).skip_blanks();
@@ -5268,7 +5231,7 @@ pub(crate) unsafe extern "C" fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> i32 
 ///
 /// `[27] Misc ::= Comment | PI |  S`
 #[doc(alias = "xmlParseMisc")]
-pub(crate) unsafe extern "C" fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
     #[allow(clippy::while_immutable_condition)]
     while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
         (*ctxt).skip_blanks();
@@ -5374,7 +5337,7 @@ const XML_SUBSTITUTE_BOTH: usize = 3;
 ///
 /// Returns A newly allocated string with the substitution done. The caller must deallocate it !
 #[doc(alias = "xmlStringDecodeEntities")]
-pub(crate) unsafe extern "C" fn xml_string_decode_entities(
+pub(crate) unsafe fn xml_string_decode_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
     what: i32,
@@ -5396,7 +5359,7 @@ pub(crate) unsafe extern "C" fn xml_string_decode_entities(
 ///
 /// Returns A newly allocated string with the substitution done. The caller must deallocate it !
 #[doc(alias = "xmlStringLenDecodeEntities")]
-pub(crate) unsafe extern "C" fn xml_string_len_decode_entities(
+pub(crate) unsafe fn xml_string_len_decode_entities(
     ctxt: XmlParserCtxtPtr,
     str: *const XmlChar,
     len: i32,
@@ -5457,7 +5420,7 @@ pub(crate) use xml_err_encoding_int;
 ///
 /// Returns the current c_char value and its length
 #[doc(alias = "xmlStringCurrentChar")]
-pub(crate) unsafe extern "C" fn xml_string_current_char(
+pub(crate) unsafe fn xml_string_current_char(
     ctxt: XmlParserCtxtPtr,
     cur: *const XmlChar,
     len: *mut i32,
@@ -5467,17 +5430,15 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
     }
     'encoding_error: {
         if ctxt.is_null() || (*ctxt).charset == XmlCharEncoding::UTF8 {
-            /*
-             * We are supposed to handle UTF8, check it's valid
-             * From rfc2044: encoding of the Unicode values on UTF-8:
-             *
-             * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-             * 0000 0000-0000 007F   0xxxxxxx
-             * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-             * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-             *
-             * Check for the 0x110000 limit too
-             */
+            // We are supposed to handle UTF8, check it's valid
+            // From rfc2044: encoding of the Unicode values on UTF-8:
+            //
+            // UCS-4 range (hex.)           UTF-8 octet sequence (binary)
+            // 0000 0000-0000 007F   0xxxxxxx
+            // 0000 0080-0000 07FF   110xxxxx 10xxxxxx
+            // 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
+            //
+            // Check for the 0x110000 limit too
 
             let mut val: u32;
             let c: u8 = *cur;
@@ -5493,21 +5454,21 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
                         if c & 0xf8 != 0xf0 || *cur.add(3) & 0xc0 != 0x80 {
                             break 'encoding_error;
                         }
-                        /* 4-byte code */
+                        // 4-byte code
                         *len = 4;
                         val = (*cur.add(0) as u32 & 0x7) << 18;
                         val |= (*cur.add(1) as u32 & 0x3f) << 12;
                         val |= (*cur.add(2) as u32 & 0x3f) << 6;
                         val |= *cur.add(3) as u32 & 0x3f;
                     } else {
-                        /* 3-byte code */
+                        // 3-byte code
                         *len = 3;
                         val = (*cur.add(0) as u32 & 0xf) << 12;
                         val |= (*cur.add(1) as u32 & 0x3f) << 6;
                         val |= *cur.add(2) as u32 & 0x3f;
                     }
                 } else {
-                    /* 2-byte code */
+                    // 2-byte code
                     *len = 2;
                     val = (*cur.add(0) as u32 & 0x1f) << 6;
                     val |= *cur.add(1) as u32 & 0x3f;
@@ -5522,26 +5483,22 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
                 }
                 return val as _;
             } else {
-                /* 1-byte code */
+                // 1-byte code
                 *len = 1;
                 return *cur as _;
             }
         }
-        /*
-         * Assume it's a fixed length encoding (1) with
-         * a compatible encoding for the ASCII set, since
-         * XML constructs only use < 128 chars
-         */
+        // Assume it's a fixed length encoding (1) with
+        // a compatible encoding for the ASCII set, since
+        // XML constructs only use < 128 chars
         *len = 1;
         return *cur as _;
     }
     // encoding_error:
 
-    /*
-     * An encoding problem may arise from a truncated input buffer
-     * splitting a character in the middle. In that case do not raise
-     * an error but return 0 to indicate an end of stream problem
-     */
+    // An encoding problem may arise from a truncated input buffer
+    // splitting a character in the middle. In that case do not raise
+    // an error but return 0 to indicate an end of stream problem
     if ctxt.is_null()
         || (*ctxt).input.is_null()
         || (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < 4
@@ -5549,13 +5506,10 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
         *len = 0;
         return 0;
     }
-    /*
-     * If we detect an UTF8 error that probably mean that the
-     * input encoding didn't get properly advertised in the
-     * declaration header. Report the error and switch the encoding
-     * to ISO-Latin-1 (if you don't like this policy, just declare the
-     * encoding !)
-     */
+    // If we detect an UTF8 error that probably mean that the
+    // input encoding didn't get properly advertised in the
+    // declaration header. Report the error and switch the encoding
+    // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
     {
         let buffer = format!(
             "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
@@ -5602,7 +5556,7 @@ pub(crate) unsafe extern "C" fn xml_string_current_char(
 ///   - Included in literal in entity values
 ///   - Included as Parameter Entity reference within DTDs
 #[doc(alias = "xmlParserHandlePEReference")]
-pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtxtPtr) {
+pub(crate) unsafe fn xml_parser_handle_pereference(ctxt: XmlParserCtxtPtr) {
     match (*ctxt).instate {
         XmlParserInputState::XmlParserCDATASection => {
             return;
@@ -5632,7 +5586,7 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
         | XmlParserInputState::XmlParserPI
         | XmlParserInputState::XmlParserSystemLiteral
         | XmlParserInputState::XmlParserPublicLiteral => {
-            /* we just ignore it there */
+            // we just ignore it there
             return;
         }
         XmlParserInputState::XmlParserEpilog => {
@@ -5640,23 +5594,19 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
             return;
         }
         XmlParserInputState::XmlParserEntityValue => {
-            /*
-             * NOTE: in the case of entity values, we don't do the
-             *       substitution here since we need the literal
-             *       entity value to be able to save the internal
-             *       subset of the document.
-             *       This will be handled by xmlStringDecodeEntities
-             */
+            // NOTE: in the case of entity values, we don't do the
+            //       substitution here since we need the literal
+            //       entity value to be able to save the internal
+            //       subset of the document.
+            //       This will be handled by xmlStringDecodeEntities
             return;
         }
         XmlParserInputState::XmlParserDTD => {
-            /*
-             * [WFC: Well-Formedness Constraint: PEs in Internal Subset]
-             * In the internal DTD subset, parameter-entity references
-             * can occur only where markup declarations can occur, not
-             * within markup declarations.
-             * In that case this is handled in xmlParseMarkupDecl
-             */
+            // [WFC: Well-Formedness Constraint: PEs in Internal Subset]
+            // In the internal DTD subset, parameter-entity references
+            // can occur only where markup declarations can occur, not
+            // within markup declarations.
+            // In that case this is handled in xmlParseMarkupDecl
             if (*ctxt).external == 0 && (*ctxt).input_tab.len() == 1 {
                 return;
             }
@@ -5687,7 +5637,7 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
 /// The current REC reference the successors of RFC 1766, currently 5646
 ///
 /// http://www.rfc-editor.org/rfc/rfc5646.txt
-/// ```ignore
+/// ```text
 /// langtag       = language
 ///                 ["-" script]
 ///                 ["-" region]
@@ -5727,7 +5677,7 @@ pub(crate) unsafe extern "C" fn xml_parser_handle_pereference(ctxt: XmlParserCtx
 ///
 /// Returns 1 if correct 0 otherwise
 #[doc(alias = "xmlCheckLanguageID")]
-pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i32 {
+pub(crate) unsafe fn xml_check_language_id(lang: *const XmlChar) -> i32 {
     let mut cur: *const XmlChar = lang;
     let mut nxt: *const XmlChar;
 
@@ -5739,11 +5689,9 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
         || (*cur.add(0) == b'x' && *cur.add(1) == b'-')
         || (*cur.add(0) == b'X' && *cur.add(1) == b'-')
     {
-        /*
-         * Still allow IANA code and user code which were coming
-         * from the previous version of the XML-1.0 specification
-         * it's deprecated but we should not fail
-         */
+        // Still allow IANA code and user code which were coming
+        // from the previous version of the XML-1.0 specification
+        // it's deprecated but we should not fail
         cur = cur.add(2);
         while (*cur.add(0) >= b'A' && *cur.add(0) <= b'Z')
             || (*cur.add(0) >= b'a' && *cur.add(0) <= b'z')
@@ -5759,9 +5707,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
         nxt = nxt.add(1);
     }
     if nxt.offset_from(cur) >= 4 {
-        /*
-         * Reserved
-         */
+        // Reserved
         if nxt.offset_from(cur) > 8 || *nxt.add(0) != 0 {
             return 0;
         }
@@ -5770,7 +5716,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
     if nxt.offset_from(cur) < 2 {
         return 0;
     }
-    /* we got an ISO 639 code */
+    // we got an ISO 639 code
     if *nxt.add(0) == 0 {
         return 1;
     }
@@ -5781,7 +5727,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
     nxt = nxt.add(1);
     cur = nxt;
     'region_m49: {
-        /* now we can have extlang or script or region or variant */
+        // now we can have extlang or script or region or variant
         if *nxt.add(0) >= b'0' && *nxt.add(0) <= b'9' {
             break 'region_m49;
         }
@@ -5805,7 +5751,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
                     if nxt.offset_from(cur) != 3 {
                         return 0;
                     }
-                    /* we parsed an extlang */
+                    // we parsed an extlang
                     if *nxt.add(0) == 0 {
                         return 1;
                     }
@@ -5815,7 +5761,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
                     nxt = nxt.add(1);
                     cur = nxt;
 
-                    /* now we can have script or region or variant */
+                    // now we can have script or region or variant
                     if *nxt.add(0) >= b'0' && *nxt.add(0) <= b'9' {
                         break 'region_m49;
                     }
@@ -5834,7 +5780,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
                     if nxt.offset_from(cur) != 4 {
                         return 0;
                     }
-                    /* we parsed a script */
+                    // we parsed a script
                 }
                 if *nxt.add(0) == 0 {
                     return 1;
@@ -5845,7 +5791,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
 
                 nxt = nxt.add(1);
                 cur = nxt;
-                /* now we can have region or variant */
+                // now we can have region or variant
                 if *nxt.add(0) >= b'0' && *nxt.add(0) <= b'9' {
                     break 'region_m49;
                 }
@@ -5861,7 +5807,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
                 if nxt.offset_from(cur) != 2 {
                     return 0;
                 }
-                /* we parsed a region */
+                // we parsed a region
             }
             //  region:
             if *nxt.add(0) == 0 {
@@ -5873,7 +5819,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
 
             nxt = nxt.add(1);
             cur = nxt;
-            /* now we can just have a variant */
+            // now we can just have a variant
             while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
                 || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
             {
@@ -5885,7 +5831,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
             }
         }
 
-        /* we parsed a variant */
+        // we parsed a variant
         //  variant:
         if *nxt.add(0) == 0 {
             return 1;
@@ -5893,7 +5839,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
         if *nxt.add(0) != b'-' {
             return 0;
         }
-        /* extensions and private use subtags not checked */
+        // extensions and private use subtags not checked
         return 1;
     }
 
@@ -5911,7 +5857,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
 
         nxt = nxt.add(1);
         cur = nxt;
-        /* now we can just have a variant */
+        // now we can just have a variant
         while (*nxt.add(0) >= b'A' && *nxt.add(0) <= b'Z')
             || (*nxt.add(0) >= b'a' && *nxt.add(0) <= b'z')
         {
@@ -5922,7 +5868,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
             return 0;
         }
 
-        /* we parsed a variant */
+        // we parsed a variant
         //  variant:
         if *nxt.add(0) == 0 {
             return 1;
@@ -5930,7 +5876,7 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
         if *nxt.add(0) != b'-' {
             return 0;
         }
-        /* extensions and private use subtags not checked */
+        // extensions and private use subtags not checked
         return 1;
     }
     0
@@ -5940,19 +5886,17 @@ pub(crate) unsafe extern "C" fn xml_check_language_id(lang: *const XmlChar) -> i
 ///
 /// Returns the number of xmlChar written
 #[doc(alias = "xmlCopyCharMultiByte")]
-pub unsafe extern "C" fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i32) -> i32 {
+pub unsafe fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i32) -> i32 {
     if out.is_null() || val < 0 {
         return 0;
     }
-    /*
-     * We are supposed to handle UTF8, check it's valid
-     * From rfc2044: encoding of the Unicode values on UTF-8:
-     *
-     * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-     * 0000 0000-0000 007F   0xxxxxxx
-     * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-     * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-     */
+    // We are supposed to handle UTF8, check it's valid
+    // From rfc2044: encoding of the Unicode values on UTF-8:
+    //
+    // UCS-4 range (hex.)           UTF-8 octet sequence (binary)
+    // 0000 0000-0000 007F   0xxxxxxx
+    // 0000 0080-0000 07FF   110xxxxx 10xxxxxx
+    // 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
     if val >= 0x80 {
         let savedout: *mut XmlChar = out;
         let bits: i32;
@@ -5992,11 +5936,11 @@ pub unsafe extern "C" fn xml_copy_char_multi_byte(mut out: *mut XmlChar, val: i3
 ///
 /// Returns the number of xmlChar written
 #[doc(alias = "xmlCopyChar")]
-pub unsafe extern "C" fn xml_copy_char(_len: i32, out: *mut XmlChar, val: i32) -> i32 {
+pub unsafe fn xml_copy_char(_len: i32, out: *mut XmlChar, val: i32) -> i32 {
     if out.is_null() || val < 0 {
         return 0;
     }
-    /* the len parameter is ignored */
+    // the len parameter is ignored
     if val >= 0x80 {
         return xml_copy_char_multi_byte(out, val);
     }
@@ -6009,7 +5953,7 @@ pub(crate) const LINE_LEN: usize = 80;
 
 /// This function removes used input for the parser.
 #[doc(alias = "xmlParserInputShrink")]
-pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr) {
+pub(crate) unsafe fn xml_parser_input_shrink(input: XmlParserInputPtr) {
     let mut used: usize;
 
     if input.is_null() {
@@ -6029,10 +5973,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
     };
 
     used = (*input).cur.offset_from((*input).base) as _;
-    /*
-     * Do not shrink on large buffers whose only a tiny fraction
-     * was consumed
-     */
+    // Do not shrink on large buffers whose only a tiny fraction was consumed
     if used > INPUT_CHUNK {
         let ret = buf.trim_head(used - LINE_LEN);
         if ret > 0 {
@@ -6056,7 +5997,7 @@ pub(crate) unsafe extern "C" fn xml_parser_input_shrink(input: XmlParserInputPtr
 
     (*input).base = buf.as_ref().as_ptr();
     if (*input).base.is_null() {
-        /* TODO: raise error */
+        // TODO: raise error
         (*input).base = c"".as_ptr() as _;
         (*input).cur = (*input).base;
         (*input).end = (*input).base;
