@@ -6,7 +6,7 @@ authors = ["tayu0110"]
 license = "MIT"
 repository = "https://github.com/tayu0110/exml.git"
 description = "Pure Rust XML library based on libxml2"
-keywords = ["xml", "xpath", "catalog", "schema", "relaxng", "dtd"]
+keywords = ["xml", "xpath", "schema", "relaxng", "dtd"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
