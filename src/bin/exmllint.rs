@@ -3362,12 +3362,6 @@ fn usage(f: &mut impl Write, name: &str) {
         )
         .ok();
     }
-
-    writeln!(
-        f,
-        "\nLibxml project home page: https://gitlab.gnome.org/GNOME/libxml2",
-    )
-    .ok();
 }
 
 unsafe extern "C" fn register_node(node: XmlNodePtr) {

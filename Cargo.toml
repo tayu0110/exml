@@ -103,8 +103,8 @@ name = "test_threads"
 required-features = ["catalog"]
 
 [[bin]]
-name = "xmllint"
-path = "src/bin/xmllint.rs"
+name = "exmllint"
+path = "src/bin/exmllint.rs"
 
 [dev-dependencies]
 glob = "0.3.1"
