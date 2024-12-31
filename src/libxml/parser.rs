@@ -131,6 +131,7 @@ use crate::{
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
+    parser::XmlParserCharValid,
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
@@ -144,10 +145,7 @@ use crate::{
 };
 
 use super::{
-    chvalid::{
-        xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
-        xml_is_pubid_char,
-    },
+    chvalid::{xml_is_blank_char, xml_is_char, xml_is_pubid_char},
     entities::{
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
@@ -2492,52 +2490,6 @@ macro_rules! xml_ns_err {
     };
 }
 pub(crate) use xml_ns_err;
-
-pub(crate) unsafe fn xml_is_name_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
-    if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 == 0 {
-        // Use the new checks of production [4] [4a] amd [5] of the
-        // Update 5 of XML-1.0
-        if c != b' ' as i32
-            && c != b'>' as i32
-            && c != b'/' as i32 /* accelerators */
-            && ((c >= b'a' as i32 && c <= b'z' as i32)
-                || (c >= b'A' as i32 && c <= b'Z' as i32)
-                || (c >= b'0' as i32 && c <= b'9' as i32) /* !start */
-                || c == b'_' as i32
-                || c == b':' as i32
-                || c == b'-' as i32
-                || c == b'.' as i32
-                || c == 0xB7 /* !start */
-                || (0xC0..=0xD6).contains(&c)
-                || (0xD8..=0xF6).contains(&c)
-                || (0xF8..=0x2FF).contains(&c)
-                || (0x300..=0x36F).contains(&c) /* !start */
-                || (0x370..=0x37D).contains(&c)
-                || (0x37F..=0x1FFF).contains(&c)
-                || (0x200C..=0x200D).contains(&c)
-                || (0x203F..=0x2040).contains(&c) /* !start */
-                || (0x2070..=0x218F).contains(&c)
-                || (0x2C00..=0x2FEF).contains(&c)
-                || (0x3001..=0xD7FF).contains(&c)
-                || (0xF900..=0xFDCF).contains(&c)
-                || (0xFDF0..=0xFFFD).contains(&c)
-                || (0x10000..=0xEFFFF).contains(&c))
-        {
-            return 1;
-        }
-    } else if xml_is_letter(c as u32)
-        || xml_is_digit(c as u32)
-        || c == b'.' as i32
-        || c == b'-' as i32
-        || c == b'_' as i32
-        || c == b':' as i32
-        || xml_is_combining(c as u32)
-        || xml_is_extender(c as u32)
-    {
-        return 1;
-    }
-    0
-}
 
 static XML_PARSER_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -5164,7 +5116,7 @@ unsafe fn xml_is_name_start_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
     0
 }
 
-unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
+unsafe fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
     let mut len: i32 = 0;
     let mut l: i32 = 0;
     let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
@@ -5189,7 +5141,7 @@ unsafe extern "C" fn xml_parse_ncname_complex(ctxt: XmlParserCtxtPtr) -> *const 
     while c != ' '
         && c != '>'
         && c != '/' /* test bigname.xml */
-        && (xml_is_name_char(ctxt, c as i32) != 0 && c != ':')
+        && (c.is_name_char(&*ctxt) && c != ':')
     {
         if len <= i32::MAX - l {
             len += l;
@@ -5454,10 +5406,7 @@ pub(crate) unsafe fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, extra: u64)
 /// Returns the value parsed (as an int), 0 in case of error, str will be
 /// updated to the current value of the index
 #[doc(alias = "xmlParseStringCharRef")]
-unsafe extern "C" fn xml_parse_string_char_ref(
-    ctxt: XmlParserCtxtPtr,
-    str: *mut *const XmlChar,
-) -> i32 {
+unsafe fn xml_parse_string_char_ref(ctxt: XmlParserCtxtPtr, str: *mut *const XmlChar) -> i32 {
     let mut ptr: *const XmlChar;
     let mut cur: XmlChar;
     let mut val: i32 = 0;
@@ -5554,7 +5503,7 @@ unsafe extern "C" fn xml_parse_string_char_ref(
 ///
 /// Returns the Name parsed or NULL. The @str pointer is updated to the current location in the string.
 #[doc(alias = "xmlParseStringName")]
-pub(crate) unsafe extern "C" fn xml_parse_string_name(
+pub(crate) unsafe fn xml_parse_string_name(
     ctxt: XmlParserCtxtPtr,
     str: *mut *const XmlChar,
 ) -> *mut XmlChar {
@@ -5577,7 +5526,7 @@ pub(crate) unsafe extern "C" fn xml_parse_string_name(
     COPY_BUF!(l, buf.as_mut_ptr(), len, c);
     cur = cur.add(l as usize);
     c = CUR_SCHAR!(ctxt, cur, l);
-    while xml_is_name_char(ctxt, c) != 0 {
+    while (c as u32).is_name_char(&*ctxt) {
         COPY_BUF!(l, buf.as_mut_ptr(), len, c);
         cur = cur.add(l as usize);
         c = CUR_SCHAR!(ctxt, cur, l);
@@ -5594,7 +5543,7 @@ pub(crate) unsafe extern "C" fn xml_parse_string_name(
                 return null_mut();
             }
             memcpy(buffer as _, buf.as_ptr() as _, len as _);
-            while xml_is_name_char(ctxt, c) != 0 {
+            while (c as u32).is_name_char(&*ctxt) {
                 if len + 10 > max {
                     max *= 2;
                     let tmp: *mut XmlChar = xml_realloc(buffer as _, max as usize) as _;
