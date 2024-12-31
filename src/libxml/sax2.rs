@@ -203,8 +203,12 @@ unsafe fn xml_sax2_err_memory(ctxt: XmlParserCtxtPtr, msg: &str) {
 
     if !ctxt.is_null() {
         (*ctxt).err_no = XmlParserErrors::XmlErrNoMemory as i32;
-        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
-            schannel = (*(*ctxt).sax).serror;
+        if let Some(sax) = (*ctxt)
+            .sax
+            .as_deref()
+            .filter(|sax| sax.initialized == XML_SAX2_MAGIC as u32)
+        {
+            schannel = sax.serror;
         }
         __xml_raise_error!(
             schannel,
@@ -309,12 +313,12 @@ pub unsafe fn xml_sax2_external_subset(
         let mut consumed: u64;
 
         // Ask the Entity resolver to load the damn thing
-        if !(*ctxt).sax.is_null() && (*(*ctxt).sax).resolve_entity.is_some() {
-            input = ((*(*ctxt).sax).resolve_entity.unwrap())(
-                (*ctxt).user_data.clone(),
-                external_id,
-                system_id,
-            );
+        if let Some(resolve_entity) = (*ctxt)
+            .sax
+            .as_deref_mut()
+            .and_then(|sax| sax.resolve_entity)
+        {
+            input = resolve_entity((*ctxt).user_data.clone(), external_id, system_id);
         }
         if input.is_null() {
             return;
@@ -642,15 +646,13 @@ pub unsafe fn xml_sax2_entity_decl(
         }
     } else if (*ctxt).in_subset == 2 {
         ent = xml_add_dtd_entity((*ctxt).my_doc, name, typ, public_id, system_id, content);
-        if ent.is_null()
-            && (*ctxt).pedantic != 0
-            && !(*ctxt).sax.is_null()
-            && (*(*ctxt).sax).warning.is_some()
-        {
-            (*(*ctxt).sax).warning.unwrap()(
-                (*ctxt).user_data.clone(),
-                format!("Entity({name}) already defined in the external subset\n",).as_str(),
-            );
+        if ent.is_null() && (*ctxt).pedantic != 0 {
+            if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
+                warning(
+                    (*ctxt).user_data.clone(),
+                    format!("Entity({name}) already defined in the external subset\n",).as_str(),
+                );
+            }
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
             if let Some(system_id) = system_id {
@@ -708,8 +710,8 @@ macro_rules! xml_err_valid {
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $error as i32;
-                if !(*ctxt).sax.is_null() && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32 {
-                    schannel = (*(*ctxt).sax).serror;
+                if let Some(sax) = (*ctxt).sax.as_deref().filter(|sax| sax.initialized == XML_SAX2_MAGIC as u32) {
+                    schannel = sax.serror;
                 }
                 __xml_raise_error!(
                     schannel,
@@ -1015,15 +1017,13 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             system_id,
             notation_name,
         );
-        if ent.is_null()
-            && (*ctxt).pedantic != 0
-            && !(*ctxt).sax.is_null()
-            && (*(*ctxt).sax).warning.is_some()
-        {
-            (*(*ctxt).sax).warning.unwrap()(
-                (*ctxt).user_data.clone(),
-                format!("Entity({name}) already defined in the internal subset\n").as_str(),
-            )
+        if ent.is_null() && (*ctxt).pedantic != 0 {
+            if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
+                warning(
+                    (*ctxt).user_data.clone(),
+                    format!("Entity({name}) already defined in the internal subset\n").as_str(),
+                )
+            }
         }
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
             if let Some(system_id) = system_id {
@@ -1056,15 +1056,13 @@ pub unsafe fn xml_sax2_unparsed_entity_decl(
             system_id,
             notation_name,
         );
-        if ent.is_null()
-            && (*ctxt).pedantic != 0
-            && !(*ctxt).sax.is_null()
-            && (*(*ctxt).sax).warning.is_some()
-        {
-            (*(*ctxt).sax).warning.unwrap()(
-                (*ctxt).user_data.clone(),
-                format!("Entity({name}) already defined in the external subset\n").as_str(),
-            )
+        if ent.is_null() && (*ctxt).pedantic != 0 {
+            if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
+                warning(
+                    (*ctxt).user_data.clone(),
+                    format!("Entity({name}) already defined in the external subset\n").as_str(),
+                )
+            }
         }
 
         if !ent.is_null() && (*ent).uri.load(Ordering::Relaxed).is_null() {
@@ -1203,9 +1201,7 @@ pub unsafe fn xml_sax2_end_document(ctx: Option<GenericErrorContext>) {
         }
     }
 
-    /*
-     * Grab the encoding if it was added on-the-fly
-     */
+    // Grab the encoding if it was added on-the-fly
     if (*ctxt).encoding.is_some()
         && !(*ctxt).my_doc.is_null()
         && (*(*ctxt).my_doc).encoding.is_none()
@@ -1509,8 +1505,8 @@ unsafe fn xml_sax2_attribute_internal(
         if *val.add(0) != 0 {
             let uri: XmlURIPtr = xml_parse_uri(val as _);
             if uri.is_null() {
-                if !(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some() {
-                    (*(*ctxt).sax).warning.unwrap()(
+                if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
+                    warning(
                         (*ctxt).user_data.clone(),
                         format!(
                             "xmlns: {} not a valid URI\n",
@@ -1520,17 +1516,17 @@ unsafe fn xml_sax2_attribute_internal(
                     );
                 }
             } else {
-                if (*uri).scheme.is_null()
-                    && (!(*ctxt).sax.is_null() && (*(*ctxt).sax).warning.is_some())
-                {
-                    (*(*ctxt).sax).warning.unwrap()(
-                        (*ctxt).user_data.clone(),
-                        format!(
-                            "xmlns: URI {} is not absolute\n",
-                            CStr::from_ptr(val as *const i8).to_string_lossy()
-                        )
-                        .as_str(),
-                    );
+                if (*uri).scheme.is_null() {
+                    if let Some(warning) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.warning) {
+                        warning(
+                            (*ctxt).user_data.clone(),
+                            format!(
+                                "xmlns: URI {} is not absolute\n",
+                                CStr::from_ptr(val as *const i8).to_string_lossy()
+                            )
+                            .as_str(),
+                        );
+                    }
                 }
                 xml_free_uri(uri);
             }
@@ -1771,10 +1767,8 @@ unsafe fn xml_sax2_attribute_internal(
         && !(*ctxt).my_doc.is_null()
         && !(*(*ctxt).my_doc).int_subset.is_null();
     if f {
-        /*
-         * If we don't substitute entities, the validation should be
-         * done on a value with replaced entities anyway.
-         */
+        // If we don't substitute entities, the validation should be
+        // done on a value with replaced entities anyway.
         if (*ctxt).replace_entities == 0 {
             let mut val: *mut XmlChar;
 
@@ -1791,11 +1785,9 @@ unsafe fn xml_sax2_attribute_internal(
                     value,
                 );
             } else {
-                /*
-                 * Do the last stage of the attribute normalization
-                 * It need to be done twice ... it's an extra burden related
-                 * to the ability to keep xmlSAX2References in attributes
-                 */
+                // Do the last stage of the attribute normalization
+                // It need to be done twice ... it's an extra burden related
+                // to the ability to keep xmlSAX2References in attributes
                 let nvalnorm: *mut XmlChar = xml_valid_normalize_attribute_value(
                     (*ctxt).my_doc,
                     (*ctxt).node,
@@ -3179,108 +3171,105 @@ pub unsafe fn xml_sax_default_version(version: i32) -> i32 {
 ///
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlSAXVersion")]
-pub unsafe fn xml_sax_version(hdlr: *mut XmlSAXHandler, version: i32) -> i32 {
-    if hdlr.is_null() {
-        return -1;
-    }
+pub fn xml_sax_version(hdlr: &mut XmlSAXHandler, version: i32) -> i32 {
     if version == 2 {
-        (*hdlr).start_element = None;
-        (*hdlr).end_element = None;
-        (*hdlr).start_element_ns = Some(xml_sax2_start_element_ns);
-        (*hdlr).end_element_ns = Some(xml_sax2_end_element_ns);
-        (*hdlr).serror = None;
-        (*hdlr).initialized = XML_SAX2_MAGIC as _;
+        hdlr.start_element = None;
+        hdlr.end_element = None;
+        hdlr.start_element_ns = Some(xml_sax2_start_element_ns);
+        hdlr.end_element_ns = Some(xml_sax2_end_element_ns);
+        hdlr.serror = None;
+        hdlr.initialized = XML_SAX2_MAGIC as _;
     } else if cfg!(feature = "sax1") && version == 1 {
         #[cfg(feature = "sax1")]
         {
-            (*hdlr).start_element = Some(xml_sax2_start_element);
-            (*hdlr).end_element = Some(xml_sax2_end_element);
-            (*hdlr).initialized = 1;
+            hdlr.start_element = Some(xml_sax2_start_element);
+            hdlr.end_element = Some(xml_sax2_end_element);
+            hdlr.initialized = 1;
         }
     } else {
         return -1;
     }
-    (*hdlr).internal_subset = Some(xml_sax2_internal_subset);
-    (*hdlr).external_subset = Some(xml_sax2_external_subset);
-    (*hdlr).is_standalone = Some(xml_sax2_is_standalone);
-    (*hdlr).has_internal_subset = Some(xml_sax2_has_internal_subset);
-    (*hdlr).has_external_subset = Some(xml_sax2_has_external_subset);
-    (*hdlr).resolve_entity = Some(xml_sax2_resolve_entity);
-    (*hdlr).get_entity = Some(xml_sax2_get_entity);
-    (*hdlr).get_parameter_entity = Some(xml_sax2_get_parameter_entity);
-    (*hdlr).entity_decl = Some(xml_sax2_entity_decl);
-    (*hdlr).attribute_decl = Some(xml_sax2_attribute_decl);
-    (*hdlr).element_decl = Some(xml_sax2_element_decl);
-    (*hdlr).notation_decl = Some(xml_sax2_notation_decl);
-    (*hdlr).unparsed_entity_decl = Some(xml_sax2_unparsed_entity_decl);
-    (*hdlr).set_document_locator = Some(xml_sax2_set_document_locator);
-    (*hdlr).start_document = Some(xml_sax2_start_document);
-    (*hdlr).end_document = Some(xml_sax2_end_document);
-    (*hdlr).reference = Some(xml_sax2_reference);
-    (*hdlr).characters = Some(xml_sax2_characters);
-    (*hdlr).cdata_block = Some(xml_sax2_cdata_block);
-    (*hdlr).ignorable_whitespace = Some(xml_sax2_characters);
-    (*hdlr).processing_instruction = Some(xml_sax2_processing_instruction);
-    (*hdlr).comment = Some(xml_sax2_comment);
-    (*hdlr).warning = Some(parser_warning);
-    (*hdlr).error = Some(parser_error);
-    (*hdlr).fatal_error = Some(parser_error);
+    hdlr.internal_subset = Some(xml_sax2_internal_subset);
+    hdlr.external_subset = Some(xml_sax2_external_subset);
+    hdlr.is_standalone = Some(xml_sax2_is_standalone);
+    hdlr.has_internal_subset = Some(xml_sax2_has_internal_subset);
+    hdlr.has_external_subset = Some(xml_sax2_has_external_subset);
+    hdlr.resolve_entity = Some(xml_sax2_resolve_entity);
+    hdlr.get_entity = Some(xml_sax2_get_entity);
+    hdlr.get_parameter_entity = Some(xml_sax2_get_parameter_entity);
+    hdlr.entity_decl = Some(xml_sax2_entity_decl);
+    hdlr.attribute_decl = Some(xml_sax2_attribute_decl);
+    hdlr.element_decl = Some(xml_sax2_element_decl);
+    hdlr.notation_decl = Some(xml_sax2_notation_decl);
+    hdlr.unparsed_entity_decl = Some(xml_sax2_unparsed_entity_decl);
+    hdlr.set_document_locator = Some(xml_sax2_set_document_locator);
+    hdlr.start_document = Some(xml_sax2_start_document);
+    hdlr.end_document = Some(xml_sax2_end_document);
+    hdlr.reference = Some(xml_sax2_reference);
+    hdlr.characters = Some(xml_sax2_characters);
+    hdlr.cdata_block = Some(xml_sax2_cdata_block);
+    hdlr.ignorable_whitespace = Some(xml_sax2_characters);
+    hdlr.processing_instruction = Some(xml_sax2_processing_instruction);
+    hdlr.comment = Some(xml_sax2_comment);
+    hdlr.warning = Some(parser_warning);
+    hdlr.error = Some(parser_error);
+    hdlr.fatal_error = Some(parser_error);
 
     0
 }
 
 /// Initialize the default XML SAX2 handler
 #[doc(alias = "xmlSAX2InitDefaultSAXHandler")]
-pub unsafe fn xml_sax2_init_default_sax_handler(hdlr: *mut XmlSAXHandler, warning: i32) {
-    if hdlr.is_null() || (*hdlr).initialized != 0 {
+pub unsafe fn xml_sax2_init_default_sax_handler(hdlr: &mut XmlSAXHandler, warning: i32) {
+    if hdlr.initialized != 0 {
         return;
     }
 
     xml_sax_version(hdlr, XML_SAX2_DEFAULT_VERSION_VALUE);
     if warning == 0 {
-        (*hdlr).warning = None;
+        hdlr.warning = None;
     } else {
-        (*hdlr).warning = Some(parser_warning);
+        hdlr.warning = Some(parser_warning);
     }
 }
 
 /// Initialize the default HTML SAX2 handler
 #[doc(alias = "xmlSAX2InitHtmlDefaultSAXHandler")]
 #[cfg(feature = "html")]
-pub unsafe fn xml_sax2_init_html_default_sax_handler(hdlr: *mut XmlSAXHandler) {
-    if hdlr.is_null() || (*hdlr).initialized != 0 {
+pub unsafe fn xml_sax2_init_html_default_sax_handler(hdlr: &mut XmlSAXHandler) {
+    if hdlr.initialized != 0 {
         return;
     }
 
-    (*hdlr).internal_subset = Some(xml_sax2_internal_subset);
-    (*hdlr).external_subset = None;
-    (*hdlr).is_standalone = None;
-    (*hdlr).has_internal_subset = None;
-    (*hdlr).has_external_subset = None;
-    (*hdlr).resolve_entity = None;
-    (*hdlr).get_entity = Some(xml_sax2_get_entity);
-    (*hdlr).get_parameter_entity = None;
-    (*hdlr).entity_decl = None;
-    (*hdlr).attribute_decl = None;
-    (*hdlr).element_decl = None;
-    (*hdlr).notation_decl = None;
-    (*hdlr).unparsed_entity_decl = None;
-    (*hdlr).set_document_locator = Some(xml_sax2_set_document_locator);
-    (*hdlr).start_document = Some(xml_sax2_start_document);
-    (*hdlr).end_document = Some(xml_sax2_end_document);
-    (*hdlr).start_element = Some(xml_sax2_start_element);
-    (*hdlr).end_element = Some(xml_sax2_end_element);
-    (*hdlr).reference = None;
-    (*hdlr).characters = Some(xml_sax2_characters);
-    (*hdlr).cdata_block = Some(xml_sax2_cdata_block);
-    (*hdlr).ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
-    (*hdlr).processing_instruction = Some(xml_sax2_processing_instruction);
-    (*hdlr).comment = Some(xml_sax2_comment);
-    (*hdlr).warning = Some(parser_warning);
-    (*hdlr).error = Some(parser_error);
-    (*hdlr).fatal_error = Some(parser_error);
+    hdlr.internal_subset = Some(xml_sax2_internal_subset);
+    hdlr.external_subset = None;
+    hdlr.is_standalone = None;
+    hdlr.has_internal_subset = None;
+    hdlr.has_external_subset = None;
+    hdlr.resolve_entity = None;
+    hdlr.get_entity = Some(xml_sax2_get_entity);
+    hdlr.get_parameter_entity = None;
+    hdlr.entity_decl = None;
+    hdlr.attribute_decl = None;
+    hdlr.element_decl = None;
+    hdlr.notation_decl = None;
+    hdlr.unparsed_entity_decl = None;
+    hdlr.set_document_locator = Some(xml_sax2_set_document_locator);
+    hdlr.start_document = Some(xml_sax2_start_document);
+    hdlr.end_document = Some(xml_sax2_end_document);
+    hdlr.start_element = Some(xml_sax2_start_element);
+    hdlr.end_element = Some(xml_sax2_end_element);
+    hdlr.reference = None;
+    hdlr.characters = Some(xml_sax2_characters);
+    hdlr.cdata_block = Some(xml_sax2_cdata_block);
+    hdlr.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
+    hdlr.processing_instruction = Some(xml_sax2_processing_instruction);
+    hdlr.comment = Some(xml_sax2_comment);
+    hdlr.warning = Some(parser_warning);
+    hdlr.error = Some(parser_error);
+    hdlr.fatal_error = Some(parser_error);
 
-    (*hdlr).initialized = 1;
+    hdlr.initialized = 1;
 }
 
 #[doc(alias = "htmlDefaultSAXHandlerInit")]
@@ -3435,68 +3424,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_sax2_init_default_saxhandler() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_hdlr in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                for n_warning in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
-                    let warning = gen_int(n_warning, 1);
-
-                    xml_sax2_init_default_sax_handler(hdlr, warning);
-                    des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
-                    des_int(n_warning, warning, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSAX2InitDefaultSAXHandler",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_hdlr);
-                        eprintln!(" {}", n_warning);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSAX2InitDefaultSAXHandler()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_sax2_init_html_default_saxhandler() {
-        #[cfg(feature = "html")]
-        let mut leaks = 0;
-
-        unsafe {
-            for n_hdlr in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                let mem_base = xml_mem_blocks();
-                let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
-
-                xml_sax2_init_html_default_sax_handler(hdlr);
-                des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlSAX2InitHtmlDefaultSAXHandler",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlSAX2InitHtmlDefaultSAXHandler()"
-                    );
-                    eprintln!(" {}", n_hdlr);
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_saxdefault_version() {
         #[cfg(feature = "sax1")]
         unsafe {
@@ -3525,37 +3452,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlSAXDefaultVersion()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_saxversion() {
-        let mut leaks = 0;
-
-        unsafe {
-            for n_hdlr in 0..GEN_NB_XML_SAXHANDLER_PTR {
-                for n_version in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let hdlr = gen_xml_saxhandler_ptr(n_hdlr, 0);
-                    let version = gen_int(n_version, 1);
-
-                    let ret_val = xml_sax_version(hdlr, version);
-                    desret_int(ret_val);
-                    des_xml_saxhandler_ptr(n_hdlr, hdlr, 0);
-                    des_int(n_version, version, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSAXVersion",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_hdlr);
-                        eprintln!(" {}", n_version);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlSAXVersion()");
         }
     }
 }

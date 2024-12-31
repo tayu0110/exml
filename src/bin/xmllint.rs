@@ -273,21 +273,23 @@ unsafe fn xmllint_external_entity_loader(
         }
     }
 
-    if !ctxt.is_null() && !(*ctxt).sax.is_null() {
-        warning = (*(*ctxt).sax).warning;
-        err = (*(*ctxt).sax).error;
-        (*(*ctxt).sax).warning = None;
-        (*(*ctxt).sax).error = None;
+    if !ctxt.is_null() {
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            warning = sax.warning.take();
+            err = sax.error.take();
+        }
     }
 
     if let Some(loader) = DEFAULT_ENTITY_LOADER {
         ret = loader(url, id, ctxt);
         if !ret.is_null() {
-            if warning.is_some() {
-                (*(*ctxt).sax).warning = warning;
-            }
-            if err.is_some() {
-                (*(*ctxt).sax).error = err;
+            if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                if warning.is_some() {
+                    sax.warning = warning;
+                }
+                if err.is_some() {
+                    sax.error = err;
+                }
             }
             if LOAD_TRACE != 0 {
                 eprintln!(
@@ -306,11 +308,13 @@ unsafe fn xmllint_external_entity_loader(
             new_url.push_str(lastsegment.unwrap());
             ret = loader(Some(&new_url), id, ctxt);
             if !ret.is_null() {
-                if warning.is_some() {
-                    (*(*ctxt).sax).warning = warning;
-                }
-                if err.is_some() {
-                    (*(*ctxt).sax).error = err;
+                if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+                    if warning.is_some() {
+                        sax.warning = warning;
+                    }
+                    if err.is_some() {
+                        sax.error = err;
+                    }
                 }
                 if LOAD_TRACE != 0 {
                     eprintln!(
@@ -324,10 +328,14 @@ unsafe fn xmllint_external_entity_loader(
         }
     }
     if err.is_some() {
-        (*(*ctxt).sax).error = err;
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.error = err;
+        }
     }
     if let Some(warning) = warning {
-        (*(*ctxt).sax).warning = Some(warning);
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.warning = Some(warning);
+        }
         if url.is_some() {
             todo!()
             // xml_error_with_format!(
@@ -1472,12 +1480,17 @@ unsafe fn test_sax(filename: &str) {
             );
             let cfilename = CString::new(filename).unwrap();
             xml_schema_validate_set_filename(vctxt, cfilename.as_ptr());
+            let handler = {
+                let mut hdl = XmlSAXHandler::default();
+                std::ptr::copy(handler, &mut hdl, 1);
+                hdl
+            };
 
             let ret: c_int = xml_schema_validate_stream(
                 vctxt,
                 buf,
                 XmlCharEncoding::None,
-                handler,
+                Some(Box::new(handler)),
                 Some(GenericErrorContext::new(user_data.as_ptr())),
             );
             if REPEAT == 0 {
@@ -1500,13 +1513,19 @@ unsafe fn test_sax(filename: &str) {
             xml_schema_free_valid_ctxt(vctxt);
         }
     } else {
+        let handler = {
+            let mut hdl = XmlSAXHandler::default();
+            std::ptr::copy(handler, &mut hdl, 1);
+            hdl
+        };
         // Create the parser context amd hook the input
-        let ctxt: XmlParserCtxtPtr =
-            xml_new_sax_parser_ctxt(handler, Some(GenericErrorContext::new(user_data.as_ptr())));
-        if ctxt.is_null() {
+        let Ok(ctxt) = xml_new_sax_parser_ctxt(
+            Some(Box::new(handler)),
+            Some(GenericErrorContext::new(user_data.as_ptr())),
+        ) else {
             PROGRESULT = XmllintReturnCode::ErrMem;
             return;
-        }
+        };
         xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
 
         if !(*ctxt).my_doc.is_null() {
@@ -2108,7 +2127,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 if res > 0 {
                     let filename = filename.map(|f| CString::new(f).unwrap());
                     ctxt = html_create_push_parser_ctxt(
-                        null_mut(),
+                        None,
                         None,
                         chars.as_ptr(),
                         res,
@@ -2199,7 +2218,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                 if res > 0 {
                     ctxt = xml_create_push_parser_ctxt(
-                        null_mut(),
+                        None,
                         None,
                         chars.as_ptr(),
                         res,
@@ -2258,8 +2277,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             ctxt = rectxt;
         }
 
-        (*(*ctxt).sax).error = Some(xml_html_error);
-        (*(*ctxt).sax).warning = Some(xml_html_warning);
+        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
+            sax.error = Some(xml_html_error);
+            sax.warning = Some(xml_html_warning);
+        }
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 

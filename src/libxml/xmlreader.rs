@@ -50,8 +50,7 @@ use crate::{
             xml_free_parser_ctxt, xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc,
             EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc,
             XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XML_SAX2_MAGIC,
+            XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
@@ -218,80 +217,128 @@ pub type XmlTextReaderPtr = *mut XmlTextReader;
 #[cfg(feature = "libxml_reader")]
 #[repr(C)]
 pub struct XmlTextReader {
-    mode: XmlTextReaderMode,         /* the parsing mode */
-    doc: XmlDocPtr,                  /* when walking an existing doc */
-    validate: XmlTextReaderValidate, /* is there any validation */
-    allocs: i32,                     /* what structure were deallocated */
+    // the parsing mode
+    mode: XmlTextReaderMode,
+    // when walking an existing doc
+    doc: XmlDocPtr,
+    // is there any validation
+    validate: XmlTextReaderValidate,
+    // what structure were deallocated
+    allocs: i32,
     state: XmlTextReaderState,
-    ctxt: XmlParserCtxtPtr,                           /* the parser context */
-    sax: XmlSAXHandlerPtr,                            /* the parser SAX callbacks */
-    input: Option<XmlParserInputBuffer>,              /* the input */
-    start_element: Option<StartElementSAXFunc>,       /* initial SAX callbacks */
-    end_element: Option<EndElementSAXFunc>,           /* idem */
-    start_element_ns: Option<StartElementNsSAX2Func>, /* idem */
-    end_element_ns: Option<EndElementNsSAX2Func>,     /* idem */
+    // the parser context
+    ctxt: XmlParserCtxtPtr,
+    // the parser SAX callbacks
+    // sax: Option<Box<XmlSAXHandler>>,
+    // the input
+    input: Option<XmlParserInputBuffer>,
+    // initial SAX callbacks
+    start_element: Option<StartElementSAXFunc>,
+    // idem
+    end_element: Option<EndElementSAXFunc>,
+    // idem
+    start_element_ns: Option<StartElementNsSAX2Func>,
+    // idem
+    end_element_ns: Option<EndElementNsSAX2Func>,
     characters: Option<CharactersSAXFunc>,
     cdata_block: Option<CDATABlockSAXFunc>,
-    base: u32,            /* base of the segment in the input */
-    cur: u32,             /* current position in the input */
-    node: XmlNodePtr,     /* current node */
-    curnode: XmlNodePtr,  /* current attribute node */
-    depth: i32,           /* depth of the current node */
-    faketext: XmlNodePtr, /* fake xmlNs chld */
-    preserve: i32,        /* preserve the resulting document */
-    buffer: XmlBufPtr,    /* used to return const xmlChar * */
-    dict: XmlDictPtr,     /* the context dictionary */
+    // base of the segment in the input
+    base: u32,
+    // current position in the input
+    cur: u32,
+    // current node
+    node: XmlNodePtr,
+    // current attribute node
+    curnode: XmlNodePtr,
+    // depth of the current node
+    depth: i32,
+    // fake xmlNs chld
+    faketext: XmlNodePtr,
+    // preserve the resulting document
+    preserve: i32,
+    // used to return const xmlChar *
+    buffer: XmlBufPtr,
+    // the context dictionary
+    dict: XmlDictPtr,
 
-    /* entity stack when traversing entities content */
-    ent: XmlNodePtr,          /* Current Entity Ref Node */
-    ent_nr: i32,              /* Depth of the entities stack */
-    ent_max: i32,             /* Max depth of the entities stack */
-    ent_tab: *mut XmlNodePtr, /* array of entities */
+    // entity stack when traversing entities content
+    // Current Entity Ref Node
+    ent: XmlNodePtr,
+    // Depth of the entities stack
+    ent_nr: i32,
+    // Max depth of the entities stack
+    ent_max: i32,
+    // array of entities
+    ent_tab: *mut XmlNodePtr,
 
-    /* error handling */
-    error_func: Option<XmlTextReaderErrorFunc>, /* callback function */
-    error_func_arg: Option<GenericErrorContext>, /* callback function user argument */
+    // error handling
+    // callback function
+    error_func: Option<XmlTextReaderErrorFunc>,
+    // callback function user argument
+    error_func_arg: Option<GenericErrorContext>,
 
-    /* Handling of RelaxNG validation */
+    // Handling of RelaxNG validation
+    // The Relax NG schemas
     #[cfg(feature = "schema")]
-    rng_schemas: XmlRelaxNGPtr, /* The Relax NG schemas */
+    rng_schemas: XmlRelaxNGPtr,
+    // The Relax NG validation context
     #[cfg(feature = "schema")]
-    rng_valid_ctxt: XmlRelaxNGValidCtxtPtr, /* The Relax NG validation context */
+    rng_valid_ctxt: XmlRelaxNGValidCtxtPtr,
+    // 1 if the context was provided by the user
     #[cfg(feature = "schema")]
-    rng_preserve_ctxt: i32, /* 1 if the context was provided by the user */
+    rng_preserve_ctxt: i32,
+    // The number of errors detected
     #[cfg(feature = "schema")]
-    rng_valid_errors: i32, /* The number of errors detected */
+    rng_valid_errors: i32,
+    // the node if RNG not progressive
     #[cfg(feature = "schema")]
-    rng_full_node: XmlNodePtr, /* the node if RNG not progressive */
-    /* Handling of Schemas validation */
+    rng_full_node: XmlNodePtr,
+
+    // Handling of Schemas validation
+    // The Schemas schemas
     #[cfg(feature = "schema")]
-    xsd_schemas: XmlSchemaPtr, /* The Schemas schemas */
+    xsd_schemas: XmlSchemaPtr,
+    // The Schemas validation context
     #[cfg(feature = "schema")]
-    xsd_valid_ctxt: XmlSchemaValidCtxtPtr, /* The Schemas validation context */
+    xsd_valid_ctxt: XmlSchemaValidCtxtPtr,
+    // 1 if the context was provided by the user
     #[cfg(feature = "schema")]
-    xsd_preserve_ctxt: i32, /* 1 if the context was provided by the user */
+    xsd_preserve_ctxt: i32,
+    // The number of errors detected
     #[cfg(feature = "schema")]
-    xsd_valid_errors: i32, /* The number of errors detected */
+    xsd_valid_errors: i32,
+    // the schemas plug in SAX pipeline
     #[cfg(feature = "schema")]
-    xsd_plug: XmlSchemaSAXPlugPtr, /* the schemas plug in SAX pipeline */
-    /* Handling of XInclude processing */
+    xsd_plug: XmlSchemaSAXPlugPtr,
+
+    // Handling of XInclude processing
+    // is xinclude asked for
     #[cfg(feature = "xinclude")]
-    xinclude: i32, /* is xinclude asked for */
+    xinclude: i32,
+    // the xinclude name from dict
     #[cfg(feature = "xinclude")]
-    xinclude_name: *const XmlChar, /* the xinclude name from dict */
+    xinclude_name: *const XmlChar,
+    // the xinclude context
     #[cfg(feature = "xinclude")]
-    xincctxt: XmlXincludeCtxtPtr, /* the xinclude context */
+    xincctxt: XmlXincludeCtxtPtr,
+    // counts for xinclude
     #[cfg(feature = "xinclude")]
-    in_xinclude: i32, /* counts for xinclude */
+    in_xinclude: i32,
+    // number of preserve patterns
     #[cfg(feature = "libxml_pattern")]
-    pattern_nr: i32, /* number of preserve patterns */
+    pattern_nr: i32,
+    // max preserve patterns
     #[cfg(feature = "libxml_pattern")]
-    pattern_max: i32, /* max preserve patterns */
+    pattern_max: i32,
+    // array of preserve patterns
     #[cfg(feature = "libxml_pattern")]
-    pattern_tab: *mut XmlPatternPtr, /* array of preserve patterns */
-    preserves: i32,    /* level of preserves */
-    parser_flags: i32, /* the set of options set */
-    /* Structured error handling */
+    pattern_tab: *mut XmlPatternPtr,
+    // level of preserves
+    preserves: i32,
+    // the set of options set
+    parser_flags: i32,
+
+    // Structured error handling
     serror_func: Option<StructuredError>, /* callback function */
 }
 
@@ -325,9 +372,7 @@ impl XmlTextReader {
         let mut node_found = false;
         if self.mode == XmlTextReaderMode::XmlTextreaderModeInitial {
             self.mode = XmlTextReaderMode::XmlTextreaderModeInteractive;
-            /*
-             * Initial state
-             */
+            // Initial state
             while {
                 val = self.push_data();
                 if val < 0 {
@@ -384,11 +429,9 @@ impl XmlTextReader {
                 }
 
                 'goto_node_found: {
-                    /*
-                     * If we are not backtracking on ancestors or examined nodes,
-                     * that the parser didn't finished or that we aren't at the end
-                     * of stream, continue processing.
-                     */
+                    // If we are not backtracking on ancestors or examined nodes,
+                    // that the parser didn't finished or that we aren't at the end
+                    // of stream, continue processing.
                     while !self.node.is_null()
                         && (*self.node).next.is_none()
                         && (*self.ctxt).node_tab.len() == olddepth
@@ -525,9 +568,7 @@ impl XmlTextReader {
                         self.node = null_mut();
                         self.depth = -1;
 
-                        /*
-                         * Cleanup of the old node
-                         */
+                        // Cleanup of the old node
                         #[cfg(not(feature = "xinclude"))]
                         let f = true;
                         #[cfg(feature = "xinclude")]
@@ -571,9 +612,7 @@ impl XmlTextReader {
             node_found = false;
             // DUMP_READER
 
-            /*
-             * If we are in the middle of a piece of CDATA make sure it's finished
-             */
+            // If we are in the middle of a piece of CDATA make sure it's finished
             if (!self.node.is_null()
                 && (*self.node).next.is_none()
                 && ((*self.node).element_type() == XmlElementType::XmlTextNode
@@ -585,9 +624,7 @@ impl XmlTextReader {
 
             #[cfg(feature = "xinclude")]
             {
-                /*
-                 * Handle XInclude if asked for
-                 */
+                // Handle XInclude if asked for
                 if self.xinclude != 0
                     && self.in_xinclude == 0
                     && self.state != XmlTextReaderState::Backtrack
@@ -626,9 +663,7 @@ impl XmlTextReader {
                     continue 'get_next_node;
                 }
             }
-            /*
-             * Handle entities enter and exit when in entity replacement mode
-             */
+            // Handle entities enter and exit when in entity replacement mode
             if !self.node.is_null()
                 && (*self.node).element_type() == XmlElementType::XmlEntityRefNode
                 && !self.ctxt.is_null()
@@ -1063,9 +1098,7 @@ impl XmlTextReader {
 
         while self.state == XmlTextReaderState::None {
             if xml_buf_use(inbuf) < self.cur as usize + CHUNK_SIZE {
-                /*
-                 * Refill the buffer unless we are at the end of the stream
-                 */
+                // Refill the buffer unless we are at the end of the stream
                 if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
                     val = self.input.as_mut().unwrap().read(4096);
                     if val == 0 && self.input.as_ref().unwrap().context.is_none() {
@@ -1088,10 +1121,8 @@ impl XmlTextReader {
                     break;
                 }
             }
-            /*
-             * parse by block of CHUNK_SIZE bytes, various tests show that
-             * it's the best tradeoff at least on a 1.2GH Duron
-             */
+            // parse by block of CHUNK_SIZE bytes, various tests show that
+            // it's the best tradeoff at least on a 1.2GH Duron
             if xml_buf_use(inbuf) >= self.cur as usize + CHUNK_SIZE {
                 val = xml_parse_chunk(
                     self.ctxt,
@@ -1122,9 +1153,7 @@ impl XmlTextReader {
             }
         }
 
-        /*
-         * Discard the consumed input when needed and possible
-         */
+        // Discard the consumed input when needed and possible
         if self.mode == XmlTextReaderMode::XmlTextreaderModeInteractive {
             if self.input.as_ref().unwrap().context.is_some()
                 && (self.cur >= 4096 && xml_buf_use(inbuf) - self.cur as usize <= CHUNK_SIZE)
@@ -1135,10 +1164,7 @@ impl XmlTextReader {
                 }
             }
         }
-        /*
-         * At the end of the stream signal that the work is done to the Push
-         * parser.
-         */
+        // At the end of the stream signal that the work is done to the Push parser.
         else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
             && self.state != XmlTextReaderState::Done
         {
@@ -2874,7 +2900,7 @@ impl Default for XmlTextReader {
             allocs: 0,
             state: XmlTextReaderState::default(),
             ctxt: null_mut(),
-            sax: null_mut(),
+            // sax: None,
             input: None,
             start_element: None,
             end_element: None,
@@ -3116,9 +3142,6 @@ pub unsafe fn xml_new_text_reader(
 ) -> XmlTextReaderPtr {
     use crate::generic_error;
 
-    // if input.is_null() {
-    //     return null_mut();
-    // }
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
     if ret.is_null() {
         generic_error!("xmlNewTextReader : malloc failed\n");
@@ -3136,30 +3159,24 @@ pub unsafe fn xml_new_text_reader(
         generic_error!("xmlNewTextReader : malloc failed\n");
         return null_mut();
     }
-    /* no operation on a reader should require a huge buffer */
+    // no operation on a reader should require a huge buffer
     xml_buf_set_allocation_scheme(
         (*ret).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
-    (*ret).sax = xml_malloc(size_of::<XmlSAXHandler>()) as *mut XmlSAXHandler;
-    if (*ret).sax.is_null() {
-        xml_buf_free((*ret).buffer);
-        xml_free(ret as _);
-        generic_error!("xmlNewTextReader : malloc failed\n");
-        return null_mut();
-    }
-    xml_sax_version((*ret).sax, 2);
-    (*ret).start_element = (*(*ret).sax).start_element;
-    (*(*ret).sax).start_element = Some(xml_text_reader_start_element);
-    (*ret).end_element = (*(*ret).sax).end_element;
-    (*(*ret).sax).end_element = Some(xml_text_reader_end_element);
+    let mut sax = XmlSAXHandler::default();
+    xml_sax_version(&mut sax, 2);
+    (*ret).start_element = sax.start_element;
+    sax.start_element = Some(xml_text_reader_start_element);
+    (*ret).end_element = sax.end_element;
+    sax.end_element = Some(xml_text_reader_end_element);
     #[cfg(feature = "sax1")]
     {
-        if (*(*ret).sax).initialized == XML_SAX2_MAGIC as u32 {
-            (*ret).start_element_ns = (*(*ret).sax).start_element_ns;
-            (*(*ret).sax).start_element_ns = Some(xml_text_reader_start_element_ns);
-            (*ret).end_element_ns = (*(*ret).sax).end_element_ns;
-            (*(*ret).sax).end_element_ns = Some(xml_text_reader_end_element_ns);
+        if sax.initialized == XML_SAX2_MAGIC as u32 {
+            (*ret).start_element_ns = sax.start_element_ns;
+            sax.start_element_ns = Some(xml_text_reader_start_element_ns);
+            (*ret).end_element_ns = sax.end_element_ns;
+            sax.end_element_ns = Some(xml_text_reader_end_element_ns);
         } else {
             (*ret).start_element_ns = None;
             (*ret).end_element_ns = None;
@@ -3167,16 +3184,16 @@ pub unsafe fn xml_new_text_reader(
     }
     #[cfg(not(feature = "sax1"))]
     {
-        (*ret).start_element_ns = (*(*ret).sax).start_element_ns;
-        (*(*ret).sax).start_element_ns = Some(xml_text_reader_start_element_ns);
-        (*ret).end_element_ns = (*(*ret).sax).end_element_ns;
-        (*(*ret).sax).end_element_ns = Some(xml_text_reader_end_element_ns);
+        (*ret).start_element_ns = sax.start_element_ns;
+        sax.start_element_ns = Some(xml_text_reader_start_element_ns);
+        (*ret).end_element_ns = sax.end_element_ns;
+        sax.end_element_ns = Some(xml_text_reader_end_element_ns);
     }
-    (*ret).characters = (*(*ret).sax).characters;
-    (*(*ret).sax).characters = Some(xml_text_reader_characters);
-    (*(*ret).sax).ignorable_whitespace = Some(xml_text_reader_characters);
-    (*ret).cdata_block = (*(*ret).sax).cdata_block;
-    (*(*ret).sax).cdata_block = Some(xml_text_reader_cdata_block);
+    (*ret).characters = sax.characters;
+    sax.characters = Some(xml_text_reader_characters);
+    sax.ignorable_whitespace = Some(xml_text_reader_characters);
+    (*ret).cdata_block = sax.cdata_block;
+    sax.cdata_block = Some(xml_text_reader_cdata_block);
 
     (*ret).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
     (*ret).node = null_mut();
@@ -3200,7 +3217,7 @@ pub unsafe fn xml_new_text_reader(
         >= 4
     {
         (*ret).ctxt = xml_create_push_parser_ctxt(
-            (*ret).sax,
+            Some(Box::new(sax)),
             None,
             (*ret)
                 .input
@@ -3216,7 +3233,7 @@ pub unsafe fn xml_new_text_reader(
         (*ret).base = 0;
         (*ret).cur = 4;
     } else {
-        (*ret).ctxt = xml_create_push_parser_ctxt((*ret).sax, None, null_mut(), 0, uri);
+        (*ret).ctxt = xml_create_push_parser_ctxt(Some(Box::new(sax)), None, null_mut(), 0, uri);
         (*ret).base = 0;
         (*ret).cur = 0;
     }
@@ -3224,7 +3241,6 @@ pub unsafe fn xml_new_text_reader(
     if (*ret).ctxt.is_null() {
         generic_error!("xmlNewTextReader : malloc failed\n");
         xml_buf_free((*ret).buffer);
-        xml_free((*ret).sax as _);
         xml_free(ret as _);
         return null_mut();
     }
@@ -3233,9 +3249,7 @@ pub unsafe fn xml_new_text_reader(
     (*(*ret).ctxt).linenumbers = 1;
     (*(*ret).ctxt).dict_names = 1;
     (*ret).allocs = XML_TEXTREADER_CTXT;
-    /*
-     * use the parser dictionary to allocate all elements and attributes names
-     */
+    // use the parser dictionary to allocate all elements and attributes names
     (*(*ret).ctxt).docdict = 1;
     (*ret).dict = (*(*ret).ctxt).dict;
     #[cfg(feature = "xinclude")]
@@ -3288,7 +3302,7 @@ pub unsafe fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderP
 /// Deallocate all the resources associated to the reader
 #[doc(alias = "xmlFreeTextReader")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
+pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
     use super::xinclude::xml_xinclude_free_context;
 
     if reader.is_null() {
@@ -3345,9 +3359,6 @@ pub unsafe extern "C" fn xml_free_text_reader(reader: XmlTextReaderPtr) {
             xml_free_parser_ctxt((*reader).ctxt);
         }
     }
-    if !(*reader).sax.is_null() {
-        xml_free((*reader).sax as _);
-    }
     if !(*reader).buffer.is_null() {
         xml_buf_free((*reader).buffer);
     }
@@ -3381,16 +3392,11 @@ pub unsafe fn xml_text_reader_setup(
     };
 
     if reader.is_null() {
-        // if !input.is_none() {
-        //     xml_free_parser_input_buffer(input);
-        // }
         return -1;
     }
 
-    /*
-     * we force the generation of compact text nodes on the reader
-     * since usr applications should never modify the tree
-     */
+    // we force the generation of compact text nodes on the reader
+    // since usr applications should never modify the tree
     options |= XmlParserOption::XmlParseCompact as i32;
 
     (*reader).doc = null_mut();
@@ -3399,8 +3405,6 @@ pub unsafe fn xml_text_reader_setup(
     (*reader).validate = XmlTextReaderValidate::NotValidate;
     if input.is_some() && (*reader).input.is_some() && (*reader).allocs & XML_TEXTREADER_INPUT != 0
     {
-        // xml_free_parser_input_buffer((*reader).input);
-        // (*reader).input = null_mut();
         let _ = (*reader).input.take();
         (*reader).allocs -= XML_TEXTREADER_INPUT;
     }
@@ -3416,30 +3420,24 @@ pub unsafe fn xml_text_reader_setup(
         generic_error!("xmlTextReaderSetup : malloc failed\n");
         return -1;
     }
-    /* no operation on a reader should require a huge buffer */
+    // no operation on a reader should require a huge buffer
     xml_buf_set_allocation_scheme(
         (*reader).buffer,
         XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
     );
-    if (*reader).sax.is_null() {
-        (*reader).sax = xml_malloc(size_of::<XmlSAXHandler>()) as *mut XmlSAXHandler;
-    }
-    if (*reader).sax.is_null() {
-        generic_error!("xmlTextReaderSetup : malloc failed\n");
-        return -1;
-    }
-    xml_sax_version((*reader).sax, 2);
-    (*reader).start_element = (*(*reader).sax).start_element;
-    (*(*reader).sax).start_element = Some(xml_text_reader_start_element);
-    (*reader).end_element = (*(*reader).sax).end_element;
-    (*(*reader).sax).end_element = Some(xml_text_reader_end_element);
+    let mut sax = (*(*reader).ctxt).sax.take().unwrap_or_default();
+    xml_sax_version(&mut sax, 2);
+    (*reader).start_element = sax.start_element;
+    sax.start_element = Some(xml_text_reader_start_element);
+    (*reader).end_element = sax.end_element;
+    sax.end_element = Some(xml_text_reader_end_element);
     #[cfg(feature = "sax1")]
     {
-        if (*(*reader).sax).initialized == XML_SAX2_MAGIC as u32 {
-            (*reader).start_element_ns = (*(*reader).sax).start_element_ns;
-            (*(*reader).sax).start_element_ns = Some(xml_text_reader_start_element_ns);
-            (*reader).end_element_ns = (*(*reader).sax).end_element_ns;
-            (*(*reader).sax).end_element_ns = Some(xml_text_reader_end_element_ns);
+        if sax.initialized == XML_SAX2_MAGIC as u32 {
+            (*reader).start_element_ns = sax.start_element_ns;
+            sax.start_element_ns = Some(xml_text_reader_start_element_ns);
+            (*reader).end_element_ns = sax.end_element_ns;
+            sax.end_element_ns = Some(xml_text_reader_end_element_ns);
         } else {
             (*reader).start_element_ns = None;
             (*reader).end_element_ns = None;
@@ -3447,16 +3445,17 @@ pub unsafe fn xml_text_reader_setup(
     }
     #[cfg(not(feature = "sax1"))]
     {
-        (*reader).startElementNs = (*(*reader).sax).startElementNs;
-        (*(*reader).sax).startElementNs = Some(xml_text_reader_start_element_ns);
-        (*reader).endElementNs = (*(*reader).sax).endElementNs;
-        (*(*reader).sax).endElementNs = Some(xml_text_reader_end_element_ns);
+        (*reader).start_element_ns = sax.start_element_ns;
+        sax.start_element_ns = Some(xml_text_reader_start_element_ns);
+        (*reader).end_element_ns = sax.end_element_ns;
+        sax.end_element_ns = Some(xml_text_reader_end_element_ns);
     }
-    (*reader).characters = (*(*reader).sax).characters;
-    (*(*reader).sax).characters = Some(xml_text_reader_characters);
-    (*(*reader).sax).ignorable_whitespace = Some(xml_text_reader_characters);
-    (*reader).cdata_block = (*(*reader).sax).cdata_block;
-    (*(*reader).sax).cdata_block = Some(xml_text_reader_cdata_block);
+    (*reader).characters = sax.characters;
+    sax.characters = Some(xml_text_reader_characters);
+    sax.ignorable_whitespace = Some(xml_text_reader_characters);
+    (*reader).cdata_block = sax.cdata_block;
+    sax.cdata_block = Some(xml_text_reader_cdata_block);
+    (*(*reader).ctxt).sax = Some(sax);
 
     (*reader).mode = XmlTextReaderMode::XmlTextreaderModeInitial as _;
     (*reader).node = null_mut();
@@ -3482,7 +3481,7 @@ pub unsafe fn xml_text_reader_setup(
                 >= 4
             {
                 (*reader).ctxt = xml_create_push_parser_ctxt(
-                    (*reader).sax,
+                    (*(*reader).ctxt).sax.take(),
                     None,
                     (*reader)
                         .input
@@ -3498,8 +3497,13 @@ pub unsafe fn xml_text_reader_setup(
                 (*reader).base = 0;
                 (*reader).cur = 4;
             } else {
-                (*reader).ctxt =
-                    xml_create_push_parser_ctxt((*reader).sax, None, null_mut(), 0, url);
+                (*reader).ctxt = xml_create_push_parser_ctxt(
+                    (*(*reader).ctxt).sax.take(),
+                    None,
+                    null_mut(),
+                    0,
+                    url,
+                );
                 (*reader).base = 0;
                 (*reader).cur = 0;
             }
@@ -3508,9 +3512,6 @@ pub unsafe fn xml_text_reader_setup(
 
             xml_ctxt_reset((*reader).ctxt);
             let buf = XmlParserInputBuffer::new(enc);
-            // if buf.is_null() {
-            //     return -1;
-            // }
             let input_stream: XmlParserInputPtr = xml_new_input_stream((*reader).ctxt);
             if input_stream.is_null() {
                 return -1;
@@ -3558,9 +3559,7 @@ pub unsafe fn xml_text_reader_setup(
     (*(*reader).ctxt)._private = reader as _;
     (*(*reader).ctxt).linenumbers = 1;
     (*(*reader).ctxt).dict_names = 1;
-    /*
-     * use the parser dictionary to allocate all elements and attributes names
-     */
+    // use the parser dictionary to allocate all elements and attributes names
     (*(*reader).ctxt).docdict = 1;
     (*(*reader).ctxt).parse_mode = XmlParserMode::XmlParseReader;
 
@@ -4801,7 +4800,7 @@ fn xml_text_reader_validity_structured_relay(
 /// Returns 0 in case the RelaxNG validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderRelaxNGValidateInternal")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
+unsafe fn xml_text_reader_relaxng_validate_internal(
     reader: XmlTextReaderPtr,
     rng: *const c_char,
     ctxt: XmlRelaxNGValidCtxtPtr,
@@ -4822,7 +4821,7 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
         return -1;
     }
 
-    /* Cleanup previous validation stuff. */
+    // Cleanup previous validation stuff.
     if !(*reader).rng_valid_ctxt.is_null() {
         if (*reader).rng_preserve_ctxt == 0 {
             xml_relaxng_free_valid_ctxt((*reader).rng_valid_ctxt);
@@ -4836,12 +4835,12 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
     }
 
     if rng.is_null() && ctxt.is_null() {
-        /* We just want to deactivate the validation, so get out. */
+        // We just want to deactivate the validation, so get out.
         return 0;
     }
 
     if !rng.is_null() {
-        /* Parse the schema and create validation environment. */
+        // Parse the schema and create validation environment.
 
         let pctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(rng);
         let ctx = GenericErrorContext::new(reader);
@@ -4872,16 +4871,14 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
             return -1;
         }
     } else {
-        /* Use the given validation context. */
+        // Use the given validation context.
         (*reader).rng_valid_ctxt = ctxt;
         (*reader).rng_preserve_ctxt = 1;
     }
-    /*
-     * Redirect the validation context's error channels to use
-     * the reader channels.
-     * TODO: In case the user provides the validation context we
-     *    could make this redirection optional.
-     */
+    // Redirect the validation context's error channels to use
+    // the reader channels.
+    // TODO: In case the user provides the validation context we
+    //    could make this redirection optional.
     let ctx = GenericErrorContext::new(reader);
     if (*reader).error_func.is_some() {
         xml_relaxng_set_valid_errors(
@@ -4911,7 +4908,7 @@ unsafe extern "C" fn xml_text_reader_relaxng_validate_internal(
 /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderRelaxNGValidate")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-pub unsafe extern "C" fn xml_text_reader_relaxng_validate(
+pub unsafe fn xml_text_reader_relaxng_validate(
     reader: XmlTextReaderPtr,
     rng: *const c_char,
 ) -> i32 {
@@ -4925,7 +4922,7 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate(
 /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderRelaxNGValidateCtxt")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
+pub unsafe fn xml_text_reader_relaxng_validate_ctxt(
     reader: XmlTextReaderPtr,
     ctxt: XmlRelaxNGValidCtxtPtr,
     options: i32,
@@ -4942,7 +4939,7 @@ pub unsafe extern "C" fn xml_text_reader_relaxng_validate_ctxt(
 /// Returns 0 in case the RelaxNG validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderRelaxNGSetSchema")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-pub unsafe extern "C" fn xml_text_reader_relaxng_set_schema(
+pub unsafe fn xml_text_reader_relaxng_set_schema(
     reader: XmlTextReaderPtr,
     schema: XmlRelaxNGPtr,
 ) -> i32 {
@@ -5066,7 +5063,7 @@ unsafe extern "C" fn xml_text_reader_locator(
 /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderSchemaValidateInternal")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-unsafe extern "C" fn xml_text_reader_schema_validate_internal(
+unsafe fn xml_text_reader_schema_validate_internal(
     reader: XmlTextReaderPtr,
     xsd: *const c_char,
     ctxt: XmlSchemaValidCtxtPtr,
@@ -5087,7 +5084,7 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
         return -1;
     }
 
-    /* Cleanup previous validation stuff. */
+    // Cleanup previous validation stuff.
     if !(*reader).xsd_plug.is_null() {
         xml_schema_sax_unplug((*reader).xsd_plug);
         (*reader).xsd_plug = null_mut();
@@ -5105,13 +5102,13 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
     }
 
     if xsd.is_null() && ctxt.is_null() {
-        /* We just want to deactivate the validation, so get out. */
+        // We just want to deactivate the validation, so get out.
         return 0;
     }
 
     let ctx = GenericErrorContext::new(reader);
     if !xsd.is_null() {
-        /* Parse the schema and create validation environment. */
+        // Parse the schema and create validation environment.
         let pctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(xsd);
         if (*reader).error_func.is_some() {
             xml_schema_set_parser_errors(
@@ -5134,7 +5131,7 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
         }
         (*reader).xsd_plug = xml_schema_sax_plug(
             (*reader).xsd_valid_ctxt,
-            addr_of_mut!((*(*reader).ctxt).sax),
+            &mut (*(*reader).ctxt).sax,
             addr_of_mut!((*(*reader).ctxt).user_data),
         );
         if (*reader).xsd_plug.is_null() {
@@ -5145,12 +5142,12 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
             return -1;
         }
     } else {
-        /* Use the given validation context. */
+        // Use the given validation context.
         (*reader).xsd_valid_ctxt = ctxt;
         (*reader).xsd_preserve_ctxt = 1;
         (*reader).xsd_plug = xml_schema_sax_plug(
             (*reader).xsd_valid_ctxt,
-            addr_of_mut!((*(*reader).ctxt).sax),
+            &mut (*(*reader).ctxt).sax,
             addr_of_mut!((*(*reader).ctxt).user_data),
         );
         if (*reader).xsd_plug.is_null() {
@@ -5164,12 +5161,10 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
         Some(xml_text_reader_locator),
         reader as *mut c_void,
     );
-    /*
-     * Redirect the validation context's error channels to use
-     * the reader channels.
-     * TODO: In case the user provides the validation context we
-     *   could make this redirection optional.
-     */
+    // Redirect the validation context's error channels to use
+    // the reader channels.
+    // TODO: In case the user provides the validation context we
+    //   could make this redirection optional.
     if (*reader).error_func.is_some() {
         xml_schema_set_valid_errors(
             (*reader).xsd_valid_ctxt,
@@ -5197,10 +5192,7 @@ unsafe extern "C" fn xml_text_reader_schema_validate_internal(
 /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderSchemaValidate")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-pub unsafe extern "C" fn xml_text_reader_schema_validate(
-    reader: XmlTextReaderPtr,
-    xsd: *const c_char,
-) -> i32 {
+pub unsafe fn xml_text_reader_schema_validate(reader: XmlTextReaderPtr, xsd: *const c_char) -> i32 {
     xml_text_reader_schema_validate_internal(reader, xsd, null_mut(), 0)
 }
 
@@ -5211,7 +5203,7 @@ pub unsafe extern "C" fn xml_text_reader_schema_validate(
 /// Returns 0 in case the schemas validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderSchemaValidateCtxt")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-pub unsafe extern "C" fn xml_text_reader_schema_validate_ctxt(
+pub unsafe fn xml_text_reader_schema_validate_ctxt(
     reader: XmlTextReaderPtr,
     ctxt: XmlSchemaValidCtxtPtr,
     options: i32,
@@ -5228,10 +5220,7 @@ pub unsafe extern "C" fn xml_text_reader_schema_validate_ctxt(
 /// Returns 0 in case the Schema validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderSetSchema")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-pub unsafe extern "C" fn xml_text_reader_set_schema(
-    reader: XmlTextReaderPtr,
-    schema: XmlSchemaPtr,
-) -> i32 {
+pub unsafe fn xml_text_reader_set_schema(reader: XmlTextReaderPtr, schema: XmlSchemaPtr) -> i32 {
     if reader.is_null() {
         return -1;
     }
@@ -5279,7 +5268,7 @@ pub unsafe extern "C" fn xml_text_reader_set_schema(
     }
     (*reader).xsd_plug = xml_schema_sax_plug(
         (*reader).xsd_valid_ctxt,
-        addr_of_mut!((*(*reader).ctxt).sax),
+        &mut (*(*reader).ctxt).sax,
         addr_of_mut!((*(*reader).ctxt).user_data),
     );
     if (*reader).xsd_plug.is_null() {
@@ -5748,10 +5737,12 @@ pub unsafe fn xml_text_reader_set_error_handler(
     arg: Option<GenericErrorContext>,
 ) {
     if f.is_some() {
-        (*(*(*reader).ctxt).sax).error = Some(xml_text_reader_error);
-        (*(*(*reader).ctxt).sax).serror = None;
+        if let Some(sax) = (*(*reader).ctxt).sax.as_deref_mut() {
+            sax.error = Some(xml_text_reader_error);
+            sax.serror = None;
+            sax.warning = Some(xml_text_reader_warning);
+        }
         (*(*reader).ctxt).vctxt.error = Some(xml_text_reader_validity_error);
-        (*(*(*reader).ctxt).sax).warning = Some(xml_text_reader_warning);
         (*(*reader).ctxt).vctxt.warning = Some(xml_text_reader_validity_warning);
         (*reader).error_func = f;
         (*reader).serror_func = None;
@@ -5783,10 +5774,12 @@ pub unsafe fn xml_text_reader_set_error_handler(
             }
         }
     } else {
-        /* restore defaults */
-        (*(*(*reader).ctxt).sax).error = Some(parser_error);
+        // restore defaults
+        if let Some(sax) = (*(*reader).ctxt).sax.as_deref_mut() {
+            sax.error = Some(parser_error);
+            sax.warning = Some(parser_warning);
+        }
         (*(*reader).ctxt).vctxt.error = Some(parser_validity_error);
-        (*(*(*reader).ctxt).sax).warning = Some(parser_warning);
         (*(*reader).ctxt).vctxt.warning = Some(parser_validity_warning);
         (*reader).error_func = None;
         (*reader).serror_func = None;
@@ -5833,10 +5826,12 @@ pub unsafe fn xml_text_reader_set_structured_error_handler(
     use crate::error::parser_validity_warning;
 
     if f.is_some() {
-        (*(*(*reader).ctxt).sax).error = None;
-        (*(*(*reader).ctxt).sax).serror = Some(xml_text_reader_structured_error);
+        if let Some(sax) = (*(*reader).ctxt).sax.as_deref_mut() {
+            sax.error = None;
+            sax.serror = Some(xml_text_reader_structured_error);
+            sax.warning = Some(xml_text_reader_warning);
+        }
         (*(*reader).ctxt).vctxt.error = Some(xml_text_reader_validity_error);
-        (*(*(*reader).ctxt).sax).warning = Some(xml_text_reader_warning);
         (*(*reader).ctxt).vctxt.warning = Some(xml_text_reader_validity_warning);
         (*reader).serror_func = f;
         (*reader).error_func = None;
@@ -5872,11 +5867,13 @@ pub unsafe fn xml_text_reader_set_structured_error_handler(
             }
         }
     } else {
-        /* restore defaults */
-        (*(*(*reader).ctxt).sax).error = Some(parser_error);
-        (*(*(*reader).ctxt).sax).serror = None;
+        // restore defaults
+        if let Some(sax) = (*(*reader).ctxt).sax.as_deref_mut() {
+            sax.error = Some(parser_error);
+            sax.serror = None;
+            sax.warning = Some(parser_warning);
+        }
         (*(*reader).ctxt).vctxt.error = Some(parser_validity_error);
-        (*(*(*reader).ctxt).sax).warning = Some(parser_warning);
         (*(*reader).ctxt).vctxt.warning = Some(parser_validity_warning);
         (*reader).error_func = None;
         (*reader).serror_func = None;

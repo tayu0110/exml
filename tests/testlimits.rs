@@ -6,7 +6,7 @@ use std::{
     ffi::{CStr, CString},
     io::{self, Read},
     os::raw::c_void,
-    ptr::{addr_of, null_mut},
+    ptr::null_mut,
     sync::atomic::{AtomicPtr, AtomicU64, AtomicUsize, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -938,12 +938,12 @@ unsafe fn sax_test(filename: *const i8, limit: usize, options: i32, fail: i32) -
     NB_TESTS.set(NB_TESTS.get() + 1);
 
     DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
-    let ctxt: XmlParserCtxtPtr =
-        xml_new_sax_parser_ctxt(addr_of!(CALLBACK_SAX2_HANDLER_STRUCT), None);
-    if ctxt.is_null() {
+    let mut sax = XmlSAXHandler::default();
+    std::ptr::copy(&CALLBACK_SAX2_HANDLER_STRUCT, &mut sax, 1);
+    let Ok(ctxt) = xml_new_sax_parser_ctxt(Some(Box::new(sax)), None) else {
         eprintln!("Failed to create parser context");
         return 1;
-    }
+    };
     let filename = CStr::from_ptr(filename).to_string_lossy();
     let filename = filename.as_ref();
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, options);

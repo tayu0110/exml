@@ -1486,12 +1486,11 @@ macro_rules! __xml_raise_error {
                                 (*ctxt).nb_errors += 1;
                             }
 
-                            if schannel.is_none()
-                                && !(*ctxt).sax.is_null()
-                                && (*(*ctxt).sax).initialized == XML_SAX2_MAGIC as u32
-                                && (*(*ctxt).sax).serror.is_some() {
-                                schannel = (*(*ctxt).sax).serror;
-                                data = (*ctxt).user_data.clone();
+                            if schannel.is_none() {
+                                if let Some(serror) = (*ctxt).sax.as_deref_mut().filter(|sax| sax.initialized == XML_SAX2_MAGIC as u32).and_then(|sax| sax.serror) {
+                                    schannel = Some(serror);
+                                    data = (*ctxt).user_data.clone();
+                                }
                             }
                         }
                     }
@@ -1613,11 +1612,12 @@ macro_rules! __xml_raise_error {
                     // Find the callback channel if channel param is NULL
                     if !ctxt.is_null() && channel.is_none()
                         && state.structured_error.is_none()
-                        && !(*ctxt).sax.is_null() {
+                        && (*ctxt).sax.is_some() {
+                        let sax = (*ctxt).sax.as_deref_mut().unwrap();
                         if matches!(level, XmlErrorLevel::XmlErrWarning) {
-                            channel = (*(*ctxt).sax).warning;
+                            channel = sax.warning;
                         } else {
-                            channel = (*(*ctxt).sax).error;
+                            channel = sax.error;
                         }
                         channel.map(|c| (c, error, Cow::<'static, str>::Owned(msg.to_owned()), (*ctxt).user_data.clone()))
                     } else if channel.is_none() {

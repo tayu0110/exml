@@ -28,7 +28,7 @@ use std::{
     cell::RefCell,
     ffi::{c_char, CStr},
     io::{self, Write},
-    mem::{size_of, size_of_val, zeroed},
+    mem::{size_of, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     rc::Rc,
@@ -546,8 +546,8 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
                 (*ctxt).my_doc = html_new_doc_no_dtd(null_mut(), null_mut());
             }
             if (*ctxt).my_doc.is_null() {
-                if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
-                    (*(*ctxt).sax).error.unwrap()(
+                if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {
+                    error(
                         (*ctxt).user_data.clone(),
                         "SAX.startDocument(): out of memory\n",
                     );
@@ -582,8 +582,8 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
                 (*doc).standalone = (*ctxt).standalone;
             }
         } else {
-            if !(*ctxt).sax.is_null() && (*(*ctxt).sax).error.is_some() {
-                (*(*ctxt).sax).error.unwrap()(
+            if let Some(error) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.error) {
+                error(
                     (*ctxt).user_data.clone(),
                     "SAX.startDocument(): out of memory\n",
                 );
@@ -615,20 +615,14 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
     doc: *mut XmlDocPtr,
     compression: i32,
 ) -> XmlTextWriterPtr<'static> {
-    let mut sax_handler: XmlSAXHandler = unsafe { zeroed() };
-
-    memset(
-        addr_of_mut!(sax_handler) as _,
-        b'\0' as _,
-        size_of_val(&sax_handler),
-    );
-    xml_sax2_init_default_sax_handler(addr_of_mut!(sax_handler), 1);
+    let mut sax_handler = XmlSAXHandler::default();
+    xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
     sax_handler.start_document = Some(xml_text_writer_start_document_callback);
     sax_handler.start_element = Some(xml_sax2_start_element);
     sax_handler.end_element = Some(xml_sax2_end_element);
 
     let ctxt: XmlParserCtxtPtr =
-        xml_create_push_parser_ctxt(addr_of_mut!(sax_handler), None, null_mut(), 0, null_mut());
+        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, null_mut());
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -637,10 +631,7 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
         );
         return null_mut();
     }
-    /*
-     * For some reason this seems to completely break if node names
-     * are interned.
-     */
+    // For some reason this seems to completely break if node names are interned.
     (*ctxt).dict_names = 0;
 
     (*ctxt).my_doc = xml_new_doc(Some(XML_DEFAULT_VERSION));
@@ -680,13 +671,11 @@ pub unsafe extern "C" fn xml_new_text_writer_doc(
 ///
 /// Returns the new xmlTextWriterPtr or NULL in case of error
 #[doc(alias = "xmlNewTextWriterTree")]
-pub unsafe extern "C" fn xml_new_text_writer_tree(
+pub unsafe fn xml_new_text_writer_tree(
     doc: XmlDocPtr,
     node: XmlNodePtr,
     compression: i32,
 ) -> XmlTextWriterPtr<'static> {
-    let mut sax_handler: XmlSAXHandler = unsafe { zeroed() };
-
     if doc.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -696,18 +685,14 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
         return null_mut();
     }
 
-    memset(
-        addr_of_mut!(sax_handler) as _,
-        b'\0' as _,
-        size_of_val(&sax_handler),
-    );
-    xml_sax2_init_default_sax_handler(addr_of_mut!(sax_handler), 1);
+    let mut sax_handler = XmlSAXHandler::default();
+    xml_sax2_init_default_sax_handler(&mut sax_handler, 1);
     sax_handler.start_document = Some(xml_text_writer_start_document_callback);
     sax_handler.start_element = Some(xml_sax2_start_element);
     sax_handler.end_element = Some(xml_sax2_end_element);
 
     let ctxt: XmlParserCtxtPtr =
-        xml_create_push_parser_ctxt(addr_of_mut!(sax_handler), None, null_mut(), 0, null_mut());
+        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, null_mut());
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -741,7 +726,7 @@ pub unsafe extern "C" fn xml_new_text_writer_tree(
 
 /// Deallocate all the resources associated to the writer
 #[doc(alias = "xmlFreeTextWriter")]
-pub unsafe extern "C" fn xml_free_text_writer(writer: XmlTextWriterPtr) {
+pub unsafe fn xml_free_text_writer(writer: XmlTextWriterPtr) {
     if writer.is_null() {
         return;
     }
@@ -1320,9 +1305,8 @@ pub unsafe fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> io::Resul
             // Output namespace declarations
             sum += xml_text_writer_output_nsdecl(writer)?;
 
-            if (*writer).indent != 0
-            /* next element needs indent */
-            {
+            // next element needs indent
+            if (*writer).indent != 0 {
                 (*writer).doindent = 1;
             }
             sum += (*writer).out.write_str("/>")?;
