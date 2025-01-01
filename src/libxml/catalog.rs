@@ -61,14 +61,12 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         globals::xml_free,
-        parser::{
-            xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr,
-            XmlParserInputPtr,
-        },
+        parser::{xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr},
         parser_internals::{xml_new_input_stream, XML_MAX_NAMELEN},
         threads::xml_get_thread_id,
         xmlstring::{xml_str_equal, XmlChar},
     },
+    parser::XmlParserInputPtr,
     tree::{
         xml_free_doc, xml_free_ns, xml_new_doc, xml_new_doc_node, xml_new_dtd, xml_new_ns,
         NodeCommon, XmlDocPtr, XmlDtdPtr, XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,

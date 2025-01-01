@@ -36,12 +36,13 @@ use crate::{
     libxml::{
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
-        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlSAXLocatorPtr},
+        parser::{XmlParserCtxtPtr, XmlParserInputState, XmlSAXLocatorPtr},
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
         },
         xmlstring::XmlChar,
     },
+    parser::XmlParserInputPtr,
     tree::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,

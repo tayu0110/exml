@@ -55,8 +55,8 @@ use crate::{
         parser::{
             xml_ctxt_read_file, xml_ctxt_read_memory, xml_free_parser_ctxt,
             xml_new_io_input_stream, xml_new_parser_ctxt, xml_new_sax_parser_ctxt,
-            xml_parse_document, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption,
-            XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            xml_parse_document, XmlParserCtxtPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
+            XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         pattern::{
             xml_free_pattern, xml_free_stream_ctxt, xml_pattern_get_stream_ctxt,
@@ -139,6 +139,7 @@ use crate::{
             xml_strlen, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
         },
     },
+    parser::XmlParserInputPtr,
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,

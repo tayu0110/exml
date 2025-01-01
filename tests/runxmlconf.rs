@@ -20,7 +20,7 @@ use exml::{
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader, XmlParserCtxtPtr,
-            XmlParserInputPtr, XmlParserOption,
+            XmlParserOption,
         },
         parser_internals::xml_new_input_from_file,
         xmlmemory::{
@@ -29,6 +29,7 @@ use exml::{
         },
         xmlstring::xml_str_equal,
     },
+    parser::XmlParserInputPtr,
     tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,

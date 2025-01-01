@@ -26,8 +26,7 @@ use exml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
-            xml_new_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
-            XmlParserInputPtr, XmlParserOption,
+            xml_new_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserOption,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -35,6 +34,7 @@ use exml::{
         },
         xmlstring::{xml_strlen, XmlChar},
     },
+    parser::XmlParserInputPtr,
     tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
@@ -167,7 +167,7 @@ static mut NB_ERRORS: c_int = 0;
 static mut NB_LEAKS: c_int = 0;
 static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
 
-unsafe extern "C" fn fatal_error() -> c_int {
+unsafe fn fatal_error() -> c_int {
     eprintln!("Exitting tests on fatal error");
     exit(1);
 }
@@ -347,7 +347,7 @@ fn test_structured_error_handler(_ctx: Option<GenericErrorContext>, err: &XmlErr
     }
 }
 
-unsafe extern "C" fn initialize_libxml2() {
+unsafe fn initialize_libxml2() {
     set_get_warnings_default_value(0);
     set_pedantic_parser_default_value(0);
 
@@ -947,7 +947,7 @@ unsafe fn launch_tests(tst: &TestDesc) -> c_int {
 static mut VERBOSE: c_int = 0;
 static mut TESTS_QUIET: c_int = 0;
 
-unsafe extern "C" fn runtest(i: usize) -> c_int {
+unsafe fn runtest(i: usize) -> c_int {
     let mut ret: c_int = 0;
 
     let old_errors: c_int = NB_ERRORS;

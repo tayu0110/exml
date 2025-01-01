@@ -23,7 +23,7 @@ use exml::{
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
             xml_new_sax_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
-            XmlParserInputPtr, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         xmlmemory::{
@@ -32,6 +32,7 @@ use exml::{
         },
         xmlstring::XmlChar,
     },
+    parser::XmlParserInputPtr,
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
@@ -39,7 +40,7 @@ use exml::{
 };
 use libc::{memcpy, strlen, strncmp};
 
-/* maximum time for one parsing before declaring a timeout */
+// maximum time for one parsing before declaring a timeout
 const MAX_TIME: u64 = 2; /* seconds */
 
 thread_local! {

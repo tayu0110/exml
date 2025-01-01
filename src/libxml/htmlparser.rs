@@ -46,8 +46,7 @@ use crate::{
         parser::{
             xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
             xml_new_io_input_stream, xml_parser_add_node_info, XmlParserCtxt, XmlParserCtxtPtr,
-            XmlParserInput, XmlParserInputPtr, XmlParserInputState, XmlParserOption, XmlSAXHandler,
-            XmlSAXHandlerPtr,
+            XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
         },
         parser_internals::{
             xml_free_input_stream, xml_new_input_stream, xml_switch_encoding, INPUT_CHUNK,
@@ -60,7 +59,7 @@ use crate::{
             XmlChar,
         },
     },
-    parser::XmlParserNodeInfo,
+    parser::{XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo},
     tree::{
         xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlNodePtr,

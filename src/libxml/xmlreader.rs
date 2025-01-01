@@ -49,8 +49,8 @@ use crate::{
             xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
             xml_free_parser_ctxt, xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc,
             EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc,
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            XmlParserCtxtPtr, XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler,
+            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
@@ -3389,6 +3389,7 @@ pub unsafe fn xml_text_reader_setup(
         encoding::{find_encoding_handler, XmlCharEncoding},
         generic_error,
         libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
+        parser::XmlParserInputPtr,
     };
 
     if reader.is_null() {
@@ -5641,10 +5642,10 @@ pub type XmlTextReaderErrorFunc = unsafe fn(
 /// Returns the line number or -1 in case of error.
 #[doc(alias = "xmlTextReaderLocatorLineNumber")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_locator_line_number(
-    locator: XmlTextReaderLocatorPtr,
-) -> i32 {
-    /* we know that locator is a xmlParserCtxtPtr */
+pub unsafe fn xml_text_reader_locator_line_number(locator: XmlTextReaderLocatorPtr) -> i32 {
+    // we know that locator is a xmlParserCtxtPtr
+
+    use crate::parser::XmlParserInputPtr;
     let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
     let ret: i32;
 
@@ -5654,7 +5655,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
     if !(*ctx).node.is_null() {
         ret = (*(*ctx).node).get_line_no() as _;
     } else {
-        /* inspired from error.c */
+        // inspired from error.c
         let mut input: XmlParserInputPtr;
         input = (*ctx).input;
         if (*input).filename.is_none() && (*ctx).input_tab.len() > 1 {
@@ -5675,14 +5676,12 @@ pub unsafe extern "C" fn xml_text_reader_locator_line_number(
 /// Returns the base URI or NULL in case of error, if non NULL it need to be freed by the caller.
 #[doc(alias = "xmlTextReaderLocatorBaseURI")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
-    locator: XmlTextReaderLocatorPtr,
-) -> *mut XmlChar {
-    /* we know that locator is a xmlParserCtxtPtr */
+pub unsafe fn xml_text_reader_locator_base_uri(locator: XmlTextReaderLocatorPtr) -> *mut XmlChar {
+    // we know that locator is a xmlParserCtxtPtr
 
     use std::ffi::CString;
 
-    use crate::tree::NodeCommon;
+    use crate::{parser::XmlParserInputPtr, tree::NodeCommon};
     let ctx: XmlParserCtxtPtr = locator as XmlParserCtxtPtr;
     let ret: *mut XmlChar;
 
@@ -5695,7 +5694,7 @@ pub unsafe extern "C" fn xml_text_reader_locator_base_uri(
             .map(|c| CString::new(c).unwrap());
         ret = xml_strdup(tmp.as_ref().map_or(null_mut(), |t| t.as_ptr() as *const u8));
     } else {
-        /* inspired from error.c */
+        // inspired from error.c
         let mut input: XmlParserInputPtr;
         input = (*ctx).input;
         if (*input).filename.is_none() && (*ctx).input_tab.len() > 1 {

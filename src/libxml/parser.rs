@@ -49,7 +49,6 @@ use std::{
     ffi::{c_char, c_void, CStr, CString},
     io::Read,
     mem::{size_of, take},
-    ops::DerefMut,
     ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
     rc::Rc,
     slice::from_raw_parts,
@@ -67,7 +66,7 @@ use crate::{
             xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free,
             xml_buf_set_allocation_scheme,
         },
-        xml_buf_overflow_error, XmlBufRef,
+        XmlBufRef,
     },
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{
@@ -131,7 +130,7 @@ use crate::{
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
-    parser::{XmlParserCharValid, XmlParserNodeInfo, XmlParserNodeInfoSeq},
+    parser::{XmlParserCharValid, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq},
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
@@ -206,131 +205,6 @@ pub(crate) const XML_DEFAULT_VERSION: &str = "1.0";
 /// Callback for freeing some parser input allocations.
 #[doc(alias = "xmlParserInputDeallocate")]
 pub type XmlParserInputDeallocate = unsafe extern "C" fn(*mut XmlChar) -> c_void;
-
-pub type XmlParserInputPtr = *mut XmlParserInput;
-/// An xmlParserInput is an input flow for the XML processor.
-/// Each entity parsed is associated an xmlParserInput (except the
-/// few predefined ones). This is the case both for internal entities
-/// - in which case the flow is already completely in memory  
-/// - or external entities  
-/// - in which case we use the buf structure for
-///   progressive reading and I18N conversions to the internal UTF-8 format.
-#[doc(alias = "xmlParserInput")]
-#[repr(C)]
-pub struct XmlParserInput {
-    /* Input buffer */
-    pub buf: Option<Rc<RefCell<XmlParserInputBuffer>>>, /* UTF-8 encoded buffer */
-    pub filename: Option<String>,                       /* The file analyzed, if any */
-    pub(crate) directory: Option<String>,               /* the directory/base of the file */
-    pub base: *const XmlChar,                           /* Base of the array to parse */
-    pub cur: *const XmlChar,                            /* Current c_char being parsed */
-    pub end: *const XmlChar,                            /* end of the array to parse */
-    pub(crate) length: i32,                             /* length if known */
-    pub line: i32,                                      /* Current line */
-    pub(crate) col: i32,                                /* Current column */
-    pub consumed: u64,                                  /* How many xmlChars already consumed */
-    pub(crate) free: Option<XmlParserInputDeallocate>,  /* function to deallocate the base */
-    pub(crate) encoding: Option<String>,                /* the encoding string for entity */
-    pub(crate) version: Option<String>,                 /* the version string for entity */
-    pub(crate) standalone: i32,                         /* Was that entity marked standalone */
-    pub(crate) id: i32,                                 /* an unique identifier for the entity */
-    pub(crate) parent_consumed: u64,                    /* consumed bytes from parents */
-    pub(crate) entity: XmlEntityPtr,                    /* entity, if any */
-}
-
-impl XmlParserInput {
-    /// Update the input to use the current set of pointers from the buffer.
-    ///
-    /// Returns `-1` in case of error, `0` otherwise
-    #[doc(alias = "xmlBufResetInput")]
-    pub(crate) fn reset_base(&mut self) -> i32 {
-        let Some(mut buffer) = self
-            .buf
-            .as_ref()
-            .and_then(|buf| buf.borrow().buffer)
-            .filter(|buf| buf.is_ok())
-        else {
-            return -1;
-        };
-        self.base = buffer.as_mut_ptr();
-        self.cur = buffer.as_mut_ptr();
-        unsafe {
-            self.end = buffer.as_mut_ptr().add(buffer.len());
-        }
-        0
-    }
-
-    /// Returns the distance between the base and the top of the buffer.
-    #[doc(alias = "xmlBufGetInputBase")]
-    pub(crate) fn get_base(&self) -> usize {
-        let Some(mut buffer) = self
-            .buf
-            .as_ref()
-            .and_then(|buf| buf.borrow().buffer)
-            .filter(|buf| buf.is_ok())
-        else {
-            return 0;
-        };
-        unsafe {
-            let mut base = self.base.offset_from(buffer.as_mut_ptr()) as usize;
-            if base > buffer.capacity() {
-                xml_buf_overflow_error(buffer.deref_mut(), "Input reference outside of the buffer");
-                base = 0;
-            }
-            base
-        }
-    }
-
-    /// Update the input to use the base and cur relative to the buffer
-    /// after a possible reallocation of its content
-    ///
-    /// Returns -1 in case of error, 0 otherwise
-    #[doc(alias = "xmlBufSetInputBaseCur")]
-    pub(crate) fn set_base_and_cursor(&mut self, base: usize, cur: usize) -> i32 {
-        let Some(mut buffer) = self
-            .buf
-            .as_ref()
-            .and_then(|buf| buf.borrow().buffer)
-            .filter(|buf| buf.is_ok())
-        else {
-            self.base = c"".as_ptr() as _;
-            self.cur = self.base;
-            self.end = self.base;
-            return -1;
-        };
-
-        unsafe {
-            self.base = buffer.as_mut_ptr().add(base);
-            self.cur = self.base.add(cur);
-            self.end = buffer.as_mut_ptr().add(buffer.len());
-        }
-        0
-    }
-}
-
-impl Default for XmlParserInput {
-    fn default() -> Self {
-        Self {
-            buf: None,
-            filename: None,
-            directory: None,
-            base: null(),
-            cur: null(),
-            end: null(),
-            length: 0,
-            line: 0,
-            col: 0,
-            consumed: 0,
-            free: None,
-            encoding: None,
-            version: None,
-            standalone: 0,
-            id: 0,
-            parent_consumed: 0,
-            entity: null_mut(),
-        }
-    }
-}
 
 /// The parser is now working also as a state based parser.
 /// The recursive one use the state info for entities processing.
@@ -9554,74 +9428,6 @@ pub(crate) unsafe fn xml_parser_find_node_info(
     Some((*ctxt).node_seq[pos].clone())
 }
 
-// /// -- Initialize (set to initial state) node info sequence
-// #[doc(alias = "xmlInitNodeInfoSeq")]
-// pub(crate) unsafe fn xml_init_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
-//     if seq.is_null() {
-//         return;
-//     }
-//     (*seq).length = 0;
-//     (*seq).maximum = 0;
-//     (*seq).buffer = null_mut();
-// }
-
-// /// -- Clear (release memory and reinitialize) node
-// ///   info sequence
-// #[doc(alias = "xmlClearNodeInfoSeq")]
-// pub(crate) unsafe fn xml_clear_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
-//     if seq.is_null() {
-//         return;
-//     }
-//     if !(*seq).buffer.is_null() {
-//         xml_free((*seq).buffer as _);
-//     }
-//     xml_init_node_info_seq(seq);
-// }
-
-// /// Find the index that the info record for the given node is or should be at in a sorted sequence
-// ///
-// /// Returns a long indicating the position of the record
-// #[doc(alias = "xmlParserFindNodeInfoIndex")]
-// pub(crate) unsafe fn xml_parser_find_node_info_index(
-//     seq: XmlParserNodeInfoSeqPtr,
-//     node: XmlNodePtr,
-// ) -> u64 {
-//     let mut upper: u64;
-//     let mut lower: u64;
-//     let mut middle: u64;
-//     let mut found: i32 = 0;
-
-//     if seq.is_null() || node.is_null() {
-//         return u64::MAX;
-//     }
-
-//     // Do a binary search for the key
-//     lower = 1;
-//     upper = (*seq).length;
-//     middle = 0;
-//     while lower <= upper && found == 0 {
-//         middle = lower + (upper - lower) / 2;
-//         match node.cmp(&((*(*seq).buffer.add(middle as usize - 1)).node as _)) {
-//             std::cmp::Ordering::Equal => {
-//                 found = 1;
-//             }
-//             std::cmp::Ordering::Less => {
-//                 upper = middle - 1;
-//             }
-//             std::cmp::Ordering::Greater => {
-//                 lower = middle + 1;
-//             }
-//         }
-//     }
-
-//     // Return position
-//     if middle == 0 || (*(*seq).buffer.add(middle as usize - 1)).node < node {
-//         middle
-//     } else {
-//         middle - 1
-//     }
-// }
-
 /// Insert node info record into the sorted sequence
 #[doc(alias = "xmlParserAddNodeInfo")]
 pub(crate) unsafe fn xml_parser_add_node_info(
@@ -9689,7 +9495,7 @@ pub unsafe fn xml_load_external_entity(
 /// Returns the index in bytes from the beginning of the entity or -1
 /// in case the index could not be computed.
 #[doc(alias = "xmlByteConsumed")]
-pub unsafe extern "C" fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
+pub unsafe fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
     if ctxt.is_null() {
         return -1;
     }

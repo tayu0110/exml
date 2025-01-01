@@ -58,10 +58,11 @@ use crate::{
         __xml_simple_oom_error,
     },
     libxml::{
-        parser::{XmlParserCtxtPtr, XmlParserInputPtr, XmlParserInputState, XmlParserOption},
+        parser::{XmlParserCtxtPtr, XmlParserInputState, XmlParserOption},
         parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
     },
     nanohttp::XmlNanoHTTPCtxt,
+    parser::XmlParserInputPtr,
     uri::canonic_path,
 };
 
@@ -382,7 +383,7 @@ pub(crate) use __xml_loader_err;
 ///
 /// Returns the input or NULL in case of HTTP error.
 #[doc(alias = "xmlCheckHTTPInput")]
-pub unsafe extern "C" fn xml_check_http_input(
+pub unsafe fn xml_check_http_input(
     ctxt: XmlParserCtxtPtr,
     mut ret: XmlParserInputPtr,
 ) -> XmlParserInputPtr {

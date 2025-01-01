@@ -20,22 +20,21 @@ use exml::{
         globals::{xml_free, xml_malloc},
         parser::{
             xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
-            xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
+            xml_read_memory, XmlParserCtxtPtr,
         },
         parser_internals::xml_new_input_stream,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
+    parser::XmlParserInputPtr,
     tree::{xml_free_doc, NodeCommon, XmlDocPtr},
 };
 use libc::{memset, strlen};
 
-/**
- * Test the UTF-8 decoding routines
- *
- * author: Daniel Veillard
- * copy: see Copyright for the status of this software.
- */
+/// Test the UTF-8 decoding routines
+///
+/// author: Daniel Veillard
+/// copy: see Copyright for the status of this software.
 
 static LAST_ERROR: RwLock<XmlParserErrors> = RwLock::new(XmlParserErrors::XmlErrOK);
 
@@ -69,7 +68,7 @@ static mut DOCUMENT2: [c_char; 100] = {
     buf
 };
 
-unsafe extern "C" fn test_document_range_byte1(
+unsafe fn test_document_range_byte1(
     ctxt: XmlParserCtxtPtr,
     document: *mut c_char,
     len: c_int,
@@ -118,7 +117,7 @@ unsafe extern "C" fn test_document_range_byte1(
     0
 }
 
-unsafe extern "C" fn test_document_range_byte2(
+unsafe fn test_document_range_byte2(
     ctxt: XmlParserCtxtPtr,
     document: *mut c_char,
     len: c_int,
@@ -137,46 +136,35 @@ unsafe extern "C" fn test_document_range_byte2(
             let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
-            /* if first bit of first c_char is set, then second bit must too */
             if i & 0x80 != 0 && i & 0x40 == 0 {
+                // if first bit of first c_char is set, then second bit must too
                 assert!(
                     !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
-            }
-            /*
-             * if first bit of first c_char is set, then second c_char first
-             * bits must be 10
-             */
-            else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
+            } else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
+                // if first bit of first c_char is set, then second c_char first
+                // bits must be 10
                 assert!(
                     !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
-            }
-            /*
-             * if using a 2 byte encoding then the value must be greater
-             * than 0x80, i.e. one of bits 5 to 1 of i must be set
-             */
-            else if i & 0x80 != 0 && i & 0x1E == 0 {
+            } else if i & 0x80 != 0 && i & 0x1E == 0 {
+                // if using a 2 byte encoding then the value must be greater
+                // than 0x80, i.e. one of bits 5 to 1 of i must be set
                 assert!(
                     !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 )
-            }
-            /*
-             * if third bit of first c_char is set, then the sequence would need
-             * at least 3 bytes, but we give only 2 !
-             */
-            else if i & 0xE0 == 0xE0 {
+            } else if i & 0xE0 == 0xE0 {
+                // if third bit of first c_char is set, then the sequence would need
+                // at least 3 bytes, but we give only 2 !
                 assert!(
                     !last_error.is_ok() && res.is_null(),
                     "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}"
                 );
             } else {
-                /*
-                 * We should see no error in remaining cases
-                 */
+                // We should see no error in remaining cases
                 assert!(
                     last_error.is_ok() && !res.is_null(),
                     "Failed to parse document for Bytes 0x{i:02X} 0x{j:02X}"
@@ -190,23 +178,17 @@ unsafe extern "C" fn test_document_range_byte2(
     0
 }
 
-/**
- * testDocumentRanges:
- *
- * Test the correct UTF8 character parsing in context of XML documents
- * Those are in-context injection tests checking the parser behaviour on
- * edge case values at different point in content, beginning and end of
- * CDATA in text or in attribute values.
- */
-
-unsafe extern "C" fn test_document_ranges() -> c_int {
+/// Test the correct UTF8 character parsing in context of XML documents
+/// Those are in-context injection tests checking the parser behaviour on
+/// edge case values at different point in content, beginning and end of
+/// CDATA in text or in attribute values.
+#[doc(alias = "testDocumentRanges")]
+unsafe fn test_document_ranges() -> c_int {
     let mut data: *mut c_char;
     let test_ret: c_int = 0;
 
-    /*
-     * Set up a parsing context using the first document as
-     * the current input source.
-     */
+    // Set up a parsing context using the first document as
+    // the current input source.
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     if ctxt.is_null() {
         eprintln!("Failed to allocate parser context");
@@ -221,7 +203,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 1 byte injection at beginning of area */
+    // test 1 byte injection at beginning of area
     assert_eq!(
         test_document_range_byte1(
             ctxt,
@@ -240,7 +222,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 1 byte injection at end of area */
+    // test 1 byte injection at end of area
     assert_eq!(
         test_document_range_byte1(
             ctxt,
@@ -261,7 +243,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 1 byte injection at beginning of area */
+    // test 1 byte injection at beginning of area
     assert_eq!(
         test_document_range_byte1(
             ctxt,
@@ -280,7 +262,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 1 byte injection at end of area */
+    // test 1 byte injection at end of area
     assert_eq!(
         test_document_range_byte1(
             ctxt,
@@ -302,7 +284,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 2 byte injection at beginning of area */
+    // test 2 byte injection at beginning of area
     assert_eq!(
         test_document_range_byte2(
             ctxt,
@@ -319,7 +301,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 2 byte injection at end of area */
+    // test 2 byte injection at end of area
     assert_eq!(
         test_document_range_byte2(
             ctxt,
@@ -338,7 +320,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 2 byte injection at beginning of area */
+    // test 2 byte injection at beginning of area
     assert_eq!(
         test_document_range_byte2(
             ctxt,
@@ -355,7 +337,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     *data.add(1) = b' ' as _;
     *data.add(2) = b' ' as _;
     *data.add(3) = b' ' as _;
-    /* test 2 byte injection at end of area */
+    // test 2 byte injection at end of area
     assert_eq!(
         test_document_range_byte2(
             ctxt,
@@ -372,7 +354,7 @@ unsafe extern "C" fn test_document_ranges() -> c_int {
     test_ret
 }
 
-unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
 
     *data.add(1) = 0;
@@ -387,7 +369,7 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
         let mut len = 0;
         let c = (*ctxt).current_char(&mut len).unwrap_or('\0');
         if i == 0 || i >= 0x80 {
-            /* we must see an error there */
+            // we must see an error there
             if *LAST_ERROR.read().unwrap() != XmlParserErrors::XmlErrInvalidChar {
                 eprintln!("Failed to detect invalid char for Byte 0x{i:02X}");
                 return 1;
@@ -405,7 +387,7 @@ unsafe extern "C" fn test_char_range_byte1(ctxt: XmlParserCtxtPtr) -> c_int {
     0
 }
 
-unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
 
     *data.add(2) = 0;
@@ -423,54 +405,39 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
             let last_error = *LAST_ERROR.read().unwrap();
 
             #[allow(clippy::if_same_then_else)]
-            /* if first bit of first c_char is set, then second bit must too */
             if i & 0x80 != 0 && i & 0x40 == 0 {
+                // if first bit of first c_char is set, then second bit must too
                 if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}");
                     return 1;
                 }
-            }
-            /*
-             * if first bit of first c_char is set, then second c_char first
-             * bits must be 10
-             */
-            else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
+            } else if i & 0x80 != 0 && j & 0xC0 != 0x80 {
+                // if first bit of first c_char is set, then second c_char first
+                // bits must be 10
                 if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}: {c}");
                     return 1;
                 }
-            }
-            /*
-             * if using a 2 byte encoding then the value must be greater
-             * than 0x80, i.e. one of bits 5 to 1 of i must be set
-             */
-            else if i & 0x80 != 0 && i & 0x1E == 0 {
+            } else if i & 0x80 != 0 && i & 0x1E == 0 {
+                // if using a 2 byte encoding then the value must be greater
+                // than 0x80, i.e. one of bits 5 to 1 of i must be set
                 if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X}: {c}");
                     return 1;
                 }
-            }
-            /*
-             * if third bit of first c_char is set, then the sequence would need
-             * at least 3 bytes, but we give only 2 !
-             */
-            else if i & 0xE0 == 0xE0 {
+            } else if i & 0xE0 == 0xE0 {
+                // if third bit of first c_char is set, then the sequence would need
+                // at least 3 bytes, but we give only 2 !
                 if last_error != XmlParserErrors::XmlErrInvalidChar {
                     eprintln!("Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x00");
                     return 1;
                 }
-            }
-            /*
-             * We should see no error in remaining cases
-             */
-            else if !last_error.is_ok() || len != 2 {
+            } else if !last_error.is_ok() || len != 2 {
+                // We should see no error in remaining cases
                 eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X}",);
                 return 1;
-            }
-            /*
-             * Finally check the value is right
-             */
-            else if c as i32 != (j & 0x3F) + ((i & 0x1F) << 6) {
+            } else if c as i32 != (j & 0x3F) + ((i & 0x1F) << 6) {
+                // Finally check the value is right
                 eprintln!(
                     "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X}: expect {} got {c}",
                     (j & 0x3F) + ((i & 0x1F) << 6),
@@ -482,7 +449,7 @@ unsafe extern "C" fn test_char_range_byte2(ctxt: XmlParserCtxtPtr) -> c_int {
     0
 }
 
-unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
     let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
 
@@ -504,11 +471,9 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                 let last_error = *LAST_ERROR.read().unwrap();
 
                 #[allow(clippy::if_same_then_else)]
-                /*
-                 * if fourth bit of first c_char is set, then the sequence would need
-                 * at least 4 bytes, but we give only 3 !
-                 */
                 if i & 0xF0 == 0xF0 {
+                    // if fourth bit of first c_char is set, then the sequence would need
+                    // at least 4 bytes, but we give only 3 !
                     if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!(
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{:02X}",
@@ -516,51 +481,38 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
                         );
                         return 1;
                     }
-                }
-                /*
-                 * The second and the third bytes must start with 10
-                 */
-                else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 {
+                } else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 {
+                    // The second and the third bytes must start with 10
                     if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!(
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}"
                         );
                         return 1;
                     }
-                }
-                /*
-                 * if using a 3 byte encoding then the value must be greater
-                 * than 0x800, i.e. one of bits 4 to 0 of i must be set or
-                 * the 6th byte of data[1] must be set
-                 */
-                else if i & 0xF == 0 && j & 0x20 == 0 {
+                } else if i & 0xF == 0 && j & 0x20 == 0 {
+                    // if using a 3 byte encoding then the value must be greater
+                    // than 0x800, i.e. one of bits 4 to 0 of i must be set or
+                    // the 6th byte of data[1] must be set
                     if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!(
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}"
                         );
                         return 1;
                     }
-                }
-                /*
-                 * There are values in that range that are not allowed in XML-1.0
-                 */
-                else if (value > 0xD7FF && value < 0xE000) || (value > 0xFFFD && value < 0x10000)
+                } else if (value > 0xD7FF && value < 0xE000) || (value > 0xFFFD && value < 0x10000)
                 {
+                    // There are values in that range that are not allowed in XML-1.0
                     if last_error != XmlParserErrors::XmlErrInvalidChar {
                         eprintln!("Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
                         return 1;
                     }
                 } else {
-                    /*
-                     * We should see no error in remaining cases
-                     */
+                    // We should see no error in remaining cases
                     assert!(
                         last_error.is_ok() && len == 3,
                         "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}",
                     );
-                    /*
-                     * Finally check the value is right
-                     */
+                    // Finally check the value is right
                     assert!(c as i32 == value,
                         "Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{:02X}: expect {value} got {c}",
                         *data.add(2)
@@ -572,7 +524,7 @@ unsafe extern "C" fn test_char_range_byte3(ctxt: XmlParserCtxtPtr) -> c_int {
     0
 }
 
-unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
+unsafe fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
     let lows: [c_uchar; 6] = [0, 0x80, 0x81, 0xC1, 0xFF, 0xBF];
     let data: *mut c_char = (*(*ctxt).input).cur as *mut c_char;
 
@@ -598,49 +550,32 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
                     let last_error = *LAST_ERROR.read().unwrap();
 
                     #[allow(clippy::if_same_then_else)]
-                    /*
-                     * if fifth bit of first c_char is set, then the sequence would need
-                     * at least 5 bytes, but we give only 4 !
-                     */
                     if i & 0xF8 == 0xF8 {
+                        // if fifth bit of first c_char is set, then the sequence would need
+                        // at least 5 bytes, but we give only 4 !
                         assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar,
                             "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{:02X}", *data.add(3)
                         );
-                    }
-                    /*
-                     * The second, third and fourth bytes must start with 10
-                     */
-                    else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 || nl & 0xC0 != 0x80 {
+                    } else if j & 0xC0 != 0x80 || nk & 0xC0 != 0x80 || nl & 0xC0 != 0x80 {
+                        // The second, third and fourth bytes must start with 10
                         assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar, "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
-                    }
-                    /*
-                     * if using a 3 byte encoding then the value must be greater
-                     * than 0x10000, i.e. one of bits 3 to 0 of i must be set or
-                     * the 6 or 5th byte of j must be set
-                     */
-                    else if i & 0x7 == 0 && j & 0x30 == 0 {
+                    } else if i & 0x7 == 0 && j & 0x30 == 0 {
+                        // if using a 3 byte encoding then the value must be greater
+                        // than 0x10000, i.e. one of bits 3 to 0 of i must be set or
+                        // the 6 or 5th byte of j must be set
                         assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar, "Failed to detect invalid char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
-                    }
-                    /*
-                     * There are values in that range that are not allowed in XML-1.0
-                     */
-                    else if (value > 0xD7FF && value < 0xE000)
+                    } else if (value > 0xD7FF && value < 0xE000)
                         || (value > 0xFFFD && value < 0x10000)
                         || value > 0x10FFFF
                     {
+                        // There are values in that range that are not allowed in XML-1.0
                         assert_eq!(last_error, XmlParserErrors::XmlErrInvalidChar, "Failed to detect invalid char 0x{value:04X} for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X} 0x{nl:02X}");
-                    }
-                    /*
-                     * We should see no error in remaining cases
-                     */
-                    else if !last_error.is_ok() || len != 4 {
+                    } else if !last_error.is_ok() || len != 4 {
+                        // We should see no error in remaining cases
                         eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{nk:02X}");
                         return 1;
-                    }
-                    /*
-                     * Finally check the value is right
-                     */
-                    else if c as i32 != value {
+                    } else if c as i32 != value {
+                        // Finally check the value is right
                         eprintln!("Failed to parse char for Bytes 0x{i:02X} 0x{j:02X} 0x{:02X}: expect {value} got {c}", *data.add(2) as i32);
                         return 1;
                     }
@@ -651,24 +586,18 @@ unsafe extern "C" fn test_char_range_byte4(ctxt: XmlParserCtxtPtr) -> c_int {
     0
 }
 
-/**
- * testCharRanges:
- *
- * Test the correct UTF8 character parsing in isolation i.e.
- * not when parsing a full document, this is less expensive and we can
- * cover the full range of UTF-8 chars accepted by XML-1.0
- */
-
-unsafe extern "C" fn test_char_ranges() -> c_int {
+/// Test the correct UTF8 character parsing in isolation i.e.
+/// not when parsing a full document, this is less expensive and we can
+/// cover the full range of UTF-8 chars accepted by XML-1.0
+#[doc(alias = "testCharRanges")]
+unsafe fn test_char_ranges() -> c_int {
     let mut data: [u8; 5] = [0; 5];
     let mut test_ret: c_int = 0;
 
     memset(data.as_mut_ptr() as _, 0, 5);
 
-    /*
-     * Set up a parsing context using the above data buffer as
-     * the current input source.
-     */
+    // Set up a parsing context using the above data buffer as
+    // the current input source.
     let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
     assert!(!ctxt.is_null(), "Failed to allocate parser context");
     let Some(buf) = XmlParserInputBuffer::from_memory(data.to_vec(), XmlCharEncoding::None) else {
@@ -717,12 +646,10 @@ unsafe extern "C" fn test_char_ranges() -> c_int {
     test_ret
 }
 
-unsafe extern "C" fn test_user_encoding() -> c_int {
-    /*
-     * Create a document encoded as UTF-16LE with an ISO-8859-1 encoding
-     * declaration, then parse it with xmlReadMemory and the encoding
-     * argument set to UTF-16LE.
-     */
+unsafe fn test_user_encoding() -> c_int {
+    // Create a document encoded as UTF-16LE with an ISO-8859-1 encoding
+    // declaration, then parse it with xmlReadMemory and the encoding
+    // argument set to UTF-16LE.
     let start: *const c_char = c"<?xml version='1.0' encoding='ISO-8859-1'?><d>".as_ptr();
     let end: *const c_char = c"</d>".as_ptr();
     let start_size: c_int = strlen(start) as _;
@@ -785,22 +712,16 @@ unsafe extern "C" fn test_user_encoding() -> c_int {
 
 #[test]
 fn main() {
-    /*
-     * this initialize the library and check potential ABI mismatches
-     * between the version it was compiled for and the actual shared
-     * library used.
-     */
+    // this initialize the library and check potential ABI mismatches
+    // between the version it was compiled for and the actual shared
+    // library used.
     // LIBXML_TEST_VERSION
 
-    /*
-     * Catch errors separately
-     */
+    // Catch errors separately
 
     set_structured_error(Some(error_handler), None);
     unsafe {
-        /*
-         * Run the tests
-         */
+        // Run the tests
         assert!(
             test_char_ranges() == 0,
             "Failed to pass 'test_char_ranges()'"
@@ -814,13 +735,9 @@ fn main() {
             "Failed to pass 'test_user_encoding()'"
         );
 
-        /*
-         * Cleanup function for the XML library.
-         */
+        // Cleanup function for the XML library.
         xml_cleanup_parser();
-        /*
-         * this is to debug memory for regression tests
-         */
+        // this is to debug memory for regression tests
         xml_memory_dump();
     }
 }
