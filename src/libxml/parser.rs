@@ -48,9 +48,9 @@ use std::{
     cell::RefCell,
     ffi::{c_char, c_void, CStr, CString},
     io::Read,
-    mem::{size_of, size_of_val},
+    mem::{size_of, take},
     ops::DerefMut,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
     rc::Rc,
     slice::from_raw_parts,
     str::{from_utf8, from_utf8_unchecked},
@@ -131,7 +131,7 @@ use crate::{
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
-    parser::{XmlParserCharValid, XmlParserNodeInfo, XmlParserNodeInfoPtr},
+    parser::{XmlParserCharValid, XmlParserNodeInfo, XmlParserNodeInfoSeq},
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
@@ -328,24 +328,6 @@ impl Default for XmlParserInput {
             id: 0,
             parent_consumed: 0,
             entity: null_mut(),
-        }
-    }
-}
-
-pub type XmlParserNodeInfoSeqPtr = *mut XmlParserNodeInfoSeq;
-#[repr(C)]
-pub struct XmlParserNodeInfoSeq {
-    maximum: u64,
-    length: u64,
-    buffer: *mut XmlParserNodeInfo,
-}
-
-impl Default for XmlParserNodeInfoSeq {
-    fn default() -> Self {
-        Self {
-            maximum: 0,
-            length: 0,
-            buffer: null_mut(),
         }
     }
 }
@@ -648,13 +630,13 @@ pub struct XmlParserCtxt {
 
     // for use by HTML non-recursive parser
     // Current NodeInfo
-    pub(crate) node_info: *mut XmlParserNodeInfo,
+    // pub(crate) node_info: *mut XmlParserNodeInfo,
     // Depth of the parsing stack
-    pub(crate) node_info_nr: i32,
+    // pub(crate) node_info_nr: i32,
     // Max depth of the parsing stack
-    pub(crate) node_info_max: i32,
+    // pub(crate) node_info_max: i32,
     // array of nodeInfos
-    pub(crate) node_info_tab: *mut XmlParserNodeInfo,
+    pub(crate) node_info_tab: Vec<Rc<RefCell<XmlParserNodeInfo>>>,
 
     // we need to label inputs
     pub(crate) input_id: i32,
@@ -1747,10 +1729,10 @@ impl Default for XmlParserCtxt {
             parse_mode: XmlParserMode::default(),
             nbentities: 0,
             sizeentities: 0,
-            node_info: null_mut(),
-            node_info_nr: 0,
-            node_info_max: 0,
-            node_info_tab: null_mut(),
+            // node_info: null_mut(),
+            // node_info_nr: 0,
+            // node_info_max: 0,
+            node_info_tab: vec![],
             input_id: 0,
             sizeentcopy: 0,
             end_check_state: 0,
@@ -4417,9 +4399,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         (*ctxt).atts_special = (*oldctxt).atts_special;
         (*ctxt).linenumbers = (*oldctxt).linenumbers;
         (*ctxt).record_info = (*oldctxt).record_info;
-        (*ctxt).node_seq.maximum = (*oldctxt).node_seq.maximum;
-        (*ctxt).node_seq.length = (*oldctxt).node_seq.length;
-        (*ctxt).node_seq.buffer = (*oldctxt).node_seq.buffer;
+        (*ctxt).node_seq = take(&mut (*oldctxt).node_seq);
     } else {
         // Doing validity checking on chunk without context doesn't make sense
         (*ctxt)._private = null_mut();
@@ -4485,13 +4465,8 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         (*oldctxt).nb_warnings = (*ctxt).nb_warnings;
         (*oldctxt).validate = (*ctxt).validate;
         (*oldctxt).valid = (*ctxt).valid;
-        (*oldctxt).node_seq.maximum = (*ctxt).node_seq.maximum;
-        (*oldctxt).node_seq.length = (*ctxt).node_seq.length;
-        (*oldctxt).node_seq.buffer = (*ctxt).node_seq.buffer;
+        (*oldctxt).node_seq = take(&mut (*ctxt).node_seq);
     }
-    (*ctxt).node_seq.maximum = 0;
-    (*ctxt).node_seq.length = 0;
-    (*ctxt).node_seq.buffer = null_mut();
     let sax = (*ctxt).sax.take();
     xml_free_parser_ctxt(ctxt);
     (*new_doc).int_subset = null_mut();
@@ -4717,7 +4692,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
     (*ctxt).input_id = 1;
-    xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
+    (*ctxt).node_seq.clear();
     Ok(())
 }
 
@@ -4757,11 +4732,11 @@ pub(crate) unsafe fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> i32 {
 
 /// Clear (release owned resources) and reinitialize a parser context
 #[doc(alias = "xmlClearParserCtxt")]
-pub unsafe extern "C" fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
+pub unsafe fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
-    xml_clear_node_info_seq(addr_of_mut!((*ctxt).node_seq));
+    (*ctxt).node_seq.clear();
     xml_ctxt_reset(ctxt);
 }
 
@@ -4783,16 +4758,10 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         xml_free_input_stream(input);
     }
     (*ctxt).space_tab.clear();
-    (*ctxt).space_tab.shrink_to_fit();
     (*ctxt).name_tab.clear();
-    (*ctxt).name_tab.shrink_to_fit();
     (*ctxt).node_tab.clear();
-    (*ctxt).node_tab.shrink_to_fit();
-    if !(*ctxt).node_info_tab.is_null() {
-        xml_free((*ctxt).node_info_tab as _);
-    }
+    (*ctxt).node_info_tab.clear();
     (*ctxt).input_tab.clear();
-    (*ctxt).input_tab.shrink_to_fit();
     (*ctxt).version = None;
     (*ctxt).encoding = None;
     (*ctxt).ext_sub_uri = None;
@@ -4806,9 +4775,7 @@ pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         xml_dict_free((*ctxt).dict);
     }
     (*ctxt).ns_tab.clear();
-    (*ctxt).ns_tab.shrink_to_fit();
     (*ctxt).push_tab.clear();
-    (*ctxt).push_tab.shrink_to_fit();
     if !(*ctxt).attallocs.is_null() {
         xml_free((*ctxt).attallocs as _);
     }
@@ -9577,140 +9544,104 @@ pub unsafe fn xml_new_io_input_stream(
 pub(crate) unsafe fn xml_parser_find_node_info(
     ctxt: XmlParserCtxtPtr,
     node: XmlNodePtr,
-) -> *const XmlParserNodeInfo {
-    if ctxt.is_null() || node.is_null() {
-        return null_mut();
+) -> Option<Rc<RefCell<XmlParserNodeInfo>>> {
+    if ctxt.is_null() {
+        return None;
     }
+    let node = NonNull::new(node)?;
     // Find position where node should be at
-    let pos: u64 = xml_parser_find_node_info_index(addr_of_mut!((*ctxt).node_seq), node);
-    if pos < (*ctxt).node_seq.length && (*(*ctxt).node_seq.buffer.add(pos as usize)).node == node {
-        (*ctxt).node_seq.buffer.add(pos as usize)
-    } else {
-        null_mut()
-    }
+    let pos = (*ctxt).node_seq.binary_search(Some(node)).ok()?;
+    Some((*ctxt).node_seq[pos].clone())
 }
 
-/// -- Initialize (set to initial state) node info sequence
-#[doc(alias = "xmlInitNodeInfoSeq")]
-pub(crate) unsafe fn xml_init_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
-    if seq.is_null() {
-        return;
-    }
-    (*seq).length = 0;
-    (*seq).maximum = 0;
-    (*seq).buffer = null_mut();
-}
+// /// -- Initialize (set to initial state) node info sequence
+// #[doc(alias = "xmlInitNodeInfoSeq")]
+// pub(crate) unsafe fn xml_init_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
+//     if seq.is_null() {
+//         return;
+//     }
+//     (*seq).length = 0;
+//     (*seq).maximum = 0;
+//     (*seq).buffer = null_mut();
+// }
 
-/// -- Clear (release memory and reinitialize) node
-///   info sequence
-#[doc(alias = "xmlClearNodeInfoSeq")]
-pub(crate) unsafe fn xml_clear_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
-    if seq.is_null() {
-        return;
-    }
-    if !(*seq).buffer.is_null() {
-        xml_free((*seq).buffer as _);
-    }
-    xml_init_node_info_seq(seq);
-}
+// /// -- Clear (release memory and reinitialize) node
+// ///   info sequence
+// #[doc(alias = "xmlClearNodeInfoSeq")]
+// pub(crate) unsafe fn xml_clear_node_info_seq(seq: XmlParserNodeInfoSeqPtr) {
+//     if seq.is_null() {
+//         return;
+//     }
+//     if !(*seq).buffer.is_null() {
+//         xml_free((*seq).buffer as _);
+//     }
+//     xml_init_node_info_seq(seq);
+// }
 
-/// Find the index that the info record for the given node is or should be at in a sorted sequence
-///
-/// Returns a long indicating the position of the record
-#[doc(alias = "xmlParserFindNodeInfoIndex")]
-pub(crate) unsafe fn xml_parser_find_node_info_index(
-    seq: XmlParserNodeInfoSeqPtr,
-    node: XmlNodePtr,
-) -> u64 {
-    let mut upper: u64;
-    let mut lower: u64;
-    let mut middle: u64;
-    let mut found: i32 = 0;
+// /// Find the index that the info record for the given node is or should be at in a sorted sequence
+// ///
+// /// Returns a long indicating the position of the record
+// #[doc(alias = "xmlParserFindNodeInfoIndex")]
+// pub(crate) unsafe fn xml_parser_find_node_info_index(
+//     seq: XmlParserNodeInfoSeqPtr,
+//     node: XmlNodePtr,
+// ) -> u64 {
+//     let mut upper: u64;
+//     let mut lower: u64;
+//     let mut middle: u64;
+//     let mut found: i32 = 0;
 
-    if seq.is_null() || node.is_null() {
-        return u64::MAX;
-    }
+//     if seq.is_null() || node.is_null() {
+//         return u64::MAX;
+//     }
 
-    // Do a binary search for the key
-    lower = 1;
-    upper = (*seq).length;
-    middle = 0;
-    while lower <= upper && found == 0 {
-        middle = lower + (upper - lower) / 2;
-        match node.cmp(&((*(*seq).buffer.add(middle as usize - 1)).node as _)) {
-            std::cmp::Ordering::Equal => {
-                found = 1;
-            }
-            std::cmp::Ordering::Less => {
-                upper = middle - 1;
-            }
-            std::cmp::Ordering::Greater => {
-                lower = middle + 1;
-            }
-        }
-    }
+//     // Do a binary search for the key
+//     lower = 1;
+//     upper = (*seq).length;
+//     middle = 0;
+//     while lower <= upper && found == 0 {
+//         middle = lower + (upper - lower) / 2;
+//         match node.cmp(&((*(*seq).buffer.add(middle as usize - 1)).node as _)) {
+//             std::cmp::Ordering::Equal => {
+//                 found = 1;
+//             }
+//             std::cmp::Ordering::Less => {
+//                 upper = middle - 1;
+//             }
+//             std::cmp::Ordering::Greater => {
+//                 lower = middle + 1;
+//             }
+//         }
+//     }
 
-    // Return position
-    if middle == 0 || (*(*seq).buffer.add(middle as usize - 1)).node < node {
-        middle
-    } else {
-        middle - 1
-    }
-}
+//     // Return position
+//     if middle == 0 || (*(*seq).buffer.add(middle as usize - 1)).node < node {
+//         middle
+//     } else {
+//         middle - 1
+//     }
+// }
 
 /// Insert node info record into the sorted sequence
 #[doc(alias = "xmlParserAddNodeInfo")]
-pub(crate) unsafe fn xml_parser_add_node_info(ctxt: XmlParserCtxtPtr, info: XmlParserNodeInfoPtr) {
-    if ctxt.is_null() || info.is_null() {
+pub(crate) unsafe fn xml_parser_add_node_info(
+    ctxt: XmlParserCtxtPtr,
+    info: Rc<RefCell<XmlParserNodeInfo>>,
+) {
+    if ctxt.is_null() {
         return;
     }
 
     // Find pos and check to see if node is already in the sequence
-    let pos: u64 =
-        xml_parser_find_node_info_index(addr_of_mut!((*ctxt).node_seq), (*info).node as XmlNodePtr);
-
-    if pos < (*ctxt).node_seq.length
-        && !(*ctxt).node_seq.buffer.is_null()
-        && (*(*ctxt).node_seq.buffer.add(pos as usize)).node == (*info).node
-    {
-        *(*ctxt).node_seq.buffer.add(pos as usize) = *info;
-    }
-    // Otherwise, we need to add new node to buffer
-    else {
-        if (*ctxt).node_seq.length + 1 > (*ctxt).node_seq.maximum
-            || (*ctxt).node_seq.buffer.is_null()
-        {
-            if (*ctxt).node_seq.maximum == 0 {
-                (*ctxt).node_seq.maximum = 2;
-            }
-            let byte_size: u32 = (size_of_val(&*(*ctxt).node_seq.buffer)
-                * (2 * (*ctxt).node_seq.maximum as usize)) as _;
-
-            let tmp_buffer: XmlParserNodeInfoPtr = if (*ctxt).node_seq.buffer.is_null() {
-                xml_malloc(byte_size as usize) as _
-            } else {
-                xml_realloc((*ctxt).node_seq.buffer as _, byte_size as usize) as _
-            };
-
-            if tmp_buffer.is_null() {
-                xml_err_memory(ctxt, Some("failed to allocate buffer\n"));
-                return;
-            }
-            (*ctxt).node_seq.buffer = tmp_buffer;
-            (*ctxt).node_seq.maximum *= 2;
+    let pos = (*ctxt).node_seq.binary_search(info.borrow().node);
+    match pos {
+        Ok(pos) => {
+            (*ctxt).node_seq[pos] = info;
         }
-
-        // If position is not at end, move elements out of the way
-        if pos != (*ctxt).node_seq.length {
-            for i in (pos..(*ctxt).node_seq.length).rev() {
-                *(*ctxt).node_seq.buffer.add(i as usize + 1) =
-                    *(*ctxt).node_seq.buffer.add(i as usize);
-            }
+        Err(pos) => {
+            // Otherwise, we need to add new node to buffer
+            (*ctxt).node_seq.insert(pos, info);
         }
-
-        // Copy element and increase length
-        *(*ctxt).node_seq.buffer.add(pos as usize) = *info;
-        (*ctxt).node_seq.length += 1;
     }
 }
 
@@ -9908,7 +9839,7 @@ pub unsafe fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
     }
     (*ctxt).sizeentities = 0;
     (*ctxt).sizeentcopy = 0;
-    xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
+    (*ctxt).node_seq.clear();
 
     if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
         table.clear_with(|data, _| xml_free(data as _));
@@ -12365,34 +12296,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_clear_node_info_seq() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_seq in 0..GEN_NB_XML_PARSER_NODE_INFO_SEQ_PTR {
-                let mem_base = xml_mem_blocks();
-                let seq = gen_xml_parser_node_info_seq_ptr(n_seq, 0);
-
-                xml_clear_node_info_seq(seq);
-                des_xml_parser_node_info_seq_ptr(n_seq, seq, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlClearNodeInfoSeq",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_seq);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlClearNodeInfoSeq()"
-            );
-        }
-    }
-
-    #[test]
     fn test_xml_clear_parser_ctxt() {
         unsafe {
             let mut leaks = 0;
@@ -12553,34 +12456,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlHasFeature()");
-        }
-    }
-
-    #[test]
-    fn test_xml_init_node_info_seq() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_seq in 0..GEN_NB_XML_PARSER_NODE_INFO_SEQ_PTR {
-                let mem_base = xml_mem_blocks();
-                let seq = gen_xml_parser_node_info_seq_ptr(n_seq, 0);
-
-                xml_init_node_info_seq(seq);
-                des_xml_parser_node_info_seq_ptr(n_seq, seq, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlInitNodeInfoSeq",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_seq);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlInitNodeInfoSeq()"
-            );
         }
     }
 
@@ -12840,110 +12715,6 @@ mod tests {
             assert!(
                 leaks == 0,
                 "{leaks} Leaks are found in xmlParseExtParsedEnt()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_parser_add_node_info() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_info in 0..GEN_NB_CONST_XML_PARSER_NODE_INFO_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let info = gen_const_xml_parser_node_info_ptr(n_info, 1);
-
-                    xml_parser_add_node_info(ctxt, info as XmlParserNodeInfoPtr);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_const_xml_parser_node_info_ptr(n_info, info, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlParserAddNodeInfo",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_info);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParserAddNodeInfo()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_parser_find_node_info() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctx in 0..GEN_NB_CONST_XML_PARSER_CTXT_PTR {
-                for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctx = gen_const_xml_parser_ctxt_ptr(n_ctx, 0);
-                    let node = gen_const_xml_node_ptr(n_node, 1);
-
-                    let ret_val =
-                        xml_parser_find_node_info(ctx as XmlParserCtxtPtr, node as XmlNodePtr);
-                    desret_const_xml_parser_node_info_ptr(ret_val);
-                    des_const_xml_parser_ctxt_ptr(n_ctx, ctx, 0);
-                    des_const_xml_node_ptr(n_node, node as XmlNodePtr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlParserFindNodeInfo",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_ctx);
-                        eprintln!(" {}", n_node);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParserFindNodeInfo()"
-            );
-        }
-    }
-
-    #[test]
-    fn test_xml_parser_find_node_info_index() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_seq in 0..GEN_NB_CONST_XML_PARSER_NODE_INFO_SEQ_PTR {
-                for n_node in 0..GEN_NB_CONST_XML_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let seq = gen_const_xml_parser_node_info_seq_ptr(n_seq, 0);
-                    let node = gen_const_xml_node_ptr(n_node, 1);
-
-                    let ret_val = xml_parser_find_node_info_index(
-                        seq as XmlParserNodeInfoSeqPtr,
-                        node as XmlNodePtr,
-                    );
-                    desret_unsigned_long(ret_val);
-                    des_const_xml_parser_node_info_seq_ptr(n_seq, seq, 0);
-                    des_const_xml_node_ptr(n_node, node as XmlNodePtr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlParserFindNodeInfoIndex",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_seq);
-                        eprintln!(" {}", n_node);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlParserFindNodeInfoIndex()"
             );
         }
     }

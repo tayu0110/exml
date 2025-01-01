@@ -25,9 +25,9 @@ use std::{
     cell::RefCell,
     ffi::{c_char, CStr, CString},
     io::Read,
-    mem::{size_of, size_of_val, zeroed},
+    mem::{size_of, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null, null_mut, NonNull},
     rc::Rc,
     str::from_utf8,
     sync::atomic::{AtomicI32, Ordering},
@@ -44,10 +44,10 @@ use crate::{
         dict::{xml_dict_create, xml_dict_lookup},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_free_parser_ctxt, xml_init_node_info_seq, xml_init_parser,
-            xml_load_external_entity, xml_new_io_input_stream, xml_parser_add_node_info,
-            XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
-            XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
+            xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
+            xml_new_io_input_stream, xml_parser_add_node_info, XmlParserCtxt, XmlParserCtxtPtr,
+            XmlParserInput, XmlParserInputPtr, XmlParserInputState, XmlParserOption, XmlSAXHandler,
+            XmlSAXHandlerPtr,
         },
         parser_internals::{
             xml_free_input_stream, xml_new_input_stream, xml_switch_encoding, INPUT_CHUNK,
@@ -7193,20 +7193,8 @@ unsafe fn html_auto_close_on_close(ctxt: HtmlParserCtxtPtr, newtag: *const XmlCh
 ///
 /// Returns 0 in case of error, the pointer to NodeInfo otherwise
 #[doc(alias = "htmlNodeInfoPop")]
-unsafe extern "C" fn html_node_info_pop(ctxt: HtmlParserCtxtPtr) -> *mut HtmlParserNodeInfo {
-    if (*ctxt).node_info_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).node_info_nr -= 1;
-    if (*ctxt).node_info_nr < 0 {
-        return null_mut();
-    }
-    if (*ctxt).node_info_nr > 0 {
-        (*ctxt).node_info = (*ctxt).node_info_tab.add((*ctxt).node_info_nr as usize - 1);
-    } else {
-        (*ctxt).node_info = null_mut();
-    }
-    (*ctxt).node_info_tab.add((*ctxt).node_info_nr as usize)
+unsafe fn html_node_info_pop(ctxt: HtmlParserCtxtPtr) -> Option<Rc<RefCell<HtmlParserNodeInfo>>> {
+    (*ctxt).node_info_tab.pop()
 }
 
 /// Parse an end of tag
@@ -8630,7 +8618,7 @@ unsafe fn html_parse_content(ctxt: HtmlParserCtxtPtr) {
 /// `[41] Attribute ::= Name Eq AttValue`
 #[doc(alias = "htmlParseElement")]
 pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
-    let mut node_info: HtmlParserNodeInfo = unsafe { zeroed() };
+    let mut node_info = XmlParserNodeInfo::default();
     let mut oldptr: *const XmlChar;
 
     if ctxt.is_null() || (*ctxt).input.is_null() {
@@ -8708,8 +8696,8 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
             node_info.end_pos = (*(*ctxt).input).consumed
                 + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
             node_info.end_line = (*(*ctxt).input).line as _;
-            node_info.node = (*ctxt).node;
-            xml_parser_add_node_info(ctxt, addr_of_mut!(node_info));
+            node_info.node = NonNull::new((*ctxt).node);
+            xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
         }
         return;
     }
@@ -8743,8 +8731,8 @@ pub(crate) unsafe fn html_parse_element(ctxt: HtmlParserCtxtPtr) {
         node_info.end_pos = (*(*ctxt).input).consumed
             + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
         node_info.end_line = (*(*ctxt).input).line as _;
-        node_info.node = (*ctxt).node;
-        xml_parser_add_node_info(ctxt, addr_of_mut!(node_info));
+        node_info.node = NonNull::new((*ctxt).node);
+        xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
     }
     if (*ctxt).current_byte() == 0 {
         html_auto_close_on_end(ctxt);
@@ -8809,9 +8797,7 @@ unsafe fn html_init_parser_ctxt(
     (*ctxt).name_tab.shrink_to(10);
     (*ctxt).name = None;
 
-    (*ctxt).node_info_tab = null_mut();
-    (*ctxt).node_info_nr = 0;
-    (*ctxt).node_info_max = 0;
+    (*ctxt).node_info_tab.clear();
 
     (*ctxt).my_doc = null_mut();
     (*ctxt).well_formed = 1;
@@ -8830,7 +8816,7 @@ unsafe fn html_init_parser_ctxt(
     {
         (*ctxt).catalogs = None;
     }
-    xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
+    (*ctxt).node_seq.clear();
     0
 }
 
@@ -8891,16 +8877,15 @@ pub unsafe fn html_create_memory_parser_ctxt(buffer: Vec<u8>) -> HtmlParserCtxtP
 }
 
 #[doc(alias = "htmlParserFinishElementParsing")]
-unsafe extern "C" fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr) {
-    /*
-     * Capture end position and add node
-     */
+unsafe fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr) {
+    // Capture end position and add node
     if !(*ctxt).node.is_null() && (*ctxt).record_info != 0 {
-        (*(*ctxt).node_info).end_pos = (*(*ctxt).input).consumed
+        let node_info = (*ctxt).node_info_tab.last_mut().expect("Internal Error");
+        node_info.borrow_mut().end_pos = (*(*ctxt).input).consumed
             + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
-        (*(*ctxt).node_info).end_line = (*(*ctxt).input).line as _;
-        (*(*ctxt).node_info).node = (*ctxt).node;
-        xml_parser_add_node_info(ctxt, (*ctxt).node_info);
+        node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
+        node_info.borrow_mut().node = NonNull::new((*ctxt).node);
+        xml_parser_add_node_info(ctxt, node_info.clone());
         html_node_info_pop(ctxt);
     }
     if (*ctxt).current_byte() == 0 {
@@ -8912,29 +8897,12 @@ unsafe extern "C" fn html_parser_finish_element_parsing(ctxt: HtmlParserCtxtPtr)
 ///
 /// Returns 0 in case of error, the index in the stack otherwise
 #[doc(alias = "htmlNodeInfoPush")]
-unsafe extern "C" fn html_node_info_push(
+unsafe fn html_node_info_push(
     ctxt: HtmlParserCtxtPtr,
-    value: *mut HtmlParserNodeInfo,
-) -> i32 {
-    if (*ctxt).node_info_nr >= (*ctxt).node_info_max {
-        if (*ctxt).node_info_max == 0 {
-            (*ctxt).node_info_max = 5;
-        }
-        (*ctxt).node_info_max *= 2;
-        (*ctxt).node_info_tab = xml_realloc(
-            (*ctxt).node_info_tab as _,
-            (*ctxt).node_info_max as usize * size_of_val(&*(*ctxt).node_info_tab.add(0)),
-        ) as _;
-        if (*ctxt).node_info_tab.is_null() {
-            html_err_memory(ctxt, None);
-            return 0;
-        }
-    }
-    *(*ctxt).node_info_tab.add((*ctxt).node_info_nr as usize) = *value;
-    (*ctxt).node_info = (*ctxt).node_info_tab.add((*ctxt).node_info_nr as usize);
-    let res = (*ctxt).node_info_nr;
-    (*ctxt).node_info_nr += 1;
-    res
+    value: Rc<RefCell<HtmlParserNodeInfo>>,
+) -> usize {
+    (*ctxt).node_info_tab.push(value);
+    (*ctxt).node_info_tab.len()
 }
 
 /// Parse an HTML element, new version, non recursive
@@ -8943,14 +8911,8 @@ unsafe extern "C" fn html_node_info_push(
 ///
 /// `[41] Attribute ::= Name Eq AttValue`
 #[doc(alias = "htmlParseElementInternal")]
-unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
-    let mut node_info: HtmlParserNodeInfo = HtmlParserNodeInfo {
-        node: null_mut(),
-        begin_line: 0,
-        begin_pos: 0,
-        end_line: 0,
-        end_pos: 0,
-    };
+unsafe fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
+    let mut node_info = HtmlParserNodeInfo::default();
 
     if ctxt.is_null() || (*ctxt).input.is_null() {
         html_parse_err(
@@ -9022,7 +8984,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
         }
 
         if (*ctxt).record_info != 0 {
-            html_node_info_push(ctxt, addr_of_mut!(node_info));
+            html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
         }
         html_parser_finish_element_parsing(ctxt);
         return;
@@ -9038,7 +9000,7 @@ unsafe extern "C" fn html_parse_element_internal(ctxt: HtmlParserCtxtPtr) {
     }
 
     if (*ctxt).record_info != 0 {
-        html_node_info_push(ctxt, addr_of_mut!(node_info));
+        html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
     }
 }
 
@@ -10038,8 +10000,6 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
     let mut cur: XmlChar;
     let mut next: XmlChar;
 
-    let mut node_info: HtmlParserNodeInfo = unsafe { zeroed() };
-
     'done: loop {
         input = (*ctxt).input;
         if input.is_null() {
@@ -10304,7 +10264,8 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     break 'done;
                 }
 
-                /* Capture start position */
+                // Capture start position
+                let mut node_info = HtmlParserNodeInfo::default();
                 if (*ctxt).record_info != 0 {
                     node_info.begin_pos = (*(*ctxt).input).consumed
                         + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
@@ -10362,7 +10323,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     }
 
                     if (*ctxt).record_info != 0 {
-                        html_node_info_push(ctxt, addr_of_mut!(node_info));
+                        html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
                     }
 
                     (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10380,7 +10341,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                 }
 
                 if (*ctxt).record_info != 0 {
-                    html_node_info_push(ctxt, addr_of_mut!(node_info));
+                    html_node_info_push(ctxt, Rc::new(RefCell::new(node_info)));
                 }
 
                 (*ctxt).instate = XmlParserInputState::XmlParserContent;
@@ -10842,7 +10803,7 @@ macro_rules! DICT_FREE {
 
 /// Reset a parser context
 #[doc(alias = "htmlCtxtReset")]
-pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
+pub unsafe fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     let mut input: XmlParserInputPtr;
 
     if ctxt.is_null() {
@@ -10908,7 +10869,7 @@ pub unsafe extern "C" fn html_ctxt_reset(ctxt: HtmlParserCtxtPtr) {
     {
         (*ctxt).catalogs = None;
     }
-    xml_init_node_info_seq(addr_of_mut!((*ctxt).node_seq));
+    (*ctxt).node_seq.clear();
 
     if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
         table.clear_with(|data, _| xml_free(data as _));

@@ -23,8 +23,8 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::ffi::{c_char, CStr, CString};
-use std::mem::{size_of, zeroed};
-use std::ptr::{addr_of_mut, null, null_mut};
+use std::mem::size_of;
+use std::ptr::{addr_of_mut, null, null_mut, NonNull};
 use std::rc::Rc;
 use std::slice::from_raw_parts;
 use std::str::{from_utf8, from_utf8_mut};
@@ -37,7 +37,7 @@ use crate::hash::XmlHashTableRef;
 use crate::io::__xml_loader_err;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
-use crate::parser::{XmlParserCharValid, XmlParserNodeInfo, XmlParserNodeInfoPtr};
+use crate::parser::{XmlParserCharValid, XmlParserNodeInfo};
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::uri::build_uri;
 use crate::{
@@ -4727,7 +4727,6 @@ pub(crate) unsafe fn xml_parse_end_tag(ctxt: XmlParserCtxtPtr) {
 pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     let name: *const XmlChar;
     let mut prefix: *const XmlChar = null_mut();
-    let mut node_info: XmlParserNodeInfo = unsafe { zeroed() };
     let mut tlen: i32 = 0;
     let ns_nr = (*ctxt).ns_tab.len();
 
@@ -4745,11 +4744,15 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     }
 
     // Capture start position
-    if (*ctxt).record_info != 0 {
-        node_info.begin_pos = (*(*ctxt).input).consumed
-            + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
-        node_info.begin_line = (*(*ctxt).input).line as _;
-    }
+    let (begin_pos, begin_line) = if (*ctxt).record_info != 0 {
+        (
+            (*(*ctxt).input).consumed
+                + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64,
+            (*(*ctxt).input).line as u64,
+        )
+    } else {
+        (0, 0)
+    };
 
     if (*ctxt).space_tab.is_empty() || (*ctxt).space() == -2 {
         (*ctxt).space_push(-1);
@@ -4843,21 +4846,29 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
             (*ctxt).ns_pop((*ctxt).ns_tab.len() - ns_nr);
         }
         if !cur.is_null() && (*ctxt).record_info != 0 {
-            node_info.node = cur;
-            node_info.end_pos = (*(*ctxt).input).consumed
-                + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
-            node_info.end_line = (*(*ctxt).input).line as _;
-            xml_parser_add_node_info(ctxt, addr_of_mut!(node_info));
+            let node_info = XmlParserNodeInfo {
+                node: NonNull::new(cur),
+                begin_pos,
+                begin_line,
+                end_pos: (*(*ctxt).input).consumed
+                    + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64,
+                end_line: (*(*ctxt).input).line as u64,
+            };
+            xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
         }
         return 1;
     }
     if (*ctxt).current_byte() == b'>' {
         (*ctxt).advance(1);
         if !cur.is_null() && (*ctxt).record_info != 0 {
-            node_info.node = cur;
-            node_info.end_pos = 0;
-            node_info.end_line = 0;
-            xml_parser_add_node_info(ctxt, addr_of_mut!(node_info));
+            let node_info = XmlParserNodeInfo {
+                node: NonNull::new(cur),
+                begin_pos,
+                begin_line,
+                end_pos: 0,
+                end_line: 0,
+            };
+            xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
         }
     } else {
         xml_fatal_err_msg_str_int_str!(
@@ -4906,12 +4917,10 @@ pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
 
     // Capture end position
     if !cur.is_null() && (*ctxt).record_info != 0 {
-        let node_info: XmlParserNodeInfoPtr =
-            xml_parser_find_node_info(ctxt, cur) as XmlParserNodeInfoPtr;
-        if !node_info.is_null() {
-            (*node_info).end_pos = (*(*ctxt).input).consumed
+        if let Some(node_info) = xml_parser_find_node_info(ctxt, cur) {
+            node_info.borrow_mut().end_pos = (*(*ctxt).input).consumed
                 + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
-            (*node_info).end_line = (*(*ctxt).input).line as _;
+            node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
         }
     }
 }

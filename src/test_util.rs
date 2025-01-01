@@ -24,8 +24,7 @@ use crate::{
         },
         parser::{
             xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlFeature, XmlParserCtxt,
-            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfoSeq, XmlParserNodeInfoSeqPtr,
-            XmlParserOption, XmlSAXHandlerPtr,
+            XmlParserCtxtPtr, XmlParserInputPtr, XmlParserOption, XmlSAXHandlerPtr,
         },
         parser_internals::{xml_create_memory_parser_ctxt, xml_free_input_stream},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -50,7 +49,7 @@ use crate::{
         xmlstring::{xml_strdup, XmlChar},
         xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
     },
-    parser::XmlParserNodeInfo,
+    parser::{XmlParserNodeInfo, XmlParserNodeInfoSeq, XmlParserNodeInfoSeqPtr},
     tree::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDOMWrapCtxtPtr,
