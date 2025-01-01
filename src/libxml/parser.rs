@@ -103,9 +103,9 @@ use crate::{
             xml_parse_entity_ref, xml_parse_entity_value, xml_parse_external_subset,
             xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
             xml_parse_pi, xml_parse_reference, xml_parse_sddecl, xml_parse_start_tag,
-            xml_parse_system_literal, xml_parse_version_info, xml_push_input, xml_switch_encoding,
-            INPUT_CHUNK, XML_MAX_DICTIONARY_LIMIT, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN,
-            XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
+            xml_parse_system_literal, xml_parse_version_info, xml_switch_encoding, INPUT_CHUNK,
+            XML_MAX_DICTIONARY_LIMIT, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH,
+            XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
         sax2::{
@@ -1813,7 +1813,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     }
 
     // plug some encoding conversion routines here.
-    if xml_push_input(ctxt, input) < 0 {
+    if (*ctxt).push_input(input) < 0 {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -1911,7 +1911,7 @@ pub unsafe fn xml_io_parse_dtd(
     }
 
     // plug some encoding conversion routines here.
-    if xml_push_input(ctxt, pinput) < 0 {
+    if (*ctxt).push_input(pinput) < 0 {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
@@ -3968,38 +3968,6 @@ unsafe fn xml_parse_string_pereference(
     entity
 }
 
-/// The current input pointed by (*ctxt).input came to an end pop it and return the next c_char.
-///
-/// Returns the current XmlChar in the parser context
-#[doc(alias = "xmlPopInput")]
-pub unsafe fn xml_pop_input(ctxt: XmlParserCtxtPtr) -> XmlChar {
-    if ctxt.is_null() || (*ctxt).input_tab.len() <= 1 {
-        return 0;
-    }
-    if get_parser_debug_entities() != 0 {
-        generic_error!("Popping input {}\n", (*ctxt).input_tab.len());
-    }
-    if (*ctxt).input_tab.len() > 1
-        && (*ctxt).in_subset == 0
-        && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        xml_fatal_err(
-            ctxt,
-            XmlParserErrors::XmlErrInternalError,
-            Some("Unfinished entity outside the DTD"),
-        );
-    }
-    let input: XmlParserInputPtr = (*ctxt).input_pop();
-    if !(*input).entity.is_null() {
-        (*(*input).entity).flags &= !XML_ENT_EXPANDING as i32;
-    }
-    xml_free_input_stream(input);
-    if *(*(*ctxt).input).cur == 0 {
-        (*ctxt).force_grow();
-    }
-    (*ctxt).current_byte()
-}
-
 /// Load the original content of the given system entity from the
 /// ExternalID/SystemID given. This is to be used for Included in Literal
 /// http://www.w3.org/TR/REC-xml/#inliteral processing of entities references
@@ -4057,7 +4025,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: XmlEntityPtr) 
 
     // Push the entity as the current input, read c_char by c_char
     // saving to the buffer until the end of the entity or an error
-    if xml_push_input(ctxt, input) < 0 {
+    if (*ctxt).push_input(input) < 0 {
         xml_buf_free(buf);
         xml_free_input_stream(input);
         return -1;
@@ -4082,7 +4050,7 @@ unsafe fn xml_load_entity_content(ctxt: XmlParserCtxtPtr, entity: XmlEntityPtr) 
         (*ctxt).sizeentities = (*ctxt)
             .sizeentities
             .saturating_add((*(*ctxt).input).consumed);
-        xml_pop_input(ctxt);
+        (*ctxt).pop_input();
     } else if !xml_is_char(c as u32) {
         xml_fatal_err_msg_int!(
             ctxt,

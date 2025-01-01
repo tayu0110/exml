@@ -64,11 +64,11 @@ use super::{
     },
     globals::{xml_free, xml_malloc, xml_realloc, xml_register_node_default_value},
     parser::{
-        xml_load_external_entity, xml_pop_input, XmlParserOption, XmlSAXHandler,
-        XML_COMPLETE_ATTRS, XML_SAX2_MAGIC, XML_SKIP_IDS,
+        xml_load_external_entity, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS,
+        XML_SAX2_MAGIC, XML_SKIP_IDS,
     },
     parser_internals::{
-        xml_free_input_stream, xml_parse_external_subset, xml_push_input, xml_split_qname,
+        xml_free_input_stream, xml_parse_external_subset, xml_split_qname,
         xml_string_decode_entities, xml_string_len_decode_entities, xml_switch_encoding,
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
     },
@@ -336,7 +336,7 @@ pub unsafe fn xml_sax2_external_subset(
         let oldprogressive: i32 = (*ctxt).progressive;
         (*ctxt).progressive = 0;
         (*ctxt).input = null_mut();
-        xml_push_input(ctxt, input);
+        (*ctxt).push_input(input);
 
         // On the fly encoding conversion if needed
         if (*(*ctxt).input).length >= 4 {
@@ -361,9 +361,8 @@ pub unsafe fn xml_sax2_external_subset(
         xml_parse_external_subset(ctxt, external_id, system_id);
 
         // Free up the external entities
-        #[allow(clippy::while_immutable_condition)]
         while (*ctxt).input_tab.len() > 1 {
-            xml_pop_input(ctxt);
+            (*ctxt).pop_input();
         }
 
         consumed = (*(*ctxt).input).consumed;

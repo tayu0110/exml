@@ -601,48 +601,6 @@ pub(crate) unsafe fn xml_new_entity_input_stream(
     input
 }
 
-/// Match to a new input stream which is stacked on top of the previous one(s).
-///
-/// Returns -1 in case of error or the index in the input stack
-#[doc(alias = "xmlPushInput")]
-pub unsafe fn xml_push_input(ctxt: XmlParserCtxtPtr, input: XmlParserInputPtr) -> i32 {
-    if input.is_null() {
-        return -1;
-    }
-
-    if get_parser_debug_entities() != 0 {
-        if !(*ctxt).input.is_null() && (*(*ctxt).input).filename.is_some() {
-            generic_error!(
-                "{}({}): ",
-                (*(*ctxt).input).filename.as_ref().unwrap(),
-                (*(*ctxt).input).line
-            );
-        }
-        let cur = CStr::from_ptr((*input).cur as *const i8).to_string_lossy();
-        generic_error!(
-            "Pushing input {} : {}\n",
-            (*ctxt).input_tab.len() + 1,
-            &cur[..cur.len().min(30)]
-        );
-    }
-    if ((*ctxt).input_tab.len() > 40 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0)
-        || (*ctxt).input_tab.len() > 100
-    {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityLoop, None);
-        #[allow(clippy::while_immutable_condition)]
-        while (*ctxt).input_tab.len() > 1 {
-            xml_free_input_stream((*ctxt).input_pop());
-        }
-        return -1;
-    }
-    let ret: i32 = (*ctxt).input_push(input);
-    if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        return -1;
-    }
-    (*ctxt).grow();
-    ret
-}
-
 /// Free up an input stream.
 #[doc(alias = "xmlFreeInputStream")]
 pub unsafe fn xml_free_input_stream(input: XmlParserInputPtr) {
@@ -3991,7 +3949,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
             }
 
             input = xml_new_entity_input_stream(ctxt, entity);
-            if xml_push_input(ctxt, input) < 0 {
+            if (*ctxt).push_input(input) < 0 {
                 xml_free_input_stream(input);
                 return;
             }
@@ -5610,11 +5568,7 @@ pub(crate) unsafe fn xml_parser_input_shrink(input: XmlParserInputPtr) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        globals::reset_last_error,
-        libxml::{parser::xml_pop_input, xmlmemory::xml_mem_blocks},
-        test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -5871,69 +5825,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_pop_input() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = xml_pop_input(ctxt);
-                desret_xml_char(ret_val);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlPopInput",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlPopInput()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_push_input() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_input in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let input = gen_xml_parser_input_ptr(n_input, 1);
-
-                    let ret_val = xml_push_input(ctxt, input);
-                    desret_int(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_xml_parser_input_ptr(n_input, input, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlPushInput",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlPushInput()");
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_input);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_set_entity_reference_func() {
-
-        /* missing type support */
     }
 
     #[test]

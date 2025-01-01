@@ -16,16 +16,16 @@ use crate::{
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{XmlError, XmlParserErrors},
     generic_error,
-    globals::GenericErrorContext,
+    globals::{get_parser_debug_entities, GenericErrorContext},
     hash::XmlHashTableRef,
     libxml::{
         catalog::XmlCatalogEntry,
         chvalid::{xml_is_blank_char, xml_is_char},
-        entities::{XmlEntityType, XML_ENT_PARSED},
+        entities::{XmlEntityType, XML_ENT_EXPANDING, XML_ENT_PARSED},
         parser::{
-            xml_parse_document, xml_parser_entity_check, xml_pop_input, XmlDefAttrsPtr,
-            XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler, XmlStartTag,
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_parse_document, xml_parser_entity_check, XmlDefAttrsPtr, XmlParserInputState,
+            XmlParserMode, XmlParserOption, XmlSAXHandler, XmlStartTag, XML_COMPLETE_ATTRS,
+            XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         parser_internals::{
             xml_free_input_stream, xml_parse_pe_reference, INPUT_CHUNK, LINE_LEN,
@@ -38,7 +38,7 @@ use crate::{
     tree::{xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlNodePtr, XML_XML_NAMESPACE},
 };
 
-use super::{XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq};
+use super::{xml_fatal_err, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq};
 
 /// The parser context.
 ///
@@ -591,7 +591,7 @@ impl XmlParserCtxt {
 
                     xml_parser_entity_check(self, consumed);
 
-                    xml_pop_input(self);
+                    self.pop_input();
                 } else {
                     break;
                 }
@@ -921,6 +921,75 @@ impl XmlParserCtxt {
         let rem = self.ns_tab.len() - nr;
         self.ns_tab.truncate(rem);
         nr
+    }
+
+    /// Match to a new input stream which is stacked on top of the previous one(s).
+    ///
+    /// Returns -1 in case of error or the index in the input stack
+    #[doc(alias = "xmlPushInput")]
+    pub unsafe fn push_input(&mut self, input: XmlParserInputPtr) -> i32 {
+        if get_parser_debug_entities() != 0 {
+            if !self.input.is_null() && (*self.input).filename.is_some() {
+                generic_error!(
+                    "{}({}): ",
+                    (*self.input).filename.as_ref().unwrap(),
+                    (*self.input).line
+                );
+            }
+            let cur = CStr::from_ptr((*input).cur as *const i8).to_string_lossy();
+            generic_error!(
+                "Pushing input {} : {}\n",
+                self.input_tab.len() + 1,
+                &cur[..cur.len().min(30)]
+            );
+        }
+        if (self.input_tab.len() > 40 && self.options & XmlParserOption::XmlParseHuge as i32 == 0)
+            || self.input_tab.len() > 100
+        {
+            xml_fatal_err(self, XmlParserErrors::XmlErrEntityLoop, None);
+            while self.input_tab.len() > 1 {
+                xml_free_input_stream(self.input_pop());
+            }
+            return -1;
+        }
+        let ret: i32 = self.input_push(input);
+        if matches!(self.instate, XmlParserInputState::XmlParserEOF) {
+            return -1;
+        }
+        self.grow();
+        ret
+    }
+
+    /// The current input pointed by self.input came to an end pop it and return the next c_char.
+    ///
+    /// Returns the current XmlChar in the parser context
+    #[doc(alias = "xmlPopInput")]
+    pub unsafe fn pop_input(&mut self) -> u8 {
+        if self.input_tab.len() <= 1 {
+            return 0;
+        }
+        if get_parser_debug_entities() != 0 {
+            generic_error!("Popping input {}\n", self.input_tab.len());
+        }
+        if self.input_tab.len() > 1
+            && self.in_subset == 0
+            && !matches!(self.instate, XmlParserInputState::XmlParserEOF)
+        {
+            xml_fatal_err(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                Some("Unfinished entity outside the DTD"),
+            );
+        }
+        let input: XmlParserInputPtr = self.input_pop();
+        if !(*input).entity.is_null() {
+            (*(*input).entity).flags &= !XML_ENT_EXPANDING as i32;
+        }
+        xml_free_input_stream(input);
+        if *(*self.input).cur == 0 {
+            self.force_grow();
+        }
+        self.current_byte()
     }
 
     /// Do the SAX2 detection and specific initialization
