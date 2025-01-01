@@ -515,7 +515,7 @@ impl XmlParserCtxt {
     pub(crate) unsafe fn force_grow(&mut self) -> i32 {
         let input: XmlParserInputPtr = self.input;
         let cur_end: ptrdiff_t = (*input).end.offset_from((*input).cur);
-        let cur_base: ptrdiff_t = (*input).cur.offset_from((*input).base);
+        let cur_base: ptrdiff_t = (*input).offset_from_base() as isize;
 
         let Some(buf) = (*input).buf.as_mut() else {
             return 0;
@@ -577,7 +577,7 @@ impl XmlParserCtxt {
             return;
         }
 
-        used = (*input).cur.offset_from((*input).base) as usize;
+        used = (*input).offset_from_base();
         // Do not shrink on large buffers whose only a tiny fraction was consumed
         if used > INPUT_CHUNK {
             let res: size_t = buf
@@ -600,7 +600,7 @@ impl XmlParserCtxt {
 
     pub(crate) unsafe fn shrink(&mut self) {
         if self.progressive == 0
-            && (*self.input).cur.offset_from((*self.input).base) > 2 * INPUT_CHUNK as isize
+            && (*self.input).offset_from_base() > 2 * INPUT_CHUNK
             && (*self.input).end.offset_from((*self.input).cur) < 2 * INPUT_CHUNK as isize
         {
             self.force_shrink();
@@ -821,8 +821,7 @@ impl XmlParserCtxt {
                     }
 
                     consumed = (*self.input).consumed;
-                    consumed = consumed
-                        .saturating_add((*self.input).cur.offset_from((*self.input).base) as _);
+                    consumed = consumed.saturating_add((*self.input).offset_from_base() as u64);
 
                     // Add to sizeentities when parsing an external entity for the first time.
                     let ent: XmlEntityPtr = (*self.input).entity;
@@ -1446,8 +1445,8 @@ impl XmlParserCtxt {
 
         // Shrink the current input buffer.
         // Move it as the raw buffer and create a new input buffer
-        let processed: size_t = (*input).cur.offset_from((*input).base) as usize;
-        buf.trim_head(processed as usize);
+        let processed = (*input).offset_from_base();
+        buf.trim_head(processed);
         (*input).consumed += processed as u64;
         input_buf.borrow_mut().raw = Some(buf);
         input_buf.borrow_mut().buffer = XmlBufRef::new();
@@ -2016,7 +2015,7 @@ pub(crate) unsafe fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -
         return 0;
     }
 
-    let indx: size_t = (*input).cur.offset_from((*input).base) as _;
+    let indx = (*input).offset_from_base();
     if buf.len() > indx + INPUT_CHUNK {
         return 0;
     }
@@ -2033,7 +2032,7 @@ pub(crate) unsafe fn xml_parser_input_grow(input: XmlParserInputPtr, len: i32) -
         (*input).end = (*input).base;
         return -1;
     }
-    (*input).cur = (*input).base.add(indx as usize);
+    (*input).cur = (*input).base.add(indx);
     (*input).end = if buf.is_ok() {
         buf.as_ref().as_ptr().add(buf.len())
     } else {
@@ -3897,8 +3896,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     // Also record the size of the entity parsed
     if !(*ctxt).input.is_null() && !oldctxt.is_null() {
         let mut consumed: u64 = (*(*ctxt).input).consumed;
-        consumed =
-            consumed.saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
+        consumed = consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
 
         (*oldctxt).sizeentities = (*oldctxt).sizeentities.saturating_add(consumed);
         (*oldctxt).sizeentities = (*oldctxt).sizeentities.saturating_add((*ctxt).sizeentities);
@@ -4381,7 +4379,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
 
     if size != 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
         let base: size_t = (*(*ctxt).input).get_base();
-        let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        let cur = (*(*ctxt).input).offset_from_base();
 
         (*(*ctxt).input)
             .buf
@@ -4727,7 +4725,7 @@ pub(crate) unsafe fn xml_parser_entity_check(ctxt: XmlParserCtxtPtr, extra: u64)
             && (*entity).flags & XML_ENT_PARSED as i32 == 0)
     {
         consumed = consumed.saturating_add((*input).consumed);
-        consumed = consumed.saturating_add((*input).cur.offset_from((*input).base) as _);
+        consumed = consumed.saturating_add((*input).offset_from_base() as u64);
     }
     consumed = consumed.saturating_add((*ctxt).sizeentities);
 
@@ -6565,7 +6563,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
     }
     (*ctxt).advance(1);
 
-    let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+    let cur = (*(*ctxt).input).offset_from_base();
     let inputid: i32 = (*(*ctxt).input).id;
     let mut nbdef = 0usize;
     let mut nb_ns = 0usize;
@@ -6581,7 +6579,7 @@ pub(crate) unsafe fn xml_parse_start_tag2(
         );
         return null_mut();
     }
-    *tlen = ((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as usize - cur) as _;
+    *tlen = ((*(*ctxt).input).offset_from_base() - cur) as _;
 
     // Now parse the attributes, it ends up with the ending
     //
@@ -7886,7 +7884,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
         return 0;
     }
 
-    if !(*ctxt).input.is_null() && (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) > 4096 {
+    if !(*ctxt).input.is_null() && (*(*ctxt).input).offset_from_base() > 4096 {
         (*ctxt).force_shrink();
     }
 
@@ -7906,8 +7904,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                     && !input_buffer.borrow().raw.unwrap().is_empty()
                 {
                     let base: size_t = (*(*ctxt).input).get_base();
-                    let current: size_t =
-                        (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+                    let current = (*(*ctxt).input).offset_from_base();
 
                     input_buffer.borrow_mut().push_bytes(b"");
                     (*(*ctxt).input).set_base_and_cursor(base, current);
@@ -8408,7 +8405,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             {
                                 // Special case to provide identical behaviour
                                 // between pull and push parsers on enpty CDATA sections
-                                if (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) >= 9
+                                if (*(*ctxt).input).offset_from_base() >= 9
                                     && strncmp(
                                         (*(*ctxt).input).cur.sub(9) as _,
                                         c"<![CDATA[".as_ptr() as _,
@@ -8690,7 +8687,7 @@ pub unsafe fn xml_parse_chunk(
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
         let base: size_t = (*(*ctxt).input).get_base();
-        let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        let cur = (*(*ctxt).input).offset_from_base();
 
         let res: i32 = (*(*ctxt).input)
             .buf
@@ -8713,7 +8710,7 @@ pub unsafe fn xml_parse_chunk(
             && input.borrow().raw.is_some()
         {
             let base: size_t = (*(*ctxt).input).get_base();
-            let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+            let current = (*(*ctxt).input).offset_from_base();
 
             let res = input.borrow_mut().decode(terminate != 0);
             (*(*ctxt).input).set_base_and_cursor(base, current);
@@ -8733,8 +8730,7 @@ pub unsafe fn xml_parse_chunk(
 
     if !(*ctxt).input.is_null()
         && ((*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) > XML_MAX_LOOKUP_LIMIT as isize
-            || (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base)
-                > XML_MAX_LOOKUP_LIMIT as isize)
+            || (*(*ctxt).input).offset_from_base() > XML_MAX_LOOKUP_LIMIT)
         && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
     {
         xml_fatal_err(
@@ -8750,7 +8746,7 @@ pub unsafe fn xml_parse_chunk(
 
     if end_in_lf == 1 && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
         let base: size_t = (*(*ctxt).input).get_base();
-        let current: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        let current = (*(*ctxt).input).offset_from_base();
 
         (*(*ctxt).input)
             .buf
@@ -8967,7 +8963,7 @@ pub unsafe fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
         }
         return ((*input).buf.as_ref().unwrap().borrow().rawconsumed - unused as u64) as i64;
     }
-    (*input).consumed as i64 + (*input).cur.offset_from((*input).base) as i64
+    (*input).consumed as i64 + (*input).offset_from_base() as i64
 }
 
 /// This is the set of XML parser options that can be passed down
@@ -9157,7 +9153,7 @@ pub unsafe fn xml_ctxt_reset_push(
 
     if size > 0 && !chunk.is_null() && !(*ctxt).input.is_null() && (*(*ctxt).input).buf.is_some() {
         let base: size_t = (*(*ctxt).input).get_base();
-        let cur: size_t = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        let cur = (*(*ctxt).input).offset_from_base();
 
         (*(*ctxt).input)
             .buf

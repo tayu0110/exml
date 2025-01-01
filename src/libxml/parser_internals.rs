@@ -385,7 +385,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
     if !(*ctxt).input.is_null()
         && (*(*ctxt).input).consumed == 0
         && !(*(*ctxt).input).cur.is_null()
-        && (*(*ctxt).input).cur == (*(*ctxt).input).base
+        && (*(*ctxt).input).offset_from_base() == 0
         && matches!(
             enc,
             XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
@@ -1200,7 +1200,7 @@ unsafe fn xml_parse_name_complex(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("Name"));
         return null_mut();
     }
-    if (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) < len as isize {
+    if (*(*ctxt).input).offset_from_base() < len as usize {
         // There were a couple of bugs where PERefs lead to to a change
         // of the buffer. Check the buffer size to avoid passing an invalid
         // pointer to xmlDictLookup.
@@ -3467,8 +3467,7 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
     // Also record the size of the entity parsed
     if !(*ctxt).input.is_null() && !oldctxt.is_null() {
         let mut consumed: u64 = (*(*ctxt).input).consumed;
-        consumed =
-            consumed.saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
+        consumed = consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
 
         (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add(consumed);
         (*oldctxt).sizeentcopy = (*oldctxt).sizeentcopy.saturating_add((*ctxt).sizeentcopy);
@@ -4121,8 +4120,8 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     && (*old_ent).flags & XML_ENT_PARSED as i32 == 0)
             {
                 parent_consumed = parent_consumed.saturating_add((*(*ctxt).input).consumed);
-                parent_consumed = parent_consumed
-                    .saturating_add((*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _);
+                parent_consumed =
+                    parent_consumed.saturating_add((*(*ctxt).input).offset_from_base() as u64);
             }
 
             input = xml_new_entity_input_stream(ctxt, entity);
@@ -4521,8 +4520,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
     // Capture start position
     let (begin_pos, begin_line) = if (*ctxt).record_info != 0 {
         (
-            (*(*ctxt).input).consumed
-                + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64,
+            (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64,
             (*(*ctxt).input).line as u64,
         )
     } else {
@@ -4625,8 +4623,7 @@ pub(crate) unsafe fn xml_parse_element_start(ctxt: XmlParserCtxtPtr) -> i32 {
                 node: NonNull::new(cur),
                 begin_pos,
                 begin_line,
-                end_pos: (*(*ctxt).input).consumed
-                    + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64,
+                end_pos: (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64,
                 end_line: (*(*ctxt).input).line as u64,
             };
             xml_parser_add_node_info(ctxt, Rc::new(RefCell::new(node_info)));
@@ -4693,8 +4690,8 @@ pub(crate) unsafe fn xml_parse_element_end(ctxt: XmlParserCtxtPtr) {
     // Capture end position
     if !cur.is_null() && (*ctxt).record_info != 0 {
         if let Some(node_info) = xml_parser_find_node_info(ctxt, cur) {
-            node_info.borrow_mut().end_pos = (*(*ctxt).input).consumed
-                + (*ctxt).current_ptr().offset_from((*(*ctxt).input).base) as u64;
+            node_info.borrow_mut().end_pos =
+                (*(*ctxt).input).consumed + (*(*ctxt).input).offset_from_base() as u64;
             node_info.borrow_mut().end_line = (*(*ctxt).input).line as _;
         }
     }
@@ -5697,8 +5694,6 @@ pub(crate) const LINE_LEN: usize = 80;
 /// This function removes used input for the parser.
 #[doc(alias = "xmlParserInputShrink")]
 pub(crate) unsafe fn xml_parser_input_shrink(input: XmlParserInputPtr) {
-    let mut used: usize;
-
     if input.is_null() {
         return;
     }
@@ -5715,7 +5710,7 @@ pub(crate) unsafe fn xml_parser_input_shrink(input: XmlParserInputPtr) {
         return;
     };
 
-    used = (*input).cur.offset_from((*input).base) as _;
+    let mut used = (*input).offset_from_base();
     // Do not shrink on large buffers whose only a tiny fraction was consumed
     if used > INPUT_CHUNK {
         let ret = buf.trim_head(used - LINE_LEN);

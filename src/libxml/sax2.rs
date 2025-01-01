@@ -367,7 +367,7 @@ pub unsafe fn xml_sax2_external_subset(
         }
 
         consumed = (*(*ctxt).input).consumed;
-        let buffered: usize = (*(*ctxt).input).cur.offset_from((*(*ctxt).input).base) as _;
+        let buffered = (*(*ctxt).input).offset_from_base();
         if buffered as u64 > u64::MAX - consumed {
             consumed = u64::MAX;
         } else {

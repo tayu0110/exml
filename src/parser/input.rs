@@ -105,6 +105,11 @@ pub struct XmlParserInput {
 }
 
 impl XmlParserInput {
+    /// Return the offset of `cur` from `base`.
+    pub(crate) unsafe fn offset_from_base(&self) -> usize {
+        self.cur.offset_from(self.base) as usize
+    }
+
     /// Update the input to use the current set of pointers from the buffer.
     ///
     /// Returns `-1` in case of error, `0` otherwise
