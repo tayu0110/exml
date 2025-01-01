@@ -33,7 +33,7 @@ use std::{
     sync::atomic::{AtomicI32, Ordering},
 };
 
-use libc::{bsearch, memcpy, memset, ptrdiff_t, size_t, snprintf, strcmp, strlen, INT_MAX};
+use libc::{bsearch, memcpy, memset, size_t, snprintf, strcmp, strlen, INT_MAX};
 
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
@@ -5530,7 +5530,7 @@ macro_rules! html_parse_err_int {
 ///
 /// Returns an encoding string or NULL if not found, the string need to be freed
 #[doc(alias = "htmlFindEncoding")]
-unsafe extern "C" fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
+unsafe fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar {
     let mut start: *const XmlChar;
     let mut cur: *const XmlChar;
 
@@ -5554,7 +5554,7 @@ unsafe extern "C" fn html_find_encoding(ctxt: XmlParserCtxtPtr) -> *mut XmlChar 
 
     start = (*(*ctxt).input).cur;
     let end: *const XmlChar = (*(*ctxt).input).end;
-    /* we also expect the input buffer to be zero terminated */
+    // we also expect the input buffer to be zero terminated
     if *end != 0 {
         return null_mut();
     }
@@ -5638,7 +5638,7 @@ unsafe fn html_parse_err(
 ///
 /// Returns the current char value and its length
 #[doc(alias = "htmlCurrentChar")]
-unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
+unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
     let mut val: u32;
 
     if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
@@ -5650,18 +5650,14 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
         return (*ctxt).token;
     }
 
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < INPUT_CHUNK as isize
-        && (*ctxt).force_grow() < 0
-    {
+    if (*(*ctxt).input).remainder_len() < INPUT_CHUNK && (*ctxt).force_grow() < 0 {
         return 0;
     }
 
     if (*ctxt).charset != XmlCharEncoding::UTF8 {
-        /*
-         * Assume it's a fixed length encoding (1) with
-         * a compatible encoding for the ASCII set, since
-         * HTML constructs only use < 128 chars
-         */
+        // Assume it's a fixed length encoding (1) with
+        // a compatible encoding for the ASCII set, since
+        // HTML constructs only use < 128 chars
         if *(*(*ctxt).input).cur < 0x80 {
             *len = 1;
             if *(*(*ctxt).input).cur == 0 && (*(*ctxt).input).cur < (*(*ctxt).input).end {
@@ -5676,9 +5672,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
             return *(*(*ctxt).input).cur as _;
         }
 
-        /*
-         * Humm this is bad, do an automatic flow conversion
-         */
+        // Humm this is bad, do an automatic flow conversion
         let guess: *mut XmlChar = html_find_encoding(ctxt);
         if guess.is_null() {
             xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
@@ -5710,17 +5704,15 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
         (*ctxt).charset = XmlCharEncoding::UTF8;
     }
 
-    /*
-     * We are supposed to handle UTF8, check it's valid
-     * From rfc2044: encoding of the Unicode values on UTF-8:
-     *
-     * UCS-4 range (hex.)           UTF-8 octet sequence (binary)
-     * 0000 0000-0000 007F   0xxxxxxx
-     * 0000 0080-0000 07FF   110xxxxx 10xxxxxx
-     * 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
-     *
-     * Check for the 0x110000 limit too
-     */
+    // We are supposed to handle UTF8, check it's valid
+    // From rfc2044: encoding of the Unicode values on UTF-8:
+    //
+    // UCS-4 range (hex.)           UTF-8 octet sequence (binary)
+    // 0000 0000-0000 007F   0xxxxxxx
+    // 0000 0080-0000 07FF   110xxxxx 10xxxxxx
+    // 0000 0800-0000 FFFF   1110xxxx 10xxxxxx 10xxxxxx
+    //
+    // Check for the 0x110000 limit too
     let cur: *const u8 = (*(*ctxt).input).cur;
     let c: u8 = *cur;
     'goto_encoding_error: {
@@ -5728,7 +5720,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
             if c & 0x40 == 0 {
                 break 'goto_encoding_error;
             }
-            let avail: size_t = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+            let avail = (*(*ctxt).input).remainder_len();
 
             if avail < 2 || *cur.add(1) & 0xc0 != 0x80 {
                 break 'goto_encoding_error;
@@ -5741,7 +5733,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                     if c & 0xf8 != 0xf0 || avail < 4 || *cur.add(3) & 0xc0 != 0x80 {
                         break 'goto_encoding_error;
                     }
-                    /* 4-byte code */
+                    // 4-byte code
                     *len = 4;
                     val = (*cur.add(0) as u32 & 0x7) << 18;
                     val |= (*cur.add(1) as u32 & 0x3f) << 12;
@@ -5751,7 +5743,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                         break 'goto_encoding_error;
                     }
                 } else {
-                    /* 3-byte code */
+                    // 3-byte code
                     *len = 3;
                     val = (*cur.add(0) as u32 & 0xf) << 12;
                     val |= (*cur.add(1) as u32 & 0x3f) << 6;
@@ -5761,7 +5753,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                     }
                 }
             } else {
-                /* 2-byte code */
+                // 2-byte code
                 *len = 2;
                 val = (*cur.add(0) as u32 & 0x1f) << 6;
                 val |= *cur.add(1) as u32 & 0x3f;
@@ -5790,7 +5782,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
                 *len = 1;
                 return b' ' as _;
             }
-            /* 1-byte code */
+            // 1-byte code
             *len = 1;
             return *(*(*ctxt).input).cur as _;
         }
@@ -5805,7 +5797,7 @@ unsafe extern "C" fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) ->
         use std::fmt::Write as _;
         let mut buffer = String::new();
 
-        if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+        if (*(*ctxt).input).remainder_len() >= 4 {
             writeln!(
                 buffer,
                 "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}",
@@ -9148,7 +9140,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         set_document_locator((*ctxt).user_data.clone(), xml_default_sax_locator());
     }
 
-    if (*ctxt).encoding.is_none() && ((*(*ctxt).input).end.offset_from((*(*ctxt).input).cur)) >= 4 {
+    if (*ctxt).encoding.is_none() && (*(*ctxt).input).remainder_len() >= 4 {
         // Get the 4 first bytes and decode the charset
         // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
         // plug some encoding conversion routines.
@@ -9855,7 +9847,6 @@ unsafe fn html_parse_lookup_sequence(
     third: XmlChar,
     ignoreattrval: i32,
 ) -> i32 {
-    let mut len: size_t;
     let mut quote: i32;
 
     let input: HtmlParserInputPtr = (*ctxt).input;
@@ -9867,7 +9858,7 @@ unsafe fn html_parse_lookup_sequence(
     quote = (*ctxt).end_check_state;
 
     let buf: *const XmlChar = (*input).cur;
-    len = (*input).end.offset_from((*input).cur) as _;
+    let mut len = (*input).remainder_len();
 
     // take into account the sequence length
     if third != 0 {
@@ -9924,7 +9915,6 @@ unsafe fn html_parse_lookup_sequence(
 #[cfg(feature = "libxml_push")]
 unsafe fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
     let mut mark: i32;
-    let mut offset: i32;
 
     loop {
         mark = html_parse_lookup_sequence(ctxt, b'-', b'-', 0, 0);
@@ -9937,8 +9927,8 @@ unsafe fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
             (*ctxt).check_index = 0;
             break;
         }
-        offset = if NXT!(ctxt, mark + 2) == b'!' { 3 } else { 2 };
-        if mark + offset >= (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as i32 {
+        let offset = if NXT!(ctxt, mark + 2) == b'!' { 3 } else { 2 };
+        if mark + offset >= (*(*ctxt).input).remainder_len() as i32 {
             (*ctxt).check_index = mark as _;
             return -1;
         }
@@ -9955,7 +9945,7 @@ unsafe fn html_parse_lookup_comment_end(ctxt: HtmlParserCtxtPtr) -> i32 {
 unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i32 {
     let ret: i32 = 0;
     let mut input: HtmlParserInputPtr;
-    let mut avail: ptrdiff_t = 0;
+    let mut avail = 0;
     let mut cur: XmlChar;
     let mut next: XmlChar;
 
@@ -9964,7 +9954,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
         if input.is_null() {
             break;
         }
-        avail = (*input).end.offset_from((*input).cur) as _;
+        avail = (*input).remainder_len();
         if avail == 0 && terminate != 0 {
             html_auto_close_on_end(ctxt);
             if (*ctxt).name_tab.is_empty()
@@ -10004,7 +9994,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                 cur = *(*input).cur.add(0);
                 if xml_is_blank_char(cur as u32) {
                     SKIP_BLANKS!(ctxt);
-                    avail = (*input).end.offset_from((*input).cur) as _;
+                    avail = (*input).remainder_len();
                 }
                 if let Some(set_document_locator) = (*ctxt)
                     .sax
@@ -10047,7 +10037,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
             }
             XmlParserInputState::XmlParserMisc => {
                 SKIP_BLANKS!(ctxt);
-                avail = (*input).end.offset_from((*input).cur) as _;
+                avail = (*input).remainder_len();
                 // no chars input buffer
                 if avail < 1 {
                     // goto done;
@@ -10108,7 +10098,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
             }
             XmlParserInputState::XmlParserProlog => {
                 SKIP_BLANKS!(ctxt);
-                avail = (*input).end.offset_from((*input).cur) as _;
+                avail = (*input).remainder_len();
                 if avail < 2 {
                     // goto done;
                     break 'done;
@@ -10141,7 +10131,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                 }
             }
             XmlParserInputState::XmlParserEpilog => {
-                avail = (*input).end.offset_from((*input).cur) as _;
+                avail = (*input).remainder_len();
                 if avail < 1 {
                     // goto done;
                     break 'done;
@@ -10460,7 +10450,7 @@ unsafe fn html_parse_try_or_finish(ctxt: HtmlParserCtxtPtr, terminate: i32) -> i
                     (*ctxt).check_index = 0;
                     while !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
                         && cur != b'<'
-                        && ((*input).cur < (*input).end)
+                        && (*input).cur < (*input).end
                     {
                         if cur == b'&' {
                             html_parse_reference(ctxt);

@@ -4146,7 +4146,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                     return;
                 }
-                if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+                if (*(*ctxt).input).remainder_len() >= 4 {
                     start[0] = (*ctxt).current_byte();
                     start[1] = NXT!(ctxt, 1);
                     start[2] = NXT!(ctxt, 2);
@@ -5041,7 +5041,7 @@ pub unsafe fn xml_parse_external_subset(
     (*ctxt).detect_sax2();
     (*ctxt).grow();
 
-    if (*ctxt).encoding.is_none() && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+    if (*ctxt).encoding.is_none() && (*(*ctxt).input).remainder_len() >= 4 {
         let mut start: [XmlChar; 4] = [0; 4];
 
         start[0] = (*ctxt).current_byte();
@@ -5239,10 +5239,7 @@ pub(crate) unsafe fn xml_string_current_char(
     // An encoding problem may arise from a truncated input buffer
     // splitting a character in the middle. In that case do not raise
     // an error but return 0 to indicate an end of stream problem
-    if ctxt.is_null()
-        || (*ctxt).input.is_null()
-        || (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < 4
-    {
+    if ctxt.is_null() || (*ctxt).input.is_null() || (*(*ctxt).input).remainder_len() < 4 {
         *len = 0;
         return 0;
     }

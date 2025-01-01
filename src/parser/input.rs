@@ -110,6 +110,12 @@ impl XmlParserInput {
         self.cur.offset_from(self.base) as usize
     }
 
+    /// Return the length of remainder buffer length.  
+    /// In other word, the offset of `end` from `cur`.
+    pub(crate) unsafe fn remainder_len(&self) -> usize {
+        self.end.offset_from(self.cur) as usize
+    }
+
     /// Update the input to use the current set of pointers from the buffer.
     ///
     /// Returns `-1` in case of error, `0` otherwise

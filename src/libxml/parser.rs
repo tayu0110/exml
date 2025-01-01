@@ -514,7 +514,7 @@ impl XmlParserCtxt {
     #[doc(alias = "xmlParserGrow")]
     pub(crate) unsafe fn force_grow(&mut self) -> i32 {
         let input: XmlParserInputPtr = self.input;
-        let cur_end: ptrdiff_t = (*input).end.offset_from((*input).cur);
+        let cur_end: ptrdiff_t = (*input).remainder_len() as isize;
         let cur_base: ptrdiff_t = (*input).offset_from_base() as isize;
 
         let Some(buf) = (*input).buf.as_mut() else {
@@ -554,9 +554,7 @@ impl XmlParserCtxt {
     }
 
     pub(crate) unsafe fn grow(&mut self) {
-        if self.progressive == 0
-            && ((*self.input).end.offset_from((*self.input).cur) as usize) < INPUT_CHUNK
-        {
+        if self.progressive == 0 && (*self.input).remainder_len() < INPUT_CHUNK {
             self.force_grow();
         }
     }
@@ -601,7 +599,7 @@ impl XmlParserCtxt {
     pub(crate) unsafe fn shrink(&mut self) {
         if self.progressive == 0
             && (*self.input).offset_from_base() > 2 * INPUT_CHUNK
-            && (*self.input).end.offset_from((*self.input).cur) < 2 * INPUT_CHUNK as isize
+            && (*self.input).remainder_len() < 2 * INPUT_CHUNK
         {
             self.force_shrink();
         }
@@ -665,9 +663,8 @@ impl XmlParserCtxt {
     }
 
     pub(crate) unsafe fn content_bytes(&self) -> &[u8] {
-        let len = (*self.input).end.offset_from((*self.input).cur);
-        assert!(len >= 0);
-        from_raw_parts((*self.input).cur, len as usize)
+        let len = (*self.input).remainder_len();
+        from_raw_parts((*self.input).cur, len)
     }
 
     /// Skip to the next character.
@@ -686,7 +683,7 @@ impl XmlParserCtxt {
             return;
         }
 
-        if (*self.input).end.offset_from((*self.input).cur) < INPUT_CHUNK as isize {
+        if (*self.input).remainder_len() < INPUT_CHUNK {
             if self.force_grow() < 0 {
                 return;
             }
@@ -742,7 +739,7 @@ impl XmlParserCtxt {
         // input encoding didn't get properly advertised in the declaration header.
         // Report the error and switch the encoding
         // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-        if self.input.is_null() || (*self.input).end.offset_from((*self.input).cur) < 4 {
+        if self.input.is_null() || (*self.input).remainder_len() < 4 {
             __xml_err_encoding!(
                 self,
                 XmlParserErrors::XmlErrInvalidChar,
@@ -874,9 +871,7 @@ impl XmlParserCtxt {
             return None;
         }
 
-        if (*self.input).end.offset_from((*self.input).cur) < INPUT_CHUNK as isize
-            && self.force_grow() < 0
-        {
+        if (*self.input).remainder_len() < INPUT_CHUNK && self.force_grow() < 0 {
             return None;
         }
 
@@ -923,7 +918,7 @@ impl XmlParserCtxt {
                         // input encoding didn't get properly advertised in the
                         // declaration header. Report the error and switch the encoding
                         // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
-                        if (*self.input).end.offset_from((*self.input).cur) < 4 {
+                        if (*self.input).remainder_len() < 4 {
                             __xml_err_encoding!(
                                 self,
                                 XmlParserErrors::XmlErrInvalidChar,
@@ -2478,7 +2473,7 @@ pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         return -1;
     }
 
-    if (*ctxt).encoding().is_none() && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+    if (*ctxt).encoding().is_none() && (*(*ctxt).input).remainder_len() >= 4 {
         // Get the 4 first bytes and decode the charset
         // if enc != XML_CHAR_ENCODING_NONE
         // plug some encoding conversion routines.
@@ -2656,7 +2651,7 @@ pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
     // Get the 4 first bytes and decode the charset
     // if enc != XML_CHAR_ENCODING_NONE
     // plug some encoding conversion routines.
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+    if (*(*ctxt).input).remainder_len() >= 4 {
         start[0] = (*ctxt).current_byte();
         start[1] = (*ctxt).nth_byte(1);
         start[2] = (*ctxt).nth_byte(2);
@@ -3125,7 +3120,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+    if (*(*ctxt).input).remainder_len() >= 4 {
         let input = from_raw_parts((*(*ctxt).input).cur, 4);
         let enc = detect_encoding(input);
         xml_switch_encoding(ctxt, enc);
@@ -3245,9 +3240,7 @@ pub unsafe fn xml_io_parse_dtd(
     (*(*ctxt).my_doc).ext_subset =
         xml_new_dtd((*ctxt).my_doc, Some("none"), Some("none"), Some("none"));
 
-    if matches!(enc, XmlCharEncoding::None)
-        && (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4
-    {
+    if matches!(enc, XmlCharEncoding::None) && (*(*ctxt).input).remainder_len() >= 4 {
         // Get the 4 first bytes and decode the charset
         // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
         // plug some encoding conversion routines.
@@ -3793,7 +3786,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     // if enc != xmlCharEncoding::XML_CHAR_ENCODING_NONE
     // plug some encoding conversion routines.
     (*ctxt).grow();
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) >= 4 {
+    if (*(*ctxt).input).remainder_len() >= 4 {
         start[0] = (*ctxt).current_byte();
         start[1] = (*ctxt).nth_byte(1);
         start[2] = (*ctxt).nth_byte(2);
@@ -7025,7 +7018,7 @@ unsafe fn xml_parse_lookup_char(ctxt: XmlParserCtxtPtr, c: i32) -> i32 {
     };
 
     if memchr(cur as _, c, (*(*ctxt).input).end.offset_from(cur) as _).is_null() {
-        let index: size_t = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+        let index = (*(*ctxt).input).remainder_len();
 
         if index > i64::MAX as usize {
             (*ctxt).check_index = 0;
@@ -7910,7 +7903,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                     (*(*ctxt).input).set_base_and_cursor(base, current);
                 }
             }
-            avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+            avail = (*(*ctxt).input).remainder_len();
             if avail < 1 {
                 // goto done;
                 return ret;
@@ -8353,7 +8346,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
 
                         if terminate != 0 {
                             // Unfinished CDATA section
-                            size = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+                            size = (*(*ctxt).input).remainder_len() as i32;
                         } else {
                             if avail < XML_PARSER_BIG_BUFFER_SIZE + 2 {
                                 // goto done;
@@ -8439,7 +8432,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                 | XmlParserInputState::XmlParserProlog
                 | XmlParserInputState::XmlParserEpilog => {
                     (*ctxt).skip_blanks();
-                    avail = (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) as _;
+                    avail = (*(*ctxt).input).remainder_len();
                     if avail < 2 {
                         // goto done;
                         return ret;
@@ -8615,7 +8608,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
         return ret;
     }
     // encoding_error:
-    if (*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) < 4 {
+    if (*(*ctxt).input).remainder_len() < 4 {
         __xml_err_encoding!(
             ctxt,
             XmlParserErrors::XmlErrInvalidChar,
@@ -8729,7 +8722,7 @@ pub unsafe fn xml_parse_chunk(
     }
 
     if !(*ctxt).input.is_null()
-        && ((*(*ctxt).input).end.offset_from((*(*ctxt).input).cur) > XML_MAX_LOOKUP_LIMIT as isize
+        && ((*(*ctxt).input).remainder_len() > XML_MAX_LOOKUP_LIMIT
             || (*(*ctxt).input).offset_from_base() > XML_MAX_LOOKUP_LIMIT)
         && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0
     {
@@ -8937,7 +8930,7 @@ pub unsafe fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
         // Encoding conversion, compute the number of unused original
         // bytes from the input not consumed and subtract that from
         // the raw consumed value, this is not a cheap operation
-        if (*input).end.offset_from((*input).cur) > 0 {
+        if (*input).remainder_len() > 0 {
             // The original code seems to continue processing as long as the write succeeds,
             // even if encoding errors occur.
             // However, the new API stops processing when an error occurs,
@@ -8945,7 +8938,7 @@ pub unsafe fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
             let mut out = [0u8; 32000];
             let Ok(input) = from_utf8(from_raw_parts(
                 (*input).cur,
-                (*input).end.offset_from((*input).cur) as usize,
+                (*input).remainder_len() as usize,
             )) else {
                 return -1;
             };
