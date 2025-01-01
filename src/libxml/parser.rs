@@ -131,7 +131,7 @@ use crate::{
         xmlschemastypes::xml_schema_cleanup_types,
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
-    parser::XmlParserCharValid,
+    parser::{XmlParserCharValid, XmlParserNodeInfo, XmlParserNodeInfoPtr},
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
         xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
@@ -330,23 +330,6 @@ impl Default for XmlParserInput {
             entity: null_mut(),
         }
     }
-}
-
-/// The parser can be asked to collect Node information, i.e. at what
-/// place in the file they were detected.
-/// NOTE: This is off by default and not very well tested.
-#[doc(alias = "xmlParserNodeInfo")]
-pub type XmlParserNodeInfoPtr = *mut XmlParserNodeInfo;
-
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct XmlParserNodeInfo {
-    pub(crate) node: *const XmlNode,
-    /* Position & line # that text that created the node begins & ends on */
-    pub(crate) begin_pos: u64,
-    pub(crate) begin_line: u64,
-    pub(crate) end_pos: u64,
-    pub(crate) end_line: u64,
 }
 
 pub type XmlParserNodeInfoSeqPtr = *mut XmlParserNodeInfoSeq;

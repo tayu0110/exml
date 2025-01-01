@@ -37,7 +37,7 @@ use crate::hash::XmlHashTableRef;
 use crate::io::__xml_loader_err;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
-use crate::parser::XmlParserCharValid;
+use crate::parser::{XmlParserCharValid, XmlParserNodeInfo, XmlParserNodeInfoPtr};
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::uri::build_uri;
 use crate::{
@@ -68,8 +68,7 @@ use crate::{
             xml_parse_version_num, xml_parser_add_node_info, xml_parser_entity_check,
             xml_parser_find_node_info, xml_string_decode_entities_int, xml_validity_error,
             xml_warning_msg, XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInput,
-            XmlParserInputPtr, XmlParserInputState, XmlParserMode, XmlParserNodeInfo,
-            XmlParserNodeInfoPtr, XmlParserOption, XML_SKIP_IDS,
+            XmlParserInputPtr, XmlParserInputState, XmlParserMode, XmlParserOption, XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
         uri::xml_canonic_path,
