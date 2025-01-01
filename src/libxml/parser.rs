@@ -103,7 +103,7 @@ use crate::{
             xml_parse_entity_ref, xml_parse_entity_value, xml_parse_external_subset,
             xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
             xml_parse_pi, xml_parse_reference, xml_parse_sddecl, xml_parse_start_tag,
-            xml_parse_system_literal, xml_parse_version_info, xml_switch_encoding, INPUT_CHUNK,
+            xml_parse_system_literal, xml_parse_version_info, INPUT_CHUNK,
             XML_MAX_DICTIONARY_LIMIT, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH,
             XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
@@ -1180,7 +1180,7 @@ pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         start[3] = (*ctxt).nth_byte(3);
         let enc = detect_encoding(&start);
         if !matches!(enc, XmlCharEncoding::None) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
     }
 
@@ -1355,7 +1355,7 @@ pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
         start[3] = (*ctxt).nth_byte(3);
         let enc = detect_encoding(&start);
         if !matches!(enc, XmlCharEncoding::None) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
     }
 
@@ -1820,7 +1820,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     if (*(*ctxt).input).remainder_len() >= 4 {
         let input = from_raw_parts((*(*ctxt).input).cur, 4);
         let enc = detect_encoding(input);
-        xml_switch_encoding(ctxt, enc);
+        (*ctxt).switch_encoding(enc);
     }
 
     if (*input).filename.is_none() {
@@ -1916,7 +1916,7 @@ pub unsafe fn xml_io_parse_dtd(
         return null_mut();
     }
     if !matches!(enc, XmlCharEncoding::None) {
-        xml_switch_encoding(ctxt, enc);
+        (*ctxt).switch_encoding(enc);
     }
 
     (*pinput).filename = None;
@@ -1947,7 +1947,7 @@ pub unsafe fn xml_io_parse_dtd(
         start[3] = (*ctxt).nth_byte(3);
         enc = detect_encoding(&start);
         if !matches!(enc, XmlCharEncoding::None) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
     }
 
@@ -2490,7 +2490,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
         start[3] = (*ctxt).nth_byte(3);
         let enc = detect_encoding(&start);
         if !matches!(enc, XmlCharEncoding::None) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
     }
 
@@ -6604,7 +6604,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        xml_switch_encoding(ctxt, enc);
+                        (*ctxt).switch_encoding(enc);
                         break 'to_break;
                     }
                     if avail < 2 {
@@ -7490,7 +7490,7 @@ pub unsafe fn xml_new_io_input_stream(
     (*input_stream).reset_base();
 
     if !matches!(enc, XmlCharEncoding::None) {
-        xml_switch_encoding(ctxt, enc);
+        (*ctxt).switch_encoding(enc);
     }
 
     input_stream
@@ -7838,7 +7838,7 @@ pub unsafe fn xml_ctxt_reset_push(
             );
         };
     } else if !matches!(enc, XmlCharEncoding::None) {
-        xml_switch_encoding(ctxt, enc);
+        (*ctxt).switch_encoding(enc);
     }
 
     0

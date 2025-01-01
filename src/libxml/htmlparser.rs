@@ -49,8 +49,8 @@ use crate::{
             XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
         },
         parser_internals::{
-            xml_free_input_stream, xml_new_input_stream, xml_switch_encoding, INPUT_CHUNK,
-            XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
+            xml_free_input_stream, xml_new_input_stream, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
+            XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         uri::xml_canonic_path,
@@ -5677,7 +5677,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
         // Humm this is bad, do an automatic flow conversion
         let guess: *mut XmlChar = html_find_encoding(ctxt);
         if guess.is_null() {
-            xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
+            (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
         } else {
             (*(*ctxt).input).encoding = Some(
                 CStr::from_ptr(guess as *const i8)
@@ -5842,7 +5842,7 @@ unsafe fn html_current_char(ctxt: XmlParserCtxtPtr, len: *mut i32) -> i32 {
             .encoder
             .is_none()
     {
-        xml_switch_encoding(ctxt, XmlCharEncoding::ISO8859_1);
+        (*ctxt).switch_encoding(XmlCharEncoding::ISO8859_1);
     }
     *len = 1;
     *(*(*ctxt).input).cur as _
@@ -6741,7 +6741,7 @@ unsafe fn html_check_encoding_direct(ctxt: HtmlParserCtxtPtr, encoding: Option<&
                     None,
                 );
             } else {
-                xml_switch_encoding(ctxt, enc);
+                (*ctxt).switch_encoding(enc);
             }
             (*ctxt).charset = XmlCharEncoding::UTF8;
         } else {
@@ -9152,7 +9152,7 @@ pub unsafe fn html_parse_document(ctxt: HtmlParserCtxtPtr) -> i32 {
         start[3] = NXT!(ctxt, 3);
         let enc = detect_encoding(&start);
         if !matches!(enc, XmlCharEncoding::None) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
     }
 
@@ -9274,7 +9274,7 @@ unsafe fn html_create_doc_parser_ctxt(
         let enc = encoding.parse().unwrap_or(XmlCharEncoding::Error);
         // registered set of known encodings
         if !matches!(enc, XmlCharEncoding::Error) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
             if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
                 html_parse_err(
                     ctxt,

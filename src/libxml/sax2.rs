@@ -69,8 +69,8 @@ use super::{
     },
     parser_internals::{
         xml_free_input_stream, xml_parse_external_subset, xml_split_qname,
-        xml_string_decode_entities, xml_string_len_decode_entities, xml_switch_encoding,
-        XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
+        xml_string_decode_entities, xml_string_len_decode_entities, XML_MAX_TEXT_LENGTH,
+        XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
     },
     uri::{xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
     valid::{
@@ -342,7 +342,7 @@ pub unsafe fn xml_sax2_external_subset(
         if (*(*ctxt).input).length >= 4 {
             let input = from_raw_parts((*(*ctxt).input).cur, 4);
             let enc = detect_encoding(input);
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
 
         if (*input).filename.is_none() {

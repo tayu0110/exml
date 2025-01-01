@@ -45,7 +45,7 @@ use crate::parser::{
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::uri::build_uri;
 use crate::{
-    encoding::{detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding},
+    encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     generic_error,
     globals::{get_parser_debug_entities, GenericErrorContext},
     io::{xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
@@ -366,104 +366,6 @@ pub unsafe fn xml_create_entity_parser_ctxt(
 ) -> XmlParserCtxtPtr {
     xml_create_entity_parser_ctxt_internal(None, None, url, id, base, null_mut())
         .unwrap_or(null_mut())
-}
-
-/// Change the input functions when discovering the character encoding of a given entity.
-///
-/// Returns 0 in case of success, -1 otherwise
-#[doc(alias = "xmlSwitchEncoding")]
-pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) -> i32 {
-    if ctxt.is_null() {
-        return -1;
-    }
-
-    // FIXME: The BOM shouldn't be skipped here, but in the parsing code.
-    //
-    // Note that we look for a decoded UTF-8 BOM when switching to UTF-16.
-    // This is mostly useless but Webkit/Chromium relies on this behavior.
-    // See https://bugs.chromium.org/p/chromium/issues/detail?id=1451026
-    if !(*ctxt).input.is_null()
-        && (*(*ctxt).input).consumed == 0
-        && !(*(*ctxt).input).cur.is_null()
-        && (*(*ctxt).input).offset_from_base() == 0
-        && matches!(
-            enc,
-            XmlCharEncoding::UTF8 | XmlCharEncoding::UTF16LE | XmlCharEncoding::UTF16BE
-        )
-    {
-        // Errata on XML-1.0 June 20 2001
-        // Specific handling of the Byte Order Mark for UTF-8
-        if *(*(*ctxt).input).cur.add(0) == 0xEF
-            && *(*(*ctxt).input).cur.add(1) == 0xBB
-            && *(*(*ctxt).input).cur.add(2) == 0xBF
-        {
-            (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(3);
-        }
-    }
-
-    let Some(handler) = (match enc {
-        XmlCharEncoding::Error => {
-            __xml_err_encoding!(
-                ctxt,
-                XmlParserErrors::XmlErrUnknownEncoding,
-                "encoding unknown\n"
-            );
-            return -1;
-        }
-        XmlCharEncoding::None => {
-            // let's assume it's UTF-8 without the XML decl
-            (*ctxt).charset = XmlCharEncoding::UTF8;
-            return 0;
-        }
-        XmlCharEncoding::UTF8 => {
-            // default encoding, no conversion should be needed
-            (*ctxt).charset = XmlCharEncoding::UTF8;
-            return 0;
-        }
-        XmlCharEncoding::EBCDIC => (*(*ctxt).input).detect_ebcdic(),
-        _ => get_encoding_handler(enc),
-    }) else {
-        // Default handlers.
-        match enc {
-            XmlCharEncoding::ASCII => {
-                // default encoding, no conversion should be needed
-                (*ctxt).charset = XmlCharEncoding::UTF8;
-                return 0;
-            }
-            XmlCharEncoding::ISO8859_1 => {
-                if (*ctxt).input_tab.len() == 1
-                    && (*ctxt).encoding.is_none()
-                    && !(*ctxt).input.is_null()
-                    && (*(*ctxt).input).encoding.is_some()
-                {
-                    (*ctxt).encoding = (*(*ctxt).input).encoding.clone();
-                }
-                (*ctxt).charset = enc;
-                return 0;
-            }
-            _ => {
-                let name = enc.get_name().unwrap_or("");
-                __xml_err_encoding!(
-                    ctxt,
-                    XmlParserErrors::XmlErrUnsupportedEncoding,
-                    "encoding not supported: {}\n",
-                    name
-                );
-                // TODO: We could recover from errors in external entities
-                // if we didn't stop the parser. But most callers of this
-                // function don't check the return value.
-                (*ctxt).stop();
-                return -1;
-            }
-        }
-    };
-    let ret: i32 = (*ctxt).switch_input_encoding((*ctxt).input, handler);
-    if ret < 0 || (*ctxt).err_no == XmlParserErrors::XmlI18NConvFailed as i32 {
-        // on encoding conversion errors, stop the parser
-        (*ctxt).stop();
-        (*ctxt).err_no = XmlParserErrors::XmlI18NConvFailed as i32;
-    }
-    ret
 }
 
 /// Create a new input stream based on a memory buffer.
@@ -3977,7 +3879,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                     start[3] = NXT!(ctxt, 3);
                     let enc = detect_encoding(&start);
                     if !matches!(enc, XmlCharEncoding::None) {
-                        xml_switch_encoding(ctxt, enc);
+                        (*ctxt).switch_encoding(enc);
                     }
                 }
 
@@ -4874,7 +4776,7 @@ pub unsafe fn xml_parse_external_subset(
         start[3] = NXT!(ctxt, 3);
         let enc = detect_encoding(&start);
         if !matches!(enc, XmlCharEncoding::None) {
-            xml_switch_encoding(ctxt, enc);
+            (*ctxt).switch_encoding(enc);
         }
     }
 
