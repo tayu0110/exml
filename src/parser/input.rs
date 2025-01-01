@@ -42,12 +42,19 @@ use std::{
     ops::DerefMut,
     ptr::{null, null_mut},
     rc::Rc,
+    slice::from_raw_parts,
+    str::{from_utf8, from_utf8_mut},
 };
 
 use crate::{
     buf::xml_buf_overflow_error,
+    encoding::{
+        find_encoding_handler, get_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler,
+    },
     io::XmlParserInputBuffer,
-    libxml::{entities::XmlEntityPtr, parser::XmlParserInputDeallocate},
+    libxml::{
+        chvalid::xml_is_blank_char, entities::XmlEntityPtr, parser::XmlParserInputDeallocate,
+    },
 };
 
 pub type XmlParserInputPtr = *mut XmlParserInput;
@@ -164,6 +171,70 @@ impl XmlParserInput {
             self.end = buffer.as_mut_ptr().add(buffer.len());
         }
         0
+    }
+
+    #[doc(alias = "xmlDetectEBCDIC")]
+    pub(crate) unsafe fn detect_ebcdic(&self) -> Option<XmlCharEncodingHandler> {
+        let mut out: [u8; 200] = [0; 200];
+
+        // To detect the EBCDIC code page, we convert the first 200 bytes
+        // to EBCDIC-US and try to find the encoding declaration.
+        let mut handler = get_encoding_handler(XmlCharEncoding::EBCDIC)?;
+        let inlen = self.end.offset_from(self.cur) as usize;
+        let outstr = from_utf8_mut(&mut out).ok()?;
+        let Ok((_, outlen)) = handler.decode(from_raw_parts(self.cur, inlen), outstr) else {
+            return Some(handler);
+        };
+        out[outlen] = 0;
+
+        let mut i: usize = 0;
+        while i < outlen {
+            if out[i] == b'>' {
+                break;
+            }
+            if out[i] == b'e' && out[i..].starts_with(b"encoding") {
+                let mut cur: u8;
+
+                i += 8;
+                while xml_is_blank_char(out[i] as u32) {
+                    i += 1;
+                }
+                i += 1;
+                if out[i - 1] != b'=' {
+                    break;
+                }
+                while xml_is_blank_char(out[i] as u32) {
+                    i += 1;
+                }
+                let quote: u8 = out[i];
+                i += 1;
+                if quote != b'\'' && quote != b'"' {
+                    break;
+                }
+                let start: usize = i;
+                cur = out[i];
+                while cur.is_ascii_lowercase()
+                    || cur.is_ascii_uppercase()
+                    || cur.is_ascii_digit()
+                    || cur == b'.'
+                    || cur == b'_'
+                    || cur == b'-'
+                {
+                    i += 1;
+                    cur = out[i];
+                }
+                if cur != quote {
+                    break;
+                }
+                return from_utf8(&out[start..i])
+                    .ok()
+                    .and_then(find_encoding_handler);
+            }
+
+            i += 1;
+        }
+
+        Some(handler)
     }
 }
 

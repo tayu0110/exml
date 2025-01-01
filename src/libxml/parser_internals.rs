@@ -26,8 +26,7 @@ use std::ffi::{c_char, CStr, CString};
 use std::mem::size_of;
 use std::ptr::{addr_of_mut, null, null_mut, NonNull};
 use std::rc::Rc;
-use std::slice::from_raw_parts;
-use std::str::{from_utf8, from_utf8_mut};
+use std::str::from_utf8;
 use std::sync::atomic::Ordering;
 
 use libc::{memcpy, memset, snprintf, INT_MAX};
@@ -46,10 +45,7 @@ use crate::parser::{
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::uri::build_uri;
 use crate::{
-    encoding::{
-        detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding,
-        XmlCharEncodingHandler,
-    },
+    encoding::{detect_encoding, find_encoding_handler, get_encoding_handler, XmlCharEncoding},
     generic_error,
     globals::{get_parser_debug_entities, GenericErrorContext},
     io::{xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
@@ -372,74 +368,6 @@ pub unsafe fn xml_create_entity_parser_ctxt(
         .unwrap_or(null_mut())
 }
 
-unsafe fn xml_detect_ebcdic(input: XmlParserInputPtr) -> Option<XmlCharEncodingHandler> {
-    let mut out: [XmlChar; 200] = [0; 200];
-
-    // To detect the EBCDIC code page, we convert the first 200 bytes
-    // to EBCDIC-US and try to find the encoding declaration.
-    let mut handler = get_encoding_handler(XmlCharEncoding::EBCDIC)?;
-    let inlen = (*input).end.offset_from((*input).cur) as usize;
-    let outstr = from_utf8_mut(&mut out).ok()?;
-    let Ok((_, outlen)) = handler.decode(from_raw_parts((*input).cur, inlen), outstr) else {
-        return Some(handler);
-    };
-    out[outlen] = 0;
-
-    let mut i: usize = 0;
-    while i < outlen {
-        if out[i] == b'>' {
-            break;
-        }
-        if out[i] == b'e'
-            && xml_strncmp(out.as_ptr().add(i) as _, c"encoding".as_ptr() as _, 8) == 0
-        {
-            let mut cur: u8;
-
-            i += 8;
-            while xml_is_blank_char(out[i] as u32) {
-                i += 1;
-            }
-            i += 1;
-            if out[i - 1] != b'=' {
-                break;
-            }
-            while xml_is_blank_char(out[i] as u32) {
-                i += 1;
-            }
-            let quote: u8 = out[i];
-            i += 1;
-            if quote != b'\'' && quote != b'"' {
-                break;
-            }
-            let start: usize = i;
-            cur = out[i];
-            while cur.is_ascii_lowercase()
-                || cur.is_ascii_uppercase()
-                || cur.is_ascii_digit()
-                || cur == b'.'
-                || cur == b'_'
-                || cur == b'-'
-            {
-                i += 1;
-                cur = out[i];
-            }
-            if cur != quote {
-                break;
-            }
-            out[i] = 0;
-            return find_encoding_handler(
-                CStr::from_ptr((out.as_ptr() as *mut c_char).add(start))
-                    .to_str()
-                    .unwrap(),
-            );
-        }
-
-        i += 1;
-    }
-
-    Some(handler)
-}
-
 /// Change the input functions when discovering the character encoding of a given entity.
 ///
 /// Returns 0 in case of success, -1 otherwise
@@ -492,7 +420,7 @@ pub unsafe fn xml_switch_encoding(ctxt: XmlParserCtxtPtr, enc: XmlCharEncoding) 
             (*ctxt).charset = XmlCharEncoding::UTF8;
             return 0;
         }
-        XmlCharEncoding::EBCDIC => xml_detect_ebcdic((*ctxt).input),
+        XmlCharEncoding::EBCDIC => (*(*ctxt).input).detect_ebcdic(),
         _ => get_encoding_handler(enc),
     }) else {
         // Default handlers.
