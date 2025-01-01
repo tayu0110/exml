@@ -59,10 +59,10 @@ use crate::{
     },
     libxml::{
         parser::{XmlParserCtxtPtr, XmlParserInputState, XmlParserOption},
-        parser_internals::{__xml_err_encoding, xml_free_input_stream, xml_new_input_from_file},
+        parser_internals::{xml_free_input_stream, xml_new_input_from_file},
     },
     nanohttp::XmlNanoHTTPCtxt,
-    parser::XmlParserInputPtr,
+    parser::{XmlParserInputPtr, __xml_err_encoding},
     uri::canonic_path,
 };
 

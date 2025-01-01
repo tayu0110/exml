@@ -37,6 +37,7 @@
 //
 // daniel@veillard.com
 
+mod error;
 mod input;
 mod node_info;
 
@@ -46,6 +47,7 @@ use crate::libxml::{
     parser_internals::xml_is_letter,
 };
 
+pub(crate) use error::*;
 pub use input::*;
 pub use node_info::*;
 
