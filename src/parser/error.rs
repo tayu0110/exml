@@ -4,6 +4,140 @@ use crate::{
 };
 
 /// Handle a fatal parser error, i.e. violating Well-Formedness constraints
+#[doc(alias = "xmlFatalErr")]
+pub(crate) unsafe fn xml_fatal_err(
+    ctxt: XmlParserCtxtPtr,
+    error: XmlParserErrors,
+    info: Option<&str>,
+) {
+    if !ctxt.is_null()
+        && (*ctxt).disable_sax != 0
+        && matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+    {
+        return;
+    }
+    let errmsg = match error {
+        XmlParserErrors::XmlErrInvalidHexCharRef => "CharRef: invalid hexadecimal value",
+        XmlParserErrors::XmlErrInvalidDecCharRef => "CharRef: invalid decimal value",
+        XmlParserErrors::XmlErrInvalidCharRef => "CharRef: invalid value",
+        XmlParserErrors::XmlErrInternalError => "internal error",
+        XmlParserErrors::XmlErrPERefAtEOF => "PEReference at end of document",
+        XmlParserErrors::XmlErrPERefInProlog => "PEReference in prolog",
+        XmlParserErrors::XmlErrPERefInEpilog => "PEReference in epilog",
+        XmlParserErrors::XmlErrPERefNoName => "PEReference: no name",
+        XmlParserErrors::XmlErrPERefSemicolMissing => "PEReference: expecting ';'",
+        XmlParserErrors::XmlErrEntityLoop => "Detected an entity reference loop",
+        XmlParserErrors::XmlErrEntityNotStarted => "EntityValue: \" or ' expected",
+        XmlParserErrors::XmlErrEntityPEInternal => "PEReferences forbidden in internal subset",
+        XmlParserErrors::XmlErrEntityNotFinished => "EntityValue: \" or ' expected",
+        XmlParserErrors::XmlErrAttributeNotStarted => "AttValue: \" or ' expected",
+        XmlParserErrors::XmlErrLtInAttribute => "Unescaped '<' not allowed in attributes values",
+        XmlParserErrors::XmlErrLiteralNotStarted => "SystemLiteral \" or ' expected",
+        XmlParserErrors::XmlErrLiteralNotFinished => {
+            "Unfinished System or Public ID \" or ' expected"
+        }
+        XmlParserErrors::XmlErrMisplacedCDATAEnd => "Sequence ']]>' not allowed in content",
+        XmlParserErrors::XmlErrURIRequired => "SYSTEM or PUBLIC, the URI is missing",
+        XmlParserErrors::XmlErrPubidRequired => "PUBLIC, the Public Identifier is missing",
+        XmlParserErrors::XmlErrHyphenInComment => "Comment must not contain '--' (double-hyphen)",
+        XmlParserErrors::XmlErrPINotStarted => "xmlParsePI : no target name",
+        XmlParserErrors::XmlErrReservedXmlName => "Invalid PI name",
+        XmlParserErrors::XmlErrNotationNotStarted => "NOTATION: Name expected here",
+        XmlParserErrors::XmlErrNotationNotFinished => "'>' required to close NOTATION declaration",
+        XmlParserErrors::XmlErrValueRequired => "Entity value required",
+        XmlParserErrors::XmlErrURIFragment => "Fragment not allowed",
+        XmlParserErrors::XmlErrAttlistNotStarted => "'(' required to start ATTLIST enumeration",
+        XmlParserErrors::XmlErrNmtokenRequired => "NmToken expected in ATTLIST enumeration",
+        XmlParserErrors::XmlErrAttlistNotFinished => "')' required to finish ATTLIST enumeration",
+        XmlParserErrors::XmlErrMixedNotStarted => "MixedContentDecl : '|' or ')*' expected",
+        XmlParserErrors::XmlErrPCDATARequired => "MixedContentDecl : '#PCDATA' expected",
+        XmlParserErrors::XmlErrElemcontentNotStarted => "ContentDecl : Name or '(' expected",
+        XmlParserErrors::XmlErrElemcontentNotFinished => "ContentDecl : ',' '|' or ')' expected",
+        XmlParserErrors::XmlErrPERefInIntSubset => {
+            "PEReference: forbidden within markup decl in internal subset"
+        }
+        XmlParserErrors::XmlErrGtRequired => "expected '>'",
+        XmlParserErrors::XmlErrCondsecInvalid => "XML conditional section '[' expected",
+        XmlParserErrors::XmlErrExtSubsetNotFinished => "Content error in the external subset",
+        XmlParserErrors::XmlErrCondsecInvalidKeyword => {
+            "conditional section INCLUDE or IGNORE keyword expected"
+        }
+        XmlParserErrors::XmlErrCondsecNotFinished => "XML conditional section not closed",
+        XmlParserErrors::XmlErrXMLDeclNotStarted => "Text declaration '<?xml' required",
+        XmlParserErrors::XmlErrXMLDeclNotFinished => "parsing XML declaration: '?>' expected",
+        XmlParserErrors::XmlErrExtEntityStandalone => {
+            "external parsed entities cannot be standalone"
+        }
+        XmlParserErrors::XmlErrEntityRefSemicolMissing => "EntityRef: expecting ';'",
+        XmlParserErrors::XmlErrDoctypeNotFinished => "DOCTYPE improperly terminated",
+        XmlParserErrors::XmlErrLtSlashRequired => "EndTag: '</' not found",
+        XmlParserErrors::XmlErrEqualRequired => "expected '='",
+        XmlParserErrors::XmlErrStringNotClosed => "String not closed expecting \" or '",
+        XmlParserErrors::XmlErrStringNotStarted => "String not started expecting ' or \"",
+        XmlParserErrors::XmlErrEncodingName => "Invalid XML encoding name",
+        XmlParserErrors::XmlErrStandaloneValue => "standalone accepts only 'yes' or 'no'",
+        XmlParserErrors::XmlErrDocumentEmpty => "Document is empty",
+        XmlParserErrors::XmlErrDocumentEnd => "Extra content at the end of the document",
+        XmlParserErrors::XmlErrNotWellBalanced => "chunk is not well balanced",
+        XmlParserErrors::XmlErrExtraContent => "extra content at the end of well balanced chunk",
+        XmlParserErrors::XmlErrVersionMissing => "Malformed declaration expecting version",
+        XmlParserErrors::XmlErrNameTooLong => "Name too long",
+        _ => "Unregistered error message",
+    };
+    if !ctxt.is_null() {
+        (*ctxt).err_no = error as i32;
+    }
+    if let Some(info) = info {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromParser,
+            error,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            Some(info.to_owned().into()),
+            None,
+            None,
+            0,
+            0,
+            "{}: {}\n",
+            errmsg,
+            info
+        );
+    } else {
+        __xml_raise_error!(
+            None,
+            None,
+            None,
+            ctxt as _,
+            null_mut(),
+            XmlErrorDomain::XmlFromParser,
+            error,
+            XmlErrorLevel::XmlErrFatal,
+            None,
+            0,
+            None,
+            None,
+            None,
+            0,
+            0,
+            "{}\n",
+            errmsg
+        );
+    }
+    if !ctxt.is_null() {
+        (*ctxt).well_formed = 0;
+        if (*ctxt).recovery == 0 {
+            (*ctxt).disable_sax = 1;
+        }
+    }
+}
+
+/// Handle a fatal parser error, i.e. violating Well-Formedness constraints
 #[doc(alias = "xmlFatalErrMsg")]
 pub(crate) unsafe fn xml_fatal_err_msg(ctxt: XmlParserCtxtPtr, error: XmlParserErrors, msg: &str) {
     if !ctxt.is_null()
