@@ -58,11 +58,11 @@ use crate::{
         __xml_simple_oom_error,
     },
     libxml::{
-        parser::{XmlParserCtxtPtr, XmlParserInputState, XmlParserOption},
+        parser::{XmlParserInputState, XmlParserOption},
         parser_internals::{xml_free_input_stream, xml_new_input_from_file},
     },
     nanohttp::XmlNanoHTTPCtxt,
-    parser::{XmlParserInputPtr, __xml_err_encoding},
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr, __xml_err_encoding},
     uri::canonic_path,
 };
 

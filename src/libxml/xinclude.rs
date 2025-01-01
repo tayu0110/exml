@@ -46,8 +46,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_realloc},
         parser::{
             xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
-            xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr, XmlParserOption,
-            XML_DETECT_IDS,
+            xml_new_parser_ctxt, xml_parse_document, XmlParserOption, XML_DETECT_IDS,
         },
         parser_internals::{xml_free_input_stream, xml_string_current_char},
         uri::{xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, XmlURIPtr},
@@ -589,7 +588,7 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Xm
 
     xml_init_parser();
 
-    let pctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+    let pctxt = xml_new_parser_ctxt();
     if pctxt.is_null() {
         xml_xinclude_err_memory(ctxt, null_mut(), Some("cannot allocate parser context"));
         return null_mut();
@@ -1799,7 +1798,7 @@ unsafe fn xml_xinclude_load_doc(
 ///
 /// Returns 0 in case of success, -1 in case of failure
 #[doc(alias = "xmlXIncludeLoadTxt")]
-unsafe extern "C" fn xml_xinclude_load_txt(
+unsafe fn xml_xinclude_load_txt(
     ctxt: XmlXincludeCtxtPtr,
     mut url: *const XmlChar,
     refe: XmlXincludeRefPtr,
@@ -1808,7 +1807,7 @@ unsafe extern "C" fn xml_xinclude_load_txt(
     let mut i: i32;
     let mut ret: i32 = -1;
     let mut enc = XmlCharEncoding::None;
-    let mut pctxt: XmlParserCtxtPtr = null_mut();
+    let mut pctxt = null_mut();
     let mut input_stream: XmlParserInputPtr = null_mut();
 
     /* Don't read from stdin. */

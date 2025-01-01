@@ -37,16 +37,18 @@
 //
 // daniel@veillard.com
 
+mod context;
 mod error;
 mod input;
 mod node_info;
 
 use crate::libxml::{
     chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
-    parser::{XmlParserCtxt, XmlParserOption},
+    parser::XmlParserOption,
     parser_internals::xml_is_letter,
 };
 
+pub use context::*;
 pub(crate) use error::*;
 pub use input::*;
 pub use node_info::*;

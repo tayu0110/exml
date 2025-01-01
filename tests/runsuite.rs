@@ -24,7 +24,7 @@ use exml::{
         globals::xml_free,
         parser::{
             xml_cleanup_parser, xml_init_parser, xml_read_file, xml_read_memory,
-            xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserOption,
+            xml_set_external_entity_loader, XmlParserOption,
         },
         parser_internals::xml_new_string_input_stream,
         relaxng::{
@@ -48,7 +48,7 @@ use exml::{
         xmlschemastypes::xml_schema_init_types,
         xmlstring::{xml_str_equal, xml_strdup, XmlChar},
     },
-    parser::XmlParserInputPtr,
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,

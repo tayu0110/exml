@@ -24,8 +24,7 @@ use std::{
 
 use crate::{
     globals::{GenericError, GenericErrorContext, GLOBAL_STATE},
-    libxml::parser::XmlParserCtxtPtr,
-    parser::XmlParserInputPtr,
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{NodeCommon, XmlElementType, XmlNode, XmlNodePtr},
 };
 
@@ -1432,10 +1431,8 @@ macro_rules! __xml_raise_error {
                 XML_MAX_ERRORS, generic_error_default, parser_error, parser_warning, parser_validity_error,
                 parser_validity_warning, report_error, XmlErrorDomain, XmlErrorLevel, XmlParserErrors,
             },
-            libxml::{
-                parser::{XmlParserCtxtPtr, XML_SAX2_MAGIC},
-            },
-            parser::XmlParserInputPtr,
+            libxml::parser::XML_SAX2_MAGIC,
+            parser::{XmlParserCtxtPtr, XmlParserInputPtr},
             tree::{NodeCommon, XmlElementType, XmlNodePtr},
         };
         (|mut schannel: Option<StructuredError>,

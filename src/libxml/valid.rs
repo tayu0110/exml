@@ -60,7 +60,7 @@ use crate::{
             xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
             xml_list_remove_first, xml_list_walk, XmlListPtr,
         },
-        parser::{XmlParserCtxtPtr, XmlParserMode},
+        parser::XmlParserMode,
         parser_internals::xml_string_current_char,
         xmlautomata::{
             xml_automata_new_epsilon, xml_automata_new_state, xml_automata_new_transition,
@@ -68,6 +68,7 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
+    parser::XmlParserCtxtPtr,
     tree::{
         split_qname2, xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2,
         xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,

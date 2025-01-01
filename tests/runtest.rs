@@ -46,8 +46,8 @@ use exml::{
         parser::{
             xml_cleanup_parser, xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser,
             xml_parse_document, xml_parse_file, xml_read_file, xml_read_memory,
-            xml_set_external_entity_loader, XmlParserCtxtPtr, XmlParserOption, XmlSAXHandler,
-            XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            xml_set_external_entity_loader, XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr,
+            XML_SAX2_MAGIC,
         },
         parser_internals::xml_create_file_parser_ctxt,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -64,7 +64,7 @@ use exml::{
         xmlschemastypes::xml_schema_init_types,
         xmlstring::XmlChar,
     },
-    parser::XmlParserInputPtr,
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,

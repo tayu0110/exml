@@ -35,8 +35,10 @@ use std::{
 use libc::memset;
 
 use crate::{
-    buf::libxml_api::{xml_buf_cat, xml_buf_create, xml_buf_free, XmlBufPtr},
-    buf::libxml_api::{xml_buf_create_size, xml_buf_empty, xml_buf_set_allocation_scheme},
+    buf::libxml_api::{
+        xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_empty, xml_buf_free,
+        xml_buf_set_allocation_scheme, XmlBufPtr,
+    },
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
     },
@@ -49,8 +51,8 @@ use crate::{
             xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
             xml_free_parser_ctxt, xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc,
             EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc,
-            XmlParserCtxtPtr, XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler,
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS,
+            XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
@@ -83,6 +85,7 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
+    parser::XmlParserCtxtPtr,
     tree::{
         xml_buf_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd, xml_doc_copy_node,
         xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns, xml_free_ns_list, xml_new_doc_text,

@@ -61,7 +61,7 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         globals::xml_free,
-        parser::{xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document, XmlParserCtxtPtr},
+        parser::{xml_free_parser_ctxt, xml_new_parser_ctxt, xml_parse_document},
         parser_internals::{xml_new_input_stream, XML_MAX_NAMELEN},
         threads::xml_get_thread_id,
         xmlstring::{xml_str_equal, XmlChar},
@@ -3089,7 +3089,7 @@ pub unsafe fn xml_catalog_remove(value: &str) -> i32 {
 pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
     let ret: XmlDocPtr;
 
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+    let ctxt = xml_new_parser_ctxt();
     if ctxt.is_null() {
         xml_catalog_err_memory("allocating parser context");
         return null_mut();
@@ -3102,7 +3102,6 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
 
     let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input_stream.is_null() {
-        // xml_free_parser_input_buffer(buf);
         xml_free_parser_ctxt(ctxt);
         return null_mut();
     }

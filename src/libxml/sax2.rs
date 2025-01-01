@@ -36,13 +36,13 @@ use crate::{
     libxml::{
         entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
-        parser::{XmlParserCtxtPtr, XmlParserInputState, XmlSAXLocatorPtr},
+        parser::{XmlParserInputState, XmlSAXLocatorPtr},
         valid::{
             xml_validate_attribute_decl, xml_validate_document_final, xml_validate_one_element,
         },
         xmlstring::XmlChar,
     },
-    parser::{xml_err_memory, XmlParserInputPtr},
+    parser::{xml_err_memory, XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
@@ -417,7 +417,7 @@ macro_rules! xml_fatal_err_msg {
         );
     };
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -562,7 +562,7 @@ pub unsafe fn xml_sax2_resolve_entity(
 #[doc(alias = "xmlWarnMsg")]
 macro_rules! xml_warn_msg {
     ($ctxt:expr, $error:expr, $msg:literal, $str1:expr) => {
-        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -701,7 +701,7 @@ macro_rules! xml_err_valid {
         xml_err_valid!(@inner $ctxt, $error, &msg, Some($str1.to_owned().into()), Some($str2.to_owned().into()));
     };
     (@inner $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         let mut schannel: Option<StructuredError> = None;
 
         if ctxt.is_null()
@@ -1262,7 +1262,7 @@ macro_rules! xml_ns_warn_msg {
         );
     };
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
@@ -1329,7 +1329,7 @@ macro_rules! xml_ns_err_msg {
         );
     };
     (@inner, $ctxt:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        let ctxt = $ctxt as *mut $crate::libxml::parser::XmlParserCtxt;
+        let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
             || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)

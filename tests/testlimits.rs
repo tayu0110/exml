@@ -22,8 +22,8 @@ use exml::{
         entities::{XmlEntityPtr, XmlEntityType},
         parser::{
             xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
-            xml_new_sax_parser_ctxt, xml_set_external_entity_loader, XmlParserCtxtPtr,
-            XmlParserOption, XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
+            xml_new_sax_parser_ctxt, xml_set_external_entity_loader, XmlParserOption,
+            XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         parser_internals::{XML_MAX_LOOKUP_LIMIT, XML_MAX_TEXT_LENGTH},
         xmlmemory::{
@@ -32,7 +32,7 @@ use exml::{
         },
         xmlstring::XmlChar,
     },
-    parser::XmlParserInputPtr,
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,

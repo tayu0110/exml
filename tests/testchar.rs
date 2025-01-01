@@ -20,13 +20,13 @@ use exml::{
         globals::{xml_free, xml_malloc},
         parser::{
             xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
-            xml_read_memory, XmlParserCtxtPtr,
+            xml_read_memory,
         },
         parser_internals::xml_new_input_stream,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
-    parser::XmlParserInputPtr,
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{xml_free_doc, NodeCommon, XmlDocPtr},
 };
 use libc::{memset, strlen};

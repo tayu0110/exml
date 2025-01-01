@@ -53,12 +53,13 @@ use crate::{
             XmlListPtr,
         },
         parser::{
-            xml_create_push_parser_ctxt, xml_free_parser_ctxt, xml_parse_chunk, XmlParserCtxtPtr,
+            xml_create_push_parser_ctxt, xml_free_parser_ctxt, xml_parse_chunk,
             XmlParserInputState, XmlSAXHandler, XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
+    parser::XmlParserCtxtPtr,
     tree::{xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };

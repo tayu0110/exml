@@ -37,10 +37,10 @@ use crate::io::__xml_loader_err;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::parser::{
-    xml_err_memory, XmlParserCharValid, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
-    __xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_err_msg_str, xml_fatal_err_msg,
+    xml_err_memory, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo, __xml_err_encoding,
+    xml_err_encoding_int, xml_err_internal, xml_err_msg_str, xml_fatal_err_msg,
     xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_ns_err,
-    xml_validity_error, xml_warning_msg,
+    xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxtPtr,
 };
 use crate::tree::{NodeCommon, NodePtr, XmlNode};
 use crate::uri::build_uri;
@@ -66,8 +66,8 @@ use crate::{
             xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
             xml_parse_text_decl, xml_parse_version_num, xml_parser_add_node_info,
             xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
-            XmlDefAttrs, XmlDefAttrsPtr, XmlParserCtxtPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, XML_SKIP_IDS,
+            XmlDefAttrs, XmlDefAttrsPtr, XmlParserInputState, XmlParserMode, XmlParserOption,
+            XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
         uri::xml_canonic_path,

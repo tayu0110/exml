@@ -54,8 +54,8 @@ use exml::{
             xml_get_external_entity_loader, xml_has_feature, xml_new_parser_ctxt,
             xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_file, xml_read_io,
             xml_read_memory, xml_set_external_entity_loader, XmlExternalEntityLoader, XmlFeature,
-            XmlParserCtxtPtr, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr,
-            XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS,
+            XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
@@ -92,7 +92,7 @@ use exml::{
         },
         xmlstring::XmlChar,
     },
-    parser::XmlParserInputPtr,
+    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
         NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,

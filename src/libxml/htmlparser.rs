@@ -45,8 +45,8 @@ use crate::{
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
-            xml_new_io_input_stream, xml_parser_add_node_info, XmlParserCtxt, XmlParserCtxtPtr,
-            XmlParserInputState, XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
+            xml_new_io_input_stream, xml_parser_add_node_info, XmlParserInputState,
+            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
         },
         parser_internals::{
             xml_free_input_stream, xml_new_input_stream, xml_switch_encoding, INPUT_CHUNK,
@@ -59,7 +59,9 @@ use crate::{
             XmlChar,
         },
     },
-    parser::{XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo},
+    parser::{
+        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
+    },
     tree::{
         xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,
         XmlNodePtr,
@@ -5456,7 +5458,7 @@ macro_rules! COPY_BUF {
 /// Parse a content: comment, sub-element, reference or text.
 /// This is the entry point when called from parser.c
 #[doc(alias = "htmlParseContent")]
-pub(crate) unsafe extern "C" fn __html_parse_content(ctxt: *mut c_void) {
+pub(crate) unsafe fn __html_parse_content(ctxt: *mut c_void) {
     if !ctxt.is_null() {
         html_parse_content_internal(ctxt as HtmlParserCtxtPtr);
     }
@@ -5466,7 +5468,7 @@ pub(crate) unsafe extern "C" fn __html_parse_content(ctxt: *mut c_void) {
 ///
 /// Returns the number of space chars skipped
 #[doc(alias = "htmlSkipBlankChars")]
-unsafe extern "C" fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
+unsafe fn html_skip_blank_chars(ctxt: XmlParserCtxtPtr) -> i32 {
     let mut res: i32 = 0;
 
     while xml_is_blank_char(*(*(*ctxt).input).cur as u32) {
