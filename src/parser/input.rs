@@ -53,7 +53,10 @@ use crate::{
     },
     io::XmlParserInputBuffer,
     libxml::{
-        chvalid::xml_is_blank_char, entities::XmlEntityPtr, parser::XmlParserInputDeallocate,
+        chvalid::xml_is_blank_char,
+        entities::XmlEntityPtr,
+        parser::XmlParserInputDeallocate,
+        parser_internals::{INPUT_CHUNK, LINE_LEN},
     },
 };
 
@@ -182,6 +185,56 @@ impl XmlParserInput {
             self.end = buffer.as_mut_ptr().add(buffer.len());
         }
         0
+    }
+
+    /// This function removes used input for the parser.
+    #[doc(alias = "xmlParserInputShrink")]
+    pub(crate) unsafe fn shrink(&mut self) {
+        if self.buf.is_none() {
+            return;
+        }
+        if self.base.is_null() {
+            return;
+        }
+        if self.cur.is_null() {
+            return;
+        }
+        let Some(mut buf) = self.buf.as_ref().unwrap().borrow().buffer else {
+            return;
+        };
+
+        let mut used = self.offset_from_base();
+        // Do not shrink on large buffers whose only a tiny fraction was consumed
+        if used > INPUT_CHUNK {
+            let ret = buf.trim_head(used - LINE_LEN);
+            if ret > 0 {
+                used -= ret;
+                if ret as u64 > u64::MAX || self.consumed > u64::MAX - ret as u64 {
+                    self.consumed = u64::MAX;
+                } else {
+                    self.consumed += ret as u64;
+                }
+            }
+        }
+
+        if buf.len() <= INPUT_CHUNK {
+            self.buf
+                .as_mut()
+                .unwrap()
+                .borrow_mut()
+                .read(2 * INPUT_CHUNK as i32);
+        }
+
+        self.base = buf.as_ref().as_ptr();
+        if self.base.is_null() {
+            // TODO: raise error
+            self.base = c"".as_ptr() as _;
+            self.cur = self.base;
+            self.end = self.base;
+            return;
+        }
+        self.cur = self.base.add(used);
+        self.end = buf.as_ref().as_ptr().add(buf.len());
     }
 
     #[doc(alias = "xmlDetectEBCDIC")]

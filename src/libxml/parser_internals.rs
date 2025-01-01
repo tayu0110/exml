@@ -2388,7 +2388,7 @@ pub(crate) unsafe fn xml_parse_attribute_type(
 
 /// Add a defaulted attribute for an element
 #[doc(alias = "xmlAddDefAttrs")]
-pub(crate) unsafe extern "C" fn xml_add_def_attrs(
+pub(crate) unsafe fn xml_add_def_attrs(
     ctxt: XmlParserCtxtPtr,
     fullname: *const XmlChar,
     fullattr: *const XmlChar,
@@ -5411,62 +5411,8 @@ pub unsafe fn xml_copy_char(_len: i32, out: *mut XmlChar, val: i32) -> i32 {
     1
 }
 
-/* we need to keep enough input to show errors in context */
+// we need to keep enough input to show errors in context
 pub(crate) const LINE_LEN: usize = 80;
-
-/// This function removes used input for the parser.
-#[doc(alias = "xmlParserInputShrink")]
-pub(crate) unsafe fn xml_parser_input_shrink(input: XmlParserInputPtr) {
-    if input.is_null() {
-        return;
-    }
-    if (*input).buf.is_none() {
-        return;
-    }
-    if (*input).base.is_null() {
-        return;
-    }
-    if (*input).cur.is_null() {
-        return;
-    }
-    let Some(mut buf) = (*input).buf.as_ref().unwrap().borrow().buffer else {
-        return;
-    };
-
-    let mut used = (*input).offset_from_base();
-    // Do not shrink on large buffers whose only a tiny fraction was consumed
-    if used > INPUT_CHUNK {
-        let ret = buf.trim_head(used - LINE_LEN);
-        if ret > 0 {
-            used -= ret;
-            if ret as u64 > u64::MAX || (*input).consumed > u64::MAX - ret as u64 {
-                (*input).consumed = u64::MAX;
-            } else {
-                (*input).consumed += ret as u64;
-            }
-        }
-    }
-
-    if buf.len() <= INPUT_CHUNK {
-        (*input)
-            .buf
-            .as_mut()
-            .unwrap()
-            .borrow_mut()
-            .read(2 * INPUT_CHUNK as i32);
-    }
-
-    (*input).base = buf.as_ref().as_ptr();
-    if (*input).base.is_null() {
-        // TODO: raise error
-        (*input).base = c"".as_ptr() as _;
-        (*input).cur = (*input).base;
-        (*input).end = (*input).base;
-        return;
-    }
-    (*input).cur = (*input).base.add(used);
-    (*input).end = buf.as_ref().as_ptr().add(buf.len());
-}
 
 #[cfg(test)]
 mod tests {
@@ -5696,34 +5642,6 @@ mod tests {
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_buffer);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_parser_input_shrink() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_in in 0..GEN_NB_XML_PARSER_INPUT_PTR {
-                let mem_base = xml_mem_blocks();
-                let input = gen_xml_parser_input_ptr(n_in, 0);
-
-                xml_parser_input_shrink(input);
-                des_xml_parser_input_ptr(n_in, input, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlParserInputShrink",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlParserInputShrink()"
-                    );
-                    eprintln!(" {}", n_in);
                 }
             }
         }
