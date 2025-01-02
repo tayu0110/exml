@@ -68,8 +68,9 @@ use crate::{
             xml_strlen, XmlChar,
         },
     },
+    parser::split_qname2,
     tree::{
-        split_qname2, xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
+        xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
         xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },

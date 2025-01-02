@@ -189,7 +189,7 @@ macro_rules! xml_fatal_err_msg_str {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $error as i32;
@@ -687,7 +687,7 @@ macro_rules! __xml_err_encoding {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $xmlerr as _;
@@ -728,7 +728,10 @@ macro_rules! xml_err_encoding_int {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+            || !matches!(
+                (*ctxt).instate,
+                $crate::libxml::parser::XmlParserInputState::XmlParserEOF
+            )
         {
             if !ctxt.is_null() {
                 (*ctxt).err_no = $error as i32;

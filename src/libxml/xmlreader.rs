@@ -1649,7 +1649,7 @@ impl XmlTextReader {
     pub unsafe fn get_attribute(&mut self, name: &str) -> Option<String> {
         use std::ffi::CStr;
 
-        use crate::tree::{split_qname2, NodeCommon};
+        use crate::{parser::split_qname2, tree::NodeCommon};
 
         let mut ns: XmlNsPtr;
 
@@ -1954,7 +1954,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderMoveToAttribute")]
     #[cfg(feature = "libxml_reader")]
     pub unsafe fn move_to_attribute(&mut self, name: &str) -> i32 {
-        use crate::tree::{split_qname2, NodeCommon};
+        use crate::{parser::split_qname2, tree::NodeCommon};
 
         let mut ns: XmlNsPtr;
         let mut prop: XmlAttrPtr;

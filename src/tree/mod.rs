@@ -955,33 +955,6 @@ pub unsafe extern "C" fn xml_split_qname2(
     ret
 }
 
-/// Parse an XML qualified name string
-///
-/// ```ignore
-/// [NS 5] QName ::= (Prefix ':')? LocalPart
-///
-/// [NS 6] Prefix ::= NCName
-///
-/// [NS 7] LocalPart ::= NCName
-/// ```
-///
-/// Returns `None` if the name doesn't have a prefix.
-/// Otherwise, returns `Some((Prefix, LocalPart))`.
-///
-/// # Note:
-/// This function does not perform validation.
-#[doc(alias = "xmlSplitQName2")]
-pub fn split_qname2(name: &str) -> Option<(&str, &str)> {
-    // nasty but valid
-    if name.starts_with(':') {
-        return None;
-    }
-
-    // we are not trying to validate but just to cut, and yes it will
-    // work even if this is as set of UTF-8 encoded chars
-    name.split_once(':')
-}
-
 /// Rarse an XML qualified name string,i
 ///
 /// Returns NULL if it is not a Qualified Name, otherwise, update len

@@ -41,17 +41,28 @@ mod context;
 mod error;
 mod input;
 mod node_info;
+mod qname;
 
-use crate::libxml::{
-    chvalid::{xml_is_combining, xml_is_digit, xml_is_extender},
-    parser::XmlParserOption,
-    parser_internals::xml_is_letter,
+use std::{
+    ptr::null_mut,
+    str::{from_utf8, from_utf8_unchecked},
+};
+
+use crate::{
+    encoding::XmlCharEncoding,
+    error::XmlParserErrors,
+    libxml::{
+        chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
+        parser::XmlParserOption,
+        parser_internals::xml_is_letter,
+    },
 };
 
 pub use context::*;
 pub(crate) use error::*;
 pub use input::*;
 pub use node_info::*;
+pub use qname::*;
 
 pub(crate) trait XmlParserCharValid {
     fn is_name_char(&self, ctxt: &XmlParserCtxt) -> bool;
@@ -200,4 +211,75 @@ impl XmlParserCharValid for char {
     fn is_name_start_char(&self, ctxt: &XmlParserCtxt) -> bool {
         (*self as u32).is_name_start_char(ctxt)
     }
+}
+
+/// The current c_char value, if using UTF-8 this may actually span multiple
+/// bytes in the input buffer.
+///
+/// Returns the current c_char value and its length
+#[doc(alias = "xmlStringCurrentChar")]
+pub(crate) unsafe fn xml_string_current_char(
+    ctxt: Option<&mut XmlParserCtxt>,
+    cur: &[u8],
+) -> Result<char, (u8, usize)> {
+    assert!(!cur.is_empty());
+    if ctxt
+        .as_ref()
+        .map_or(true, |ctxt| ctxt.charset == XmlCharEncoding::UTF8)
+    {
+        // We are supposed to handle UTF8, check it's valid
+        // From rfc2044: encoding of the Unicode values on UTF-8:
+        let cur = &cur[..cur.len().min(4)];
+        let c = match from_utf8(cur) {
+            Ok(s) => s.chars().next().ok_or((0, 0))?,
+            Err(e) if e.valid_up_to() > 0 => {
+                let s = from_utf8_unchecked(&cur[..e.valid_up_to()]);
+                s.chars().next().ok_or((0, 0))?
+            }
+            Err(_) => {
+                // An encoding problem may arise from a truncated input buffer
+                // splitting a character in the middle. In that case do not raise
+                // an error but return 0 to indicate an end of stream problem
+                let Some(ctxt) =
+                    ctxt.filter(|ctxt| !ctxt.input.is_null() && (*ctxt.input).remainder_len() >= 4)
+                else {
+                    return Err((0, 0));
+                };
+
+                // If we detect an UTF8 error that probably mean that the
+                // input encoding didn't get properly advertised in the
+                // declaration header. Report the error and switch the encoding
+                // to ISO-Latin-1 (if you don't like this policy, just declare the encoding !)
+                {
+                    let buffer = format!(
+                        "Bytes: 0x{:02X} 0x{:02X} 0x{:02X} 0x{:02X}\n",
+                        *(*ctxt.input).cur.add(0),
+                        *(*ctxt.input).cur.add(1),
+                        *(*ctxt.input).cur.add(2),
+                        *(*ctxt.input).cur.add(3),
+                    );
+                    __xml_err_encoding!(
+                        ctxt as *mut XmlParserCtxt,
+                        XmlParserErrors::XmlErrInvalidChar,
+                        "Input is not proper UTF-8, indicate encoding !\n{}",
+                        buffer
+                    );
+                }
+                return Ok(cur[0] as char);
+            }
+        };
+        if !xml_is_char(c as u32) {
+            xml_err_encoding_int!(
+                ctxt.map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt),
+                XmlParserErrors::XmlErrInvalidChar,
+                "Char 0x{:X} out of allowed range\n",
+                c as i32
+            );
+        }
+        return Ok(c);
+    }
+    // Assume it's a fixed length encoding (1) with
+    // a compatible encoding for the ASCII set, since
+    // XML constructs only use < 128 chars
+    Ok(cur[0] as char)
 }

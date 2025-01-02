@@ -68,14 +68,14 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
-    parser::XmlParserCtxtPtr,
+    parser::{split_qname2, XmlParserCtxtPtr},
     tree::{
-        split_qname2, xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2,
-        xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
-        XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID,
-        XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_build_qname, xml_free_node, xml_new_doc_node, xml_split_qname2, xml_split_qname3,
+        NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement, XmlElementContent,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlEnumerationPtr, XmlID, XmlIDPtr,
+        XmlNode, XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
