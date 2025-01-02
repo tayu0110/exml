@@ -2128,7 +2128,7 @@ pub unsafe fn xml_add_attribute_decl(
     dtd: XmlDtdPtr,
     elem: &str,
     name: &str,
-    ns: *const XmlChar,
+    ns: Option<&str>,
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
     mut default_value: Option<&str>,
@@ -2200,10 +2200,11 @@ pub unsafe fn xml_add_attribute_decl(
         && !(*(*dtd).doc).int_subset.is_null()
     {
         if let Some(attributes) = (*(*(*dtd).doc).int_subset).attributes {
+            let ns = ns.map(|ns| CString::new(ns).unwrap());
             ret = attributes
                 .lookup3(
                     CString::new(name).unwrap().as_c_str(),
-                    (!ns.is_null()).then(|| CStr::from_ptr(ns as *const i8)),
+                    ns.as_deref(),
                     Some(CString::new(elem).unwrap().as_c_str()),
                 )
                 .copied()
@@ -2248,7 +2249,12 @@ pub unsafe fn xml_add_attribute_decl(
     if !dict.is_null() {
         let name = CString::new(name).unwrap();
         (*ret).name = xml_dict_lookup(dict, name.as_ptr() as *const u8, -1);
-        let prefix = xml_dict_lookup(dict, ns, -1);
+        let ns = ns.map(|ns| CString::new(ns).unwrap());
+        let prefix = xml_dict_lookup(
+            dict,
+            ns.as_deref().map_or(null(), |ns| ns.as_ptr() as *const u8),
+            -1,
+        );
         (*ret).prefix = (!prefix.is_null()).then(|| {
             CStr::from_ptr(prefix as *const i8)
                 .to_string_lossy()
@@ -2264,11 +2270,7 @@ pub unsafe fn xml_add_attribute_decl(
     } else {
         let name = CString::new(name).unwrap();
         (*ret).name = xml_strdup(name.as_ptr() as *const u8);
-        (*ret).prefix = (!ns.is_null()).then(|| {
-            CStr::from_ptr(ns as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
+        (*ret).prefix = ns.map(|ns| ns.to_owned());
         (*ret).elem = Some(elem.to_owned());
     }
     (*ret).def = def;

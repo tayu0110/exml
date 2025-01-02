@@ -42,7 +42,7 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    parser::{xml_err_memory, XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{split_qname, xml_err_memory, XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
@@ -768,8 +768,6 @@ pub unsafe fn xml_sax2_attribute_decl(
 ) {
     let attr: XmlAttributePtr;
 
-    let mut prefix: *mut XmlChar = null_mut();
-
     if ctx.is_none() {
         return;
     }
@@ -793,16 +791,14 @@ pub unsafe fn xml_sax2_attribute_decl(
         (*ctxt).valid = tmp;
     }
     // TODO: optimize name/prefix allocation
-    let fullname = CString::new(fullname).unwrap();
-    let name: *mut XmlChar =
-        xml_split_qname(ctxt, fullname.as_ptr() as *const u8, &raw mut prefix as _);
+    let (prefix, name) = split_qname(&mut *ctxt, fullname);
     (*ctxt).vctxt.valid = 1;
     if (*ctxt).in_subset == 1 {
         attr = xml_add_attribute_decl(
             &raw mut (*ctxt).vctxt as _,
             (*(*ctxt).my_doc).int_subset,
             elem,
-            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            name,
             prefix,
             typ,
             def,
@@ -814,7 +810,7 @@ pub unsafe fn xml_sax2_attribute_decl(
             &raw mut (*ctxt).vctxt as _,
             (*(*ctxt).my_doc).ext_subset,
             elem,
-            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            name,
             prefix,
             typ,
             def,
@@ -822,14 +818,12 @@ pub unsafe fn xml_sax2_attribute_decl(
             tree,
         );
     } else {
-        let n = CStr::from_ptr(name as *const i8).to_string_lossy();
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrInternalError,
             "SAX.xmlSAX2AttributeDecl({}) called while not in subset\n",
-            n
+            name
         );
-        xml_free(name as _);
         xml_free_enumeration(tree);
         return;
     }
@@ -846,12 +840,6 @@ pub unsafe fn xml_sax2_attribute_decl(
             (*ctxt).valid &=
                 xml_validate_attribute_decl(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc, attr);
         }
-    }
-    if !prefix.is_null() {
-        xml_free(prefix as _);
-    }
-    if !name.is_null() {
-        xml_free(name as _);
     }
 }
 

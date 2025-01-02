@@ -14,8 +14,8 @@ use super::XmlParserCtxt;
 /// [NS 7] LocalPart ::= NCName
 /// ```
 ///
-/// If a prefix is found, return `Some((Prefix, LocalPart))`.  
-/// Otherwise, return `None`.
+/// If a prefix is found, return `(Some(Prefix), LocalPart)`.  
+/// Otherwise, return `(None, name)`.
 ///
 /// # Note
 /// - Both `Prefix` and `LocalPart` does not include the delimiter ':'.
@@ -24,12 +24,14 @@ use super::XmlParserCtxt;
 pub unsafe fn split_qname<'a>(
     ctxt: &mut XmlParserCtxt,
     name: &'a str,
-) -> Option<(&'a str, &'a str)> {
+) -> (Option<&'a str>, &'a str) {
     // nasty but well=formed
     if name.starts_with(':') {
-        return None;
+        return (None, name);
     }
-    let (prefix, local) = name.split_once(':').filter(|qname| !qname.1.is_empty())?;
+    let Some((prefix, local)) = name.split_once(':').filter(|qname| !qname.1.is_empty()) else {
+        return (None, name);
+    };
     if local.starts_with(|c| {
         // Check that the first character is proper to start a new name
         !xml_is_letter(c as u32) && c != '_'
@@ -41,7 +43,7 @@ pub unsafe fn split_qname<'a>(
             name
         );
     }
-    Some((prefix, local))
+    (Some(prefix), local)
 }
 
 /// Parse an XML qualified name string
