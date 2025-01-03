@@ -745,6 +745,24 @@ impl XmlParserCtxt {
         Some(c)
     }
 
+    pub(super) unsafe fn consume_char_if(
+        &mut self,
+        mut f: impl FnMut(&Self, char) -> bool,
+    ) -> Option<char> {
+        let mut len = 0;
+        let c = self.current_char(&mut len)?;
+        f(self, c).then(|| {
+            if c == '\n' {
+                (*self.input).line += 1;
+                (*self.input).col = 1;
+            } else {
+                (*self.input).col += 1;
+            }
+            (*self.input).cur = (*self.input).cur.add(c.len_utf8());
+            c
+        })
+    }
+
     /// Pushes a new parser input on top of the input stack
     ///
     /// Returns -1 in case of error, the index in the stack otherwise

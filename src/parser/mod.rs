@@ -41,6 +41,7 @@ mod context;
 mod error;
 mod input;
 mod node_info;
+mod parse;
 mod qname;
 
 use std::{
@@ -71,6 +72,7 @@ pub use context::*;
 pub(crate) use error::*;
 pub use input::*;
 pub use node_info::*;
+pub(crate) use parse::*;
 pub use qname::*;
 
 pub(crate) trait XmlParserCharValid {

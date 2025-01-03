@@ -33,7 +33,7 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
-use crate::parser::{xml_create_memory_parser_ctxt, xml_free_parser_ctxt};
+use crate::parser::{parse_nmtoken, xml_create_memory_parser_ctxt, xml_free_parser_ctxt};
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{XmlParserErrors, __xml_raise_error},
@@ -2031,7 +2031,6 @@ pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnume
 /// Returns: the enumeration attribute tree built while parsing
 #[doc(alias = "xmlParseEnumerationType")]
 pub(crate) unsafe fn xml_parse_enumeration_type(ctxt: XmlParserCtxtPtr) -> XmlEnumerationPtr {
-    let mut name: *mut XmlChar;
     let mut ret: XmlEnumerationPtr = null_mut();
     let mut last: XmlEnumerationPtr = null_mut();
     let mut cur: XmlEnumerationPtr;
@@ -2044,37 +2043,25 @@ pub(crate) unsafe fn xml_parse_enumeration_type(ctxt: XmlParserCtxtPtr) -> XmlEn
     while {
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
-        name = xml_parse_nmtoken(ctxt);
-        if name.is_null() {
+        let Some(name) = parse_nmtoken(&mut *ctxt) else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrNmtokenRequired, None);
             return ret;
-        }
+        };
         tmp = ret;
         while !tmp.is_null() {
-            if Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref()
-                == (*tmp).name.as_deref()
-            {
-                let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+            if Some(name.as_str()) == (*tmp).name.as_deref() {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
                     "standalone: attribute enumeration value token {} duplicated\n",
-                    n
+                    name
                 );
-                if xml_dict_owns((*ctxt).dict, name) == 0 {
-                    xml_free(name as _);
-                }
                 break;
             }
             tmp = (*tmp).next;
         }
         if tmp.is_null() {
-            cur = xml_create_enumeration(
-                Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
-            );
-            if xml_dict_owns((*ctxt).dict, name) == 0 {
-                xml_free(name as _);
-            }
+            cur = xml_create_enumeration(Some(&name));
             if cur.is_null() {
                 xml_free_enumeration(ret);
                 return null_mut();

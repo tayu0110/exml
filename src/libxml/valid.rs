@@ -1485,7 +1485,6 @@ pub unsafe fn xml_create_enumeration(name: Option<&str>) -> XmlEnumerationPtr {
         xml_verr_memory(null_mut(), Some("malloc failed"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlEnumeration>());
     std::ptr::write(&mut *ret, XmlEnumeration::default());
 
     (*ret).name = name.map(|n| n.to_owned());
@@ -1494,7 +1493,7 @@ pub unsafe fn xml_create_enumeration(name: Option<&str>) -> XmlEnumerationPtr {
 
 /// free an enumeration attribute node (recursive).
 #[doc(alias = "xmlFreeEnumeration")]
-pub unsafe extern "C" fn xml_free_enumeration(cur: XmlEnumerationPtr) {
+pub unsafe fn xml_free_enumeration(cur: XmlEnumerationPtr) {
     if cur.is_null() {
         return;
     }
