@@ -42,7 +42,6 @@ use crate::{
         hash::{
             xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTablePtr,
         },
-        parser::{xml_read_file, xml_read_memory},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
         uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{xml_validate_document_final, XmlValidCtxt},
@@ -68,7 +67,7 @@ use crate::{
             xml_strlen, XmlChar,
         },
     },
-    parser::split_qname2,
+    parser::{split_qname2, xml_read_file, xml_read_memory},
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
         xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,

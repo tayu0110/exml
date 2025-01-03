@@ -2140,10 +2140,8 @@ pub unsafe fn xml_shell_load(
     _node2: XmlNodePtr,
 ) -> i32 {
     use crate::{
-        libxml::{
-            globals::xml_free, htmlparser::html_parse_file, parser::xml_read_file,
-            xmlstring::xml_strdup,
-        },
+        libxml::{globals::xml_free, htmlparser::html_parse_file, xmlstring::xml_strdup},
+        parser::xml_read_file,
         uri::canonic_path,
         xpath::{xml_xpath_free_context, xml_xpath_new_context},
     };

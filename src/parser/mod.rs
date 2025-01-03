@@ -44,18 +44,30 @@ mod node_info;
 mod qname;
 
 use std::{
+    cell::RefCell,
+    ffi::CStr,
+    io::Read,
     ptr::null_mut,
+    rc::Rc,
     str::{from_utf8, from_utf8_unchecked},
 };
 
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
+    io::XmlParserInputBuffer,
     libxml::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        parser::XmlParserOption,
-        parser_internals::xml_is_letter,
+        parser::{
+            xml_create_doc_parser_ctxt, xml_ctxt_reset, xml_free_parser_ctxt, xml_init_parser,
+            xml_load_external_entity, xml_new_io_input_stream, xml_new_parser_ctxt,
+            XmlParserOption,
+        },
+        parser_internals::{
+            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_is_letter,
+        },
     },
+    tree::XmlDocPtr,
 };
 
 pub use context::*;
@@ -282,4 +294,202 @@ pub(crate) unsafe fn xml_string_current_char(
     // a compatible encoding for the ASCII set, since
     // XML constructs only use < 128 chars
     Ok(cur[0] as char)
+}
+
+/// Parse an XML in-memory document and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlReadDoc")]
+pub unsafe fn xml_read_doc(
+    cur: *const u8,
+    url: Option<&str>,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    if cur.is_null() {
+        return null_mut();
+    }
+    xml_init_parser();
+
+    let ctxt: XmlParserCtxtPtr = xml_create_doc_parser_ctxt(cur);
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    let res = (*ctxt).do_read(url, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
+}
+
+/// Parse an XML file from the filesystem or the network.
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlReadFile")]
+pub unsafe fn xml_read_file(filename: &str, encoding: Option<&str>, options: i32) -> XmlDocPtr {
+    xml_init_parser();
+    let ctxt: XmlParserCtxtPtr = xml_create_url_parser_ctxt(Some(filename), options);
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    let res = (*ctxt).do_read(None, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
+}
+
+/// Parse an XML in-memory document and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlReadMemory")]
+pub unsafe fn xml_read_memory(
+    buffer: Vec<u8>,
+    url: Option<&str>,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    xml_init_parser();
+    let ctxt: XmlParserCtxtPtr = xml_create_memory_parser_ctxt(buffer);
+
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    let res = (*ctxt).do_read(url, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
+}
+
+/// Parse an XML document from I/O functions and source and build a tree.
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlReadIO")]
+pub unsafe fn xml_read_io(
+    ioctx: impl Read + 'static,
+    url: Option<&str>,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    xml_init_parser();
+
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    let stream: XmlParserInputPtr =
+        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
+    if stream.is_null() {
+        xml_free_parser_ctxt(ctxt);
+        return null_mut();
+    }
+    (*ctxt).input_push(stream);
+    let res = (*ctxt).do_read(url, encoding, options);
+    xml_free_parser_ctxt(ctxt);
+    res
+}
+
+/// Parse an XML in-memory document and build a tree.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlCtxtReadDoc")]
+pub unsafe fn xml_ctxt_read_doc(
+    ctxt: XmlParserCtxtPtr,
+    cur: *const u8,
+    url: Option<&str>,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    if cur.is_null() {
+        return null_mut();
+    }
+    xml_ctxt_read_memory(
+        ctxt,
+        CStr::from_ptr(cur as *const i8).to_bytes().to_vec(),
+        url,
+        encoding,
+        options,
+    )
+}
+
+/// Parse an XML file from the filesystem or the network.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlCtxtReadFile")]
+pub unsafe fn xml_ctxt_read_file(
+    ctxt: XmlParserCtxtPtr,
+    filename: &str,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    xml_init_parser();
+
+    xml_ctxt_reset(ctxt);
+
+    let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
+    if stream.is_null() {
+        return null_mut();
+    }
+    (*ctxt).input_push(stream);
+    (*ctxt).do_read(None, encoding, options)
+}
+
+/// Parse an XML in-memory document and build a tree.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlCtxtReadMemory")]
+pub unsafe fn xml_ctxt_read_memory(
+    ctxt: XmlParserCtxtPtr,
+    buffer: Vec<u8>,
+    url: Option<&str>,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    xml_init_parser();
+    xml_ctxt_reset(ctxt);
+
+    let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
+        return null_mut();
+    };
+    let stream: XmlParserInputPtr =
+        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
+    if stream.is_null() {
+        return null_mut();
+    }
+
+    (*ctxt).input_push(stream);
+    (*ctxt).do_read(url, encoding, options)
+}
+
+/// Parse an XML document from I/O functions and source and build a tree.
+/// This reuses the existing @ctxt parser context
+///
+/// Returns the resulting document tree
+#[doc(alias = "xmlCtxtReadIO")]
+pub unsafe fn xml_ctxt_read_io(
+    ctxt: XmlParserCtxtPtr,
+    ioctx: impl Read + 'static,
+    url: Option<&str>,
+    encoding: Option<&str>,
+    options: i32,
+) -> XmlDocPtr {
+    if ctxt.is_null() {
+        return null_mut();
+    }
+    xml_init_parser();
+    xml_ctxt_reset(ctxt);
+
+    let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
+    let stream: XmlParserInputPtr =
+        xml_new_io_input_stream(ctxt, Rc::new(RefCell::new(input)), XmlCharEncoding::None);
+    if stream.is_null() {
+        return null_mut();
+    }
+    (*ctxt).input_push(stream);
+    (*ctxt).do_read(url, encoding, options)
 }

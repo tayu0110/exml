@@ -1638,8 +1638,7 @@ macro_rules! __xml_raise_error {
                     || channel as usize == parser_validity_error as usize
                     || channel as usize == parser_validity_warning as usize {
                     report_error(&error, ctxt, Some(s.as_ref()), None, None);
-                } else if /* TODO: std::ptr::addr_of!(channel) == std::ptr::addr_of!(libc::fprintf) || */
-                    channel as usize == generic_error_default as usize {
+                } else if channel as usize == generic_error_default as usize {
                     report_error(&error, ctxt, Some(s.as_ref()), Some(channel), data);
                 } else {
                     channel(data, s.as_ref());

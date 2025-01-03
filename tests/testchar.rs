@@ -18,15 +18,12 @@ use exml::{
     io::XmlParserInputBuffer,
     libxml::{
         globals::{xml_free, xml_malloc},
-        parser::{
-            xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt,
-            xml_read_memory,
-        },
+        parser::{xml_cleanup_parser, xml_ctxt_reset, xml_free_parser_ctxt, xml_new_parser_ctxt},
         parser_internals::xml_new_input_stream,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
-    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{xml_free_doc, NodeCommon, XmlDocPtr},
 };
 use libc::{memset, strlen};

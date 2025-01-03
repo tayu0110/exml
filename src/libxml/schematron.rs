@@ -35,6 +35,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     io::{XmlOutputCloseCallback, XmlOutputWriteCallback},
     libxml::xmlstring::xml_str_equal,
+    parser::{xml_read_file, xml_read_memory},
     tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
         internals::{xml_xpath_register_ns, xml_xpath_register_variable_ns},
@@ -48,7 +49,7 @@ use crate::{
 use super::{
     dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
     globals::{xml_free, xml_malloc},
-    parser::{xml_read_file, xml_read_memory, XmlParserOption},
+    parser::XmlParserOption,
     pattern::{
         xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternFlags, XmlPatternPtr,
     },

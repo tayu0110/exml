@@ -49,13 +49,12 @@ use exml::{
         },
         htmltree::{html_doc_dump, html_save_file, html_save_file_format},
         parser::{
-            xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_read_file, xml_ctxt_read_io,
-            xml_ctxt_read_memory, xml_ctxt_use_options, xml_free_parser_ctxt,
-            xml_get_external_entity_loader, xml_has_feature, xml_new_parser_ctxt,
-            xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd, xml_read_file, xml_read_io,
-            xml_read_memory, xml_set_external_entity_loader, XmlExternalEntityLoader, XmlFeature,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS,
-            XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_use_options,
+            xml_free_parser_ctxt, xml_get_external_entity_loader, xml_has_feature,
+            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd,
+            xml_set_external_entity_loader, XmlExternalEntityLoader, XmlFeature, XmlParserOption,
+            XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+            XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
@@ -92,7 +91,10 @@ use exml::{
         },
         xmlstring::XmlChar,
     },
-    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{
+        xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_read_file, xml_read_io,
+        xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
+    },
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
         NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
@@ -1539,13 +1541,10 @@ unsafe fn test_sax(filename: &str) {
     }
 }
 
-/************************************************************************
- *                                    *
- *            Stream Test processing                *
- *                                    *
- ************************************************************************/
+// Stream Test processing
+
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn process_node(reader: XmlTextReaderPtr) {
+unsafe fn process_node(reader: XmlTextReaderPtr) {
     use exml::libxml::{
         pattern::{xml_free_stream_ctxt, xml_pattern_match, xml_stream_pop, xml_stream_push},
         xmlreader::{
@@ -2083,11 +2082,8 @@ unsafe extern "C" fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
     xml_xpath_free_object(res);
 }
 
-/************************************************************************
- *                                    *
- *            Tree Test processing                *
- *                                    *
- ************************************************************************/
+// Tree Test processing
+
 unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr) {
     let mut doc: XmlDocPtr = null_mut();
     #[cfg(feature = "libxml_tree")]

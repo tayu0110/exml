@@ -18,8 +18,8 @@ use exml::{
     },
     libxml::{
         parser::{
-            xml_cleanup_parser, xml_ctxt_read_file, xml_free_parser_ctxt, xml_init_parser,
-            xml_new_parser_ctxt, xml_read_file, xml_set_external_entity_loader, XmlParserOption,
+            xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser, xml_new_parser_ctxt,
+            xml_set_external_entity_loader, XmlParserOption,
         },
         parser_internals::xml_new_input_from_file,
         xmlmemory::{
@@ -28,7 +28,7 @@ use exml::{
         },
         xmlstring::xml_str_equal,
     },
-    parser::{XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{xml_ctxt_read_file, xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
@@ -199,7 +199,7 @@ unsafe fn xmlconf_test_invalid(
             "test {id} : {filename} invalid document turned not well-formed too\n",
         );
     } else {
-        /* invalidity should be reported both in the context and in the document */
+        // invalidity should be reported both in the context and in the document
         if (*ctxt).valid != 0 || (*doc).properties & XmlDocProperties::XmlDocDTDValid as i32 != 0 {
             test_log!(
                 logfile,

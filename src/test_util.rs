@@ -23,8 +23,8 @@ use crate::{
             HtmlParserCtxtPtr, HtmlStatus,
         },
         parser::{
-            xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlFeature,
-            XmlParserOption, XmlSAXHandlerPtr,
+            xml_free_parser_ctxt, xml_new_parser_ctxt, XmlFeature, XmlParserOption,
+            XmlSAXHandlerPtr,
         },
         parser_internals::{xml_create_memory_parser_ctxt, xml_free_input_stream},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
@@ -50,7 +50,7 @@ use crate::{
         xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
     },
     parser::{
-        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
+        xml_read_memory, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
         XmlParserNodeInfoSeq, XmlParserNodeInfoSeqPtr,
     },
     tree::{
