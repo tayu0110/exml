@@ -4,6 +4,7 @@ use crate::{
         parser::{XmlParserInputState, XmlParserOption},
         parser_internals::{xml_is_letter, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH},
     },
+    parser::{build_qname, xml_ns_err},
 };
 
 use super::{
@@ -269,4 +270,83 @@ pub(crate) unsafe fn parse_name(ctxt: &mut XmlParserCtxt) -> Option<String> {
     }
     // accelerator for special cases
     parse_name_complex(ctxt)
+}
+
+/// Parse an XML Namespace QName
+///
+/// ```text
+/// [6]  QName  ::= (Prefix ':')? LocalPart
+/// [7]  Prefix  ::= NCName
+/// [8]  LocalPart  ::= NCName
+/// ```
+///
+/// Returns the Name parsed or NULL
+#[doc(alias = "xmlParseQName")]
+pub(crate) unsafe fn parse_qname(ctxt: &mut XmlParserCtxt) -> (Option<String>, Option<String>) {
+    ctxt.grow();
+    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return (None, None);
+    }
+
+    let Some(l) = parse_ncname(ctxt) else {
+        if ctxt.current_byte() == b':' {
+            if let Some(l) = parse_name(ctxt) {
+                xml_ns_err!(
+                    ctxt,
+                    XmlParserErrors::XmlNsErrQname,
+                    "Failed to parse QName '{}'\n",
+                    l
+                );
+                return (None, Some(l));
+            }
+        }
+        return (None, None);
+    };
+    if ctxt.current_byte() == b':' {
+        ctxt.skip_char();
+        let p = l;
+        let Some(l) = parse_ncname(ctxt) else {
+            if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                return (None, None);
+            }
+            xml_ns_err!(
+                ctxt,
+                XmlParserErrors::XmlNsErrQname,
+                "Failed to parse QName '{}:'\n",
+                p
+            );
+            let l = parse_nmtoken(ctxt);
+            let p = if let Some(l) = l.as_deref() {
+                build_qname(l, Some(&p))
+            } else {
+                if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                    return (None, None);
+                }
+                build_qname("", Some(&p))
+            };
+            return (None, Some(p.into_owned()));
+        };
+        if ctxt.current_byte() == b':' {
+            xml_ns_err!(
+                ctxt,
+                XmlParserErrors::XmlNsErrQname,
+                "Failed to parse QName '{}:{}:'\n",
+                p,
+                l
+            );
+            ctxt.skip_char();
+            if let Some(tmp) = parse_name(ctxt) {
+                let l = build_qname(&tmp, Some(&l));
+                return (Some(p), Some(l.into_owned()));
+            }
+            if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+                return (None, None);
+            }
+            let l = build_qname("", Some(&l));
+            return (Some(p), Some(l.into_owned()));
+        }
+        (Some(p), Some(l))
+    } else {
+        (None, Some(l))
+    }
 }
