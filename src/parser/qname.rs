@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{
     error::XmlParserErrors, libxml::parser_internals::xml_is_letter, parser::xml_fatal_err_msg_str,
 };
@@ -92,4 +94,16 @@ pub fn split_qname3<'a>(name: &'a str, len: &mut usize) -> Option<&'a str> {
     let (prefix, local) = name.split_once(':').filter(|qname| !qname.1.is_empty())?;
     *len = prefix.len();
     Some(local)
+}
+
+/// Builds the QName `"prefix:ncname"`.
+///
+/// If `prefix` is `Some` and not empty, return `Cow::Owned(QName)`.  
+/// Otherwise, return `Cow::Borrowed(ncname)`.
+#[doc(alias = "xmlBuildQName")]
+pub fn build_qname<'a>(ncname: &'a str, prefix: Option<&str>) -> Cow<'a, str> {
+    let Some(prefix) = prefix.filter(|p| !p.is_empty()) else {
+        return Cow::Borrowed(ncname);
+    };
+    Cow::Owned(format!("{prefix}:{ncname}"))
 }

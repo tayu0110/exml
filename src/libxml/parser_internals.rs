@@ -31,24 +31,15 @@ use std::sync::atomic::Ordering;
 
 use libc::{memcpy, memset, snprintf, INT_MAX};
 
-use crate::error::{XmlParserErrors, __xml_raise_error};
-use crate::hash::XmlHashTableRef;
-use crate::io::__xml_loader_err;
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
-use crate::parser::{
-    xml_err_memory, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo, __xml_err_encoding,
-    xml_err_encoding_int, xml_err_internal, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-    xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_ns_err,
-    xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxtPtr,
-};
-use crate::tree::{NodeCommon, NodePtr, XmlNode};
-use crate::uri::build_uri;
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
+    error::{XmlParserErrors, __xml_raise_error},
     generic_error,
     globals::{get_parser_debug_entities, GenericErrorContext},
-    io::{xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
+    hash::XmlHashTableRef,
+    io::{__xml_loader_err, xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
         chvalid::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
@@ -79,13 +70,20 @@ use crate::{
             xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strncmp, xml_strndup, XmlChar,
         },
     },
+    parser::{
+        xml_err_memory, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo, __xml_err_encoding,
+        xml_err_encoding_int, xml_err_internal, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_ns_err,
+        xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxtPtr,
+    },
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_new_doc, xml_new_doc_node, xml_split_qname3, XmlAttributeDefault, XmlAttributeType,
-        XmlDocProperties, XmlDocPtr, XmlElementContentOccur, XmlElementContentPtr,
-        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
-        XML_XML_NAMESPACE,
+        xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon, NodePtr, XmlAttributeDefault,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
+        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
+        XmlEnumerationPtr, XmlNode, XmlNodePtr, XML_XML_NAMESPACE,
     },
+    uri::build_uri,
 };
 
 use super::dict::XmlDictRef;

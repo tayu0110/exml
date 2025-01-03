@@ -42,16 +42,15 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    parser::{split_qname, xml_err_memory, XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{build_qname, split_qname, xml_err_memory, XmlParserCtxtPtr, XmlParserInputPtr},
     tree::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
-        xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
-        xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
-        xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname, NodeCommon,
-        NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType,
-        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlElementPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr,
-        XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi,
+        xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_reference,
+        xml_text_concat, xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
+        XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path},
 };
@@ -1793,6 +1792,8 @@ unsafe fn xml_check_defaulted_attributes(
     prefix: Option<&str>,
     atts: &[(String, Option<String>)],
 ) {
+    use crate::parser::build_qname;
+
     let mut elem_decl: XmlElementPtr;
     let mut internal: i32 = 1;
 
@@ -1881,39 +1882,21 @@ unsafe fn xml_check_defaulted_attributes(
                         || ((*attr).prefix.is_none() && (*attr).name().as_deref() == Some("xmlns"))
                         || (*ctxt).loadsubset & XML_COMPLETE_ATTRS as i32 != 0
                     {
-                        let pre = (*attr).prefix.as_deref().map(|p| CString::new(p).unwrap());
                         let tst: XmlAttributePtr = (*(*(*ctxt).my_doc).int_subset).get_qattr_desc(
                             (*attr).elem.as_deref().unwrap(),
                             (*attr).name().as_deref().unwrap(),
                             (*attr).prefix.as_deref(),
                         );
                         if tst == attr || tst.is_null() {
-                            let mut fname: [XmlChar; 50] = [0; 50];
-
-                            let fulln: *mut XmlChar = xml_build_qname(
-                                (*attr).name,
-                                pre.as_ref().map_or(null(), |p| p.as_ptr() as *const u8),
-                                fname.as_mut_ptr() as _,
-                                50,
-                            );
-                            if fulln.is_null() {
-                                xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                                return;
-                            }
+                            let name = (*attr).name().unwrap();
+                            let fulln = build_qname(&name, (*attr).prefix.as_deref());
 
                             // Check that the attribute is not declared in the serialization
-                            if !atts.iter().any(|(att, _)| {
-                                att.as_str()
-                                    == CStr::from_ptr(fulln as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref()
-                            }) {
+                            if !atts.iter().any(|(att, _)| att.as_str() == fulln) {
                                 let value = (*attr).default_value;
                                 xml_sax2_attribute_internal(
                                     Some(GenericErrorContext::new(ctxt)),
-                                    CStr::from_ptr(fulln as *const i8)
-                                        .to_string_lossy()
-                                        .as_ref(),
+                                    &fulln,
                                     (!value.is_null())
                                         .then(|| {
                                             CStr::from_ptr(value as *const i8).to_string_lossy()
@@ -1921,9 +1904,6 @@ unsafe fn xml_check_defaulted_attributes(
                                         .as_deref(),
                                     prefix,
                                 );
-                            }
-                            if fulln != fname.as_ptr() as _ && fulln != (*attr).name as _ {
-                                xml_free(fulln as _);
                             }
                         }
                     }
@@ -2153,7 +2133,6 @@ pub unsafe fn xml_sax2_start_element_ns(
     let ret: XmlNodePtr;
     let mut last: XmlNsPtr = null_mut();
     let mut ns: XmlNsPtr;
-    let mut lname: *mut XmlChar = null_mut();
 
     if ctx.is_none() {
         return;
@@ -2182,27 +2161,25 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     // Take care of the rare case of an undefined namespace prefix
-    let clocalname = CString::new(localname).unwrap();
-    let clocalname = clocalname.as_ptr() as *const u8;
+    let mut lname = None;
     if orig_uri.is_none() {
         if let Some(prefix) = prefix {
-            let prefix = CString::new(prefix).unwrap();
-            lname = xml_build_qname(clocalname, prefix.as_ptr() as *const u8, null_mut(), 0);
+            lname = Some(build_qname(localname, Some(prefix)));
         }
     }
     // allocate the node
     if !(*ctxt).free_elems.is_null() {
         ret = (*ctxt).free_elems;
-        (*ctxt).free_elems = (*ret).next.map_or(null_mut(), |n| n.as_ptr());
+        (*ctxt).free_elems = (*ret).next().map_or(null_mut(), |n| n.as_ptr());
         (*ctxt).free_elems_nr -= 1;
         std::ptr::write(&mut *ret, XmlNode::default());
         (*ret).doc = (*ctxt).my_doc;
         (*ret).typ = XmlElementType::XmlElementNode;
 
-        if lname.is_null() {
-            (*ret).name = xml_strdup(clocalname);
+        if let Some(lname) = lname {
+            (*ret).name = xml_strndup(lname.as_ptr(), lname.len() as i32);
         } else {
-            (*ret).name = lname;
+            (*ret).name = xml_strndup(localname.as_ptr(), localname.len() as i32);
         }
         if (*ret).name.is_null() {
             xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
@@ -2215,10 +2192,10 @@ pub unsafe fn xml_sax2_start_element_ns(
             xml_register_node_default_value(ret);
         }
     } else {
-        if lname.is_null() {
-            ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), localname, null_mut());
+        if let Some(lname) = lname {
+            ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), &lname, null_mut());
         } else {
-            ret = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), lname, null_mut());
+            ret = xml_new_doc_node((*ctxt).my_doc, null_mut(), localname, null_mut());
         }
         if ret.is_null() {
             xml_sax2_err_memory(ctxt, "xmlSAX2StartElementNs");
@@ -2349,7 +2326,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     for attr in &attributes {
         // Handle the rare case of an undefined attribute prefix
         if attr.1.is_some() && attr.2.is_none() {
-            lname = xml_build_qname(
+            let lname = xml_build_qname(
                 attr.0.as_ptr() as *const u8,
                 attr.1
                     .as_deref()
