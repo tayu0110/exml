@@ -4,12 +4,10 @@ use crate::{
         parser::{XmlParserInputState, XmlParserOption},
         parser_internals::{xml_is_letter, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH},
     },
-    parser::{build_qname, xml_ns_err},
-};
-
-use super::{
-    xml_fatal_err, xml_is_combining, xml_is_digit, xml_is_extender, XmlParserCharValid,
-    XmlParserCtxt,
+    parser::{
+        build_qname, xml_fatal_err, xml_is_combining, xml_is_digit, xml_is_extender, xml_ns_err,
+        XmlParserCharValid, XmlParserCtxt,
+    },
 };
 
 /// Parse an XML Nmtoken.
