@@ -33,7 +33,9 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
-use crate::parser::{parse_nmtoken, xml_create_memory_parser_ctxt, xml_free_parser_ctxt};
+use crate::parser::{
+    parse_name, parse_nmtoken, xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
+};
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{XmlParserErrors, __xml_raise_error},
@@ -46,7 +48,7 @@ use crate::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
             xml_is_extender, xml_is_ideographic,
         },
-        dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, xml_dict_reference},
+        dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference},
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
@@ -1577,11 +1579,7 @@ pub(crate) unsafe fn xml_parse_comment(ctxt: XmlParserCtxtPtr) {
 }
 
 // List of XML prefixed PI allowed by W3C specs
-const XML_W3_CPIS: &[*const c_char] = &[
-    c"xml-stylesheet".as_ptr() as _,
-    c"xml-model".as_ptr() as _,
-    null(),
-];
+const XML_W3_CPIS: &[&str] = &["xml-stylesheet", "xml-model"];
 
 /// Parse the name of a PI
 ///
@@ -1589,32 +1587,22 @@ const XML_W3_CPIS: &[*const c_char] = &[
 ///
 /// Returns the PITarget name or NULL
 #[doc(alias = "xmlParsePITarget")]
-pub(crate) unsafe fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *const XmlChar {
-    let name: *const XmlChar = xml_parse_name(ctxt);
-    if !name.is_null()
-        && (*name.add(0) == b'x' || *name.add(0) == b'X')
-        && (*name.add(1) == b'm' || *name.add(1) == b'M')
-        && (*name.add(2) == b'l' || *name.add(2) == b'L')
-    {
-        if *name.add(0) == b'x' && *name.add(1) == b'm' && *name.add(2) == b'l' && *name.add(3) == 0
-        {
+pub(crate) unsafe fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> Option<String> {
+    let name = parse_name(&mut *ctxt)?;
+    if name.as_bytes()[..name.len().min(3)].eq_ignore_ascii_case(b"xml") {
+        if name == "xml" {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrReservedXmlName,
                 "XML declaration allowed only at the start of the document\n",
             );
-            return name;
-        } else if *name.add(3) == 0 {
+            return Some(name);
+        } else if name.len() == 3 {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrReservedXmlName, None);
-            return name;
+            return Some(name);
         }
-        for &pis in XML_W3_CPIS {
-            if pis.is_null() {
-                break;
-            }
-            if xml_str_equal(name, pis as *const XmlChar) {
-                return name;
-            }
+        if XML_W3_CPIS.iter().any(|&pi| pi == name) {
+            return Some(name);
         }
         xml_warning_msg!(
             ctxt,
@@ -1622,8 +1610,7 @@ pub(crate) unsafe fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *const XmlCh
             "xmlParsePITarget: invalid name prefix 'xml'\n"
         );
     }
-    if !name.is_null() && !xml_strchr(name, b':').is_null() {
-        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    if name.contains(':') {
         xml_ns_err!(
             ctxt,
             XmlParserErrors::XmlNsErrColon,
@@ -1631,7 +1618,7 @@ pub(crate) unsafe fn xml_parse_pi_target(ctxt: XmlParserCtxtPtr) -> *const XmlCh
             name
         );
     }
-    name
+    Some(name)
 }
 
 /// Parse an XML Catalog Processing Instruction.
@@ -1731,7 +1718,6 @@ pub(crate) unsafe fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
         XML_MAX_TEXT_LENGTH
     };
     let mut l: i32 = 0;
-    let target: *const XmlChar;
     let state: XmlParserInputState;
 
     if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
@@ -1742,9 +1728,7 @@ pub(crate) unsafe fn xml_parse_pi(ctxt: XmlParserCtxtPtr) {
         (*ctxt).advance(2);
 
         // Parse the target name and check for special support like namespace.
-        target = xml_parse_pi_target(ctxt);
-        if !target.is_null() {
-            let target = CStr::from_ptr(target as *const i8).to_string_lossy();
+        if let Some(target) = xml_parse_pi_target(ctxt) {
             if (*ctxt).current_byte() == b'?' && NXT!(ctxt, 1) == b'>' {
                 if inputid != (*(*ctxt).input).id {
                     xml_fatal_err_msg(
@@ -1950,7 +1934,6 @@ pub(crate) unsafe fn xml_parse_default_decl(
 /// Returns: the notation attribute tree built while parsing
 #[doc(alias = "xmlParseNotationType")]
 pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnumerationPtr {
-    let mut name: *const XmlChar;
     let mut ret: XmlEnumerationPtr = null_mut();
     let mut last: XmlEnumerationPtr = null_mut();
     let mut cur: XmlEnumerationPtr;
@@ -1963,8 +1946,7 @@ pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnume
     while {
         (*ctxt).skip_char();
         (*ctxt).skip_blanks();
-        name = xml_parse_name(ctxt);
-        if name.is_null() {
+        let Some(name) = parse_name(&mut *ctxt) else {
             xml_fatal_err_msg(
                 ctxt,
                 XmlParserErrors::XmlErrNameRequired,
@@ -1972,30 +1954,22 @@ pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnume
             );
             xml_free_enumeration(ret);
             return null_mut();
-        }
+        };
         tmp = ret;
         while !tmp.is_null() {
-            if Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref()
-                == (*tmp).name.as_deref()
-            {
-                let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+            if Some(name.as_str()) == (*tmp).name.as_deref() {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
                     "standalone: attribute notation value token {} duplicated\n",
-                    n
+                    name
                 );
-                if xml_dict_owns((*ctxt).dict, name) == 0 {
-                    xml_free(name as _);
-                }
                 break;
             }
             tmp = (*tmp).next;
         }
         if tmp.is_null() {
-            cur = xml_create_enumeration(
-                Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
-            );
+            cur = xml_create_enumeration(Some(&name));
             if cur.is_null() {
                 xml_free_enumeration(ret);
                 return null_mut();
@@ -2396,7 +2370,6 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
     let mut ret: XmlElementContentPtr = null_mut();
     let mut cur: XmlElementContentPtr = null_mut();
     let mut n: XmlElementContentPtr;
-    let mut elem: *const XmlChar = null();
 
     (*ctxt).grow();
     if (*ctxt).content_bytes().starts_with(b"#PCDATA") {
@@ -2413,7 +2386,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             (*ctxt).skip_char();
             ret = xml_new_doc_element_content(
                 (*ctxt).my_doc,
-                null(),
+                None,
                 XmlElementContentType::XmlElementContentPCDATA,
             );
             if ret.is_null() {
@@ -2428,7 +2401,7 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
         if (*ctxt).current_byte() == b'(' || (*ctxt).current_byte() == b'|' {
             ret = xml_new_doc_element_content(
                 (*ctxt).my_doc,
-                null(),
+                None,
                 XmlElementContentType::XmlElementContentPCDATA,
             );
             cur = ret;
@@ -2436,15 +2409,38 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                 return null_mut();
             }
         }
-        #[allow(clippy::while_immutable_condition)]
+        let mut elem: Option<String> = None;
         while (*ctxt).current_byte() == b'|'
             && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
             (*ctxt).skip_char();
-            if elem.is_null() {
+            if let Some(elem) = elem.as_deref() {
+                n = xml_new_doc_element_content(
+                    (*ctxt).my_doc,
+                    None,
+                    XmlElementContentType::XmlElementContentOr,
+                );
+                if n.is_null() {
+                    xml_free_doc_element_content((*ctxt).my_doc, ret);
+                    return null_mut();
+                }
+                (*n).c1 = xml_new_doc_element_content(
+                    (*ctxt).my_doc,
+                    Some(elem),
+                    XmlElementContentType::XmlElementContentElement,
+                );
+                if !(*n).c1.is_null() {
+                    (*(*n).c1).parent = n;
+                }
+                (*cur).c2 = n;
+                if !n.is_null() {
+                    (*n).parent = cur;
+                }
+                cur = n;
+            } else {
                 ret = xml_new_doc_element_content(
                     (*ctxt).my_doc,
-                    null(),
+                    None,
                     XmlElementContentType::XmlElementContentOr,
                 );
                 if ret.is_null() {
@@ -2456,33 +2452,10 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
                     (*cur).parent = ret;
                 }
                 cur = ret;
-            } else {
-                n = xml_new_doc_element_content(
-                    (*ctxt).my_doc,
-                    null(),
-                    XmlElementContentType::XmlElementContentOr,
-                );
-                if n.is_null() {
-                    xml_free_doc_element_content((*ctxt).my_doc, ret);
-                    return null_mut();
-                }
-                (*n).c1 = xml_new_doc_element_content(
-                    (*ctxt).my_doc,
-                    elem,
-                    XmlElementContentType::XmlElementContentElement,
-                );
-                if !(*n).c1.is_null() {
-                    (*(*n).c1).parent = n;
-                }
-                (*cur).c2 = n;
-                if !n.is_null() {
-                    (*n).parent = cur;
-                }
-                cur = n;
             }
             (*ctxt).skip_blanks();
-            elem = xml_parse_name(ctxt);
-            if elem.is_null() {
+            elem = parse_name(&mut *ctxt);
+            if elem.is_none() {
                 xml_fatal_err_msg(
                     ctxt,
                     XmlParserErrors::XmlErrNameRequired,
@@ -2495,10 +2468,10 @@ pub(crate) unsafe fn xml_parse_element_mixed_content_decl(
             (*ctxt).grow();
         }
         if (*ctxt).current_byte() == b')' && NXT!(ctxt, 1) == b'*' {
-            if !elem.is_null() {
+            if let Some(elem) = elem {
                 (*cur).c2 = xml_new_doc_element_content(
                     (*ctxt).my_doc,
-                    elem,
+                    Some(&elem),
                     XmlElementContentType::XmlElementContentElement,
                 );
                 if !(*cur).c2.is_null() {
@@ -2641,16 +2614,14 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> XmlEntityPt
         return null_mut();
     }
     (*ctxt).skip_char();
-    let name: *const XmlChar = xml_parse_name(ctxt);
-    if name.is_null() {
+    let Some(name) = parse_name(&mut *ctxt) else {
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrNameRequired,
             "xmlParseEntityRef: no name\n",
         );
         return null_mut();
-    }
-    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    };
     if (*ctxt).current_byte() != b';' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrEntityRefSemicolMissing, None);
         return null_mut();
@@ -3537,16 +3508,14 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
         return;
     }
     (*ctxt).skip_char();
-    let name: *const XmlChar = xml_parse_name(ctxt);
-    if name.is_null() {
+    let Some(name) = parse_name(&mut *ctxt) else {
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrPERefNoName,
             "PEReference: no name\n",
         );
         return;
-    }
-    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    };
     if get_parser_debug_entities() != 0 {
         generic_error!("PEReference: {}\n", name);
     }
@@ -3711,20 +3680,15 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
     (*ctxt).skip_blanks();
 
     // Parse the DOCTYPE name.
-    let name: *const XmlChar = xml_parse_name(ctxt);
-    if name.is_null() {
+    let name = parse_name(&mut *ctxt);
+    if name.is_none() {
         xml_fatal_err_msg(
             ctxt,
             XmlParserErrors::XmlErrNameRequired,
             "xmlParseDocTypeDecl : no DOCTYPE name !\n",
         );
     }
-    (*ctxt).int_sub_name = (!name.is_null()).then(|| {
-        CStr::from_ptr(name as *const i8)
-            .to_string_lossy()
-            .into_owned()
-    });
-
+    (*ctxt).int_sub_name = name.as_deref().map(|n| n.to_owned());
     (*ctxt).skip_blanks();
 
     // Check for SystemID and ExternalID
@@ -3757,9 +3721,7 @@ pub(crate) unsafe fn xml_parse_doc_type_decl(ctxt: XmlParserCtxtPtr) {
         {
             internal_subset(
                 (*ctxt).user_data.clone(),
-                (!name.is_null())
-                    .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
-                    .as_deref(),
+                name.as_deref(),
                 (*ctxt).ext_sub_system.as_deref(),
                 (*ctxt).ext_sub_uri.as_deref(),
             );

@@ -115,12 +115,12 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
     parser::{
-        __xml_err_encoding, xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
-        xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
-        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
-        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
-        xml_warning_msg, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr,
-        XmlParserNodeInfo,
+        __xml_err_encoding, parse_name, xml_create_entity_parser_ctxt_internal,
+        xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
+        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
+        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+        xml_ns_warn, xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxt,
+        XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
@@ -8574,7 +8574,6 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
     let mut cur: XmlElementContentPtr;
     let mut last: XmlElementContentPtr = null_mut();
     let mut op: XmlElementContentPtr;
-    let mut elem: *const XmlChar;
     let mut typ: XmlChar = 0;
 
     if (depth > 128 && (*ctxt).options & XmlParserOption::XmlParseHuge as i32 == 0) || depth > 2048
@@ -8603,14 +8602,13 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
         (*ctxt).skip_blanks();
         (*ctxt).grow();
     } else {
-        elem = xml_parse_name(ctxt);
-        if elem.is_null() {
+        let Some(elem) = parse_name(&mut *ctxt) else {
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotStarted, None);
             return null_mut();
-        }
+        };
         cur = xml_new_doc_element_content(
             (*ctxt).my_doc,
-            elem,
+            Some(&elem),
             XmlElementContentType::XmlElementContentElement,
         );
         ret = cur;
@@ -8634,7 +8632,6 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
         (*ctxt).grow();
     }
     (*ctxt).skip_blanks();
-    #[allow(clippy::while_immutable_condition)]
     while ((*ctxt).current_byte() != b')')
         && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
     {
@@ -8667,7 +8664,7 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
 
             op = xml_new_doc_element_content(
                 (*ctxt).my_doc,
-                null_mut(),
+                None,
                 XmlElementContentType::XmlElementContentSeq,
             );
             if op.is_null() {
@@ -8724,7 +8721,7 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
 
             op = xml_new_doc_element_content(
                 (*ctxt).my_doc,
-                null_mut(),
+                None,
                 XmlElementContentType::XmlElementContentOr,
             );
             if op.is_null() {
@@ -8782,17 +8779,16 @@ pub(crate) unsafe fn xml_parse_element_children_content_decl_priv(
             }
             (*ctxt).skip_blanks();
         } else {
-            elem = xml_parse_name(ctxt);
-            if elem.is_null() {
+            let Some(elem) = parse_name(&mut *ctxt) else {
                 xml_fatal_err(ctxt, XmlParserErrors::XmlErrElemcontentNotStarted, None);
                 if !ret.is_null() {
                     xml_free_doc_element_content((*ctxt).my_doc, ret);
                 }
                 return null_mut();
-            }
+            };
             last = xml_new_doc_element_content(
                 (*ctxt).my_doc,
-                elem,
+                Some(&elem),
                 XmlElementContentType::XmlElementContentElement,
             );
             if last.is_null() {

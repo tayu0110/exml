@@ -504,8 +504,8 @@ pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotat
 ///
 /// Returns null_mut() if not, otherwise the new element content structure
 #[doc(alias = "xmlNewElementContent")]
-pub unsafe extern "C" fn xml_new_element_content(
-    name: *const XmlChar,
+pub unsafe fn xml_new_element_content(
+    name: Option<&str>,
     typ: XmlElementContentType,
 ) -> XmlElementContentPtr {
     xml_new_doc_element_content(null_mut(), name, typ)
@@ -516,16 +516,14 @@ pub unsafe extern "C" fn xml_new_element_content(
 ///
 /// Returns the new xmlElementContentPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElementContent")]
-pub unsafe extern "C" fn xml_copy_element_content(
-    content: XmlElementContentPtr,
-) -> XmlElementContentPtr {
+pub unsafe fn xml_copy_element_content(content: XmlElementContentPtr) -> XmlElementContentPtr {
     xml_copy_doc_element_content(null_mut(), content)
 }
 
 /// Free an element content structure. The whole subtree is removed.
 /// Deprecated, use xmlFreeDocElementContent instead
 #[doc(alias = "xmlFreeElementContent")]
-pub unsafe extern "C" fn xml_free_element_content(cur: XmlElementContentPtr) {
+pub unsafe fn xml_free_element_content(cur: XmlElementContentPtr) {
     xml_free_doc_element_content(null_mut(), cur);
 }
 
@@ -533,20 +531,14 @@ pub unsafe extern "C" fn xml_free_element_content(cur: XmlElementContentPtr) {
 ///
 /// Returns null_mut() if not, otherwise the new element content structure
 #[doc(alias = "xmlNewDocElementContent")]
-pub unsafe extern "C" fn xml_new_doc_element_content(
-    doc: XmlDocPtr,
-    name: *const XmlChar,
+pub unsafe fn xml_new_doc_element_content(
+    _doc: XmlDocPtr,
+    name: Option<&str>,
     typ: XmlElementContentType,
 ) -> XmlElementContentPtr {
-    let mut dict: XmlDictPtr = null_mut();
-
-    if !doc.is_null() {
-        dict = (*doc).dict;
-    }
-
     match typ {
         XmlElementContentType::XmlElementContentElement => {
-            if name.is_null() {
+            if name.is_none() {
                 xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
@@ -557,7 +549,7 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
         XmlElementContentType::XmlElementContentPCDATA
         | XmlElementContentType::XmlElementContentSeq
         | XmlElementContentType::XmlElementContentOr => {
-            if !name.is_null() {
+            if name.is_some() {
                 xml_err_valid!(
                     null_mut(),
                     XmlParserErrors::XmlErrInternalError,
@@ -583,22 +575,12 @@ pub unsafe extern "C" fn xml_new_doc_element_content(
     memset(ret as _, 0, size_of::<XmlElementContent>());
     (*ret).typ = typ;
     (*ret).ocur = XmlElementContentOccur::XmlElementContentOnce;
-    if !name.is_null() {
-        let mut l: i32 = 0;
-
-        let tmp: *const XmlChar = xml_split_qname3(name, addr_of_mut!(l) as _);
-        if tmp.is_null() {
-            if dict.is_null() {
-                (*ret).name = xml_strdup(name);
-            } else {
-                (*ret).name = xml_dict_lookup(dict, name, -1);
-            }
-        } else if dict.is_null() {
-            (*ret).prefix = xml_strndup(name, l);
-            (*ret).name = xml_strdup(tmp);
+    if let Some(name) = name {
+        if let Some((prefix, local)) = split_qname2(name) {
+            (*ret).prefix = xml_strndup(prefix.as_ptr(), prefix.len() as i32);
+            (*ret).name = xml_strndup(local.as_ptr(), local.len() as i32);
         } else {
-            (*ret).prefix = xml_dict_lookup(dict, name, l);
-            (*ret).name = xml_dict_lookup(dict, tmp, -1);
+            (*ret).name = xml_strndup(name.as_ptr(), name.len() as i32);
         }
     }
     ret
@@ -8805,81 +8787,6 @@ mod tests {
                             eprint!(" {}", n_elem);
                             eprintln!(" {}", n_attr);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_element_content() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_type in 0..GEN_NB_XML_ELEMENT_CONTENT_TYPE {
-                        let mem_base = xml_mem_blocks();
-                        let doc = gen_xml_doc_ptr(n_doc, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let typ = gen_xml_element_content_type(n_type, 2);
-
-                        let ret_val = xml_new_doc_element_content(doc, name, typ);
-                        xml_free_doc_element_content(doc, ret_val);
-                        let ret_val = null_mut();
-                        desret_xml_element_content_ptr(ret_val);
-                        des_xml_doc_ptr(n_doc, doc, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_xml_element_content_type(n_type, typ, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlNewDocElementContent",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlNewDocElementContent()"
-                            );
-                            eprint!(" {}", n_doc);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_type);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_element_content() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_type in 0..GEN_NB_XML_ELEMENT_CONTENT_TYPE {
-                    let mem_base = xml_mem_blocks();
-                    let name = gen_const_xml_char_ptr(n_name, 0);
-                    let typ = gen_xml_element_content_type(n_type, 1);
-
-                    let ret_val = xml_new_element_content(name as *const XmlChar, typ);
-                    desret_xml_element_content_ptr(ret_val);
-                    des_const_xml_char_ptr(n_name, name, 0);
-                    des_xml_element_content_type(n_type, typ, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewElementContent",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewElementContent()"
-                        );
-                        eprint!(" {}", n_name);
-                        eprintln!(" {}", n_type);
                     }
                 }
             }
