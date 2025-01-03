@@ -1356,7 +1356,7 @@ unsafe fn xml_sax2_attribute_internal(
     ctx: Option<GenericErrorContext>,
     fullname: &str,
     value: Option<&str>,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
 ) {
     use super::htmltree::html_is_boolean_attr;
 
@@ -1856,8 +1856,8 @@ unsafe fn xml_sax2_attribute_internal(
 #[cfg(any(feature = "sax1", feature = "html", feature = "libxml_writer",))]
 unsafe fn xml_check_defaulted_attributes(
     ctxt: XmlParserCtxtPtr,
-    name: *const XmlChar,
-    prefix: *const XmlChar,
+    name: &str,
+    prefix: Option<&str>,
     atts: &[(String, Option<String>)],
 ) {
     let mut elem_decl: XmlElementPtr;
@@ -2021,8 +2021,6 @@ pub unsafe fn xml_sax2_start_element(
 
     let mut parent: XmlNodePtr;
     let mut ns: XmlNsPtr;
-    let name: *mut XmlChar;
-    let mut prefix: *mut XmlChar = null_mut();
 
     if ctx.is_none() {
         return;
@@ -2054,23 +2052,18 @@ pub unsafe fn xml_sax2_start_element(
         (*ctxt).validate = 0;
     }
 
-    let fullname = CString::new(fullname).unwrap();
-    if (*ctxt).html != 0 {
-        prefix = null_mut();
-        name = xml_strdup(fullname.as_ptr() as *const u8);
+    let (prefix, name) = if (*ctxt).html != 0 {
+        (None, fullname)
     } else {
         // Split the full name into a namespace prefix and the tag name
-        name = xml_split_qname(ctxt, fullname.as_ptr() as *const u8, addr_of_mut!(prefix));
-    }
+        split_qname(&mut *ctxt, fullname)
+    };
 
     // Note : the namespace resolution is deferred until the end of the
     //        attributes parsing, since local namespace can be defined as
     //        an attribute at this level.
-    let ret: XmlNodePtr = xml_new_doc_node_eat_name((*ctxt).my_doc, null_mut(), name, null_mut());
+    let ret: XmlNodePtr = xml_new_doc_node((*ctxt).my_doc, null_mut(), name, null_mut());
     if ret.is_null() {
-        if !prefix.is_null() {
-            xml_free(prefix as _);
-        }
         xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
         return;
     }
@@ -2094,9 +2087,6 @@ pub unsafe fn xml_sax2_start_element(
     if (*ctxt).node_push(ret) < 0 {
         (*ret).unlink();
         xml_free_node(ret);
-        if !prefix.is_null() {
-            xml_free(prefix as _);
-        }
         return;
     }
 
@@ -2124,21 +2114,20 @@ pub unsafe fn xml_sax2_start_element(
 
         // Search the namespace, note that since the attributes have been
         // processed, the local namespaces are available.
-        let pre =
-            (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy());
-        ns = (*ret).search_ns((*ctxt).my_doc, pre.as_deref());
+        ns = (*ret).search_ns((*ctxt).my_doc, prefix);
         if ns.is_null() && !parent.is_null() {
-            ns = (*parent).search_ns((*ctxt).my_doc, pre.as_deref());
+            ns = (*parent).search_ns((*ctxt).my_doc, prefix);
         }
-        if !prefix.is_null() && ns.is_null() {
-            ns = xml_new_ns(ret, null_mut(), pre.as_deref());
-            let prefix = CStr::from_ptr(prefix as *const i8).to_string_lossy();
-            xml_ns_warn_msg!(
-                ctxt,
-                XmlParserErrors::XmlNsErrUndefinedNamespace,
-                "Namespace prefix {} is not defined\n",
-                prefix
-            );
+        if ns.is_null() {
+            if let Some(prefix) = prefix {
+                ns = xml_new_ns(ret, null_mut(), Some(prefix));
+                xml_ns_warn_msg!(
+                    ctxt,
+                    XmlParserErrors::XmlNsErrUndefinedNamespace,
+                    "Namespace prefix {} is not defined\n",
+                    prefix
+                );
+            }
         }
 
         // set the namespace node, making sure that if the default namespace
@@ -2154,12 +2143,12 @@ pub unsafe fn xml_sax2_start_element(
     // process all the other attributes
     if (*ctxt).html != 0 {
         for (att, value) in atts {
-            xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), null_mut());
+            xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), None);
         }
     } else {
         for (att, value) in atts {
             if !att.starts_with("xmlns") {
-                xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), null_mut());
+                xml_sax2_attribute_internal(ctx.clone(), att, value.as_deref(), None);
             }
         }
     }
@@ -2179,10 +2168,6 @@ pub unsafe fn xml_sax2_start_element(
             (*ctxt).valid &= xml_validate_root(addr_of_mut!((*ctxt).vctxt) as _, (*ctxt).my_doc);
             (*ctxt).vctxt.flags |= XML_VCTXT_DTD_VALIDATED as u32;
         }
-    }
-
-    if !prefix.is_null() {
-        xml_free(prefix as _);
     }
 }
 
@@ -2264,12 +2249,12 @@ pub unsafe fn xml_sax2_start_element_ns(
     }
 
     // Take care of the rare case of an undefined namespace prefix
-    let localname = CString::new(localname).unwrap();
-    let localname = localname.as_ptr() as *const u8;
+    let clocalname = CString::new(localname).unwrap();
+    let clocalname = clocalname.as_ptr() as *const u8;
     if orig_uri.is_none() {
         if let Some(prefix) = prefix {
             let prefix = CString::new(prefix).unwrap();
-            lname = xml_build_qname(localname, prefix.as_ptr() as *const u8, null_mut(), 0);
+            lname = xml_build_qname(clocalname, prefix.as_ptr() as *const u8, null_mut(), 0);
         }
     }
     // allocate the node
@@ -2282,7 +2267,7 @@ pub unsafe fn xml_sax2_start_element_ns(
         (*ret).typ = XmlElementType::XmlElementNode;
 
         if lname.is_null() {
-            (*ret).name = xml_strdup(localname);
+            (*ret).name = xml_strdup(clocalname);
         } else {
             (*ret).name = lname;
         }
@@ -2347,14 +2332,11 @@ pub unsafe fn xml_sax2_start_element_ns(
                 && !(*ctxt).my_doc.is_null()
                 && !(*(*ctxt).my_doc).int_subset.is_null()
             {
-                let prefix = prefix.map(|p| CString::new(p).unwrap());
                 (*ctxt).valid &= xml_validate_one_namespace(
                     addr_of_mut!((*ctxt).vctxt) as _,
                     (*ctxt).my_doc,
                     ret,
-                    prefix
-                        .as_deref()
-                        .map_or(null(), |p| p.as_ptr() as *const u8),
+                    prefix,
                     ns,
                     uri.as_ptr() as *const u8,
                 );

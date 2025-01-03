@@ -2259,10 +2259,7 @@ unsafe extern "C" fn xml_xinclude_expand_node(
 ///
 /// Returns 0 if substitution succeeded, -1 if some processing failed
 #[doc(alias = "xmlXIncludeIncludeNode")]
-unsafe extern "C" fn xml_xinclude_include_node(
-    ctxt: XmlXincludeCtxtPtr,
-    refe: XmlXincludeRefPtr,
-) -> i32 {
+unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeRefPtr) -> i32 {
     let mut cur: XmlNodePtr;
     let mut end: XmlNodePtr;
     let mut list: XmlNodePtr;
@@ -2315,9 +2312,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
 
             (*cur).add_prev_sibling(end);
         }
-        /*
-         * FIXME: xmlUnlinkNode doesn't coalesce text nodes.
-         */
+        // FIXME: xmlUnlinkNode doesn't coalesce text nodes.
         (*cur).unlink();
         xml_free_node(cur);
     } else {
@@ -2334,7 +2329,7 @@ unsafe extern "C" fn xml_xinclude_include_node(
             xml_free_node(now.as_ptr());
             child = next;
         }
-        end = xml_new_doc_node((*cur).doc, (*cur).ns, (*cur).name, null_mut());
+        end = xml_new_doc_node((*cur).doc, (*cur).ns, &(*cur).name().unwrap(), null_mut());
         if end.is_null() {
             xml_xinclude_err!(
                 ctxt,

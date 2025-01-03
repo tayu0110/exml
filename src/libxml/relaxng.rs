@@ -3578,12 +3578,8 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                         if let Some(name) = (*cur).get_prop("name") {
                             let cname = CString::new(name.as_str()).unwrap();
                             if let Some(mut children) = (*cur).children() {
-                                let node: XmlNodePtr = xml_new_doc_node(
-                                    (*cur).doc,
-                                    (*cur).ns,
-                                    c"name".as_ptr() as _,
-                                    null_mut(),
-                                );
+                                let node: XmlNodePtr =
+                                    xml_new_doc_node((*cur).doc, (*cur).ns, "name", null_mut());
                                 if !node.is_null() {
                                     children.add_prev_sibling(node);
                                     text =
@@ -3595,7 +3591,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                                 text = xml_new_child(
                                     cur,
                                     (*cur).ns,
-                                    c"name".as_ptr() as _,
+                                    "name",
                                     cname.as_ptr() as *const u8,
                                 );
                             }

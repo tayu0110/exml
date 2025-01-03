@@ -4508,13 +4508,13 @@ pub unsafe extern "C" fn xml_validate_element(
             ns = (*elem).ns_def;
             while !ns.is_null() {
                 if (*elem).ns.is_null() {
-                    ret &= xml_validate_one_namespace(ctxt, doc, elem, null_mut(), ns, (*ns).href);
+                    ret &= xml_validate_one_namespace(ctxt, doc, elem, None, ns, (*ns).href);
                 } else {
                     ret &= xml_validate_one_namespace(
                         ctxt,
                         doc,
                         elem,
-                        (*(*elem).ns).prefix,
+                        (*(*elem).ns).prefix().as_deref(),
                         ns,
                         (*ns).href,
                     );
@@ -4556,7 +4556,6 @@ unsafe fn xml_valid_get_elem_decl(
     extsubset: *mut i32,
 ) -> XmlElementPtr {
     let mut elem_decl: XmlElementPtr = null_mut();
-    let mut prefix: *const XmlChar = null_mut();
 
     if ctxt.is_null() || doc.is_null() || elem.is_null() || (*elem).name.is_null() {
         return null_mut();
@@ -4566,14 +4565,20 @@ unsafe fn xml_valid_get_elem_decl(
     }
 
     // Fetch the declaration for the qualified name
+    let mut prefix = None;
     if !(*elem).ns.is_null() && (*(*elem).ns).prefix().is_some() {
-        prefix = (*(*elem).ns).prefix;
+        prefix = (*(*elem).ns).prefix();
     }
 
-    if !prefix.is_null() {
-        elem_decl = xml_get_dtd_qelement_desc((*doc).int_subset, (*elem).name, prefix);
+    if let Some(prefix) = prefix {
+        elem_decl =
+            xml_get_dtd_qelement_desc((*doc).int_subset, &(*elem).name().unwrap(), Some(&prefix));
         if elem_decl.is_null() && !(*doc).ext_subset.is_null() {
-            elem_decl = xml_get_dtd_qelement_desc((*doc).ext_subset, (*elem).name, prefix);
+            elem_decl = xml_get_dtd_qelement_desc(
+                (*doc).ext_subset,
+                &(*elem).name().unwrap(),
+                Some(&prefix),
+            );
             if !elem_decl.is_null() && !extsubset.is_null() {
                 *extsubset = 1;
             }
@@ -6586,11 +6591,11 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateOneNamespace")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_one_namespace(
+pub unsafe fn xml_validate_one_namespace(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
-    prefix: *const XmlChar,
+    prefix: Option<&str>,
     ns: XmlNsPtr,
     value: *const XmlChar,
 ) -> i32 {
@@ -6606,10 +6611,16 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         return 0;
     }
 
-    if !prefix.is_null() {
+    if let Some(prefix) = prefix {
         let mut fname: [XmlChar; 50] = [0; 50];
+        let prefix = CString::new(prefix).unwrap();
 
-        let fullname: *mut XmlChar = xml_build_qname((*elem).name, prefix, fname.as_mut_ptr(), 50);
+        let fullname: *mut XmlChar = xml_build_qname(
+            (*elem).name,
+            prefix.as_ptr() as *const u8,
+            fname.as_mut_ptr(),
+            50,
+        );
         if fullname.is_null() {
             xml_verr_memory(ctxt, Some("Validating namespace"));
             return 0;
@@ -6675,7 +6686,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         }
     }
 
-    /* Validity Constraint: Attribute Value Type */
+    // Validity Constraint: Attribute Value Type
     if attr_decl.is_null() {
         if let Some(prefix) = (*ns).prefix() {
             let elem_name = (*elem).name().unwrap();
@@ -6910,7 +6921,7 @@ pub unsafe extern "C" fn xml_validate_one_namespace(
         }
     }
 
-    /* Fixed Attribute Default */
+    // Fixed Attribute Default
     if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
         && !xml_str_equal((*attr_decl).default_value, value)
     {
@@ -7262,10 +7273,10 @@ pub unsafe extern "C" fn xml_get_dtd_notation_desc(
 ///
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdQElementDesc")]
-pub unsafe extern "C" fn xml_get_dtd_qelement_desc(
+pub unsafe fn xml_get_dtd_qelement_desc(
     dtd: XmlDtdPtr,
-    name: *const XmlChar,
-    prefix: *const XmlChar,
+    name: &str,
+    prefix: Option<&str>,
 ) -> XmlElementPtr {
     if dtd.is_null() {
         return null_mut();
@@ -7275,7 +7286,15 @@ pub unsafe extern "C" fn xml_get_dtd_qelement_desc(
     }
     let table: XmlElementTablePtr = (*dtd).elements as XmlElementTablePtr;
 
-    xml_hash_lookup2(table, name, prefix) as _
+    let name = CString::new(name).unwrap();
+    let prefix = prefix.map(|p| CString::new(p).unwrap());
+    xml_hash_lookup2(
+        table,
+        name.as_ptr() as *const u8,
+        prefix
+            .as_deref()
+            .map_or(null(), |p| p.as_ptr() as *const u8),
+    ) as _
 }
 
 /// Search the DTD for the description of this element
@@ -7437,12 +7456,8 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
     let parent_last: *mut XmlNode = (*parent).last().map_or(null_mut(), |l| l.as_ptr());
 
     // Creates a dummy node and insert it into the tree
-    let test_node: *mut XmlNode = xml_new_doc_node(
-        (*ref_node).doc,
-        null_mut(),
-        c"<!dummy?>".as_ptr() as _,
-        null_mut(),
-    );
+    let test_node: *mut XmlNode =
+        xml_new_doc_node((*ref_node).doc, null_mut(), "<!dummy?>", null_mut());
     if test_node.is_null() {
         return -1;
     }
@@ -8665,45 +8680,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_get_dtd_qelement_desc() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_dtd in 0..GEN_NB_XML_DTD_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let dtd = gen_xml_dtd_ptr(n_dtd, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let prefix = gen_const_xml_char_ptr(n_prefix, 2);
-
-                        let ret_val = xml_get_dtd_qelement_desc(dtd, name, prefix);
-                        desret_xml_element_ptr(ret_val);
-                        des_xml_dtd_ptr(n_dtd, dtd, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_prefix, prefix, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlGetDtdQElementDesc",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlGetDtdQElementDesc()"
-                            );
-                            eprint!(" {}", n_dtd);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_prefix);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_get_id() {
         unsafe {
             let mut leaks = 0;
@@ -9771,63 +9747,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_doc);
                             eprintln!(" {}", n_elem);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_one_namespace() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_ns in 0..GEN_NB_XML_NS_PTR {
-                                for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                                    let doc = gen_xml_doc_ptr(n_doc, 1);
-                                    let elem = gen_xml_node_ptr(n_elem, 2);
-                                    let prefix = gen_const_xml_char_ptr(n_prefix, 3);
-                                    let ns = gen_xml_ns_ptr(n_ns, 4);
-                                    let value = gen_const_xml_char_ptr(n_value, 5);
-
-                                    let ret_val = xml_validate_one_namespace(
-                                        ctxt, doc, elem, prefix, ns, value,
-                                    );
-                                    desret_int(ret_val);
-                                    des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                                    des_xml_doc_ptr(n_doc, doc, 1);
-                                    des_xml_node_ptr(n_elem, elem, 2);
-                                    des_const_xml_char_ptr(n_prefix, prefix, 3);
-                                    des_xml_ns_ptr(n_ns, ns, 4);
-                                    des_const_xml_char_ptr(n_value, value, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlValidateOneNamespace",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        assert!(
-                                            leaks == 0,
-                                            "{leaks} Leaks are found in xmlValidateOneNamespace()"
-                                        );
-                                        eprint!(" {}", n_ctxt);
-                                        eprint!(" {}", n_doc);
-                                        eprint!(" {}", n_elem);
-                                        eprint!(" {}", n_prefix);
-                                        eprint!(" {}", n_ns);
-                                        eprintln!(" {}", n_value);
-                                    }
-                                }
-                            }
                         }
                     }
                 }

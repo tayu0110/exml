@@ -38,7 +38,7 @@ use std::{
     borrow::Cow,
     ffi::{c_char, CStr, CString},
     mem::size_of,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
@@ -1769,8 +1769,6 @@ pub unsafe fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> Xml
 #[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
-    use std::ffi::CString;
-
     use crate::libxml::{
         entities::xml_copy_entities_table,
         valid::{
@@ -1831,14 +1829,10 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
             }
         } else if matches!((*cur).element_type(), XmlElementType::XmlElementDecl) {
             let tmp: XmlElementPtr = cur as _;
-            let prefix = (*tmp).prefix.as_deref().map(|p| CString::new(p).unwrap());
-            let name = (*tmp).name().map(|n| CString::new(n.as_ref()).unwrap());
             q = xml_get_dtd_qelement_desc(
                 ret,
-                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-                prefix
-                    .as_ref()
-                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
+                (*tmp).name().as_deref().unwrap(),
+                (*tmp).prefix.as_deref(),
             ) as _;
         } else if matches!((*cur).element_type(), XmlElementType::XmlAttributeDecl) {
             let tmp: XmlAttributePtr = cur as _;
@@ -1962,17 +1956,14 @@ macro_rules! UPDATE_LAST_CHILD_AND_PARENT {
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocNode")]
-pub unsafe extern "C" fn xml_new_doc_node(
+pub unsafe fn xml_new_doc_node(
     doc: XmlDocPtr,
     ns: XmlNsPtr,
-    name: *const XmlChar,
+    name: &str,
     content: *const XmlChar,
 ) -> XmlNodePtr {
-    let cur = if !doc.is_null() && !(*doc).dict.is_null() {
-        xml_new_node_eat_name(ns, xml_dict_lookup((*doc).dict, name, -1) as _)
-    } else {
-        xml_new_node(ns, name)
-    };
+    let name = CString::new(name).unwrap();
+    let cur = xml_new_node(ns, name.as_ptr() as *const u8);
     if !cur.is_null() {
         (*cur).doc = doc;
         if !content.is_null() {
@@ -1997,7 +1988,7 @@ pub unsafe extern "C" fn xml_new_doc_node(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocNodeEatName")]
-pub unsafe extern "C" fn xml_new_doc_node_eat_name(
+pub unsafe fn xml_new_doc_node_eat_name(
     doc: XmlDocPtr,
     ns: XmlNsPtr,
     name: *mut XmlChar,
@@ -2105,20 +2096,16 @@ pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar)
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewChild")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_new_child(
+pub unsafe fn xml_new_child(
     parent: XmlNodePtr,
     ns: XmlNsPtr,
-    name: *const XmlChar,
+    name: &str,
     content: *const XmlChar,
 ) -> XmlNodePtr {
     let cur: XmlNodePtr;
     let prev: XmlNodePtr;
 
     if parent.is_null() {
-        return null_mut();
-    }
-
-    if name.is_null() {
         return null_mut();
     }
 
@@ -2492,10 +2479,10 @@ pub unsafe extern "C" fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextChild")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_new_text_child(
+pub unsafe fn xml_new_text_child(
     parent: XmlNodePtr,
     ns: XmlNsPtr,
-    name: *const XmlChar,
+    name: &str,
     content: *const XmlChar,
 ) -> XmlNodePtr {
     let cur: XmlNodePtr;
@@ -2505,13 +2492,7 @@ pub unsafe extern "C" fn xml_new_text_child(
         return null_mut();
     }
 
-    if name.is_null() {
-        return null_mut();
-    }
-
-    /*
-     * Allocate a new node
-     */
+    // Allocate a new node
     if matches!((*parent).element_type(), XmlElementType::XmlElementNode) {
         if ns.is_null() {
             cur = xml_new_doc_raw_node((*parent).doc, (*parent).ns, name, content);
@@ -2564,10 +2545,10 @@ pub unsafe extern "C" fn xml_new_text_child(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocRawNode")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_new_doc_raw_node(
+pub unsafe fn xml_new_doc_raw_node(
     doc: XmlDocPtr,
     ns: XmlNsPtr,
-    name: *const XmlChar,
+    name: &str,
     content: *const XmlChar,
 ) -> XmlNodePtr {
     let cur: XmlNodePtr = xml_new_doc_node(doc, ns, name, null_mut());
@@ -6221,50 +6202,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_new_child() {
-        #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-        unsafe {
-            let mut leaks = 0;
-            #[cfg(feature = "libxml_tree")]
-            {
-                for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                    for n_ns in 0..GEN_NB_XML_NS_PTR {
-                        for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let parent = gen_xml_node_ptr(n_parent, 0);
-                                let ns = gen_xml_ns_ptr(n_ns, 1);
-                                let name = gen_const_xml_char_ptr(n_name, 2);
-                                let content = gen_const_xml_char_ptr(n_content, 3);
-
-                                let ret_val = xml_new_child(parent, ns, name, content);
-                                desret_xml_node_ptr(ret_val);
-                                des_xml_node_ptr(n_parent, parent, 0);
-                                des_xml_ns_ptr(n_ns, ns, 1);
-                                des_const_xml_char_ptr(n_name, name, 2);
-                                des_const_xml_char_ptr(n_content, content, 3);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlNewChild",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNewChild()");
-                                    eprint!(" {}", n_parent);
-                                    eprint!(" {}", n_ns);
-                                    eprint!(" {}", n_name);
-                                    eprintln!(" {}", n_content);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_new_doc_fragment() {
         #[cfg(feature = "libxml_tree")]
         unsafe {
@@ -6286,46 +6223,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocFragment()");
                     eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_node() {
-        unsafe {
-            let mut leaks = 0;
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_ns in 0..GEN_NB_XML_NS_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let doc = gen_xml_doc_ptr(n_doc, 0);
-                            let ns = gen_xml_ns_ptr(n_ns, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let content = gen_const_xml_char_ptr(n_content, 3);
-
-                            let ret_val = xml_new_doc_node(doc, ns, name, content);
-                            desret_xml_node_ptr(ret_val);
-                            des_xml_doc_ptr(n_doc, doc, 0);
-                            des_xml_ns_ptr(n_ns, ns, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_content, content, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlNewDocNode",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlNewDocNode()");
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_ns);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_content);
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -6402,51 +6299,6 @@ mod tests {
                             eprint!(" {}", n_doc);
                             eprint!(" {}", n_name);
                             eprintln!(" {}", n_value);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_doc_raw_node() {
-        #[cfg(feature = "libxml_tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                for n_ns in 0..GEN_NB_XML_NS_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let doc = gen_xml_doc_ptr(n_doc, 0);
-                            let ns = gen_xml_ns_ptr(n_ns, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let content = gen_const_xml_char_ptr(n_content, 3);
-
-                            let ret_val = xml_new_doc_raw_node(doc, ns, name, content);
-                            desret_xml_node_ptr(ret_val);
-                            des_xml_doc_ptr(n_doc, doc, 0);
-                            des_xml_ns_ptr(n_ns, ns, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_content, content, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlNewDocRawNode",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlNewDocRawNode()"
-                                );
-                                eprint!(" {}", n_doc);
-                                eprint!(" {}", n_ns);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_content);
-                            }
                         }
                     }
                 }
@@ -6724,48 +6576,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlNewText()");
                     eprintln!(" {}", n_content);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_text_child() {
-        #[cfg(feature = "libxml_tree")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_parent in 0..GEN_NB_XML_NODE_PTR {
-                for n_ns in 0..GEN_NB_XML_NS_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let parent = gen_xml_node_ptr(n_parent, 0);
-                            let ns = gen_xml_ns_ptr(n_ns, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let content = gen_const_xml_char_ptr(n_content, 3);
-
-                            let ret_val = xml_new_text_child(parent, ns, name, content);
-                            desret_xml_node_ptr(ret_val);
-                            des_xml_node_ptr(n_parent, parent, 0);
-                            des_xml_ns_ptr(n_ns, ns, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_content, content, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlNewTextChild",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlNewTextChild()");
-                                eprint!(" {}", n_parent);
-                                eprint!(" {}", n_ns);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_content);
-                            }
-                        }
-                    }
                 }
             }
         }

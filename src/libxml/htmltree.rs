@@ -318,9 +318,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
 
     let mut found_head = false;
     let mut found_meta = false;
-    /*
-     * Search the html
-     */
+    // Search the html
     while !cur.is_null() {
         if matches!((*cur).element_type(), XmlElementType::XmlElementNode) && !(*cur).name.is_null()
         {
@@ -348,9 +346,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         }
         cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
 
-        /*
-         * Search the head
-         */
+        // Search the head
         while !cur.is_null() {
             if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 && !(*cur).name.is_null()
@@ -378,11 +374,8 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                   content: Option<&str>| {
         if meta.is_null() {
             if encoding.is_some() && !head.is_null() {
-                /*
-                 * Create a new Meta element with the right attributes
-                 */
-
-                meta = xml_new_doc_node(doc, null_mut(), c"meta".as_ptr() as _, null_mut());
+                // Create a new Meta element with the right attributes
+                meta = xml_new_doc_node(doc, null_mut(), "meta", null_mut());
                 if let Some(mut children) = (*head).children() {
                     children.add_prev_sibling(meta);
                 } else {
@@ -397,7 +390,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                 xml_new_prop(meta, c"content".as_ptr() as _, newcontent.as_ptr() as _);
             }
         } else {
-            /* remove the meta tag if NULL is passed */
+            // remove the meta tag if NULL is passed
             if encoding.is_none() {
                 (*meta).unlink();
                 xml_free_node(meta);
@@ -427,10 +420,8 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
     }
 
     // found_meta:
-    /*
-     * Search and update all the remaining the meta elements carrying
-     * encoding information
-     */
+    // Search and update all the remaining the meta elements carrying
+    // encoding information
     let mut content = None;
     while !cur.is_null() {
         if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
