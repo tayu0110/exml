@@ -50,8 +50,7 @@ use exml::{
         htmltree::{html_doc_dump, html_save_file, html_save_file_format},
         parser::{
             xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_use_options,
-            xml_free_parser_ctxt, xml_get_external_entity_loader, xml_has_feature,
-            xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_parse_chunk, xml_parse_dtd,
+            xml_get_external_entity_loader, xml_has_feature, xml_parse_chunk, xml_parse_dtd,
             xml_set_external_entity_loader, XmlExternalEntityLoader, XmlFeature, XmlParserOption,
             XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
             XML_SAX2_MAGIC,
@@ -92,8 +91,9 @@ use exml::{
         xmlstring::XmlChar,
     },
     parser::{
-        xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_read_file, xml_read_io,
-        xml_read_memory, XmlParserCtxtPtr, XmlParserInputPtr,
+        xml_ctxt_read_file, xml_ctxt_read_io, xml_ctxt_read_memory, xml_free_parser_ctxt,
+        xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_read_file, xml_read_io, xml_read_memory,
+        XmlParserCtxtPtr, XmlParserInputPtr,
     },
     tree::{
         set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
@@ -402,27 +402,19 @@ unsafe extern "C" fn my_strdup_func(str: *const u8) -> *mut u8 {
     }
     ret
 }
-/************************************************************************
- *                                    *
- * Internal timing routines to remove the necessity to have        *
- * unix-specific function calls.                    *
- *                                    *
- ************************************************************************/
+// Internal timing routines to remove the necessity to have
+// unix-specific function calls.
 static mut BEGIN: timeval = unsafe { zeroed() };
 static mut END: timeval = unsafe { zeroed() };
 
-/*
- * startTimer: call where you want to start timing
- */
-unsafe extern "C" fn start_timer() {
+// startTimer: call where you want to start timing
+unsafe fn start_timer() {
     gettimeofday(addr_of_mut!(BEGIN), null_mut());
 }
 
-/*
- * end_timer: call where you want to stop timing and to print out a
- *           message about the timing performed; format is a printf
- *           type argument
- */
+// end_timer: call where you want to stop timing and to print out a
+//            message about the timing performed; format is a printf
+//            type argument
 macro_rules! end_timer {
     ( $fmt:literal, $( $args:expr ),* ) => {
         gettimeofday(addr_of_mut!(END), null_mut());
@@ -437,19 +429,13 @@ macro_rules! end_timer {
         end_timer!($fmt, );
     }
 }
-/************************************************************************
- *                                    *
- *            HTML output                    *
- *                                    *
- ************************************************************************/
+// HTML output
 static mut BUFFER: [c_char; 50000] = [0; 50000];
 
-unsafe extern "C" fn xml_htmlencode_send() {
-    /*
-     * xmlEncodeEntitiesReentrant assumes valid UTF-8, but the buffer might
-     * end with a truncated UTF-8 sequence. This is a hack to at least avoid
-     * an out-of-bounds read.
-     */
+unsafe fn xml_htmlencode_send() {
+    // xmlEncodeEntitiesReentrant assumes valid UTF-8, but the buffer might
+    // end with a truncated UTF-8 sequence. This is a hack to at least avoid
+    // an out-of-bounds read.
     memset(addr_of_mut!(BUFFER[BUFFER.len() - 4]) as _, 0, 4);
     let result: *mut c_char =
         xml_encode_entities_reentrant(null_mut(), BUFFER.as_ptr() as _) as *mut c_char;
@@ -461,14 +447,9 @@ unsafe extern "C" fn xml_htmlencode_send() {
     BUFFER[0] = 0;
 }
 
-/**
- * xmlHTMLPrintFileInfo:
- * @input:  an xmlParserInputPtr input
- *
- * Displays the associated file and line information for the current input
- */
-
-unsafe extern "C" fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
+/// Displays the associated file and line information for the current input
+#[doc(alias = "xmlHTMLPrintFileInfo")]
+unsafe fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
     generic_error!("<p>");
 
     let len = strlen(BUFFER.as_ptr());
@@ -494,14 +475,9 @@ unsafe extern "C" fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
     xml_htmlencode_send();
 }
 
-/**
- * xmlHTMLPrintFileContext:
- * @input:  an xmlParserInputPtr input
- *
- * Displays current context within the input content for error tracking
- */
-
-unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
+/// Displays current context within the input content for error tracking
+#[doc(alias = "xmlHTMLPrintFileContext")]
+unsafe fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
     let mut cur: *const XmlChar;
     let mut base: *const XmlChar;
     let mut n: c_int;
@@ -574,15 +550,9 @@ unsafe extern "C" fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
     generic_error!("</pre>");
 }
 
-/**
- * xml_html_error:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format an error messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format an error messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "xmlHTMLError")]
 fn xml_html_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
@@ -606,15 +576,9 @@ fn xml_html_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // xml_htmlencode_send();
 }
 
-/**
- * xmlHTMLWarning:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a warning messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a warning messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "xmlHTMLWarning")]
 fn xml_html_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
@@ -638,15 +602,9 @@ fn xml_html_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // xml_htmlencode_send();
 }
 
-/**
- * xmlHTMLValidityError:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format an validity error messages, gives file,
- * line, position and extra parameters.
- */
+/// Display and format an validity error messages, gives file,
+/// line, position and extra parameters.
+#[doc(alias = "xmlHTMLValidityError")]
 fn xml_html_validity_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
@@ -674,15 +632,9 @@ fn xml_html_validity_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // PROGRESULT = XmllintReturnCode::ErrValid;
 }
 
-/**
- * xmlHTMLValidityWarning:
- * @ctx:  an XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a validity warning messages, gives file, line,
- * position and extra parameters.
- */
+/// Display and format a validity warning messages, gives file, line,
+/// position and extra parameters.
+#[doc(alias = "xmlHTMLValidityWarning")]
 fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
     todo!()
     // let ctxt: XmlParserCtxtPtr = ctx as XmlParserCtxtPtr;
@@ -709,20 +661,13 @@ fn xml_html_validity_warning(_ctx: Option<GenericErrorContext>, _msg: &str) {
     // xml_htmlencode_send();
 }
 
-/************************************************************************
- *                                    *
- *            Shell Interface                    *
- *                                    *
- ************************************************************************/
-/**
- * xmlShellReadline:
- * @prompt:  the prompt value
- *
- * Read a string
- *
- * Returns a pointer to it or NULL on EOF the caller is expected to
- *     free the returned string.
- */
+// Shell Interface
+
+/// Read a string
+///
+/// Returns a pointer to it or NULL on EOF the caller is expected to
+///     free the returned string.
+#[doc(alias = "xmlShellReadline")]
 #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
 unsafe fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
     use std::io::{stdin, stdout, Write};
@@ -747,16 +692,12 @@ unsafe fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
     }
 }
 
-/************************************************************************
- *                                    *
- *            I/O Interfaces                    *
- *                                    *
- ************************************************************************/
+// I/O Interfaces
 
-unsafe extern "C" fn my_read(f: *mut c_void, buf: *mut c_char, len: c_int) -> c_int {
+unsafe fn my_read(f: *mut c_void, buf: *mut c_char, len: c_int) -> c_int {
     fread(buf as _, 1, len as _, f as *mut FILE) as _
 }
-unsafe extern "C" fn my_close(context: *mut c_void) -> c_int {
+unsafe fn my_close(context: *mut c_void) -> c_int {
     let f: *mut FILE = context as *mut FILE;
     extern "C" {
         static stdin: *mut FILE;
@@ -767,15 +708,9 @@ unsafe extern "C" fn my_close(context: *mut c_void) -> c_int {
     fclose(f)
 }
 
-/************************************************************************
- *                                    *
- *            SAX based tests                    *
- *                                    *
- ************************************************************************/
+// SAX based tests
 
-/*
- * empty SAX block
- */
+// empty SAX block
 static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
     internal_subset: None,
     is_standalone: None,
@@ -815,14 +750,10 @@ static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 // extern xmlSAXHandlerPtr debugSAXHandler;
 static mut CALLBACKS: c_int = 0;
 
-/**
- * isStandaloneDebug:
- * @ctxt:  An XML parser context
- *
- * Is this document tagged standalone ?
- *
- * Returns 1 if true
- */
+/// Is this document tagged standalone ?
+///
+/// Returns 1 if true
+#[doc(alias = "isStandaloneDebug")]
 unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -832,14 +763,10 @@ unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     0
 }
 
-/**
- * hasInternalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an internal subset
- *
- * Returns 1 if true
- */
+/// Does this document has an internal subset
+///
+/// Returns 1 if true
+#[doc(alias = "hasInternalSubsetDebug")]
 unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -849,14 +776,10 @@ unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int 
     0
 }
 
-/**
- * hasExternalSubsetDebug:
- * @ctxt:  An XML parser context
- *
- * Does this document has an external subset
- *
- * Returns 1 if true
- */
+/// Does this document has an external subset
+///
+/// Returns 1 if true
+#[doc(alias = "hasExternalSubsetDebug")]
 unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1087,14 +1010,9 @@ unsafe fn unparsed_entity_decl_debug(
     );
 }
 
-/**
- * setDocumentLocatorDebug:
- * @ctxt:  An XML parser context
- * @loc: A SAX Locator
- *
- * Receive the document locator at startup, actually xmlDefaultSAXLocator
- * Everything is available on the context, so this is useless in our case.
- */
+/// Receive the document locator at startup, actually xmlDefaultSAXLocator
+/// Everything is available on the context, so this is useless in our case.
+#[doc(alias = "setDocumentLocatorDebug")]
 unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1103,12 +1021,8 @@ unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: Xm
     println!("SAX.setDocumentLocator()");
 }
 
-/**
- * startDocumentDebug:
- * @ctxt:  An XML parser context
- *
- * called when the document start being processed.
- */
+/// called when the document start being processed.
+#[doc(alias = "startDocumentDebug")]
 unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1117,12 +1031,8 @@ unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
     println!("SAX.startDocument()");
 }
 
-/**
- * endDocumentDebug:
- * @ctxt:  An XML parser context
- *
- * called when the document end has been detected.
- */
+/// called when the document end has been detected.
+#[doc(alias = "endDocumentDebug")]
 unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     CALLBACKS += 1;
     if NOOUT != 0 {
@@ -1234,15 +1144,9 @@ unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     println!("SAX.comment({value})");
 }
 
-/**
- * warningDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a warning messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a warning messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "warningDebug")]
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
@@ -1253,15 +1157,9 @@ fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     print!("SAX.warning: {}", msg);
 }
 
-/**
- * errorDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a error messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a error messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "errorDebug")]
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
@@ -1272,15 +1170,9 @@ fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     print!("SAX.error: {}", msg);
 }
 
-/**
- * fatalErrorDebug:
- * @ctxt:  An XML parser context
- * @msg:  the message to display/transmit
- * @...:  extra parameters for the message display
- *
- * Display and format a fatalError messages, gives file, line, position and
- * extra parameters.
- */
+/// Display and format a fatalError messages, gives file, line, position and
+/// extra parameters.
+#[doc(alias = "fatalErrorDebug")]
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
@@ -1587,7 +1479,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
         let mut is_match: c_int = -1;
 
         if typ == XmlReaderTypes::XmlReaderTypeElement {
-            /* do the check only on element start */
+            // do the check only on element start
             is_match =
                 xml_pattern_match(PATTERNC.load(Ordering::Relaxed), (*reader).current_node());
 
@@ -1660,7 +1552,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn stream_file(filename: *mut c_char) {
+unsafe fn stream_file(filename: *mut c_char) {
     use std::{ptr::null, slice::from_raw_parts};
 
     use exml::libxml::{
@@ -1775,9 +1667,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
             }
         }
 
-        /*
-         * Process all nodes in sequence
-         */
+        // Process all nodes in sequence
         if TIMING != 0 && REPEAT == 0 {
             start_timer();
         }
@@ -1834,9 +1724,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
                 eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
             }
         }
-        /*
-         * Done, cleanup and status
-         */
+        // Done, cleanup and status
         xml_free_text_reader(reader);
         if ret != 0 {
             eprintln!(
@@ -1865,7 +1753,7 @@ unsafe extern "C" fn stream_file(filename: *mut c_char) {
 }
 
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn walk_doc(doc: XmlDocPtr) {
+unsafe fn walk_doc(doc: XmlDocPtr) {
     use std::{ptr::null, sync::atomic::Ordering};
 
     use exml::{
@@ -2402,9 +2290,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         );
     }
 
-    /*
-     * test intermediate copy if needed.
-     */
+    // test intermediate copy if needed.
     #[cfg(feature = "libxml_tree")]
     if COPY != 0 {
         tmp = doc;

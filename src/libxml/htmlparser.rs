@@ -44,9 +44,9 @@ use crate::{
         dict::{xml_dict_create, xml_dict_lookup},
         globals::{xml_default_sax_locator, xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
-            xml_new_io_input_stream, xml_parser_add_node_info, XmlParserInputState,
-            XmlParserOption, XmlSAXHandler, XmlSAXHandlerPtr,
+            xml_init_parser, xml_load_external_entity, xml_new_io_input_stream,
+            xml_parser_add_node_info, XmlParserInputState, XmlParserOption, XmlSAXHandler,
+            XmlSAXHandlerPtr,
         },
         parser_internals::{
             xml_free_input_stream, xml_new_input_stream, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
@@ -60,7 +60,8 @@ use crate::{
         },
     },
     parser::{
-        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
+        xml_free_parser_ctxt, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
+        XmlParserNodeInfo,
     },
     tree::{
         xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,

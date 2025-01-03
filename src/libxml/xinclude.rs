@@ -45,15 +45,15 @@ use crate::{
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser::{
-            xml_ctxt_use_options, xml_free_parser_ctxt, xml_init_parser, xml_load_external_entity,
-            xml_new_parser_ctxt, xml_parse_document, XmlParserOption, XML_DETECT_IDS,
+            xml_ctxt_use_options, xml_init_parser, xml_load_external_entity, xml_parse_document,
+            XmlParserOption, XML_DETECT_IDS,
         },
         parser_internals::{xml_free_input_stream, xml_string_current_char},
         uri::{xml_build_relative_uri, xml_free_uri, xml_parse_uri, xml_save_uri, XmlURIPtr},
         xmlstring::{xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, XmlChar},
         xpointer::{xml_xptr_eval, xml_xptr_new_context},
     },
-    parser::XmlParserInputPtr,
+    parser::{xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
         xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,

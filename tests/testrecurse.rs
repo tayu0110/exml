@@ -25,8 +25,7 @@ use exml::{
     libxml::{
         entities::{xml_get_doc_entity, XmlEntityPtr},
         parser::{
-            xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser, xml_new_parser_ctxt,
-            xml_set_external_entity_loader, XmlParserOption,
+            xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
         },
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -34,7 +33,10 @@ use exml::{
         },
         xmlstring::{xml_strlen, XmlChar},
     },
-    parser::{xml_ctxt_read_file, XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{
+        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
+        XmlParserInputPtr,
+    },
     tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};

@@ -59,13 +59,10 @@ use crate::{
     libxml::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser::{
-            xml_create_doc_parser_ctxt, xml_ctxt_reset, xml_free_parser_ctxt, xml_init_parser,
-            xml_load_external_entity, xml_new_io_input_stream, xml_new_parser_ctxt,
-            XmlParserOption,
+            xml_create_doc_parser_ctxt, xml_ctxt_reset, xml_init_parser, xml_load_external_entity,
+            xml_new_io_input_stream, XmlParserOption,
         },
-        parser_internals::{
-            xml_create_memory_parser_ctxt, xml_create_url_parser_ctxt, xml_is_letter,
-        },
+        parser_internals::xml_is_letter,
     },
     tree::XmlDocPtr,
 };

@@ -49,14 +49,14 @@ use std::{
     ffi::{c_char, c_void, CStr, CString},
     io::Read,
     mem::{size_of, take},
-    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut, NonNull},
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8,
     sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
-use libc::{memchr, memcpy, memmove, memset, ptrdiff_t, size_t, strlen, strncmp, strstr};
+use libc::{memchr, memcpy, memmove, ptrdiff_t, size_t, strlen, strncmp, strstr};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::xml_catalog_cleanup;
@@ -65,12 +65,10 @@ use crate::{
         xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme,
     },
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
-    error::{parser_validity_error, parser_validity_warning, XmlError, XmlParserErrors},
+    error::{XmlError, XmlParserErrors},
     generic_error,
     globals::{
-        get_do_validity_checking_default_value, get_get_warnings_default_value,
-        get_keep_blanks_default_value, get_line_numbers_default_value,
-        get_load_ext_dtd_default_value, get_parser_debug_entities,
+        get_keep_blanks_default_value, get_line_numbers_default_value, get_parser_debug_entities,
         get_pedantic_parser_default_value, get_substitute_entities_default_value,
         set_indent_tree_output, set_keep_blanks_default_value, set_line_numbers_default_value,
         set_pedantic_parser_default_value, set_substitute_entities_default_value, GenericError,
@@ -83,34 +81,30 @@ use crate::{
     },
     libxml::{
         dict::{
-            __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_create, xml_dict_free,
-            xml_dict_lookup, xml_dict_reference, xml_dict_set_limit,
+            __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup,
+            xml_dict_reference,
         },
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
-            xml_init_globals_internal, xml_malloc, xml_malloc_atomic, xml_realloc,
+            xml_init_globals_internal, xml_malloc_atomic, xml_realloc,
         },
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
             xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
-            xml_create_entity_parser_ctxt_internal, xml_create_file_parser_ctxt,
-            xml_create_memory_parser_ctxt, xml_free_input_stream, xml_new_entity_input_stream,
-            xml_new_input_stream, xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
+            xml_free_input_stream, xml_new_entity_input_stream, xml_new_input_stream,
+            xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
             xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
             xml_parse_encoding_decl, xml_parse_entity_ref, xml_parse_entity_value,
             xml_parse_external_subset, xml_parse_misc, xml_parse_name, xml_parse_nmtoken,
             xml_parse_pe_reference, xml_parse_pi, xml_parse_reference, xml_parse_sddecl,
             xml_parse_start_tag, xml_parse_system_literal, xml_parse_version_info, INPUT_CHUNK,
-            XML_MAX_DICTIONARY_LIMIT, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH,
-            XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
+            XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
+            XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
-        sax2::{
-            xml_sax2_entity_decl, xml_sax2_get_entity, xml_sax2_ignorable_whitespace,
-            xml_sax_version,
-        },
+        sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri},
         valid::{
             xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
@@ -121,15 +115,16 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
     parser::{
-        xml_err_internal, xml_err_msg_str, xml_fatal_err_msg, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_ns_err, xml_validity_error, xml_warning_msg,
-        XmlParserCharValid, XmlParserInputPtr, XmlParserNodeInfo, __xml_err_encoding,
-        xml_err_attribute_dup, xml_err_memory, xml_fatal_err, xml_fatal_err_msg_int, xml_ns_warn,
-        XmlParserCtxt, XmlParserCtxtPtr,
+        __xml_err_encoding, xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
+        xml_warning_msg, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr,
+        XmlParserNodeInfo,
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
-        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr, XmlAttrPtr,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr,
         XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
         XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
@@ -144,7 +139,6 @@ use super::{
     entities::{
         XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
     },
-    parser_internals::XML_VCTXT_USE_PCTXT,
     threads::{
         __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
         xml_init_threads_internal,
@@ -1430,6 +1424,8 @@ pub unsafe fn xml_sax_user_parse_file(
     user_data: Option<GenericErrorContext>,
     filename: Option<&str>,
 ) -> i32 {
+    use crate::parser::{xml_create_file_parser_ctxt, xml_free_parser_ctxt};
+
     let ret: i32;
 
     let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
@@ -1471,6 +1467,8 @@ pub unsafe fn xml_sax_user_parse_memory(
     user_data: Option<GenericErrorContext>,
     buffer: Vec<u8>,
 ) -> i32 {
+    use crate::parser::xml_create_memory_parser_ctxt;
+
     let ret: i32;
 
     xml_init_parser();
@@ -1654,7 +1652,7 @@ pub unsafe fn xml_sax_parse_file_with_data(
     recovery: i32,
     data: *mut c_void,
 ) -> XmlDocPtr {
-    use crate::io::xml_parser_get_directory;
+    use crate::{io::xml_parser_get_directory, parser::xml_create_file_parser_ctxt};
 
     let replaced = sax.is_some();
     let ret: XmlDocPtr;
@@ -1722,6 +1720,8 @@ pub(crate) unsafe fn xml_sax_parse_entity(
     sax: Option<Box<XmlSAXHandler>>,
     filename: Option<&str>,
 ) -> XmlDocPtr {
+    use crate::parser::xml_create_file_parser_ctxt;
+
     let replaced = sax.is_some();
     let ret: XmlDocPtr;
 
@@ -1776,6 +1776,8 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     system_id: Option<&str>,
 ) -> XmlDtdPtr {
     use std::slice::from_raw_parts;
+
+    use crate::parser::{xml_free_parser_ctxt, xml_new_sax_parser_ctxt};
 
     let mut ret: XmlDtdPtr = null_mut();
     let mut input: XmlParserInputPtr = null_mut();
@@ -1889,6 +1891,8 @@ pub unsafe fn xml_io_parse_dtd(
     input: XmlParserInputBuffer,
     mut enc: XmlCharEncoding,
 ) -> XmlDtdPtr {
+    use crate::parser::xml_new_sax_parser_ctxt;
+
     let mut ret: XmlDtdPtr = null_mut();
     let mut start: [XmlChar; 4] = [0; 4];
 
@@ -2681,271 +2685,6 @@ pub unsafe fn xml_parse_ctxt_external_entity(
     error as i32
 }
 
-/// Allocate and initialize a new parser context.
-///
-/// Returns the xmlParserCtxtPtr or NULL
-#[doc(alias = "xmlNewParserCtxt")]
-pub unsafe fn xml_new_parser_ctxt() -> XmlParserCtxtPtr {
-    xml_new_sax_parser_ctxt(None, None).unwrap_or(null_mut())
-}
-
-/// Initialize a SAX parser context
-///
-/// Returns 0 in case of success and -1 in case of error
-#[doc(alias = "xmlInitSAXParserCtxt")]
-unsafe fn xml_init_sax_parser_ctxt(
-    ctxt: XmlParserCtxtPtr,
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-) -> Result<(), Option<Box<XmlSAXHandler>>> {
-    let mut input: XmlParserInputPtr;
-
-    if ctxt.is_null() {
-        xml_err_internal!(null_mut(), "Got NULL parser context\n");
-        return Err(sax);
-    }
-
-    xml_init_parser();
-
-    if (*ctxt).dict.is_null() {
-        (*ctxt).dict = xml_dict_create();
-    }
-    if (*ctxt).dict.is_null() {
-        xml_err_memory(null_mut(), Some("cannot initialize parser context\n"));
-        return Err(sax);
-    }
-    xml_dict_set_limit((*ctxt).dict, XML_MAX_DICTIONARY_LIMIT);
-
-    if let Some(mut sax) = sax {
-        if sax.initialized != XML_SAX2_MAGIC as u32 {
-            // These fields won't used in SAX1 handling.
-            sax._private = AtomicPtr::new(null_mut());
-            sax.start_element_ns = None;
-            sax.end_element_ns = None;
-            sax.serror = None;
-        }
-        (*ctxt).sax = Some(sax);
-        (*ctxt).user_data = if user_data.is_some() {
-            user_data
-        } else {
-            Some(GenericErrorContext::new(ctxt))
-        };
-    } else {
-        let mut sax = XmlSAXHandler::default();
-        xml_sax_version(&mut sax, 2);
-        (*ctxt).sax = Some(Box::new(sax));
-        (*ctxt).user_data = Some(GenericErrorContext::new(ctxt));
-    }
-
-    (*ctxt).maxatts = 0;
-    (*ctxt).atts = vec![];
-    // Allocate the Input stack
-    (*ctxt).input_tab.shrink_to(5);
-    while {
-        input = (*ctxt).input_pop();
-        !input.is_null()
-    } {
-        // Non consuming
-        xml_free_input_stream(input);
-    }
-    (*ctxt).input = null_mut();
-    (*ctxt).version = None;
-    (*ctxt).encoding = None;
-    (*ctxt).standalone = -1;
-    (*ctxt).has_external_subset = 0;
-    (*ctxt).has_perefs = 0;
-    (*ctxt).html = 0;
-    (*ctxt).external = 0;
-    (*ctxt).instate = XmlParserInputState::XmlParserStart;
-    (*ctxt).token = 0;
-    (*ctxt).directory = None;
-
-    // Allocate the Node stack
-    (*ctxt).node_tab.clear();
-    (*ctxt).node_tab.shrink_to(10);
-    (*ctxt).node = null_mut();
-
-    // Allocate the Name stack
-    (*ctxt).name_tab.clear();
-    (*ctxt).name_tab.shrink_to(10);
-    (*ctxt).name = None;
-
-    // Allocate the space stack
-    (*ctxt).space_tab.clear();
-    (*ctxt).space_tab.shrink_to(10);
-    (*ctxt).space_tab.push(-1);
-
-    (*ctxt).my_doc = null_mut();
-    (*ctxt).well_formed = 1;
-    (*ctxt).ns_well_formed = 1;
-    (*ctxt).valid = 1;
-    (*ctxt).loadsubset = get_load_ext_dtd_default_value();
-    if (*ctxt).loadsubset != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
-    }
-    (*ctxt).validate = get_do_validity_checking_default_value();
-    (*ctxt).pedantic = get_pedantic_parser_default_value();
-    if (*ctxt).pedantic != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParsePedantic as i32;
-    }
-    (*ctxt).linenumbers = get_line_numbers_default_value();
-    (*ctxt).keep_blanks = get_keep_blanks_default_value();
-    if (*ctxt).keep_blanks == 0 {
-        if let Some(sax) = (*ctxt).sax.as_deref_mut() {
-            sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
-        }
-        (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
-    }
-
-    (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
-    (*ctxt).vctxt.user_data = Some(GenericErrorContext::new(ctxt));
-    (*ctxt).vctxt.error = Some(parser_validity_error);
-    (*ctxt).vctxt.warning = Some(parser_validity_warning);
-    if (*ctxt).validate != 0 {
-        if get_get_warnings_default_value() == 0 {
-            (*ctxt).vctxt.warning = None;
-        } else {
-            (*ctxt).vctxt.warning = Some(parser_validity_warning);
-        }
-        (*ctxt).vctxt.node_max = 0;
-        (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
-    }
-    (*ctxt).replace_entities = get_substitute_entities_default_value();
-    if (*ctxt).replace_entities != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseNoent as i32;
-    }
-    (*ctxt).record_info = 0;
-    (*ctxt).check_index = 0;
-    (*ctxt).in_subset = 0;
-    (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
-    (*ctxt).depth = 0;
-    (*ctxt).charset = XmlCharEncoding::UTF8;
-    #[cfg(feature = "catalog")]
-    {
-        (*ctxt).catalogs = None;
-    }
-    (*ctxt).sizeentities = 0;
-    (*ctxt).sizeentcopy = 0;
-    (*ctxt).input_id = 1;
-    (*ctxt).node_seq.clear();
-    Ok(())
-}
-
-/// Allocate and initialize a new SAX parser context.   
-/// If userData is NULL, the parser context will be passed as user data.
-///
-/// Returns the xmlParserCtxtPtr or NULL if memory allocation failed.
-#[doc(alias = "xmlNewSAXParserCtxt")]
-pub unsafe fn xml_new_sax_parser_ctxt(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-) -> Result<XmlParserCtxtPtr, Option<Box<XmlSAXHandler>>> {
-    let ctxt: XmlParserCtxtPtr = xml_malloc(size_of::<XmlParserCtxt>()) as XmlParserCtxtPtr;
-    if ctxt.is_null() {
-        xml_err_memory(null_mut(), Some("cannot allocate parser context\n"));
-        return Err(sax);
-    }
-    memset(ctxt as _, 0, size_of::<XmlParserCtxt>());
-    std::ptr::write(&mut *ctxt, XmlParserCtxt::default());
-    if let Err(sax) = xml_init_sax_parser_ctxt(ctxt, sax, user_data) {
-        xml_free_parser_ctxt(ctxt);
-        return Err(sax);
-    }
-    Ok(ctxt)
-}
-
-/// Initialize a parser context
-///
-/// Returns 0 in case of success and -1 in case of error
-#[doc(alias = "xmlInitParserCtxt")]
-pub(crate) unsafe fn xml_init_parser_ctxt(ctxt: XmlParserCtxtPtr) -> i32 {
-    match xml_init_sax_parser_ctxt(ctxt, None, None) {
-        Ok(_) => 0,
-        Err(_) => -1,
-    }
-}
-
-/// Clear (release owned resources) and reinitialize a parser context
-#[doc(alias = "xmlClearParserCtxt")]
-pub unsafe fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).node_seq.clear();
-    xml_ctxt_reset(ctxt);
-}
-
-/// Free all the memory used by a parser context. However the parsed
-/// document in (*ctxt).myDoc is not freed.
-#[doc(alias = "xmlFreeParserCtxt")]
-pub unsafe fn xml_free_parser_ctxt(ctxt: XmlParserCtxtPtr) {
-    let mut input: XmlParserInputPtr;
-
-    if ctxt.is_null() {
-        return;
-    }
-
-    while {
-        input = (*ctxt).input_pop();
-        !input.is_null()
-    } {
-        // Non consuming
-        xml_free_input_stream(input);
-    }
-    (*ctxt).space_tab.clear();
-    (*ctxt).name_tab.clear();
-    (*ctxt).node_tab.clear();
-    (*ctxt).node_info_tab.clear();
-    (*ctxt).input_tab.clear();
-    (*ctxt).version = None;
-    (*ctxt).encoding = None;
-    (*ctxt).ext_sub_uri = None;
-    (*ctxt).ext_sub_system = None;
-    (*ctxt).sax = None;
-    (*ctxt).directory = None;
-    if !(*ctxt).vctxt.node_tab.is_null() {
-        xml_free((*ctxt).vctxt.node_tab as _);
-    }
-    if !(*ctxt).dict.is_null() {
-        xml_dict_free((*ctxt).dict);
-    }
-    (*ctxt).ns_tab.clear();
-    (*ctxt).push_tab.clear();
-    if !(*ctxt).attallocs.is_null() {
-        xml_free((*ctxt).attallocs as _);
-    }
-    if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
-        table.clear_with(|data, _| xml_free(data as _));
-    }
-    let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
-    if !(*ctxt).free_elems.is_null() {
-        let mut cur = (*ctxt).free_elems;
-        while !cur.is_null() {
-            let next = (*cur).next.map_or(null_mut(), |n| n.as_ptr());
-            xml_free(cur as _);
-            cur = next;
-        }
-    }
-    if !(*ctxt).free_attrs.is_null() {
-        let mut cur: XmlAttrPtr;
-        let mut next: XmlAttrPtr;
-
-        cur = (*ctxt).free_attrs;
-        while !cur.is_null() {
-            next = (*cur).next;
-            xml_free(cur as _);
-            cur = next;
-        }
-    }
-
-    #[cfg(feature = "catalog")]
-    {
-        (*ctxt).catalogs = None;
-    }
-    drop_in_place(ctxt);
-    xml_free(ctxt as _);
-}
-
 /// Setup the parser context to parse a new buffer; Clears any prior
 /// contents from the parser context. The buffer parameter must not be
 /// NULL, but the filename parameter can be
@@ -2956,6 +2695,8 @@ pub(crate) unsafe fn xml_setup_parser_for_buffer(
     buffer: *const XmlChar,
     filename: *const c_char,
 ) {
+    use crate::parser::xml_clear_parser_ctxt;
+
     if ctxt.is_null() || buffer.is_null() {
         return;
     }
@@ -3014,7 +2755,7 @@ pub unsafe fn xml_create_push_parser_ctxt(
     size: i32,
     filename: *const c_char,
 ) -> XmlParserCtxtPtr {
-    use crate::io::xml_parser_get_directory;
+    use crate::{io::xml_parser_get_directory, parser::xml_new_sax_parser_ctxt};
 
     let buf = Rc::new(RefCell::new(XmlParserInputBuffer::new(
         XmlCharEncoding::None,
@@ -9986,34 +9727,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_clear_parser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                xml_clear_parser_ctxt(ctxt);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlClearParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlClearParserCtxt()"
-            );
-        }
-    }
-
-    #[test]
     fn test_xml_create_doc_parser_ctxt() {
         unsafe {
             let mut leaks = 0;
@@ -10169,32 +9882,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_init_parser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = xml_init_parser_ctxt(ctxt);
-                desret_int(ret_val);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlInitParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlInitParserCtxt()");
-        }
-    }
-
-    #[test]
     fn test_xml_keep_blanks_default() {
         unsafe {
             let mut leaks = 0;
@@ -10249,26 +9936,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlLineNumbersDefault()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_new_parser_ctxt() {
-        unsafe {
-            let mut leaks = 0;
-            let mem_base = xml_mem_blocks();
-
-            let ret_val = xml_new_parser_ctxt();
-            desret_xml_parser_ctxt_ptr(ret_val);
-            reset_last_error();
-            if mem_base != xml_mem_blocks() {
-                leaks += 1;
-                eprintln!(
-                    "Leak of {} blocks found in xmlNewParserCtxt",
-                    xml_mem_blocks() - mem_base
-                );
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlNewParserCtxt()");
         }
     }
 

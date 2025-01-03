@@ -49,10 +49,10 @@ use crate::{
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
             xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
-            xml_free_parser_ctxt, xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc,
-            EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc,
-            XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS,
-            XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func,
+            EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc, XmlParserInputState,
+            XmlParserMode, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
+            XML_SAX2_MAGIC,
         },
         parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
@@ -3306,6 +3306,8 @@ pub unsafe fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderP
 #[doc(alias = "xmlFreeTextReader")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
+    use crate::parser::xml_free_parser_ctxt;
+
     use super::xinclude::xml_xinclude_free_context;
 
     if reader.is_null() {

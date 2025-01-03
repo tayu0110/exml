@@ -53,13 +53,13 @@ use crate::{
             XmlListPtr,
         },
         parser::{
-            xml_create_push_parser_ctxt, xml_free_parser_ctxt, xml_parse_chunk,
-            XmlParserInputState, XmlSAXHandler, XML_DEFAULT_VERSION,
+            xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
+            XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
-    parser::XmlParserCtxtPtr,
+    parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     tree::{xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };
@@ -612,7 +612,7 @@ unsafe fn xml_text_writer_start_document_callback(ctx: Option<GenericErrorContex
 ///
 /// Returns the new xmlTextWriterPtr or NULL in case of error
 #[doc(alias = "xmlNewTextWriterDoc")]
-pub unsafe extern "C" fn xml_new_text_writer_doc(
+pub unsafe fn xml_new_text_writer_doc(
     doc: *mut XmlDocPtr,
     compression: i32,
 ) -> XmlTextWriterPtr<'static> {

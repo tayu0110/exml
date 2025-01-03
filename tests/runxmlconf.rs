@@ -18,8 +18,7 @@ use exml::{
     },
     libxml::{
         parser::{
-            xml_cleanup_parser, xml_free_parser_ctxt, xml_init_parser, xml_new_parser_ctxt,
-            xml_set_external_entity_loader, XmlParserOption,
+            xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
         },
         parser_internals::xml_new_input_from_file,
         xmlmemory::{
@@ -28,7 +27,10 @@ use exml::{
         },
         xmlstring::xml_str_equal,
     },
-    parser::{xml_ctxt_read_file, xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{
+        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_file,
+        XmlParserCtxtPtr, XmlParserInputPtr,
+    },
     tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
         xml_xpath_context_set_cache, xml_xpath_free_context, xml_xpath_new_context, XmlXPathContext,
@@ -146,7 +148,7 @@ fn test_error_handler(_user_data: Option<GenericErrorContext>, error: &XmlError)
 
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
 
-unsafe extern "C" fn initialize_libxml2() {
+unsafe fn initialize_libxml2() {
     set_get_warnings_default_value(0);
     set_pedantic_parser_default_value(0);
 
@@ -159,25 +161,19 @@ unsafe extern "C" fn initialize_libxml2() {
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
     CTXT_XPATH.store(xml_xpath_new_context(null_mut()), Ordering::Relaxed);
-    /*
-     * Deactivate the cache if created; otherwise we have to create/free it
-     * for every test, since it will confuse the memory leak detection.
-     * Note that normally this need not be done, since the cache is not
-     * created until set explicitly with xmlXPathContextSetCache();
-     * but for test purposes it is sometimes useful to activate the
-     * cache by default for the whole library.
-     */
+    // Deactivate the cache if created; otherwise we have to create/free it
+    // for every test, since it will confuse the memory leak detection.
+    // Note that normally this need not be done, since the cache is not
+    // created until set explicitly with xmlXPathContextSetCache();
+    // but for test purposes it is sometimes useful to activate the
+    // cache by default for the whole library.
     if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
         xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
     }
     set_structured_error(Some(test_error_handler), None);
 }
 
-/************************************************************************
- *									*
- *		Run the xmlconf test if found				*
- *									*
- ************************************************************************/
+// Run the xmlconf test if found
 
 unsafe fn xmlconf_test_invalid(
     logfile: &mut Option<File>,

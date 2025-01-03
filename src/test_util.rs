@@ -22,11 +22,8 @@ use crate::{
             html_free_parser_ctxt, HtmlDocPtr, HtmlElemDesc, HtmlEntityDesc, HtmlNodePtr,
             HtmlParserCtxtPtr, HtmlStatus,
         },
-        parser::{
-            xml_free_parser_ctxt, xml_new_parser_ctxt, XmlFeature, XmlParserOption,
-            XmlSAXHandlerPtr,
-        },
-        parser_internals::{xml_create_memory_parser_ctxt, xml_free_input_stream},
+        parser::{XmlFeature, XmlParserOption, XmlSAXHandlerPtr},
+        parser_internals::xml_free_input_stream,
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::{XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
@@ -50,7 +47,8 @@ use crate::{
         xmlwriter::{xml_free_text_writer, XmlTextWriterPtr},
     },
     parser::{
-        xml_read_memory, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
+        xml_create_memory_parser_ctxt, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory,
+        XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
         XmlParserNodeInfoSeq, XmlParserNodeInfoSeqPtr,
     },
     tree::{

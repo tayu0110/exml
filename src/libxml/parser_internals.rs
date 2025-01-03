@@ -33,6 +33,7 @@ use libc::{memcpy, memset, snprintf, INT_MAX};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
+use crate::parser::{xml_create_memory_parser_ctxt, xml_free_parser_ctxt};
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
     error::{XmlParserErrors, __xml_raise_error},
@@ -49,8 +50,7 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_free_parser_ctxt, xml_load_external_entity, xml_new_parser_ctxt,
-            xml_new_sax_parser_ctxt, xml_parse_att_value_internal, xml_parse_cdsect,
+            xml_load_external_entity, xml_parse_att_value_internal, xml_parse_cdsect,
             xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_conditional_sections,
             xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
             xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_external_id,
@@ -83,7 +83,6 @@ use crate::{
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
         XmlEnumerationPtr, XmlNode, XmlNodePtr, XML_XML_NAMESPACE,
     },
-    uri::build_uri,
 };
 
 use super::dict::XmlDictRef;
@@ -91,7 +90,6 @@ use super::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
 use super::hash::XmlHashTable;
-use super::parser::XmlSAXHandler;
 
 macro_rules! VALID_CTXT {
     ($ctxt:expr) => {
@@ -128,14 +126,10 @@ pub const XML_MAX_HUGE_LENGTH: usize = 1000000000;
 /// Introduced in 2.9.0
 pub const XML_MAX_NAME_LENGTH: usize = 50000;
 
-/**
- * XML_MAX_DICTIONARY_LIMIT:
- *
- * Maximum size allowed by the parser for a dictionary by default
- * This is not a limitation of the parser but a safety boundary feature,
- * use XML_PARSE_HUGE option to override it.
- * Introduced in 2.9.0
- */
+/// Maximum size allowed by the parser for a dictionary by default
+/// This is not a limitation of the parser but a safety boundary feature,
+/// use XML_PARSE_HUGE option to override it.
+/// Introduced in 2.9.0
 pub const XML_MAX_DICTIONARY_LIMIT: usize = 10000000;
 
 /// Maximum size allowed by the parser for ahead lookup
@@ -191,180 +185,6 @@ pub fn xml_is_letter(c: u32) -> bool {
 pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
 /// Set if the validation context is part of a parser context.
 pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
-
-/// Create a parser context for a file content.
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateFileParserCtxt")]
-pub unsafe fn xml_create_file_parser_ctxt(filename: Option<&str>) -> XmlParserCtxtPtr {
-    xml_create_url_parser_ctxt(filename, 0)
-}
-
-/// Create a parser context for a file or URL content.
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateURLParserCtxt")]
-pub unsafe fn xml_create_url_parser_ctxt(filename: Option<&str>, options: i32) -> XmlParserCtxtPtr {
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if ctxt.is_null() {
-        xml_err_memory(null_mut(), Some("cannot allocate parser context"));
-        return null_mut();
-    }
-
-    if options != 0 {
-        (*ctxt).ctxt_use_options_internal(options, None);
-    }
-    (*ctxt).linenumbers = 1;
-
-    let input_stream: XmlParserInputPtr = xml_load_external_entity(filename, None, ctxt);
-    if input_stream.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    }
-
-    (*ctxt).input_push(input_stream);
-    if (*ctxt).directory.is_none() {
-        if let Some(filename) = filename {
-            if let Some(directory) = xml_parser_get_directory(filename) {
-                (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
-            }
-        }
-    }
-
-    ctxt
-}
-
-/// Create a parser context for an XML in-memory document.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateMemoryParserCtxt")]
-pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr {
-    if buffer.is_empty() {
-        return null_mut();
-    }
-
-    let ctxt: XmlParserCtxtPtr = xml_new_parser_ctxt();
-    if ctxt.is_null() {
-        return null_mut();
-    }
-
-    let Some(buf) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    };
-
-    let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
-    if input.is_null() {
-        xml_free_parser_ctxt(ctxt);
-        return null_mut();
-    }
-
-    (*input).filename = None;
-    (*input).buf = Some(Rc::new(RefCell::new(buf)));
-    (*input).reset_base();
-
-    (*ctxt).input_push(input);
-    ctxt
-}
-
-/// Create a parser context for an external entity
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// If create new context successfully, return new context wrapped `Ok`.  
-/// Otherwise, return received SAX handler wrapped `Err`.
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateEntityParserCtxtInternal")]
-pub(crate) unsafe fn xml_create_entity_parser_ctxt_internal(
-    sax: Option<Box<XmlSAXHandler>>,
-    user_data: Option<GenericErrorContext>,
-    mut url: Option<&str>,
-    id: Option<&str>,
-    base: Option<&str>,
-    pctx: XmlParserCtxtPtr,
-) -> Result<XmlParserCtxtPtr, Option<Box<XmlSAXHandler>>> {
-    let input_stream: XmlParserInputPtr;
-
-    let ctxt = match xml_new_sax_parser_ctxt(sax, user_data) {
-        Ok(ctxt) => ctxt,
-        Err(sax) => return Err(sax),
-    };
-
-    if !pctx.is_null() {
-        (*ctxt).options = (*pctx).options;
-        (*ctxt)._private = (*pctx)._private;
-        (*ctxt).input_id = (*pctx).input_id;
-    }
-
-    // Don't read from stdin.
-    if url == Some("-") {
-        url = Some("./-");
-    }
-
-    if let Some(uri) = url.zip(base).and_then(|(url, base)| build_uri(url, base)) {
-        input_stream = xml_load_external_entity(Some(&uri), id, ctxt as _);
-        if input_stream.is_null() {
-            let sax = (*ctxt).sax.take();
-            xml_free_parser_ctxt(ctxt);
-            return Err(sax);
-        }
-
-        (*ctxt).input_push(input_stream);
-
-        if (*ctxt).directory.is_none() {
-            if let Some(url) = url {
-                if let Some(directory) = xml_parser_get_directory(url) {
-                    (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
-                }
-            }
-        }
-    } else {
-        input_stream = xml_load_external_entity(url, id, ctxt);
-        if input_stream.is_null() {
-            let sax = (*ctxt).sax.take();
-            xml_free_parser_ctxt(ctxt);
-            return Err(sax);
-        }
-
-        (*ctxt).input_push(input_stream);
-
-        if (*ctxt).directory.is_none() {
-            if let Some(url) = url {
-                if let Some(directory) = xml_parser_get_directory(url) {
-                    (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
-                }
-            }
-        }
-    }
-    Ok(ctxt)
-}
-
-/// Create a parser context for an external entity
-///
-/// In original libxml2, automatic support for ZLIB/Compress compressed document is provided
-/// by default if found at compile-time.  
-/// However, this crate does not support currently.
-///
-/// Returns the new parser context or NULL
-#[doc(alias = "xmlCreateEntityParserCtxt")]
-pub unsafe fn xml_create_entity_parser_ctxt(
-    url: Option<&str>,
-    id: Option<&str>,
-    base: Option<&str>,
-) -> XmlParserCtxtPtr {
-    xml_create_entity_parser_ctxt_internal(None, None, url, id, base, null_mut())
-        .unwrap_or(null_mut())
-}
 
 /// Create a new input stream based on a memory buffer.
 ///
