@@ -27315,7 +27315,12 @@ unsafe extern "C" fn xml_schema_vattributes_complex(vctxt: XmlSchemaValidCtxtPtr
                             // http://lists.w3.org/Archives/Public/www-xml-schema-comments/2005JulSep/0406.html
                             // If we have QNames: do we need to ensure there's a
                             // prefix defined for the QName?
-                            xml_new_ns_prop(def_attr_owner_elem, ns, (*iattr).local_name, value);
+                            xml_new_ns_prop(
+                                def_attr_owner_elem,
+                                ns,
+                                &CStr::from_ptr((*iattr).local_name as *const i8).to_string_lossy(),
+                                value,
+                            );
                         }
                         if !norm_value.is_null() {
                             xml_free(norm_value as _);

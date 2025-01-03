@@ -47,11 +47,11 @@ use crate::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node,
         xml_new_doc_node_eat_name, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd, xml_new_ns,
-        xml_new_ns_prop, xml_new_ns_prop_eat_name, xml_new_reference, xml_text_concat,
-        xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
-        XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname, NodeCommon,
+        NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType,
+        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr, XmlElementPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr,
+        XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path},
 };
@@ -68,9 +68,9 @@ use super::{
         XML_SAX2_MAGIC, XML_SKIP_IDS,
     },
     parser_internals::{
-        xml_free_input_stream, xml_parse_external_subset, xml_split_qname,
-        xml_string_decode_entities, xml_string_len_decode_entities, XML_MAX_TEXT_LENGTH,
-        XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
+        xml_free_input_stream, xml_parse_external_subset, xml_string_decode_entities,
+        xml_string_len_decode_entities, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
+        XML_VCTXT_DTD_VALIDATED,
     },
     uri::{xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
     valid::{
@@ -80,7 +80,7 @@ use super::{
         xml_validate_dtd_final, xml_validate_element_decl, xml_validate_notation_decl,
         xml_validate_one_attribute, xml_validate_one_namespace, xml_validate_root,
     },
-    xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, xml_strndup},
+    xmlstring::{xml_strcat, xml_strdup, xml_strlen, xml_strndup},
 };
 
 /// Provides the public ID e.g. "-//SGMLSOURCE//DTD DEMO//EN"
@@ -1360,8 +1360,6 @@ unsafe fn xml_sax2_attribute_internal(
 ) {
     use super::htmltree::html_is_boolean_attr;
 
-    let mut name: *mut XmlChar;
-    let mut ns: *mut XmlChar = null_mut();
     let nval: *mut XmlChar;
     let namespace: XmlNsPtr;
     let value = value.map(|v| CString::new(v).unwrap());
@@ -1374,15 +1372,14 @@ unsafe fn xml_sax2_attribute_internal(
     };
 
     let cfullname = CString::new(fullname).unwrap();
-    if (*ctxt).html != 0 {
-        name = xml_strdup(cfullname.as_ptr() as *const u8);
-        ns = null_mut();
-        // namespace = null_mut();
+    let (ns, name) = if (*ctxt).html != 0 {
+        (None, fullname)
     } else {
         // Split the full name into a namespace prefix and the tag name
-        name = xml_split_qname(ctxt, cfullname.as_ptr() as *const u8, addr_of_mut!(ns));
-        if !name.is_null() && *name.add(0) == 0 {
-            if xml_str_equal(ns, c"xmlns".as_ptr() as _) {
+        let (prefix, mut local) = split_qname(&mut *ctxt, fullname);
+        let mut ns = prefix;
+        if let Some(prefix) = prefix.filter(|_| local.is_empty()) {
+            if prefix == "xmlns" {
                 xml_ns_err_msg!(
                     ctxt,
                     XmlParserErrors::XmlErrNsDeclError,
@@ -1397,21 +1394,11 @@ unsafe fn xml_sax2_attribute_internal(
                     fullname
                 );
             }
-            if !ns.is_null() {
-                xml_free(ns as _);
-            }
-            ns = null_mut();
-            xml_free(name as _);
-            name = xml_strdup(cfullname.as_ptr() as *const u8);
+            ns = None;
+            local = fullname;
         }
-    }
-    if name.is_null() {
-        xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-        if !ns.is_null() {
-            xml_free(ns as _);
-        }
-        return;
-    }
+        (ns, local)
+    };
 
     #[cfg(not(feature = "html"))]
     let f = false;
@@ -1450,15 +1437,7 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     // Check whether it's a namespace definition
-    if (*ctxt).html == 0
-        && ns.is_null()
-        && *name.add(0) == b'x'
-        && *name.add(1) == b'm'
-        && *name.add(2) == b'l'
-        && *name.add(3) == b'n'
-        && *name.add(4) == b's'
-        && *name.add(5) == 0
-    {
+    if (*ctxt).html == 0 && ns.is_none() && name == "xmlns" {
         let val: *mut XmlChar;
 
         if (*ctxt).replace_entities == 0 {
@@ -1467,9 +1446,6 @@ unsafe fn xml_sax2_attribute_internal(
             (*ctxt).depth -= 1;
             if val.is_null() {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                if !name.is_null() {
-                    xml_free(name as _);
-                }
                 if !nval.is_null() {
                     xml_free(nval as _);
                 }
@@ -1531,9 +1507,6 @@ unsafe fn xml_sax2_attribute_internal(
                 );
             }
         }
-        if !name.is_null() {
-            xml_free(name as _);
-        }
         if !nval.is_null() {
             xml_free(nval as _);
         }
@@ -1542,15 +1515,7 @@ unsafe fn xml_sax2_attribute_internal(
         }
         return;
     }
-    if (*ctxt).html != 0
-        && !ns.is_null()
-        && *ns.add(0) == b'x'
-        && *ns.add(1) == b'm'
-        && *ns.add(2) == b'l'
-        && *ns.add(3) == b'n'
-        && *ns.add(4) == b's'
-        && *ns.add(5) == 0
-    {
+    if (*ctxt).html != 0 && ns == Some("xmlns") {
         let val: *mut XmlChar;
 
         if !(*ctxt).replace_entities != 0 {
@@ -1559,10 +1524,6 @@ unsafe fn xml_sax2_attribute_internal(
             (*ctxt).depth -= 1;
             if val.is_null() {
                 xml_sax2_err_memory(ctxt, "xmlSAX2StartElement");
-                xml_free(ns as _);
-                if !name.is_null() {
-                    xml_free(name as _);
-                }
                 if !nval.is_null() {
                     xml_free(nval as _);
                 }
@@ -1572,13 +1533,6 @@ unsafe fn xml_sax2_attribute_internal(
             val = value as _;
         }
 
-        let name = {
-            let tmp = CStr::from_ptr(name as *const i8)
-                .to_string_lossy()
-                .into_owned();
-            xml_free(name as _);
-            tmp
-        };
         if *val.add(0) == 0 {
             xml_ns_err_msg!(
                 ctxt,
@@ -1613,9 +1567,8 @@ unsafe fn xml_sax2_attribute_internal(
             }
         }
 
-        /* a standard namespace definition */
-        let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, Some(&name));
-        xml_free(ns as _);
+        // a standard namespace definition
+        let nsret: XmlNsPtr = xml_new_ns((*ctxt).node, val, Some(name));
         #[cfg(feature = "libxml_valid")]
         {
             // Validate also for namespace decls, they are attributes from an XML-1.0 perspective
@@ -1644,15 +1597,10 @@ unsafe fn xml_sax2_attribute_internal(
         return;
     }
 
-    if !ns.is_null() {
-        namespace = (*(*ctxt).node).search_ns(
-            (*ctxt).my_doc,
-            Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
-        );
+    if let Some(ns) = ns {
+        namespace = (*(*ctxt).node).search_ns((*ctxt).my_doc, Some(ns));
 
         if namespace.is_null() {
-            let ns = CStr::from_ptr(ns as *const i8).to_string_lossy();
-            let name = CStr::from_ptr(name as *const i8).to_string_lossy();
             xml_ns_err_msg!(
                 ctxt,
                 XmlParserErrors::XmlNsErrUndefinedNamespace,
@@ -1666,32 +1614,23 @@ unsafe fn xml_sax2_attribute_internal(
             prop = (*(*ctxt).node).properties;
             while !prop.is_null() {
                 if !(*prop).ns.is_null()
-                    && (xml_str_equal(name, (*prop).name)
-                        && (namespace == (*prop).ns
-                            || xml_str_equal((*namespace).href as _, (*(*prop).ns).href as _)))
+                    && (Some(name) == (*prop).name().as_deref()
+                        && (namespace == (*prop).ns || (*namespace).href() == (*(*prop).ns).href()))
                 {
-                    let n = CStr::from_ptr(name as *const i8).to_string_lossy();
-                    let h = CStr::from_ptr((*namespace).href as *const i8).to_string_lossy();
                     xml_ns_err_msg!(
                         ctxt,
                         XmlParserErrors::XmlErrAttributeRedefined,
                         "Attribute {} in {} redefined\n",
-                        n,
-                        h
+                        name,
+                        (*namespace).href().unwrap()
                     );
                     (*ctxt).well_formed = 0;
                     if (*ctxt).recovery == 0 {
                         (*ctxt).disable_sax = 1;
                     }
-                    if !name.is_null() {
-                        xml_free(name as _);
-                    }
                     // goto error;
                     if !nval.is_null() {
                         xml_free(nval as _);
-                    }
-                    if !ns.is_null() {
-                        xml_free(ns as _);
                     }
                 }
                 prop = (*prop).next;
@@ -1702,14 +1641,11 @@ unsafe fn xml_sax2_attribute_internal(
     }
 
     // !!!!!! <a toto:arg="" xmlns:toto="http://toto.com">
-    let ret: XmlAttrPtr = xml_new_ns_prop_eat_name((*ctxt).node, namespace, name, null());
+    let ret: XmlAttrPtr = xml_new_ns_prop((*ctxt).node, namespace, name, null());
     if ret.is_null() {
         // goto error;
         if !nval.is_null() {
             xml_free(nval as _);
-        }
-        if !ns.is_null() {
-            xml_free(ns as _);
         }
     }
 
@@ -1845,9 +1781,6 @@ unsafe fn xml_sax2_attribute_internal(
     // error:
     if !nval.is_null() {
         xml_free(nval as _);
-    }
-    if !ns.is_null() {
-        xml_free(ns as _);
     }
 }
 
@@ -2602,7 +2535,12 @@ unsafe fn xml_sax2_attribute_ns(
             xml_register_node_default_value(ret as XmlNodePtr);
         }
     } else {
-        ret = xml_new_ns_prop((*ctxt).node, namespace, localname, null_mut());
+        ret = xml_new_ns_prop(
+            (*ctxt).node,
+            namespace,
+            &CStr::from_ptr(localname as *const i8).to_string_lossy(),
+            null_mut(),
+        );
         if ret.is_null() {
             xml_err_memory(ctxt, Some("xmlSAX2AttributeNs"));
             return;

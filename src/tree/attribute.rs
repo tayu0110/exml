@@ -25,7 +25,7 @@ use libc::memset;
 use crate::{
     dict::xml_dict_lookup,
     libxml::{
-        globals::{xml_malloc, xml_register_node_default_value},
+        globals::{xml_free, xml_malloc, xml_register_node_default_value},
         xmlstring::{xml_strdup, XmlChar},
     },
 };
@@ -144,7 +144,7 @@ impl NodeCommon for XmlAttr {
 /// but XML special chars need to be escaped first by using.  
 /// xmlEncodeEntitiesReentrant(). Use xmlNewProp() if you don't need entities support.
 #[doc(alias = "xmlNewDocProp")]
-pub unsafe extern "C" fn xml_new_doc_prop(
+pub unsafe fn xml_new_doc_prop(
     doc: XmlDocPtr,
     name: *const XmlChar,
     value: *const XmlChar,
@@ -205,7 +205,8 @@ pub unsafe fn xml_new_prop(
         return null_mut();
     }
 
-    xml_new_prop_internal(node, null_mut(), name, value, 0)
+    let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+    xml_new_prop_internal(node, null_mut(), &n, value)
 }
 
 /// Create a new property tagged with a namespace and carried by a node.  
@@ -214,20 +215,16 @@ pub unsafe fn xml_new_prop(
 pub unsafe fn xml_new_ns_prop(
     node: XmlNodePtr,
     ns: XmlNsPtr,
-    name: *const XmlChar,
+    name: &str,
     value: *const XmlChar,
 ) -> XmlAttrPtr {
-    if name.is_null() {
-        return null_mut();
-    }
-
-    xml_new_prop_internal(node, ns, name, value, 0)
+    xml_new_prop_internal(node, ns, name, value)
 }
 
 /// Create a new property tagged with a namespace and carried by a node.  
 /// Returns a pointer to the attribute
 #[doc(alias = "xmlNewNsPropEatName")]
-pub unsafe extern "C" fn xml_new_ns_prop_eat_name(
+pub unsafe fn xml_new_ns_prop_eat_name(
     node: XmlNodePtr,
     ns: XmlNsPtr,
     name: *mut XmlChar,
@@ -237,5 +234,8 @@ pub unsafe extern "C" fn xml_new_ns_prop_eat_name(
         return null_mut();
     }
 
-    xml_new_prop_internal(node, ns, name, value, 1)
+    let n = CStr::from_ptr(name as *const i8).to_string_lossy();
+    let res = xml_new_prop_internal(node, ns, &n, value);
+    xml_free(name as _);
+    res
 }

@@ -48,7 +48,7 @@ pub unsafe fn split_qname<'a>(
 
 /// Parse an XML qualified name string
 ///
-/// ```ignore
+/// ```text
 /// [NS 5] QName ::= (Prefix ':')? LocalPart
 ///
 /// [NS 6] Prefix ::= NCName

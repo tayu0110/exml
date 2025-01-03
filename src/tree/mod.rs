@@ -1135,36 +1135,18 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
 unsafe fn xml_new_prop_internal(
     node: XmlNodePtr,
     ns: XmlNsPtr,
-    name: *const XmlChar,
+    name: &str,
     value: *const XmlChar,
-    eatname: i32,
 ) -> XmlAttrPtr {
     let mut doc: XmlDocPtr = null_mut();
 
     if !node.is_null() && !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        if eatname == 1
-            && ((*node).doc.is_null()
-                || (*(*node).doc).dict.is_null()
-                || xml_dict_owns((*(*node).doc).dict, name) == 0)
-        {
-            xml_free(name as _);
-        }
         return null_mut();
     }
 
-    /*
-     * Allocate a new property and fill the fields.
-     */
+    // Allocate a new property and fill the fields.
     let cur: XmlAttrPtr = xml_malloc(size_of::<XmlAttr>()) as _;
     if cur.is_null() {
-        if eatname == 1
-            && (node.is_null()
-                || (*node).doc.is_null()
-                || (*(*node).doc).dict.is_null()
-                || xml_dict_owns((*(*node).doc).dict, name) == 0)
-        {
-            xml_free(name as _);
-        }
         xml_tree_err_memory("building attribute");
         return null_mut();
     }
@@ -1178,15 +1160,7 @@ unsafe fn xml_new_prop_internal(
     }
     (*cur).ns = ns;
 
-    if eatname == 0 {
-        if !doc.is_null() && !(*doc).dict.is_null() {
-            (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
-        } else {
-            (*cur).name = xml_strdup(name);
-        }
-    } else {
-        (*cur).name = name;
-    }
+    (*cur).name = xml_strndup(name.as_ptr(), name.len() as i32);
 
     if !value.is_null() {
         (*cur).children = NodePtr::from_ptr(xml_new_doc_text(doc, value));
@@ -1201,9 +1175,7 @@ unsafe fn xml_new_prop_internal(
         }
     }
 
-    /*
-     * Add it at the end to preserve parsing order ...
-     */
+    // Add it at the end to preserve parsing order ...
     if !node.is_null() {
         if (*node).properties.is_null() {
             (*node).properties = cur;
@@ -6428,46 +6400,6 @@ mod tests {
                         assert!(leaks == 0, "{leaks} Leaks are found in xmlNewNodeEatName()");
                         eprint!(" {}", n_ns);
                         eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_ns_prop() {
-        unsafe {
-            let mut leaks = 0;
-            for n_node in 0..GEN_NB_XML_NODE_PTR {
-                for n_ns in 0..GEN_NB_XML_NS_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_value in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let node = gen_xml_node_ptr(n_node, 0);
-                            let ns = gen_xml_ns_ptr(n_ns, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let value = gen_const_xml_char_ptr(n_value, 3);
-
-                            let ret_val = xml_new_ns_prop(node, ns, name, value);
-                            desret_xml_attr_ptr(ret_val);
-                            des_xml_node_ptr(n_node, node, 0);
-                            des_xml_ns_ptr(n_ns, ns, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_value, value, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlNewNsProp",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlNewNsProp()");
-                                eprint!(" {}", n_node);
-                                eprint!(" {}", n_ns);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_value);
-                            }
-                        }
                     }
                 }
             }

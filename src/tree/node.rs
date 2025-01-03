@@ -1944,14 +1944,12 @@ impl XmlNode {
             return prop;
         }
         // No equal attr found; create a new one.
-        let name = CString::new(name).unwrap();
         let value = value.map(|v| CString::new(v).unwrap());
         xml_new_prop_internal(
             self,
             ns,
-            name.as_ptr() as *const u8,
+            name,
             value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
-            0,
         )
     }
 

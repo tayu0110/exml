@@ -1246,7 +1246,7 @@ impl<T> XmlC14NCtx<'_, T> {
         attr = xml_new_ns_prop(
             null_mut(),
             xml_base_attr.ns,
-            c"base".as_ptr() as _,
+            "base",
             res.as_ptr() as *const u8,
         );
         if attr.is_null() {
