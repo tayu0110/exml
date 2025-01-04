@@ -115,7 +115,7 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
     parser::{
-        __xml_err_encoding, parse_name, xml_create_entity_parser_ctxt_internal,
+        __xml_err_encoding, parse_char_ref, parse_name, xml_create_entity_parser_ctxt_internal,
         xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
         xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
         xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
@@ -4181,15 +4181,14 @@ unsafe fn xml_parse_att_value_complex(
 
             // OK loop until we reach one of the ending c_char or a size limit.
             let mut c = (*ctxt).current_char(&mut l).unwrap_or('\0');
-            while ((*ctxt).current_byte() != limit /* checked */ && xml_is_char(c as u32) && c != '<')
+            while ((*ctxt).current_byte() != limit && xml_is_char(c as u32) && c != '<')
                 && !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
             {
                 if c == '&' {
                     in_space = 0;
                     if (*ctxt).nth_byte(1) == b'#' {
-                        let val: i32 = xml_parse_char_ref(ctxt);
-
-                        if val == b'&' as i32 {
+                        let val = parse_char_ref(&mut *ctxt);
+                        if val == Some('&') {
                             if (*ctxt).replace_entities != 0 {
                                 if len + 10 > buf_size {
                                     grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
@@ -4213,11 +4212,11 @@ unsafe fn xml_parse_att_value_complex(
                                 *buf.add(len as usize) = b';';
                                 len += 1;
                             }
-                        } else if val != 0 {
+                        } else if let Some(val) = val {
                             if len + 10 > buf_size {
                                 grow_buffer!(ctxt, buf, 10, buf_size, rep, 'mem_error);
                             }
-                            len += xml_copy_char(0, buf.add(len as usize), val) as usize;
+                            len += xml_copy_char(0, buf.add(len as usize), val as i32) as usize;
                         }
                     } else {
                         ent = xml_parse_entity_ref(ctxt);
@@ -9105,135 +9104,6 @@ pub(crate) unsafe fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
     }
 
     (*ctxt).instate = XmlParserInputState::XmlParserDTD;
-}
-
-/// Parse a numeric character reference. Always consumes '&'.
-///
-/// `[66] CharRef ::= '&#' [0-9]+ ';' | '&#x' [0-9a-fA-F]+ ';'`
-///
-/// `[ WFC: Legal Character ]`  
-/// Characters referred to using character references must match the production for Char.
-///
-/// Returns the value parsed (as an int), 0 in case of error
-#[doc(alias = "xmlParseCharRef")]
-pub(crate) unsafe fn xml_parse_char_ref(ctxt: XmlParserCtxtPtr) -> i32 {
-    let mut val: i32 = 0;
-    let mut count: i32 = 0;
-
-    // Using RAW/CUR/NEXT is okay since we are working on ASCII range here
-    if (*ctxt).current_byte() == b'&' && (*ctxt).nth_byte(1) == b'#' && (*ctxt).nth_byte(2) == b'x'
-    {
-        (*ctxt).advance(3);
-        (*ctxt).grow();
-        #[allow(clippy::while_immutable_condition)]
-        while (*ctxt).current_byte() != b';' {
-            // loop blocked by count
-            let res = {
-                let f = count > 20;
-                count += 1;
-                f
-            };
-            if res {
-                count = 0;
-                (*ctxt).grow();
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return 0;
-                }
-            }
-            if ((*ctxt).current_byte() >= b'0') && ((*ctxt).current_byte() <= b'9') {
-                val = val * 16 + ((*ctxt).current_byte() - b'0') as i32;
-            } else if ((*ctxt).current_byte() >= b'a')
-                && ((*ctxt).current_byte() <= b'f')
-                && (count < 20)
-            {
-                val = val * 16 + ((*ctxt).current_byte() - b'a') as i32 + 10;
-            } else if ((*ctxt).current_byte() >= b'A')
-                && ((*ctxt).current_byte() <= b'F')
-                && (count < 20)
-            {
-                val = val * 16 + ((*ctxt).current_byte() - b'A') as i32 + 10;
-            } else {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrInvalidHexCharRef, None);
-                val = 0;
-                break;
-            }
-            if val > 0x110000 {
-                val = 0x110000;
-            }
-
-            (*ctxt).skip_char();
-            count += 1;
-        }
-        if (*ctxt).current_byte() == b';' {
-            // on purpose to avoid reentrancy problems with NEXT and SKIP
-            (*(*ctxt).input).col += 1;
-            (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
-        }
-    } else if (*ctxt).current_byte() == b'&' && (*ctxt).nth_byte(1) == b'#' {
-        (*ctxt).advance(2);
-        (*ctxt).grow();
-        #[allow(clippy::while_immutable_condition)]
-        while (*ctxt).current_byte() != b';' {
-            // loop blocked by count
-            let res = {
-                let f = count > 20;
-                count += 1;
-                f
-            };
-            if res {
-                count = 0;
-                (*ctxt).grow();
-                if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-                    return 0;
-                }
-            }
-            if ((*ctxt).current_byte() >= b'0') && ((*ctxt).current_byte() <= b'9') {
-                val = val * 10 + ((*ctxt).current_byte() - b'0') as i32;
-            } else {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrInvalidDecCharRef, None);
-                val = 0;
-                break;
-            }
-            if val > 0x110000 {
-                val = 0x110000;
-            }
-
-            (*ctxt).skip_char();
-            count += 1;
-        }
-        if (*ctxt).current_byte() == b';' {
-            // on purpose to avoid reentrancy problems with NEXT and SKIP
-            (*(*ctxt).input).col += 1;
-            (*(*ctxt).input).cur = (*(*ctxt).input).cur.add(1);
-        }
-    } else {
-        if (*ctxt).current_byte() == b'&' {
-            (*ctxt).advance(1);
-        }
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrInvalidCharRef, None);
-    }
-
-    // [ WFC: Legal Character ]
-    // Characters referred to using character references must match the
-    // production for Char.
-    if val >= 0x110000 {
-        xml_fatal_err_msg_int!(
-            ctxt,
-            XmlParserErrors::XmlErrInvalidChar,
-            "xmlParseCharRef: character reference out of bounds\n",
-            val
-        );
-    } else if xml_is_char(val as u32) {
-        return val;
-    } else {
-        xml_fatal_err_msg_int!(
-            ctxt,
-            XmlParserErrors::XmlErrInvalidChar,
-            format!("xmlParseCharRef: invalid XmlChar value {val}\n").as_str(),
-            val
-        );
-    }
-    0
 }
 
 /// Parse escaped pure raw content. Always consumes '<!['.

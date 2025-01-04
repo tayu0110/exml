@@ -20,21 +20,24 @@
 //
 // daniel@veillard.com
 
-use std::borrow::Cow;
-use std::cell::RefCell;
-use std::ffi::{c_char, CStr, CString};
-use std::mem::size_of;
-use std::ptr::{addr_of_mut, null, null_mut, NonNull};
-use std::rc::Rc;
-use std::str::from_utf8;
-use std::sync::atomic::Ordering;
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    ffi::{c_char, CStr, CString},
+    io::Write,
+    mem::size_of,
+    ptr::{addr_of_mut, null, null_mut, NonNull},
+    rc::Rc,
+    str::from_utf8_unchecked,
+    sync::atomic::Ordering,
+};
 
-use libc::{memcpy, memset, snprintf, INT_MAX};
+use libc::{memcpy, memset, INT_MAX};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::parser::{
-    parse_name, parse_nmtoken, xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
+    parse_char_ref, parse_name, parse_nmtoken, xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
 };
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
@@ -53,7 +56,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             xml_load_external_entity, xml_parse_att_value_internal, xml_parse_cdsect,
-            xml_parse_char_data_internal, xml_parse_char_ref, xml_parse_conditional_sections,
+            xml_parse_char_data_internal, xml_parse_conditional_sections,
             xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
             xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_external_id,
             xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
@@ -3007,63 +3010,53 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
 
     // Simple case of a CharRef
     if NXT!(ctxt, 1) == b'#' {
-        let mut i: i32 = 0;
-        let mut out: [XmlChar; 16] = [0; 16];
+        let mut out = [0; 16];
         let hex: i32 = NXT!(ctxt, 2) as _;
-        let value: i32 = xml_parse_char_ref(ctxt);
-
-        if value == 0 {
+        let Some(value) = parse_char_ref(&mut *ctxt) else {
             return;
-        }
+        };
+
         if (*ctxt).charset != XmlCharEncoding::UTF8 {
             // So we are using non-UTF-8 buffers
             // Check that the c_char fit on 8bits, if not
             // generate a CharRef.
-            if value <= 0xFF {
-                out[0] = value as _;
-                out[1] = 0;
+            if value as u32 <= 0xFF {
+                let out = value.encode_utf8(&mut out[..]);
                 if (*ctxt).disable_sax == 0 {
                     if let Some(characters) =
                         (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
                     {
-                        let s = from_utf8(&out[..1]).expect("Internal Error");
-                        characters((*ctxt).user_data.clone(), s);
+                        characters((*ctxt).user_data.clone(), out);
                     }
                 }
             } else {
+                let mut slice = &mut out[..];
                 if hex == b'x' as i32 || hex == b'X' as i32 {
-                    snprintf(
-                        out.as_mut_ptr() as _,
-                        out.len(),
-                        c"#x%X".as_ptr() as _,
-                        value,
-                    );
+                    write!(slice, "#x{:X}", value as u32);
                 } else {
-                    snprintf(
-                        out.as_mut_ptr() as _,
-                        out.len(),
-                        c"#%d".as_ptr() as _,
-                        value,
-                    );
+                    write!(slice, "#{}", value as u32);
                 }
+                let rem = slice.len();
+                let len = out.len() - rem;
                 if (*ctxt).disable_sax == 0 {
                     if let Some(reference) =
                         (*ctxt).sax.as_deref_mut().and_then(|sax| sax.reference)
                     {
-                        let out = CStr::from_ptr(out.as_ptr() as *const i8).to_string_lossy();
-                        reference((*ctxt).user_data.clone(), &out);
+                        // # Safety
+                        // `out` contains only '#', 'x' and ascii hex digit characters.
+                        // Therefore, UTF-8 validation won't fail.
+                        let out = unsafe { from_utf8_unchecked(&out[..len]) };
+                        reference((*ctxt).user_data.clone(), out);
                     }
                 }
             }
         } else {
             // Just encode the value in UTF-8
-            COPY_BUF!(0, out.as_mut_ptr(), i, value);
-            out[i as usize] = 0;
+            let out = value.encode_utf8(&mut out[..]);
             if (*ctxt).disable_sax == 0 {
                 if let Some(characters) = (*ctxt).sax.as_deref_mut().and_then(|sax| sax.characters)
                 {
-                    let s = from_utf8(&out[..i as usize]).expect("Internal Error");
-                    characters((*ctxt).user_data.clone(), s);
+                    characters((*ctxt).user_data.clone(), out);
                 }
             }
         }
