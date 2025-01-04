@@ -48,11 +48,10 @@ use crate::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
-            xml_byte_consumed, xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options,
-            xml_parse_chunk, CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func,
-            EndElementSAXFunc, StartElementNsSAX2Func, StartElementSAXFunc, XmlParserInputState,
-            XmlParserMode, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XML_SAX2_MAGIC,
+            xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options, xml_parse_chunk,
+            CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
+            StartElementNsSAX2Func, StartElementSAXFunc, XmlParserInputState, XmlParserMode,
+            XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
@@ -2229,7 +2228,7 @@ impl XmlTextReader {
         if self.ctxt.is_null() {
             return -1;
         }
-        xml_byte_consumed(self.ctxt)
+        (*self.ctxt).byte_consumed()
     }
 
     /// Hacking interface allowing to get the xmlDocPtr corresponding to the

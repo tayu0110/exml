@@ -7307,60 +7307,6 @@ pub unsafe fn xml_load_external_entity(
     XML_CURRENT_EXTERNAL_ENTITY_LOADER(url, id, ctxt)
 }
 
-/// This function provides the current index of the parser relative
-/// to the start of the current entity. This function is computed in
-/// bytes from the beginning starting at zero and finishing at the
-/// size in byte of the file if parsing a file. The function is
-/// of constant cost if the input is UTF-8 but can be costly if run
-/// on non-UTF-8 input.
-///
-/// Returns the index in bytes from the beginning of the entity or -1
-/// in case the index could not be computed.
-#[doc(alias = "xmlByteConsumed")]
-pub unsafe fn xml_byte_consumed(ctxt: XmlParserCtxtPtr) -> i64 {
-    if ctxt.is_null() {
-        return -1;
-    }
-    let input: XmlParserInputPtr = (*ctxt).input;
-    if input.is_null() {
-        return -1;
-    }
-    if (*input).buf.is_some() && (*input).buf.as_ref().unwrap().borrow().encoder.is_some() {
-        let mut unused: u32 = 0;
-        let mut buf = (*input).buf.as_ref().unwrap().borrow_mut();
-        let handler = buf.encoder.as_mut().unwrap();
-        // Encoding conversion, compute the number of unused original
-        // bytes from the input not consumed and subtract that from
-        // the raw consumed value, this is not a cheap operation
-        if (*input).remainder_len() > 0 {
-            // The original code seems to continue processing as long as the write succeeds,
-            // even if encoding errors occur.
-            // However, the new API stops processing when an error occurs,
-            // so it is not possible to reproduce such a process ...
-            let mut out = [0u8; 32000];
-            let Ok(input) = from_utf8(from_raw_parts(
-                (*input).cur,
-                (*input).remainder_len() as usize,
-            )) else {
-                return -1;
-            };
-            let mut read = 0;
-            while read < input.len() {
-                let Ok((r, w)) = handler.encode(&input[read..], &mut out) else {
-                    return -1;
-                };
-                unused += w as u32;
-                read += r;
-            }
-        }
-        if (*input).buf.as_ref().unwrap().borrow().rawconsumed < unused as u64 {
-            return -1;
-        }
-        return ((*input).buf.as_ref().unwrap().borrow().rawconsumed - unused as u64) as i64;
-    }
-    (*input).consumed as i64 + (*input).offset_from_base() as i64
-}
-
 /// This is the set of XML parser options that can be passed down
 /// to the xmlReadDoc() and similar calls.
 #[doc(alias = "xmlParserOption")]
@@ -9566,31 +9512,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_byte_consumed() {
-        unsafe {
-            let mut leaks = 0;
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = xml_byte_consumed(ctxt);
-                desret_long(ret_val);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlByteConsumed",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlByteConsumed()");
-        }
-    }
 
     #[test]
     fn test_xml_create_doc_parser_ctxt() {

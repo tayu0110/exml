@@ -290,6 +290,54 @@ impl XmlParserCtxt {
         (*self.input).base
     }
 
+    /// This function provides the current index of the parser relative
+    /// to the start of the current entity. This function is computed in
+    /// bytes from the beginning starting at zero and finishing at the
+    /// size in byte of the file if parsing a file. The function is
+    /// of constant cost if the input is UTF-8 but can be costly if run
+    /// on non-UTF-8 input.
+    ///
+    /// Returns the index in bytes from the beginning of the entity or -1
+    /// in case the index could not be computed.
+    #[doc(alias = "xmlByteConsumed")]
+    pub unsafe fn byte_consumed(&self) -> i64 {
+        let input: XmlParserInputPtr = self.input;
+        if input.is_null() {
+            return -1;
+        }
+        if (*input).buf.is_some() && (*input).buf.as_ref().unwrap().borrow().encoder.is_some() {
+            let mut unused = 0;
+            let mut buf = (*input).buf.as_ref().unwrap().borrow_mut();
+            let handler = buf.encoder.as_mut().unwrap();
+            // Encoding conversion, compute the number of unused original
+            // bytes from the input not consumed and subtract that from
+            // the raw consumed value, this is not a cheap operation
+            if (*input).remainder_len() > 0 {
+                // The original code seems to continue processing as long as the write succeeds,
+                // even if encoding errors occur.
+                // However, the new API stops processing when an error occurs,
+                // so it is not possible to reproduce such a process ...
+                let mut out = [0u8; 32000];
+                let Ok(input) = from_utf8(self.content_bytes()) else {
+                    return -1;
+                };
+                let mut read = 0;
+                while read < input.len() {
+                    let Ok((r, w)) = handler.encode(&input[read..], &mut out) else {
+                        return -1;
+                    };
+                    unused += w;
+                    read += r;
+                }
+            }
+            if (*input).buf.as_ref().unwrap().borrow().rawconsumed < unused as u64 {
+                return -1;
+            }
+            return ((*input).buf.as_ref().unwrap().borrow().rawconsumed - unused as u64) as i64;
+        }
+        (*input).consumed as i64 + (*input).offset_from_base() as i64
+    }
+
     #[doc(alias = "xmlParserGrow")]
     pub(crate) unsafe fn force_grow(&mut self) -> i32 {
         let input: XmlParserInputPtr = self.input;
