@@ -29,7 +29,6 @@ use std::ffi::{c_char, c_void};
 use std::{
     borrow::Cow,
     env::current_dir,
-    ffi::{c_int, c_uint, CString},
     fs::{metadata, File},
     io::{self, stdin, ErrorKind, Read},
     path::{Path, PathBuf},
@@ -140,7 +139,7 @@ pub(crate) unsafe fn __xml_ioerr(
     mut code: XmlParserErrors,
     extra: Option<&str>,
 ) {
-    let mut idx: c_uint;
+    let mut idx: u32;
     let errno = *__errno_location();
 
     if code == XmlParserErrors::XmlErrOK {
@@ -317,7 +316,7 @@ macro_rules! __xml_loader_err {
     };
     ($ctx:expr, $msg:literal, $filename:expr) => {
         let msg = format!($msg, $filename);
-        $crate::io::__xml_loader_err!(@inner $ctx, &msg, Some($filename.into()));
+        $crate::io::__xml_loader_err!(@inner $ctx, &msg, Some($filename.to_owned().into()));
     };
     (@inner $ctx:expr, $msg:expr, $filename:expr) => {
         use $crate::{
@@ -449,7 +448,7 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
     let ret: XmlParserInputPtr;
 
     if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNonet as i32 != 0 {
-        let options: c_int = (*ctxt).options;
+        let options = (*ctxt).options;
 
         (*ctxt).options -= XmlParserOption::XmlParseNonet as i32;
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
@@ -467,8 +466,7 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
         __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", id);
         return null_mut();
     };
-    let resource = CString::new(resource).unwrap();
-    ret = xml_new_input_from_file(ctxt, resource.as_ptr());
+    ret = xml_new_input_from_file(&mut *ctxt, &resource);
     ret
 }
 
@@ -517,7 +515,7 @@ unsafe fn xml_resolve_resource_from_catalog(
     let mut resource = None;
 
     // If the resource doesn't exists as a file,
-    // try to load it from the resource poc_inted in the catalogs
+    // try to load it from the resource pointed in the catalogs
     let pref: XmlCatalogAllow = xml_catalog_get_defaults();
 
     if !matches!(pref, XmlCatalogAllow::None) && xml_no_net_exists(url) == 0 {
@@ -625,7 +623,7 @@ pub fn xml_check_filename(path: impl AsRef<Path>) -> i32 {
 /// Returns 1 if matches, 0 otherwise
 #[doc(alias = "xmlIOFTPMatch")]
 #[cfg(feature = "ftp")]
-pub fn xml_io_ftp_match(filename: &str) -> c_int {
+pub fn xml_io_ftp_match(filename: &str) -> i32 {
     filename.starts_with("ftp://") as i32
 }
 
@@ -647,8 +645,8 @@ pub unsafe fn xml_io_ftp_open(filename: &str) -> *mut c_void {
 pub unsafe extern "C" fn xml_io_ftp_read(
     context: *mut c_void,
     buffer: *mut c_char,
-    len: c_int,
-) -> c_int {
+    len: i32,
+) -> i32 {
     if buffer.is_null() || len < 0 {
         return -1;
     }
@@ -660,7 +658,7 @@ pub unsafe extern "C" fn xml_io_ftp_read(
 /// Returns 0
 #[doc(alias = "xmlIOFTPClose")]
 #[cfg(feature = "ftp")]
-pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> c_int {
+pub unsafe extern "C" fn xml_io_ftp_close(context: *mut c_void) -> i32 {
     xml_nanoftp_close(context)
 }
 

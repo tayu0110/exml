@@ -80,8 +80,7 @@ unsafe fn test_external_entity_loader(
     _id: Option<&str>,
     ctxt: XmlParserCtxtPtr,
 ) -> XmlParserInputPtr {
-    let url = CString::new(url.unwrap()).unwrap();
-    xml_new_input_from_file(ctxt, url.as_ptr())
+    xml_new_input_from_file(&mut *ctxt, url.unwrap())
 }
 
 // Trapping the error messages at the generic level to grab the equivalent of

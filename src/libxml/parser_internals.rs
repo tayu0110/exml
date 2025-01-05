@@ -4912,10 +4912,7 @@ pub(crate) const LINE_LEN: usize = 80;
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks,
-        parser::xml_new_input_from_file, test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -5046,40 +5043,6 @@ mod tests {
                         );
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_entity);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_input_from_file() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let filename = gen_filepath(n_filename, 1);
-
-                    let ret_val = xml_new_input_from_file(ctxt, filename);
-                    desret_xml_parser_input_ptr(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_filepath(n_filename, filename, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewInputFromFile",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewInputFromFile()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_filename);
                     }
                 }
             }

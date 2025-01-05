@@ -39,7 +39,7 @@
 
 use std::{
     cell::RefCell,
-    ffi::{CStr, CString},
+    ffi::CStr,
     ops::DerefMut,
     ptr::{null, null_mut},
     rc::Rc,
@@ -62,10 +62,10 @@ use crate::{
         globals::{xml_free, xml_malloc},
         parser::{xml_load_external_entity, XmlParserInputDeallocate},
         parser_internals::{INPUT_CHUNK, LINE_LEN},
-        uri::xml_canonic_path,
-        xmlstring::{xml_strdup, xml_strlen},
+        xmlstring::xml_strlen,
     },
     parser::xml_err_internal,
+    uri::canonic_path,
 };
 
 use super::{xml_err_memory, XmlParserCtxt, XmlParserCtxtPtr};
@@ -405,39 +405,21 @@ pub unsafe fn xml_new_string_input_stream(
 /// Returns the new input stream or NULL in case of error
 #[doc(alias = "xmlNewInputFromFile")]
 pub unsafe fn xml_new_input_from_file(
-    ctxt: XmlParserCtxtPtr,
-    filename: *const i8,
+    ctxt: &mut XmlParserCtxt,
+    filename: &str,
 ) -> XmlParserInputPtr {
     let mut input_stream: XmlParserInputPtr;
 
     if get_parser_debug_entities() != 0 {
-        generic_error!(
-            "new input from file: {}\n",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
-    }
-    if ctxt.is_null() {
-        return null_mut();
+        generic_error!("new input from file: {filename}\n");
     }
 
-    if filename.is_null() {
-        __xml_loader_err!(ctxt, "failed to load external entity: NULL filename \n");
-        return null_mut();
-    }
-    let Some(buf) = XmlParserInputBuffer::from_uri(
-        CStr::from_ptr(filename).to_string_lossy().as_ref(),
-        XmlCharEncoding::None,
-    ) else {
-        if filename.is_null() {
-            __xml_loader_err!(ctxt, "failed to load external entity: NULL filename \n");
-        } else {
-            let filename = CStr::from_ptr(filename).to_string_lossy();
-            __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
-        }
+    let Some(buf) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
+        __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
         return null_mut();
     };
 
-    input_stream = xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
+    input_stream = xml_new_input_stream(Some(ctxt));
     if input_stream.is_null() {
         return null_mut();
     }
@@ -448,28 +430,13 @@ pub unsafe fn xml_new_input_from_file(
         return null_mut();
     }
 
-    let uri = if let Some(filename) = (*input_stream).filename.as_deref() {
-        let filename = CString::new(filename).unwrap();
-        xml_strdup(filename.as_ptr() as *mut u8)
-    } else {
-        xml_strdup(filename as *mut u8)
-    };
-    let directory =
-        xml_parser_get_directory(CStr::from_ptr(uri as *const i8).to_string_lossy().as_ref());
-    {
-        let canonic = xml_canonic_path(uri as *const u8);
-        if !canonic.is_null() {
-            (*input_stream).filename = Some(
-                CStr::from_ptr(canonic as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(canonic as _);
-        }
-    }
-    if !uri.is_null() {
-        xml_free(uri as _);
-    }
+    let uri = (*input_stream)
+        .filename
+        .clone()
+        .unwrap_or_else(|| filename.to_owned());
+    let directory = xml_parser_get_directory(&uri);
+    let canonic = canonic_path(&uri);
+    (*input_stream).filename = Some(canonic.into_owned());
     if let Some(directory) = directory.as_deref() {
         (*input_stream).directory = Some(directory.to_string_lossy().into_owned());
     } else {
@@ -477,9 +444,9 @@ pub unsafe fn xml_new_input_from_file(
     }
     (*input_stream).reset_base();
 
-    if (*ctxt).directory.is_none() {
+    if ctxt.directory.is_none() {
         if let Some(directory) = directory {
-            (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
+            ctxt.directory = Some(directory.to_string_lossy().into_owned());
         }
     }
     input_stream
