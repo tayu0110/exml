@@ -53,16 +53,13 @@ use crate::libxml::catalog::{
 use crate::libxml::nanoftp::{xml_nanoftp_close, xml_nanoftp_open, xml_nanoftp_read};
 use crate::{
     encoding::find_encoding_handler,
-    error::{
-        XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
-        __xml_simple_oom_error,
-    },
-    libxml::{
-        parser::{XmlParserInputState, XmlParserOption},
-        parser_internals::{xml_free_input_stream, xml_new_input_from_file},
-    },
+    error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
+    libxml::parser::XmlParserOption,
     nanohttp::XmlNanoHTTPCtxt,
-    parser::{XmlParserCtxtPtr, XmlParserInputPtr, __xml_err_encoding},
+    parser::{
+        XmlParserCtxtPtr, XmlParserInputPtr, __xml_err_encoding, xml_free_input_stream,
+        xml_new_input_from_file,
+    },
     uri::canonic_path,
 };
 
@@ -336,7 +333,7 @@ macro_rules! __xml_loader_err {
 
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
                 if let Some(sax) = (*ctxt).sax.as_deref_mut() {
@@ -353,7 +350,7 @@ macro_rules! __xml_loader_err {
                     data = (*ctxt).user_data.clone();
                 }
             }
-            __xml_raise_error!(
+            $crate::error::__xml_raise_error!(
                 schannel,
                 channel,
                 data,

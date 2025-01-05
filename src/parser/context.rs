@@ -40,9 +40,8 @@ use crate::{
             XML_SAX2_MAGIC,
         },
         parser_internals::{
-            xml_free_input_stream, xml_new_input_stream, xml_parse_pe_reference, INPUT_CHUNK,
-            LINE_LEN, XML_MAX_DICTIONARY_LIMIT, XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH,
-            XML_VCTXT_USE_PCTXT,
+            xml_parse_pe_reference, INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT,
+            XML_MAX_LOOKUP_LIMIT, XML_PARSER_MAX_DEPTH, XML_VCTXT_USE_PCTXT,
         },
         sax2::{
             xml_sax2_end_element, xml_sax2_ignorable_whitespace, xml_sax2_start_element,
@@ -56,7 +55,8 @@ use crate::{
 };
 
 use super::{
-    xml_err_memory, xml_fatal_err, XmlParserInputPtr, XmlParserNodeInfo, XmlParserNodeInfoSeq,
+    xml_err_memory, xml_fatal_err, xml_free_input_stream, xml_new_input_stream, XmlParserInputPtr,
+    XmlParserNodeInfo, XmlParserNodeInfoSeq,
 };
 
 /// The parser context.

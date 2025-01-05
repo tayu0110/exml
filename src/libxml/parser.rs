@@ -92,7 +92,6 @@ use crate::{
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
             xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
-            xml_free_input_stream, xml_new_entity_input_stream, xml_new_input_stream,
             xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
             xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
@@ -118,7 +117,8 @@ use crate::{
         __xml_err_encoding, parse_char_ref, parse_name, xml_create_entity_parser_ctxt_internal,
         xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
         xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_free_parser_ctxt, xml_new_sax_parser_ctxt, xml_ns_err,
+        xml_fatal_err_msg_str_int_str, xml_free_input_stream, xml_free_parser_ctxt,
+        xml_new_entity_input_stream, xml_new_input_stream, xml_new_sax_parser_ctxt, xml_ns_err,
         xml_ns_warn, xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxt,
         XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
     },
@@ -2697,7 +2697,7 @@ pub(crate) unsafe fn xml_setup_parser_for_buffer(
     buffer: *const XmlChar,
     filename: *const c_char,
 ) {
-    use crate::parser::xml_clear_parser_ctxt;
+    use crate::parser::{xml_clear_parser_ctxt, xml_new_input_stream};
 
     if ctxt.is_null() || buffer.is_null() {
         return;
@@ -2757,7 +2757,10 @@ pub unsafe fn xml_create_push_parser_ctxt(
     size: i32,
     filename: *const c_char,
 ) -> XmlParserCtxtPtr {
-    use crate::{io::xml_parser_get_directory, parser::xml_new_sax_parser_ctxt};
+    use crate::{
+        io::xml_parser_get_directory,
+        parser::{xml_free_input_stream, xml_new_input_stream, xml_new_sax_parser_ctxt},
+    };
 
     let buf = Rc::new(RefCell::new(XmlParserInputBuffer::new(
         XmlCharEncoding::None,

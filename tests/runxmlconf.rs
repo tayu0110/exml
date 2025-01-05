@@ -20,7 +20,6 @@ use exml::{
         parser::{
             xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
         },
-        parser_internals::xml_new_input_from_file,
         xmlmemory::{
             xml_mem_display_last, xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup,
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
@@ -28,8 +27,8 @@ use exml::{
         xmlstring::xml_str_equal,
     },
     parser::{
-        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_file,
-        XmlParserCtxtPtr, XmlParserInputPtr,
+        xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_input_from_file, xml_new_parser_ctxt,
+        xml_read_file, XmlParserCtxtPtr, XmlParserInputPtr,
     },
     tree::{xml_free_doc, NodeCommon, XmlDocProperties, XmlDocPtr, XmlElementType, XmlNodePtr},
     xpath::{
@@ -67,11 +66,7 @@ fn compose_dir(dir: Option<&str>, path: &str) -> String {
     format!("{dir}/{path}")
 }
 
-/************************************************************************
- *									*
- *		Libxml2 specific routines				*
- *									*
- ************************************************************************/
+// Libxml2 specific routines
 
 static mut NB_SKIPPED: c_int = 0;
 static mut NB_TESTS: c_int = 0;

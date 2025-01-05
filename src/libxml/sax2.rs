@@ -42,7 +42,10 @@ use crate::{
         },
         xmlstring::XmlChar,
     },
-    parser::{build_qname, split_qname, xml_err_memory, XmlParserCtxtPtr, XmlParserInputPtr},
+    parser::{
+        build_qname, split_qname, xml_err_memory, xml_free_input_stream, XmlParserCtxtPtr,
+        XmlParserInputPtr,
+    },
     tree::{
         xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
         xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi,
@@ -67,9 +70,8 @@ use super::{
         XML_SAX2_MAGIC, XML_SKIP_IDS,
     },
     parser_internals::{
-        xml_free_input_stream, xml_parse_external_subset, xml_string_decode_entities,
-        xml_string_len_decode_entities, XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF,
-        XML_VCTXT_DTD_VALIDATED,
+        xml_parse_external_subset, xml_string_decode_entities, xml_string_len_decode_entities,
+        XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
     },
     uri::{xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
     valid::{

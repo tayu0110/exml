@@ -579,10 +579,10 @@ macro_rules! xml_err_internal {
         let ctxt = $ctxt as *mut $crate::parser::XmlParserCtxt;
         if ctxt.is_null()
             || (*ctxt).disable_sax == 0
-            || !matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
+            || !matches!((*ctxt).instate, $crate::libxml::parser::XmlParserInputState::XmlParserEOF)
         {
             if !ctxt.is_null() {
-                (*ctxt).err_no = XmlParserErrors::XmlErrInternalError as i32;
+                (*ctxt).err_no = $crate::error::XmlParserErrors::XmlErrInternalError as i32;
             }
             $crate::error::__xml_raise_error!(
                 None,

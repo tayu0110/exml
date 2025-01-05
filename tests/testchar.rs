@@ -19,13 +19,12 @@ use exml::{
     libxml::{
         globals::{xml_free, xml_malloc},
         parser::{xml_cleanup_parser, xml_ctxt_reset},
-        parser_internals::xml_new_input_stream,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
     parser::{
-        xml_free_parser_ctxt, xml_new_parser_ctxt, xml_read_memory, XmlParserCtxtPtr,
-        XmlParserInputPtr,
+        xml_free_parser_ctxt, xml_new_input_stream, xml_new_parser_ctxt, xml_read_memory,
+        XmlParserCtxtPtr, XmlParserInputPtr,
     },
     tree::{xml_free_doc, NodeCommon, XmlDocPtr},
 };
@@ -606,7 +605,6 @@ unsafe fn test_char_ranges() -> c_int {
     };
     let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
     if input.is_null() {
-        // xml_free_parser_input_buffer(buf);
         test_ret = 1;
         // goto error;
         xml_free_parser_ctxt(ctxt);

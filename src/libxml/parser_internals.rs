@@ -23,7 +23,7 @@
 use std::{
     borrow::Cow,
     cell::RefCell,
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString},
     io::Write,
     mem::size_of,
     ptr::{addr_of_mut, null, null_mut, NonNull},
@@ -32,20 +32,20 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::{memcpy, memset, INT_MAX};
+use libc::{memcpy, INT_MAX};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::parser::{
-    parse_char_ref, parse_name, parse_nmtoken, xml_create_memory_parser_ctxt, xml_free_parser_ctxt,
+    parse_char_ref, parse_name, parse_nmtoken, xml_create_memory_parser_ctxt,
+    xml_free_input_stream, xml_free_parser_ctxt, xml_new_entity_input_stream,
 };
 use crate::{
     encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
-    error::{XmlParserErrors, __xml_raise_error},
+    error::XmlParserErrors,
     generic_error,
     globals::{get_parser_debug_entities, GenericErrorContext},
     hash::XmlHashTableRef,
-    io::{__xml_loader_err, xml_check_http_input, xml_parser_get_directory, XmlParserInputBuffer},
     libxml::{
         chvalid::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
@@ -55,18 +55,16 @@ use crate::{
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
-            xml_load_external_entity, xml_parse_att_value_internal, xml_parse_cdsect,
-            xml_parse_char_data_internal, xml_parse_conditional_sections,
-            xml_parse_element_children_content_decl_priv, xml_parse_enc_name, xml_parse_end_tag1,
-            xml_parse_end_tag2, xml_parse_external_entity_private, xml_parse_external_id,
-            xml_parse_markup_decl, xml_parse_start_tag2, xml_parse_string_name,
-            xml_parse_text_decl, xml_parse_version_num, xml_parser_add_node_info,
-            xml_parser_entity_check, xml_parser_find_node_info, xml_string_decode_entities_int,
-            XmlDefAttrs, XmlDefAttrsPtr, XmlParserInputState, XmlParserMode, XmlParserOption,
-            XML_SKIP_IDS,
+            xml_parse_att_value_internal, xml_parse_cdsect, xml_parse_char_data_internal,
+            xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
+            xml_parse_enc_name, xml_parse_end_tag1, xml_parse_end_tag2,
+            xml_parse_external_entity_private, xml_parse_external_id, xml_parse_markup_decl,
+            xml_parse_start_tag2, xml_parse_string_name, xml_parse_text_decl,
+            xml_parse_version_num, xml_parser_add_node_info, xml_parser_entity_check,
+            xml_parser_find_node_info, xml_string_decode_entities_int, XmlDefAttrs, XmlDefAttrsPtr,
+            XmlParserInputState, XmlParserMode, XmlParserOption, XML_SKIP_IDS,
         },
         sax2::xml_sax2_get_entity,
-        uri::xml_canonic_path,
         valid::{
             xml_create_enumeration, xml_free_doc_element_content, xml_free_enumeration,
             xml_new_doc_element_content, xml_validate_element, xml_validate_root,
@@ -76,8 +74,8 @@ use crate::{
         },
     },
     parser::{
-        xml_err_memory, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo, __xml_err_encoding,
-        xml_err_encoding_int, xml_err_internal, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_err_memory, XmlParserInputPtr, XmlParserNodeInfo, __xml_err_encoding,
+        xml_err_encoding_int, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str, xml_ns_err,
         xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxtPtr,
     },
@@ -189,279 +187,6 @@ pub fn xml_is_letter(c: u32) -> bool {
 pub(crate) const XML_VCTXT_DTD_VALIDATED: usize = 1usize << 0;
 /// Set if the validation context is part of a parser context.
 pub(crate) const XML_VCTXT_USE_PCTXT: usize = 1usize << 1;
-
-/// Create a new input stream based on a memory buffer.
-///
-/// Returns the new input stream
-#[doc(alias = "xmlNewStringInputStream")]
-pub unsafe fn xml_new_string_input_stream(
-    ctxt: XmlParserCtxtPtr,
-    buffer: *const XmlChar,
-) -> XmlParserInputPtr {
-    if buffer.is_null() {
-        xml_err_internal!(ctxt, "xmlNewStringInputStream string = NULL\n");
-        return null_mut();
-    }
-    if get_parser_debug_entities() != 0 {
-        generic_error!(
-            "new fixed input: {}\n",
-            CStr::from_ptr(buffer as *const i8)
-                .to_string_lossy()
-                .chars()
-                .take(30)
-                .collect::<String>()
-        );
-    }
-    let Some(buf) = XmlParserInputBuffer::from_memory(
-        CStr::from_ptr(buffer as *const i8).to_bytes().to_vec(),
-        XmlCharEncoding::None,
-    ) else {
-        xml_err_memory(ctxt, None);
-        return null_mut();
-    };
-    let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
-    if input.is_null() {
-        xml_err_memory(ctxt, Some("couldn't allocate a new input stream\n"));
-        // xml_free_parser_input_buffer(buf);
-        return null_mut();
-    }
-    (*input).buf = Some(Rc::new(RefCell::new(buf)));
-    (*input).reset_base();
-    input
-}
-
-/// Create a new input stream based on an xmlEntityPtr
-///
-/// Returns the new input stream or NULL
-#[doc(alias = "xmlNewEntityInputStream")]
-pub(crate) unsafe fn xml_new_entity_input_stream(
-    ctxt: XmlParserCtxtPtr,
-    entity: XmlEntityPtr,
-) -> XmlParserInputPtr {
-    let input: XmlParserInputPtr;
-
-    if entity.is_null() {
-        xml_err_internal!(ctxt, "xmlNewEntityInputStream entity = NULL\n");
-        return null_mut();
-    }
-    if get_parser_debug_entities() != 0 {
-        generic_error!(
-            "new input from entity: {}\n",
-            CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8).to_string_lossy()
-        );
-    }
-    if (*entity).content.load(Ordering::Relaxed).is_null() {
-        match (*entity).etype {
-            XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-                xml_err_internal!(ctxt, "Cannot parse entity {}\n", name);
-            }
-            XmlEntityType::XmlExternalGeneralParsedEntity
-            | XmlEntityType::XmlExternalParameterEntity => {
-                let uri = (*entity).uri.load(Ordering::Relaxed);
-                let external_id = (*entity).external_id.load(Ordering::Relaxed);
-                input = xml_load_external_entity(
-                    (!uri.is_null())
-                        .then(|| CStr::from_ptr(uri as *const i8).to_string_lossy())
-                        .as_deref(),
-                    (!external_id.is_null())
-                        .then(|| CStr::from_ptr(external_id as *const i8).to_string_lossy())
-                        .as_deref(),
-                    ctxt,
-                );
-                if !input.is_null() {
-                    (*input).entity = entity;
-                }
-                return input;
-            }
-            XmlEntityType::XmlInternalGeneralEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-                xml_err_internal!(ctxt, "Internal entity {} without content !\n", name);
-            }
-            XmlEntityType::XmlInternalParameterEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-                xml_err_internal!(
-                    ctxt,
-                    "Internal parameter entity {} without content !\n",
-                    name
-                );
-            }
-            XmlEntityType::XmlInternalPredefinedEntity => {
-                let name = CStr::from_ptr((*entity).name.load(Ordering::Relaxed) as *const i8)
-                    .to_string_lossy();
-                xml_err_internal!(ctxt, "Predefined entity {} without content !\n", name);
-            }
-            _ => {
-                unreachable!()
-            }
-        }
-        return null_mut();
-    }
-    input = xml_new_input_stream(ctxt);
-    if input.is_null() {
-        return null_mut();
-    }
-    if !(*entity).uri.load(Ordering::Relaxed).is_null() {
-        (*input).filename = Some(
-            CStr::from_ptr((*entity).uri.load(Ordering::Relaxed) as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-    }
-    (*input).base = (*entity).content.load(Ordering::Relaxed) as _;
-    if (*entity).length == 0 {
-        (*entity).length = xml_strlen((*entity).content.load(Ordering::Relaxed) as _);
-    }
-    (*input).cur = (*entity).content.load(Ordering::Relaxed);
-    (*input).length = (*entity).length;
-    (*input).end = (*entity)
-        .content
-        .load(Ordering::Relaxed)
-        .add((*input).length as usize);
-    (*input).entity = entity;
-    input
-}
-
-/// Free up an input stream.
-#[doc(alias = "xmlFreeInputStream")]
-pub unsafe fn xml_free_input_stream(input: XmlParserInputPtr) {
-    if input.is_null() {
-        return;
-    }
-
-    (*input).filename = None;
-    (*input).directory = None;
-    (*input).encoding = None;
-    (*input).version = None;
-    if !(*input).base.is_null() {
-        if let Some(free) = (*input).free {
-            free((*input).base as _);
-        }
-    }
-    let _ = (*input).buf.take();
-    xml_free(input as _);
-}
-
-/// Create a new input stream based on a file or an URL.
-///
-/// Returns the new input stream or NULL in case of error
-#[doc(alias = "xmlNewInputFromFile")]
-pub unsafe fn xml_new_input_from_file(
-    ctxt: XmlParserCtxtPtr,
-    filename: *const c_char,
-) -> XmlParserInputPtr {
-    let mut input_stream: XmlParserInputPtr;
-
-    if get_parser_debug_entities() != 0 {
-        generic_error!(
-            "new input from file: {}\n",
-            CStr::from_ptr(filename).to_string_lossy()
-        );
-    }
-    if ctxt.is_null() {
-        return null_mut();
-    }
-
-    if filename.is_null() {
-        __xml_loader_err!(ctxt, "failed to load external entity: NULL filename \n");
-        return null_mut();
-    }
-    let Some(buf) = XmlParserInputBuffer::from_uri(
-        CStr::from_ptr(filename).to_string_lossy().as_ref(),
-        XmlCharEncoding::None,
-    ) else {
-        if filename.is_null() {
-            __xml_loader_err!(ctxt, "failed to load external entity: NULL filename \n");
-        } else {
-            let filename = CStr::from_ptr(filename).to_string_lossy();
-            __xml_loader_err!(ctxt, "failed to load external entity \"{}\"\n", filename);
-        }
-        return null_mut();
-    };
-
-    input_stream = xml_new_input_stream(ctxt);
-    if input_stream.is_null() {
-        // xml_free_parser_input_buffer(buf);
-        return null_mut();
-    }
-
-    (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
-    input_stream = xml_check_http_input(ctxt, input_stream);
-    if input_stream.is_null() {
-        return null_mut();
-    }
-
-    let uri = if let Some(filename) = (*input_stream).filename.as_deref() {
-        let filename = CString::new(filename).unwrap();
-        xml_strdup(filename.as_ptr() as *mut XmlChar)
-    } else {
-        xml_strdup(filename as *mut XmlChar)
-    };
-    let directory =
-        xml_parser_get_directory(CStr::from_ptr(uri as *const i8).to_string_lossy().as_ref());
-    {
-        let canonic = xml_canonic_path(uri as *const XmlChar);
-        if !canonic.is_null() {
-            (*input_stream).filename = Some(
-                CStr::from_ptr(canonic as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(canonic as _);
-        }
-    }
-    if !uri.is_null() {
-        xml_free(uri as _);
-    }
-    if let Some(directory) = directory.as_deref() {
-        (*input_stream).directory = Some(directory.to_string_lossy().into_owned());
-    } else {
-        (*input_stream).directory = None;
-    }
-    (*input_stream).reset_base();
-
-    if (*ctxt).directory.is_none() {
-        if let Some(directory) = directory {
-            (*ctxt).directory = Some(directory.to_string_lossy().into_owned());
-        }
-    }
-    input_stream
-}
-
-/// Create a new input stream structure.
-///
-/// Returns the new input stream or NULL
-#[doc(alias = "xmlNewInputStream")]
-pub unsafe fn xml_new_input_stream(ctxt: XmlParserCtxtPtr) -> XmlParserInputPtr {
-    let input: XmlParserInputPtr = xml_malloc(size_of::<XmlParserInput>()) as XmlParserInputPtr;
-    if input.is_null() {
-        xml_err_memory(ctxt, Some("couldn't allocate a new input stream\n"));
-        return null_mut();
-    }
-    memset(input as _, 0, size_of::<XmlParserInputBuffer>());
-    std::ptr::write(&mut *input, XmlParserInput::default());
-    (*input).line = 1;
-    (*input).col = 1;
-    (*input).standalone = -1;
-    std::ptr::write(&raw mut (*input).buf, None);
-
-    // If the context is NULL the id cannot be initialized, but that
-    // should not happen while parsing which is the situation where
-    // the id is actually needed.
-    if !ctxt.is_null() {
-        if (*input).id == INT_MAX {
-            xml_err_memory(ctxt, Some("Input ID overflow\n"));
-            return null_mut();
-        }
-        (*input).id = (*ctxt).input_id;
-        (*ctxt).input_id += 1;
-    }
-
-    input
-}
 
 macro_rules! CUR_SCHAR {
     ($ctxt:expr, $s:expr, $l:expr) => {
@@ -5183,7 +4908,12 @@ pub(crate) const LINE_LEN: usize = 80;
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{
+        globals::reset_last_error,
+        libxml::xmlmemory::xml_mem_blocks,
+        parser::{xml_new_input_from_file, xml_new_input_stream, xml_new_string_input_stream},
+        test_util::*,
+    };
 
     use super::*;
 

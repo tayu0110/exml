@@ -53,7 +53,6 @@ use crate::{
             StartElementNsSAX2Func, StartElementSAXFunc, XmlParserInputState, XmlParserMode,
             XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
-        parser_internals::xml_new_input_stream,
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
@@ -3393,7 +3392,7 @@ pub unsafe fn xml_text_reader_setup(
         encoding::{find_encoding_handler, XmlCharEncoding},
         generic_error,
         libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
-        parser::XmlParserInputPtr,
+        parser::{xml_new_input_stream, XmlParserInputPtr},
     };
 
     if reader.is_null() {

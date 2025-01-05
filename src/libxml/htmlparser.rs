@@ -49,8 +49,7 @@ use crate::{
             XmlSAXHandlerPtr,
         },
         parser_internals::{
-            xml_free_input_stream, xml_new_input_stream, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
-            XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
+            INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
         uri::xml_canonic_path,
@@ -60,8 +59,8 @@ use crate::{
         },
     },
     parser::{
-        xml_free_parser_ctxt, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr,
-        XmlParserNodeInfo,
+        xml_free_input_stream, xml_free_parser_ctxt, xml_new_input_stream, XmlParserCtxt,
+        XmlParserCtxtPtr, XmlParserInput, XmlParserInputPtr, XmlParserNodeInfo,
     },
     tree::{
         xml_create_int_subset, xml_free_doc, NodeCommon, XmlDocPtr, XmlDtdPtr, XmlElementType,
