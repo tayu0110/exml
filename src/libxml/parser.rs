@@ -97,10 +97,10 @@ use crate::{
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
             xml_parse_encoding_decl, xml_parse_entity_ref, xml_parse_entity_value,
             xml_parse_external_subset, xml_parse_misc, xml_parse_name, xml_parse_nmtoken,
-            xml_parse_pe_reference, xml_parse_pi, xml_parse_reference, xml_parse_sddecl,
-            xml_parse_start_tag, xml_parse_system_literal, xml_parse_version_info, INPUT_CHUNK,
-            XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
-            XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
+            xml_parse_pe_reference, xml_parse_pi, xml_parse_reference, xml_parse_start_tag,
+            xml_parse_system_literal, xml_parse_version_info, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
+            XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF,
+            XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
@@ -114,13 +114,14 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
     parser::{
-        __xml_err_encoding, parse_char_ref, parse_name, xml_create_entity_parser_ctxt_internal,
-        xml_create_memory_parser_ctxt, xml_err_attribute_dup, xml_err_memory, xml_err_msg_str,
-        xml_fatal_err, xml_fatal_err_msg, xml_fatal_err_msg_int, xml_fatal_err_msg_str,
-        xml_fatal_err_msg_str_int_str, xml_free_input_stream, xml_free_parser_ctxt,
-        xml_new_entity_input_stream, xml_new_input_stream, xml_new_sax_parser_ctxt, xml_ns_err,
-        xml_ns_warn, xml_validity_error, xml_warning_msg, XmlParserCharValid, XmlParserCtxt,
-        XmlParserCtxtPtr, XmlParserInputPtr, XmlParserNodeInfo,
+        __xml_err_encoding, parse_char_ref, parse_name, parse_xmldecl,
+        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
+        xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
+        xml_free_input_stream, xml_free_parser_ctxt, xml_new_entity_input_stream,
+        xml_new_input_stream, xml_new_sax_parser_ctxt, xml_ns_err, xml_ns_warn, xml_validity_error,
+        xml_warning_msg, XmlParserCharValid, XmlParserCtxt, XmlParserCtxtPtr, XmlParserInputPtr,
+        XmlParserNodeInfo,
     },
     tree::{
         xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
@@ -1184,7 +1185,7 @@ pub unsafe fn xml_parse_document(ctxt: XmlParserCtxtPtr) -> i32 {
         && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
     {
         // Note that we will switch encoding on the fly.
-        xml_parse_xmldecl(ctxt);
+        parse_xmldecl(&mut *ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32
             || matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
         {
@@ -1364,7 +1365,7 @@ pub unsafe fn xml_parse_ext_parsed_ent(ctxt: XmlParserCtxtPtr) -> i32 {
         && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
     {
         // Note that we will switch encoding on the fly.
-        xml_parse_xmldecl(ctxt);
+        parse_xmldecl(&mut *ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
             // The XML REC instructs us to stop parsing right here
             return -1;
@@ -6415,7 +6416,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             && xml_is_blank_char(*(*(*ctxt).input).cur.add(5) as u32)
                         {
                             ret += 5;
-                            xml_parse_xmldecl(ctxt);
+                            parse_xmldecl(&mut *ctxt);
                             if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
                                 // The XML REC instructs us to stop parsing right here
                                 (*ctxt).halt();
@@ -9323,123 +9324,6 @@ pub(crate) unsafe fn xml_parse_enc_name(ctxt: XmlParserCtxtPtr) -> Option<String
     }
     xml_fatal_err(ctxt, XmlParserErrors::XmlErrEncodingName, None);
     None
-}
-
-/// parse an XML declaration header
-///
-/// `[23] XMLDecl ::= '<?xml' VersionInfo EncodingDecl? SDDecl? S? '?>'`
-#[doc(alias = "xmlParseXMLDecl")]
-pub(crate) unsafe fn xml_parse_xmldecl(ctxt: XmlParserCtxtPtr) {
-    // This value for standalone indicates that the document has an
-    // XML declaration but it does not have a standalone attribute.
-    // It will be overwritten later if a standalone attribute is found.
-    (*(*ctxt).input).standalone = -2;
-
-    // We know that '<?xml' is here.
-    (*ctxt).advance(5);
-
-    if !xml_is_blank_char((*ctxt).current_byte() as u32) {
-        xml_fatal_err_msg(
-            ctxt,
-            XmlParserErrors::XmlErrSpaceRequired,
-            "Blank needed after '<?xml'\n",
-        );
-    }
-    (*ctxt).skip_blanks();
-
-    // We must have the VersionInfo here.
-    let version = xml_parse_version_info(ctxt);
-    if let Some(version) = version {
-        if version != XML_DEFAULT_VERSION {
-            // Changed here for XML-1.0 5th edition
-            if (*ctxt).options & XmlParserOption::XmlParseOld10 as i32 != 0 {
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrUnknownVersion,
-                    "Unsupported version '{}'\n",
-                    version
-                );
-            } else if version.starts_with("1.") {
-                xml_warning_msg!(
-                    ctxt,
-                    XmlParserErrors::XmlWarUnknownVersion,
-                    "Unsupported version '{}'\n",
-                    version
-                );
-            } else {
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrUnknownVersion,
-                    "Unsupported version '{}'\n",
-                    version
-                );
-            }
-        }
-        (*ctxt).version = Some(version);
-    } else {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrVersionMissing, None);
-    }
-
-    // We may have the encoding declaration
-    if !xml_is_blank_char((*ctxt).current_byte() as u32) {
-        if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
-            (*ctxt).advance(2);
-            return;
-        }
-        xml_fatal_err_msg(
-            ctxt,
-            XmlParserErrors::XmlErrSpaceRequired,
-            "Blank needed here\n",
-        );
-    }
-    xml_parse_encoding_decl(ctxt);
-    if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32
-        || matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF)
-    {
-        // The XML REC instructs us to stop parsing right here
-        return;
-    }
-
-    // We may have the standalone status.
-    if (*(*ctxt).input).encoding.is_some() && !xml_is_blank_char((*ctxt).current_byte() as u32) {
-        if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
-            (*ctxt).advance(2);
-            return;
-        }
-        xml_fatal_err_msg(
-            ctxt,
-            XmlParserErrors::XmlErrSpaceRequired,
-            "Blank needed here\n",
-        );
-    }
-
-    // We can grow the input buffer freely at that point
-    (*ctxt).grow();
-
-    (*ctxt).skip_blanks();
-    (*(*ctxt).input).standalone = xml_parse_sddecl(ctxt);
-
-    (*ctxt).skip_blanks();
-    if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
-        (*ctxt).advance(2);
-    } else if (*ctxt).current_byte() == b'>' {
-        /* Deprecated old WD ... */
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, None);
-        (*ctxt).skip_char();
-    } else {
-        let mut c: i32;
-
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, None);
-        while {
-            c = (*ctxt).current_byte() as _;
-            c != 0
-        } {
-            (*ctxt).skip_char();
-            if c == b'>' as i32 {
-                break;
-            }
-        }
-    }
 }
 
 /// Parse an XML declaration header for external entities
