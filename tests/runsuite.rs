@@ -142,7 +142,7 @@ unsafe fn test_external_entity_loader(
         if strcmp(TEST_ENTITIES_NAME[i], url.as_ptr()) == 0 {
             ret = xml_new_string_input_stream(
                 (!ctxt.is_null()).then(|| &mut *ctxt),
-                TEST_ENTITIES_VALUE[i] as *const XmlChar,
+                &CStr::from_ptr(TEST_ENTITIES_VALUE[i]).to_string_lossy(),
             );
             if !ret.is_null() {
                 (*ret).filename = Some(

@@ -376,29 +376,17 @@ pub unsafe fn xml_new_input_stream(ctxt: Option<&mut XmlParserCtxt>) -> XmlParse
 #[doc(alias = "xmlNewStringInputStream")]
 pub unsafe fn xml_new_string_input_stream(
     mut ctxt: Option<&mut XmlParserCtxt>,
-    buffer: *const u8,
+    buffer: &str,
 ) -> XmlParserInputPtr {
     let ctxt_ptr = ctxt
         .as_deref_mut()
         .map_or(null_mut(), |ctxt| ctxt as *mut XmlParserCtxt);
-    if buffer.is_null() {
-        xml_err_internal!(ctxt_ptr, "xmlNewStringInputStream string = NULL\n");
-        return null_mut();
-    }
     if get_parser_debug_entities() != 0 {
-        generic_error!(
-            "new fixed input: {}\n",
-            CStr::from_ptr(buffer as *const i8)
-                .to_string_lossy()
-                .chars()
-                .take(30)
-                .collect::<String>()
-        );
+        generic_error!("new fixed input: {buffer}\n");
     }
-    let Some(buf) = XmlParserInputBuffer::from_memory(
-        CStr::from_ptr(buffer as *const i8).to_bytes().to_vec(),
-        XmlCharEncoding::None,
-    ) else {
+    let Some(buf) =
+        XmlParserInputBuffer::from_memory(buffer.as_bytes().to_vec(), XmlCharEncoding::None)
+    else {
         xml_err_memory(ctxt_ptr, None);
         return null_mut();
     };
