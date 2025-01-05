@@ -3516,7 +3516,7 @@ pub unsafe fn xml_text_reader_setup(
 
             xml_ctxt_reset((*reader).ctxt);
             let buf = XmlParserInputBuffer::new(enc);
-            let input_stream: XmlParserInputPtr = xml_new_input_stream((*reader).ctxt);
+            let input_stream: XmlParserInputPtr = xml_new_input_stream(Some(&mut *(*reader).ctxt));
             if input_stream.is_null() {
                 return -1;
             }

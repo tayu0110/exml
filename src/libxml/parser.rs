@@ -2703,7 +2703,7 @@ pub(crate) unsafe fn xml_setup_parser_for_buffer(
         return;
     }
 
-    let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
+    let input: XmlParserInputPtr = xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
     if input.is_null() {
         xml_err_memory(null_mut(), Some("parsing new buffer: out of memory\n"));
         xml_clear_parser_ctxt(ctxt);
@@ -2779,7 +2779,8 @@ pub unsafe fn xml_create_push_parser_ctxt(
         (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
-    let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
+    let input_stream: XmlParserInputPtr =
+        xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();
@@ -7233,7 +7234,8 @@ pub unsafe fn xml_new_io_input_stream(
     if get_parser_debug_entities() != 0 {
         generic_error!("new input from I/O\n");
     }
-    let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
+    let input_stream: XmlParserInputPtr =
+        xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
     if input_stream.is_null() {
         return null_mut();
     }
@@ -7484,7 +7486,8 @@ pub unsafe fn xml_ctxt_reset_push(
         (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
-    let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
+    let input_stream: XmlParserInputPtr =
+        xml_new_input_stream((!ctxt.is_null()).then(|| &mut *ctxt));
     if input_stream.is_null() {
         return 1;
     }

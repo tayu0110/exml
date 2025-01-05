@@ -69,7 +69,7 @@ fn check_test_file(filename: &str) -> bool {
     }
 }
 
-unsafe extern "C" fn compose_dir(dir: *const XmlChar, path: *const XmlChar) -> *mut XmlChar {
+unsafe fn compose_dir(dir: *const XmlChar, path: *const XmlChar) -> *mut XmlChar {
     let mut buf: [c_char; 500] = [0; 500];
 
     if dir.is_null() {
@@ -97,7 +97,7 @@ static mut NB_UNIMPLEMENTED: c_int = 0;
 static mut NB_LEAKS: c_int = 0;
 static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
 
-unsafe extern "C" fn fatal_error() -> c_int {
+unsafe fn fatal_error() -> c_int {
     panic!("Exitting tests on fatal error");
 }
 
@@ -105,7 +105,7 @@ const MAX_ENTITIES: usize = 20;
 static mut TEST_ENTITIES_NAME: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
 static mut TEST_ENTITIES_VALUE: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
 static mut NB_ENTITIES: usize = 0;
-unsafe extern "C" fn reset_entities() {
+unsafe fn reset_entities() {
     for i in 0..NB_ENTITIES {
         if !TEST_ENTITIES_NAME[i].is_null() {
             xml_free(TEST_ENTITIES_NAME[i] as _);
@@ -116,7 +116,7 @@ unsafe extern "C" fn reset_entities() {
     }
     NB_ENTITIES = 0;
 }
-unsafe extern "C" fn add_entity(name: *mut c_char, content: *mut c_char) -> c_int {
+unsafe fn add_entity(name: *mut c_char, content: *mut c_char) -> c_int {
     if NB_ENTITIES >= MAX_ENTITIES {
         eprintln!("Too many entities defined");
         return -1;
@@ -140,7 +140,10 @@ unsafe fn test_external_entity_loader(
     for i in 0..NB_ENTITIES {
         let url = CString::new(url.unwrap()).unwrap();
         if strcmp(TEST_ENTITIES_NAME[i], url.as_ptr()) == 0 {
-            ret = xml_new_string_input_stream(ctxt, TEST_ENTITIES_VALUE[i] as *const XmlChar);
+            ret = xml_new_string_input_stream(
+                (!ctxt.is_null()).then(|| &mut *ctxt),
+                TEST_ENTITIES_VALUE[i] as *const XmlChar,
+            );
             if !ret.is_null() {
                 (*ret).filename = Some(
                     CStr::from_ptr(TEST_ENTITIES_NAME[i])
@@ -209,7 +212,7 @@ fn test_error_handler(_ctx: Option<GenericErrorContext>, msg: &str) {
 
 static CTXT_XPATH: AtomicPtr<XmlXPathContext> = AtomicPtr::new(null_mut());
 
-unsafe extern "C" fn initialize_libxml2() {
+unsafe fn initialize_libxml2() {
     set_get_warnings_default_value(0);
     set_pedantic_parser_default_value(0);
 
@@ -222,18 +225,16 @@ unsafe extern "C" fn initialize_libxml2() {
     xml_init_parser();
     xml_set_external_entity_loader(test_external_entity_loader);
     CTXT_XPATH.store(xml_xpath_new_context(null_mut()), Ordering::Relaxed);
-    /*
-     * Deactivate the cache if created; otherwise we have to create/free it
-     * for every test, since it will confuse the memory leak detection.
-     * Note that normally this need not be done, since the cache is not
-     * created until set explicitly with xmlXPathContextSetCache();
-     * but for test purposes it is sometimes useful to activate the
-     * cache by default for the whole library.
-     */
+    // Deactivate the cache if created; otherwise we have to create/free it
+    // for every test, since it will confuse the memory leak detection.
+    // Note that normally this need not be done, since the cache is not
+    // created until set explicitly with xmlXPathContextSetCache();
+    // but for test purposes it is sometimes useful to activate the
+    // cache by default for the whole library.
     if !(*CTXT_XPATH.load(Ordering::Relaxed)).cache.is_null() {
         xml_xpath_context_set_cache(CTXT_XPATH.load(Ordering::Relaxed), 0, -1, 0);
     }
-    /* used as default namespace in xstc tests */
+    // used as default namespace in xstc tests
     xml_xpath_register_ns(
         CTXT_XPATH.load(Ordering::Relaxed),
         c"ts".as_ptr() as _,
@@ -252,7 +253,7 @@ unsafe extern "C" fn initialize_libxml2() {
     }
 }
 
-unsafe extern "C" fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodePtr {
+unsafe fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodePtr {
     let mut ret: XmlNodePtr = null_mut();
 
     if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
@@ -284,7 +285,7 @@ unsafe extern "C" fn get_next(cur: XmlNodePtr, xpath: *const c_char) -> XmlNodeP
     ret
 }
 
-unsafe extern "C" fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut XmlChar {
+unsafe fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut XmlChar {
     let mut ret: *mut XmlChar = null_mut();
 
     if cur.is_null() || (*cur).doc.is_null() || xpath.is_null() {
@@ -315,10 +316,7 @@ unsafe extern "C" fn get_string(cur: XmlNodePtr, xpath: *const c_char) -> *mut X
     ret
 }
 
-unsafe extern "C" fn xsd_incorrect_test_case(
-    logfile: &mut Option<File>,
-    mut cur: XmlNodePtr,
-) -> c_int {
+unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
     let mut ret: c_int = 0;
 
     cur = get_next(cur, c"./incorrect[1]".as_ptr() as _);
@@ -338,10 +336,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
 
     let memt: c_int = xml_mem_used();
     EXTRA_MEMORY_FROM_RESOLVER = 0;
-    /*
-     * dump the schemas to a buffer, then reparse it and compile the schemas
-     */
-    // let buf: XmlBufferPtr = xml_buffer_create();
+    // dump the schemas to a buffer, then reparse it and compile the schemas
     let buf = xml_buf_create();
     if buf.is_null() {
         eprintln!("out of memory !");
@@ -371,7 +366,6 @@ unsafe extern "C" fn xsd_incorrect_test_case(
     }
 
     if !buf.is_null() {
-        // xml_buffer_free(buf);
         xml_buf_free(buf);
     }
     if !rng.is_null() {
@@ -390,7 +384,7 @@ unsafe extern "C" fn xsd_incorrect_test_case(
     ret
 }
 
-unsafe extern "C" fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
+unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
     let mut test: XmlNodePtr;
     let mut name: *mut XmlChar;
     let mut content: *mut XmlChar;
@@ -427,12 +421,11 @@ unsafe extern "C" fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar
         tst = get_next(tst, c"following-sibling::resource[1]".as_ptr() as _);
     }
     if !buf.is_null() {
-        // xml_buffer_free(buf);
         xml_buf_free(buf);
     }
 }
 
-unsafe extern "C" fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
+unsafe fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
     let mut test: XmlNodePtr;
 
     let name: *mut XmlChar = get_string(tst, c"string(@name)".as_ptr() as _);
@@ -444,7 +437,7 @@ unsafe extern "C" fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
     if res.is_null() {
         return;
     }
-    /* Now process resources and subdir recursively */
+    // Now process resources and subdir recursively
     test = get_next(tst, c"./resource[1]".as_ptr() as _);
     if !test.is_null() {
         install_resources(test, res);
@@ -457,7 +450,7 @@ unsafe extern "C" fn install_dirs(tst: XmlNodePtr, base: *const XmlChar) {
     xml_free(res as _);
 }
 
-unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
+unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
     let mut test: XmlNodePtr;
     let mut tmp: XmlNodePtr;
     let mut doc: XmlDocPtr;
@@ -495,9 +488,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
 
     memt = xml_mem_used();
     EXTRA_MEMORY_FROM_RESOLVER = 0;
-    /*
-     * dump the schemas to a buffer, then reparse it and compile the schemas
-     */
+    // dump the schemas to a buffer, then reparse it and compile the schemas
     let buf = xml_buf_create();
     if buf.is_null() {
         eprintln!("out of memory !");
@@ -714,7 +705,7 @@ unsafe extern "C" fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) 
     ret
 }
 
-unsafe extern "C" fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn xsd_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
     if VERBOSE != 0 {
         let doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
 
@@ -775,7 +766,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     ret
 }
 
-unsafe extern "C" fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
+unsafe fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNodePtr) -> c_int {
     if VERBOSE != 0 {
         let mut doc: *mut XmlChar = get_string(cur, c"string(documentation)".as_ptr() as _);
 
@@ -799,7 +790,7 @@ unsafe extern "C" fn rng_test_suite(logfile: &mut Option<File>, mut cur: XmlNode
     0
 }
 
-unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
+unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
     let mut cur: XmlNodePtr;
     let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
@@ -885,7 +876,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
     ret
 }
 
-unsafe extern "C" fn xstc_test_instance(
+unsafe fn xstc_test_instance(
     logfile: &mut Option<File>,
     cur: XmlNodePtr,
     schemas: XmlSchemaPtr,
@@ -1048,7 +1039,7 @@ unsafe extern "C" fn xstc_test_instance(
     ret
 }
 
-unsafe extern "C" fn xstc_test_group(
+unsafe fn xstc_test_group(
     logfile: &mut Option<File>,
     cur: XmlNodePtr,
     base: *const c_char,
@@ -1152,10 +1143,8 @@ unsafe extern "C" fn xstc_test_group(
                         if !schemas.is_null() {
                             xstc_test_instance(logfile, instance, schemas, path, base);
                         } else {
-                            /*
-                             * We'll automatically mark the instances as failed
-                             * if the schema was broken.
-                             */
+                            // We'll automatically mark the instances as failed
+                            // if the schema was broken.
                             NB_ERRORS += 1;
                         }
                         instance = get_next(

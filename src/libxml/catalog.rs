@@ -3097,7 +3097,7 @@ pub unsafe fn xml_parse_catalog_file(filename: &str) -> XmlDocPtr {
         return null_mut();
     };
 
-    let input_stream: XmlParserInputPtr = xml_new_input_stream(ctxt);
+    let input_stream: XmlParserInputPtr = xml_new_input_stream(Some(&mut *ctxt));
     if input_stream.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();

@@ -1913,7 +1913,7 @@ pub unsafe fn xml_create_memory_parser_ctxt(buffer: Vec<u8>) -> XmlParserCtxtPtr
         return null_mut();
     };
 
-    let input: XmlParserInputPtr = xml_new_input_stream(ctxt);
+    let input: XmlParserInputPtr = xml_new_input_stream(Some(&mut *ctxt));
     if input.is_null() {
         xml_free_parser_ctxt(ctxt);
         return null_mut();

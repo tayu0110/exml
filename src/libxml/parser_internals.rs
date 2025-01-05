@@ -4484,25 +4484,27 @@ pub(crate) unsafe fn xml_string_current_char(
     *cur as _
 }
 
-/// `[69] PEReference ::= '%' Name ';'`
+/// ```text
+/// [69] PEReference ::= '%' Name ';'
 ///
-/// `[ WFC: No Recursion ]`
+/// [ WFC: No Recursion ]
 /// A parsed entity must not contain a recursive reference to itself, either directly or indirectly.
 ///
-/// `[ WFC: Entity Declared ]`
+/// [ WFC: Entity Declared ]
 /// In a document without any DTD, a document with only an internal DTD
 /// subset which contains no parameter entity references, or a document
 /// with "standalone='yes'", ...  ... The declaration of a parameter
 /// entity must precede any reference to it...
 ///
-/// `[ VC: Entity Declared ]`
+/// [ VC: Entity Declared ]
 /// In a document with an external subset or external parameter entities
 /// with "standalone='no'", ...  ... The declaration of a parameter entity
 /// must precede any reference to it...
 ///
-/// `[ WFC: In DTD ]`
+/// [ WFC: In DTD ]
 /// Parameter-entity references may only appear in the DTD.
 /// NOTE: misleading but this is handled.
+/// ```
 ///
 /// A PEReference may have been detected in the current input stream
 /// the handling is done accordingly to
@@ -4582,12 +4584,14 @@ pub(crate) unsafe fn xml_parser_handle_pereference(ctxt: XmlParserCtxtPtr) {
 /// # Note
 /// This is somewhat deprecated, those productions were removed from the XML Second edition.
 ///
-/// `[33] LanguageID ::= Langcode ('-' Subcode)*`  
-/// `[34] Langcode ::= ISO639Code |  IanaCode |  UserCode`  
-/// `[35] ISO639Code ::= ([a-z] | [A-Z]) ([a-z] | [A-Z])`  
-/// `[36] IanaCode ::= ('i' | 'I') '-' ([a-z] | [A-Z])+`  
-/// `[37] UserCode ::= ('x' | 'X') '-' ([a-z] | [A-Z])+`  
-/// `[38] Subcode ::= ([a-z] | [A-Z])+`
+/// ```text
+/// [33] LanguageID ::= Langcode ('-' Subcode)*
+/// [34] Langcode ::= ISO639Code |  IanaCode |  UserCode
+/// [35] ISO639Code ::= ([a-z] | [A-Z]) ([a-z] | [A-Z])
+/// [36] IanaCode ::= ('i' | 'I') '-' ([a-z] | [A-Z])+
+/// [37] UserCode ::= ('x' | 'X') '-' ([a-z] | [A-Z])+
+/// [38] Subcode ::= ([a-z] | [A-Z])+
+/// ```
 ///
 /// The current REC reference the successors of RFC 1766, currently 5646
 ///
@@ -4909,10 +4913,8 @@ pub(crate) const LINE_LEN: usize = 80;
 #[cfg(test)]
 mod tests {
     use crate::{
-        globals::reset_last_error,
-        libxml::xmlmemory::xml_mem_blocks,
-        parser::{xml_new_input_from_file, xml_new_input_stream, xml_new_string_input_stream},
-        test_util::*,
+        globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks,
+        parser::xml_new_input_from_file, test_util::*,
     };
 
     use super::*;
@@ -5078,66 +5080,6 @@ mod tests {
                         );
                         eprint!(" {}", n_ctxt);
                         eprintln!(" {}", n_filename);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_input_stream() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                let ret_val = xml_new_input_stream(ctxt);
-                desret_xml_parser_input_ptr(ret_val);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNewInputStream",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlNewInputStream()");
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_new_string_input_stream() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_buffer in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                    let buffer = gen_const_xml_char_ptr(n_buffer, 1);
-
-                    let ret_val = xml_new_string_input_stream(ctxt, buffer);
-                    desret_xml_parser_input_ptr(ret_val);
-                    des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_const_xml_char_ptr(n_buffer, buffer, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlNewStringInputStream",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlNewStringInputStream()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_buffer);
                     }
                 }
             }
