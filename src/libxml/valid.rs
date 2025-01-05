@@ -52,9 +52,9 @@ use crate::{
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
-            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_copy, xml_hash_create_dict,
-            xml_hash_free, xml_hash_lookup, xml_hash_lookup2, xml_hash_remove_entry,
-            xml_hash_remove_entry2, xml_hash_scan, xml_hash_update_entry, XmlHashTable,
+            xml_hash_add_entry, xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup,
+            xml_hash_lookup2, xml_hash_remove_entry, xml_hash_remove_entry2, xml_hash_scan,
+            xml_hash_update_entry, XmlHashTable,
         },
         list::{
             xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
@@ -80,7 +80,8 @@ use crate::{
 };
 
 use super::{
-    chvalid::xml_is_blank_char, dict::XmlDictRef, hash::CVoidWrapper,
+    chvalid::xml_is_blank_char,
+    hash::{xml_hash_create, CVoidWrapper},
     parser_internals::XML_VCTXT_USE_PCTXT,
 };
 
@@ -353,12 +354,7 @@ pub unsafe fn xml_add_notation_decl(
     // Create the Notation table if needed.
     table = (*dtd).notations as XmlNotationTablePtr;
     if table.is_null() {
-        let mut dict: XmlDictPtr = null_mut();
-        if !(*dtd).doc.is_null() {
-            dict = (*(*dtd).doc).dict;
-        }
-
-        (*dtd).notations = xml_hash_create_dict(0, dict) as _;
+        (*dtd).notations = xml_hash_create(0) as _;
         table = (*dtd).notations as _;
     }
     if table.is_null() {
@@ -1051,12 +1047,7 @@ pub unsafe fn xml_add_element_decl(
     // Create the Element table if needed.
     table = (*dtd).elements as XmlElementTablePtr;
     if table.is_null() {
-        let mut dict: XmlDictPtr = null_mut();
-
-        if !(*dtd).doc.is_null() {
-            dict = (*(*dtd).doc).dict;
-        }
-        table = xml_hash_create_dict(0, dict);
+        table = xml_hash_create(0);
         (*dtd).elements = table as *mut c_void;
     }
     if table.is_null() {
@@ -1966,7 +1957,7 @@ unsafe extern "C" fn xml_free_attribute(attr: XmlAttributePtr) {
 ///
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdElementDesc2")]
-unsafe extern "C" fn xml_get_dtd_element_desc2(
+unsafe fn xml_get_dtd_element_desc2(
     ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
     mut name: *const XmlChar,
@@ -1981,21 +1972,13 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
         return null_mut();
     }
     if (*dtd).elements.is_null() {
-        let mut dict: XmlDictPtr = null_mut();
-
-        if !(*dtd).doc.is_null() {
-            dict = (*(*dtd).doc).dict;
-        }
-
         if create == 0 {
             return null_mut();
         }
-        /*
-         * Create the Element table if needed.
-         */
+        // Create the Element table if needed.
         table = (*dtd).elements as XmlElementTablePtr;
         if table.is_null() {
-            table = xml_hash_create_dict(0, dict);
+            table = xml_hash_create(0);
             (*dtd).elements = table as *mut c_void;
         }
         if table.is_null() {
@@ -2024,13 +2007,10 @@ unsafe extern "C" fn xml_get_dtd_element_desc2(
             }
             return cur;
         }
-        memset(cur as _, 0, size_of::<XmlElement>());
         std::ptr::write(&mut *cur, XmlElement::default());
         (*cur).typ = XmlElementType::XmlElementDecl;
 
-        /*
-         * fill the structure.
-         */
+        // fill the structure.
         (*cur).name = Some(Box::new(name.to_string_lossy().into_owned()));
         (*cur).prefix = (!prefix.is_null()).then(|| {
             CStr::from_ptr(prefix as *const i8)
@@ -2181,13 +2161,8 @@ pub unsafe fn xml_add_attribute_decl(
         && !(*(*dtd).doc).int_subset.is_null()
     {
         if let Some(attributes) = (*(*(*dtd).doc).int_subset).attributes {
-            let ns = ns.map(|ns| CString::new(ns).unwrap());
             ret = attributes
-                .lookup3(
-                    CString::new(name).unwrap().as_c_str(),
-                    ns.as_deref(),
-                    Some(CString::new(elem).unwrap().as_c_str()),
-                )
+                .lookup3(name, ns, Some(elem))
                 .copied()
                 .unwrap_or(null_mut());
             if !ret.is_null() {
@@ -2201,8 +2176,7 @@ pub unsafe fn xml_add_attribute_decl(
     let mut table = if let Some(table) = (*dtd).attributes {
         table
     } else {
-        let dict = XmlDictRef::from_raw(dict);
-        let table = XmlHashTable::with_capacity_dict(0, dict);
+        let table = XmlHashTable::with_capacity(0);
         let Some(table) = XmlHashTableRef::from_table(table) else {
             xml_verr_memory(ctxt, Some("xmlAddAttributeDecl: Table creation failed!\n"));
             xml_free_enumeration(tree as _);
@@ -2267,15 +2241,11 @@ pub unsafe fn xml_add_attribute_decl(
 
     // Validity Check:
     // Search the DTD for previous declarations of the ATTLIST
-    let prefix = (*ret).prefix.as_deref().map(|p| CString::new(p).unwrap());
-    let ret_elem = (*ret).elem.as_deref().map(|e| CString::new(e).unwrap());
     if table
         .add_entry3(
-            CString::new((*ret).name().unwrap().as_ref())
-                .unwrap()
-                .as_c_str(),
-            prefix.as_deref(),
-            ret_elem.as_deref(),
+            (*ret).name().unwrap().as_ref(),
+            (*ret).prefix.as_deref(),
+            (*ret).elem.as_deref(),
             ret as _,
         )
         .is_err()
@@ -2605,7 +2575,7 @@ unsafe extern "C" fn xml_free_id(id: XmlIDPtr) {
 ///
 /// Returns null_mut() if not, otherwise the new xmlIDPtr
 #[doc(alias = "xmlAddID")]
-pub unsafe extern "C" fn xml_add_id(
+pub unsafe fn xml_add_id(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     value: *const XmlChar,
@@ -2623,12 +2593,10 @@ pub unsafe extern "C" fn xml_add_id(
         return null_mut();
     }
 
-    /*
-     * Create the ID table if needed.
-     */
+    // Create the ID table if needed.
     table = (*doc).ids as XmlIDTablePtr;
     if table.is_null() {
-        (*doc).ids = xml_hash_create_dict(0, (*doc).dict) as _;
+        (*doc).ids = xml_hash_create(0) as _;
         table = (*doc).ids as _;
     }
     if table.is_null() {
@@ -2913,7 +2881,7 @@ extern "C" fn xml_dummy_compare(_data0: *const c_void, _data1: *const c_void) ->
 ///
 /// Returns null_mut() if not, otherwise the new xmlRefPtr
 #[doc(alias = "xmlAddRef")]
-pub(crate) unsafe extern "C" fn xml_add_ref(
+pub(crate) unsafe fn xml_add_ref(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     value: *const XmlChar,
@@ -2935,7 +2903,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
     // Create the Ref table if needed.
     table = (*doc).refs as XmlRefTablePtr;
     if table.is_null() {
-        (*doc).refs = xml_hash_create_dict(0, (*doc).dict) as _;
+        (*doc).refs = xml_hash_create(0) as _;
         table = (*doc).refs as _;
     }
     if table.is_null() {
@@ -2952,9 +2920,7 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
     // fill the structure.
     (*ret).value = xml_strdup(value);
     if xml_is_streaming(ctxt) != 0 {
-        /*
-         * Operating in streaming mode, attr is gonna disappear
-         */
+        // Operating in streaming mode, attr is gonna disappear
         (*ret).name = xml_strdup((*attr).name);
         (*ret).attr = null_mut();
     } else {
@@ -2963,12 +2929,11 @@ pub(crate) unsafe extern "C" fn xml_add_ref(
     }
     (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
-    /* To add a reference :-
-     * References are maintained as a list of references,
-     * Lookup the entry, if no entry create new nodelist
-     * Add the owning node to the NodeList
-     * Return the ref
-     */
+    // To add a reference :-
+    // References are maintained as a list of references,
+    // Lookup the entry, if no entry create new nodelist
+    // Add the owning node to the NodeList
+    // Return the ref
 
     ref_list = xml_hash_lookup(table, value) as _;
     'failed: {
@@ -3816,7 +3781,10 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
             if !(*doc).int_subset.is_null() {
                 if let Some(table) = (*(*doc).int_subset).attributes {
                     table.scan(|&payload, _, _, name3| {
-                        if !payload.is_null() && name3.map(|n| n.as_ref()) == attr_elem.as_deref() {
+                        if !payload.is_null()
+                            && name3.map(|n| n.as_ref())
+                                == attr_elem.as_deref().map(|a| a.to_string_lossy()).as_deref()
+                        {
                             xml_validate_attribute_id_callback(payload, &raw mut nb_id);
                         }
                     });
@@ -3907,28 +3875,27 @@ pub unsafe extern "C" fn xml_validate_attribute_decl(
 
 /// Validate that the given attribute value match  the proper production
 ///
-/// `[ VC: ID ]`  
+/// ```text
+/// [ VC: ID ]
 /// Values of type ID must match the Name production....
 ///
-/// `[ VC: IDREF ]`  
+/// [ VC: IDREF ]
 /// Values of type IDREF must match the Name production, and values
 /// of type IDREFS must match Names ...
 ///
-/// `[ VC: Entity Name ]`  
+/// [ VC: Entity Name ]
 /// Values of type ENTITY must match the Name production, values
 /// of type ENTITIES must match Names ...
 ///
-/// `[ VC: Name Token ]`
+/// [ VC: Name Token ]
 /// Values of type NMTOKEN must match the Nmtoken production; values
 /// of type NMTOKENS must match Nmtokens.
+/// ```
 ///
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateAttributeValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_attribute_value(
-    typ: XmlAttributeType,
-    value: *const XmlChar,
-) -> i32 {
+pub unsafe fn xml_validate_attribute_value(typ: XmlAttributeType, value: *const XmlChar) -> i32 {
     xml_validate_attribute_value_internal(null_mut(), typ, value)
 }
 

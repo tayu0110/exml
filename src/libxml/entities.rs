@@ -52,7 +52,7 @@ use crate::{
     },
 };
 
-use super::{chvalid::xml_is_char, dict::XmlDictRef, hash::CVoidWrapper};
+use super::{chvalid::xml_is_char, hash::CVoidWrapper};
 
 /// The different valid entity types.
 #[repr(C)]
@@ -433,16 +433,14 @@ unsafe fn xml_add_entity(
                 }
             }
             if (*dtd).entities.is_none() {
-                let dict = XmlDictRef::from_raw(dict);
-                let table = XmlHashTable::with_capacity_dict(0, dict);
+                let table = XmlHashTable::with_capacity(0);
                 (*dtd).entities = XmlHashTableRef::from_table(table);
             }
             table = (*dtd).entities;
         }
         XmlEntityType::XmlInternalParameterEntity | XmlEntityType::XmlExternalParameterEntity => {
             if (*dtd).pentities.is_none() {
-                let dict = XmlDictRef::from_raw(dict);
-                let table = XmlHashTable::with_capacity_dict(0, dict);
+                let table = XmlHashTable::with_capacity(0);
                 (*dtd).pentities = XmlHashTableRef::from_table(table);
             }
             table = (*dtd).pentities;
@@ -461,7 +459,7 @@ unsafe fn xml_add_entity(
     }
     (*ret).doc.store((*dtd).doc, Ordering::Relaxed);
 
-    if table.add_entry(&CString::new(name).unwrap(), ret).is_err() {
+    if table.add_entry(name, ret).is_err() {
         // entity was already defined at another level.
         xml_free_entity(ret);
         return null_mut();
@@ -698,9 +696,7 @@ unsafe fn xml_get_entity_from_table(
     table: XmlHashTableRef<'static, XmlEntityPtr>,
     name: &str,
 ) -> XmlEntityPtr {
-    table
-        .lookup(&CString::new(name).unwrap())
-        .map_or(null_mut(), |p| *p)
+    table.lookup(name).map_or(null_mut(), |p| *p)
 }
 
 /// Do an entity lookup in the document entity hash table and

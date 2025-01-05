@@ -1009,7 +1009,7 @@ pub unsafe extern "C" fn xml_xpath_err(ctxt: XmlXPathParserContextPtr, mut error
 ///
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlXPathRegisterNs")]
-pub unsafe extern "C" fn xml_xpath_register_ns(
+pub unsafe fn xml_xpath_register_ns(
     ctxt: XmlXPathContextPtr,
     prefix: *const XmlChar,
     ns_uri: *const XmlChar,
@@ -1034,9 +1034,14 @@ pub unsafe extern "C" fn xml_xpath_register_ns(
         table
     };
     if ns_uri.is_null() {
-        return match ns_hash.remove_entry(CStr::from_ptr(prefix as *const i8), |data, _| {
-            xml_free(data as _);
-        }) {
+        return match ns_hash.remove_entry(
+            CStr::from_ptr(prefix as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            |data, _| {
+                xml_free(data as _);
+            },
+        ) {
             Ok(_) => 0,
             Err(_) => -1,
         };
@@ -1046,9 +1051,15 @@ pub unsafe extern "C" fn xml_xpath_register_ns(
     if copy.is_null() {
         return -1;
     }
-    match ns_hash.update_entry(CStr::from_ptr(prefix as *const i8), copy, |data, _| {
-        xml_free(data as _);
-    }) {
+    match ns_hash.update_entry(
+        CStr::from_ptr(prefix as *const i8)
+            .to_string_lossy()
+            .as_ref(),
+        copy,
+        |data, _| {
+            xml_free(data as _);
+        },
+    ) {
         Ok(_) => 0,
         Err(_) => {
             xml_free(copy as _);
@@ -1088,11 +1099,7 @@ pub unsafe fn xml_xpath_ns_lookup(
 
     (*ctxt)
         .ns_hash
-        .and_then(|table| {
-            table
-                .lookup(&CString::new(prefix.as_ref()).unwrap())
-                .copied()
-        })
+        .and_then(|table| table.lookup(&prefix).copied())
         .unwrap_or(null_mut())
 }
 
@@ -1151,16 +1158,20 @@ pub unsafe fn xml_xpath_register_func_ns(
     let res = if let Some(f) = f {
         func_hash
             .add_entry2(
-                CStr::from_ptr(name as *const i8),
-                (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!ns_uri.is_null())
+                    .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
+                    .as_deref(),
                 f,
             )
             .is_err()
     } else {
         func_hash
             .remove_entry2(
-                CStr::from_ptr(name as *const i8),
-                (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!ns_uri.is_null())
+                    .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
+                    .as_deref(),
                 |_, _| {},
             )
             .is_err()
@@ -1214,8 +1225,10 @@ pub unsafe extern "C" fn xml_xpath_register_variable_ns(
     };
     if value.is_null() {
         return match var_hash.remove_entry2(
-            CStr::from_ptr(name as *const i8),
-            (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!ns_uri.is_null())
+                .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
+                .as_deref(),
             |data, _| {
                 xml_xpath_free_object_entry(data);
             },
@@ -1226,8 +1239,10 @@ pub unsafe extern "C" fn xml_xpath_register_variable_ns(
     }
 
     match var_hash.update_entry2(
-        CStr::from_ptr(name as *const i8),
-        (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+        CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+        (!ns_uri.is_null())
+            .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
+            .as_deref(),
         value,
         |data, _| {
             xml_xpath_free_object_entry(data);
@@ -1283,8 +1298,10 @@ pub unsafe fn xml_xpath_function_lookup_ns(
     (*ctxt)
         .func_hash?
         .lookup2(
-            CStr::from_ptr(name as *const i8),
-            (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!ns_uri.is_null())
+                .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
+                .as_deref(),
         )
         .copied()
 }
@@ -1488,10 +1505,7 @@ unsafe fn xml_xpath_cache_new_boolean(ctxt: XmlXPathContextPtr, val: bool) -> Xm
 ///
 /// Returns the created or reused object.
 #[doc(alias = "xmlXPathCacheNewFloat")]
-unsafe extern "C" fn xml_xpath_cache_new_float(
-    ctxt: XmlXPathContextPtr,
-    val: f64,
-) -> XmlXPathObjectPtr {
+unsafe fn xml_xpath_cache_new_float(ctxt: XmlXPathContextPtr, val: f64) -> XmlXPathObjectPtr {
     if !ctxt.is_null() && !(*ctxt).cache.is_null() {
         let cache: XmlXpathContextCachePtr = (*ctxt).cache as XmlXpathContextCachePtr;
 
@@ -1524,7 +1538,7 @@ unsafe extern "C" fn xml_xpath_cache_new_float(
 ///
 /// Returns a created or reused created object.
 #[doc(alias = "xmlXPathCacheObjectCopy")]
-unsafe extern "C" fn xml_xpath_cache_object_copy(
+unsafe fn xml_xpath_cache_object_copy(
     ctxt: XmlXPathContextPtr,
     val: XmlXPathObjectPtr,
 ) -> XmlXPathObjectPtr {
@@ -1559,7 +1573,7 @@ unsafe extern "C" fn xml_xpath_cache_object_copy(
 ///
 /// Returns the a copy of the value or NULL if not found
 #[doc(alias = "xmlXPathVariableLookupNS")]
-pub unsafe extern "C" fn xml_xpath_variable_lookup_ns(
+pub unsafe fn xml_xpath_variable_lookup_ns(
     ctxt: XmlXPathContextPtr,
     name: *const XmlChar,
     ns_uri: *const XmlChar,
@@ -1584,8 +1598,10 @@ pub unsafe extern "C" fn xml_xpath_variable_lookup_ns(
 
     let obj = var_hash
         .lookup2(
-            CStr::from_ptr(name as *const i8),
-            (!ns_uri.is_null()).then(|| CStr::from_ptr(ns_uri as *const i8)),
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!ns_uri.is_null())
+                .then(|| CStr::from_ptr(ns_uri as *const i8).to_string_lossy())
+                .as_deref(),
         )
         .copied()
         .unwrap_or(null_mut());

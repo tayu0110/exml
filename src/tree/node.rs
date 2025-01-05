@@ -663,7 +663,7 @@ pub trait NodeCommon {
         }
         if matches!(self.element_type(), XmlElementType::XmlEntityDecl) {
             let doc = self.document();
-            let name = self.name().map(|n| CString::new(n.as_ref()).unwrap());
+            let name = self.name().map(|n| n.into_owned());
             if !doc.is_null() {
                 if !(*doc).int_subset.is_null() {
                     if let (Some(mut table), Some(name)) =

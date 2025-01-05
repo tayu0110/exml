@@ -897,7 +897,7 @@ unsafe fn xml_rng_verr(
 
 /// Show a validation error.
 #[doc(alias = "xmlRelaxNGShowValidError")]
-unsafe extern "C" fn xml_relaxng_show_valid_error(
+unsafe fn xml_relaxng_show_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
     node: XmlNodePtr,
@@ -939,7 +939,7 @@ const MAX_ERROR: usize = 5;
 
 /// Show all validation error over a given index.
 #[doc(alias = "xmlRelaxNGDumpValidError")]
-unsafe extern "C" fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) {
+unsafe fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) {
     let mut k: usize;
     let mut err: XmlRelaxNGValidErrorPtr;
     let mut dup: XmlRelaxNGValidErrorPtr;
@@ -1050,7 +1050,7 @@ unsafe extern "C" fn xml_relaxng_valid_error_push(
 /// Register a validation error, either generating it if it's sure
 /// or stacking it for later handling if unsure.
 #[doc(alias = "xmlRelaxNGAddValidError")]
-unsafe extern "C" fn xml_relaxng_add_valid_error(
+unsafe fn xml_relaxng_add_valid_error(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
     arg1: *const XmlChar,
@@ -1064,17 +1064,13 @@ unsafe extern "C" fn xml_relaxng_add_valid_error(
         return;
     }
 
-    /*
-     * generate the error directly
-     */
+    // generate the error directly
     if (*ctxt).flags & FLAGS_IGNORABLE == 0 || (*ctxt).flags & FLAGS_NEGATIVE != 0 {
         let mut node: XmlNodePtr;
         let seq: XmlNodePtr;
 
-        /*
-         * Flush first any stacked error which might be the
-         * real cause of the problem.
-         */
+        // Flush first any stacked error which might be the
+        // real cause of the problem.
         if (*ctxt).err_nr != 0 {
             xml_relaxng_dump_valid_error(ctxt);
         }
@@ -1090,9 +1086,7 @@ unsafe extern "C" fn xml_relaxng_add_valid_error(
         }
         xml_relaxng_show_valid_error(ctxt, err, node, seq, arg1, arg2);
     } else {
-        /*
-         * Stack the error for later processing if needed
-         */
+        // Stack the error for later processing if needed
         xml_relaxng_valid_error_push(ctxt, err, arg1, arg2, dup);
     }
 }
@@ -1138,7 +1132,7 @@ unsafe fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: &str) {
 ///
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlRelaxNGRegisterTypeLibrary")]
-unsafe extern "C" fn xml_relaxng_register_type_library(
+unsafe fn xml_relaxng_register_type_library(
     namespace: *const XmlChar,
     data: *mut c_void,
     have: Option<XmlRelaxNGTypeHave>,
@@ -1154,7 +1148,11 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
         return -1;
     }
     if registered_types
-        .lookup(CStr::from_ptr(namespace as *const i8))
+        .lookup(
+            CStr::from_ptr(namespace as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        )
         .is_some()
     {
         generic_error!(
@@ -1176,7 +1174,12 @@ unsafe extern "C" fn xml_relaxng_register_type_library(
     (*lib).check = check;
     (*lib).facet = facet;
     (*lib).freef = freef;
-    match registered_types.add_entry(CStr::from_ptr(namespace as *const i8), lib) {
+    match registered_types.add_entry(
+        CStr::from_ptr(namespace as *const i8)
+            .to_string_lossy()
+            .as_ref(),
+        lib,
+    ) {
         Ok(_) => 0,
         Err(_) => {
             generic_error!(
@@ -2559,9 +2562,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                 cur = (*cur).next;
             }
 
-            /*
-             * Let's check that all rules makes a partitions according to 7.4
-             */
+            // Let's check that all rules makes a partitions according to 7.4
             partitions = xml_malloc(size_of::<XmlRelaxNGPartition>()) as _;
             if partitions.is_null() {
                 break 'goto_error;
@@ -2609,7 +2610,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
                         if (*(*tmp)).typ == XmlRelaxNGType::Text {
                             if (*partitions)
                                 .triage
-                                .and_then(|mut t| t.add_entry2(c"#text", None, i + 1).ok())
+                                .and_then(|mut t| t.add_entry2("#text", None, i + 1).ok())
                                 .is_none()
                             {
                                 is_determinist = -1;
@@ -2622,7 +2623,9 @@ extern "C" fn xml_relaxng_compute_interleaves(
                                     .triage
                                     .and_then(|mut t| {
                                         t.add_entry2(
-                                            CStr::from_ptr((*(*tmp)).name as *const i8),
+                                            CStr::from_ptr((*(*tmp)).name as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
                                             None,
                                             i + 1,
                                         )
@@ -2634,9 +2637,15 @@ extern "C" fn xml_relaxng_compute_interleaves(
                                     .triage
                                     .and_then(|mut t| {
                                         t.add_entry2(
-                                            CStr::from_ptr((*(*tmp)).name as *const i8),
+                                            CStr::from_ptr((*(*tmp)).name as *const i8)
+                                                .to_string_lossy()
+                                                .as_ref(),
                                             (!(*(*tmp)).ns.is_null())
-                                                .then(|| CStr::from_ptr((*(*tmp)).ns as *const i8)),
+                                                .then(|| {
+                                                    CStr::from_ptr((*(*tmp)).ns as *const i8)
+                                                        .to_string_lossy()
+                                                })
+                                                .as_deref(),
                                             i + 1,
                                         )
                                         .ok()
@@ -2650,16 +2659,20 @@ extern "C" fn xml_relaxng_compute_interleaves(
                             let res = if (*(*tmp)).ns.is_null() || *(*(*tmp)).ns.add(0) == 0 {
                                 (*partitions)
                                     .triage
-                                    .and_then(|mut t| t.add_entry2(c"#any", None, i + 1).ok())
+                                    .and_then(|mut t| t.add_entry2("#any", None, i + 1).ok())
                                     .is_none()
                             } else {
                                 (*partitions)
                                     .triage
                                     .and_then(|mut t| {
                                         t.add_entry2(
-                                            c"#any",
+                                            "#any",
                                             (!(*(*tmp)).ns.is_null())
-                                                .then(|| CStr::from_ptr((*(*tmp)).ns as *const i8)),
+                                                .then(|| {
+                                                    CStr::from_ptr((*(*tmp)).ns as *const i8)
+                                                        .to_string_lossy()
+                                                })
+                                                .as_deref(),
                                             i + 1,
                                         )
                                         .ok()
@@ -4046,7 +4059,10 @@ extern "C" fn xml_relaxng_check_combine(
                 );
                 (*ctxt).nb_interleaves += 1;
                 if table
-                    .add_entry(CStr::from_ptr(tmpname.as_ptr()), cur)
+                    .add_entry(
+                        CStr::from_ptr(tmpname.as_ptr()).to_string_lossy().as_ref(),
+                        cur,
+                    )
                     .is_err()
                 {
                     let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
@@ -4111,7 +4127,7 @@ extern "C" fn xml_relaxng_check_reference(
         }
         if let Some(defs) = (*grammar).defs {
             let def = defs
-                .lookup(CStr::from_ptr(name as *const i8))
+                .lookup(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
                 .copied()
                 .unwrap_or(null_mut());
             if !def.is_null() {
@@ -4524,7 +4540,15 @@ unsafe extern "C" fn xml_relaxng_parse_data(
 
     let lib = XML_RELAXNG_REGISTERED_TYPES
         .get()
-        .and_then(|table| table.lookup(CStr::from_ptr(library as *const i8)).copied())
+        .and_then(|table| {
+            table
+                .lookup(
+                    CStr::from_ptr(library as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                )
+                .copied()
+        })
         .unwrap_or(null_mut());
     if lib.is_null() {
         let library = CStr::from_ptr(library as *const i8).to_string_lossy();
@@ -4808,7 +4832,15 @@ unsafe extern "C" fn xml_relaxng_parse_value(
 
         lib = XML_RELAXNG_REGISTERED_TYPES
             .get()
-            .and_then(|table| table.lookup(CStr::from_ptr(library as *const i8)).copied())
+            .and_then(|table| {
+                table
+                    .lookup(
+                        CStr::from_ptr(library as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    )
+                    .copied()
+            })
             .unwrap_or(null_mut());
         if lib.is_null() {
             let library = CStr::from_ptr(library as *const i8).to_string_lossy();
@@ -4938,7 +4970,13 @@ unsafe extern "C" fn xml_relaxng_parse_interleave(
             (*ctxt).nb_interleaves,
         );
         (*ctxt).nb_interleaves += 1;
-        if table.add_entry(CStr::from_ptr(name.as_ptr()), def).is_err() {
+        if table
+            .add_entry(
+                CStr::from_ptr(name.as_ptr()).to_string_lossy().as_ref(),
+                def,
+            )
+            .is_err()
+        {
             let name = CStr::from_ptr(name.as_ptr()).to_string_lossy();
             xml_rng_perr!(
                 ctxt,
@@ -4994,14 +5032,25 @@ extern "C" fn xml_relaxng_parse_import_ref(
 
         if (*(*ctxt).grammar)
             .refs
-            .and_then(|mut table| table.add_entry(CStr::from_ptr(name as *const i8), def).ok())
+            .and_then(|mut table| {
+                table
+                    .add_entry(
+                        CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                        def,
+                    )
+                    .ok()
+            })
             .is_none()
         {
             let prev = (*(*ctxt).grammar)
                 .refs
                 .and_then(|table| {
                     table
-                        .lookup(CStr::from_ptr((*def).name as *const i8))
+                        .lookup(
+                            CStr::from_ptr((*def).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        )
                         .copied()
                 })
                 .unwrap_or(null_mut());
@@ -5035,7 +5084,7 @@ extern "C" fn xml_relaxng_parse_import_ref(
 ///
 /// Returns 0 in case of success, -1 in case of failure
 #[doc(alias = "xmlRelaxNGParseImportRefs")]
-unsafe extern "C" fn xml_relaxng_parse_import_refs(
+unsafe fn xml_relaxng_parse_import_refs(
     ctxt: XmlRelaxNGParserCtxtPtr,
     grammar: XmlRelaxNGGrammarPtr,
 ) -> i32 {
@@ -5059,10 +5108,12 @@ unsafe extern "C" fn xml_relaxng_parse_import_refs(
         return -1;
     };
     refs.scan(|data, name, _, _| {
+        let name = name.map(|n| CString::new(n.as_ref()).unwrap());
         xml_relaxng_parse_import_ref(
             *data,
             ctxt,
-            name.map_or(null_mut(), |p| p.as_ptr() as *const u8),
+            name.as_deref()
+                .map_or(null_mut(), |p| p.as_ptr() as *const u8),
         );
     });
     0
@@ -5323,11 +5374,20 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
         if let Some(mut refs) = (*(*ctxt).grammar).refs {
             if !(*def).name.is_null()
                 && refs
-                    .add_entry(CStr::from_ptr((*def).name as *const i8), def)
+                    .add_entry(
+                        CStr::from_ptr((*def).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        def,
+                    )
                     .is_err()
             {
                 let prev = refs
-                    .lookup(CStr::from_ptr((*def).name as *const i8))
+                    .lookup(
+                        CStr::from_ptr((*def).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    )
                     .copied()
                     .unwrap_or(null_mut());
                 if prev.is_null() {
@@ -5470,11 +5530,20 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
         if let Some(mut refs) = (*(*ctxt).parentgrammar).refs {
             if !(*def).name.is_null()
                 && refs
-                    .add_entry(CStr::from_ptr((*def).name as *const i8), def)
+                    .add_entry(
+                        CStr::from_ptr((*def).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                        def,
+                    )
                     .is_err()
             {
                 let prev = refs
-                    .lookup(CStr::from_ptr((*def).name as *const i8))
+                    .lookup(
+                        CStr::from_ptr((*def).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    )
                     .copied()
                     .unwrap_or(null_mut());
                 if prev.is_null() {
@@ -5849,11 +5918,11 @@ unsafe extern "C" fn xml_relaxng_parse_define(
         }
         if let Some(mut defs) = (*(*ctxt).grammar).defs {
             if defs
-                .add_entry(CStr::from_ptr(cname as *const i8), def)
+                .add_entry(&CStr::from_ptr(cname as *const i8).to_string_lossy(), def)
                 .is_err()
             {
                 let mut prev = defs
-                    .lookup(CStr::from_ptr(cname as *const i8))
+                    .lookup(&CStr::from_ptr(cname as *const i8).to_string_lossy())
                     .copied()
                     .unwrap_or(null_mut());
                 if prev.is_null() {
@@ -6015,10 +6084,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar_content(
 
 /// Applies the 4.17. combine rule for all the start element of a given grammar.
 #[doc(alias = "xmlRelaxNGCombineStart")]
-unsafe extern "C" fn xml_relaxng_combine_start(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    grammar: XmlRelaxNGGrammarPtr,
-) {
+unsafe fn xml_relaxng_combine_start(ctxt: XmlRelaxNGParserCtxtPtr, grammar: XmlRelaxNGGrammarPtr) {
     let mut choice_or_interleave: i32 = -1;
     let mut missing: i32 = 0;
     let mut cur: XmlRelaxNGDefinePtr;
@@ -6120,7 +6186,10 @@ unsafe extern "C" fn xml_relaxng_combine_start(
             );
             (*ctxt).nb_interleaves += 1;
             if table
-                .add_entry(CStr::from_ptr(tmpname.as_ptr()), cur)
+                .add_entry(
+                    CStr::from_ptr(tmpname.as_ptr()).to_string_lossy().as_ref(),
+                    cur,
+                )
                 .is_err()
             {
                 let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
@@ -6147,7 +6216,7 @@ unsafe extern "C" fn xml_relaxng_combine_start(
 ///
 /// Returns the internal xmlRelaxNGGrammarPtr built or NULL in case of error
 #[doc(alias = "xmlRelaxNGParseGrammar")]
-unsafe extern "C" fn xml_relaxng_parse_grammar(
+unsafe fn xml_relaxng_parse_grammar(
     ctxt: XmlRelaxNGParserCtxtPtr,
     nodes: XmlNodePtr,
 ) -> XmlRelaxNGGrammarPtr {
@@ -6158,9 +6227,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
         return null_mut();
     }
 
-    /*
-     * Link the new grammar in the tree
-     */
+    // Link the new grammar in the tree
     (*ret).parent = (*ctxt).grammar;
     if !(*ctxt).grammar.is_null() {
         tmp = (*(*ctxt).grammar).children;
@@ -6194,16 +6261,16 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
         );
     }
 
-    /*
-     * Apply 4.17 merging rules to defines and starts
-     */
+    // Apply 4.17 merging rules to defines and starts
     xml_relaxng_combine_start(ctxt, ret);
     if let Some(defs) = (*ret).defs {
         defs.scan(|data, name, _, _| {
+            let name = name.map(|n| CString::new(n.as_ref()).unwrap());
             xml_relaxng_check_combine(
                 *data,
                 ctxt,
-                name.map_or(null_mut(), |p| p.as_ptr() as *const u8),
+                name.as_deref()
+                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
             )
         });
     }
@@ -6211,10 +6278,12 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
     // link together defines and refs in this grammar
     if let Some(refs) = (*ret).refs {
         refs.scan(|data, name, _, _| {
+            let name = name.map(|n| CString::new(n.as_ref()).unwrap());
             xml_relaxng_check_reference(
                 *data,
                 ctxt,
-                name.map_or(null_mut(), |p| p.as_ptr() as *const u8),
+                name.as_deref()
+                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
             )
         });
     }
@@ -6229,7 +6298,7 @@ unsafe extern "C" fn xml_relaxng_parse_grammar(
 ///
 /// Returns 0 if check passed, and -1 in case of error
 #[doc(alias = "xmlRelaxNGCheckCycles")]
-unsafe extern "C" fn xml_relaxng_check_cycles(
+unsafe fn xml_relaxng_check_cycles(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
     depth: i32,
@@ -6267,7 +6336,7 @@ unsafe extern "C" fn xml_relaxng_check_cycles(
 ///
 /// Returns the new prev definition
 #[doc(alias = "xmlRelaxNGTryUnlink")]
-unsafe extern "C" fn xml_relaxng_try_unlink(
+unsafe fn xml_relaxng_try_unlink(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     cur: XmlRelaxNGDefinePtr,
     parent: XmlRelaxNGDefinePtr,
@@ -6294,7 +6363,7 @@ unsafe extern "C" fn xml_relaxng_try_unlink(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGGenerateAttributes")]
-unsafe extern "C" fn xml_relaxng_generate_attributes(
+unsafe fn xml_relaxng_generate_attributes(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -6302,10 +6371,8 @@ unsafe extern "C" fn xml_relaxng_generate_attributes(
     let mut cur: XmlRelaxNGDefinePtr;
     let mut tmp: XmlRelaxNGDefinePtr;
 
-    /*
-     * Don't run that check in case of error. Infinite recursion
-     * becomes possible.
-     */
+    // Don't run that check in case of error. Infinite recursion
+    // becomes possible.
     if (*ctxt).nb_errors != 0 {
         return -1;
     }
@@ -6378,7 +6445,7 @@ unsafe extern "C" fn xml_relaxng_generate_attributes(
 
 /// Check for simplification of empty and notAllowed
 #[doc(alias = "xmlRelaxNGSimplify")]
-unsafe extern "C" fn xml_relaxng_simplify(
+unsafe fn xml_relaxng_simplify(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
     parent: XmlRelaxNGDefinePtr,
@@ -6444,10 +6511,8 @@ unsafe extern "C" fn xml_relaxng_simplify(
             if !(*cur).name_class.is_null() {
                 xml_relaxng_simplify(ctxt, (*cur).name_class, cur);
             }
-            /*
-             * On Elements, try to move attribute only generating rules on
-             * the attrs rules.
-             */
+            // On Elements, try to move attribute only generating rules on
+            // the attrs rules.
             if (*cur).typ == XmlRelaxNGType::Element {
                 let mut attronly: i32;
                 let mut tmp: XmlRelaxNGDefinePtr;
@@ -6456,17 +6521,13 @@ unsafe extern "C" fn xml_relaxng_simplify(
                 while !(*cur).content.is_null() {
                     attronly = xml_relaxng_generate_attributes(ctxt, (*cur).content);
                     if attronly == 1 {
-                        /*
-                         * migrate (*cur).content to attrs
-                         */
+                        // migrate (*cur).content to attrs
                         tmp = (*cur).content;
                         (*cur).content = (*tmp).next;
                         (*tmp).next = (*cur).attrs;
                         (*cur).attrs = tmp;
                     } else {
-                        /*
-                         * (*cur).content can generate elements or text
-                         */
+                        // (*cur).content can generate elements or text
                         break;
                     }
                 }
@@ -6475,9 +6536,7 @@ unsafe extern "C" fn xml_relaxng_simplify(
                     tmp = (*pre).next;
                     attronly = xml_relaxng_generate_attributes(ctxt, tmp);
                     if attronly == 1 {
-                        /*
-                         * migrate tmp to attrs
-                         */
+                        // migrate tmp to attrs
                         (*pre).next = (*tmp).next;
                         (*tmp).next = (*cur).attrs;
                         (*cur).attrs = tmp;
@@ -6486,9 +6545,7 @@ unsafe extern "C" fn xml_relaxng_simplify(
                     }
                 }
             }
-            /*
-             * This may result in a simplification
-             */
+            // This may result in a simplification
             if matches!(
                 (*cur).typ,
                 XmlRelaxNGType::Group | XmlRelaxNGType::Interleave
@@ -6509,9 +6566,7 @@ unsafe extern "C" fn xml_relaxng_simplify(
                     }
                 }
             }
-            /*
-             * the current node may have been transformed back
-             */
+            // the current node may have been transformed back
             if (*cur).typ == XmlRelaxNGType::Except
                 && !(*cur).content.is_null()
                 && (*(*cur).content).typ == XmlRelaxNGType::NotAllowed
@@ -6567,10 +6622,7 @@ unsafe extern "C" fn xml_relaxng_simplify(
 
 /// Detects violations of rule 7.3
 #[doc(alias = "xmlRelaxNGCheckGroupAttrs")]
-unsafe extern "C" fn xml_relaxng_check_group_attrs(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    def: XmlRelaxNGDefinePtr,
-) {
+unsafe fn xml_relaxng_check_group_attrs(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefinePtr) {
     let mut cur: XmlRelaxNGDefinePtr;
     let mut nbchild: usize = 0;
     let mut i: usize;
@@ -6584,10 +6636,7 @@ unsafe extern "C" fn xml_relaxng_check_group_attrs(
         return;
     }
 
-    /*
-     * Don't run that check in case of error. Infinite recursion
-     * becomes possible.
-     */
+    // Don't run that check in case of error. Infinite recursion becomes possible.
     if (*ctxt).nb_errors != 0 {
         return;
     }
@@ -6656,7 +6705,7 @@ unsafe extern "C" fn xml_relaxng_check_group_attrs(
 ///
 /// Returns the content type
 #[doc(alias = "xmlRelaxNGGroupContentType")]
-unsafe extern "C" fn xml_relaxng_group_content_type(
+unsafe fn xml_relaxng_group_content_type(
     ct1: XmlRelaxNGContentType,
     ct2: XmlRelaxNGContentType,
 ) -> XmlRelaxNGContentType {
@@ -6679,7 +6728,7 @@ unsafe extern "C" fn xml_relaxng_group_content_type(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error
 #[doc(alias = "xmlRelaxNGIsNullable")]
-unsafe extern "C" fn xml_relaxng_is_nullable(define: XmlRelaxNGDefinePtr) -> i32 {
+unsafe fn xml_relaxng_is_nullable(define: XmlRelaxNGDefinePtr) -> i32 {
     let mut ret: i32;
 
     if define.is_null() {
@@ -6746,7 +6795,7 @@ unsafe extern "C" fn xml_relaxng_is_nullable(define: XmlRelaxNGDefinePtr) -> i32
 
 /// Also used to find indeterministic pattern in choice
 #[doc(alias = "xmlRelaxNGCheckChoiceDeterminism")]
-unsafe extern "C" fn xml_relaxng_check_choice_determinism(
+unsafe fn xml_relaxng_check_choice_determinism(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
 ) {
@@ -6888,7 +6937,7 @@ unsafe extern "C" fn xml_relaxng_check_choice_determinism(
 ///
 /// Returns the content type
 #[doc(alias = "xmlRelaxNGMaxContentType")]
-unsafe extern "C" fn xml_relaxng_max_content_type(
+unsafe fn xml_relaxng_max_content_type(
     ct1: XmlRelaxNGContentType,
     ct2: XmlRelaxNGContentType,
 ) -> XmlRelaxNGContentType {
@@ -6908,7 +6957,7 @@ unsafe extern "C" fn xml_relaxng_max_content_type(
 ///
 /// Returns the content type of @cur
 #[doc(alias = "xmlRelaxNGCheckRules")]
-unsafe extern "C" fn xml_relaxng_check_rules(
+unsafe fn xml_relaxng_check_rules(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut cur: XmlRelaxNGDefinePtr,
     flags: i32,
@@ -7177,9 +7226,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
                 nflags = flags;
             }
             ret = xml_relaxng_check_rules(ctxt, (*cur).content, nflags, (*cur).typ);
-            /*
-             * The 7.3 Attribute derivation rule for groups is plugged there
-             */
+            // The 7.3 Attribute derivation rule for groups is plugged there
             xml_relaxng_check_group_attrs(ctxt, cur);
         } else if (*cur).typ == XmlRelaxNGType::Interleave {
             if flags & XML_RELAXNG_IN_LIST != 0 {
@@ -7295,10 +7342,8 @@ unsafe extern "C" fn xml_relaxng_check_rules(
         if ptype == XmlRelaxNGType::Group {
             val = xml_relaxng_group_content_type(val, ret);
         } else if ptype == XmlRelaxNGType::Interleave {
-            /*
-             * TODO: scan complain that tmp is never used, seems on purpose
-             *       need double-checking
-             */
+            // TODO: scan complain that tmp is never used, seems on purpose
+            //       need double-checking
             tmp = xml_relaxng_group_content_type(val, ret);
             if tmp != XmlRelaxNGContentType::Error {
                 // tmp =
@@ -7326,7 +7371,7 @@ unsafe extern "C" fn xml_relaxng_check_rules(
 ///
 /// Returns the internal XML RelaxNG structure built or NULL in case of error
 #[doc(alias = "xmlRelaxNGParseDocument")]
-unsafe extern "C" fn xml_relaxng_parse_document(
+unsafe fn xml_relaxng_parse_document(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGPtr {
@@ -8714,7 +8759,7 @@ unsafe extern "C" fn xml_relaxng_validate_value_list(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateDatatype")]
-unsafe extern "C" fn xml_relaxng_validate_datatype(
+unsafe fn xml_relaxng_validate_datatype(
     ctxt: XmlRelaxNGValidCtxtPtr,
     value: *const XmlChar,
     define: XmlRelaxNGDefinePtr,
@@ -9842,30 +9887,18 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 (*cur).element_type(),
                 XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
             ) {
-                tmp = triage.lookup2(c"#text", None).copied();
+                tmp = triage.lookup2("#text", None).copied();
             } else if (*cur).element_type() == XmlElementType::XmlElementNode {
                 if !(*cur).ns.is_null() {
                     tmp = triage
-                        .lookup2(
-                            CStr::from_ptr((*cur).name as *const i8),
-                            (!(*(*cur).ns).href.is_null())
-                                .then(|| CStr::from_ptr((*(*cur).ns).href as *const i8)),
-                        )
-                        .or_else(|| {
-                            triage.lookup2(
-                                c"#any",
-                                (!(*(*cur).ns).href.is_null())
-                                    .then(|| CStr::from_ptr((*(*cur).ns).href as *const i8)),
-                            )
-                        })
+                        .lookup2(&(*cur).name().unwrap(), (*(*cur).ns).href().as_deref())
+                        .or_else(|| triage.lookup2("#any", (*(*cur).ns).href().as_deref()))
                         .copied();
                 } else {
-                    tmp = triage
-                        .lookup2(CStr::from_ptr((*cur).name as *const i8), None)
-                        .copied();
+                    tmp = triage.lookup2(&(*cur).name().unwrap(), None).copied();
                 }
                 if tmp.is_none() {
-                    tmp = triage.lookup2(c"#any", None).copied();
+                    tmp = triage.lookup2("#any", None).copied();
                 }
             }
 

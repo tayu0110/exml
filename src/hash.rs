@@ -29,15 +29,12 @@ use std::{
     ffi::CStr,
     mem::{replace, take},
     ops::{Deref, DerefMut},
-    ptr::{null, NonNull},
+    ptr::NonNull,
 };
 
 use anyhow::{anyhow, bail, ensure, Context};
 
-use crate::{
-    dict::XmlDictRef,
-    libxml::{parser::xml_init_parser, xmlstring::xml_str_qequal},
-};
+use crate::libxml::parser::xml_init_parser;
 
 pub use libxml_api::*;
 
@@ -45,14 +42,14 @@ const MAX_HASH_LEN: usize = 8;
 
 fn xml_hash_compute_key<T>(
     table: &XmlHashTable<T>,
-    name: Option<&Cow<'_, CStr>>,
-    name2: Option<&Cow<'_, CStr>>,
-    name3: Option<&Cow<'_, CStr>>,
+    name: Option<&Cow<'_, str>>,
+    name2: Option<&Cow<'_, str>>,
+    name3: Option<&Cow<'_, str>>,
 ) -> u64 {
     let mut value = table.seed as u64;
     if let Some(name) = name
         .filter(|name| !name.is_empty())
-        .map(|name| name.as_ref().to_bytes())
+        .map(|name| name.as_bytes())
     {
         value = value.wrapping_add(30 * name[0] as u64);
         for &ch in name {
@@ -65,7 +62,7 @@ fn xml_hash_compute_key<T>(
     value ^= value.wrapping_shl(5).wrapping_add(value.wrapping_shr(3));
     if let Some(name) = name2
         .filter(|name| !name.is_empty())
-        .map(|name| name.to_bytes())
+        .map(|name| name.as_bytes())
     {
         for &ch in name {
             value ^= value
@@ -77,7 +74,7 @@ fn xml_hash_compute_key<T>(
     value ^= value.wrapping_shl(5).wrapping_add(value.wrapping_shr(3));
     if let Some(name) = name3
         .filter(|name| !name.is_empty())
-        .map(|name| name.to_bytes())
+        .map(|name| name.as_bytes())
     {
         for &ch in name {
             value ^= value
@@ -91,17 +88,17 @@ fn xml_hash_compute_key<T>(
 
 fn xml_hash_compute_qkey<T>(
     table: &XmlHashTable<T>,
-    prefix: Option<&Cow<'_, CStr>>,
-    name: &CStr,
-    prefix2: Option<&Cow<'_, CStr>>,
-    name2: Option<&Cow<'_, CStr>>,
-    prefix3: Option<&Cow<'_, CStr>>,
-    name3: Option<&Cow<'_, CStr>>,
+    prefix: Option<&Cow<'_, str>>,
+    name: &str,
+    prefix2: Option<&Cow<'_, str>>,
+    name2: Option<&Cow<'_, str>>,
+    prefix3: Option<&Cow<'_, str>>,
+    name3: Option<&Cow<'_, str>>,
 ) -> u64 {
     let mut value = table.seed as u64;
     if let Some(prefix) = prefix
         .filter(|prefix| !prefix.is_empty())
-        .map(|prefix| prefix.as_ref().to_bytes())
+        .map(|prefix| prefix.as_bytes())
     {
         value = value.wrapping_add(30 * prefix[0] as u64);
         for &ch in prefix {
@@ -115,10 +112,10 @@ fn xml_hash_compute_qkey<T>(
             .wrapping_add(value.wrapping_shr(3))
             .wrapping_add(b':' as u64);
     } else {
-        value = value.wrapping_add(30 * name.to_bytes()[0] as u64);
+        value = value.wrapping_add(30 * name.as_bytes()[0] as u64);
     }
 
-    for &ch in name.to_bytes() {
+    for &ch in name.as_bytes() {
         value ^= value
             .wrapping_shl(5)
             .wrapping_add(value.wrapping_shr(3))
@@ -127,7 +124,7 @@ fn xml_hash_compute_qkey<T>(
     value ^= value.wrapping_shl(5).wrapping_add(value.wrapping_shr(3));
     if let Some(prefix) = prefix2
         .filter(|prefix| !prefix.is_empty())
-        .map(|prefix| prefix.as_ref().to_bytes())
+        .map(|prefix| prefix.as_bytes())
     {
         for &ch in prefix {
             value ^= value
@@ -142,7 +139,7 @@ fn xml_hash_compute_qkey<T>(
     }
     if let Some(name) = name2
         .filter(|name| !name.is_empty())
-        .map(|name| name.as_ref().to_bytes())
+        .map(|name| name.as_bytes())
     {
         for &ch in name {
             value ^= value
@@ -154,7 +151,7 @@ fn xml_hash_compute_qkey<T>(
     value ^= value.wrapping_shl(5).wrapping_add(value.wrapping_shr(3));
     if let Some(prefix) = prefix3
         .filter(|prefix| !prefix.is_empty())
-        .map(|prefix| prefix.as_ref().to_bytes())
+        .map(|prefix| prefix.as_bytes())
     {
         for &ch in prefix {
             value ^= value
@@ -169,7 +166,7 @@ fn xml_hash_compute_qkey<T>(
     }
     if let Some(name) = name3
         .filter(|name| !name.is_empty())
-        .map(|name| name.as_ref().to_bytes())
+        .map(|name| name.as_bytes())
     {
         for &ch in name {
             value ^= value
@@ -184,9 +181,9 @@ fn xml_hash_compute_qkey<T>(
 #[derive(Clone)]
 struct XmlHashEntry<'a, T> {
     next: Option<XmlHashEntryRef<'a, T>>,
-    name: Option<Cow<'a, CStr>>,
-    name2: Option<Cow<'a, CStr>>,
-    name3: Option<Cow<'a, CStr>>,
+    name: Option<Cow<'a, str>>,
+    name2: Option<Cow<'a, str>>,
+    name3: Option<Cow<'a, str>>,
     payload: Option<T>,
 }
 
@@ -244,7 +241,6 @@ type Deallocator<T> = fn(T, Option<Cow<'_, CStr>>);
 pub struct XmlHashTable<'a, T> {
     table: Box<[XmlHashEntry<'a, T>]>,
     num_elems: usize,
-    dict: Option<XmlDictRef>,
     seed: i32,
 }
 
@@ -266,33 +262,8 @@ impl<'a, T> XmlHashTable<'a, T> {
         Self {
             table,
             num_elems: 0,
-            dict: None,
             seed: rand::random(),
         }
-    }
-
-    /// Create new `XmlHashTable` with a string dictionary `dict`.
-    ///
-    /// `dict` is used for cache of name strings.
-    pub fn with_dict(dict: Option<XmlDictRef>) -> Self {
-        let mut res = Self::new();
-        if let Some(mut dict) = dict {
-            dict.add_reference();
-        }
-        res.dict = dict;
-        res
-    }
-
-    /// Create new `XmlHashTable` with capacity and a string dictionary `dict`.
-    ///
-    /// `dict` is used for cache of name strings.
-    pub fn with_capacity_dict(size: usize, dict: Option<XmlDictRef>) -> Self {
-        let mut res = Self::with_capacity(size);
-        if let Some(mut dict) = dict {
-            dict.add_reference();
-        }
-        res.dict = dict;
-        res
     }
 
     fn grow(&mut self, mut size: usize) -> Result<(), anyhow::Error> {
@@ -355,7 +326,7 @@ impl<'a, T> XmlHashTable<'a, T> {
         self.clear_with(|_, _| {});
     }
 
-    pub fn clear_with(&mut self, deallocator: impl Fn(T, Option<Cow<'_, CStr>>)) {
+    pub fn clear_with(&mut self, deallocator: impl Fn(T, Option<Cow<'_, str>>)) {
         let table = take(&mut self.table);
         for XmlHashEntry {
             mut next,
@@ -382,35 +353,17 @@ impl<'a, T> XmlHashTable<'a, T> {
 
     fn do_update_entry(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
-        name3: Option<&CStr>,
+        name: &str,
+        name2: Option<&str>,
+        name3: Option<&str>,
         data: T,
-        mut deallocator: impl FnMut(T, Option<Cow<'_, CStr>>),
+        mut deallocator: impl FnMut(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
-        let (name, name2, name3) = if let Some(mut dict) = self.dict {
-            unsafe {
-                (
-                    Some(Cow::Borrowed(CStr::from_ptr(
-                        dict.lookup(name.to_bytes())?.as_ptr() as *const i8,
-                    ))),
-                    name2
-                        .map(|name| dict.lookup(name.to_bytes()))
-                        .transpose()?
-                        .map(|ptr| Cow::Borrowed(CStr::from_ptr(ptr.as_ptr() as *const i8))),
-                    name3
-                        .map(|name| dict.lookup(name.to_bytes()))
-                        .transpose()?
-                        .map(|ptr| Cow::Borrowed(CStr::from_ptr(ptr.as_ptr() as *const i8))),
-                )
-            }
-        } else {
-            (
-                Some(Cow::Owned(name.to_owned())),
-                name2.map(|name| Cow::Owned(name.to_owned())),
-                name3.map(|name| Cow::Owned(name.to_owned())),
-            )
-        };
+        let (name, name2, name3) = (
+            Some(Cow::Owned(name.to_owned())),
+            name2.map(|name| Cow::Owned(name.to_owned())),
+            name3.map(|name| Cow::Owned(name.to_owned())),
+        );
 
         if self.is_empty() {
             self.grow(1);
@@ -462,31 +415,31 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry(c"hoge", 1u32);
-    /// table.add_entry2(c"foo", Some(c"bar"), 2);
+    /// table.add_entry("hoge", 1u32);
+    /// table.add_entry2("foo", Some("bar"), 2);
     ///
     /// // Update occurs.
     /// let mut updated = false;
-    /// assert!(table.update_entry(c"hoge", 2, |data, name| {
+    /// assert!(table.update_entry("hoge", 2, |data, name| {
     ///     assert_eq!(data, 1);
-    ///     assert_eq!(name.unwrap().as_ref(), c"hoge");
+    ///     assert_eq!(name.unwrap().as_ref(), "hoge");
     ///     updated = true;
     /// }).is_ok());
     /// assert!(updated);
-    /// table.update_entry(c"hoge", 3, |data, _| assert_eq!(data, 2));
+    /// table.update_entry("hoge", 3, |data, _| assert_eq!(data, 2));
     ///
     /// // Update does not occur, but execution is successfully completed.
     /// let mut updated = false;
-    /// assert!(table.update_entry(c"foo", 3, |_, _| {
+    /// assert!(table.update_entry("foo", 3, |_, _| {
     ///     updated = true;
     /// }).is_ok());
     /// assert!(!updated);
     /// ```
     pub fn update_entry(
         &mut self,
-        name: &CStr,
+        name: &str,
         data: T,
-        deallocator: impl FnMut(T, Option<Cow<'_, CStr>>),
+        deallocator: impl FnMut(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         self.do_update_entry(name, None, None, data, deallocator)
     }
@@ -500,29 +453,29 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry2(c"foo", Some(c"bar"), 2u32);
-    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 3);
+    /// table.add_entry2("foo", Some("bar"), 2u32);
+    /// table.add_entry3("hoge", Some("fuga"), Some("piyo"), 3);
     ///
     /// let mut updated = false;
-    /// assert!(table.update_entry2(c"foo", Some(c"bar"), 3, |data, name| {
+    /// assert!(table.update_entry2("foo", Some("bar"), 3, |data, name| {
     ///     assert_eq!(data, 2);
-    ///     assert_eq!(name.unwrap().as_ref(), c"foo");
+    ///     assert_eq!(name.unwrap().as_ref(), "foo");
     ///     updated = true;
     /// }).is_ok());
     /// assert!(updated);
     ///
     /// let mut updated = false;
-    /// assert!(table.update_entry2(c"hoge", Some(c"fuga"), 4, |_, _| {
+    /// assert!(table.update_entry2("hoge", Some("fuga"), 4, |_, _| {
     ///     updated = true;
     /// }).is_ok());
     /// assert!(!updated);
     /// ```
     pub fn update_entry2(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
+        name: &str,
+        name2: Option<&str>,
         data: T,
-        deallocator: impl FnMut(T, Option<Cow<'_, CStr>>),
+        deallocator: impl FnMut(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         self.do_update_entry(name, name2, None, data, deallocator)
     }
@@ -536,57 +489,39 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 3);
+    /// table.add_entry3("hoge", Some("fuga"), Some("piyo"), 3);
     ///
     /// let mut updated = false;
-    /// assert!(table.update_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 4, |data, name| {
+    /// assert!(table.update_entry3("hoge", Some("fuga"), Some("piyo"), 4, |data, name| {
     ///     assert_eq!(data, 3);
-    ///     assert_eq!(name.unwrap().as_ref(), c"hoge");
+    ///     assert_eq!(name.unwrap().as_ref(), "hoge");
     ///     updated = true;
     /// }).is_ok());
     /// assert!(updated);
     /// ```
     pub fn update_entry3(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
-        name3: Option<&CStr>,
+        name: &str,
+        name2: Option<&str>,
+        name3: Option<&str>,
         data: T,
-        deallocator: impl FnMut(T, Option<Cow<'_, CStr>>),
+        deallocator: impl FnMut(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         self.do_update_entry(name, name2, name3, data, deallocator)
     }
 
     fn do_add_entry(
         &mut self,
-        name: Option<&CStr>,
-        name2: Option<&CStr>,
-        name3: Option<&CStr>,
+        name: Option<&str>,
+        name2: Option<&str>,
+        name3: Option<&str>,
         data: T,
     ) -> Result<(), anyhow::Error> {
-        let (name, name2, name3) = if let Some(mut dict) = self.dict {
-            unsafe {
-                (
-                    name.map(|name| dict.lookup(name.to_bytes()))
-                        .transpose()?
-                        .map(|ptr| Cow::Borrowed(CStr::from_ptr(ptr.as_ptr() as *const i8))),
-                    name2
-                        .map(|name| dict.lookup(name.to_bytes()))
-                        .transpose()?
-                        .map(|ptr| Cow::Borrowed(CStr::from_ptr(ptr.as_ptr() as *const i8))),
-                    name3
-                        .map(|name| dict.lookup(name.to_bytes()))
-                        .transpose()?
-                        .map(|ptr| Cow::Borrowed(CStr::from_ptr(ptr.as_ptr() as *const i8))),
-                )
-            }
-        } else {
-            (
-                name.map(|name| Cow::Owned(name.to_owned())),
-                name2.map(|name| Cow::Owned(name.to_owned())),
-                name3.map(|name| Cow::Owned(name.to_owned())),
-            )
-        };
+        let (name, name2, name3) = (
+            name.map(|name| Cow::Owned(name.to_owned())),
+            name2.map(|name| Cow::Owned(name.to_owned())),
+            name3.map(|name| Cow::Owned(name.to_owned())),
+        );
 
         if self.is_empty() {
             self.grow(1);
@@ -648,13 +583,13 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// assert!(table.add_entry(c"foo", 1u32).is_ok());
-    /// // (c"foo", 1) already exists, so `table` returns `Err`.
-    /// assert!(table.add_entry(c"foo", 2u32).is_err());
+    /// assert!(table.add_entry("foo", 1u32).is_ok());
+    /// // ("foo", 1) already exists, so `table` returns `Err`.
+    /// assert!(table.add_entry("foo", 2u32).is_err());
     ///
-    /// assert_eq!(table.lookup(c"foo"), Some(&1));
+    /// assert_eq!(table.lookup("foo"), Some(&1));
     /// ```
-    pub fn add_entry(&mut self, name: &CStr, data: T) -> Result<(), anyhow::Error> {
+    pub fn add_entry(&mut self, name: &str, data: T) -> Result<(), anyhow::Error> {
         self.do_add_entry(Some(name), None, None, data)
     }
 
@@ -669,18 +604,18 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// assert!(table.add_entry2(c"foo", Some(c"bar"), 1u32).is_ok());
-    /// // (c"foo", c"bar", 1) already exists, so `table` returns `Err`.
-    /// assert!(table.add_entry2(c"foo", Some(c"bar"), 2u32).is_err());
-    /// // c"foo" already exists, but the pair of (c"foo", c"hoge") does not yet exist.
-    /// assert!(table.add_entry2(c"foo", Some(c"hoge"), 3u32).is_ok());
+    /// assert!(table.add_entry2("foo", Some("bar"), 1u32).is_ok());
+    /// // ("foo", "bar", 1) already exists, so `table` returns `Err`.
+    /// assert!(table.add_entry2("foo", Some("bar"), 2u32).is_err());
+    /// // "foo" already exists, but the pair of ("foo", "hoge") does not yet exist.
+    /// assert!(table.add_entry2("foo", Some("hoge"), 3u32).is_ok());
     ///
-    /// assert_eq!(table.lookup2(c"foo", Some(c"bar")), Some(&1));
+    /// assert_eq!(table.lookup2("foo", Some("bar")), Some(&1));
     /// ```
     pub fn add_entry2(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
+        name: &str,
+        name2: Option<&str>,
         data: T,
     ) -> Result<(), anyhow::Error> {
         self.do_add_entry(Some(name), name2, None, data)
@@ -697,20 +632,20 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"fuga"), 1u32).is_ok());
-    /// // (c"foo", c"bar", 1) already exists, so `table` returns `Err`.
-    /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"fuga"), 2u32).is_err());
-    /// // (c"foo", c"bar") already exists,
-    /// // but the pair of (c"foo", c"bar", c"piyo") does not yet exist.
-    /// assert!(table.add_entry3(c"foo", Some(c"bar"), Some(c"piyo"), 3u32).is_ok());
+    /// assert!(table.add_entry3("foo", Some("bar"), Some("fuga"), 1u32).is_ok());
+    /// // ("foo", "bar", 1) already exists, so `table` returns `Err`.
+    /// assert!(table.add_entry3("foo", Some("bar"), Some("fuga"), 2u32).is_err());
+    /// // ("foo", "bar") already exists,
+    /// // but the pair of ("foo", "bar", "piyo") does not yet exist.
+    /// assert!(table.add_entry3("foo", Some("bar"), Some("piyo"), 3u32).is_ok());
     ///
-    /// assert_eq!(table.lookup3(c"foo", Some(c"bar"), Some(c"fuga")), Some(&1));
+    /// assert_eq!(table.lookup3("foo", Some("bar"), Some("fuga")), Some(&1));
     /// ```
     pub fn add_entry3(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
-        name3: Option<&CStr>,
+        name: &str,
+        name2: Option<&str>,
+        name3: Option<&str>,
         data: T,
     ) -> Result<(), anyhow::Error> {
         self.do_add_entry(Some(name), name2, name3, data)
@@ -718,10 +653,10 @@ impl<'a, T> XmlHashTable<'a, T> {
 
     fn do_remove_entry(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
-        name3: Option<&CStr>,
-        deallocator: impl Fn(T, Option<Cow<'_, CStr>>),
+        name: &str,
+        name2: Option<&str>,
+        name3: Option<&str>,
+        deallocator: impl Fn(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         let (name, name2, name3) = (
             Some(Cow::Borrowed(name)),
@@ -792,17 +727,17 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry(c"hoge", 1);
-    /// table.add_entry2(c"hoge", Some(c"fuga"), 2);
+    /// table.add_entry("hoge", 1);
+    /// table.add_entry2("hoge", Some("fuga"), 2);
     ///
-    /// assert!(table.remove_entry(c"hoge", |data, _| assert_eq!(data, 1)).is_ok());
-    /// // No entries match with c"hoge" are found.
-    /// assert!(table.remove_entry(c"hoge", |_, _| {}).is_err());
+    /// assert!(table.remove_entry("hoge", |data, _| assert_eq!(data, 1)).is_ok());
+    /// // No entries match with "hoge" are found.
+    /// assert!(table.remove_entry("hoge", |_, _| {}).is_err());
     /// ```
     pub fn remove_entry(
         &mut self,
-        name: &CStr,
-        deallocator: impl Fn(T, Option<Cow<'_, CStr>>),
+        name: &str,
+        deallocator: impl Fn(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         self.do_remove_entry(name, None, None, deallocator)
     }
@@ -818,18 +753,18 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry2(c"hoge", Some(c"fuga"), 1);
-    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 2);
+    /// table.add_entry2("hoge", Some("fuga"), 1);
+    /// table.add_entry3("hoge", Some("fuga"), Some("piyo"), 2);
     ///
-    /// assert!(table.remove_entry2(c"hoge", Some(c"fuga"), |data, _| assert_eq!(data, 1)).is_ok());
-    /// // No entries match with (c"hoge", c"fuga") are found.
-    /// assert!(table.remove_entry2(c"hoge", Some(c"fuga"), |_, _| {}).is_err());
+    /// assert!(table.remove_entry2("hoge", Some("fuga"), |data, _| assert_eq!(data, 1)).is_ok());
+    /// // No entries match with ("hoge", "fuga") are found.
+    /// assert!(table.remove_entry2("hoge", Some("fuga"), |_, _| {}).is_err());
     /// ```
     pub fn remove_entry2(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
-        deallocator: impl Fn(T, Option<Cow<'_, CStr>>),
+        name: &str,
+        name2: Option<&str>,
+        deallocator: impl Fn(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         self.do_remove_entry(name, name2, None, deallocator)
     }
@@ -845,21 +780,21 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 2);
+    /// table.add_entry3("hoge", Some("fuga"), Some("piyo"), 2);
     ///
-    /// assert!(table.remove_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), |data, _| assert_eq!(data, 2)).is_ok());
+    /// assert!(table.remove_entry3("hoge", Some("fuga"), Some("piyo"), |data, _| assert_eq!(data, 2)).is_ok());
     /// ```
     pub fn remove_entry3(
         &mut self,
-        name: &CStr,
-        name2: Option<&CStr>,
-        name3: Option<&CStr>,
-        deallocator: impl Fn(T, Option<Cow<'_, CStr>>),
+        name: &str,
+        name2: Option<&str>,
+        name3: Option<&str>,
+        deallocator: impl Fn(T, Option<Cow<'_, str>>),
     ) -> Result<(), anyhow::Error> {
         self.do_remove_entry(name, name2, name3, deallocator)
     }
 
-    fn do_lookup(&self, name: &CStr, name2: Option<&CStr>, name3: Option<&CStr>) -> Option<&T> {
+    fn do_lookup(&self, name: &str, name2: Option<&str>, name3: Option<&str>) -> Option<&T> {
         let (name, name2, name3) = (
             Some(Cow::Borrowed(name)),
             name2.map(Cow::Borrowed),
@@ -893,12 +828,12 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry(c"hoge", 1u32);
+    /// table.add_entry("hoge", 1u32);
     ///
-    /// assert_eq!(table.lookup(c"hoge"), Some(&1));
-    /// assert_eq!(table.lookup(c"fuga"), None);
+    /// assert_eq!(table.lookup("hoge"), Some(&1));
+    /// assert_eq!(table.lookup("fuga"), None);
     /// ```
-    pub fn lookup(&self, name: &CStr) -> Option<&T> {
+    pub fn lookup(&self, name: &str) -> Option<&T> {
         self.do_lookup(name, None, None)
     }
 
@@ -912,12 +847,12 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry2(c"hoge", Some(c"fuga"), 1u32);
+    /// table.add_entry2("hoge", Some("fuga"), 1u32);
     ///
-    /// assert_eq!(table.lookup2(c"hoge", Some(c"fuga")), Some(&1));
-    /// assert_eq!(table.lookup2(c"hoge", Some(c"piyo")), None);
+    /// assert_eq!(table.lookup2("hoge", Some("fuga")), Some(&1));
+    /// assert_eq!(table.lookup2("hoge", Some("piyo")), None);
     /// ```
-    pub fn lookup2(&self, name: &CStr, name2: Option<&CStr>) -> Option<&T> {
+    pub fn lookup2(&self, name: &str, name2: Option<&str>) -> Option<&T> {
         self.do_lookup(name, name2, None)
     }
 
@@ -931,23 +866,23 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry3(c"hoge", Some(c"fuga"), Some(c"piyo"), 1u32);
+    /// table.add_entry3("hoge", Some("fuga"), Some("piyo"), 1u32);
     ///
-    /// assert_eq!(table.lookup3(c"hoge", Some(c"fuga"), Some(c"piyo")), Some(&1));
-    /// assert_eq!(table.lookup3(c"hoge", Some(c"fuga"), Some(c"bar")), None);
+    /// assert_eq!(table.lookup3("hoge", Some("fuga"), Some("piyo")), Some(&1));
+    /// assert_eq!(table.lookup3("hoge", Some("fuga"), Some("bar")), None);
     /// ```
-    pub fn lookup3(&self, name: &CStr, name2: Option<&CStr>, name3: Option<&CStr>) -> Option<&T> {
+    pub fn lookup3(&self, name: &str, name2: Option<&str>, name3: Option<&str>) -> Option<&T> {
         self.do_lookup(name, name2, name3)
     }
 
     fn do_qlookup(
         &self,
-        prefix: Option<&CStr>,
-        name: &CStr,
-        prefix2: Option<&CStr>,
-        name2: Option<&CStr>,
-        prefix3: Option<&CStr>,
-        name3: Option<&CStr>,
+        prefix: Option<&str>,
+        name: &str,
+        prefix2: Option<&str>,
+        name2: Option<&str>,
+        prefix3: Option<&str>,
+        name3: Option<&str>,
     ) -> Option<&T> {
         if !self.is_empty() {
             let key = xml_hash_compute_qkey(
@@ -962,37 +897,30 @@ impl<'a, T> XmlHashTable<'a, T> {
 
             self.table[key].payload.as_ref()?;
 
-            unsafe {
-                let (prefix, prefix2, prefix3) = (
-                    prefix.map_or(null(), |p| p.as_ptr()) as *const u8,
-                    prefix2.map_or(null(), |p| p.as_ptr()) as *const u8,
-                    prefix3.map_or(null(), |p| p.as_ptr()) as *const u8,
-                );
-                let (name, name2, name3) = (
-                    name.as_ptr() as *const u8,
-                    name2.map_or(null(), |n| n.as_ptr()) as *const u8,
-                    name3.map_or(null(), |n| n.as_ptr()) as *const u8,
-                );
-
-                let mut now = &self.table[key];
-                loop {
-                    if xml_str_qequal(
-                        prefix,
-                        name,
-                        now.name.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-                    ) && xml_str_qequal(
-                        prefix2,
-                        name2,
-                        now.name2.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-                    ) && xml_str_qequal(
-                        prefix3,
-                        name3,
-                        now.name3.as_ref().map_or(null(), |n| n.as_ptr()) as _,
-                    ) {
-                        return now.payload.as_ref();
-                    }
-                    now = now.next.as_ref()?.deref();
+            let qequal = |pre: Option<&str>, loc: Option<&str>, name: Option<&str>| -> bool {
+                let Some(pre) = pre else {
+                    return name == loc;
+                };
+                let (Some(loc), Some(name)) = (loc, name) else {
+                    return false;
+                };
+                let Some(rem) = name.strip_prefix(pre) else {
+                    return false;
+                };
+                let Some(rem) = rem.strip_prefix(':') else {
+                    return false;
+                };
+                rem == loc
+            };
+            let mut now = &self.table[key];
+            loop {
+                if qequal(prefix, Some(name), now.name.as_deref())
+                    && qequal(prefix2, name2, now.name2.as_deref())
+                    && qequal(prefix3, name3, now.name3.as_deref())
+                {
+                    return now.payload.as_ref();
                 }
+                now = now.next.as_ref()?.deref();
             }
         }
         None
@@ -1008,18 +936,18 @@ impl<'a, T> XmlHashTable<'a, T> {
     ///
     /// let mut table = XmlHashTable::new();
     ///
-    /// table.add_entry(c"hoge:fuga", 1u32);
+    /// table.add_entry("hoge:fuga", 1u32);
     ///
     /// // You can search QName by all of the following way.
-    /// assert_eq!(table.qlookup(Some(c"hoge"), c"fuga"), Some(&1));
-    /// assert_eq!(table.qlookup(None, c"hoge:fuga"), Some(&1));
-    /// assert_eq!(table.lookup(c"hoge:fuga"), Some(&1));
+    /// assert_eq!(table.qlookup(Some("hoge"), "fuga"), Some(&1));
+    /// assert_eq!(table.qlookup(None, "hoge:fuga"), Some(&1));
+    /// assert_eq!(table.lookup("hoge:fuga"), Some(&1));
     ///
-    /// table.add_entry(c"hoge", 2);
+    /// table.add_entry("hoge", 2);
     ///
-    /// assert_eq!(table.qlookup(None, c"hoge"), Some(&2));
+    /// assert_eq!(table.qlookup(None, "hoge"), Some(&2));
     /// ```
-    pub fn qlookup(&self, prefix: Option<&CStr>, name: &CStr) -> Option<&T> {
+    pub fn qlookup(&self, prefix: Option<&str>, name: &str) -> Option<&T> {
         self.do_qlookup(prefix, name, None, None, None, None)
     }
 
@@ -1030,10 +958,10 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// Please refer to the example for `XmlHashTable::qlookup`.
     pub fn qlookup2(
         &self,
-        prefix: Option<&CStr>,
-        name: &CStr,
-        prefix2: Option<&CStr>,
-        name2: Option<&CStr>,
+        prefix: Option<&str>,
+        name: &str,
+        prefix2: Option<&str>,
+        name2: Option<&str>,
     ) -> Option<&T> {
         self.do_qlookup(prefix, name, prefix2, name2, None, None)
     }
@@ -1045,12 +973,12 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// Please refer to the example for `XmlHashTable::qlookup`.
     pub fn qlookup3(
         &self,
-        prefix: Option<&CStr>,
-        name: &CStr,
-        prefix2: Option<&CStr>,
-        name2: Option<&CStr>,
-        prefix3: Option<&CStr>,
-        name3: Option<&CStr>,
+        prefix: Option<&str>,
+        name: &str,
+        prefix2: Option<&str>,
+        name2: Option<&str>,
+        prefix3: Option<&str>,
+        name3: Option<&str>,
     ) -> Option<&T> {
         self.do_qlookup(prefix, name, prefix2, name2, prefix3, name3)
     }
@@ -1062,9 +990,9 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry(c"hoge", 1u32);
-    /// table.add_entry(c"fuga", 2);
-    /// table.add_entry(c"piyo", 3);
+    /// table.add_entry("hoge", 1u32);
+    /// table.add_entry("fuga", 2);
+    /// table.add_entry("piyo", 3);
     ///
     /// let cloned = table.clone_with(|data, _| data.clone());
     ///
@@ -1074,13 +1002,13 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// assert_eq!(
     ///     data,
     ///     vec![
-    ///         (1u32, c"hoge".to_owned()),
-    ///         (2, c"fuga".to_owned()),
-    ///         (3, c"piyo".to_owned())
+    ///         (1u32, "hoge".to_owned()),
+    ///         (2, "fuga".to_owned()),
+    ///         (3, "piyo".to_owned())
     ///     ]
     /// );
     /// ```
-    pub fn clone_with(&self, mut copier: impl FnMut(&T, Option<&Cow<'a, CStr>>) -> T) -> Self {
+    pub fn clone_with(&self, mut copier: impl FnMut(&T, Option<&Cow<'a, str>>) -> T) -> Self {
         let mut res = Self::with_capacity(self.table.len());
         for mut entry in &self.table {
             if entry.payload.is_none() {
@@ -1125,19 +1053,19 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry(c"hoge", 1u32);
-    /// table.add_entry(c"fuga", 2);
-    /// table.add_entry(c"piyo", 3);
-    /// table.add_entry(c"foo", 4);
+    /// table.add_entry("hoge", 1u32);
+    /// table.add_entry("fuga", 2);
+    /// table.add_entry("piyo", 3);
+    /// table.add_entry("foo", 4);
     /// assert_eq!(table.len(), 4);
     ///
     /// table.remove_if(|data, _, _, _| data % 2 == 0, |_, _| {});
     /// assert_eq!(table.len(), 2);
     ///
-    /// assert!(table.lookup(c"hoge").is_some());
-    /// assert!(table.lookup(c"fuga").is_none());
-    /// assert!(table.lookup(c"piyo").is_some());
-    /// assert!(table.lookup(c"foo").is_none());
+    /// assert!(table.lookup("hoge").is_some());
+    /// assert!(table.lookup("fuga").is_none());
+    /// assert!(table.lookup("piyo").is_some());
+    /// assert!(table.lookup("foo").is_none());
     /// ```
     ///
     /// # Note
@@ -1149,11 +1077,11 @@ impl<'a, T> XmlHashTable<'a, T> {
         &mut self,
         mut cond: impl FnMut(
             &T,
-            Option<&Cow<'_, CStr>>,
-            Option<&Cow<'_, CStr>>,
-            Option<&Cow<'_, CStr>>,
+            Option<&Cow<'_, str>>,
+            Option<&Cow<'_, str>>,
+            Option<&Cow<'_, str>>,
         ) -> bool,
-        mut deallocator: impl FnMut(T, Option<Cow<'a, CStr>>),
+        mut deallocator: impl FnMut(T, Option<Cow<'a, str>>),
     ) {
         for entry in &mut self.table {
             while entry.payload.is_some()
@@ -1219,32 +1147,32 @@ impl<'a, T> XmlHashTable<'a, T> {
     /// use exml::hash::XmlHashTable;
     ///
     /// let mut table = XmlHashTable::new();
-    /// table.add_entry(c"foo", 1u32);
-    /// table.add_entry2(c"hoge", Some(c"fuga"), 2);
-    /// table.add_entry3(c"foo", Some(c"bar"), Some(c"piyo"), 3);
+    /// table.add_entry("foo", 1u32);
+    /// table.add_entry2("hoge", Some("fuga"), 2);
+    /// table.add_entry3("foo", Some("bar"), Some("piyo"), 3);
     ///
     /// let mut entries = vec![];
     /// table.scan(|data, s1, s2, s3| entries.push(
     ///     (
     ///         *data,
-    ///         s1.map_or(c"".to_owned(), |s| s.clone().into()),
-    ///         s2.map_or(c"".to_owned(), |s| s.clone().into()),
-    ///         s3.map_or(c"".to_owned(), |s| s.clone().into()),
+    ///         s1.map_or("".to_owned(), |s| s.clone().into()),
+    ///         s2.map_or("".to_owned(), |s| s.clone().into()),
+    ///         s3.map_or("".to_owned(), |s| s.clone().into()),
     ///     )
     /// ));
     /// entries.sort();
     /// assert_eq!(
     ///     entries,
     ///     vec![
-    ///         (1u32, c"foo".to_owned(), c"".to_owned(), c"".to_owned()),
-    ///         (2u32, c"hoge".to_owned(), c"fuga".to_owned(), c"".to_owned()),
-    ///         (3u32, c"foo".to_owned(), c"bar".to_owned(), c"piyo".to_owned()),
+    ///         (1u32, "foo".to_owned(), "".to_owned(), "".to_owned()),
+    ///         (2u32, "hoge".to_owned(), "fuga".to_owned(), "".to_owned()),
+    ///         (3u32, "foo".to_owned(), "bar".to_owned(), "piyo".to_owned()),
     ///     ],
     /// )
     /// ```
     pub fn scan(
         &self,
-        mut f: impl FnMut(&T, Option<&Cow<'_, CStr>>, Option<&Cow<'_, CStr>>, Option<&Cow<'_, CStr>>),
+        mut f: impl FnMut(&T, Option<&Cow<'_, str>>, Option<&Cow<'_, str>>, Option<&Cow<'_, str>>),
     ) {
         let num_elems = self.num_elems;
         for mut entry in &self.table {
@@ -1286,10 +1214,6 @@ impl<'a, T> Default for XmlHashTable<'a, T> {
 impl<'a, T> Drop for XmlHashTable<'a, T> {
     fn drop(&mut self) {
         self.clear();
-        if let Some(dict) = self.dict {
-            dict.free();
-            self.dict = None;
-        }
     }
 }
 
@@ -1374,9 +1298,9 @@ impl<'a, T> Drain<'a, T> {
 impl<'a, T> Iterator for Drain<'a, T> {
     type Item = (
         T,
-        Option<Cow<'a, CStr>>,
-        Option<Cow<'a, CStr>>,
-        Option<Cow<'a, CStr>>,
+        Option<Cow<'a, str>>,
+        Option<Cow<'a, str>>,
+        Option<Cow<'a, str>>,
     );
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1419,14 +1343,11 @@ impl<'a, T> Iterator for Drain<'a, T> {
 pub mod libxml_api {
     use std::{
         borrow::Cow,
-        ffi::{c_void, CStr},
+        ffi::{c_void, CStr, CString},
         ptr::{null, null_mut},
     };
 
-    use crate::{
-        dict::{XmlDictPtr, XmlDictRef},
-        libxml::{globals::xml_free, xmlstring::XmlChar},
-    };
+    use crate::libxml::{globals::xml_free, xmlstring::XmlChar};
 
     pub use super::XmlHashTable;
     use super::XmlHashTableRef;
@@ -1468,25 +1389,26 @@ pub mod libxml_api {
             .unwrap_or(null_mut())
     }
 
-    pub extern "C" fn xml_hash_create_dict(mut size: i32, dict: XmlDictPtr) -> XmlHashTablePtr {
-        if size <= 0 {
-            size = 256;
-        }
-        let dict = XmlDictRef::from_raw(dict);
-        let table = XmlHashTable::with_capacity_dict(size as usize, dict);
-        XmlHashTableRef::from_table(table)
-            .map(|table| table.as_ptr())
-            .unwrap_or(null_mut())
-    }
+    // pub extern "C" fn xml_hash_create_dict(mut size: i32, dict: XmlDictPtr) -> XmlHashTablePtr {
+    //     if size <= 0 {
+    //         size = 256;
+    //     }
+    //     let dict = XmlDictRef::from_raw(dict);
+    //     let table = XmlHashTable::with_capacity_dict(size as usize, dict);
+    //     XmlHashTableRef::from_table(table)
+    //         .map(|table| table.as_ptr())
+    //         .unwrap_or(null_mut())
+    // }
 
     pub extern "C" fn xml_hash_free(table: XmlHashTablePtr, f: Option<XmlHashDeallocator>) {
         if let Some(table) = XmlHashTableRef::from_raw(table) {
             let mut table = table.into_inner();
             table.clear_with(move |payload, name| {
                 if let Some(f) = f {
+                    let name = name.map(|n| CString::new(n.as_ref()).unwrap());
                     f(
                         payload.0,
-                        name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                     );
                 }
             });
@@ -1539,9 +1461,13 @@ pub mod libxml_api {
         };
 
         match table.do_add_entry(
-            Some(CStr::from_ptr(name as *const i8)),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+            Some(CStr::from_ptr(name as *const i8).to_string_lossy()).as_deref(),
+            (!name2.is_null())
+                .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                .as_deref(),
+            (!name3.is_null())
+                .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                .as_deref(),
             CVoidWrapper(userdata),
         ) {
             Ok(_) => 0,
@@ -1590,15 +1516,20 @@ pub mod libxml_api {
         };
 
         match table.do_update_entry(
-            CStr::from_ptr(name as *const i8),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!name2.is_null())
+                .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                .as_deref(),
+            (!name3.is_null())
+                .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                .as_deref(),
             CVoidWrapper(userdata),
-            move |payload: CVoidWrapper, name: Option<Cow<'_, CStr>>| {
+            move |payload: CVoidWrapper, name: Option<Cow<'_, str>>| {
                 if let Some(deallocator) = f {
+                    let name = name.map(|n| CString::new(n.as_ref()).unwrap());
                     deallocator(
                         payload.0,
-                        name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                     );
                 }
             },
@@ -1646,14 +1577,19 @@ pub mod libxml_api {
         };
 
         match table.do_remove_entry(
-            CStr::from_ptr(name as *const i8),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
-            move |payload: CVoidWrapper, name: Option<Cow<'_, CStr>>| {
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            (!name2.is_null())
+                .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                .as_deref(),
+            (!name3.is_null())
+                .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                .as_deref(),
+            move |payload: CVoidWrapper, name: Option<Cow<'_, str>>| {
                 if let Some(deallocator) = f {
+                    let name = name.map(|n| CString::new(n.as_ref()).unwrap());
                     deallocator(
                         payload.0,
-                        name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                        name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                     );
                 }
             },
@@ -1699,9 +1635,13 @@ pub mod libxml_api {
 
         table
             .do_lookup(
-                CStr::from_ptr(name as *const i8),
-                (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-                (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!name2.is_null())
+                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name3.is_null())
+                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                    .as_deref(),
             )
             .map(|ptr| ptr.0)
             .unwrap_or(null_mut())
@@ -1749,12 +1689,22 @@ pub mod libxml_api {
 
         table
             .do_qlookup(
-                (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
-                CStr::from_ptr(name as *const i8),
-                (!prefix2.is_null()).then(|| CStr::from_ptr(prefix2 as *const i8)),
-                (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-                (!prefix3.is_null()).then(|| CStr::from_ptr(prefix3 as *const i8)),
-                (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!prefix2.is_null())
+                    .then(|| CStr::from_ptr(prefix2 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name2.is_null())
+                    .then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!prefix3.is_null())
+                    .then(|| CStr::from_ptr(prefix3 as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name3.is_null())
+                    .then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy())
+                    .as_deref(),
             )
             .map(|ptr| ptr.0)
             .unwrap_or(null_mut())
@@ -1773,9 +1723,10 @@ pub mod libxml_api {
         };
 
         let cloned = table.clone_with(|payload, name| {
+            let name = name.map(|n| CString::new(n.as_ref()).unwrap());
             CVoidWrapper(copier(
                 payload.0,
-                name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
             ))
         });
         XmlHashTableRef::from_table(cloned)
@@ -1806,10 +1757,11 @@ pub mod libxml_api {
 
         table.scan(move |payload, name, _, _| {
             if !payload.0.is_null() {
+                let name = name.map(|n| CString::new(n.as_ref()).unwrap());
                 scanner(
                     payload.0,
                     data,
-                    name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                 );
             }
         });
@@ -1835,21 +1787,22 @@ pub mod libxml_api {
         };
 
         let (name, name2, name3) = (
-            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8)),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy()),
+            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy()),
+            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy()),
         );
 
         table.scan(move |payload, n, n2, n3| {
-            if (name.is_none() || n.map(|n| n.as_ref()) == name)
-                && (name2.is_none() || n2.map(|n| n.as_ref()) == name2)
-                && (name3.is_none() || n3.map(|n| n.as_ref()) == name3)
+            if (name.is_none() || n.map(|n| n.as_ref()) == name.as_deref())
+                && (name2.is_none() || n2.map(|n| n.as_ref()) == name2.as_deref())
+                && (name3.is_none() || n3.map(|n| n.as_ref()) == name3.as_deref())
                 && !payload.0.is_null()
             {
+                let n = n.map(|n| CString::new(n.as_ref()).unwrap());
                 scanner(
                     payload.0,
                     data,
-                    n.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    n.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                 );
             }
         });
@@ -1872,12 +1825,15 @@ pub mod libxml_api {
 
         table.scan(move |payload, name, name2, name3| {
             if !payload.0.is_null() {
+                let name = name.map(|n| CString::new(n.as_ref()).unwrap());
+                let name2 = name2.map(|n| CString::new(n.as_ref()).unwrap());
+                let name3 = name3.map(|n| CString::new(n.as_ref()).unwrap());
                 scanner(
                     payload.0,
                     data,
-                    name.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    name2.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    name3.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    name.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    name2.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    name3.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                 );
             }
         });
@@ -1903,23 +1859,26 @@ pub mod libxml_api {
         };
 
         let (name, name2, name3) = (
-            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8)),
-            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8)),
-            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8)),
+            (!name.is_null()).then(|| CStr::from_ptr(name as *const i8).to_string_lossy()),
+            (!name2.is_null()).then(|| CStr::from_ptr(name2 as *const i8).to_string_lossy()),
+            (!name3.is_null()).then(|| CStr::from_ptr(name3 as *const i8).to_string_lossy()),
         );
 
         table.scan(move |payload, n, n2, n3| {
-            if (name.is_none() || n.map(|n| n.as_ref()) == name)
-                && (name2.is_none() || n2.map(|n| n.as_ref()) == name2)
-                && (name3.is_none() || n3.map(|n| n.as_ref()) == name3)
+            if (name.is_none() || n.map(|n| n.as_ref()) == name.as_deref())
+                && (name2.is_none() || n2.map(|n| n.as_ref()) == name2.as_deref())
+                && (name3.is_none() || n3.map(|n| n.as_ref()) == name3.as_deref())
                 && !payload.0.is_null()
             {
+                let n = n.map(|n| CString::new(n.as_ref()).unwrap());
+                let n2 = n2.map(|n| CString::new(n.as_ref()).unwrap());
+                let n3 = n3.map(|n| CString::new(n.as_ref()).unwrap());
                 scanner(
                     payload.0,
                     data,
-                    n.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    n2.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
-                    n3.map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    n.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    n2.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
+                    n3.as_deref().map(|n| n.as_ptr()).unwrap_or(null()) as *const u8,
                 );
             }
         });
@@ -1927,10 +1886,13 @@ pub mod libxml_api {
 
     #[cfg(test)]
     mod tests {
-        use std::{ffi::CString, num::NonZeroU8};
+        use std::num::NonZeroU8;
 
         use rand::{
-            distributions::Alphanumeric, prelude::Distribution, seq::SliceRandom, thread_rng, Rng,
+            distributions::{Alphanumeric, DistString},
+            prelude::Distribution,
+            seq::SliceRandom,
+            thread_rng, Rng,
         };
 
         use super::*;
@@ -1945,14 +1907,23 @@ pub mod libxml_api {
                 .collect::<Vec<_>>()
         }
 
+        fn gen_ncname_len(rng: &mut impl Rng, len: usize) -> CString {
+            CString::new(Alphanumeric.sample_string(rng, len)).unwrap()
+        }
+
         fn gen_ncname(rng: &mut impl Rng) -> CString {
-            CString::from(gen_chars(rng))
+            gen_ncname_len(rng, LEN)
         }
 
         fn gen_qname(rng: &mut impl Rng) -> CString {
-            let mut chars = gen_chars(rng);
-            chars[rng.gen_range(1..29)] = NonZeroU8::new(b':').unwrap();
-            CString::from(chars)
+            let prelen = rng.gen_range(1..29);
+            let loclen = LEN - 1 - prelen;
+            CString::new(format!(
+                "{}:{}",
+                gen_ncname_len(rng, prelen).to_string_lossy(),
+                gen_ncname_len(rng, loclen).to_string_lossy()
+            ))
+            .unwrap()
         }
 
         unsafe fn ncname_insertion_test(
@@ -2007,11 +1978,11 @@ pub mod libxml_api {
         }
 
         fn split_qname(qname: &CStr) -> Option<(CString, CString)> {
-            let qname = qname.to_string_lossy();
-            let (prefix, local_name) = qname.split_once(':')?;
+            let bytes = qname.to_bytes();
+            let pos = bytes.iter().position(|&b| b == b':')?;
             Some((
-                CString::new(prefix).unwrap(),
-                CString::new(local_name).unwrap(),
+                CString::new(&bytes[..pos]).unwrap(),
+                CString::new(&bytes[pos + 1..]).unwrap(),
             ))
         }
 
@@ -2425,10 +2396,13 @@ pub mod libxml_api {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::CString, num::NonZeroU8};
+    use std::num::NonZeroU8;
 
     use rand::{
-        distributions::Alphanumeric, prelude::Distribution, seq::SliceRandom, thread_rng, Rng,
+        distributions::{Alphanumeric, DistString},
+        prelude::Distribution,
+        seq::SliceRandom,
+        thread_rng, Rng,
     };
 
     use super::*;
@@ -2443,19 +2417,27 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
-    fn gen_ncname(rng: &mut impl Rng) -> CString {
-        CString::from(gen_chars(rng))
+    fn gen_ncname_len(rng: &mut impl Rng, len: usize) -> String {
+        Alphanumeric.sample_string(rng, len)
     }
 
-    fn gen_qname(rng: &mut impl Rng) -> CString {
-        let mut chars = gen_chars(rng);
-        chars[rng.gen_range(1..29)] = NonZeroU8::new(b':').unwrap();
-        CString::from(chars)
+    fn gen_ncname(rng: &mut impl Rng) -> String {
+        gen_ncname_len(rng, LEN)
+    }
+
+    fn gen_qname(rng: &mut impl Rng) -> String {
+        let prelen = rng.gen_range(1..29);
+        let loclen = LEN - 1 - prelen;
+        format!(
+            "{}:{}",
+            gen_ncname_len(rng, prelen),
+            gen_ncname_len(rng, loclen)
+        )
     }
 
     fn ncname_insertion_test(
         table: &mut XmlHashTable<u64>,
-        entries: &mut Vec<(CString, Option<CString>, Option<CString>, u64)>,
+        entries: &mut Vec<(String, Option<String>, Option<String>, u64)>,
         rng: &mut impl Rng,
     ) {
         match rng.gen_range(1..=3) {
@@ -2487,18 +2469,15 @@ mod tests {
         }
     }
 
-    fn split_qname(qname: &CStr) -> Option<(CString, CString)> {
-        let qname = qname.to_string_lossy();
-        let (prefix, local_name) = qname.split_once(':')?;
-        Some((
-            CString::new(prefix).unwrap(),
-            CString::new(local_name).unwrap(),
-        ))
+    fn split_qname(qname: &str) -> Option<(String, String)> {
+        qname
+            .split_once(':')
+            .map(|(pre, loc)| (pre.to_owned(), loc.to_owned()))
     }
 
     fn qname_insertion_test(
         table: &mut XmlHashTable<u64>,
-        entries: &mut Vec<(CString, Option<CString>, Option<CString>, u64)>,
+        entries: &mut Vec<(String, Option<String>, Option<String>, u64)>,
         rng: &mut impl Rng,
     ) {
         match rng.gen_range(1..=3) {

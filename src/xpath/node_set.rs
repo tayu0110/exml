@@ -1,4 +1,4 @@
-use std::{ffi::CString, ptr::null_mut};
+use std::ptr::null_mut;
 
 use crate::{
     hash::XmlHashTable,
@@ -455,7 +455,6 @@ pub unsafe fn xml_xpath_distinct_sorted(nodes: Option<&XmlNodeSet>) -> Option<Bo
     for i in 0..l {
         cur = nodes.get(i);
         let strval = xml_xpath_cast_node_to_string(cur);
-        let strval = CString::new(strval).unwrap();
         if hash.lookup(&strval).is_none() {
             if hash.add_entry(&strval, ()).is_err() {
                 xml_xpath_free_node_set(Some(ret));

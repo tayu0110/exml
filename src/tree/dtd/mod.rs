@@ -87,7 +87,7 @@ impl XmlDtd {
     pub(super) unsafe fn get_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
         if let Some(table) = self.entities {
             return table
-                .lookup(CStr::from_ptr(name as *const i8))
+                .lookup(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
                 .map_or(null_mut(), |p| *p);
         }
         null_mut()
@@ -102,7 +102,7 @@ impl XmlDtd {
     pub(super) unsafe fn get_parameter_entity(&self, name: *const XmlChar) -> XmlEntityPtr {
         if let Some(table) = self.pentities {
             return table
-                .lookup(CStr::from_ptr(name as *const i8))
+                .lookup(CStr::from_ptr(name as *const i8).to_string_lossy().as_ref())
                 .map_or(null_mut(), |p| *p);
         }
         null_mut()
@@ -119,20 +119,12 @@ impl XmlDtd {
 
         if let Some((prefix, local)) = split_qname2(name) {
             table
-                .lookup3(
-                    CString::new(local).unwrap().as_c_str(),
-                    Some(CString::new(prefix).unwrap().as_c_str()),
-                    Some(CString::new(elem).unwrap().as_c_str()),
-                )
+                .lookup3(local, Some(prefix), Some(elem))
                 .copied()
                 .unwrap_or(null_mut())
         } else {
             table
-                .lookup3(
-                    CString::new(name).unwrap().as_c_str(),
-                    None,
-                    Some(CString::new(elem).unwrap().as_c_str()),
-                )
+                .lookup3(name, None, Some(elem))
                 .copied()
                 .unwrap_or(null_mut())
         }
@@ -148,11 +140,7 @@ impl XmlDtd {
         };
 
         table
-            .lookup3(
-                CString::new(name).unwrap().as_c_str(),
-                prefix.map(|p| CString::new(p).unwrap()).as_deref(),
-                Some(CString::new(elem).unwrap().as_c_str()),
-            )
+            .lookup3(name, prefix, Some(elem))
             .copied()
             .unwrap_or(null_mut())
     }

@@ -878,7 +878,7 @@ pub struct XmlDefAttrs {
 
 /// Parse a conditional section. Always consumes '<!['.
 ///
-/// ```ignore
+/// ```text
 /// [61] conditionalSect ::= includeSect | ignoreSect
 /// [62] includeSect ::= '<![' S? 'INCLUDE' S? '[' extSubsetDecl ']]>'
 /// [63] ignoreSect ::= '<![' S? 'IGNORE' S? '[' ignoreSectContents* ']]>'
@@ -1050,7 +1050,9 @@ pub(crate) unsafe fn xml_parse_conditional_sections(ctxt: XmlParserCtxtPtr) {
 
 /// Parse the internal subset declaration
 ///
-/// `[28 end] ('[' (markupdecl | PEReference | S)* ']' S?)? '>'`
+/// ```test
+/// [28 end] ('[' (markupdecl | PEReference | S)* ']' S?)? '>'
+/// ```
 #[doc(alias = "xmlParseInternalSubset")]
 unsafe fn xml_parse_internal_subset(ctxt: XmlParserCtxtPtr) {
     // Is there any DTD definition ?
@@ -4827,10 +4829,16 @@ unsafe fn xml_parse_attribute2(
     if let Some(atts) = (*ctxt).atts_special {
         if atts
             .qlookup2(
-                (!pref.is_null()).then(|| CStr::from_ptr(pref as *const i8)),
-                CStr::from_ptr(elem as *const i8),
-                (!(*prefix).is_null()).then(|| CStr::from_ptr(*prefix as *const i8)),
-                (!name.is_null()).then(|| CStr::from_ptr(name as *const i8)),
+                (!pref.is_null())
+                    .then(|| CStr::from_ptr(pref as *const i8).to_string_lossy())
+                    .as_deref(),
+                CStr::from_ptr(elem as *const i8).to_string_lossy().as_ref(),
+                (!(*prefix).is_null())
+                    .then(|| CStr::from_ptr(*prefix as *const i8).to_string_lossy())
+                    .as_deref(),
+                (!name.is_null())
+                    .then(|| CStr::from_ptr(name as *const i8).to_string_lossy())
+                    .as_deref(),
             )
             .is_some()
         {
@@ -5227,8 +5235,12 @@ pub(crate) unsafe fn xml_parse_start_tag2(
         // The attributes defaulting
         if let Some(atts_default) = (*ctxt).atts_default {
             let defaults = atts_default.lookup2(
-                CStr::from_ptr(localname as *const i8),
-                (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                CStr::from_ptr(localname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
             );
             if let Some(defaults) = defaults.copied() {
                 'b: for i in 0..(*defaults).nb_attrs as usize {

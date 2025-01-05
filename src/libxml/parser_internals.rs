@@ -90,7 +90,6 @@ use crate::{
     },
 };
 
-use super::dict::XmlDictRef;
 use super::entities::{
     XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
 };
@@ -2186,8 +2185,12 @@ pub(crate) unsafe fn xml_add_def_attrs(
         .atts_special
         .filter(|t| {
             t.lookup2(
-                CStr::from_ptr(fullname as *const i8),
-                (!fullattr.is_null()).then(|| CStr::from_ptr(fullattr as *const i8)),
+                CStr::from_ptr(fullname as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!fullattr.is_null())
+                    .then(|| CStr::from_ptr(fullattr as *const i8).to_string_lossy())
+                    .as_deref(),
             )
             .is_some()
         })
@@ -2200,8 +2203,7 @@ pub(crate) unsafe fn xml_add_def_attrs(
         let mut atts_default = if let Some(table) = (*ctxt).atts_default {
             table
         } else {
-            let dict = XmlDictRef::from_raw((*ctxt).dict);
-            let table = XmlHashTable::with_capacity_dict(10, dict);
+            let table = XmlHashTable::with_capacity(10);
             let Some(table) = XmlHashTableRef::from_table(table) else {
                 break 'mem_error;
             };
@@ -2223,8 +2225,10 @@ pub(crate) unsafe fn xml_add_def_attrs(
         // make sure there is some storage
         defaults = atts_default
             .lookup2(
-                CStr::from_ptr(name as *const i8),
-                (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                (!prefix.is_null())
+                    .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                    .as_deref(),
             )
             .map_or(null_mut(), |p| *p);
         if defaults.is_null() {
@@ -2237,8 +2241,10 @@ pub(crate) unsafe fn xml_add_def_attrs(
             (*defaults).max_attrs = 4;
             if atts_default
                 .update_entry2(
-                    CStr::from_ptr(name as *const i8),
-                    (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
                     defaults,
                     |_, _| {},
                 )
@@ -2260,8 +2266,10 @@ pub(crate) unsafe fn xml_add_def_attrs(
             (*defaults).max_attrs *= 2;
             if atts_default
                 .update_entry2(
-                    CStr::from_ptr(name as *const i8),
-                    (!prefix.is_null()).then(|| CStr::from_ptr(prefix as *const i8)),
+                    CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+                    (!prefix.is_null())
+                        .then(|| CStr::from_ptr(prefix as *const i8).to_string_lossy())
+                        .as_deref(),
                     defaults,
                     |_, _| {},
                 )
@@ -2334,8 +2342,7 @@ pub(crate) unsafe fn xml_add_special_attr(
     let mut atts_special = if let Some(table) = (*ctxt).atts_special {
         table
     } else {
-        let dict = XmlDictRef::from_raw((*ctxt).dict);
-        let table = XmlHashTable::with_capacity_dict(10, dict);
+        let table = XmlHashTable::with_capacity(10);
         let Some(table) = XmlHashTableRef::from_table(table) else {
             xml_err_memory(ctxt, None);
             return;
@@ -2344,13 +2351,17 @@ pub(crate) unsafe fn xml_add_special_attr(
         table
     };
 
-    let fullname = CStr::from_ptr(fullname as *const i8);
-    let fullattr = (!fullattr.is_null()).then(|| CStr::from_ptr(fullattr as *const i8));
-    if atts_special.lookup2(fullname, fullattr).is_some() {
+    let fullname = CStr::from_ptr(fullname as *const i8).to_string_lossy();
+    let fullattr =
+        (!fullattr.is_null()).then(|| CStr::from_ptr(fullattr as *const i8).to_string_lossy());
+    if atts_special
+        .lookup2(&fullname, fullattr.as_deref())
+        .is_some()
+    {
         return;
     }
 
-    atts_special.add_entry2(fullname, fullattr, typ);
+    atts_special.add_entry2(&fullname, fullattr.as_deref(), typ);
 }
 
 /// Parse the declaration for a Mixed Element content

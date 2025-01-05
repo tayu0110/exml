@@ -160,10 +160,8 @@ unsafe fn test_external_entity_loader(
     ret
 }
 
-/*
- * Trapping the error messages at the generic level to grab the equivalent of
- * stderr messages on CLI tools.
- */
+// Trapping the error messages at the generic level to grab the equivalent of
+// stderr messages on CLI tools.
 static mut TEST_ERRORS: [u8; 32769] = [0; 32769];
 static mut TEST_ERRORS_SIZE: usize = 0;
 
@@ -743,7 +741,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
         return -1;
     }
     println!("## XML Schemas datatypes test suite from James Clark");
-    test_log!(logfile, "filename: {}", filename);
+    test_log!(logfile, "filename: {}\n", filename);
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
@@ -810,7 +808,7 @@ unsafe extern "C" fn rng_test1(logfile: &mut Option<File>) -> c_int {
         return -1;
     }
     println!("## Relax NG test suite from James Clark");
-    test_log!(logfile, "filename: {}", filename);
+    test_log!(logfile, "filename: {}\n", filename);
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {
@@ -853,7 +851,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
         return -1;
     }
     println!("## Relax NG test suite for libxml2");
-    test_log!(logfile, "filename: {}", filename);
+    test_log!(logfile, "filename: {}\n", filename);
 
     cur = (*doc).get_root_element();
     if cur.is_null() || !xml_str_equal((*cur).name, c"testSuite".as_ptr() as _) {

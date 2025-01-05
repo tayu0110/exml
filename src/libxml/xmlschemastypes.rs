@@ -2055,7 +2055,8 @@ unsafe extern "C" fn _xml_schema_base64_decode(ch: XmlChar) -> i32 {
 /// Returns 0 if this validates, a positive error code number otherwise
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlSchemaValAtomicType")]
-unsafe extern "C" fn xml_schema_val_atomic_type(
+#[allow(clippy::too_many_arguments)]
+unsafe fn xml_schema_val_atomic_type(
     typ: XmlSchemaTypePtr,
     mut value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
@@ -2077,10 +2078,8 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
         return -1;
     }
 
-    /*
-     * validating a non existent text node is similar to validating
-     * an empty one.
-     */
+    // validating a non existent text node is similar to validating
+    // an empty one.
     if value.is_null() {
         value = c"".as_ptr() as _;
     }
@@ -2233,18 +2232,14 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                     break 'return1;
                                 }
 
-                                /*
-                                 * xs:decimal has a whitespace-facet value of 'collapse'.
-                                 */
+                                // xs:decimal has a whitespace-facet value of 'collapse'.
                                 if norm_on_the_fly != 0 {
                                     while IS_WSP_BLANK_CH!(*cur) {
                                         cur = cur.add(1);
                                     }
                                 }
 
-                                /*
-                                 * First we handle an optional sign.
-                                 */
+                                // First we handle an optional sign.
                                 neg = 0;
                                 if *cur == b'-' {
                                     neg = 1;
@@ -2252,24 +2247,18 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 } else if *cur == b'+' {
                                     cur = cur.add(1);
                                 }
-                                /*
-                                 * Disallow: "", "-", "- "
-                                 */
+                                // Disallow: "", "-", "- "
                                 if *cur == 0 {
                                     break 'return1;
                                 }
-                                /*
-                                 * Next we "pre-parse" the number, in preparation for calling
-                                 * the common routine xmlSchemaParseUInt.  We get rid of any
-                                 * leading zeroes (because we have reserved only 25 chars),
-                                 * and note the position of a decimal point.
-                                 */
+                                // Next we "pre-parse" the number, in preparation for calling
+                                // the common routine xmlSchemaParseUInt.  We get rid of any
+                                // leading zeroes (because we have reserved only 25 chars),
+                                // and note the position of a decimal point.
                                 len = 0;
                                 integ = !0;
                                 has_leading_zeroes = 0;
-                                /*
-                                 * Skip leading zeroes.
-                                 */
+                                // Skip leading zeroes.
                                 while *cur == b'0' {
                                     cur = cur.add(1);
                                     has_leading_zeroes = 1;
@@ -2298,9 +2287,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                                     break;
                                                 }
                                             }
-                                            /*
-                                             * Disallow "." but allow "00."
-                                             */
+                                            // Disallow "." but allow "00."
                                             if len == 0 && has_leading_zeroes == 0 {
                                                 break 'return1;
                                             }
@@ -2321,28 +2308,22 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                 }
                                 if *cur != 0 {
                                     break 'return1;
-                                    /* error if any extraneous chars */
+                                    // error if any extraneous chars
                                 }
                                 if !val.is_null() {
                                     v = xml_schema_new_value(XmlSchemaValType::XmlSchemasDecimal);
                                     if !v.is_null() {
-                                        /*
-                                         * Now evaluate the significant digits of the number
-                                         */
+                                        // Now evaluate the significant digits of the number
                                         if len != 0 {
                                             if integ != !0 {
-                                                /*
-                                                 * Get rid of trailing zeroes in the
-                                                 * fractional part.
-                                                 */
+                                                // Get rid of trailing zeroes in the
+                                                // fractional part.
                                                 while len != integ && *cptr.sub(1) == b'0' {
                                                     cptr = cptr.sub(1);
                                                     len = len.wrapping_sub(1);
                                                 }
                                             }
-                                            /*
-                                             * Terminate the (preparsed) string.
-                                             */
+                                            // Terminate the (preparsed) string.
                                             if len != 0 {
                                                 *cptr = 0;
                                                 cptr = cval.as_mut_ptr();
@@ -2355,12 +2336,10 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
                                                 );
                                             }
                                         }
-                                        /*
-                                         * Set the total digits to 1 if a zero value.
-                                         */
+                                        // Set the total digits to 1 if a zero value.
                                         (*v).value.decimal.sign = neg;
                                         if len == 0 {
-                                            /* Speedup for zero values. */
+                                            // Speedup for zero values.
                                             (*v).value.decimal.total = 1;
                                         } else {
                                             (*v).value.decimal.total = len;
@@ -3689,7 +3668,7 @@ unsafe extern "C" fn xml_schema_val_atomic_type(
 /// Returns 0 if this validates, a positive error code number otherwise
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlSchemaValPredefTypeNode")]
-pub unsafe extern "C" fn xml_schema_val_predef_type_node(
+pub unsafe fn xml_schema_val_predef_type_node(
     typ: XmlSchemaTypePtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
