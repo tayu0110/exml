@@ -37,11 +37,11 @@ use libc::{memcpy, INT_MAX};
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::parser::{
-    parse_char_ref, parse_name, parse_nmtoken, xml_create_memory_parser_ctxt,
+    parse_char_ref, parse_name, parse_nmtoken, parse_text_decl, xml_create_memory_parser_ctxt,
     xml_free_input_stream, xml_free_parser_ctxt, xml_new_entity_input_stream,
 };
 use crate::{
-    encoding::{detect_encoding, find_encoding_handler, XmlCharEncoding},
+    encoding::{detect_encoding, XmlCharEncoding},
     error::XmlParserErrors,
     generic_error,
     globals::{get_parser_debug_entities, GenericErrorContext},
@@ -57,10 +57,9 @@ use crate::{
         parser::{
             xml_parse_att_value_internal, xml_parse_cdsect, xml_parse_char_data_internal,
             xml_parse_conditional_sections, xml_parse_element_children_content_decl_priv,
-            xml_parse_enc_name, xml_parse_end_tag1, xml_parse_end_tag2,
-            xml_parse_external_entity_private, xml_parse_external_id, xml_parse_markup_decl,
-            xml_parse_start_tag2, xml_parse_string_name, xml_parse_text_decl,
-            xml_parse_version_num, xml_parser_add_node_info, xml_parser_entity_check,
+            xml_parse_end_tag1, xml_parse_end_tag2, xml_parse_external_entity_private,
+            xml_parse_external_id, xml_parse_markup_decl, xml_parse_start_tag2,
+            xml_parse_string_name, xml_parser_add_node_info, xml_parser_entity_check,
             xml_parser_find_node_info, xml_string_decode_entities_int, XmlDefAttrs, XmlDefAttrsPtr,
             XmlParserInputState, XmlParserMode, XmlParserOption, XML_SKIP_IDS,
         },
@@ -3385,7 +3384,7 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
                 if (*ctxt).content_bytes().starts_with(b"<?xml")
                     && xml_is_blank_char(NXT!(ctxt, 5) as u32)
                 {
-                    xml_parse_text_decl(ctxt);
+                    parse_text_decl(&mut *ctxt);
                 }
             }
         }
@@ -3994,238 +3993,6 @@ pub unsafe fn xml_parse_content(ctxt: XmlParserCtxtPtr) {
     }
 }
 
-/// Parse the XML version.
-///
-/// `[24] VersionInfo ::= S 'version' Eq (' VersionNum ' | " VersionNum ")`
-///
-/// `[25] Eq ::= S? '=' S?`
-///
-/// Returns the version string, e.g. "1.0"
-#[doc(alias = "xmlParseVersionInfo")]
-pub(crate) unsafe fn xml_parse_version_info(ctxt: XmlParserCtxtPtr) -> Option<String> {
-    let mut version = None;
-
-    if (*ctxt).content_bytes().starts_with(b"version") {
-        (*ctxt).advance(7);
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() != b'=' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, None);
-            return None;
-        }
-        (*ctxt).skip_char();
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() == b'"' {
-            (*ctxt).skip_char();
-            version = xml_parse_version_num(ctxt);
-            if (*ctxt).current_byte() != b'"' {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, None);
-            } else {
-                (*ctxt).skip_char();
-            }
-        } else if (*ctxt).current_byte() == b'\'' {
-            (*ctxt).skip_char();
-            version = xml_parse_version_num(ctxt);
-            if (*ctxt).current_byte() != b'\'' {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, None);
-            } else {
-                (*ctxt).skip_char();
-            }
-        } else {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotStarted, None);
-        }
-    }
-    version
-}
-
-/// Parse the XML encoding declaration
-///
-/// `[80] EncodingDecl ::= S 'encoding' Eq ('"' EncName '"' |  "'" EncName "'")`
-///
-/// this setups the conversion filters.
-///
-/// Returns the encoding value or NULL
-#[doc(alias = "xmlParseEncodingDecl")]
-pub(crate) unsafe fn xml_parse_encoding_decl(ctxt: XmlParserCtxtPtr) -> Option<String> {
-    let mut encoding = None;
-
-    (*ctxt).skip_blanks();
-    if (*ctxt).content_bytes().starts_with(b"encoding") {
-        (*ctxt).advance(8);
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() != b'=' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, None);
-            return None;
-        }
-        (*ctxt).skip_char();
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() == b'"' {
-            (*ctxt).skip_char();
-            encoding = xml_parse_enc_name(ctxt);
-            if (*ctxt).current_byte() != b'"' {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, None);
-                return None;
-            } else {
-                (*ctxt).skip_char();
-            }
-        } else if (*ctxt).current_byte() == b'\'' {
-            (*ctxt).skip_char();
-            encoding = xml_parse_enc_name(ctxt);
-            if (*ctxt).current_byte() != b'\'' {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, None);
-                return None;
-            } else {
-                (*ctxt).skip_char();
-            }
-        } else {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotStarted, None);
-        }
-
-        // Non standard parsing, allowing the user to ignore encoding
-        if (*ctxt).options & XmlParserOption::XmlParseIgnoreEnc as i32 != 0 {
-            return None;
-        }
-
-        // UTF-16 encoding match has already taken place at this stage,
-        // more over the little-endian/big-endian selection is already done
-        if let Some(encoding) = encoding.as_deref().filter(|e| {
-            let e = e.to_ascii_uppercase();
-            e == "UTF-16" || e == "UTF16"
-        }) {
-            // If no encoding was passed to the parser, that we are
-            // using UTF-16 and no decoder is present i.e. the
-            // document is apparently UTF-8 compatible, then raise an
-            // encoding mismatch fatal error
-            if (*ctxt).encoding.is_none()
-                && (*(*ctxt).input).buf.is_some()
-                && (*(*ctxt).input)
-                    .buf
-                    .as_ref()
-                    .unwrap()
-                    .borrow()
-                    .encoder
-                    .is_none()
-            {
-                xml_fatal_err_msg(
-                    ctxt,
-                    XmlParserErrors::XmlErrInvalidEncoding,
-                    "Document labelled UTF-16 but has UTF-8 content\n",
-                );
-            }
-            (*ctxt).encoding = Some(encoding.to_owned());
-        }
-        // UTF-8 encoding is handled natively
-        else if let Some(encoding) = encoding.as_deref().filter(|e| {
-            let e = e.to_ascii_uppercase();
-            e == "UTF-8" || e == "UTF8"
-        }) {
-            // TODO: Check for encoding mismatch.
-            (*ctxt).encoding = Some(encoding.to_owned());
-        } else if let Some(encoding) = encoding.as_deref() {
-            (*(*ctxt).input).encoding = Some(encoding.to_owned());
-
-            if let Some(handler) = find_encoding_handler(encoding) {
-                if (*ctxt).switch_to_encoding(handler) < 0 {
-                    // failed to convert
-                    (*ctxt).err_no = XmlParserErrors::XmlErrUnsupportedEncoding as i32;
-                    return None;
-                }
-            } else {
-                xml_fatal_err_msg_str!(
-                    ctxt,
-                    XmlParserErrors::XmlErrUnsupportedEncoding,
-                    "Unsupported encoding {}\n",
-                    encoding
-                );
-                return None;
-            }
-        }
-    }
-    encoding
-}
-
-/// Parse the XML standalone declaration
-///
-/// `[32] SDDecl ::= S 'standalone' Eq (("'" ('yes' | 'no') "'") | ('"' ('yes' | 'no')'"'))`
-///
-/// `[ VC: Standalone Document Declaration ]`  
-/// TODO The standalone document declaration must have the value "no"
-/// if any external markup declarations contain declarations of:
-///  - attributes with default values, if elements to which these
-///    attributes apply appear in the document without specifications
-///    of values for these attributes, or
-///  - entities (other than amp, lt, gt, apos, quot), if references
-///    to those entities appear in the document, or
-///  - attributes with values subject to normalization, where the
-///    attribute appears in the document with a value which will change
-///    as a result of normalization, or
-///  - element types with element content, if white space occurs directly
-///    within any instance of those types.
-///
-/// Returns:
-/// - 1 if standalone="yes"
-/// - 0 if standalone="no"
-/// - -2 if standalone attribute is missing or invalid
-///      (A standalone value of -2 means that the XML declaration was found,
-///       but no value was specified for the standalone attribute).
-#[doc(alias = "xmlParseSDDecl")]
-pub(crate) unsafe fn xml_parse_sddecl(ctxt: XmlParserCtxtPtr) -> i32 {
-    let mut standalone: i32 = -2;
-
-    (*ctxt).skip_blanks();
-    if (*ctxt).content_bytes().starts_with(b"standalone") {
-        (*ctxt).advance(10);
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() != b'=' {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrEqualRequired, None);
-            return standalone;
-        }
-        (*ctxt).skip_char();
-        (*ctxt).skip_blanks();
-        if (*ctxt).current_byte() == b'\'' {
-            (*ctxt).skip_char();
-            if (*ctxt).current_byte() == b'n' && NXT!(ctxt, 1) == b'o' {
-                standalone = 0;
-                (*ctxt).advance(2);
-            } else if (*ctxt).current_byte() == b'y'
-                && NXT!(ctxt, 1) == b'e'
-                && NXT!(ctxt, 2) == b's'
-            {
-                standalone = 1;
-                (*ctxt).advance(3);
-            } else {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStandaloneValue, None);
-            }
-            if (*ctxt).current_byte() != b'\'' {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, None);
-            } else {
-                (*ctxt).skip_char();
-            }
-        } else if (*ctxt).current_byte() == b'"' {
-            (*ctxt).skip_char();
-            if (*ctxt).current_byte() == b'n' && NXT!(ctxt, 1) == b'o' {
-                standalone = 0;
-                (*ctxt).advance(2);
-            } else if (*ctxt).current_byte() == b'y'
-                && NXT!(ctxt, 1) == b'e'
-                && NXT!(ctxt, 2) == b's'
-            {
-                standalone = 1;
-                (*ctxt).advance(3);
-            } else {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStandaloneValue, None);
-            }
-            if (*ctxt).current_byte() != b'"' {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotClosed, None);
-            } else {
-                (*ctxt).skip_char();
-            }
-        } else {
-            xml_fatal_err(ctxt, XmlParserErrors::XmlErrStringNotStarted, None);
-        }
-    }
-    standalone
-}
-
 /// Parse an XML Misc* optional field.
 ///
 /// `[27] Misc ::= Comment | PI |  S`
@@ -4273,7 +4040,7 @@ pub unsafe fn xml_parse_external_subset(
     }
 
     if (*ctxt).content_bytes().starts_with(b"<?xml") {
-        xml_parse_text_decl(ctxt);
+        parse_text_decl(&mut *ctxt);
         if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
             // The XML REC instructs us to stop parsing right here
             (*ctxt).halt();

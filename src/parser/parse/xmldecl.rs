@@ -252,7 +252,9 @@ pub(crate) unsafe fn parse_sddecl(ctxt: &mut XmlParserCtxt) -> i32 {
 
 /// parse an XML declaration header
 ///
-/// `[23] XMLDecl ::= '<?xml' VersionInfo EncodingDecl? SDDecl? S? '?>'`
+/// ```text
+/// [23] XMLDecl ::= '<?xml' VersionInfo EncodingDecl? SDDecl? S? '?>'
+/// ```
 #[doc(alias = "xmlParseXMLDecl")]
 pub(crate) unsafe fn parse_xmldecl(ctxt: &mut XmlParserCtxt) {
     // This value for standalone indicates that the document has an
@@ -366,4 +368,85 @@ pub(crate) unsafe fn parse_xmldecl(ctxt: &mut XmlParserCtxt) {
             }
         }
     }
+}
+
+/// Parse an XML declaration header for external entities
+///
+/// ```text
+/// [77] TextDecl ::= '<?xml' VersionInfo? EncodingDecl S? '?>'
+/// ```
+#[doc(alias = "xmlParseTextDecl")]
+pub(crate) unsafe fn parse_text_decl(ctxt: &mut XmlParserCtxt) {
+    // We know that '<?xml' is here.
+    if !ctxt.content_bytes().starts_with(b"<?xml") || !xml_is_blank_char(ctxt.nth_byte(5) as u32) {
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotStarted, None);
+        return;
+    }
+    ctxt.advance(5);
+
+    // Avoid expansion of parameter entities when skipping blanks.
+    let oldstate = ctxt.instate;
+    ctxt.instate = XmlParserInputState::XmlParserStart;
+
+    if ctxt.skip_blanks() == 0 {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrSpaceRequired,
+            "Space needed after '<?xml'\n",
+        );
+    }
+
+    // We may have the VersionInfo here.
+    let version = parse_version_info(ctxt);
+    if version.is_some() && ctxt.skip_blanks() == 0 {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrSpaceRequired,
+            "Space needed here\n",
+        );
+    }
+    (*ctxt.input).version = version.or(Some(XML_DEFAULT_VERSION.to_owned()));
+
+    // We must have the encoding declaration
+    let encoding = parse_encoding_decl(ctxt);
+    if matches!(ctxt.instate, XmlParserInputState::XmlParserEOF) {
+        return;
+    }
+    if ctxt.err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
+        // The XML REC instructs us to stop parsing right here
+        ctxt.instate = oldstate;
+        return;
+    }
+    if encoding.is_none() && ctxt.err_no == XmlParserErrors::XmlErrOK as i32 {
+        xml_fatal_err_msg(
+            ctxt,
+            XmlParserErrors::XmlErrMissingEncoding,
+            "Missing encoding in text declaration\n",
+        );
+    }
+
+    ctxt.skip_blanks();
+    if ctxt.content_bytes().starts_with(b"?>") {
+        ctxt.advance(2);
+    } else if ctxt.consume_char_if(|_, c| c == '>').is_some() {
+        // Deprecated old WD ...
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, None);
+    } else {
+        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, None);
+        ctxt.grow();
+        while !ctxt.content_bytes().is_empty() {
+            match ctxt.content_bytes().iter().position(|&c| c == b'>') {
+                Some(pos) => {
+                    ctxt.advance_with_line_handling(pos + 1);
+                    break;
+                }
+                None => {
+                    ctxt.advance_with_line_handling(ctxt.content_bytes().len());
+                    ctxt.grow();
+                }
+            }
+        }
+    }
+
+    ctxt.instate = oldstate;
 }

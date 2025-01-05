@@ -95,12 +95,11 @@ use crate::{
             xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
             xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
             xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
-            xml_parse_encoding_decl, xml_parse_entity_ref, xml_parse_entity_value,
-            xml_parse_external_subset, xml_parse_misc, xml_parse_name, xml_parse_nmtoken,
-            xml_parse_pe_reference, xml_parse_pi, xml_parse_reference, xml_parse_start_tag,
-            xml_parse_system_literal, xml_parse_version_info, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
-            XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF,
-            XML_SUBSTITUTE_REF,
+            xml_parse_entity_ref, xml_parse_entity_value, xml_parse_external_subset,
+            xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
+            xml_parse_pi, xml_parse_reference, xml_parse_start_tag, xml_parse_system_literal,
+            INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH,
+            XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
@@ -114,7 +113,7 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
     parser::{
-        __xml_err_encoding, parse_char_ref, parse_name, parse_xmldecl,
+        __xml_err_encoding, parse_char_ref, parse_name, parse_text_decl, parse_xmldecl,
         xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
         xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
@@ -2502,7 +2501,7 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if (*ctxt).content_bytes().starts_with(b"<?xml")
         && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
     {
-        xml_parse_text_decl(ctxt);
+        parse_text_decl(&mut *ctxt);
         // An XML-1.0 document can't reference an entity not XML-1.0
         if (*oldctxt).version.as_deref() == Some("1.0")
             && (*(*ctxt).input).version.as_deref() != Some("1.0")
@@ -9247,166 +9246,6 @@ pub(crate) unsafe fn xml_parse_element(ctxt: XmlParserCtxtPtr) {
     }
 
     xml_parse_element_end(ctxt);
-}
-
-/// Parse the XML version value.
-///
-/// `[26] VersionNum ::= '1.' [0-9]+`
-///
-/// In practice allow [0-9].[0-9]+ at that level
-///
-/// Returns the string giving the XML version number, or NULL
-#[doc(alias = "xmlParseVersionNum")]
-pub(crate) unsafe fn xml_parse_version_num(ctxt: XmlParserCtxtPtr) -> Option<String> {
-    let mut cur: XmlChar;
-
-    let mut buf = String::with_capacity(10);
-    cur = (*ctxt).current_byte();
-    if !cur.is_ascii_digit() {
-        return None;
-    }
-    buf.push(cur as char);
-    (*ctxt).skip_char();
-    cur = (*ctxt).current_byte();
-    if cur != b'.' {
-        return None;
-    }
-    buf.push(cur as char);
-    (*ctxt).skip_char();
-    cur = (*ctxt).current_byte();
-    while cur.is_ascii_digit() {
-        buf.push(cur as char);
-        (*ctxt).skip_char();
-        cur = (*ctxt).current_byte();
-    }
-    Some(buf)
-}
-
-/// parse the XML encoding name
-///
-/// `[81] EncName ::= [A-Za-z] ([A-Za-z0-9._] | '-')*`
-///
-/// Returns the encoding name value or NULL
-#[doc(alias = "xmlParseEncName")]
-pub(crate) unsafe fn xml_parse_enc_name(ctxt: XmlParserCtxtPtr) -> Option<String> {
-    let mut len: i32 = 0;
-    let max_length: i32 = if (*ctxt).options & XmlParserOption::XmlParseHuge as i32 != 0 {
-        XML_MAX_TEXT_LENGTH as i32
-    } else {
-        XML_MAX_NAME_LENGTH as i32
-    };
-    let mut cur: XmlChar;
-
-    cur = (*ctxt).current_byte();
-    if cur.is_ascii_lowercase() || cur.is_ascii_uppercase() {
-        let mut buf = String::with_capacity(10);
-        buf.push(cur as char);
-        len += 1;
-        (*ctxt).skip_char();
-        cur = (*ctxt).current_byte();
-        while cur.is_ascii_lowercase()
-            || cur.is_ascii_uppercase()
-            || cur.is_ascii_digit()
-            || cur == b'.'
-            || cur == b'_'
-            || cur == b'-'
-        {
-            buf.push(cur as char);
-            len += 1;
-            if len > max_length {
-                xml_fatal_err(ctxt, XmlParserErrors::XmlErrNameTooLong, Some("EncName"));
-                return None;
-            }
-            (*ctxt).skip_char();
-            cur = (*ctxt).current_byte();
-        }
-        return Some(buf);
-    }
-    xml_fatal_err(ctxt, XmlParserErrors::XmlErrEncodingName, None);
-    None
-}
-
-/// Parse an XML declaration header for external entities
-///
-/// `[77] TextDecl ::= '<?xml' VersionInfo? EncodingDecl S? '?>'`
-#[doc(alias = "xmlParseTextDecl")]
-pub(crate) unsafe fn xml_parse_text_decl(ctxt: XmlParserCtxtPtr) {
-    // We know that '<?xml' is here.
-    if (*ctxt).content_bytes().starts_with(b"<?xml")
-        && xml_is_blank_char((*ctxt).nth_byte(5) as u32)
-    {
-        (*ctxt).advance(5);
-    } else {
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotStarted, None);
-        return;
-    }
-
-    // Avoid expansion of parameter entities when skipping blanks.
-    let oldstate: i32 = (*ctxt).instate as _;
-    (*ctxt).instate = XmlParserInputState::XmlParserStart;
-
-    if (*ctxt).skip_blanks() == 0 {
-        xml_fatal_err_msg(
-            ctxt,
-            XmlParserErrors::XmlErrSpaceRequired,
-            "Space needed after '<?xml'\n",
-        );
-    }
-
-    // We may have the VersionInfo here.
-    let mut version = xml_parse_version_info(ctxt);
-    if version.is_none() {
-        version = Some(XML_DEFAULT_VERSION.to_owned());
-    } else if (*ctxt).skip_blanks() == 0 {
-        xml_fatal_err_msg(
-            ctxt,
-            XmlParserErrors::XmlErrSpaceRequired,
-            "Space needed here\n",
-        );
-    }
-    (*(*ctxt).input).version = Some(version.unwrap());
-
-    // We must have the encoding declaration
-    let encoding = xml_parse_encoding_decl(ctxt);
-    if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
-        return;
-    }
-    if (*ctxt).err_no == XmlParserErrors::XmlErrUnsupportedEncoding as i32 {
-        // The XML REC instructs us to stop parsing right here
-        (*ctxt).instate = oldstate.try_into().unwrap();
-        return;
-    }
-    if encoding.is_none() && (*ctxt).err_no == XmlParserErrors::XmlErrOK as i32 {
-        xml_fatal_err_msg(
-            ctxt,
-            XmlParserErrors::XmlErrMissingEncoding,
-            "Missing encoding in text declaration\n",
-        );
-    }
-
-    (*ctxt).skip_blanks();
-    if (*ctxt).current_byte() == b'?' && (*ctxt).nth_byte(1) == b'>' {
-        (*ctxt).advance(2);
-    } else if (*ctxt).current_byte() == b'>' {
-        // Deprecated old WD ...
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, None);
-        (*ctxt).skip_char();
-    } else {
-        let mut c: i32;
-
-        xml_fatal_err(ctxt, XmlParserErrors::XmlErrXMLDeclNotFinished, None);
-        while {
-            c = (*ctxt).current_byte() as _;
-            c != 0
-        } {
-            (*ctxt).skip_char();
-            if c == b'>' as i32 {
-                break;
-            }
-        }
-    }
-
-    (*ctxt).instate = oldstate.try_into().unwrap();
 }
 
 #[cfg(test)]
