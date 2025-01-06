@@ -37,7 +37,7 @@ use libc::{memcpy, INT_MAX};
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::parser::{
-    parse_char_ref, parse_comment, parse_name, parse_nmtoken, parse_text_decl,
+    parse_char_ref, parse_comment, parse_name, parse_nmtoken, parse_pi, parse_text_decl,
     xml_create_memory_parser_ctxt, xml_free_input_stream, xml_free_parser_ctxt,
     xml_new_entity_input_stream,
 };
@@ -3566,7 +3566,7 @@ pub(crate) unsafe fn xml_parse_content_internal(ctxt: XmlParserCtxtPtr) {
 
         // First case : a Processing Instruction.
         if *cur == b'<' && *cur.add(1) == b'?' {
-            xml_parse_pi(ctxt);
+            parse_pi(&mut *ctxt);
         }
         // Second case : a CDSection
         // 2.6.0 test was *cur not RAW
@@ -3642,7 +3642,7 @@ pub(crate) unsafe fn xml_parse_misc(ctxt: XmlParserCtxtPtr) {
         (*ctxt).skip_blanks();
         (*ctxt).grow();
         if (*ctxt).current_byte() == b'<' && NXT!(ctxt, 1) == b'?' {
-            xml_parse_pi(ctxt);
+            parse_pi(&mut *ctxt);
         } else if (*ctxt).content_bytes().starts_with(b"<!--") {
             parse_comment(&mut *ctxt);
         } else {

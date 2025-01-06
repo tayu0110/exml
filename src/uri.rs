@@ -281,7 +281,9 @@ impl XmlURI {
 
     /// Parse an URI scheme
     ///
+    /// ```text
     /// ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986Scheme")]
@@ -300,7 +302,9 @@ impl XmlURI {
     /// Parse an user information part and fills in the appropriate fields
     /// of the @uri structure
     ///
+    /// ```text
     /// userinfo      = *( unreserved / pct-encoded / sub-delims / ":" )
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986Userinfo")]
@@ -333,7 +337,7 @@ impl XmlURI {
     /// Parse an host part and fills in the appropriate fields
     /// of the @uri structure
     ///
-    /// ```ignore
+    /// ```text
     /// host          = IP-literal / IPv4address / reg-name
     /// IP-literal    = "[" ( IPv6address / IPvFuture  ) "]"
     /// IPv4address   = dec-octet "." dec-octet "." dec-octet "." dec-octet
@@ -392,7 +396,9 @@ impl XmlURI {
 
     /// Parse a port part and fills in the appropriate fields of the @uri structure
     ///
-    /// `port          = *DIGIT`
+    /// ```text
+    /// port          = *DIGIT
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986Port")]
@@ -414,7 +420,9 @@ impl XmlURI {
     /// Parse an authority part and fills in the appropriate fields
     /// of the @uri structure
     ///
-    /// `authority     = [ userinfo "@" ] host [ ":" port ]`
+    /// ```text
+    /// authority     = [ userinfo "@" ] host [ ":" port ]
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986Authority")]
@@ -436,7 +444,9 @@ impl XmlURI {
 
     /// Parse an path absolute or empty and fills in the appropriate fields of the @uri structure
     ///
-    /// `path-abempty  = *( "/" segment )`
+    /// ```text
+    /// path-abempty  = *( "/" segment )
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986PathAbEmpty")]
@@ -460,7 +470,9 @@ impl XmlURI {
 
     /// Parse an path absolute and fills in the appropriate fields of the @uri structure
     ///
-    /// `path-absolute = "/" [ segment-nz *( "/" segment ) ]`
+    /// ```text
+    /// path-absolute = "/" [ segment-nz *( "/" segment ) ]
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986PathAbsolute")]
@@ -489,7 +501,9 @@ impl XmlURI {
     /// Parse an path without root and fills in the appropriate fields
     /// of the @uri structure
     ///
-    /// `path-rootless = segment-nz *( "/" segment )`
+    /// ```text
+    /// path-rootless = segment-nz *( "/" segment )
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986PathRootless")]
@@ -515,7 +529,7 @@ impl XmlURI {
     /// Parse an hierarchical part and fills in the appropriate fields
     /// of the @uri structure
     ///
-    /// ```ignore
+    /// ```text
     /// hier-part     = "//" authority path-abempty
     ///                / path-absolute
     ///                / path-rootless
@@ -545,7 +559,9 @@ impl XmlURI {
 
     /// Parse the query part of an URI
     ///
-    /// `query = *uric`
+    /// ```text
+    /// query = *uric
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986Query")]
@@ -577,7 +593,9 @@ impl XmlURI {
 
     /// Parse the query part of an URI
     ///
-    /// `fragment      = *( pchar / "/" / "?" )`
+    /// ```text
+    /// fragment      = *( pchar / "/" / "?" )
+    /// ```
     ///
     /// # Note
     /// The strict syntax as defined by 3986 does not allow '[' and ']'
@@ -611,7 +629,9 @@ impl XmlURI {
 
     /// Parse an URI string and fills in the appropriate fields of the @uri structure
     ///
-    /// `scheme ":" hier-part [ "?" query ] [ "#" fragment ]`
+    /// ```text
+    /// scheme ":" hier-part [ "?" query ] [ "#" fragment ]
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986URI")]
@@ -635,7 +655,9 @@ impl XmlURI {
 
     /// Parse an path which is not a scheme and fills in the appropriate fields of the @uri structure
     ///
-    /// `path-noscheme = segment-nz-nc *( "/" segment )`
+    /// ```text
+    /// path-noscheme = segment-nz-nc *( "/" segment )
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986PathNoScheme")]
@@ -661,7 +683,7 @@ impl XmlURI {
     /// Parse an URI string and fills in the appropriate fields
     /// of the @uri structure
     ///
-    /// ```ignore
+    /// ```text
     /// relative-refe  = relative-part [ "?" query ] [ "#" fragment ]
     /// relative-part = "//" authority path-abempty
     ///               / path-absolute
@@ -700,7 +722,9 @@ impl XmlURI {
 
     /// Parse an URI reference string and fills in the appropriate fields of the @uri structure
     ///
-    /// `URI-reference = URI / relative-refe`
+    /// ```text
+    /// URI-reference = URI / relative-refe
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParse3986URIReference")]
@@ -721,7 +745,9 @@ impl XmlURI {
     /// Parse an URI reference string based on RFC 3986 and fills in the
     /// appropriate fields of the @uri structure
     ///
-    /// `URI-reference = URI / relative-refe`
+    /// ```text
+    /// URI-reference = URI / relative-refe
+    /// ```
     ///
     /// Returns 0 or the error code
     #[doc(alias = "xmlParseURIReference")]
@@ -731,7 +757,9 @@ impl XmlURI {
 
     /// Parse an URI based on RFC 3986
     ///
-    /// `URI-reference = [ absoluteURI | relativeURI ] [ "#" fragment ]`
+    /// ```text
+    /// URI-reference = [ absoluteURI | relativeURI ] [ "#" fragment ]
+    /// ```
     ///
     /// Returns a newly built xmlURIPtr or NULL in case of error
     #[doc(alias = "xmlParseURI")]
@@ -748,7 +776,7 @@ impl Display for XmlURI {
     }
 }
 
-///```ignore
+///```text
 /// dec-octet     = DIGIT                 ; 0-9
 ///              / %x31-39 DIGIT         ; 10-99
 ///              / "1" 2DIGIT            ; 100-199
@@ -774,7 +802,7 @@ fn parse3986_dec_octet(s: &str) -> Result<&str, i32> {
 /// Parse a segment and fills in the appropriate fields
 /// of the @uri structure
 ///
-/// ```ignore
+/// ```text
 /// segment       = *pchar
 /// segment-nz    = 1*pchar
 /// segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
