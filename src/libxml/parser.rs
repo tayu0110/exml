@@ -7355,17 +7355,6 @@ pub enum XmlParserOption {
     XmlParseBigLines = 1 << 22,  /* Store big lines numbers in text PSVI field */
 }
 
-/// Free a string if it is not owned by the "dict" dictionary in the current scope
-macro_rules! DICT_FREE {
-    ($dict:expr, $str:expr) => {
-        if !$str.is_null()
-            && ($dict.is_null() || crate::libxml::dict::xml_dict_owns($dict, $str as _) == 0)
-        {
-            xml_free($str as _);
-        }
-    };
-}
-
 /// Reset a parser context
 #[doc(alias = "xmlCtxtReset")]
 pub unsafe fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
