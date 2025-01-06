@@ -92,14 +92,14 @@ use crate::{
         htmlparser::{__html_parse_content, html_create_memory_parser_ctxt, HtmlParserOption},
         parser_internals::{
             xml_add_def_attrs, xml_add_special_attr, xml_check_language_id, xml_copy_char,
-            xml_parse_attribute_type, xml_parse_comment, xml_parse_content,
-            xml_parse_content_internal, xml_parse_default_decl, xml_parse_doc_type_decl,
-            xml_parse_element_content_decl, xml_parse_element_end, xml_parse_element_start,
-            xml_parse_entity_ref, xml_parse_entity_value, xml_parse_external_subset,
-            xml_parse_misc, xml_parse_name, xml_parse_nmtoken, xml_parse_pe_reference,
-            xml_parse_pi, xml_parse_reference, xml_parse_start_tag, xml_parse_system_literal,
-            INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH,
-            XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
+            xml_parse_attribute_type, xml_parse_content, xml_parse_content_internal,
+            xml_parse_default_decl, xml_parse_doc_type_decl, xml_parse_element_content_decl,
+            xml_parse_element_end, xml_parse_element_start, xml_parse_entity_ref,
+            xml_parse_entity_value, xml_parse_external_subset, xml_parse_misc, xml_parse_name,
+            xml_parse_nmtoken, xml_parse_pe_reference, xml_parse_pi, xml_parse_reference,
+            xml_parse_start_tag, xml_parse_system_literal, INPUT_CHUNK, XML_MAX_HUGE_LENGTH,
+            XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF,
+            XML_SUBSTITUTE_REF,
         },
         relaxng::xml_relaxng_cleanup_types,
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
@@ -113,8 +113,8 @@ use crate::{
         xmlstring::{xml_str_equal, xml_strchr, xml_strlen, xml_strndup, XmlChar},
     },
     parser::{
-        __xml_err_encoding, parse_char_ref, parse_name, parse_text_decl, parse_xmldecl,
-        xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
+        __xml_err_encoding, parse_char_ref, parse_comment, parse_name, parse_text_decl,
+        parse_xmldecl, xml_create_entity_parser_ctxt_internal, xml_create_memory_parser_ctxt,
         xml_err_attribute_dup, xml_err_memory, xml_err_msg_str, xml_fatal_err, xml_fatal_err_msg,
         xml_fatal_err_msg_int, xml_fatal_err_msg_str, xml_fatal_err_msg_str_int_str,
         xml_free_input_stream, xml_free_parser_ctxt, xml_new_entity_input_stream,
@@ -6667,7 +6667,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        xml_parse_comment(ctxt);
+                        parse_comment(&mut *ctxt);
                         (*ctxt).instate = XmlParserInputState::XmlParserContent;
                     } else if cur == b'<'
                         && *(*(*ctxt).input).cur.add(1) == b'!'
@@ -6880,7 +6880,7 @@ unsafe fn xml_parse_try_or_finish(ctxt: XmlParserCtxtPtr, terminate: i32) -> i32
                             // goto done;
                             return ret;
                         }
-                        xml_parse_comment(ctxt);
+                        parse_comment(&mut *ctxt);
                         if matches!((*ctxt).instate, XmlParserInputState::XmlParserEOF) {
                             // goto done;
                             return ret;
@@ -9049,7 +9049,7 @@ pub(crate) unsafe fn xml_parse_markup_decl(ctxt: XmlParserCtxtPtr) {
                     xml_parse_notation_decl(ctxt);
                 }
                 b'-' => {
-                    xml_parse_comment(ctxt);
+                    parse_comment(&mut *ctxt);
                 }
                 _ => {
                     // there is an error but it will be detected later
