@@ -21,7 +21,7 @@ use crate::{
 ///
 /// Returns the string giving the XML version number, or NULL
 #[doc(alias = "xmlParseVersionNum")]
-pub(crate) unsafe fn parse_version_num(ctxt: &mut XmlParserCtxt) -> Option<String> {
+unsafe fn parse_version_num(ctxt: &mut XmlParserCtxt) -> Option<String> {
     let mut buf = String::with_capacity(10);
     buf.push(ctxt.consume_char_if(|_, c| c.is_ascii_digit())?);
     ctxt.consume_char_if(|_, c| c == '.')?;
@@ -42,7 +42,7 @@ pub(crate) unsafe fn parse_version_num(ctxt: &mut XmlParserCtxt) -> Option<Strin
 ///
 /// Returns the version string, e.g. "1.0"
 #[doc(alias = "xmlParseVersionInfo")]
-pub(crate) unsafe fn parse_version_info(ctxt: &mut XmlParserCtxt) -> Option<String> {
+unsafe fn parse_version_info(ctxt: &mut XmlParserCtxt) -> Option<String> {
     if !ctxt.content_bytes().starts_with(b"version") {
         return None;
     }
@@ -73,7 +73,7 @@ pub(crate) unsafe fn parse_version_info(ctxt: &mut XmlParserCtxt) -> Option<Stri
 ///
 /// Returns the encoding name value or NULL
 #[doc(alias = "xmlParseEncName")]
-pub(crate) unsafe fn parse_enc_name(ctxt: &mut XmlParserCtxt) -> Option<String> {
+unsafe fn parse_enc_name(ctxt: &mut XmlParserCtxt) -> Option<String> {
     let max_length = if ctxt.options & XmlParserOption::XmlParseHuge as i32 != 0 {
         XML_MAX_TEXT_LENGTH
     } else {
@@ -107,7 +107,7 @@ pub(crate) unsafe fn parse_enc_name(ctxt: &mut XmlParserCtxt) -> Option<String> 
 ///
 /// Returns the encoding value or NULL
 #[doc(alias = "xmlParseEncodingDecl")]
-pub(crate) unsafe fn parse_encoding_decl(ctxt: &mut XmlParserCtxt) -> Option<String> {
+unsafe fn parse_encoding_decl(ctxt: &mut XmlParserCtxt) -> Option<String> {
     ctxt.skip_blanks();
     if !ctxt.content_bytes().starts_with(b"encoding") {
         return None;
@@ -218,7 +218,7 @@ pub(crate) unsafe fn parse_encoding_decl(ctxt: &mut XmlParserCtxt) -> Option<Str
 ///      (A standalone value of -2 means that the XML declaration was found,
 ///       but no value was specified for the standalone attribute).
 #[doc(alias = "xmlParseSDDecl")]
-pub(crate) unsafe fn parse_sddecl(ctxt: &mut XmlParserCtxt) -> i32 {
+unsafe fn parse_sddecl(ctxt: &mut XmlParserCtxt) -> i32 {
     ctxt.skip_blanks();
     if !ctxt.content_bytes().starts_with(b"standalone") {
         return -2;

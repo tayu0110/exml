@@ -1,7 +1,8 @@
+#[cfg(feature = "catalog")]
+use crate::libxml::catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI};
 use crate::{
     error::XmlParserErrors,
     libxml::{
-        catalog::{xml_catalog_get_defaults, XmlCatalogAllow, XML_CATALOG_PI},
         parser::{XmlParserInputState, XmlParserOption},
         parser_internals::{XML_MAX_HUGE_LENGTH, XML_MAX_TEXT_LENGTH},
     },
@@ -24,7 +25,7 @@ const XML_W3_CPIS: &[&str] = &["xml-stylesheet", "xml-model"];
 ///
 /// Returns the PITarget name or NULL
 #[doc(alias = "xmlParsePITarget")]
-pub(crate) unsafe fn parse_pi_target(ctxt: &mut XmlParserCtxt) -> Option<String> {
+unsafe fn parse_pi_target(ctxt: &mut XmlParserCtxt) -> Option<String> {
     let name = parse_name(ctxt)?;
     if name.as_bytes()[..name.len().min(3)].eq_ignore_ascii_case(b"xml") {
         if name == "xml" {
@@ -117,7 +118,9 @@ unsafe fn parse_catalog_pi(ctxt: &mut XmlParserCtxt, catalog: &str) {
 
 /// Parse an XML Processing Instruction.
 ///
-/// `[16] PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'`
+/// ```text
+/// [16] PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'
+/// ```
 ///
 /// The processing is transferred to SAX once parsed.
 #[doc(alias = "xmlParsePI")]
