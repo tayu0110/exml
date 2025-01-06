@@ -34,10 +34,9 @@ use crate::{
         entities::{XmlEntityType, XML_ENT_EXPANDING, XML_ENT_PARSED},
         globals::{xml_free, xml_malloc},
         parser::{
-            xml_ctxt_reset, xml_init_parser, xml_load_external_entity, xml_parse_document,
-            xml_parser_entity_check, XmlDefAttrsPtr, XmlParserInputState, XmlParserMode,
-            XmlParserOption, XmlSAXHandler, XmlStartTag, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
-            XML_SAX2_MAGIC,
+            xml_init_parser, xml_load_external_entity, xml_parse_document, xml_parser_entity_check,
+            XmlDefAttrsPtr, XmlParserInputState, XmlParserMode, XmlParserOption, XmlSAXHandler,
+            XmlStartTag, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         parser_internals::{
             xml_parse_pe_reference, INPUT_CHUNK, LINE_LEN, XML_MAX_DICTIONARY_LIMIT,
@@ -460,6 +459,80 @@ impl XmlParserCtxt {
     pub unsafe fn stop(&mut self) {
         self.halt();
         self.err_no = XmlParserErrors::XmlErrUserStop as i32;
+    }
+
+    /// Reset a parser context
+    #[doc(alias = "xmlCtxtReset")]
+    pub unsafe fn reset(&mut self) {
+        let mut input = self.input_pop();
+        while !input.is_null() {
+            // Non consuming
+            xml_free_input_stream(input);
+            input = self.input_pop();
+        }
+        self.input_tab.clear();
+        self.input = null_mut();
+
+        self.space_tab.clear();
+
+        self.node_tab.clear();
+        self.node = null_mut();
+
+        self.name_tab.clear();
+        self.name = None;
+
+        self.ns_tab.clear();
+
+        self.version = None;
+        self.encoding = None;
+        self.directory = None;
+        self.ext_sub_uri = None;
+        self.ext_sub_system = None;
+        if !self.my_doc.is_null() {
+            xml_free_doc(self.my_doc);
+        }
+        self.my_doc = null_mut();
+
+        self.standalone = -1;
+        self.has_external_subset = 0;
+        self.has_perefs = 0;
+        self.html = 0;
+        self.external = 0;
+        self.instate = XmlParserInputState::XmlParserStart;
+        self.token = 0;
+        self.well_formed = 1;
+        self.ns_well_formed = 1;
+        self.disable_sax = 0;
+        self.valid = 1;
+        self.record_info = 0;
+        self.check_index = 0;
+        self.end_check_state = 0;
+        self.in_subset = 0;
+        self.err_no = XmlParserErrors::XmlErrOK as i32;
+        self.depth = 0;
+        self.charset = XmlCharEncoding::UTF8;
+        #[cfg(feature = "catalog")]
+        {
+            self.catalogs = None;
+        }
+        self.sizeentities = 0;
+        self.sizeentcopy = 0;
+        self.node_seq.clear();
+
+        if let Some(mut table) = self.atts_default.take().map(|t| t.into_inner()) {
+            table.clear_with(|data, _| xml_free(data as _));
+        }
+        let _ = self.atts_special.take().map(|t| t.into_inner());
+
+        #[cfg(feature = "catalog")]
+        {
+            self.catalogs = None;
+        }
+        self.nb_errors = 0;
+        self.nb_warnings = 0;
+        if self.last_error.is_err() {
+            self.last_error.reset();
+        }
     }
 
     pub(crate) unsafe fn advance(&mut self, nth: usize) {
@@ -1770,7 +1843,7 @@ pub unsafe fn xml_clear_parser_ctxt(ctxt: XmlParserCtxtPtr) {
         return;
     }
     (*ctxt).node_seq.clear();
-    xml_ctxt_reset(ctxt);
+    (*ctxt).reset();
 }
 
 /// Free all the memory used by a parser context. However the parsed

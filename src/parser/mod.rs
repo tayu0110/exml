@@ -60,7 +60,7 @@ use crate::{
     libxml::{
         chvalid::{xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser::{
-            xml_create_doc_parser_ctxt, xml_ctxt_reset, xml_init_parser, xml_load_external_entity,
+            xml_create_doc_parser_ctxt, xml_init_parser, xml_load_external_entity,
             xml_new_io_input_stream, XmlParserOption,
         },
         parser_internals::xml_is_letter,
@@ -424,7 +424,7 @@ pub unsafe fn xml_ctxt_read_file(
     }
     xml_init_parser();
 
-    xml_ctxt_reset(ctxt);
+    (*ctxt).reset();
 
     let stream: XmlParserInputPtr = xml_load_external_entity(Some(filename), None, ctxt);
     if stream.is_null() {
@@ -450,7 +450,7 @@ pub unsafe fn xml_ctxt_read_memory(
         return null_mut();
     }
     xml_init_parser();
-    xml_ctxt_reset(ctxt);
+    (*ctxt).reset();
 
     let Some(input) = XmlParserInputBuffer::from_memory(buffer, XmlCharEncoding::None) else {
         return null_mut();
@@ -481,7 +481,7 @@ pub unsafe fn xml_ctxt_read_io(
         return null_mut();
     }
     xml_init_parser();
-    xml_ctxt_reset(ctxt);
+    (*ctxt).reset();
 
     let input = XmlParserInputBuffer::from_reader(ioctx, XmlCharEncoding::None);
     let stream: XmlParserInputPtr =

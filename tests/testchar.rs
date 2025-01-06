@@ -18,7 +18,7 @@ use exml::{
     io::XmlParserInputBuffer,
     libxml::{
         globals::{xml_free, xml_malloc},
-        parser::{xml_cleanup_parser, xml_ctxt_reset},
+        parser::xml_cleanup_parser,
         xmlmemory::xml_memory_dump,
         xmlstring::XmlChar,
     },
@@ -77,7 +77,7 @@ unsafe fn test_document_range_byte1(
 ) -> c_int {
     for i in 0u8..=0xFF {
         *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
-        xml_ctxt_reset(ctxt);
+        (*ctxt).reset();
 
         *data.add(0) = i as c_char;
 
@@ -125,7 +125,7 @@ unsafe fn test_document_range_byte2(
     for i in 0x80..=0xFF {
         for j in 0..=0xFF {
             *LAST_ERROR.write().unwrap() = XmlParserErrors::XmlErrOK;
-            xml_ctxt_reset(ctxt);
+            (*ctxt).reset();
 
             *data.add(0) = i as c_char;
             *data.add(1) = j as c_char;

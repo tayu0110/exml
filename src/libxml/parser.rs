@@ -7355,87 +7355,6 @@ pub enum XmlParserOption {
     XmlParseBigLines = 1 << 22,  /* Store big lines numbers in text PSVI field */
 }
 
-/// Reset a parser context
-#[doc(alias = "xmlCtxtReset")]
-pub unsafe fn xml_ctxt_reset(ctxt: XmlParserCtxtPtr) {
-    let mut input: XmlParserInputPtr;
-
-    if ctxt.is_null() {
-        return;
-    }
-
-    while {
-        input = (*ctxt).input_pop();
-        !input.is_null()
-    } {
-        // Non consuming
-        xml_free_input_stream(input);
-    }
-    (*ctxt).input_tab.clear();
-    (*ctxt).input = null_mut();
-
-    (*ctxt).space_tab.clear();
-
-    (*ctxt).node_tab.clear();
-    (*ctxt).node = null_mut();
-
-    (*ctxt).name_tab.clear();
-    (*ctxt).name = None;
-
-    (*ctxt).ns_tab.clear();
-
-    (*ctxt).version = None;
-    (*ctxt).encoding = None;
-    (*ctxt).directory = None;
-    (*ctxt).ext_sub_uri = None;
-    (*ctxt).ext_sub_system = None;
-    if !(*ctxt).my_doc.is_null() {
-        xml_free_doc((*ctxt).my_doc);
-    }
-    (*ctxt).my_doc = null_mut();
-
-    (*ctxt).standalone = -1;
-    (*ctxt).has_external_subset = 0;
-    (*ctxt).has_perefs = 0;
-    (*ctxt).html = 0;
-    (*ctxt).external = 0;
-    (*ctxt).instate = XmlParserInputState::XmlParserStart;
-    (*ctxt).token = 0;
-    (*ctxt).well_formed = 1;
-    (*ctxt).ns_well_formed = 1;
-    (*ctxt).disable_sax = 0;
-    (*ctxt).valid = 1;
-    (*ctxt).record_info = 0;
-    (*ctxt).check_index = 0;
-    (*ctxt).end_check_state = 0;
-    (*ctxt).in_subset = 0;
-    (*ctxt).err_no = XmlParserErrors::XmlErrOK as i32;
-    (*ctxt).depth = 0;
-    (*ctxt).charset = XmlCharEncoding::UTF8;
-    #[cfg(feature = "catalog")]
-    {
-        (*ctxt).catalogs = None;
-    }
-    (*ctxt).sizeentities = 0;
-    (*ctxt).sizeentcopy = 0;
-    (*ctxt).node_seq.clear();
-
-    if let Some(mut table) = (*ctxt).atts_default.take().map(|t| t.into_inner()) {
-        table.clear_with(|data, _| xml_free(data as _));
-    }
-    let _ = (*ctxt).atts_special.take().map(|t| t.into_inner());
-
-    #[cfg(feature = "catalog")]
-    {
-        (*ctxt).catalogs = None;
-    }
-    (*ctxt).nb_errors = 0;
-    (*ctxt).nb_warnings = 0;
-    if (*ctxt).last_error.is_err() {
-        (*ctxt).last_error.reset();
-    }
-}
-
 /// Reset a push parser context
 ///
 /// Returns 0 in case of success and 1 in case of error
@@ -7464,7 +7383,7 @@ pub unsafe fn xml_ctxt_reset_push(
         return 1;
     }
 
-    xml_ctxt_reset(ctxt);
+    (*ctxt).reset();
 
     if filename.is_null() {
         (*ctxt).directory = None;
@@ -9268,31 +9187,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlCreateDocParserCtxt()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_ctxt_reset() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                let mem_base = xml_mem_blocks();
-                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-
-                xml_ctxt_reset(ctxt);
-                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCtxtReset",
-                        xml_mem_blocks() - mem_base
-                    );
-                    eprintln!(" {}", n_ctxt);
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCtxtReset()");
         }
     }
 

@@ -48,10 +48,10 @@ use crate::{
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, XmlDictPtr},
         globals::{xml_deregister_node_default_value, xml_free, xml_malloc},
         parser::{
-            xml_create_push_parser_ctxt, xml_ctxt_reset, xml_ctxt_use_options, xml_parse_chunk,
-            CDATABlockSAXFunc, CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc,
-            StartElementNsSAX2Func, StartElementSAXFunc, XmlParserInputState, XmlParserMode,
-            XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
+            xml_create_push_parser_ctxt, xml_ctxt_use_options, xml_parse_chunk, CDATABlockSAXFunc,
+            CharactersSAXFunc, EndElementNsSAX2Func, EndElementSAXFunc, StartElementNsSAX2Func,
+            StartElementSAXFunc, XmlParserInputState, XmlParserMode, XmlParserOption,
+            XmlSAXHandler, XML_COMPLETE_ATTRS, XML_DETECT_IDS, XML_SAX2_MAGIC,
         },
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
@@ -3514,7 +3514,7 @@ pub unsafe fn xml_text_reader_setup(
         } else {
             let enc = XmlCharEncoding::None;
 
-            xml_ctxt_reset((*reader).ctxt);
+            (*(*reader).ctxt).reset();
             let buf = XmlParserInputBuffer::new(enc);
             let input_stream: XmlParserInputPtr = xml_new_input_stream(Some(&mut *(*reader).ctxt));
             if input_stream.is_null() {
@@ -5488,7 +5488,7 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
         let _ = (*reader).input.take();
     }
     if !(*reader).ctxt.is_null() {
-        xml_ctxt_reset((*reader).ctxt);
+        (*(*reader).ctxt).reset();
     }
 
     (*reader).ent_nr = 0;
