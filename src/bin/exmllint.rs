@@ -9,6 +9,8 @@
 // daniel@veillard.com
 #![allow(unused)]
 
+#[cfg(feature = "libxml_push")]
+use std::sync::atomic::AtomicUsize;
 use std::{
     env::args,
     ffi::{c_char, c_long, c_void, CStr, CString},
@@ -389,7 +391,7 @@ static SCHEMATRON: Mutex<Option<CString>> = Mutex::new(None);
 static WXSCHEMATRON: AtomicPtr<XmlSchematron> = AtomicPtr::new(null_mut());
 static mut REPEAT: i32 = 0;
 #[cfg(feature = "libxml_push")]
-static mut PUSHSIZE: i32 = 4096;
+static PUSHSIZE: AtomicUsize = AtomicUsize::new(4096);
 static mut PROGRESULT: XmllintReturnCode = XmllintReturnCode::ReturnOk;
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static mut PATTERNC: AtomicPtr<XmlPattern> = AtomicPtr::new(null_mut());
@@ -2196,7 +2198,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     }
                     html_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
                     while {
-                        res = fread(chars.as_mut_ptr() as _, 1, PUSHSIZE as _, f) as _;
+                        res = fread(
+                            chars.as_mut_ptr() as _,
+                            1,
+                            PUSHSIZE.load(Ordering::Relaxed),
+                            f,
+                        ) as _;
                         res > 0
                     } {
                         html_parse_chunk(ctxt, chars.as_ptr(), res, 0);
@@ -3188,9 +3195,7 @@ fn main() {
         }
     }
     if cmd_args.pushsmall {
-        unsafe {
-            PUSHSIZE = 10;
-        }
+        PUSHSIZE.store(10, Ordering::Relaxed);
     }
     if cmd_args.xinclude {
         OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
