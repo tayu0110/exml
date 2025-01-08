@@ -24815,7 +24815,7 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
     //     return -1;
 }
 
-unsafe extern "C" fn xml_schema_vcontent_model_callback(
+unsafe fn xml_schema_vcontent_model_callback(
     _exec: XmlRegExecCtxtPtr,
     _name: *const XmlChar,
     transdata: *mut c_void,
@@ -25073,10 +25073,8 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                     );
                     return -1;
                 }
-                /*
-                 * Safety belt for evaluation if the cont. model was already
-                 * examined to be invalid.
-                 */
+                // Safety belt for evaluation if the cont. model was already
+                // examined to be invalid.
                 if (*pielem).flags & XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT != 0 {
                     VERROR_INT!(
                         vctxt,
@@ -25088,9 +25086,7 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
 
                 regex_ctxt = (*pielem).regex_ctxt;
                 if regex_ctxt.is_null() {
-                    /*
-                     * Create the regex context.
-                     */
+                    // Create the regex context.
                     regex_ctxt = xml_reg_new_exec_ctxt(
                         (*ptype).cont_model,
                         Some(xml_schema_vcontent_model_callback),
@@ -25107,14 +25103,12 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                     (*pielem).regex_ctxt = regex_ctxt;
                 }
 
-                /*
-                 * SPEC (2.4) "If the {content type} is element-only or mixed,
-                 * then the sequence of the element information item's
-                 * element information item [children], if any, taken in
-                 * order, is `valid` with respect to the {content type}'s
-                 * particle, as defined in Element Sequence Locally Valid
-                 * (Particle) ($3.9.4)."
-                 */
+                // SPEC (2.4) "If the {content type} is element-only or mixed,
+                // then the sequence of the element information item's
+                // element information item [children], if any, taken in
+                // order, is `valid` with respect to the {content type}'s
+                // particle, as defined in Element Sequence Locally Valid
+                // (Particle) ($3.9.4)."
                 ret = xml_reg_exec_push_string2(
                     regex_ctxt,
                     (*(*vctxt).inode).local_name,
@@ -28812,16 +28806,12 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
             if (*inode).type_def.is_null()
                 || (*inode).flags & XML_SCHEMA_NODE_INFO_ERR_BAD_TYPE != 0
             {
-                /*
-                 * 1. the type definition might be missing if the element was
-                 *    error prone
-                 * 2. it might be abstract.
-                 */
+                // 1. the type definition might be missing if the element was
+                //    error prone
+                // 2. it might be abstract.
                 break 'end_elem;
             }
-            /*
-             * Check the content model.
-             */
+            // Check the content model.
             'character_content: {
                 'skip_nilled: {
                     if matches!(
@@ -28829,9 +28819,7 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                         XmlSchemaContentType::XmlSchemaContentMixed
                             | XmlSchemaContentType::XmlSchemaContentElements
                     ) {
-                        /*
-                         * Workaround for "anyType".
-                         */
+                        // Workaround for "anyType".
                         if (*(*inode).type_def).built_in_type
                             == XmlSchemaValType::XmlSchemasAnytype as i32
                         {
@@ -28845,9 +28833,7 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                             let mut nbneg: i32 = 0;
 
                             if (*inode).regex_ctxt.is_null() {
-                                /*
-                                 * Create the regex context.
-                                 */
+                                // Create the regex context.
                                 (*inode).regex_ctxt = xml_reg_new_exec_ctxt(
                                     (*(*inode).type_def).cont_model,
                                     Some(xml_schema_vcontent_model_callback),
@@ -28863,17 +28849,13 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                                 }
                             }
 
-                            /*
-                             * Do not check further content if the node has been nilled
-                             */
+                            // Do not check further content if the node has been nilled
                             if INODE_NILLED!(inode) {
                                 ret = 0;
                                 break 'skip_nilled;
                             }
-                            /*
-                             * Get hold of the still expected content, since a further
-                             * call to xmlRegExecPushString() will lose this information.
-                             */
+                            // Get hold of the still expected content, since a further
+                            // call to xmlRegExecPushString() will lose this information.
                             xml_reg_exec_next_values(
                                 (*inode).regex_ctxt,
                                 addr_of_mut!(nbval),
@@ -28887,9 +28869,7 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                                 null_mut(),
                             );
                             if ret < 0 || (ret == 0 && !INODE_NILLED!(inode)) {
-                                /*
-                                 * Still missing something.
-                                 */
+                                // Still missing something.
                                 ret = 1;
                                 (*inode).flags |= XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT;
                                 xml_schema_complex_type_err(

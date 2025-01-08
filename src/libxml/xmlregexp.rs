@@ -4770,7 +4770,7 @@ pub unsafe extern "C" fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
 
 /// Callback function when doing a transition in the automata
 #[doc(alias = "xmlRegExecCallbacks")]
-pub type XmlRegExecCallbacks = unsafe extern "C" fn(
+pub type XmlRegExecCallbacks = unsafe fn(
     exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
     transdata: *mut c_void,
@@ -4781,7 +4781,7 @@ pub type XmlRegExecCallbacks = unsafe extern "C" fn(
 ///
 /// Returns the new context
 #[doc(alias = "xmlRegNewExecCtxt")]
-pub unsafe extern "C" fn xml_reg_new_exec_ctxt(
+pub unsafe fn xml_reg_new_exec_ctxt(
     comp: XmlRegexpPtr,
     callback: Option<XmlRegExecCallbacks>,
     data: *mut c_void,

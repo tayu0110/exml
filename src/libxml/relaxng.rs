@@ -80,11 +80,11 @@ use super::chvalid::xml_is_blank_char;
 
 /// Signature of an error callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityErrorFunc")]
-pub type XmlRelaxNGValidityErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlRelaxNGValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 /// Signature of a warning callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityWarningFunc")]
-pub type XmlRelaxNGValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlRelaxNGValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 // List of possible Relax NG validation errors
 #[doc(alias = "xmlRelaxNGValidErr")]
@@ -147,12 +147,9 @@ enum XmlRelaxNGParserFlag {
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum XmlRelaxNGCombine {
-    #[allow(unused)]
-    Undefined = 0, /* undefined */
-    #[allow(unused)]
-    Choice, /* choice */
-    #[allow(unused)]
-    Interleave, /* interleave */
+    Undefined = 0, // undefined
+    Choice,        // choice
+    Interleave,    // interleave
 }
 
 #[repr(C)]
@@ -188,41 +185,41 @@ pub type XmlRelaxNGGrammarPtr = *mut XmlRelaxNGGrammar;
 
 #[repr(C)]
 pub struct XmlRelaxNGGrammar {
-    parent: XmlRelaxNGGrammarPtr,    /* the parent grammar if any */
-    children: XmlRelaxNGGrammarPtr,  /* the children grammar if any */
-    next: XmlRelaxNGGrammarPtr,      /* the next grammar if any */
-    start: XmlRelaxNGDefinePtr,      /* <start> content */
-    combine: XmlRelaxNGCombine,      /* the default combine value */
-    start_list: XmlRelaxNGDefinePtr, /* list of <start> definitions */
-    defs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* define* */
-    refs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* references */
+    parent: XmlRelaxNGGrammarPtr,    // the parent grammar if any
+    children: XmlRelaxNGGrammarPtr,  // the children grammar if any
+    next: XmlRelaxNGGrammarPtr,      // the next grammar if any
+    start: XmlRelaxNGDefinePtr,      // <start> content
+    combine: XmlRelaxNGCombine,      // the default combine value
+    start_list: XmlRelaxNGDefinePtr, // list of <start> definitions
+    defs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, // define
+    refs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, // references
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum XmlRelaxNGType {
-    Noop = -1,   /* a no operation from simplification  */
-    Empty = 0,   /* an empty pattern */
-    NotAllowed,  /* not allowed top */
-    Except,      /* except present in nameclass defs */
-    Text,        /* textual content */
-    Element,     /* an element */
-    Datatype,    /* external data type definition */
-    Param,       /* external data type parameter */
-    Value,       /* value from an external data type definition */
-    List,        /* a list of patterns */
-    Attribute,   /* an attribute following a pattern */
-    Def,         /* a definition */
-    Ref,         /* reference to a definition */
-    Externalref, /* reference to an external def */
-    Parentref,   /* reference to a def in the parent grammar */
-    Optional,    /* optional patterns */
-    Zeroormore,  /* zero or more non empty patterns */
-    Oneormore,   /* one or more non empty patterns */
-    Choice,      /* a choice between non empty patterns */
-    Group,       /* a pair/group of non empty patterns */
-    Interleave,  /* interleaving choice of non-empty patterns */
-    Start,       /* Used to keep track of starts on grammars */
+    Noop = -1,   // a no operation from simplification
+    Empty = 0,   // an empty pattern
+    NotAllowed,  // not allowed top
+    Except,      // except present in nameclass defs
+    Text,        // textual content
+    Element,     // an element
+    Datatype,    // external data type definition
+    Param,       // external data type parameter
+    Value,       // value from an external data type definition
+    List,        // a list of patterns
+    Attribute,   // an attribute following a pattern
+    Def,         // a definition
+    Ref,         // reference to a definition
+    Externalref, // reference to an external def
+    Parentref,   // reference to a def in the parent grammar
+    Optional,    // optional patterns
+    Zeroormore,  // zero or more non empty patterns
+    Oneormore,   // one or more non empty patterns
+    Choice,      // a choice between non empty patterns
+    Group,       // a pair/group of non empty patterns
+    Interleave,  // interleaving choice of non-empty patterns
+    Start,       // Used to keep track of starts on grammars
 }
 
 const IS_NULLABLE: i32 = 1 << 0;
@@ -239,21 +236,21 @@ pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 
 #[repr(C)]
 pub struct XmlRelaxNGDefine {
-    typ: XmlRelaxNGType,             /* the type of definition */
-    node: XmlNodePtr,                /* the node in the source */
-    name: *mut XmlChar,              /* the element local name if present */
-    ns: *mut XmlChar,                /* the namespace local name if present */
-    value: *mut XmlChar,             /* value when available */
-    data: *mut c_void,               /* data lib or specific pointer */
-    content: XmlRelaxNGDefinePtr,    /* the expected content */
-    parent: XmlRelaxNGDefinePtr,     /* the parent definition, if any */
-    next: XmlRelaxNGDefinePtr,       /* list within grouping sequences */
-    attrs: XmlRelaxNGDefinePtr,      /* list of attributes for elements */
-    name_class: XmlRelaxNGDefinePtr, /* the nameClass definition if any */
-    next_hash: XmlRelaxNGDefinePtr,  /* next define in defs/refs hash tables */
-    depth: i16,                      /* used for the cycle detection */
-    dflags: i16,                     /* define related flags */
-    cont_model: XmlRegexpPtr,        /* a compiled content model if available */
+    typ: XmlRelaxNGType,             // the type of definition
+    node: XmlNodePtr,                // the node in the source
+    name: *mut XmlChar,              // the element local name if present
+    ns: *mut XmlChar,                // the namespace local name if present
+    value: *mut XmlChar,             // value when available
+    data: *mut c_void,               // data lib or specific pointer
+    content: XmlRelaxNGDefinePtr,    // the expected content
+    parent: XmlRelaxNGDefinePtr,     // the parent definition, if any
+    next: XmlRelaxNGDefinePtr,       // list within grouping sequences
+    attrs: XmlRelaxNGDefinePtr,      // list of attributes for elements
+    name_class: XmlRelaxNGDefinePtr, // the nameClass definition if any
+    next_hash: XmlRelaxNGDefinePtr,  // next define in defs/refs hash tables
+    depth: i16,                      // used for the cycle detection
+    dflags: i16,                     // define related flags
+    cont_model: XmlRegexpPtr,        // a compiled content model if available
 }
 
 pub type XmlRelaxNGPtr = *mut XmlRelaxNG;
@@ -261,19 +258,19 @@ pub type XmlRelaxNGPtr = *mut XmlRelaxNG;
 #[doc(alias = "xmlRelaxNG")]
 #[repr(C)]
 pub struct XmlRelaxNG {
-    _private: *mut c_void, /* unused by the library for users or bindings */
+    _private: *mut c_void, // unused by the library for users or bindings
     topgrammar: XmlRelaxNGGrammarPtr,
     doc: XmlDocPtr,
 
-    idref: i32, /* requires idref checking */
+    idref: i32, // requires idref checking
 
     // It seems that these tables are unused...
-    defs: Option<XmlHashTableRef<'static, ()>>, /* define */
-    refs: Option<XmlHashTableRef<'static, ()>>, /* references */
-    documents: XmlRelaxNGDocumentPtr,           /* all the documents loaded */
-    includes: XmlRelaxNGIncludePtr,             /* all the includes loaded */
-    def_nr: i32,                                /* number of defines used */
-    def_tab: *mut XmlRelaxNGDefinePtr,          /* pointer to the allocated definitions */
+    defs: Option<XmlHashTableRef<'static, ()>>, // define
+    refs: Option<XmlHashTableRef<'static, ()>>, // references
+    documents: XmlRelaxNGDocumentPtr,           // all the documents loaded
+    includes: XmlRelaxNGIncludePtr,             // all the includes loaded
+    def_nr: i32,                                // number of defines used
+    def_tab: *mut XmlRelaxNGDefinePtr,          // pointer to the allocated definitions
 }
 
 const XML_RELAXNG_IN_ATTRIBUTE: i32 = 1 << 0;
@@ -290,56 +287,56 @@ const XML_RELAXNG_IN_NSEXCEPT: i32 = 1 << 9;
 pub type XmlRelaxNGParserCtxtPtr = *mut XmlRelaxNGParserCtxt;
 #[repr(C)]
 pub struct XmlRelaxNGParserCtxt {
-    user_data: Option<GenericErrorContext>, /* user specific data block */
-    error: Option<GenericError>,            /* the callback in case of errors */
-    warning: Option<GenericError>,          /* the callback in case of warning */
+    user_data: Option<GenericErrorContext>, // user specific data block
+    error: Option<GenericError>,            // the callback in case of errors
+    warning: Option<GenericError>,          // the callback in case of warning
     serror: Option<StructuredError>,
     err: XmlRelaxNGValidErr,
 
-    schema: XmlRelaxNGPtr,               /* The schema in use */
-    grammar: XmlRelaxNGGrammarPtr,       /* the current grammar */
-    parentgrammar: XmlRelaxNGGrammarPtr, /* the parent grammar */
-    flags: i32,                          /* parser flags */
-    nb_errors: i32,                      /* number of errors at parse time */
-    nb_warnings: i32,                    /* number of warnings at parse time */
-    define: *const XmlChar,              /* the current define scope */
-    def: XmlRelaxNGDefinePtr,            /* the current define */
+    schema: XmlRelaxNGPtr,               // The schema in use
+    grammar: XmlRelaxNGGrammarPtr,       // the current grammar
+    parentgrammar: XmlRelaxNGGrammarPtr, // the parent grammar
+    flags: i32,                          // parser flags
+    nb_errors: i32,                      // number of errors at parse time
+    nb_warnings: i32,                    // number of warnings at parse time
+    define: *const XmlChar,              // the current define scope
+    def: XmlRelaxNGDefinePtr,            // the current define
 
     nb_interleaves: i32,
-    interleaves: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, /* keep track of all the interleaves */
+    interleaves: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, // keep track of all the interleaves
 
-    documents: XmlRelaxNGDocumentPtr, /* all the documents loaded */
-    includes: XmlRelaxNGIncludePtr,   /* all the includes loaded */
+    documents: XmlRelaxNGDocumentPtr, // all the documents loaded
+    includes: XmlRelaxNGIncludePtr,   // all the includes loaded
     url: *mut XmlChar,
     document: XmlDocPtr,
 
-    def_nr: i32,                       /* number of defines used */
-    def_max: i32,                      /* number of defines allocated */
-    def_tab: *mut XmlRelaxNGDefinePtr, /* pointer to the allocated definitions */
+    def_nr: i32,                       // number of defines used
+    def_max: i32,                      // number of defines allocated
+    def_tab: *mut XmlRelaxNGDefinePtr, // pointer to the allocated definitions
 
     buffer: *const c_char,
     size: i32,
 
-    /* the document stack */
-    doc: XmlRelaxNGDocumentPtr,          /* Current parsed external ref */
-    doc_nr: i32,                         /* Depth of the parsing stack */
-    doc_max: i32,                        /* Max depth of the parsing stack */
-    doc_tab: *mut XmlRelaxNGDocumentPtr, /* array of docs */
+    // the document stack
+    doc: XmlRelaxNGDocumentPtr,          // Current parsed external ref
+    doc_nr: i32,                         // Depth of the parsing stack
+    doc_max: i32,                        // Max depth of the parsing stack
+    doc_tab: *mut XmlRelaxNGDocumentPtr, // array of docs
 
-    /* the include stack */
-    inc: XmlRelaxNGIncludePtr,          /* Current parsed include */
-    inc_nr: i32,                        /* Depth of the include parsing stack */
-    inc_max: i32,                       /* Max depth of the parsing stack */
-    inc_tab: *mut XmlRelaxNGIncludePtr, /* array of incs */
+    // the include stack
+    inc: XmlRelaxNGIncludePtr,          // Current parsed include
+    inc_nr: i32,                        // Depth of the include parsing stack
+    inc_max: i32,                       // Max depth of the parsing stack
+    inc_tab: *mut XmlRelaxNGIncludePtr, // array of incs
 
-    idref: i32, /* requires idref checking */
+    idref: i32, // requires idref checking
 
-    /* used to compile content models */
-    am: XmlAutomataPtr,         /* the automata */
-    state: XmlAutomataStatePtr, /* used to build the automata */
+    // used to compile content models
+    am: XmlAutomataPtr,         // the automata
+    state: XmlAutomataStatePtr, // used to build the automata
 
-    crng: i32,    /* compact syntax and other flags */
-    freedoc: i32, /* need to free the document */
+    crng: i32,    // compact syntax and other flags
+    freedoc: i32, // need to free the document
 }
 
 const FLAGS_IGNORABLE: i32 = 1;
@@ -352,9 +349,9 @@ pub type XmlRelaxNGInterleaveGroupPtr = *mut XmlRelaxNGInterleaveGroup;
 #[doc(alias = "xmlRelaxNGInterleaveGroup")]
 #[repr(C)]
 pub struct XmlRelaxNGInterleaveGroup {
-    rule: XmlRelaxNGDefinePtr,       /* the rule to satisfy */
-    defs: *mut XmlRelaxNGDefinePtr,  /* the array of element definitions */
-    attrs: *mut XmlRelaxNGDefinePtr, /* the array of attributes definitions */
+    rule: XmlRelaxNGDefinePtr,       // the rule to satisfy
+    defs: *mut XmlRelaxNGDefinePtr,  // the array of element definitions
+    attrs: *mut XmlRelaxNGDefinePtr, // the array of attributes definitions
 }
 
 const IS_DETERMINIST: i32 = 1;
@@ -365,10 +362,9 @@ pub type XmlRelaxNGPartitionPtr = *mut XmlRelaxNGPartition;
 #[doc(alias = "xmlRelaxNGPartitions")]
 #[repr(C)]
 pub struct XmlRelaxNGPartition {
-    nbgroups: i32, /* number of groups in the partitions */
-    triage: Option<XmlHashTableRef<'static, i32>>, /* hash table used to direct nodes to the
-                    * right group when possible */
-    flags: i32, /* determinist ? */
+    nbgroups: i32,                                 // number of groups in the partitions
+    triage: Option<XmlHashTableRef<'static, i32>>, // hash table used to direct nodes to the right group when possible
+    flags: i32,                                    // determinist ?
     groups: *mut XmlRelaxNGInterleaveGroupPtr,
 }
 
@@ -378,14 +374,14 @@ pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    node: XmlNodePtr,       /* the current node */
-    seq: XmlNodePtr,        /* the sequence of children left to validate */
-    nb_attrs: i32,          /* the number of attributes */
-    max_attrs: i32,         /* the size of attrs */
-    nb_attr_left: i32,      /* the number of attributes left to validate */
-    value: *mut XmlChar,    /* the value when operating on string */
-    endvalue: *mut XmlChar, /* the end value when operating on string */
-    attrs: *mut XmlAttrPtr, /* the array of attributes */
+    node: XmlNodePtr,       // the current node
+    seq: XmlNodePtr,        // the sequence of children left to validate
+    nb_attrs: i32,          // the number of attributes
+    max_attrs: i32,         // the size of attrs
+    nb_attr_left: i32,      // the number of attributes left to validate
+    value: *mut XmlChar,    // the value when operating on string
+    endvalue: *mut XmlChar, // the end value when operating on string
+    attrs: *mut XmlAttrPtr, // the array of attributes
 }
 
 pub type XmlRelaxNGStatesPtr = *mut XmlRelaxNGStates;
@@ -393,8 +389,8 @@ pub type XmlRelaxNGStatesPtr = *mut XmlRelaxNGStates;
 #[doc(alias = "xmlRelaxNGStates")]
 #[repr(C)]
 pub struct XmlRelaxNGStates {
-    nb_state: i32,  /* the number of states */
-    max_state: i32, /* the size of the array */
+    nb_state: i32,  // the number of states
+    max_state: i32, // the size of the array
     tab_state: *mut XmlRelaxNGValidStatePtr,
 }
 
@@ -405,12 +401,12 @@ pub type XmlRelaxNGValidErrorPtr = *mut XmlRelaxNGValidError;
 #[doc(alias = "xmlRelaxNGValidError")]
 #[repr(C)]
 pub struct XmlRelaxNGValidError {
-    err: XmlRelaxNGValidErr, /* the error number */
-    flags: i32,              /* flags */
-    node: XmlNodePtr,        /* the current node */
-    seq: XmlNodePtr,         /* the current child */
-    arg1: *const XmlChar,    /* first arg */
-    arg2: *const XmlChar,    /* second arg */
+    err: XmlRelaxNGValidErr, // the error number
+    flags: i32,              // flags
+    node: XmlNodePtr,        // the current node
+    seq: XmlNodePtr,         // the current child
+    arg1: *const XmlChar,    // first arg
+    arg2: *const XmlChar,    // second arg
 }
 
 pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
@@ -418,48 +414,43 @@ pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
 #[doc(alias = "xmlRelaxNGValidCtxt")]
 #[repr(C)]
 pub struct XmlRelaxNGValidCtxt {
-    user_data: Option<GenericErrorContext>, /* user specific data block */
-    error: Option<GenericError>,            /* the callback in case of errors */
-    warning: Option<GenericError>,          /* the callback in case of warning */
+    user_data: Option<GenericErrorContext>, // user specific data block
+    error: Option<GenericError>,            // the callback in case of errors
+    warning: Option<GenericError>,          // the callback in case of warning
     serror: Option<StructuredError>,
-    nb_errors: i32, /* number of errors in validation */
+    nb_errors: i32, // number of errors in validation
 
-    schema: XmlRelaxNGPtr, /* The schema in use */
-    doc: XmlDocPtr,        /* the document being validated */
-    flags: i32,            /* validation flags */
-    depth: i32,            /* validation depth */
-    idref: i32,            /* requires idref checking */
-    err_no: i32,           /* the first error found */
+    schema: XmlRelaxNGPtr, // The schema in use
+    doc: XmlDocPtr,        // the document being validated
+    flags: i32,            // validation flags
+    depth: i32,            // validation depth
+    idref: i32,            // requires idref checking
+    err_no: i32,           // the first error found
 
-    /*
-     * Errors accumulated in branches may have to be stacked to be
-     * provided back when it's sure they affect validation.
-     */
-    err: XmlRelaxNGValidErrorPtr,     /* Last error */
-    err_nr: i32,                      /* Depth of the error stack */
-    err_max: i32,                     /* Max depth of the error stack */
-    err_tab: XmlRelaxNGValidErrorPtr, /* stack of errors */
+    // Errors accumulated in branches may have to be stacked to be
+    // provided back when it's sure they affect validation.
+    err: XmlRelaxNGValidErrorPtr,     // Last error
+    err_nr: i32,                      // Depth of the error stack
+    err_max: i32,                     // Max depth of the error stack
+    err_tab: XmlRelaxNGValidErrorPtr, // stack of errors
 
-    state: XmlRelaxNGValidStatePtr, /* the current validation state */
-    states: XmlRelaxNGStatesPtr,    /* the accumulated state list */
+    state: XmlRelaxNGValidStatePtr, // the current validation state
+    states: XmlRelaxNGStatesPtr,    // the accumulated state list
 
-    free_state: XmlRelaxNGStatesPtr, /* the pool of free valid states */
+    free_state: XmlRelaxNGStatesPtr, // the pool of free valid states
     free_states_nr: i32,
     free_states_max: i32,
-    free_states: *mut XmlRelaxNGStatesPtr, /* the pool of free state groups */
+    free_states: *mut XmlRelaxNGStatesPtr, // the pool of free state groups
 
-    /*
-     * This is used for "progressive" validation
-     */
-    elem: XmlRegExecCtxtPtr,          /* the current element regexp */
-    elem_nr: i32,                     /* the number of element validated */
-    elem_max: i32,                    /* the max depth of elements */
-    elem_tab: *mut XmlRegExecCtxtPtr, /* the stack of regexp runtime */
-    pstate: i32,                      /* progressive state */
-    pnode: XmlNodePtr,                /* the current node */
-    pdef: XmlRelaxNGDefinePtr,        /* the non-streamable definition */
-    perr: i32,                        /* signal error in content model
-                                       * outside the regexp */
+    // This is used for "progressive" validation
+    elem: XmlRegExecCtxtPtr,          // the current element regexp
+    elem_nr: i32,                     // the number of element validated
+    elem_max: i32,                    // the max depth of elements
+    elem_tab: *mut XmlRegExecCtxtPtr, // the stack of regexp runtime
+    pstate: i32,                      // progressive state
+    pnode: XmlNodePtr,                // the current node
+    pdef: XmlRelaxNGDefinePtr,        // the non-streamable definition
+    perr: i32,                        // signal error in content model outside the regexp
 }
 
 pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
@@ -467,11 +458,11 @@ pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
 #[doc(alias = "xmlRelaxNGInclude")]
 #[repr(C)]
 pub struct XmlRelaxNGInclude {
-    next: XmlRelaxNGIncludePtr,   /* keep a chain of includes */
-    href: *mut XmlChar,           /* the normalized href value */
-    doc: XmlDocPtr,               /* the associated XML document */
-    content: XmlRelaxNGDefinePtr, /* the definitions */
-    schema: XmlRelaxNGPtr,        /* the schema */
+    next: XmlRelaxNGIncludePtr,   // keep a chain of includes
+    href: *mut XmlChar,           // the normalized href value
+    doc: XmlDocPtr,               // the associated XML document
+    content: XmlRelaxNGDefinePtr, // the definitions
+    schema: XmlRelaxNGPtr,        // the schema
 }
 
 pub type XmlRelaxNGDocumentPtr = *mut XmlRelaxNGDocument;
@@ -479,25 +470,25 @@ pub type XmlRelaxNGDocumentPtr = *mut XmlRelaxNGDocument;
 #[doc(alias = "xmlRelaxNGDocument")]
 #[repr(C)]
 pub struct XmlRelaxNGDocument {
-    next: XmlRelaxNGDocumentPtr,  /* keep a chain of documents */
-    href: *mut XmlChar,           /* the normalized href value */
-    doc: XmlDocPtr,               /* the associated XML document */
-    content: XmlRelaxNGDefinePtr, /* the definitions */
-    schema: XmlRelaxNGPtr,        /* the schema */
-    external_ref: i32,            /* 1 if an external ref */
+    next: XmlRelaxNGDocumentPtr,  // keep a chain of documents
+    href: *mut XmlChar,           // the normalized href value
+    doc: XmlDocPtr,               // the associated XML document
+    content: XmlRelaxNGDefinePtr, // the definitions
+    schema: XmlRelaxNGPtr,        // the schema
+    external_ref: i32,            // 1 if an external ref
 }
 
 /// Function provided by a type library to check if a type is exported
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGTypeHave")]
-type XmlRelaxNGTypeHave = unsafe extern "C" fn(data: *mut c_void, typ: *const XmlChar) -> i32;
+type XmlRelaxNGTypeHave = unsafe fn(data: *mut c_void, typ: *const XmlChar) -> i32;
 
 /// Function provided by a type library to check if a value match a type
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGTypeCheck")]
-type XmlRelaxNGTypeCheck = unsafe extern "C" fn(
+type XmlRelaxNGTypeCheck = unsafe fn(
     data: *mut c_void,
     typ: *const XmlChar,
     value: *const XmlChar,
@@ -509,7 +500,7 @@ type XmlRelaxNGTypeCheck = unsafe extern "C" fn(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGFacetCheck")]
-type XmlRelaxNGFacetCheck = unsafe extern "C" fn(
+type XmlRelaxNGFacetCheck = unsafe fn(
     data: *mut c_void,
     typ: *const XmlChar,
     facet: *const XmlChar,
@@ -520,13 +511,13 @@ type XmlRelaxNGFacetCheck = unsafe extern "C" fn(
 
 /// Function provided by a type library to free a returned result
 #[doc(alias = "xmlRelaxNGTypeFree")]
-type XmlRelaxNGTypeFree = unsafe extern "C" fn(data: *mut c_void, result: *mut c_void);
+type XmlRelaxNGTypeFree = unsafe fn(data: *mut c_void, result: *mut c_void);
 
 /// Function provided by a type library to compare two values accordingly to a type.
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGTypeCompare")]
-type XmlRelaxNGTypeCompare = unsafe extern "C" fn(
+type XmlRelaxNGTypeCompare = unsafe fn(
     data: *mut c_void,
     typ: *const XmlChar,
     value1: *const XmlChar,
@@ -538,13 +529,13 @@ type XmlRelaxNGTypeCompare = unsafe extern "C" fn(
 pub type XmlRelaxNGTypeLibraryPtr = *mut XmlRelaxNGTypeLibrary;
 #[repr(C)]
 pub struct XmlRelaxNGTypeLibrary {
-    namespace: *const XmlChar,           /* the datatypeLibrary value */
-    data: *mut c_void,                   /* data needed for the library */
-    have: Option<XmlRelaxNGTypeHave>,    /* the export function */
-    check: Option<XmlRelaxNGTypeCheck>,  /* the checking function */
-    comp: Option<XmlRelaxNGTypeCompare>, /* the compare function */
-    facet: Option<XmlRelaxNGFacetCheck>, /* the facet check function */
-    freef: Option<XmlRelaxNGTypeFree>,   /* the freeing function */
+    namespace: *const XmlChar,           // the datatypeLibrary value
+    data: *mut c_void,                   // data needed for the library
+    have: Option<XmlRelaxNGTypeHave>,    // the export function
+    check: Option<XmlRelaxNGTypeCheck>,  // the checking function
+    comp: Option<XmlRelaxNGTypeCompare>, // the compare function
+    facet: Option<XmlRelaxNGFacetCheck>, // the facet check function
+    freef: Option<XmlRelaxNGTypeFree>,   // the freeing function
 }
 
 thread_local! {
@@ -583,7 +574,7 @@ macro_rules! VALID_ERR3P {
 ///
 /// Returns the error string, it must be deallocated by the caller
 #[doc(alias = "xmlRelaxNGGetErrorString")]
-unsafe extern "C" fn xml_relaxng_get_error_string(
+unsafe fn xml_relaxng_get_error_string(
     err: XmlRelaxNGValidErr,
     mut arg1: *const XmlChar,
     mut arg2: *const XmlChar,
@@ -987,7 +978,7 @@ unsafe fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) {
 ///
 /// Returns 0 in case of error, the index in the stack otherwise
 #[doc(alias = "xmlRelaxNGValidErrorPush")]
-unsafe extern "C" fn xml_relaxng_valid_error_push(
+unsafe fn xml_relaxng_valid_error_push(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: XmlRelaxNGValidErr,
     arg1: *const XmlChar,
@@ -1196,7 +1187,7 @@ unsafe fn xml_relaxng_register_type_library(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGSchemaTypeHave")]
-unsafe extern "C" fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
+unsafe fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
     if typ.is_null() {
         return -1;
     }
@@ -1212,7 +1203,7 @@ unsafe extern "C" fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *cons
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGSchemaTypeCheck")]
-unsafe extern "C" fn xml_relaxng_schema_type_check(
+unsafe fn xml_relaxng_schema_type_check(
     _data: *mut c_void,
     r#type: *const XmlChar,
     value: *const XmlChar,
@@ -1231,7 +1222,7 @@ unsafe extern "C" fn xml_relaxng_schema_type_check(
     }
     let ret: i32 = xml_schema_val_predef_type_node(typ, value, result as _, node);
     if ret == 2 {
-        /* special ID error code */
+        // special ID error code
         return 2;
     }
     if ret == 0 {
@@ -1247,7 +1238,7 @@ unsafe extern "C" fn xml_relaxng_schema_type_check(
 ///
 /// Returns 1 if equal, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGSchemaTypeCompare")]
-unsafe extern "C" fn xml_relaxng_schema_type_compare(
+unsafe fn xml_relaxng_schema_type_compare(
     _data: *mut c_void,
     r#type: *const XmlChar,
     value1: *const XmlChar,
@@ -1306,7 +1297,7 @@ unsafe extern "C" fn xml_relaxng_schema_type_compare(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGSchemaFacetCheck")]
-unsafe extern "C" fn xml_relaxng_schema_facet_check(
+unsafe fn xml_relaxng_schema_facet_check(
     _data: *mut c_void,
     r#type: *const XmlChar,
     facetname: *const XmlChar,
@@ -1378,7 +1369,7 @@ unsafe extern "C" fn xml_relaxng_schema_facet_check(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGSchemaFreeValue")]
-unsafe extern "C" fn xml_relaxng_schema_free_value(_data: *mut c_void, value: *mut c_void) {
+unsafe fn xml_relaxng_schema_free_value(_data: *mut c_void, value: *mut c_void) {
     xml_schema_free_value(value as _);
 }
 
@@ -1399,7 +1390,7 @@ macro_rules! IS_RELAXNG {
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGDefaultTypeHave")]
-unsafe extern "C" fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
+unsafe fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
     if typ.is_null() {
         return -1;
     }
@@ -1416,7 +1407,7 @@ unsafe extern "C" fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *con
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGDefaultTypeCheck")]
-unsafe extern "C" fn xml_relaxng_default_type_check(
+unsafe fn xml_relaxng_default_type_check(
     _data: *mut c_void,
     typ: *const XmlChar,
     value: *const XmlChar,
@@ -1440,7 +1431,7 @@ unsafe extern "C" fn xml_relaxng_default_type_check(
 ///
 /// Returns the new string or NULL in case of error.
 #[doc(alias = "xmlRelaxNGNormalize")]
-unsafe extern "C" fn xml_relaxng_normalize(
+unsafe fn xml_relaxng_normalize(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut str: *const XmlChar,
 ) -> *mut XmlChar {
@@ -1489,7 +1480,7 @@ unsafe extern "C" fn xml_relaxng_normalize(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGDefaultTypeCompare")]
-unsafe extern "C" fn xml_relaxng_default_type_compare(
+unsafe fn xml_relaxng_default_type_compare(
     _data: *mut c_void,
     typ: *const XmlChar,
     value1: *const XmlChar,
@@ -1504,10 +1495,8 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
         ret = xml_str_equal(value1, value2) as i32;
     } else if xml_str_equal(typ, c"token".as_ptr() as _) {
         if !xml_str_equal(value1, value2) {
-            /*
-             * TODO: trivial optimizations are possible by
-             * computing at compile-time
-             */
+            // TODO: trivial optimizations are possible by
+            // computing at compile-time
             let nval: *mut XmlChar = xml_relaxng_normalize(null_mut(), value1);
             let nvalue: *mut XmlChar = xml_relaxng_normalize(null_mut(), value2);
 
@@ -1535,7 +1524,7 @@ unsafe extern "C" fn xml_relaxng_default_type_compare(
 ///
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlRelaxNGInitTypes")]
-pub unsafe extern "C" fn xml_relaxng_init_types() -> i32 {
+pub unsafe fn xml_relaxng_init_types() -> i32 {
     if XML_RELAXNG_TYPE_INITIALIZED.get() {
         return 0;
     }
@@ -1584,7 +1573,7 @@ extern "C" fn xml_relaxng_free_type_library(lib: XmlRelaxNGTypeLibraryPtr) {
 
 /// Cleanup the default Schemas type library associated to RelaxNG
 #[doc(alias = "xmlRelaxNGCleanupTypes")]
-pub(crate) unsafe extern "C" fn xml_relaxng_cleanup_types() {
+pub(crate) unsafe fn xml_relaxng_cleanup_types() {
     xml_schema_cleanup_types();
     if !XML_RELAXNG_TYPE_INITIALIZED.get() {
         return;
@@ -1660,9 +1649,7 @@ unsafe fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: Option<&str>
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewParserCtxt")]
-pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
-    url: *const c_char,
-) -> XmlRelaxNGParserCtxtPtr {
+pub unsafe fn xml_relaxng_new_parser_ctxt(url: *const c_char) -> XmlRelaxNGParserCtxtPtr {
     if url.is_null() {
         return null_mut();
     }
@@ -1686,7 +1673,7 @@ pub unsafe extern "C" fn xml_relaxng_new_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewMemParserCtxt")]
-pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
+pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: i32,
 ) -> XmlRelaxNGParserCtxtPtr {
@@ -1717,9 +1704,7 @@ pub unsafe extern "C" fn xml_relaxng_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewDocParserCtxt")]
-pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
-    doc: XmlDocPtr,
-) -> XmlRelaxNGParserCtxtPtr {
+pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParserCtxtPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -1748,10 +1733,7 @@ pub unsafe extern "C" fn xml_relaxng_new_doc_parser_ctxt(
 ///
 /// Returns 0 if success and -1 in case of error
 #[doc(alias = "xmlRelaxParserSetFlag")]
-pub unsafe extern "C" fn xml_relax_parser_set_flag(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    mut flags: i32,
-) -> i32 {
+pub unsafe fn xml_relax_parser_set_flag(ctxt: XmlRelaxNGParserCtxtPtr, mut flags: i32) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -1771,7 +1753,7 @@ pub unsafe extern "C" fn xml_relax_parser_set_flag(
 
 /// Deallocate RelaxNG partition set structures.
 #[doc(alias = "xmlRelaxNGFreePartition")]
-unsafe extern "C" fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
+unsafe fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
     let mut group: XmlRelaxNGInterleaveGroupPtr;
 
     if !partitions.is_null() {
@@ -1799,7 +1781,7 @@ unsafe extern "C" fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionP
 
 /// Deallocate a RelaxNG define structure.
 #[doc(alias = "xmlRelaxNGFreeDefine")]
-unsafe extern "C" fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
+unsafe fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
     if define.is_null() {
         return;
     }
@@ -1835,7 +1817,7 @@ unsafe extern "C" fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
 
 /// Deallocate a RelaxNG schema structure.
 #[doc(alias = "xmlRelaxNGFreeInnerSchema")]
-unsafe extern "C" fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
+unsafe fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         return;
     }
@@ -1855,7 +1837,7 @@ unsafe extern "C" fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
 
 /// Deallocate a RelaxNG document structure.
 #[doc(alias = "xmlRelaxNGFreeDocument")]
-unsafe extern "C" fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
+unsafe fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
     if docu.is_null() {
         return;
     }
@@ -1874,7 +1856,7 @@ unsafe extern "C" fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
 
 /// Deallocate a RelaxNG document structures.
 #[doc(alias = "xmlRelaxNGFreeDocumentList")]
-unsafe extern "C" fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocumentPtr) {
+unsafe fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocumentPtr) {
     let mut next: XmlRelaxNGDocumentPtr;
 
     while !docu.is_null() {
@@ -1886,7 +1868,7 @@ unsafe extern "C" fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocument
 
 /// Deallocate a RelaxNG include structure.
 #[doc(alias = "xmlRelaxNGFreeInclude")]
-unsafe extern "C" fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
+unsafe fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
     if incl.is_null() {
         return;
     }
@@ -1905,7 +1887,7 @@ unsafe extern "C" fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
 
 /// Deallocate a RelaxNG include structure.
 #[doc(alias = "xmlRelaxNGFreeIncludeList")]
-unsafe extern "C" fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePtr) {
+unsafe fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePtr) {
     let mut next: XmlRelaxNGIncludePtr;
 
     while !incl.is_null() {
@@ -1917,7 +1899,7 @@ unsafe extern "C" fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePt
 
 /// Free the resources associated to the schema parser context
 #[doc(alias = "xmlRelaxNGFreeParserCtxt")]
-pub unsafe extern "C" fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
+pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -2016,7 +1998,7 @@ pub unsafe fn xml_relaxng_set_parser_structured_errors(
 ///
 /// Returns a list of elements or NULL if none was found.
 #[doc(alias = "xmlRelaxNGGetElements")]
-unsafe extern "C" fn xml_relaxng_get_elements(
+unsafe fn xml_relaxng_get_elements(
     ctxt: XmlRelaxNGParserCtxtPtr,
     def: XmlRelaxNGDefinePtr,
     eora: i32,
@@ -2028,10 +2010,7 @@ unsafe extern "C" fn xml_relaxng_get_elements(
     let mut len: i32 = 0;
     let mut max: i32 = 0;
 
-    /*
-     * Don't run that check in case of error. Infinite recursion
-     * becomes possible.
-     */
+    // Don't run that check in case of error. Infinite recursion becomes possible.
     if (*ctxt).nb_errors != 0 {
         return null_mut();
     }
@@ -2087,10 +2066,8 @@ unsafe extern "C" fn xml_relaxng_get_elements(
                 | XmlRelaxNGType::Def
                 | XmlRelaxNGType::Externalref
         ) {
-            /*
-             * Don't go within elements or attributes or string values.
-             * Just gather the element top list
-             */
+            // Don't go within elements or attributes or string values.
+            // Just gather the element top list
             if !(*cur).content.is_null() {
                 parent = cur;
                 cur = (*cur).content;
@@ -2132,7 +2109,7 @@ unsafe extern "C" fn xml_relaxng_get_elements(
 
 /// pop and discard all errors until the given level is reached
 #[doc(alias = "xmlRelaxNGPopErrors")]
-unsafe extern "C" fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level: i32) {
+unsafe fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level: i32) {
     let mut err: XmlRelaxNGValidErrorPtr;
 
     for i in level..(*ctxt).err_nr {
@@ -2161,7 +2138,7 @@ const INVALID_NAME: &CStr = c"\u{1}";
 ///
 /// Returns 1 if the element matches, 0 if no, or -1 in case of error
 #[doc(alias = "xmlRelaxNGElementMatch")]
-unsafe extern "C" fn xml_relaxng_element_match(
+unsafe fn xml_relaxng_element_match(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut define: XmlRelaxNGDefinePtr,
     elem: XmlNodePtr,
@@ -2296,7 +2273,7 @@ unsafe extern "C" fn xml_relaxng_element_match(
 ///
 /// Returns 1 distinct, 0 if equal
 #[doc(alias = "xmlRelaxNGCompareNameClasses")]
-unsafe extern "C" fn xml_relaxng_compare_name_classes(
+unsafe fn xml_relaxng_compare_name_classes(
     def1: XmlRelaxNGDefinePtr,
     def2: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -2401,7 +2378,7 @@ unsafe extern "C" fn xml_relaxng_compare_name_classes(
 ///
 /// Returns 1 distinct, 0 if equal
 #[doc(alias = "xmlRelaxNGCompareElemDefLists")]
-unsafe extern "C" fn xml_relaxng_compare_elem_def_lists(
+unsafe fn xml_relaxng_compare_elem_def_lists(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     mut def1: *mut XmlRelaxNGDefinePtr,
     mut def2: *mut XmlRelaxNGDefinePtr,
@@ -2696,9 +2673,7 @@ extern "C" fn xml_relaxng_compute_interleaves(
             }
             (*partitions).groups = groups;
 
-            /*
-             * and save the partition list back in the def
-             */
+            // and save the partition list back in the def
             (*def).data = partitions as _;
             if is_mixed != 0 {
                 (*def).dflags |= IS_MIXED as i16;
@@ -2739,7 +2714,7 @@ macro_rules! IS_BLANK_NODE {
 ///
 /// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
 #[doc(alias = "xmlRelaxNGIsBlank")]
-unsafe extern "C" fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
+unsafe fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
     if str.is_null() {
         return 1;
     }
@@ -2754,10 +2729,7 @@ unsafe extern "C" fn xml_relaxng_is_blank(mut str: *mut XmlChar) -> i32 {
 
 /// Check all the attributes on the given node
 #[doc(alias = "xmlRelaxNGCleanupAttributes")]
-unsafe extern "C" fn xml_relaxng_cleanup_attributes(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    node: XmlNodePtr,
-) {
+unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodePtr) {
     let mut cur: XmlAttrPtr;
     let mut next: XmlAttrPtr;
 
@@ -2881,7 +2853,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_attributes(
 ///
 /// Returns 0 in case of error, the index in the stack otherwise
 #[doc(alias = "xmlRelaxNGDocumentPush")]
-unsafe extern "C" fn xml_relaxng_document_push(
+unsafe fn xml_relaxng_document_push(
     ctxt: XmlRelaxNGParserCtxtPtr,
     value: XmlRelaxNGDocumentPtr,
 ) -> i32 {
@@ -2916,9 +2888,7 @@ unsafe extern "C" fn xml_relaxng_document_push(
 ///
 /// Returns the doc just removed
 #[doc(alias = "xmlRelaxNGDocumentPop")]
-unsafe extern "C" fn xml_relaxng_document_pop(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-) -> XmlRelaxNGDocumentPtr {
+unsafe fn xml_relaxng_document_pop(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGDocumentPtr {
     if (*ctxt).doc_nr <= 0 {
         return null_mut();
     }
@@ -3029,7 +2999,7 @@ unsafe fn xml_relaxng_load_external_ref(
 ///
 /// Returns 0 in case of error, the index in the stack otherwise
 #[doc(alias = "xmlRelaxNGIncludePush")]
-unsafe extern "C" fn xml_relaxng_include_push(
+unsafe fn xml_relaxng_include_push(
     ctxt: XmlRelaxNGParserCtxtPtr,
     value: XmlRelaxNGIncludePtr,
 ) -> i32 {
@@ -3064,9 +3034,7 @@ unsafe extern "C" fn xml_relaxng_include_push(
 ///
 /// Returns the include just removed
 #[doc(alias = "xmlRelaxNGIncludePop")]
-unsafe extern "C" fn xml_relaxng_include_pop(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-) -> XmlRelaxNGIncludePtr {
+unsafe fn xml_relaxng_include_pop(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGIncludePtr {
     if (*ctxt).inc_nr <= 0 {
         return null_mut();
     }
@@ -3084,7 +3052,7 @@ unsafe extern "C" fn xml_relaxng_include_pop(
 /// Removes the leading and ending spaces of the value
 /// The string is modified "in situ"
 #[doc(alias = "xmlRelaxNGNormExtSpace")]
-unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
+unsafe fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
     let mut start: *mut XmlChar = value;
     let mut cur: *mut XmlChar = value;
 
@@ -3123,7 +3091,7 @@ unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
                 *start = 0;
                 return;
             }
-            /* don't try to normalize the inner spaces */
+            // don't try to normalize the inner spaces
             while xml_is_blank_char(*cur as u32) {
                 cur = cur.add(1);
             }
@@ -3142,7 +3110,7 @@ unsafe extern "C" fn xml_relaxng_norm_ext_space(value: *mut XmlChar) {
 ///
 /// Returns 0 in case of error, 1 in case of success.
 #[doc(alias = "xmlRelaxNGRemoveRedefine")]
-unsafe extern "C" fn xml_relaxng_remove_redefine(
+unsafe fn xml_relaxng_remove_redefine(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     _url: *const XmlChar,
     target: XmlNodePtr,
@@ -3403,7 +3371,7 @@ unsafe fn xml_relaxng_load_include(
 /// Cleanup the subtree from unwanted nodes for parsing, resolve
 /// Include and externalRef lookups.
 #[doc(alias = "xmlRelaxNGCleanupTree")]
-unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodePtr) {
+unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodePtr) {
     let mut cur: XmlNodePtr;
     let mut delete: XmlNodePtr;
 
@@ -3620,7 +3588,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             if let Some(ns) = (*cur).get_prop("ns") {
                                 if !text.is_null() {
                                     (*text).set_prop("ns", Some(ns.as_str()));
-                                    /* xmlUnsetProp(cur, c"ns".as_ptr() as _); */
+                                    // xmlUnsetProp(cur, c"ns".as_ptr() as _);
                                 }
                             } else if xml_str_equal((*cur).name, c"attribute".as_ptr() as _) {
                                 (*text).set_prop("ns", Some(""));
@@ -3716,9 +3684,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
                             break 'skip_children;
                         }
                     } else if xml_str_equal((*cur).name, c"anyName".as_ptr() as _) {
-                        /*
-                         * 4.16
-                         */
+                        // 4.16
                         if (*ctxt).flags & XML_RELAXNG_IN_ANYEXCEPT != 0 {
                             xml_rng_perr!(
                                 ctxt,
@@ -3849,10 +3815,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, roo
 ///
 /// Returns the cleaned up document or NULL in case of error
 #[doc(alias = "xmlRelaxNGCleanupDoc")]
-unsafe extern "C" fn xml_relaxng_cleanup_doc(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    doc: XmlDocPtr,
-) -> XmlDocPtr {
+unsafe fn xml_relaxng_cleanup_doc(ctxt: XmlRelaxNGParserCtxtPtr, doc: XmlDocPtr) -> XmlDocPtr {
     // Extract the root
     let root: XmlNodePtr = if doc.is_null() {
         null_mut()
@@ -3877,7 +3840,7 @@ unsafe extern "C" fn xml_relaxng_cleanup_doc(
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlRelaxNGNewRelaxNG")]
-unsafe extern "C" fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
+unsafe fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr {
     let ret: XmlRelaxNGPtr = xml_malloc(size_of::<XmlRelaxNG>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(ctxt, None);
@@ -3892,7 +3855,7 @@ unsafe extern "C" fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> X
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlRelaxNGNewDefine")]
-unsafe extern "C" fn xml_relaxng_new_define(
+unsafe fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -4021,9 +3984,7 @@ extern "C" fn xml_relaxng_check_combine(
         while !tmp.is_null() {
             if !(*tmp).content.is_null() {
                 if !(*(*tmp).content).next.is_null() {
-                    /*
-                     * we need first to create a wrapper.
-                     */
+                    // we need first to create a wrapper.
                     tmp2 = xml_relaxng_new_define(ctxt, (*(*tmp).content).node);
                     if tmp2.is_null() {
                         break;
@@ -4163,9 +4124,7 @@ extern "C" fn xml_relaxng_check_reference(
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlRelaxNGNewGrammar")]
-unsafe extern "C" fn xml_relaxng_new_grammar(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-) -> XmlRelaxNGGrammarPtr {
+unsafe fn xml_relaxng_new_grammar(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGGrammarPtr {
     let ret: XmlRelaxNGGrammarPtr = xml_malloc(size_of::<XmlRelaxNGGrammar>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(ctxt, None);
@@ -4180,7 +4139,7 @@ unsafe extern "C" fn xml_relaxng_new_grammar(
 ///
 /// Returns the definition pointer or NULL in case of error.
 #[doc(alias = "xmlRelaxNGParseExceptNameClass")]
-unsafe extern "C" fn xml_relaxng_parse_except_name_class(
+unsafe fn xml_relaxng_parse_except_name_class(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
     attr: i32,
@@ -4250,7 +4209,7 @@ unsafe extern "C" fn xml_relaxng_parse_except_name_class(
 ///
 /// Returns the definition pointer or NULL in case of error.
 #[doc(alias = "xmlRelaxNGParseNameClass")]
-unsafe extern "C" fn xml_relaxng_parse_name_class(
+unsafe fn xml_relaxng_parse_name_class(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
     def: XmlRelaxNGDefinePtr,
@@ -4454,7 +4413,7 @@ unsafe extern "C" fn xml_relaxng_parse_name_class(
 ///
 /// Returns the datatypeLibrary value or NULL if not found
 #[doc(alias = "xmlRelaxNGGetDataTypeLibrary")]
-unsafe extern "C" fn xml_relaxng_get_data_type_library(
+unsafe fn xml_relaxng_get_data_type_library(
     _ctxt: XmlRelaxNGParserCtxtPtr,
     mut node: XmlNodePtr,
 ) -> *mut XmlChar {
@@ -4491,7 +4450,7 @@ unsafe extern "C" fn xml_relaxng_get_data_type_library(
 ///
 /// Returns the definition pointer or NULL in case of error
 #[doc(alias = "xmlRelaxNGParseData")]
-unsafe extern "C" fn xml_relaxng_parse_data(
+unsafe fn xml_relaxng_parse_data(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -4705,7 +4664,7 @@ unsafe extern "C" fn xml_relaxng_parse_data(
 ///
 /// Returns the definition pointer or NULL in case of error.
 #[doc(alias = "xmlRelaxNGParseAttribute")]
-unsafe extern "C" fn xml_relaxng_parse_attribute(
+unsafe fn xml_relaxng_parse_attribute(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -4795,7 +4754,7 @@ unsafe extern "C" fn xml_relaxng_parse_attribute(
 ///
 /// Returns the definition pointer or NULL in case of error
 #[doc(alias = "xmlRelaxNGParseValue")]
-unsafe extern "C" fn xml_relaxng_parse_value(
+unsafe fn xml_relaxng_parse_value(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -4943,7 +4902,7 @@ unsafe extern "C" fn xml_relaxng_parse_value(
 ///
 /// Returns the definition pointer or NULL in case of error
 #[doc(alias = "xmlRelaxNGParseInterleave")]
-unsafe extern "C" fn xml_relaxng_parse_interleave(
+unsafe fn xml_relaxng_parse_interleave(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -5123,7 +5082,7 @@ unsafe fn xml_relaxng_parse_import_refs(
 ///
 /// Returns the xmlRelaxNGDefinePtr or NULL in case of error
 #[doc(alias = "xmlRelaxNGProcessExternalRef")]
-unsafe extern "C" fn xml_relaxng_process_external_ref(
+unsafe fn xml_relaxng_process_external_ref(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -5204,7 +5163,7 @@ unsafe extern "C" fn xml_relaxng_process_external_ref(
 ///
 /// Returns the definition pointer or NULL in case of error or if no pattern is generated.
 #[doc(alias = "xmlRelaxNGParsePattern")]
-unsafe extern "C" fn xml_relaxng_parse_pattern(
+unsafe fn xml_relaxng_parse_pattern(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -5619,7 +5578,7 @@ unsafe extern "C" fn xml_relaxng_parse_pattern(
 ///
 /// Returns the definition pointer or NULL in case of error.
 #[doc(alias = "xmlRelaxNGParseElement")]
-unsafe extern "C" fn xml_relaxng_parse_element(
+unsafe fn xml_relaxng_parse_element(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
@@ -5745,7 +5704,7 @@ unsafe extern "C" fn xml_relaxng_parse_element(
 ///
 /// Returns the definition pointer or NULL in case of error.
 #[doc(alias = "xmlRelaxNGParsePatterns")]
-unsafe extern "C" fn xml_relaxng_parse_patterns(
+unsafe fn xml_relaxng_parse_patterns(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut nodes: XmlNodePtr,
     group: i32,
@@ -5798,10 +5757,7 @@ unsafe extern "C" fn xml_relaxng_parse_patterns(
 ///
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlRelaxNGParseStart")]
-unsafe extern "C" fn xml_relaxng_parse_start(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    mut nodes: XmlNodePtr,
-) -> i32 {
+unsafe fn xml_relaxng_parse_start(ctxt: XmlRelaxNGParserCtxtPtr, mut nodes: XmlNodePtr) -> i32 {
     let ret: i32 = 0;
     let def: XmlRelaxNGDefinePtr;
     let mut last: XmlRelaxNGDefinePtr;
@@ -5872,10 +5828,7 @@ unsafe extern "C" fn xml_relaxng_parse_start(
 ///
 /// Returns 0 in case of success or -1 in case of error
 #[doc(alias = "xmlRelaxNGParseDefine")]
-unsafe extern "C" fn xml_relaxng_parse_define(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    node: XmlNodePtr,
-) -> i32 {
+unsafe fn xml_relaxng_parse_define(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
     let def: XmlRelaxNGDefinePtr;
     let olddefine: *const XmlChar;
@@ -5965,10 +5918,7 @@ unsafe extern "C" fn xml_relaxng_parse_define(
 ///
 /// Returns 0 in case of success or -1 in case of error
 #[doc(alias = "xmlRelaxNGParseInclude")]
-unsafe extern "C" fn xml_relaxng_parse_include(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    node: XmlNodePtr,
-) -> i32 {
+unsafe fn xml_relaxng_parse_include(ctxt: XmlRelaxNGParserCtxtPtr, node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
     let mut tmp: i32;
 
@@ -6026,7 +5976,7 @@ unsafe extern "C" fn xml_relaxng_parse_include(
 ///
 /// Returns 0 in case of success, -1 in case of error
 #[doc(alias = "xmlRelaxNGParseGrammarContent")]
-unsafe extern "C" fn xml_relaxng_parse_grammar_content(
+unsafe fn xml_relaxng_parse_grammar_content(
     ctxt: XmlRelaxNGParserCtxtPtr,
     mut nodes: XmlNodePtr,
 ) -> i32 {
@@ -7451,7 +7401,7 @@ unsafe fn xml_relaxng_parse_document(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error
 #[doc(alias = "xmlRelaxNGIsCompilable")]
-unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 {
+unsafe fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 {
     let mut ret: i32 = -1;
 
     if def.is_null() {
@@ -7467,9 +7417,7 @@ unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 
         XmlRelaxNGType::Noop => ret = xml_relaxng_is_compilable((*def).content),
         XmlRelaxNGType::Text | XmlRelaxNGType::Empty => ret = 1,
         XmlRelaxNGType::Element => {
-            /*
-             * Check if the element content is compilable
-             */
+            // Check if the element content is compilable
             if (*def).dflags & IS_NOT_COMPILABLE as i16 == 0
                 && (*def).dflags & IS_COMPILABLE as i16 == 0
             {
@@ -7483,10 +7431,8 @@ unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 
                     }
                     list = (*list).next;
                 }
-                /*
-                 * Because the routine is recursive, we must guard against
-                 * discovering both COMPILABLE and NOT_COMPILABLE
-                 */
+                // Because the routine is recursive, we must guard against
+                // discovering both COMPILABLE and NOT_COMPILABLE
                 if ret == 0 {
                     (*def).dflags &= !IS_COMPILABLE as i16;
                     (*def).dflags |= IS_NOT_COMPILABLE as i16;
@@ -7498,10 +7444,8 @@ unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 
                     (*def).dflags |= IS_COMPILABLE as i16;
                 }
             }
-            /*
-             * All elements return a compilable status unless they
-             * are generic like anyName
-             */
+            // All elements return a compilable status unless they
+            // are generic like anyName
             if !(*def).name_class.is_null() || (*def).name.is_null() {
                 ret = 0;
             } else {
@@ -7562,7 +7506,7 @@ unsafe extern "C" fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 
     ret
 }
 
-unsafe extern "C" fn xml_relaxng_def_name(def: XmlRelaxNGDefinePtr) -> *const c_char {
+unsafe fn xml_relaxng_def_name(def: XmlRelaxNGDefinePtr) -> *const c_char {
     if def.is_null() {
         return c"none".as_ptr() as _;
     }
@@ -7598,10 +7542,7 @@ unsafe extern "C" fn xml_relaxng_def_name(def: XmlRelaxNGDefinePtr) -> *const c_
 ///
 /// Returns 0 if success and -1 in case of error
 #[doc(alias = "xmlRelaxNGCompile")]
-unsafe extern "C" fn xml_relaxng_compile(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    def: XmlRelaxNGDefinePtr,
-) -> i32 {
+unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefinePtr) -> i32 {
     let mut ret: i32 = 0;
     let mut list: XmlRelaxNGDefinePtr;
 
@@ -7623,14 +7564,12 @@ unsafe extern "C" fn xml_relaxng_compile(
                     return -1;
                 }
 
-                /*
-                 * assume identical strings but not same pointer are different
-                 * atoms, needed for non-determinism detection
-                 * That way if 2 elements with the same name are in a choice
-                 * branch the automata is found non-deterministic and
-                 * we fallback to the normal validation which does the right
-                 * thing of exploring both choices.
-                 */
+                // assume identical strings but not same pointer are different
+                // atoms, needed for non-determinism detection
+                // That way if 2 elements with the same name are in a choice
+                // branch the automata is found non-deterministic and
+                // we fallback to the normal validation which does the right
+                // thing of exploring both choices.
                 xml_automata_set_flags((*ctxt).am, 1);
 
                 (*ctxt).state = xml_automata_get_init_state((*ctxt).am);
@@ -7679,9 +7618,7 @@ unsafe extern "C" fn xml_relaxng_compile(
                 xml_automata_set_final_state((*ctxt).am, (*ctxt).state);
                 (*def).cont_model = xml_automata_compile((*ctxt).am);
                 if xml_regexp_is_determinist((*def).cont_model) == 0 {
-                    /*
-                     * we can only use the automata if it is determinist
-                     */
+                    // we can only use the automata if it is determinist
                     xml_reg_free_regexp((*def).cont_model);
                     (*def).cont_model = null_mut();
                 }
@@ -7691,11 +7628,9 @@ unsafe extern "C" fn xml_relaxng_compile(
             } else {
                 let oldam: XmlAutomataPtr = (*ctxt).am;
 
-                /*
-                 * we can't build the content model for this element content
-                 * but it still might be possible to build it for some of its
-                 * children, recurse.
-                 */
+                // we can't build the content model for this element content
+                // but it still might be possible to build it for some of its
+                // children, recurse.
                 ret = xml_relaxng_try_compile(ctxt, def);
                 (*ctxt).am = oldam;
             }
@@ -7795,7 +7730,7 @@ unsafe extern "C" fn xml_relaxng_compile(
         | XmlRelaxNGType::List
         | XmlRelaxNGType::Param
         | XmlRelaxNGType::Value => {
-            /* This should not happen and generate an internal error */
+            // This should not happen and generate an internal error
             eprintln!(
                 "RNG internal error trying to compile {}",
                 CStr::from_ptr(xml_relaxng_def_name(def))
@@ -7812,10 +7747,7 @@ unsafe extern "C" fn xml_relaxng_compile(
 ///
 /// Returns 0 if success and -1 in case of error
 #[doc(alias = "xmlRelaxNGTryCompile")]
-unsafe extern "C" fn xml_relaxng_try_compile(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    def: XmlRelaxNGDefinePtr,
-) -> i32 {
+unsafe fn xml_relaxng_try_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefinePtr) -> i32 {
     let mut ret: i32 = 0;
     let mut list: XmlRelaxNGDefinePtr;
 
@@ -8007,7 +7939,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
 
 /// Deallocate a RelaxNG grammar structure.
 #[doc(alias = "xmlRelaxNGFreeGrammar")]
-unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
+unsafe fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
     if grammar.is_null() {
         return;
     }
@@ -8030,7 +7962,7 @@ unsafe extern "C" fn xml_relaxng_free_grammar(grammar: XmlRelaxNGGrammarPtr) {
 
 /// Deallocate a RelaxNG structure.
 #[doc(alias = "xmlRelaxNGFree")]
-pub unsafe extern "C" fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
+pub unsafe fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         return;
     }
@@ -8060,7 +7992,7 @@ pub unsafe extern "C" fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpDefines")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_relaxng_dump_defines<'a>(
+unsafe fn xml_relaxng_dump_defines<'a>(
     output: &mut (impl Write + 'a),
     mut defines: XmlRelaxNGDefinePtr,
 ) {
@@ -8073,10 +8005,7 @@ unsafe extern "C" fn xml_relaxng_dump_defines<'a>(
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpDefine")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_relaxng_dump_define<'a>(
-    output: &mut (impl Write + 'a),
-    define: XmlRelaxNGDefinePtr,
-) {
+unsafe fn xml_relaxng_dump_define<'a>(output: &mut (impl Write + 'a), define: XmlRelaxNGDefinePtr) {
     if define.is_null() {
         return;
     }
@@ -8195,7 +8124,7 @@ unsafe extern "C" fn xml_relaxng_dump_define<'a>(
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDumpGrammar")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_relaxng_dump_grammar<'a>(
+unsafe fn xml_relaxng_dump_grammar<'a>(
     output: &mut (impl Write + 'a),
     grammar: XmlRelaxNGGrammarPtr,
     top: i32,
@@ -8234,10 +8163,7 @@ unsafe extern "C" fn xml_relaxng_dump_grammar<'a>(
 /// Dump a RelaxNG structure back
 #[doc(alias = "xmlRelaxNGDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_relaxng_dump<'a>(
-    output: &mut (impl Write + 'a),
-    schema: XmlRelaxNGPtr,
-) {
+pub unsafe fn xml_relaxng_dump<'a>(output: &mut (impl Write + 'a), schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         writeln!(output, "RelaxNG empty or failed to compile");
         return;
@@ -8260,7 +8186,7 @@ pub unsafe extern "C" fn xml_relaxng_dump<'a>(
 /// Dump the transformed RelaxNG tree.
 #[doc(alias = "xmlRelaxNGDumpTree")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_relaxng_dump_tree(output: &mut impl Write, schema: XmlRelaxNGPtr) {
+pub unsafe fn xml_relaxng_dump_tree(output: &mut impl Write, schema: XmlRelaxNGPtr) {
     if schema.is_null() {
         writeln!(output, "RelaxNG empty or failed to compile");
         return;
@@ -8293,7 +8219,7 @@ pub unsafe fn xml_relaxng_set_valid_errors(
 ///
 /// Returns -1 in case of error and 0 otherwise
 #[doc(alias = "xmlRelaxNGGetValidErrors")]
-pub unsafe extern "C" fn xml_relaxng_get_valid_errors(
+pub unsafe fn xml_relaxng_get_valid_errors(
     ctxt: XmlRelaxNGValidCtxtPtr,
     err: *mut Option<GenericError>,
     warn: *mut Option<GenericError>,
@@ -8332,10 +8258,7 @@ pub unsafe fn xml_relaxng_set_valid_structured_errors(
 
 /// Free a RelaxNG validation state container
 #[doc(alias = "xmlRelaxNGFreeStates")]
-unsafe extern "C" fn xml_relaxng_free_states(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    states: XmlRelaxNGStatesPtr,
-) {
+unsafe fn xml_relaxng_free_states(ctxt: XmlRelaxNGValidCtxtPtr, states: XmlRelaxNGStatesPtr) {
     if states.is_null() {
         return;
     }
@@ -8374,9 +8297,7 @@ unsafe extern "C" fn xml_relaxng_free_states(
 ///
 /// Returns the validation context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewValidCtxt")]
-pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
-    schema: XmlRelaxNGPtr,
-) -> XmlRelaxNGValidCtxtPtr {
+pub unsafe fn xml_relaxng_new_valid_ctxt(schema: XmlRelaxNGPtr) -> XmlRelaxNGValidCtxtPtr {
     let ret: XmlRelaxNGValidCtxtPtr = xml_malloc(size_of::<XmlRelaxNGValidCtxt>()) as _;
     if ret.is_null() {
         xml_rng_verr_memory(null_mut(), "building context\n");
@@ -8406,7 +8327,7 @@ pub unsafe extern "C" fn xml_relaxng_new_valid_ctxt(
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlRelaxNGNewStates")]
-unsafe extern "C" fn xml_relaxng_new_states(
+unsafe fn xml_relaxng_new_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut size: i32,
 ) -> XmlRelaxNGStatesPtr {
@@ -8444,7 +8365,7 @@ unsafe extern "C" fn xml_relaxng_new_states(
 ///
 /// Return 1 in case of success and 0 if this is a duplicate and -1 on error
 #[doc(alias = "xmlRelaxNGAddStateUniq")]
-unsafe extern "C" fn xml_relaxng_add_states_uniq(
+unsafe fn xml_relaxng_add_states_uniq(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
     state: XmlRelaxNGValidStatePtr,
@@ -8472,7 +8393,7 @@ unsafe extern "C" fn xml_relaxng_add_states_uniq(
 
 /// Deallocate a RelaxNG validation state structure.
 #[doc(alias = "xmlRelaxNGFreeValidState")]
-unsafe extern "C" fn xml_relaxng_free_valid_state(
+unsafe fn xml_relaxng_free_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     state: XmlRelaxNGValidStatePtr,
 ) {
@@ -8497,7 +8418,7 @@ unsafe extern "C" fn xml_relaxng_free_valid_state(
 ///
 /// Returns the exec or NULL if empty
 #[doc(alias = "xmlRelaxNGElemPop")]
-unsafe extern "C" fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPtr {
+unsafe fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPtr {
     if (*ctxt).elem_nr <= 0 {
         return null_mut();
     }
@@ -8514,7 +8435,7 @@ unsafe extern "C" fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRe
 
 /// Free the resources associated to the schema validation context
 #[doc(alias = "xmlRelaxNGFreeValidCtxt")]
-pub unsafe extern "C" fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
+pub unsafe fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -8556,7 +8477,7 @@ pub unsafe extern "C" fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPt
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlRelaxNGNewValidState")]
-unsafe extern "C" fn xml_relaxng_new_valid_state(
+unsafe fn xml_relaxng_new_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGValidStatePtr {
@@ -8657,13 +8578,11 @@ unsafe extern "C" fn xml_relaxng_new_valid_state(
 ///
 /// Returns the new sibling or NULL in case of error.
 #[doc(alias = "xmlRelaxNGSkipIgnored")]
-unsafe extern "C" fn xml_relaxng_skip_ignored(
+unsafe fn xml_relaxng_skip_ignored(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut node: XmlNodePtr,
 ) -> XmlNodePtr {
-    /*
-     * TODO complete and handle entities
-     */
+    // TODO complete and handle entities
     while !node.is_null()
         && (matches!(
             (*node).element_type(),
@@ -8683,7 +8602,7 @@ unsafe extern "C" fn xml_relaxng_skip_ignored(
 
 /// Pops the top error from the error stack
 #[doc(alias = "xmlRelaxNGValidErrorPop")]
-unsafe extern "C" fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
+unsafe fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
     if (*ctxt).err_nr <= 0 {
         (*ctxt).err = null_mut();
         return;
@@ -8712,7 +8631,7 @@ unsafe extern "C" fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
 ///
 /// Returns 0 if the operation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGNextValue")]
-unsafe extern "C" fn xml_relaxng_next_value(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
+unsafe fn xml_relaxng_next_value(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
     let mut cur: *mut XmlChar;
 
     cur = (*(*ctxt).state).value;
@@ -8739,7 +8658,7 @@ unsafe extern "C" fn xml_relaxng_next_value(ctxt: XmlRelaxNGValidCtxtPtr) -> i32
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateValueList")]
-unsafe extern "C" fn xml_relaxng_validate_value_list(
+unsafe fn xml_relaxng_validate_value_list(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut defines: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -8844,7 +8763,7 @@ unsafe fn xml_relaxng_validate_datatype(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateValue")]
-unsafe extern "C" fn xml_relaxng_validate_value(
+unsafe fn xml_relaxng_validate_value(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -8896,10 +8815,8 @@ unsafe extern "C" fn xml_relaxng_validate_value(
                         ret = -1;
                     }
                 } else {
-                    /*
-                     * TODO: trivial optimizations are possible by
-                     * computing at compile-time
-                     */
+                    // TODO: trivial optimizations are possible by
+                    // computing at compile-time
                     let nval: *mut XmlChar = xml_relaxng_normalize(ctxt, (*define).value);
                     let nvalue: *mut XmlChar = xml_relaxng_normalize(ctxt, value);
 
@@ -9116,7 +9033,7 @@ unsafe extern "C" fn xml_relaxng_validate_value(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateValueContent")]
-unsafe extern "C" fn xml_relaxng_validate_value_content(
+unsafe fn xml_relaxng_validate_value_content(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut defines: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -9136,7 +9053,7 @@ unsafe extern "C" fn xml_relaxng_validate_value_content(
 ///
 /// Returns 1 if the attribute matches, 0 if no, or -1 in case of error
 #[doc(alias = "xmlRelaxNGAttributeMatch")]
-unsafe extern "C" fn xml_relaxng_attribute_match(
+unsafe fn xml_relaxng_attribute_match(
     _ctxt: XmlRelaxNGValidCtxtPtr,
     mut define: XmlRelaxNGDefinePtr,
     prop: XmlAttrPtr,
@@ -9198,7 +9115,7 @@ unsafe extern "C" fn xml_relaxng_attribute_match(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateAttribute")]
-unsafe extern "C" fn xml_relaxng_validate_attribute(
+unsafe fn xml_relaxng_validate_attribute(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -9248,9 +9165,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
             (*(*ctxt).state).value = oldvalue;
             (*(*ctxt).state).seq = oldseq;
             if ret == 0 {
-                /*
-                 * flag the attribute as processed
-                 */
+                // flag the attribute as processed
                 *(*(*ctxt).state).attrs.add(j as usize) = null_mut();
                 (*(*ctxt).state).nb_attr_left -= 1;
             }
@@ -9305,7 +9220,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateAttributeList")]
-unsafe extern "C" fn xml_relaxng_validate_attribute_list(
+unsafe fn xml_relaxng_validate_attribute_list(
     ctxt: XmlRelaxNGValidCtxtPtr,
     defines: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -9341,7 +9256,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute_list(
                 return -1;
             }
             if res == -1 {
-                /* continues on -2 */
+                // continues on -2
                 break;
             }
         }
@@ -9353,7 +9268,7 @@ unsafe extern "C" fn xml_relaxng_validate_attribute_list(
 
 /// Handle the callback and if needed validate the element children.
 #[doc(alias = "xmlRelaxNGValidateCompiledCallback")]
-unsafe extern "C" fn xml_relaxng_validate_compiled_callback(
+unsafe fn xml_relaxng_validate_compiled_callback(
     _exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
     transdata: *mut c_void,
@@ -9396,7 +9311,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_callback(
 ///
 /// Returns 0 in case of success, -1 in case of error.
 #[doc(alias = "xmlRelaxNGValidateCompiledContent")]
-unsafe extern "C" fn xml_relaxng_validate_compiled_content(
+unsafe fn xml_relaxng_validate_compiled_content(
     ctxt: XmlRelaxNGValidCtxtPtr,
     regexp: XmlRegexpPtr,
     content: XmlNodePtr,
@@ -9460,9 +9375,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
         ret = 0;
         (*(*ctxt).state).seq = null_mut();
     } else if ret == 0 {
-        /*
-         * TODO: get some of the names needed to exit the current state of exec
-         */
+        // TODO: get some of the names needed to exit the current state of exec
         VALID_ERR2!(
             ctxt,
             XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
@@ -9476,10 +9389,8 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
         ret = -1;
     }
     xml_reg_free_exec_ctxt(exec);
-    /*
-     * There might be content model errors outside of the pure
-     * regexp validation, e.g. for attribute values.
-     */
+    // There might be content model errors outside of the pure
+    // regexp validation, e.g. for attribute values.
     if ret == 0 && (*ctxt).perr != 0 {
         ret = (*ctxt).perr;
     }
@@ -9492,10 +9403,7 @@ unsafe extern "C" fn xml_relaxng_validate_compiled_content(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateElementEnd")]
-unsafe extern "C" fn xml_relaxng_validate_element_end(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    dolog: i32,
-) -> i32 {
+unsafe fn xml_relaxng_validate_element_end(ctxt: XmlRelaxNGValidCtxtPtr, dolog: i32) -> i32 {
     let state: XmlRelaxNGValidStatePtr = (*ctxt).state;
     if !(*state).seq.is_null() {
         (*state).seq = xml_relaxng_skip_ignored(ctxt, (*state).seq);
@@ -9534,7 +9442,7 @@ unsafe extern "C" fn xml_relaxng_validate_element_end(
 ///
 /// Returns the index of the "best" state or -1 in case of error
 #[doc(alias = "xmlRelaxNGBestState")]
-unsafe extern "C" fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
+unsafe fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32 {
     let mut state: XmlRelaxNGValidStatePtr;
 
     let mut tmp: i32;
@@ -9569,7 +9477,7 @@ unsafe extern "C" fn xml_relaxng_best_state(ctxt: XmlRelaxNGValidCtxtPtr) -> i32
 /// Find the "best" state in the (*ctxt).states list of states to report
 /// errors about and log it.
 #[doc(alias = "xmlRelaxNGLogBestError")]
-unsafe extern "C" fn xml_relaxng_log_best_error(ctxt: XmlRelaxNGValidCtxtPtr) {
+unsafe fn xml_relaxng_log_best_error(ctxt: XmlRelaxNGValidCtxtPtr) {
     if ctxt.is_null() || (*ctxt).states.is_null() || (*(*ctxt).states).nb_state <= 0 {
         return;
     }
@@ -9586,7 +9494,7 @@ unsafe extern "C" fn xml_relaxng_log_best_error(ctxt: XmlRelaxNGValidCtxtPtr) {
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateDefinitionList")]
-unsafe extern "C" fn xml_relaxng_validate_definition_list(
+unsafe fn xml_relaxng_validate_definition_list(
     ctxt: XmlRelaxNGValidCtxtPtr,
     mut defines: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -9612,7 +9520,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition_list(
             return -1;
         }
         if res == -1 {
-            /* continues on -2 */
+            // continues on -2
             break;
         }
         defines = (*defines).next;
@@ -9625,7 +9533,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition_list(
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlRelaxNGCopyValidState")]
-unsafe extern "C" fn xml_relaxng_copy_valid_state(
+unsafe fn xml_relaxng_copy_valid_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     state: XmlRelaxNGValidStatePtr,
 ) -> XmlRelaxNGValidStatePtr {
@@ -9687,7 +9595,7 @@ unsafe extern "C" fn xml_relaxng_copy_valid_state(
 ///
 /// Returns 1 if equal, 0 otherwise
 #[doc(alias = "xmlRelaxNGEqualValidState")]
-unsafe extern "C" fn xml_relaxng_equal_valid_state(
+unsafe fn xml_relaxng_equal_valid_state(
     _ctxt: XmlRelaxNGValidCtxtPtr,
     state1: XmlRelaxNGValidStatePtr,
     state2: XmlRelaxNGValidStatePtr,
@@ -9728,7 +9636,7 @@ unsafe extern "C" fn xml_relaxng_equal_valid_state(
 ///
 /// Return 1 in case of success and 0 if this is a duplicate and -1 on error
 #[doc(alias = "xmlRelaxNGAddState")]
-unsafe extern "C" fn xml_relaxng_add_states(
+unsafe fn xml_relaxng_add_states(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
     state: XmlRelaxNGValidStatePtr,
@@ -9764,10 +9672,7 @@ unsafe extern "C" fn xml_relaxng_add_states(
 ///
 /// Returns 1 if matches 0 otherwise
 #[doc(alias = "xmlRelaxNGNodeMatchesList")]
-unsafe extern "C" fn xml_relaxng_node_matches_list(
-    node: XmlNodePtr,
-    list: *mut XmlRelaxNGDefinePtr,
-) -> i32 {
+unsafe fn xml_relaxng_node_matches_list(node: XmlNodePtr, list: *mut XmlRelaxNGDefinePtr) -> i32 {
     let mut cur: XmlRelaxNGDefinePtr;
     let mut i: i32 = 0;
     let mut tmp: i32;
@@ -9808,7 +9713,7 @@ unsafe extern "C" fn xml_relaxng_node_matches_list(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateInterleave")]
-unsafe extern "C" fn xml_relaxng_validate_interleave(
+unsafe fn xml_relaxng_validate_interleave(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -9831,16 +9736,12 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
         VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrInternodata);
         return -1;
     }
-    /*
-     * Optimizations for MIXED
-     */
+    // Optimizations for MIXED
     let oldflags: i32 = (*ctxt).flags;
     if (*define).dflags & IS_MIXED as i16 != 0 {
         (*ctxt).flags |= FLAGS_MIXED_CONTENT;
         if nbgroups == 2 {
-            /*
-             * this is a pure <mixed> case
-             */
+            // this is a pure <mixed> case
             if !(*ctxt).state.is_null() {
                 (*(*ctxt).state).seq = xml_relaxng_skip_ignored(ctxt, (*(*ctxt).state).seq);
             }
@@ -9928,9 +9829,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 i += 1;
             }
         }
-        /*
-         * We break as soon as an element not matched is found
-         */
+        // We break as soon as an element not matched is found
         if i >= nbgroups {
             break;
         }
@@ -9982,13 +9881,13 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 oldstate = (*ctxt).state;
                 (*ctxt).state = null_mut();
                 if !cur.is_null()
-                        /* there's a nasty violation of context-free unambiguities,
-                           since in open-name-class context, interleave in the
-                           production shall finish without caring about anything
-                           else that is OK to follow in that case -- it would
-                           otherwise get marked as "extra content" and would
-                           hence fail the validation, hence this perhaps
-                           dirty attempt to rectify such a situation */
+                        // there's a nasty violation of context-free unambiguities,
+                        // since in open-name-class context, interleave in the
+                        // production shall finish without caring about anything
+                        // else that is OK to follow in that case -- it would
+                        // otherwise get marked as "extra content" and would
+                        // hence fail the validation, hence this perhaps
+                        // dirty attempt to rectify such a situation
                         && ((*(*define).parent).typ != XmlRelaxNGType::Def
                             || !xml_str_equal((*(*define).parent).name,
                                             c"open-name-class".as_ptr() as _))
@@ -10007,9 +9906,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                 let mut best: i32 = -1;
                 let mut lowattr: i32 = -1;
 
-                /*
-                 * PBM: what happen if there is attributes checks in the interleaves
-                 */
+                // PBM: what happen if there is attributes checks in the interleaves
                 for j in 0..(*(*ctxt).states).nb_state {
                     cur = (*(*(*(*ctxt).states).tab_state.add(j as usize))).seq;
                     cur = xml_relaxng_skip_ignored(ctxt, cur);
@@ -10022,7 +9919,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                         found = 1;
                         if (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left <= lowattr
                         {
-                            /* try  to keep the latest one to mach old heuristic */
+                            // try to keep the latest one to mach old heuristic
                             lowattr =
                                 (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left;
                             best = j;
@@ -10038,16 +9935,14 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
                         } else if (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left
                             <= lowattr
                         {
-                            /* try  to keep the latest one to mach old heuristic */
+                            // try to keep the latest one to mach old heuristic
                             lowattr =
                                 (*(*(*(*ctxt).states).tab_state.add(j as usize))).nb_attr_left;
                             best = j;
                         }
                     }
                 }
-                /*
-                 * BIG PBM: here we pick only one restarting point :-(
-                 */
+                // BIG PBM: here we pick only one restarting point :-(
                 if (*(*ctxt).states).nb_state > 0 {
                     xml_relaxng_free_valid_state(ctxt, oldstate);
                     if best != -1 {
@@ -10111,9 +10006,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
 
     //   done:
     (*ctxt).flags = oldflags;
-    /*
-     * builds the next links chain from the prev one
-     */
+    // builds the next links chain from the prev one
     cur = lastchg;
     while !cur.is_null() {
         if cur == start {
@@ -10138,7 +10031,7 @@ unsafe extern "C" fn xml_relaxng_validate_interleave(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateState")]
-unsafe extern "C" fn xml_relaxng_validate_state(
+unsafe fn xml_relaxng_validate_state(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -10206,10 +10099,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 }
                 break 'to_break;
             }
-            /*
-             * This node was already validated successfully against
-             * this definition.
-             */
+            // This node was already validated successfully against this definition.
             if (*node).psvi == define as _ {
                 (*(*ctxt).state).seq =
                     xml_relaxng_skip_ignored(ctxt, (*node).next.map_or(null_mut(), |n| n.as_ptr()));
@@ -10317,9 +10207,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                         }
                     }
                     if tmp != 0 {
-                        /*
-                         * validation error, log the message for the "best" one
-                         */
+                        // validation error, log the message for the "best" one
                         (*ctxt).flags |= FLAGS_IGNORABLE;
                         xml_relaxng_log_best_error(ctxt);
                     }
@@ -10380,9 +10268,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                         }
                     }
                     if tmp != 0 {
-                        /*
-                         * validation error, log the message for the "best" one
-                         */
+                        // validation error, log the message for the "best" one
                         (*ctxt).flags |= FLAGS_IGNORABLE;
                         xml_relaxng_log_best_error(ctxt);
                     }
@@ -10488,9 +10374,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 ret = -1;
                 break 'to_break;
             }
-            /*
-             * All the input states are also exit states
-             */
+            // All the input states are also exit states
             if !(*ctxt).state.is_null() {
                 xml_relaxng_add_states(
                     ctxt,
@@ -10581,10 +10465,8 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                     }
                 }
                 if progress != 0 {
-                    /*
-                     * Collect all the new nodes added at that step
-                     * and make them the new node set
-                     */
+                    // Collect all the new nodes added at that step
+                    // and make them the new node set
                     if (*res).nb_state - base == 1 {
                         (*ctxt).state = xml_relaxng_copy_valid_state(
                             ctxt,
@@ -10641,17 +10523,13 @@ unsafe extern "C" fn xml_relaxng_validate_state(
                 && !(*define).data.is_null()
                 && !node.is_null()
             {
-                /*
-                 * node.is_null() can't be optimized since IS_TRIABLE
-                 * doesn't account for choice which may lead to
-                 * only attributes.
-                 */
+                // node.is_null() can't be optimized since IS_TRIABLE
+                // doesn't account for choice which may lead to
+                // only attributes.
                 let triage: XmlHashTablePtr = (*define).data as _;
 
-                /*
-                 * Something we can optimize cleanly there is only one
-                 * possible branch out !
-                 */
+                // Something we can optimize cleanly there is only one
+                // possible branch out !
                 if matches!(
                     (*node).element_type(),
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode
@@ -10920,7 +10798,7 @@ unsafe extern "C" fn xml_relaxng_validate_state(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateDefinition")]
-unsafe extern "C" fn xml_relaxng_validate_definition(
+unsafe fn xml_relaxng_validate_definition(
     ctxt: XmlRelaxNGValidCtxtPtr,
     define: XmlRelaxNGDefinePtr,
 ) -> i32 {
@@ -10928,9 +10806,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
     let mut ret: i32;
     let mut j: i32;
 
-    /*
-     * We should NOT have both (*ctxt).state and (*ctxt).states
-     */
+    // We should NOT have both (*ctxt).state and (*ctxt).states
     if !(*ctxt).state.is_null() && !(*ctxt).states.is_null() {
         // TODO
         xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
@@ -10967,9 +10843,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
         (*ctxt).state = *(*states).tab_state.add(i as usize);
         (*ctxt).states = null_mut();
         ret = xml_relaxng_validate_state(ctxt, define);
-        /*
-         * We should NOT have both (*ctxt).state and (*ctxt).states
-         */
+        // We should NOT have both (*ctxt).state and (*ctxt).states
         if !(*ctxt).state.is_null() && !(*ctxt).states.is_null() {
             // TODO
             xml_relaxng_free_valid_state(ctxt, (*ctxt).state);
@@ -10978,24 +10852,24 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
         if ret == 0 {
             if (*ctxt).states.is_null() {
                 if !res.is_null() {
-                    /* add the state to the container */
+                    // add the state to the container
                     xml_relaxng_add_states(ctxt, res, (*ctxt).state);
                     (*ctxt).state = null_mut();
                 } else {
-                    /* add the state directly in states */
+                    // add the state directly in states
                     *(*states).tab_state.add(j as usize) = (*ctxt).state;
                     j += 1;
                     (*ctxt).state = null_mut();
                 }
             } else if res.is_null() {
-                /* make it the new container and copy other results */
+                // make it the new container and copy other results
                 res = (*ctxt).states;
                 (*ctxt).states = null_mut();
                 for k in 0..j {
                     xml_relaxng_add_states(ctxt, res, *(*states).tab_state.add(k as usize));
                 }
             } else {
-                /* add all the new results to res and reff the container */
+                // add all the new results to res and reff the container
                 for k in 0..(*(*ctxt).states).nb_state {
                     xml_relaxng_add_states(ctxt, res, *(*(*ctxt).states).tab_state.add(k as usize));
                 }
@@ -11046,10 +10920,7 @@ unsafe extern "C" fn xml_relaxng_validate_definition(
 ///
 /// Returns 0 if the validation succeeded or an error code.
 #[doc(alias = "xmlRelaxNGValidateDocument")]
-unsafe extern "C" fn xml_relaxng_validate_document(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    doc: XmlDocPtr,
-) -> i32 {
+unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let mut ret: i32;
     let mut state: XmlRelaxNGValidStatePtr;
     let mut node: XmlNodePtr;
@@ -11135,7 +11006,7 @@ unsafe extern "C" fn xml_relaxng_validate_document(
 /// Returns the number of elements found in the document or -1 in case of error.
 #[doc(alias = "xmlRelaxNGCleanPSVI")]
 #[cfg(feature = "schema")]
-unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
+unsafe fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
     let mut cur: XmlNodePtr;
 
     if node.is_null()
@@ -11191,10 +11062,7 @@ unsafe extern "C" fn xml_relaxng_clean_psvi(node: XmlNodePtr) {
 /// Returns 0 if the document is valid, a positive error code
 /// number otherwise and -1 in case of internal or API error.
 #[doc(alias = "xmlRelaxNGValidateDoc")]
-pub unsafe extern "C" fn xml_relaxng_validate_doc(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    doc: XmlDocPtr,
-) -> i32 {
+pub unsafe fn xml_relaxng_validate_doc(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     if ctxt.is_null() || doc.is_null() {
         return -1;
     }
@@ -11202,14 +11070,10 @@ pub unsafe extern "C" fn xml_relaxng_validate_doc(
     (*ctxt).doc = doc;
 
     let ret: i32 = xml_relaxng_validate_document(ctxt, doc);
-    /*
-     * Remove all left PSVI
-     */
+    // Remove all left PSVI
     xml_relaxng_clean_psvi(doc as _);
 
-    /*
-     * TODO: build error codes
-     */
+    // TODO: build error codes
     if ret == -1 {
         return 1;
     }
@@ -11219,7 +11083,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_doc(
 /// Handle the callback and if needed validate the element children.
 /// some of the in/out information are passed via the context in @inputdata.
 #[doc(alias = "xmlRelaxNGValidateProgressiveCallback")]
-unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
+unsafe fn xml_relaxng_validate_progressive_callback(
     _exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
     transdata: *mut c_void,
@@ -11276,9 +11140,7 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
         return;
     }
     if (*define).cont_model.is_null() {
-        /*
-         * this node cannot be validated in a streamable fashion
-         */
+        // this node cannot be validated in a streamable fashion
         (*ctxt).pstate = 0;
         (*ctxt).pdef = define;
         return;
@@ -11294,9 +11156,7 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
     }
     xml_relaxng_elem_push(ctxt, exec);
 
-    /*
-     * Validate the attributes part of the content.
-     */
+    // Validate the attributes part of the content.
     state = xml_relaxng_new_valid_state(ctxt, node);
     if state.is_null() {
         (*ctxt).pstate = -1;
@@ -11338,9 +11198,7 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
             }
         }
         if tmp != 0 {
-            /*
-             * validation error, log the message for the "best" one
-             */
+            // validation error, log the message for the "best" one
             (*ctxt).flags |= FLAGS_IGNORABLE;
             xml_relaxng_log_best_error(ctxt);
         }
@@ -11364,10 +11222,7 @@ unsafe extern "C" fn xml_relaxng_validate_progressive_callback(
 ///
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlRelaxNGElemPush")]
-unsafe extern "C" fn xml_relaxng_elem_push(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    exec: XmlRegExecCtxtPtr,
-) -> i32 {
+unsafe fn xml_relaxng_elem_push(ctxt: XmlRelaxNGValidCtxtPtr, exec: XmlRegExecCtxtPtr) -> i32 {
     if (*ctxt).elem_tab.is_null() {
         (*ctxt).elem_max = 10;
         (*ctxt).elem_tab =
@@ -11399,7 +11254,7 @@ unsafe extern "C" fn xml_relaxng_elem_push(
 /// returns 1 if no validation problem was found or 0 if validating the
 /// element requires a full node, and -1 in case of error.
 #[doc(alias = "xmlRelaxNGValidatePushElement")]
-pub unsafe extern "C" fn xml_relaxng_validate_push_element(
+pub unsafe fn xml_relaxng_validate_push_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -11499,7 +11354,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
 ///
 /// returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlRelaxNGValidatePopElement")]
-pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
+pub unsafe fn xml_relaxng_validate_pop_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -11509,16 +11364,12 @@ pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
     if ctxt.is_null() || (*ctxt).elem.is_null() || elem.is_null() {
         return -1;
     }
-    /*
-     * verify that we reached a terminal state of the content model.
-     */
+    // verify that we reached a terminal state of the content model.
     let exec: XmlRegExecCtxtPtr = xml_relaxng_elem_pop(ctxt);
     ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
     match ret.cmp(&0) {
         std::cmp::Ordering::Equal => {
-            /*
-             * TODO: get some of the names needed to exit the current state of exec
-             */
+            // TODO: get some of the names needed to exit the current state of exec
             VALID_ERR2!(
                 ctxt,
                 XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
@@ -11542,7 +11393,7 @@ pub unsafe extern "C" fn xml_relaxng_validate_pop_element(
 ///
 /// Returns 1 if no validation problem was found or -1 in case of error.
 #[doc(alias = "xmlRelaxNGValidateFullElement")]
-pub unsafe extern "C" fn xml_relaxng_validate_full_element(
+pub unsafe fn xml_relaxng_validate_full_element(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _doc: XmlDocPtr,
     elem: XmlNodePtr,
