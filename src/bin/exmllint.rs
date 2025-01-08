@@ -23,6 +23,7 @@ use std::{
         atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
         LazyLock, Mutex, OnceLock,
     },
+    time::Instant,
 };
 
 use clap::Parser;
@@ -127,12 +128,13 @@ const ERR_XPATH: i32 = 10; // XPath evaluation error
 
 // Internal timing routines to remove the necessity to have
 // unix-specific function calls.
+static TIMER: Mutex<Option<Instant>> = Mutex::new(None);
 static mut BEGIN: timeval = unsafe { zeroed() };
 static mut END: timeval = unsafe { zeroed() };
 
 // startTimer: call where you want to start timing
-unsafe fn start_timer() {
-    gettimeofday(addr_of_mut!(BEGIN), null_mut());
+fn start_timer() {
+    *TIMER.lock().unwrap() = Some(Instant::now());
 }
 
 // end_timer: call where you want to stop timing and to print out a
@@ -140,13 +142,10 @@ unsafe fn start_timer() {
 //            type argument
 macro_rules! end_timer {
     ( $fmt:literal, $( $args:expr ),* ) => {
-        gettimeofday(addr_of_mut!(END), null_mut());
-        let mut msec: c_long = END.tv_sec - BEGIN.tv_sec;
-        msec *= 1000;
-        msec += (END.tv_usec - BEGIN.tv_usec) / 1000;
-
+        let lock = TIMER.lock().unwrap();
+        let timer = lock.as_ref().expect("Timer has not set.");
         eprint!($fmt, $( $args ),*);
-        eprintln!(" took {} ms", msec);
+        eprintln!(" took {} ms", timer.elapsed().as_millis());
     };
     ( $fmt:literal ) => {
         end_timer!($fmt, );
@@ -3321,133 +3320,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
 // Usage and Main
 
-fn show_version(name: &str) {
-    eprintln!(
-        "{}: using libxml version {}",
-        name,
-        env!("CARGO_PKG_VERSION")
-    );
-    eprint!("   compiled with: ");
-    if xml_has_feature(Some(XmlFeature::XmlWithThread)) {
-        eprint!("Threads ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithTree)) {
-        eprint!("Tree ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithOutput)) {
-        eprint!("Output ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithPush)) {
-        eprint!("Push ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithReader)) {
-        eprint!("Reader ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithPattern)) {
-        eprint!("Patterns ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithWriter)) {
-        eprint!("Writer ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithSax1)) {
-        eprint!("SAXv1 ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithFtp)) {
-        eprint!("FTP ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithHttp)) {
-        eprint!("HTTP ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithValid)) {
-        eprint!("DTDValid ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithHtml)) {
-        eprint!("HTML ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithC14n)) {
-        eprint!("C14N ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithCatalog)) {
-        eprint!("Catalog ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithXpath)) {
-        eprint!("XPath ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithXptr)) {
-        eprint!("XPointer ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithXinclude)) {
-        eprint!("XInclude ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithIconv)) {
-        eprint!("Iconv ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithIcu)) {
-        eprint!("ICU ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithIso8859x)) {
-        eprint!("ISO8859X ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithUnicode)) {
-        eprint!("Unicode ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithRegexp)) {
-        eprint!("Regexps ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithAutomata)) {
-        eprint!("Automata ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithExpr)) {
-        eprint!("Expr ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithSchemas)) {
-        eprint!("Schemas ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithSchematron)) {
-        eprint!("Schematron ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithModules)) {
-        eprint!("Modules ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithDebug)) {
-        eprint!("Debug ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithDebugMem)) {
-        eprint!("MemDebug ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithDebugRun)) {
-        eprint!("RunDebug ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithZlib)) {
-        eprint!("Zlib ");
-    }
-    if xml_has_feature(Some(XmlFeature::XmlWithLzma)) {
-        eprint!("Lzma ");
-    }
-    eprintln!();
-}
-
-fn usage(f: &mut impl Write, name: &str) {
-    writeln!(f, "Usage : {} [options] XMLfiles ...", name).ok();
-    #[cfg(feature = "libxml_output")]
-    {
-        writeln!(
-            f,
-            "\tParse the XML files and output the result of the parsing",
-        )
-        .ok();
-    }
-    #[cfg(not(feature = "libxml_output"))]
-    {
-        writeln!(f, "\tParse the XML files").ok();
-    }
-    writeln!(
-        f,
-        "\t--version : display the version of the XML library used",
-    )
-    .ok();
-}
-
 unsafe extern "C" fn register_node(node: XmlNodePtr) {
     (*node)._private = malloc(size_of::<c_long>());
     if (*node)._private.is_null() {
@@ -3468,10 +3340,10 @@ unsafe extern "C" fn deregister_node(node: XmlNodePtr) {
 fn main() {
     let xml_files = CMD_ARGS.xml_files.clone();
     for arg in xml_files {
+        if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) != 0 {
+            start_timer();
+        }
         unsafe {
-            if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) != 0 {
-                start_timer();
-            }
             // Remember file names.  "-" means stdin.  <sven@zen.org>
             if !arg.starts_with('-') || arg == "-" {
                 if REPEAT.load(Ordering::Relaxed) != 0 {
