@@ -166,6 +166,7 @@ macro_rules! end_timer {
 )]
 #[command(version, name = "exmllint", arg_required_else_help = true)]
 struct CmdArgs {
+    #[clap(required = true)]
     xml_files: Vec<String>,
     /// limits memory allocation to nbbytes bytes
     #[arg(long, value_name = "nbbytes")]
@@ -537,6 +538,11 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     if cmd_args.encode.is_some() {
         // OK it's for testing purposes
         add_encoding_alias("UTF-8", "DVEnc");
+    }
+    if let Some(pretty) = cmd_args.pretty {
+        if pretty == 1 {
+            cmd_args.format = true;
+        }
     }
     if cmd_args.walker {
         cmd_args.noout = true;
