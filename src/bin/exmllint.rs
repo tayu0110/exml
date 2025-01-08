@@ -394,9 +394,9 @@ static REPEAT: AtomicUsize = AtomicUsize::new(0);
 static PUSHSIZE: AtomicUsize = AtomicUsize::new(4096);
 static mut PROGRESULT: XmllintReturnCode = XmllintReturnCode::ReturnOk;
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-static mut PATTERNC: AtomicPtr<XmlPattern> = AtomicPtr::new(null_mut());
+static PATTERNC: AtomicPtr<XmlPattern> = AtomicPtr::new(null_mut());
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-static mut PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
+static PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
 static mut NBREGISTER: i32 = 0;
 static OPTIONS: AtomicI32 = AtomicI32::new(
     XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32,
