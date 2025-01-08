@@ -389,7 +389,7 @@ static WXSCHEMAS: AtomicPtr<XmlSchema> = AtomicPtr::new(null_mut());
 static SCHEMATRON: Mutex<Option<CString>> = Mutex::new(None);
 #[cfg(feature = "schematron")]
 static WXSCHEMATRON: AtomicPtr<XmlSchematron> = AtomicPtr::new(null_mut());
-static mut REPEAT: i32 = 0;
+static REPEAT: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "libxml_push")]
 static PUSHSIZE: AtomicUsize = AtomicUsize::new(4096);
 static mut PROGRESULT: XmllintReturnCode = XmllintReturnCode::ReturnOk;
@@ -1561,7 +1561,7 @@ unsafe fn test_sax(filename: &str) {
                 Some(Box::new(handler)),
                 Some(GenericErrorContext::new(user_data.as_ptr())),
             );
-            if REPEAT == 0 {
+            if REPEAT.load(Ordering::Relaxed) == 0 {
                 match ret.cmp(&0) {
                     std::cmp::Ordering::Equal => {
                         if !CMD_ARGS.get().unwrap().quiet {
@@ -1810,7 +1810,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         }
         #[cfg(feature = "schema")]
         if let Some(mut relaxng) = CMD_ARGS.get().unwrap().relaxng.as_deref() {
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
             let crelaxng = CString::new(relaxng).unwrap();
@@ -1819,13 +1819,13 @@ unsafe fn stream_file(filename: *mut c_char) {
                 generic_error!("Relax-NG schema {relaxng} failed to compile\n");
                 PROGRESULT = XmllintReturnCode::ErrSchemacomp;
             }
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Compiling the schemas");
             }
         }
         #[cfg(feature = "schema")]
         if let Some(mut schema) = CMD_ARGS.get().unwrap().schema.as_deref() {
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
             let cschema = CString::new(schema).unwrap();
@@ -1834,13 +1834,13 @@ unsafe fn stream_file(filename: *mut c_char) {
                 generic_error!("XSD schema {schema} failed to compile\n");
                 PROGRESULT = XmllintReturnCode::ErrSchemacomp;
             }
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Compiling the schemas");
             }
         }
 
         // Process all nodes in sequence
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
         ret = (*reader).read();
@@ -1854,7 +1854,7 @@ unsafe fn stream_file(filename: *mut c_char) {
             }
             ret = (*reader).read();
         }
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             #[cfg(any(feature = "schema", feature = "libxml_valid"))]
             {
                 let mut is_validating = false;
@@ -1996,7 +1996,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
     }
     let reader: XmlTextReaderPtr = xml_reader_walker(doc);
     if !reader.is_null() {
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
         ret = (*reader).read();
@@ -2010,7 +2010,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             }
             ret = (*reader).read();
         }
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("walking through the doc");
         }
         xml_free_text_reader(reader);
@@ -2142,7 +2142,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     #[cfg(feature = "libxml_tree")]
     let tmp: XmlDocPtr;
 
-    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
         start_timer();
     }
 
@@ -2438,7 +2438,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         return;
     }
 
-    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
         end_timer!("Parsing");
     }
 
@@ -2454,13 +2454,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     #[cfg(feature = "xinclude")]
     if CMD_ARGS.get().unwrap().xinclude {
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
         if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
             PROGRESULT = XmllintReturnCode::ErrUnclass;
         }
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Xinclude processing");
         }
     }
@@ -2553,7 +2553,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
         // print it.
         if !cfg!(feature = "libxml_debug") || !CMD_ARGS.get().unwrap().debug {
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
             if cfg!(feature = "html")
@@ -2595,7 +2595,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     } else if html_doc_dump(&mut stdout(), doc) < 0 {
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
-                    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+                    if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                         end_timer!("Saving");
                     }
                 }
@@ -2728,7 +2728,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     PROGRESULT = XmllintReturnCode::ErrOut;
                 }
             }
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Saving");
             }
         } else {
@@ -2756,7 +2756,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     if CMD_ARGS.get().unwrap().dtdvalid.is_some() || CMD_ARGS.get().unwrap().dtdvalidfpi.is_some() {
         let dtd: XmlDtdPtr;
 
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
         if let Some(dtd_valid) = CMD_ARGS.get().unwrap().dtdvalid.as_deref() {
@@ -2764,7 +2764,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         } else {
             dtd = xml_parse_dtd(CMD_ARGS.get().unwrap().dtdvalidfpi.as_deref(), None);
         }
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Parsing DTD");
         }
         if dtd.is_null() {
@@ -2788,7 +2788,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             (*cvp).error = Some(generic_error_default);
             (*cvp).warning = Some(generic_error_default);
 
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
             if xml_validate_dtd(cvp, doc, dtd) == 0 {
@@ -2803,7 +2803,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
-            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Validating against DTD");
             }
             xml_free_valid_ctxt(cvp);
@@ -2818,7 +2818,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             return;
         }
 
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
         (*cvp).error = Some(generic_error_default);
@@ -2828,14 +2828,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Validating");
         }
         xml_free_valid_ctxt(cvp);
     }
     #[cfg(feature = "schematron")]
     if !WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
 
@@ -2873,13 +2873,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
         xml_schematron_free_valid_ctxt(ctxt);
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Validating");
         }
     }
     #[cfg(feature = "schema")]
     if !RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
 
@@ -2915,11 +2915,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
         xml_relaxng_free_valid_ctxt(ctxt);
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Validating");
         }
     } else if !WXSCHEMAS.load(Ordering::Relaxed).is_null() {
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             start_timer();
         }
 
@@ -2955,7 +2955,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
         xml_schema_free_valid_ctxt(ctxt);
-        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Validating");
         }
     }
@@ -2969,11 +2969,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     }
 
     // free it.
-    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
         start_timer();
     }
     xml_free_doc(doc);
-    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
         end_timer!("Freeing");
     }
 }
@@ -3190,9 +3190,10 @@ fn main() {
         OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
     }
     if cmd_args.repeat > 0 {
-        unsafe {
-            REPEAT = 100 * 10i32.pow(cmd_args.repeat as u32 - 1);
-        }
+        REPEAT.store(
+            100 * 10usize.pow(cmd_args.repeat as u32 - 1),
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.pushsmall {
         PUSHSIZE.store(10, Ordering::Relaxed);
@@ -3484,15 +3485,15 @@ fn main() {
     CMD_ARGS.set(cmd_args).expect("Internal Error");
     for arg in xml_files {
         unsafe {
-            if CMD_ARGS.get().unwrap().timing && REPEAT != 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) != 0 {
                 start_timer();
             }
             // Remember file names.  "-" means stdin.  <sven@zen.org>
             if !arg.starts_with('-') || arg == "-" {
-                if REPEAT != 0 {
+                if REPEAT.load(Ordering::Relaxed) != 0 {
                     let mut ctxt: XmlParserCtxtPtr = null_mut();
 
-                    for _ in 0..REPEAT {
+                    for _ in 0..REPEAT.load(Ordering::Relaxed) {
                         #[cfg(feature = "libxml_reader")]
                         {
                             let carg =
@@ -3546,8 +3547,8 @@ fn main() {
                     }
                 }
                 files += 1;
-                if CMD_ARGS.get().unwrap().timing && REPEAT != 0 {
-                    end_timer!("{} iterations", REPEAT);
+                if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) != 0 {
+                    end_timer!("{} iterations", REPEAT.load(Ordering::Relaxed));
                 }
             }
         }
