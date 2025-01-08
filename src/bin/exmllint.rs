@@ -9,8 +9,6 @@
 // daniel@veillard.com
 #![allow(unused)]
 
-#[cfg(feature = "libxml_push")]
-use std::sync::atomic::AtomicUsize;
 use std::{
     env::args,
     ffi::{c_char, c_long, c_void, CStr, CString},
@@ -22,7 +20,7 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::{
-        atomic::{AtomicI32, AtomicPtr, Ordering},
+        atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
         Mutex, OnceLock,
     },
 };
@@ -113,21 +111,19 @@ use libc::{
 
 const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
 
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum XmllintReturnCode {
-    ReturnOk = 0,      // No error
-    ErrUnclass = 1,    // Unclassified
-    ErrDtd = 2,        // Error in DTD
-    ErrValid = 3,      // Validation error
-    ErrRdfile = 4,     // CtxtReadFile error
-    ErrSchemacomp = 5, // Schema compilation
-    ErrOut = 6,        // Error writing output
-    ErrSchemapat = 7,  // Error in schema pattern
-    ErrRdregis = 8,    // Error in Reader registration
-    ErrMem = 9,        // Out of memory error
-    ErrXpath = 10,     // XPath evaluation error
-}
+// Error codes.
+// These are similar to `xmllintReturnCode` in original xmllint.
+const RETURN_OK: i32 = 0; // No error
+const ERR_UNCLASS: i32 = 1; // Unclassified
+const ERR_DTD: i32 = 2; // Error in DTD
+const ERR_VALID: i32 = 3; // Validation error
+const ERR_RDFILE: i32 = 4; // CtxtReadFile error
+const ERR_SCHEMACOMP: i32 = 5; // Schema compilation
+const ERR_OUT: i32 = 6; // Error writing output
+const ERR_SCHEMAPAT: i32 = 7; // Error in schema pattern
+const ERR_RDREGIS: i32 = 8; // Error in Reader registration
+const ERR_MEM: i32 = 9; // Out of memory error
+const ERR_XPATH: i32 = 10; // XPath evaluation error
 
 #[derive(clap::Parser, Debug)]
 #[cfg_attr(
@@ -386,18 +382,16 @@ static RELAXNGSCHEMAS: AtomicPtr<XmlRelaxNG> = AtomicPtr::new(null_mut());
 #[cfg(feature = "schema")]
 static WXSCHEMAS: AtomicPtr<XmlSchema> = AtomicPtr::new(null_mut());
 #[cfg(feature = "schematron")]
-static SCHEMATRON: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "schematron")]
 static WXSCHEMATRON: AtomicPtr<XmlSchematron> = AtomicPtr::new(null_mut());
 static REPEAT: AtomicUsize = AtomicUsize::new(0);
 #[cfg(feature = "libxml_push")]
 static PUSHSIZE: AtomicUsize = AtomicUsize::new(4096);
-static mut PROGRESULT: XmllintReturnCode = XmllintReturnCode::ReturnOk;
+static PROGRESULT: AtomicI32 = AtomicI32::new(RETURN_OK);
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static PATTERNC: AtomicPtr<XmlPattern> = AtomicPtr::new(null_mut());
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
-static mut NBREGISTER: i32 = 0;
+static NBREGISTER: AtomicUsize = AtomicUsize::new(0);
 static OPTIONS: AtomicI32 = AtomicI32::new(
     XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32,
 );
@@ -539,7 +533,7 @@ unsafe fn xmllint_external_entity_loader(
 unsafe fn oom() {
     let maxmem = CMD_ARGS.get().unwrap().maxmem.unwrap_or(0);
     eprintln!("Ran out of memory needs > {} bytes", maxmem);
-    PROGRESULT = XmllintReturnCode::ErrMem;
+    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
 }
 
 unsafe extern "C" fn my_free_func(mem: *mut c_void) {
@@ -804,7 +798,7 @@ fn xml_html_validity_error(_ctx: Option<GenericErrorContext>, _msg: &str) {
 
     // xml_htmlprint_file_context(input);
     // xml_htmlencode_send();
-    // PROGRESULT = XmllintReturnCode::ErrValid;
+    // PROGRESULT.store(ErrValid, Ordering::Relaxed);
 }
 
 /// Display and format a validity warning messages, gives file, line,
@@ -1435,7 +1429,11 @@ unsafe fn start_element_ns_debug(
         } else {
             print!(", {}='", attr.0);
         }
-        print!("{}...', {}", attr.3, attr.3.len());
+        print!(
+            "{}...', {}",
+            attr.3.chars().take(4).collect::<String>(),
+            attr.3.len()
+        );
     }
     println!(")");
 }
@@ -1537,7 +1535,7 @@ unsafe fn test_sax(filename: &str) {
             let vctxt: XmlSchemaValidCtxtPtr =
                 xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
             if vctxt.is_null() {
-                PROGRESULT = XmllintReturnCode::ErrMem;
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                 return;
             }
             xml_schema_set_valid_errors(
@@ -1570,11 +1568,11 @@ unsafe fn test_sax(filename: &str) {
                     }
                     std::cmp::Ordering::Greater => {
                         eprintln!("{} fails to validate", filename);
-                        PROGRESULT = XmllintReturnCode::ErrValid;
+                        PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
                     }
                     std::cmp::Ordering::Less => {
                         eprintln!("{} validation generated an internal error", filename);
-                        PROGRESULT = XmllintReturnCode::ErrValid;
+                        PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
                     }
                 }
             }
@@ -1591,7 +1589,7 @@ unsafe fn test_sax(filename: &str) {
             Some(Box::new(handler)),
             Some(GenericErrorContext::new(user_data.as_ptr())),
         ) else {
-            PROGRESULT = XmllintReturnCode::ErrMem;
+            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
             return;
         };
         xml_ctxt_read_file(ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
@@ -1764,7 +1762,7 @@ unsafe fn stream_file(filename: *mut c_char) {
                 "mmap failure for file {}",
                 CStr::from_ptr(filename).to_string_lossy()
             );
-            PROGRESULT = XmllintReturnCode::ErrRdfile;
+            PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
             return;
         }
 
@@ -1817,7 +1815,7 @@ unsafe fn stream_file(filename: *mut c_char) {
             ret = xml_text_reader_relaxng_validate(reader, crelaxng.as_ptr());
             if ret < 0 {
                 generic_error!("Relax-NG schema {relaxng} failed to compile\n");
-                PROGRESULT = XmllintReturnCode::ErrSchemacomp;
+                PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
             }
             if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Compiling the schemas");
@@ -1832,7 +1830,7 @@ unsafe fn stream_file(filename: *mut c_char) {
             ret = xml_text_reader_schema_validate(reader, cschema.as_ptr());
             if ret < 0 {
                 generic_error!("XSD schema {schema} failed to compile\n");
-                PROGRESULT = XmllintReturnCode::ErrSchemacomp;
+                PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
             }
             if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Compiling the schemas");
@@ -1882,7 +1880,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         if CMD_ARGS.get().unwrap().valid && !(*reader).is_valid().unwrap_or(false) {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
-            PROGRESULT = XmllintReturnCode::ErrValid;
+            PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
         }
         #[cfg(feature = "schema")]
         if CMD_ARGS.get().unwrap().relaxng.is_some() || CMD_ARGS.get().unwrap().schema.is_some() {
@@ -1891,7 +1889,7 @@ unsafe fn stream_file(filename: *mut c_char) {
                     "{} fails to validate",
                     CStr::from_ptr(filename).to_string_lossy()
                 );
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             } else if !CMD_ARGS.get().unwrap().quiet {
                 eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
             }
@@ -1903,14 +1901,14 @@ unsafe fn stream_file(filename: *mut c_char) {
                 "{} : failed to parse",
                 CStr::from_ptr(filename).to_string_lossy()
             );
-            PROGRESULT = XmllintReturnCode::ErrUnclass;
+            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
     } else {
         eprintln!(
             "Unable to open {}",
             CStr::from_ptr(filename).to_string_lossy()
         );
-        PROGRESULT = XmllintReturnCode::ErrUnclass;
+        PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
     }
     #[cfg(feature = "libxml_pattern")]
     if !PATSTREAM.load(Ordering::Relaxed).is_null() {
@@ -1952,7 +1950,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
         };
         if root.is_null() {
             generic_error!("Document does not have a root element");
-            PROGRESULT = XmllintReturnCode::ErrUnclass;
+            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
             return;
         }
         let mut i = 0;
@@ -1976,7 +1974,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             );
             if PATTERNC.load(Ordering::Relaxed).is_null() {
                 generic_error!("Pattern {pattern} failed to compile\n");
-                PROGRESULT = XmllintReturnCode::ErrSchemapat;
+                PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
             }
         }
         if !PATTERNC.load(Ordering::Relaxed).is_null() {
@@ -2016,11 +2014,11 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
         xml_free_text_reader(reader);
         if ret != 0 {
             eprintln!("failed to walk through the doc");
-            PROGRESULT = XmllintReturnCode::ErrUnclass;
+            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
     } else {
         eprintln!("Failed to crate a reader from the document");
-        PROGRESULT = XmllintReturnCode::ErrUnclass;
+        PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
     }
     #[cfg(feature = "libxml_pattern")]
     if !PATSTREAM.load(Ordering::Relaxed).is_null() {
@@ -2049,7 +2047,7 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                     if !nodeset.node_tab.is_empty() {
                         let Some(buf) = XmlOutputBuffer::from_writer(stdout(), None) else {
                             eprintln!("Out of memory for XPath");
-                            PROGRESULT = XmllintReturnCode::ErrMem;
+                            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                             return;
                         };
                         let buf = Rc::new(RefCell::new(buf));
@@ -2097,11 +2095,11 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
         }
         XmlXPathObjectType::XPathUndefined => {
             eprintln!("XPath Object is uninitialized");
-            PROGRESULT = XmllintReturnCode::ErrXpath;
+            PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
         }
         _ => {
             eprintln!("XPath object of unexpected type");
-            PROGRESULT = XmllintReturnCode::ErrXpath;
+            PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
         }
     }
 }
@@ -2119,7 +2117,7 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
     let ctxt: XmlXPathContextPtr = xml_xpath_new_context(doc);
     if ctxt.is_null() {
         eprintln!("Out of memory for XPath");
-        PROGRESULT = XmllintReturnCode::ErrMem;
+        PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
         return;
     }
     (*ctxt).node = doc as XmlNodePtr;
@@ -2128,7 +2126,7 @@ unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
 
     if res.is_null() {
         eprintln!("XPath evaluation failure");
-        PROGRESULT = XmllintReturnCode::ErrXpath;
+        PROGRESULT.store(ERR_XPATH, Ordering::Relaxed);
         return;
     }
     do_xpath_dump(res);
@@ -2190,7 +2188,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         XmlCharEncoding::None,
                     );
                     if ctxt.is_null() {
-                        PROGRESULT = XmllintReturnCode::ErrMem;
+                        PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                         if f != stdin {
                             fclose(f);
                         }
@@ -2237,7 +2235,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if base == MAP_FAILED as _ {
                 close(fd);
                 eprintln!("mmap failure for file {}", filename.unwrap());
-                PROGRESULT = XmllintReturnCode::ErrRdfile;
+                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
                 return;
             }
 
@@ -2288,7 +2286,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         fname.map_or(null(), |s| s.as_ptr()),
                     );
                     if ctxt.is_null() {
-                        PROGRESULT = XmllintReturnCode::ErrMem;
+                        PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                         if f != stdin {
                             fclose(f);
                         }
@@ -2333,7 +2331,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if rectxt.is_null() {
             ctxt = xml_new_parser_ctxt();
             if ctxt.is_null() {
-                PROGRESULT = XmllintReturnCode::ErrMem;
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                 return;
             }
         } else {
@@ -2377,7 +2375,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if base == MAP_FAILED as _ {
             close(fd);
             eprintln!("mmap failure for file {}", filename.unwrap());
-            PROGRESULT = XmllintReturnCode::ErrRdfile;
+            PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
             return;
         }
 
@@ -2399,7 +2397,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if rectxt.is_null() {
                 ctxt = xml_new_parser_ctxt();
                 if ctxt.is_null() {
-                    PROGRESULT = XmllintReturnCode::ErrMem;
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     return;
                 }
             } else {
@@ -2414,7 +2412,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             );
 
             if (*ctxt).valid == 0 {
-                PROGRESULT = XmllintReturnCode::ErrRdfile;
+                PROGRESULT.store(ERR_RDFILE, Ordering::Relaxed);
             }
             if rectxt.is_null() {
                 xml_free_parser_ctxt(ctxt);
@@ -2434,7 +2432,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     // If we don't have a document we might as well give up.
     // Do we want an error message here?  <sven@zen.org>
     if doc.is_null() {
-        PROGRESULT = XmllintReturnCode::ErrUnclass;
+        PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         return;
     }
 
@@ -2458,7 +2456,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             start_timer();
         }
         if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
-            PROGRESULT = XmllintReturnCode::ErrUnclass;
+            PROGRESULT.store(ERR_UNCLASS, Ordering::Relaxed);
         }
         if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Xinclude processing");
@@ -2584,16 +2582,16 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         match File::options().write(true).truncate(true).open(filename) {
                             Ok(mut f) => {
                                 if html_doc_dump(&mut f, doc) < 0 {
-                                    PROGRESULT = XmllintReturnCode::ErrOut;
+                                    PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                                 }
                             }
                             _ => {
                                 eprintln!("failed to open {filename}");
-                                PROGRESULT = XmllintReturnCode::ErrOut;
+                                PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                             }
                         }
                     } else if html_doc_dump(&mut stdout(), doc) < 0 {
-                        PROGRESULT = XmllintReturnCode::ErrOut;
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                     if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                         end_timer!("Saving");
@@ -2616,7 +2614,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         print!("{result}");
                     } else {
                         eprintln!("Failed to canonicalize");
-                        PROGRESULT = XmllintReturnCode::ErrOut;
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                 }
             } else if cfg!(feature = "c14n") && CMD_ARGS.get().unwrap().c14n11 {
@@ -2636,7 +2634,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         print!("{result}");
                     } else {
                         eprintln!("Failed to canonicalize");
-                        PROGRESULT = XmllintReturnCode::ErrOut;
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                 }
             } else if cfg!(feature = "c14n") && CMD_ARGS.get().unwrap().exc_c14n {
@@ -2656,7 +2654,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         print!("{result}");
                     } else {
                         eprintln!("Failed to canonicalize");
-                        PROGRESULT = XmllintReturnCode::ErrOut;
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                 }
             } else if CMD_ARGS.get().unwrap().memory {
@@ -2685,7 +2683,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
                 if result.is_null() {
                     eprintln!("Failed to save");
-                    PROGRESULT = XmllintReturnCode::ErrOut;
+                    PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                 } else {
                     if write(1, result as _, len as _) == -1 {
                         eprintln!("Can't write data");
@@ -2721,11 +2719,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     if xml_save_doc(ctxt, doc) < 0 {
                         let o = CMD_ARGS.get().unwrap().output.as_deref().unwrap_or("-");
                         eprintln!("failed save to {o}");
-                        PROGRESULT = XmllintReturnCode::ErrOut;
+                        PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
                     xml_save_close(ctxt);
                 } else {
-                    PROGRESULT = XmllintReturnCode::ErrOut;
+                    PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                 }
             }
             if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
@@ -2741,7 +2739,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         }
                         _ => {
                             eprintln!("failed to open {filename}");
-                            PROGRESULT = XmllintReturnCode::ErrOut;
+                            PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                         }
                     }
                 } else {
@@ -2776,12 +2774,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     CMD_ARGS.get().unwrap().dtdvalidfpi.as_deref().unwrap()
                 );
             }
-            PROGRESULT = XmllintReturnCode::ErrDtd;
+            PROGRESULT.store(ERR_DTD, Ordering::Relaxed);
         } else {
             let cvp = xml_new_valid_ctxt();
             if cvp.is_null() {
                 generic_error!("Couldn't allocate validation context\n");
-                PROGRESULT = XmllintReturnCode::ErrMem;
+                PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                 xml_free_dtd(dtd);
                 return;
             }
@@ -2801,7 +2799,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         CMD_ARGS.get().unwrap().dtdvalidfpi.as_deref().unwrap()
                     );
                 }
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
             if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 end_timer!("Validating against DTD");
@@ -2813,7 +2811,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         let cvp = xml_new_valid_ctxt();
         if cvp.is_null() {
             generic_error!("Couldn't allocate validation context\n");
-            PROGRESULT = XmllintReturnCode::ErrMem;
+            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
             xml_free_doc(doc);
             return;
         }
@@ -2826,7 +2824,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if xml_validate_document(cvp, doc) == 0 {
             let filename = filename.unwrap();
             generic_error!("Document {filename} does not validate\n");
-            PROGRESULT = XmllintReturnCode::ErrValid;
+            PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
         }
         if CMD_ARGS.get().unwrap().timing && REPEAT.load(Ordering::Relaxed) == 0 {
             end_timer!("Validating");
@@ -2850,7 +2848,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         let ctxt: XmlSchematronValidCtxtPtr =
             xml_schematron_new_valid_ctxt(WXSCHEMATRON.load(Ordering::Relaxed), flag);
         if ctxt.is_null() {
-            PROGRESULT = XmllintReturnCode::ErrMem;
+            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
             xml_free_doc(doc);
             return;
         }
@@ -2862,14 +2860,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
             std::cmp::Ordering::Greater => {
                 eprintln!("{} fails to validate", filename.unwrap());
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
             std::cmp::Ordering::Less => {
                 eprintln!(
                     "{} validation generated an internal error",
                     filename.unwrap()
                 );
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
         }
         xml_schematron_free_valid_ctxt(ctxt);
@@ -2886,7 +2884,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         let ctxt: XmlRelaxNGValidCtxtPtr =
             xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
-            PROGRESULT = XmllintReturnCode::ErrMem;
+            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
             xml_free_doc(doc);
             return;
         }
@@ -2904,14 +2902,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
             std::cmp::Ordering::Greater => {
                 eprintln!("{} fails to validate", filename.unwrap());
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
             std::cmp::Ordering::Less => {
                 eprintln!(
                     "{} validation generated an internal error",
                     filename.unwrap()
                 );
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
         }
         xml_relaxng_free_valid_ctxt(ctxt);
@@ -2926,7 +2924,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         let ctxt: XmlSchemaValidCtxtPtr =
             xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
-            PROGRESULT = XmllintReturnCode::ErrMem;
+            PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
             xml_free_doc(doc);
             return;
         }
@@ -2944,14 +2942,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
             std::cmp::Ordering::Greater => {
                 eprintln!("{} fails to validate", filename.unwrap());
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
             std::cmp::Ordering::Less => {
                 eprintln!(
                     "{} validation generated an internal error",
                     filename.unwrap()
                 );
-                PROGRESULT = XmllintReturnCode::ErrValid;
+                PROGRESULT.store(ERR_VALID, Ordering::Relaxed);
             }
         }
         xml_schema_free_valid_ctxt(ctxt);
@@ -3111,17 +3109,17 @@ unsafe extern "C" fn register_node(node: XmlNodePtr) {
     (*node)._private = malloc(size_of::<c_long>());
     if (*node)._private.is_null() {
         eprintln!("Out of memory in xmllint:registerNode()");
-        exit(XmllintReturnCode::ErrMem as i32);
+        exit(ERR_MEM);
     }
-    *((*node)._private as *mut c_long) = 0x81726354;
-    NBREGISTER += 1;
+    *((*node)._private as *mut u64) = 0x81726354;
+    NBREGISTER.fetch_add(1, Ordering::Relaxed);
 }
 
 unsafe extern "C" fn deregister_node(node: XmlNodePtr) {
     assert!(!(*node)._private.is_null());
     assert!(*((*node)._private as *mut c_long) == 0x81726354);
     free((*node)._private);
-    NBREGISTER -= 1;
+    NBREGISTER.fetch_sub(1, Ordering::Relaxed);
 }
 
 fn main() {
@@ -3371,11 +3369,11 @@ fn main() {
                 let s = CString::new(s).unwrap();
                 let ctxt: XmlSchematronParserCtxtPtr = xml_schematron_new_parser_ctxt(s.as_ptr());
                 if ctxt.is_null() {
-                    PROGRESULT = XmllintReturnCode::ErrMem;
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
                     xml_memory_dump();
-                    exit(PROGRESULT as i32);
+                    exit(PROGRESULT.load(Ordering::Relaxed));
                 }
                 WXSCHEMATRON.store(xml_schematron_parse(ctxt), Ordering::Relaxed);
                 if WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
@@ -3383,7 +3381,7 @@ fn main() {
                         "Schematron schema {} failed to compile\n",
                         s.to_string_lossy()
                     );
-                    PROGRESULT = XmllintReturnCode::ErrSchemacomp;
+                    PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
                 xml_schematron_free_parser_ctxt(ctxt);
                 if cmd_args.timing {
@@ -3406,11 +3404,11 @@ fn main() {
                 let relaxng = CString::new(r).unwrap();
                 let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(relaxng.as_ptr());
                 if ctxt.is_null() {
-                    PROGRESULT = XmllintReturnCode::ErrMem;
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
                     xml_memory_dump();
-                    exit(PROGRESULT as i32);
+                    exit(PROGRESULT.load(Ordering::Relaxed));
                 }
                 xml_relaxng_set_parser_errors(
                     ctxt,
@@ -3421,7 +3419,7 @@ fn main() {
                 RELAXNGSCHEMAS.store(xml_relaxng_parse(ctxt), Ordering::Relaxed);
                 if RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
                     generic_error!("Relax-NG schema {r} failed to compile\n");
-                    PROGRESULT = XmllintReturnCode::ErrSchemacomp;
+                    PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
                 xml_relaxng_free_parser_ctxt(ctxt);
                 if cmd_args.timing {
@@ -3438,11 +3436,11 @@ fn main() {
                 let schema = CString::new(s).unwrap();
                 let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(schema.as_ptr());
                 if ctxt.is_null() {
-                    PROGRESULT = XmllintReturnCode::ErrMem;
+                    PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
                     xml_cleanup_parser();
                     xml_memory_dump();
-                    exit(PROGRESULT as i32);
+                    exit(PROGRESULT.load(Ordering::Relaxed));
                 }
                 xml_schema_set_parser_errors(
                     ctxt,
@@ -3453,7 +3451,7 @@ fn main() {
                 let wxschemas = xml_schema_parse(ctxt);
                 if wxschemas.is_null() {
                     generic_error!("WXS schema {s} failed to compile\n");
-                    PROGRESULT = XmllintReturnCode::ErrSchemacomp;
+                    PROGRESULT.store(ERR_SCHEMACOMP, Ordering::Relaxed);
                 }
                 WXSCHEMAS.store(wxschemas, Ordering::Relaxed);
                 xml_schema_free_parser_ctxt(ctxt);
@@ -3475,7 +3473,7 @@ fn main() {
                 );
                 if PATTERNC.load(Ordering::Relaxed).is_null() {
                     generic_error!("Pattern {p} failed to compile\n");
-                    PROGRESULT = XmllintReturnCode::ErrSchemapat;
+                    PROGRESULT.store(ERR_SCHEMAPAT, Ordering::Relaxed);
                 }
             }
         }
@@ -3527,7 +3525,7 @@ fn main() {
                         xml_free_parser_ctxt(ctxt);
                     }
                 } else {
-                    NBREGISTER = 0;
+                    NBREGISTER.store(0, Ordering::Relaxed);
                     let carg = CString::new(arg.as_str()).expect("Failed to construct argument");
 
                     if cfg!(feature = "libxml_reader") && CMD_ARGS.get().unwrap().stream {
@@ -3541,9 +3539,14 @@ fn main() {
                         parse_and_print_file(Some(&arg), null_mut());
                     }
 
-                    if CMD_ARGS.get().unwrap().chkregister && NBREGISTER != 0 {
-                        eprintln!("Registration count off: {}", NBREGISTER);
-                        PROGRESULT = XmllintReturnCode::ErrRdregis;
+                    if CMD_ARGS.get().unwrap().chkregister
+                        && NBREGISTER.load(Ordering::Relaxed) != 0
+                    {
+                        eprintln!(
+                            "Registration count off: {}",
+                            NBREGISTER.load(Ordering::Relaxed)
+                        );
+                        PROGRESULT.store(ERR_RDREGIS, Ordering::Relaxed);
                     }
                 }
                 files += 1;
@@ -3601,6 +3604,6 @@ fn main() {
         xml_cleanup_parser();
         xml_memory_dump();
 
-        exit(PROGRESULT as i32)
+        exit(PROGRESULT.load(Ordering::Relaxed))
     }
 }
