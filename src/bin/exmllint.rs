@@ -396,8 +396,6 @@ static mut PATTERNC: AtomicPtr<XmlPattern> = AtomicPtr::new(null_mut());
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static mut PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
 static mut NBREGISTER: i32 = 0;
-#[cfg(feature = "xpath")]
-static XPATHQUERY: Mutex<Option<CString>> = Mutex::new(None);
 static OPTIONS: AtomicI32 = AtomicI32::new(
     XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32,
 );
@@ -2461,7 +2459,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     }
 
     #[cfg(feature = "xpath")]
-    if let Some(query) = XPATHQUERY.lock().unwrap().as_ref() {
+    if let Some(query) = CMD_ARGS.get().unwrap().xpath.as_deref() {
+        let query = CString::new(query).unwrap();
         do_xpath_query(doc, query.as_ptr());
     }
 
