@@ -247,7 +247,7 @@ unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i3
 
 /// Write out formatting for non-significant whitespace output.
 #[doc(alias = "xmlOutputBufferWriteWSNonSig")]
-unsafe extern "C" fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: i32) {
+unsafe fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: i32) {
     ctxt.buf.borrow_mut().write_bytes(b"\n");
     for i in (0..ctxt.level + extra).step_by(ctxt.indent_nr) {
         let len = ctxt.indent_size
@@ -369,12 +369,12 @@ unsafe fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
     if cur.is_null() {
         return;
     }
-    let mut buf = (*ctxt).buf.borrow_mut();
     if (*ctxt).format == 2 {
         xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
     } else {
-        buf.write_bytes(b" ");
+        (*ctxt).buf.borrow_mut().write_bytes(b" ");
     }
+    let mut buf = (*ctxt).buf.borrow_mut();
     if !(*cur).ns.is_null() {
         if let Some(prefix) = (*(*cur).ns).prefix() {
             buf.write_str(&prefix);
