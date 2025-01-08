@@ -11,20 +11,21 @@
 
 use std::{
     env::args,
-    ffi::{c_char, c_int, c_long, c_void, CStr, CString},
+    ffi::{c_char, c_long, c_void, CStr, CString},
     fs::File,
     io::{stderr, stdin, stdout, Write},
-    mem::zeroed,
+    mem::{take, zeroed},
     num::IntErrorKind,
     process::exit,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::{
         atomic::{AtomicPtr, Ordering},
-        Mutex,
+        Mutex, OnceLock,
     },
 };
 
+use clap::Parser;
 use const_format::concatcp;
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
@@ -104,8 +105,8 @@ use exml::{
     SYSCONFDIR,
 };
 use libc::{
-    close, fclose, fopen, fread, free, gettimeofday, malloc, memset, mmap, munmap, open, size_t,
-    snprintf, stat, strlen, timeval, write, FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ,
+    close, fclose, fopen, fread, free, gettimeofday, malloc, memset, mmap, munmap, open, snprintf,
+    stat, strlen, timeval, write, FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ,
 };
 
 const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
@@ -113,129 +114,301 @@ const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/cat
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum XmllintReturnCode {
-    ReturnOk = 0,      /* No error */
-    ErrUnclass = 1,    /* Unclassified */
-    ErrDtd = 2,        /* Error in DTD */
-    ErrValid = 3,      /* Validation error */
-    ErrRdfile = 4,     /* CtxtReadFile error */
-    ErrSchemacomp = 5, /* Schema compilation */
-    ErrOut = 6,        /* Error writing output */
-    ErrSchemapat = 7,  /* Error in schema pattern */
-    ErrRdregis = 8,    /* Error in Reader registration */
-    ErrMem = 9,        /* Out of memory error */
-    ErrXpath = 10,     /* XPath evaluation error */
+    ReturnOk = 0,      // No error
+    ErrUnclass = 1,    // Unclassified
+    ErrDtd = 2,        // Error in DTD
+    ErrValid = 3,      // Validation error
+    ErrRdfile = 4,     // CtxtReadFile error
+    ErrSchemacomp = 5, // Schema compilation
+    ErrOut = 6,        // Error writing output
+    ErrSchemapat = 7,  // Error in schema pattern
+    ErrRdregis = 8,    // Error in Reader registration
+    ErrMem = 9,        // Out of memory error
+    ErrXpath = 10,     // XPath evaluation error
 }
-#[cfg(feature = "libxml_debug")]
-static mut SHELL: c_int = 0;
-#[cfg(feature = "libxml_debug")]
-static mut DEBUGENT: c_int = 0;
-static mut DEBUG: c_int = 0;
-static mut MAXMEM: c_int = 0;
-#[cfg(feature = "libxml_tree")]
-static mut COPY: c_int = 0;
-static mut RECOVERY: c_int = 0;
-static mut NOENT: c_int = 0;
-static mut NOENC: c_int = 0;
-static mut NOBLANKS: c_int = 0;
-static mut NOOUT: c_int = 0;
-static mut NOWRAP: c_int = 0;
-static mut FORMAT: c_int = 0;
-#[cfg(feature = "libxml_output")]
-static OUTPUT: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "libxml_output")]
-static mut COMPRESS: c_int = 0;
-#[cfg(feature = "libxml_output")]
-static mut OLDOUT: c_int = 0;
-#[cfg(feature = "libxml_valid")]
-static mut VALID: c_int = 0;
-#[cfg(feature = "libxml_valid")]
-static mut POSTVALID: c_int = 0;
-#[cfg(feature = "libxml_valid")]
-static DTDVALID: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "libxml_valid")]
-static DTDVALIDFPI: Mutex<Option<CString>> = Mutex::new(None);
-#[cfg(feature = "schema")]
-static mut RELAXNG: Mutex<Option<CString>> = Mutex::new(None);
+
+#[derive(clap::Parser, Debug)]
+#[cfg_attr(
+    feature = "libxml_output",
+    command(
+        about = "Parse the XML files and output the result of the parsing.\nThis tool is based on xmllint."
+    )
+)]
+#[cfg_attr(
+    not(feature = "libxml_output"),
+    command(about = "Parse the XML files.\nThis tool is based on xmllint.")
+)]
+#[command(version, name = "exmllint", arg_required_else_help = true)]
+struct CmdArgs {
+    xml_files: Vec<String>,
+    /// limits memory allocation to nbbytes bytes
+    #[arg(long, value_name = "nbbytes")]
+    maxmem: Option<usize>,
+    #[cfg(any(feature = "libxml_debug", feature = "libxml_reader"))]
+    /// dump a debug tree of the in-memory document
+    #[arg(long)]
+    debug: bool,
+    #[cfg(feature = "libxml_debug")]
+    /// run a navigating shell
+    #[arg(long)]
+    shell: bool,
+    #[cfg(feature = "libxml_tree")]
+    /// used to test the internal copy implementation
+    #[arg(long)]
+    copy: bool,
+    /// output what was parsable on broken XML documents
+    #[arg(long)]
+    recover: bool,
+    /// remove any internal arbitrary parser limits
+    #[arg(long)]
+    huge: bool,
+    /// substitute entity references by their value
+    #[arg(long)]
+    noent: bool,
+    /// ignore any encoding specified inside the document
+    #[arg(long)]
+    noenc: bool,
+    /// remove redundant namespace declarations
+    #[arg(long)]
+    nsclean: bool,
+    /// replace cdata section with text nodes
+    #[arg(long)]
+    nocdata: bool,
+    /// create document without dictionary
+    #[arg(long)]
+    nodict: bool,
+    /// don't output the result tree
+    #[arg(long)]
+    noout: bool,
+    #[cfg(feature = "libxml_output")]
+    /// save to a given file
+    #[arg(short, long, value_name = "file")]
+    output: Option<String>,
+    /// output results as HTML
+    #[arg(long)]
+    htmlout: bool,
+    /// do not put HTML doc wrapper
+    #[arg(long)]
+    nowrap: bool,
+    #[cfg(feature = "html")]
+    /// use the HTML parser
+    #[arg(long)]
+    html: bool,
+    #[cfg(feature = "html")]
+    /// force to use the XML serializer when using --html
+    #[arg(long)]
+    xmlout: bool,
+    #[cfg(feature = "html")]
+    /// do not default HTML doctype
+    #[arg(long)]
+    nodefdtd: bool,
+    /// fetch external DTD
+    #[arg(long)]
+    loaddtd: bool,
+    /// loaddtd + populate the tree with inherited attributes
+    #[arg(long)]
+    dtdattr: bool,
+    #[cfg(feature = "libxml_valid")]
+    /// validate the document in addition to std well-formed check
+    #[arg(long)]
+    valid: bool,
+    #[cfg(feature = "libxml_valid")]
+    /// do a posteriori validation, i.e after parsing
+    #[arg(long)]
+    postvalid: bool,
+    #[cfg(feature = "libxml_valid")]
+    /// do a posteriori validation against a given DTD
+    #[arg(long, value_name = "URL")]
+    dtdvalid: Option<String>,
+    #[cfg(feature = "libxml_valid")]
+    /// same but name the DTD with a Public Identifier
+    #[arg(long, value_name = "FPI")]
+    dtdvalidfpi: Option<String>,
+    /// remove the DOCTYPE of the input docs
+    #[arg(long)]
+    dropdtd: bool,
+    /// ad-hoc test for valid insertions
+    #[arg(long)]
+    insert: bool,
+    /// be quiet when succeeded
+    #[arg(long)]
+    quiet: bool,
+    /// print some timings
+    #[arg(long)]
+    timing: bool,
+    /// generate a small doc on the fly
+    #[arg(long)]
+    auto: bool,
+    /// repeat 100 times, for timing or profiling
+    #[arg(long, action = clap::ArgAction::Count)]
+    repeat: u8,
+    #[cfg(feature = "libxml_push")]
+    /// use the push mode of the parser
+    #[arg(long)]
+    push: bool,
+    #[cfg(feature = "libxml_push")]
+    /// use the push mode of the parser using tiny increments
+    #[arg(long)]
+    pushsmall: bool,
+    /// parse from memory
+    #[arg(long)]
+    memory: bool,
+    /// test user I/O support
+    #[arg(long = "test-io")]
+    test_io: bool,
+    #[cfg(feature = "xinclude")]
+    /// do XInclude processing
+    #[arg(long)]
+    xinclude: bool,
+    #[cfg(feature = "xinclude")]
+    /// same but do not generate XInclude nodes
+    #[arg(long)]
+    noxincludenode: bool,
+    #[cfg(feature = "xinclude")]
+    /// do not fixup xml:base uris
+    #[arg(long = "nofixup-base-uris")]
+    nofixup_base_uris: bool,
+    // `compress` is not supported yet. This requires LIBXML_ZLIB_ENABLED feature.
+    // #[cfg(feature = "libxml_output")]
+    // /// turn on gzip compression of output
+    // #[arg(long)]
+    // compress: bool,
+    #[arg(long)]
+    /// do not emit warnings from parser/validator
+    nowarning: bool,
+    #[arg(long)]
+    /// enable additional warnings
+    pedantic: bool,
+    #[cfg(feature = "libxml_debug")]
+    /// debug the entities defined in the document
+    #[arg(long)]
+    debugent: bool,
+    #[cfg(feature = "c14n")]
+    /// save in W3C canonical format v1.0 (with comments)
+    #[arg(long)]
+    c14n: bool,
+    #[cfg(feature = "c14n")]
+    /// save in W3C canonical format v1.1 (with comments)
+    #[arg(long)]
+    c14n11: bool,
+    #[cfg(feature = "c14n")]
+    /// save in W3C exclusive canonical format (with comments)
+    #[arg(long = "exc-c14n")]
+    exc_c14n: bool,
+    #[cfg(feature = "catalog")]
+    /// use SGML catalogs from $SGML_CATALOG_FILES
+    /// otherwise XML Catalogs starting from XML_XML_DEFAULT_CATALOG are activated by default
+    #[arg(long)]
+    catalogs: bool,
+    #[cfg(feature = "catalog")]
+    /// deactivate all catalogs
+    #[arg(long)]
+    nocatalogs: bool,
+    #[cfg(feature = "libxml_output")]
+    /// output in the given encoding
+    #[arg(long, value_name = "encoding")]
+    encode: Option<String>,
+    /// drop (ignorable?) blanks spaces
+    #[arg(long)]
+    noblanks: bool,
+    #[cfg(feature = "libxml_output")]
+    /// reformat/reindent the output
+    #[arg(long)]
+    format: bool,
+    #[cfg(feature = "libxml_output")]
+    /// pretty-print in a particular style  
+    /// - 0: Do not pretty print  
+    /// - 1: Format the XML content, as --format  
+    /// - 2: Add whitespace inside tags, preserving content  
+    #[arg(long, value_name = "STYLE", value_parser = clap::value_parser!(u8).range(0..=2))]
+    pretty: Option<u8>,
+    #[cfg(feature = "libxml_reader")]
+    /// use the streaming interface to process very large files
+    #[arg(long)]
+    stream: bool,
+    #[cfg(feature = "libxml_reader")]
+    /// create a reader and walk though the resulting doc
+    #[arg(long)]
+    walker: bool,
+    #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
+    /// test the pattern support
+    #[arg(long, value_name = "pattern_value")]
+    pattern: Option<String>,
+    #[cfg(feature = "sax1")]
+    /// use the old SAX1 interfaces for processing
+    #[arg(long)]
+    sax1: bool,
+    /// do not build a tree but work just at the SAX level
+    #[arg(long)]
+    sax: bool,
+    /// verify the node registration code
+    #[arg(long)]
+    chkregister: bool,
+    #[cfg(feature = "schema")]
+    /// do RelaxNG validation against the schema
+    #[arg(long, value_name = "schema")]
+    relaxng: Option<String>,
+    #[cfg(feature = "schema")]
+    /// do validation against the WXS schema
+    #[arg(long, value_name = "schema")]
+    schema: Option<String>,
+    #[cfg(feature = "schematron")]
+    /// do validation against a schematron
+    #[arg(long, value_name = "schema")]
+    schematron: Option<String>,
+    /// refuse to fetch DTDs or entities over network
+    #[arg(long)]
+    nonet: bool,
+    /// do not generate compact text nodes
+    #[arg(long)]
+    nocompact: bool,
+    /// print trace of all external entities loaded
+    #[arg(long = "load-trace")]
+    load_trace: bool,
+    /// provide a set of paths for resources
+    #[arg(long, value_name = "paths")]
+    path: Option<String>,
+    #[cfg(feature = "xpath")]
+    /// evaluate the XPath expression, imply --noout
+    #[arg(long, value_name = "expr")]
+    xpath: Option<String>,
+    /// use XML-1.0 parsing rules before the 5th edition
+    #[arg(long)]
+    oldxml10: bool,
+}
+
+static CMD_ARGS: OnceLock<CmdArgs> = OnceLock::new();
+
 #[cfg(feature = "schema")]
 static RELAXNGSCHEMAS: AtomicPtr<XmlRelaxNG> = AtomicPtr::new(null_mut());
-#[cfg(feature = "schema")]
-static mut SCHEMA: Mutex<Option<CString>> = Mutex::new(None);
 #[cfg(feature = "schema")]
 static WXSCHEMAS: AtomicPtr<XmlSchema> = AtomicPtr::new(null_mut());
 #[cfg(feature = "schematron")]
 static SCHEMATRON: Mutex<Option<CString>> = Mutex::new(None);
 #[cfg(feature = "schematron")]
 static WXSCHEMATRON: AtomicPtr<XmlSchematron> = AtomicPtr::new(null_mut());
-static mut REPEAT: c_int = 0;
-static mut INSERT: c_int = 0;
-#[cfg(any(feature = "html", feature = "libxml_valid"))]
-static mut HTML: c_int = 0;
-#[cfg(any(feature = "html", feature = "libxml_valid"))]
-static mut XMLOUT: c_int = 0;
-static mut HTMLOUT: c_int = 0;
-#[cfg(feature = "html")]
-static mut NODEFDTD: c_int = 0;
+static mut REPEAT: i32 = 0;
 #[cfg(feature = "libxml_push")]
-static mut PUSH: c_int = 0;
-#[cfg(feature = "libxml_push")]
-static mut PUSHSIZE: c_int = 4096;
-static mut MEMORY: c_int = 0;
-static mut TEST_IO: c_int = 0;
-static ENCODING: Mutex<Option<String>> = Mutex::new(None);
-#[cfg(feature = "xinclude")]
-static mut XINCLUDE: c_int = 0;
-static mut DTDATTRS: c_int = 0;
-static mut LOADDTD: c_int = 0;
+static mut PUSHSIZE: i32 = 4096;
 static mut PROGRESULT: XmllintReturnCode = XmllintReturnCode::ReturnOk;
-static mut QUIET: c_int = 0;
-static mut TIMING: c_int = 0;
-static mut GENERATE: c_int = 0;
-static mut DROPDTD: c_int = 0;
-#[cfg(feature = "catalog")]
-static mut CATALOGS: c_int = 0;
-#[cfg(feature = "catalog")]
-static mut NOCATALOGS: c_int = 0;
-#[cfg(feature = "c14n")]
-static mut CANONICAL: c_int = 0;
-#[cfg(feature = "c14n")]
-static mut CANONICAL_11: c_int = 0;
-#[cfg(feature = "c14n")]
-static mut EXC_CANONICAL: c_int = 0;
-#[cfg(feature = "libxml_reader")]
-static mut STREAM: c_int = 0;
-#[cfg(feature = "libxml_reader")]
-static mut WALKER: c_int = 0;
-#[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-static mut PATTERN: Mutex<Option<CString>> = Mutex::new(None);
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static mut PATTERNC: AtomicPtr<XmlPattern> = AtomicPtr::new(null_mut());
 #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
 static mut PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
-static mut CHKREGISTER: c_int = 0;
-static mut NBREGISTER: c_int = 0;
-#[cfg(feature = "sax1")]
-static mut SAX1: c_int = 0;
+static mut NBREGISTER: i32 = 0;
 #[cfg(feature = "xpath")]
 static XPATHQUERY: Mutex<Option<CString>> = Mutex::new(None);
-static mut OPTIONS: c_int =
+static mut OPTIONS: i32 =
     XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32;
-static mut SAX: c_int = 0;
-static mut OLDXML10: c_int = 0;
 
-/************************************************************************
- *                                    *
- *         Entity loading control and customization.        *
- *                                    *
- ************************************************************************/
+// Entity loading control and customization.
+
 const MAX_PATHS: usize = 64;
 #[cfg(target_os = "windows")]
 const PATH_SEPARATOR: char = ';';
 #[cfg(not(target_os = "windows"))]
 const PATH_SEPARATOR: char = ':';
-// static mut PATHS: [*mut xmlChar; MAX_PATHS + 1] = [null_mut(); MAX_PATHS + 1];
 static PATHS: Mutex<Vec<String>> = Mutex::new(vec![]);
-static mut NBPATHS: usize = 0;
-static mut LOAD_TRACE: c_int = 0;
 
 fn parse_path(mut path: &str) {
     let mut paths = PATHS.lock().unwrap();
@@ -264,11 +437,11 @@ unsafe fn xmllint_external_entity_loader(
     let mut ret: XmlParserInputPtr;
     let mut warning: Option<GenericError> = None;
     let mut err: Option<GenericError> = None;
-
+    let paths = PATHS.lock().unwrap();
     let mut lastsegment = url;
     let mut iter = url;
 
-    if let Some(mut iter) = iter.filter(|_| NBPATHS > 0) {
+    if let Some(mut iter) = iter.filter(|_| !paths.is_empty()) {
         while !iter.is_empty() {
             if let Some(rem) = iter.strip_prefix('/') {
                 lastsegment = Some(rem);
@@ -295,7 +468,7 @@ unsafe fn xmllint_external_entity_loader(
                     sax.error = err;
                 }
             }
-            if LOAD_TRACE != 0 {
+            if CMD_ARGS.get().unwrap().load_trace {
                 eprintln!(
                     "Loaded URL=\"{}\" ID=\"{}\"",
                     url.unwrap_or("(null)"),
@@ -305,7 +478,6 @@ unsafe fn xmllint_external_entity_loader(
             return ret;
         }
 
-        let paths = PATHS.lock().unwrap();
         for path in paths.iter() {
             let mut new_url = path.clone();
             new_url.push('/');
@@ -320,7 +492,7 @@ unsafe fn xmllint_external_entity_loader(
                         sax.error = err;
                     }
                 }
-                if LOAD_TRACE != 0 {
+                if CMD_ARGS.get().unwrap().load_trace {
                     eprintln!(
                         "Loaded URL=\"{}\" ID=\"{}\"",
                         new_url,
@@ -360,33 +532,33 @@ unsafe fn xmllint_external_entity_loader(
     }
     null_mut()
 }
-/************************************************************************
- *                                    *
- * Memory allocation consumption debugging                *
- *                                    *
- ************************************************************************/
 
-unsafe extern "C" fn oom() {
-    eprintln!("Ran out of memory needs > {} bytes", MAXMEM);
+// Memory allocation consumption debugging
+
+unsafe fn oom() {
+    let maxmem = CMD_ARGS.get().unwrap().maxmem.unwrap_or(0);
+    eprintln!("Ran out of memory needs > {} bytes", maxmem);
     PROGRESULT = XmllintReturnCode::ErrMem;
 }
 
 unsafe extern "C" fn my_free_func(mem: *mut c_void) {
     xml_mem_free(mem);
 }
-unsafe extern "C" fn my_malloc_func(size: size_t) -> *mut c_void {
+unsafe extern "C" fn my_malloc_func(size: usize) -> *mut c_void {
     let ret: *mut c_void = xml_mem_malloc(size);
-    if !ret.is_null() && xml_mem_used() > MAXMEM {
+    let maxmem = CMD_ARGS.get().unwrap().maxmem.unwrap_or(0);
+    if !ret.is_null() && xml_mem_used() > maxmem as i32 {
         oom();
         xml_mem_free(ret);
         return null_mut();
     }
     ret
 }
-unsafe extern "C" fn my_realloc_func(mem: *mut c_void, size: size_t) -> *mut c_void {
-    let oldsize: size_t = xml_mem_size(mem);
+unsafe extern "C" fn my_realloc_func(mem: *mut c_void, size: usize) -> *mut c_void {
+    let oldsize: usize = xml_mem_size(mem);
+    let maxmem = CMD_ARGS.get().unwrap().maxmem.unwrap_or(0);
 
-    if xml_mem_used() as usize + size - oldsize > MAXMEM as size_t {
+    if xml_mem_used() as usize + size - oldsize > maxmem {
         oom();
         return null_mut();
     }
@@ -395,7 +567,9 @@ unsafe extern "C" fn my_realloc_func(mem: *mut c_void, size: size_t) -> *mut c_v
 }
 unsafe extern "C" fn my_strdup_func(str: *const u8) -> *mut u8 {
     let ret = xml_memory_strdup(str);
-    if !ret.is_null() && xml_mem_used() > MAXMEM {
+    let maxmem = CMD_ARGS.get().unwrap().maxmem.unwrap_or(0);
+
+    if !ret.is_null() && xml_mem_used() > maxmem as i32 {
         oom();
         xml_free(ret as _);
         return null_mut();
@@ -480,7 +654,7 @@ unsafe fn xml_htmlprint_file_info(input: XmlParserInputPtr) {
 unsafe fn xml_htmlprint_file_context(input: XmlParserInputPtr) {
     let mut cur: *const XmlChar;
     let mut base: *const XmlChar;
-    let mut n: c_int;
+    let mut n: i32;
 
     if input.is_null() {
         return;
@@ -694,10 +868,10 @@ unsafe fn xml_shell_readline(prompt: *mut c_char) -> *mut c_char {
 
 // I/O Interfaces
 
-unsafe fn my_read(f: *mut c_void, buf: *mut c_char, len: c_int) -> c_int {
+unsafe fn my_read(f: *mut c_void, buf: *mut c_char, len: i32) -> i32 {
     fread(buf as _, 1, len as _, f as *mut FILE) as _
 }
-unsafe fn my_close(context: *mut c_void) -> c_int {
+unsafe fn my_close(context: *mut c_void) -> i32 {
     let f: *mut FILE = context as *mut FILE;
     extern "C" {
         static stdin: *mut FILE;
@@ -748,15 +922,15 @@ static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 // static xmlSAXHandlerPtr emptySAXHandler = &emptySAXHandlerStruct;
 // extern xmlSAXHandlerPtr debugSAXHandler;
-static mut CALLBACKS: c_int = 0;
+static mut CALLBACKS: i32 = 0;
 
 /// Is this document tagged standalone ?
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneDebug")]
-unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return 0;
     }
     println!("SAX.isStandalone()");
@@ -767,9 +941,9 @@ unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> c_int {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetDebug")]
-unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return 0;
     }
     println!("SAX.hasInternalSubset()");
@@ -780,9 +954,9 @@ unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int 
 ///
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetDebug")]
-unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> c_int {
+unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return 0;
     }
     println!("SAX.hasExternalSubset()");
@@ -798,7 +972,7 @@ unsafe fn internal_subset_debug(
     system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     print!("SAX.internalSubset({},", name.unwrap_or("(null)"));
@@ -823,7 +997,7 @@ unsafe fn external_subset_debug(
     system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     print!("SAX.externalSubset({},", name.unwrap_or("(null)"));
@@ -852,7 +1026,7 @@ unsafe fn resolve_entity_debug(
     system_id: Option<&str>,
 ) -> XmlParserInputPtr {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return null_mut();
     }
     // let ctxt: xmlParserCtxtPtr = ctx as xmlParserCtxtPtr;
@@ -877,7 +1051,7 @@ unsafe fn resolve_entity_debug(
 #[doc(alias = "getEntityDebug")]
 unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return null_mut();
     }
     println!("SAX.getEntity({name})");
@@ -893,7 +1067,7 @@ unsafe fn get_parameter_entity_debug(
     name: &str,
 ) -> XmlEntityPtr {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return null_mut();
     }
     println!("SAX.getParameterEntity({name})");
@@ -911,7 +1085,7 @@ unsafe fn entity_decl_debug(
     mut content: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!(
@@ -935,7 +1109,7 @@ unsafe fn attribute_decl_debug(
     tree: XmlEnumerationPtr,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     if let Some(default_value) = default_value {
@@ -961,7 +1135,7 @@ unsafe fn element_decl_debug(
     _content: XmlElementContentPtr,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!(
@@ -979,7 +1153,7 @@ unsafe fn notation_decl_debug(
     system_id: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!(
@@ -999,7 +1173,7 @@ unsafe fn unparsed_entity_decl_debug(
     mut notation_name: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!(
@@ -1015,7 +1189,7 @@ unsafe fn unparsed_entity_decl_debug(
 #[doc(alias = "setDocumentLocatorDebug")]
 unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.setDocumentLocator()");
@@ -1025,7 +1199,7 @@ unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: Xm
 #[doc(alias = "startDocumentDebug")]
 unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.startDocument()");
@@ -1035,7 +1209,7 @@ unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
 #[doc(alias = "endDocumentDebug")]
 unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.endDocument()");
@@ -1049,7 +1223,7 @@ unsafe fn start_element_debug(
     atts: &[(String, Option<String>)],
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     print!("SAX.startElement({name}");
@@ -1066,7 +1240,7 @@ unsafe fn start_element_debug(
 #[doc(alias = "endElementDebug")]
 unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.endElement({name})");
@@ -1077,10 +1251,9 @@ unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
 #[doc(alias = "charactersDebug")]
 unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
-
     println!("SAX.characters({ch:30}, {})", ch.len());
 }
 
@@ -1088,7 +1261,7 @@ unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 #[doc(alias = "referenceDebug")]
 unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.reference({name})");
@@ -1099,10 +1272,9 @@ unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
 #[doc(alias = "ignorableWhitespaceDebug")]
 unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
-
     println!("SAX.ignorableWhitespace({ch:30}, {})", ch.len());
 }
 
@@ -1114,7 +1286,7 @@ unsafe fn processing_instruction_debug(
     data: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     if let Some(data) = data {
@@ -1128,7 +1300,7 @@ unsafe fn processing_instruction_debug(
 #[doc(alias = "cdataBlockDebug")]
 unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.pcdata({value:20}, {})", value.len());
@@ -1138,7 +1310,7 @@ unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
 #[doc(alias = "commentDebug")]
 unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     println!("SAX.comment({value})");
@@ -1150,7 +1322,7 @@ unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
-        if NOOUT != 0 {
+        if CMD_ARGS.get().unwrap().noout {
             return;
         }
     }
@@ -1163,7 +1335,7 @@ fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
-        if NOOUT != 0 {
+        if CMD_ARGS.get().unwrap().noout {
             return;
         }
     }
@@ -1176,7 +1348,7 @@ fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
         CALLBACKS += 1;
-        if NOOUT != 0 {
+        if CMD_ARGS.get().unwrap().noout {
             return;
         }
     }
@@ -1232,7 +1404,7 @@ unsafe fn start_element_ns_debug(
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     print!("SAX.startElementNs({localname}");
@@ -1276,7 +1448,7 @@ unsafe fn end_element_ns_debug(
     uri: Option<&str>,
 ) {
     CALLBACKS += 1;
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         return;
     }
     print!("SAX.endElementNs({localname}");
@@ -1335,11 +1507,11 @@ unsafe fn test_sax(filename: &str) {
 
     CALLBACKS = 0;
 
-    if NOOUT != 0 {
+    if CMD_ARGS.get().unwrap().noout {
         handler = addr_of_mut!(EMPTY_SAXHANDLER_STRUCT);
     } else {
         #[cfg(feature = "sax1")]
-        if SAX1 != 0 {
+        if CMD_ARGS.get().unwrap().sax1 {
             handler = addr_of_mut!(DEBUG_SAXHANDLER_STRUCT);
         } else {
             handler = addr_of_mut!(DEBUG_SAX2_HANDLER_STRUCT);
@@ -1365,7 +1537,6 @@ unsafe fn test_sax(filename: &str) {
                 xml_schema_new_valid_ctxt(WXSCHEMAS.load(Ordering::Relaxed));
             if vctxt.is_null() {
                 PROGRESULT = XmllintReturnCode::ErrMem;
-                // xml_free_parser_input_buffer(buf);
                 return;
             }
             xml_schema_set_valid_errors(
@@ -1382,7 +1553,7 @@ unsafe fn test_sax(filename: &str) {
                 hdl
             };
 
-            let ret: c_int = xml_schema_validate_stream(
+            let ret: i32 = xml_schema_validate_stream(
                 vctxt,
                 buf,
                 XmlCharEncoding::None,
@@ -1392,7 +1563,7 @@ unsafe fn test_sax(filename: &str) {
             if REPEAT == 0 {
                 match ret.cmp(&0) {
                     std::cmp::Ordering::Equal => {
-                        if QUIET == 0 {
+                        if !CMD_ARGS.get().unwrap().quiet {
                             eprintln!("{} validates", filename);
                         }
                     }
@@ -1451,7 +1622,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
     let typ = (*reader).node_type();
     let empty = (*reader).is_empty_element();
 
-    if DEBUG != 0 {
+    if CMD_ARGS.get().unwrap().debug {
         name = xml_text_reader_const_name(&mut *reader);
         if name.is_null() {
             name = c"--".as_ptr() as _;
@@ -1476,7 +1647,7 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
     #[cfg(feature = "libxml_pattern")]
     if !PATTERNC.load(Ordering::Relaxed).is_null() {
         let mut path = None;
-        let mut is_match: c_int = -1;
+        let mut is_match: i32 = -1;
 
         if typ == XmlReaderTypes::XmlReaderTypeElement {
             // do the check only on element start
@@ -1484,27 +1655,31 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                 xml_pattern_match(PATTERNC.load(Ordering::Relaxed), (*reader).current_node());
 
             if is_match != 0 {
+                let pattern = CMD_ARGS
+                    .get()
+                    .unwrap()
+                    .pattern
+                    .as_deref()
+                    .unwrap_or("(null)");
                 #[cfg(any(feature = "libxml_tree", feature = "libxml_debug"))]
                 {
                     path = (*(*reader).current_node()).get_node_path();
                     println!(
-                        "Node {} matches pattern {}",
-                        path.as_deref().unwrap(),
-                        PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy()
+                        "Node {} matches pattern {pattern}",
+                        path.as_deref().unwrap()
                     );
                 }
                 #[cfg(not(any(feature = "libxml_tree", feature = "libxml_debug")))]
                 {
                     println!(
-                        "Node {} matches pattern {}",
+                        "Node {} matches pattern {pattern}",
                         CStr::from_ptr(xml_text_reader_const_name(reader)).to_string_lossy(),
-                        PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy()
                     );
                 }
             }
         }
         if !PATSTREAM.load(Ordering::Relaxed).is_null() {
-            let mut ret: c_int;
+            let mut ret: i32;
 
             if typ == XmlReaderTypes::XmlReaderTypeElement {
                 ret = xml_stream_push(
@@ -1522,15 +1697,17 @@ unsafe fn process_node(reader: XmlTextReaderPtr) {
                         path = (*(*reader).current_node()).get_node_path();
                     }
                     eprintln!("xmlPatternMatch and xmlStreamPush disagree");
+                    let pattern = CMD_ARGS
+                        .get()
+                        .unwrap()
+                        .pattern
+                        .as_deref()
+                        .unwrap_or("(null)");
                     if let Some(path) = path.as_deref() {
-                        eprintln!(
-                            "  pattern {} node {path}",
-                            PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy(),
-                        );
+                        eprintln!("  pattern {pattern} node {path}",);
                     } else {
                         eprintln!(
-                            "  pattern {} node {}",
-                            PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy(),
+                            "  pattern {pattern} node {}",
                             CStr::from_ptr(xml_text_reader_const_name(&mut *reader) as _)
                                 .to_string_lossy()
                         );
@@ -1566,12 +1743,12 @@ unsafe fn stream_file(filename: *mut c_char) {
     use libc::{close, mmap, munmap, stat, MAP_FAILED, MAP_SHARED, PROT_READ};
 
     let reader: XmlTextReaderPtr;
-    let mut ret: c_int;
-    let mut fd: c_int = -1;
+    let mut ret: i32;
+    let mut fd: i32 = -1;
     let mut info: stat = unsafe { zeroed() };
     let mut base: *const c_char = null();
 
-    if MEMORY != 0 {
+    if CMD_ARGS.get().unwrap().memory {
         if stat(filename, addr_of_mut!(info)) < 0 {
             return;
         }
@@ -1613,13 +1790,13 @@ unsafe fn stream_file(filename: *mut c_char) {
 
     if !reader.is_null() {
         #[cfg(feature = "libxml_valid")]
-        if VALID != 0 {
+        if CMD_ARGS.get().unwrap().valid {
             xml_text_reader_set_parser_prop(
                 &mut *reader,
                 XmlParserProperties::XmlParserValidate as i32,
                 1,
             );
-        } else if LOADDTD != 0 {
+        } else if CMD_ARGS.get().unwrap().loaddtd {
             xml_text_reader_set_parser_prop(
                 &mut *reader,
                 XmlParserProperties::XmlParserLoaddtd as i32,
@@ -1627,48 +1804,42 @@ unsafe fn stream_file(filename: *mut c_char) {
             );
         }
         #[cfg(not(feature = "libxml_valid"))]
-        if LOADDTD != 0 {
+        if CMD_ARGS.get().unwrap().loaddtd {
             xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoaddtd, 1);
         }
         #[cfg(feature = "schema")]
-        if let Some(mut relaxng) = RELAXNG.lock().ok().filter(|r| r.is_some()) {
-            if TIMING != 0 && REPEAT == 0 {
+        if let Some(mut relaxng) = CMD_ARGS.get().unwrap().relaxng.as_deref() {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 start_timer();
             }
-            ret = xml_text_reader_relaxng_validate(reader, relaxng.as_ref().unwrap().as_ptr());
+            let crelaxng = CString::new(relaxng).unwrap();
+            ret = xml_text_reader_relaxng_validate(reader, crelaxng.as_ptr());
             if ret < 0 {
-                generic_error!(
-                    "Relax-NG schema {} failed to compile\n",
-                    relaxng.as_ref().unwrap().to_string_lossy()
-                );
+                generic_error!("Relax-NG schema {relaxng} failed to compile\n");
                 PROGRESULT = XmllintReturnCode::ErrSchemacomp;
-                *relaxng = None;
             }
-            if TIMING != 0 && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 end_timer!("Compiling the schemas");
             }
         }
         #[cfg(feature = "schema")]
-        if let Some(mut schema) = SCHEMA.lock().ok().filter(|s| s.is_some()) {
-            if TIMING != 0 && REPEAT == 0 {
+        if let Some(mut schema) = CMD_ARGS.get().unwrap().schema.as_deref() {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 start_timer();
             }
-            ret = xml_text_reader_schema_validate(reader, schema.as_ref().unwrap().as_ptr());
+            let cschema = CString::new(schema).unwrap();
+            ret = xml_text_reader_schema_validate(reader, cschema.as_ptr());
             if ret < 0 {
-                generic_error!(
-                    "XSD schema {} failed to compile\n",
-                    schema.as_ref().unwrap().to_string_lossy()
-                );
+                generic_error!("XSD schema {schema} failed to compile\n");
                 PROGRESULT = XmllintReturnCode::ErrSchemacomp;
-                *schema = None;
             }
-            if TIMING != 0 && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 end_timer!("Compiling the schemas");
             }
         }
 
         // Process all nodes in sequence
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
         ret = (*reader).read();
@@ -1677,22 +1848,22 @@ unsafe fn stream_file(filename: *mut c_char) {
             let f = !PATTERNC.load(Ordering::Relaxed).is_null();
             #[cfg(not(feature = "libxml_pattern"))]
             let f = false;
-            if DEBUG != 0 || f {
+            if CMD_ARGS.get().unwrap().debug || f {
                 process_node(reader);
             }
             ret = (*reader).read();
         }
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             #[cfg(any(feature = "schema", feature = "libxml_valid"))]
             {
                 let mut is_validating = false;
                 #[cfg(feature = "schema")]
                 {
-                    is_validating |= RELAXNG.lock().unwrap().is_some();
+                    is_validating |= CMD_ARGS.get().unwrap().relaxng.is_some();
                 }
                 #[cfg(feature = "libxml_valid")]
                 {
-                    is_validating |= VALID != 0;
+                    is_validating |= CMD_ARGS.get().unwrap().valid;
                 }
                 if is_validating {
                     end_timer!("Parsing and validating");
@@ -1707,20 +1878,20 @@ unsafe fn stream_file(filename: *mut c_char) {
         }
 
         #[cfg(feature = "libxml_valid")]
-        if VALID != 0 && !(*reader).is_valid().unwrap_or(false) {
+        if CMD_ARGS.get().unwrap().valid && !(*reader).is_valid().unwrap_or(false) {
             let filename = CStr::from_ptr(filename).to_string_lossy().into_owned();
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
         #[cfg(feature = "schema")]
-        if RELAXNG.lock().unwrap().is_some() || SCHEMA.lock().unwrap().is_some() {
+        if CMD_ARGS.get().unwrap().relaxng.is_some() || CMD_ARGS.get().unwrap().schema.is_some() {
             if !(*reader).is_valid().unwrap_or(false) {
                 eprintln!(
                     "{} fails to validate",
                     CStr::from_ptr(filename).to_string_lossy()
                 );
                 PROGRESULT = XmllintReturnCode::ErrValid;
-            } else if QUIET == 0 {
+            } else if !CMD_ARGS.get().unwrap().quiet {
                 eprintln!("{} validates", CStr::from_ptr(filename).to_string_lossy());
             }
         }
@@ -1745,7 +1916,7 @@ unsafe fn stream_file(filename: *mut c_char) {
         xml_free_stream_ctxt(PATSTREAM.load(Ordering::Relaxed));
         PATSTREAM.store(null_mut(), Ordering::Relaxed);
     }
-    if MEMORY != 0 {
+    if CMD_ARGS.get().unwrap().memory {
         // xml_free_parser_input_buffer(input);
         munmap(base as _, info.st_size as _);
         close(fd);
@@ -1767,7 +1938,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
         tree::XmlNodePtr,
     };
 
-    let mut ret: c_int;
+    let mut ret: i32;
 
     #[cfg(feature = "libxml_pattern")]
     {
@@ -1791,10 +1962,11 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             ns = (*ns).next;
         }
 
-        if PATTERN.lock().unwrap().is_some() {
+        if let Some(pattern) = CMD_ARGS.get().unwrap().path.as_deref() {
+            let cpattern = CString::new(pattern).unwrap();
             PATTERNC.store(
                 xml_patterncompile(
-                    PATTERN.lock().unwrap().as_ref().unwrap().as_ptr() as _,
+                    cpattern.as_ptr() as *const u8,
                     (*doc).dict,
                     0,
                     Some(namespaces[..=i].to_vec()),
@@ -1802,12 +1974,8 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
                 Ordering::Relaxed,
             );
             if PATTERNC.load(Ordering::Relaxed).is_null() {
-                generic_error!(
-                    "Pattern {} failed to compile\n",
-                    PATTERN.lock().unwrap().as_ref().unwrap().to_string_lossy()
-                );
+                generic_error!("Pattern {pattern} failed to compile\n");
                 PROGRESULT = XmllintReturnCode::ErrSchemapat;
-                *PATTERN.lock().unwrap() = None;
             }
         }
         if !PATTERNC.load(Ordering::Relaxed).is_null() {
@@ -1827,7 +1995,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
     }
     let reader: XmlTextReaderPtr = xml_reader_walker(doc);
     if !reader.is_null() {
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
         ret = (*reader).read();
@@ -1836,12 +2004,12 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             let f = !PATTERNC.load(Ordering::Relaxed).is_null();
             #[cfg(not(feature = "libxml_pattern"))]
             let f = false;
-            if DEBUG != 0 || f {
+            if CMD_ARGS.get().unwrap().debug || f {
                 process_node(reader);
             }
             ret = (*reader).read();
         }
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("walking through the doc");
         }
         xml_free_text_reader(reader);
@@ -1860,13 +2028,9 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
     }
 }
 
-/************************************************************************
- *                                    *
- *            XPath Query                                     *
- *                                    *
- ************************************************************************/
+// XPath Query
 #[cfg(feature = "xpath")]
-unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
+unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
     use std::{cell::RefCell, io::stdout, rc::Rc};
 
     use exml::{
@@ -1893,10 +2057,10 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                             buf.borrow_mut().write_bytes(b"\n");
                         }
                         buf.borrow_mut().flush();
-                    } else if QUIET == 0 {
+                    } else if !CMD_ARGS.get().unwrap().quiet {
                         eprintln!("XPath set is empty");
                     }
-                } else if QUIET == 0 {
+                } else if !CMD_ARGS.get().unwrap().quiet {
                     eprintln!("XPath set is empty");
                 }
             }
@@ -1942,7 +2106,7 @@ unsafe extern "C" fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 }
 
 #[cfg(feature = "xpath")]
-unsafe extern "C" fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
+unsafe fn do_xpath_query(doc: XmlDocPtr, query: *const c_char) {
     use exml::{
         tree::XmlNodePtr,
         xpath::{
@@ -1977,21 +2141,25 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     #[cfg(feature = "libxml_tree")]
     let tmp: XmlDocPtr;
 
-    if TIMING != 0 && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
         start_timer();
     }
 
     if cfg!(feature = "libxml_tree") && filename.is_none() {
         #[cfg(feature = "libxml_tree")]
         {
-            if GENERATE != 0 {
+            if CMD_ARGS.get().unwrap().auto {
                 doc = xml_new_doc(Some("1.0"));
                 let n = xml_new_doc_node(doc, null_mut(), "info", null_mut());
                 (*n).set_content(c"abc".as_ptr() as _);
                 (*doc).set_root_element(n);
             }
         }
-    } else if cfg!(feature = "html") && cfg!(feature = "libxml_push") && HTML != 0 && PUSH != 0 {
+    } else if cfg!(feature = "html")
+        && cfg!(feature = "libxml_push")
+        && CMD_ARGS.get().unwrap().html
+        && CMD_ARGS.get().unwrap().push
+    {
         #[cfg(all(feature = "html", feature = "libxml_push"))]
         {
             extern "C" {
@@ -2005,7 +2173,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 fopen(f.as_ptr(), c"rb".as_ptr())
             };
             if !f.is_null() {
-                let mut res: c_int;
+                let mut res: i32;
                 let mut chars: [c_char; 4096] = [0; 4096];
                 let ctxt: HtmlParserCtxtPtr;
 
@@ -2043,7 +2211,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
             }
         }
-    } else if cfg!(feature = "html") && HTML != 0 && MEMORY != 0 {
+    } else if cfg!(feature = "html")
+        && CMD_ARGS.get().unwrap().html
+        && CMD_ARGS.get().unwrap().memory
+    {
         #[cfg(feature = "html")]
         {
             let mut info: stat = unsafe { zeroed() };
@@ -2051,7 +2222,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             if stat(fname.as_ptr(), addr_of_mut!(info)) < 0 {
                 return;
             }
-            let fd: c_int = open(fname.as_ptr(), O_RDONLY);
+            let fd: i32 = open(fname.as_ptr(), O_RDONLY);
             if fd < 0 {
                 return;
             }
@@ -2070,12 +2241,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             munmap(base as _, info.st_size as _);
             close(fd);
         }
-    } else if cfg!(feature = "html") && HTML != 0 {
+    } else if cfg!(feature = "html") && CMD_ARGS.get().unwrap().html {
         #[cfg(feature = "html")]
         {
             doc = html_read_file(filename.unwrap(), None, OPTIONS);
         }
-    } else if cfg!(feature = "libxml_push") && PUSH != 0 {
+    } else if cfg!(feature = "libxml_push") && CMD_ARGS.get().unwrap().push {
         // build an XML tree from a string;
         #[cfg(feature = "libxml_push")]
         {
@@ -2084,7 +2255,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
 
             let fname = filename.map(|f| CString::new(f).unwrap());
-            /* '-' Usually means stdin -<sven@zen.org> */
+            // '-' Usually means stdin -<sven@zen.org>
             let f = if filename == Some("-") {
                 stdin
             } else {
@@ -2094,13 +2265,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 )
             };
             if !f.is_null() {
-                let ret: c_int;
-                let mut res: c_int;
-                let size: c_int = 1024;
+                let ret: i32;
+                let mut res: i32;
+                let size: i32 = 1024;
                 let mut chars: [c_char; 1024] = [0; 1024];
                 let ctxt: XmlParserCtxtPtr;
 
-                /* if (repeat) size = 1024; */
+                // if (repeat) size = 1024;
                 res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                 if res > 0 {
                     ctxt = xml_create_push_parser_ctxt(
@@ -2128,7 +2299,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     doc = (*ctxt).my_doc;
                     ret = (*ctxt).well_formed;
                     xml_free_parser_ctxt(ctxt);
-                    if ret == 0 && RECOVERY == 0 {
+                    if ret == 0 && !CMD_ARGS.get().unwrap().recover {
                         xml_free_doc(doc);
                         doc = null_mut();
                     }
@@ -2138,7 +2309,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
             }
         }
-    } else if TEST_IO != 0 {
+    } else if CMD_ARGS.get().unwrap().test_io {
         if filename == Some("-") {
             doc = xml_read_io(stdin(), None, None, OPTIONS);
         } else if let Some(Ok(f)) = filename.map(File::open) {
@@ -2150,7 +2321,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         } else {
             doc = null_mut();
         }
-    } else if HTMLOUT != 0 {
+    } else if CMD_ARGS.get().unwrap().htmlout {
         let ctxt: XmlParserCtxtPtr;
 
         if rectxt.is_null() {
@@ -2175,7 +2346,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
         }
-    } else if MEMORY != 0 {
+    } else if CMD_ARGS.get().unwrap().memory {
         let mut info: stat = unsafe { zeroed() };
         let fname = filename.map(|f| CString::new(f).unwrap());
 
@@ -2186,7 +2357,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         {
             return;
         }
-        let fd: c_int = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
+        let fd: i32 = open(fname.map_or(null(), |f| f.as_ptr()), O_RDONLY);
         if fd < 0 {
             return;
         }
@@ -2208,7 +2379,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
         munmap(base as _, info.st_size as _);
         close(fd);
-    } else if cfg!(feature = "libxml_valid") && VALID != 0 {
+    } else if cfg!(feature = "libxml_valid") && CMD_ARGS.get().unwrap().valid {
         #[cfg(feature = "libxml_valid")]
         {
             let ctxt: XmlParserCtxtPtr;
@@ -2245,12 +2416,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         return;
     }
 
-    if TIMING != 0 && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
         end_timer!("Parsing");
     }
 
     // Remove DOCTYPE nodes
-    if DROPDTD != 0 {
+    if CMD_ARGS.get().unwrap().dropdtd {
         let dtd: XmlDtdPtr = (*doc).get_int_subset();
         if !dtd.is_null() {
             (*dtd).unlink();
@@ -2260,14 +2431,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     }
 
     #[cfg(feature = "xinclude")]
-    if XINCLUDE != 0 {
-        if TIMING != 0 && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().xinclude {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
         if xml_xinclude_process_flags(doc, OPTIONS) < 0 {
             PROGRESULT = XmllintReturnCode::ErrUnclass;
         }
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("Xinclude processing");
         }
     }
@@ -2279,7 +2450,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     // shell interaction
     #[cfg(all(feature = "libxml_debug", feature = "xpath"))]
-    if SHELL != 0 {
+    if CMD_ARGS.get().unwrap().shell {
         xml_xpath_order_doc_elems(doc);
         let fname = filename.map(|f| CString::new(f).unwrap());
         xml_shell(
@@ -2292,25 +2463,28 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     // test intermediate copy if needed.
     #[cfg(feature = "libxml_tree")]
-    if COPY != 0 {
+    if CMD_ARGS.get().unwrap().copy {
         tmp = doc;
-        if TIMING != 0 {
+        if CMD_ARGS.get().unwrap().timing {
             start_timer();
         }
         doc = xml_copy_doc(doc, 1);
-        if TIMING != 0 {
+        if CMD_ARGS.get().unwrap().timing {
             end_timer!("Copying");
         }
-        if TIMING != 0 {
+        if CMD_ARGS.get().unwrap().timing {
             start_timer();
         }
         xml_free_doc(tmp);
-        if TIMING != 0 {
+        if CMD_ARGS.get().unwrap().timing {
             end_timer!("Freeing original");
         }
     }
 
-    if cfg!(feature = "libxml_valid") && INSERT != 0 && HTML == 0 {
+    if cfg!(feature = "libxml_valid")
+        && CMD_ARGS.get().unwrap().insert
+        && !CMD_ARGS.get().unwrap().html
+    {
         #[cfg(feature = "libxml_valid")]
         {
             let mut list: [*const XmlChar; 256] = [null(); 256];
@@ -2344,52 +2518,47 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 }
             }
         }
-    } else if cfg!(feature = "libxml_reader") && WALKER != 0 {
+    } else if cfg!(feature = "libxml_reader") && CMD_ARGS.get().unwrap().walker {
         #[cfg(feature = "libxml_reader")]
         {
             walk_doc(doc);
         }
     }
     #[cfg(feature = "libxml_output")]
-    if NOOUT == 0 {
-        let ret: c_int;
+    if !CMD_ARGS.get().unwrap().noout {
+        let ret: i32;
 
-        /*
-         * print it.
-         */
-        if !cfg!(feature = "libxml_debug") || DEBUG == 0 {
-            if TIMING != 0 && REPEAT == 0 {
+        // print it.
+        if !cfg!(feature = "libxml_debug") || !CMD_ARGS.get().unwrap().debug {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 start_timer();
             }
-            if cfg!(feature = "html") && HTML != 0 && XMLOUT == 0 {
+            if cfg!(feature = "html")
+                && CMD_ARGS.get().unwrap().html
+                && !CMD_ARGS.get().unwrap().xmlout
+            {
                 #[cfg(feature = "html")]
                 {
-                    if COMPRESS != 0 {
-                        let o = OUTPUT
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .map_or(c"-".as_ptr(), |o| o.as_ptr());
-                        html_save_file(o, doc);
-                    } else if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
-                        let o = OUTPUT.lock().unwrap();
-                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
-                        if FORMAT == 1 {
-                            html_save_file_format(o.as_ref(), doc, Some(encoding.as_str()), 1);
+                    // if COMPRESS != 0 {
+                    //     let o = OUTPUT
+                    //         .lock()
+                    //         .unwrap()
+                    //         .as_ref()
+                    //         .map_or(c"-".as_ptr(), |o| o.as_ptr());
+                    //     html_save_file(o, doc);
+                    // } else
+                    if let Some(encoding) = CMD_ARGS.get().unwrap().encode.as_deref() {
+                        let o = CMD_ARGS.get().unwrap().output.as_deref().unwrap_or("-");
+                        if CMD_ARGS.get().unwrap().format {
+                            html_save_file_format(o, doc, Some(encoding), 1);
                         } else {
-                            html_save_file_format(o.as_ref(), doc, Some(encoding.as_str()), 0);
+                            html_save_file_format(o, doc, Some(encoding), 0);
                         }
-                    } else if FORMAT == 1 {
-                        let o = OUTPUT.lock().unwrap();
-                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
-                        html_save_file_format(o.as_ref(), doc, None, 1);
-                    } else if let Some(filename) = OUTPUT.lock().unwrap().as_deref() {
-                        let filename = filename.to_string_lossy();
-                        match File::options()
-                            .write(true)
-                            .truncate(true)
-                            .open(filename.as_ref())
-                        {
+                    } else if CMD_ARGS.get().unwrap().format {
+                        let o = CMD_ARGS.get().unwrap().output.as_deref().unwrap_or("-");
+                        html_save_file_format(o, doc, None, 1);
+                    } else if let Some(filename) = CMD_ARGS.get().unwrap().output.as_deref() {
+                        match File::options().write(true).truncate(true).open(filename) {
                             Ok(mut f) => {
                                 if html_doc_dump(&mut f, doc) < 0 {
                                     PROGRESULT = XmllintReturnCode::ErrOut;
@@ -2403,11 +2572,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     } else if html_doc_dump(&mut stdout(), doc) < 0 {
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
-                    if TIMING != 0 && REPEAT == 0 {
+                    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                         end_timer!("Saving");
                     }
                 }
-            } else if cfg!(feature = "c14n") && CANONICAL != 0 {
+            } else if cfg!(feature = "c14n") && CMD_ARGS.get().unwrap().c14n {
                 #[cfg(feature = "c14n")]
                 {
                     let mut result = String::new();
@@ -2427,12 +2596,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                 }
-            } else if cfg!(feature = "c14n") && CANONICAL_11 != 0 {
+            } else if cfg!(feature = "c14n") && CMD_ARGS.get().unwrap().c14n11 {
                 #[cfg(feature = "c14n")]
                 {
                     let mut result = String::new();
 
-                    let size: c_int = xml_c14n_doc_dump_memory(
+                    let size: i32 = xml_c14n_doc_dump_memory(
                         &mut *doc,
                         None,
                         XmlC14NMode::XmlC14N1_1,
@@ -2447,12 +2616,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                 }
-            } else if cfg!(feature = "c14n") && EXC_CANONICAL != 0 {
+            } else if cfg!(feature = "c14n") && CMD_ARGS.get().unwrap().exc_c14n {
                 #[cfg(feature = "c14n")]
                 {
                     let mut result = String::new();
 
-                    let size: c_int = xml_c14n_doc_dump_memory(
+                    let size: i32 = xml_c14n_doc_dump_memory(
                         &mut *doc,
                         None,
                         XmlC14NMode::XmlC14NExclusive1_0,
@@ -2467,26 +2636,26 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                 }
-            } else if MEMORY != 0 {
+            } else if CMD_ARGS.get().unwrap().memory {
                 let mut result: *mut XmlChar = null_mut();
-                let mut len: c_int = 0;
+                let mut len: i32 = 0;
 
-                if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
-                    if FORMAT == 1 {
+                if let Some(encoding) = CMD_ARGS.get().unwrap().encode.as_deref() {
+                    if CMD_ARGS.get().unwrap().format {
                         (*doc).dump_format_memory_enc(
                             addr_of_mut!(result),
                             addr_of_mut!(len),
-                            Some(encoding.as_str()),
+                            Some(encoding),
                             1,
                         );
                     } else {
                         (*doc).dump_memory_enc(
                             addr_of_mut!(result),
                             addr_of_mut!(len),
-                            Some(encoding.as_str()),
+                            Some(encoding),
                         );
                     }
-                } else if FORMAT == 1 {
+                } else if CMD_ARGS.get().unwrap().format {
                     (*doc).dump_format_memory(addr_of_mut!(result), addr_of_mut!(len), 1);
                 } else {
                     (*doc).dump_memory(addr_of_mut!(result), addr_of_mut!(len));
@@ -2500,76 +2669,26 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     }
                     xml_free(result as _);
                 }
-            } else if COMPRESS != 0 {
-                let o = OUTPUT.lock().unwrap();
-                let o = o.as_deref().unwrap_or(c"-");
-                (*doc).save_file(o.to_string_lossy().as_ref());
-            } else if OLDOUT != 0 {
-                if let Some(encoding) = ENCODING.lock().unwrap().as_ref() {
-                    if FORMAT == 1 {
-                        let o = OUTPUT.lock().unwrap();
-                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
-                        ret = (*doc).save_format_file_enc(o.as_ref(), Some(encoding.as_str()), 1);
-                    } else {
-                        let o = OUTPUT.lock().unwrap();
-                        let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
-                        ret = (*doc).save_file_enc(o.as_ref(), Some(encoding.as_str()));
-                    }
-                    if ret < 0 {
-                        let lock = OUTPUT.lock().unwrap();
-                        let o = lock.as_ref().map_or(c"-", |o| o.as_c_str());
-                        eprintln!("failed save to {}", o.to_string_lossy());
-                        PROGRESULT = XmllintReturnCode::ErrOut;
-                    }
-                } else if FORMAT == 1 {
-                    let o = OUTPUT.lock().unwrap();
-                    let o = o.as_deref().unwrap_or(c"-").to_string_lossy();
-                    ret = (*doc).save_format_file(o.as_ref(), 1);
-                    if ret < 0 {
-                        let lock = OUTPUT.lock().unwrap();
-                        let o = lock.as_ref().map_or(c"-", |o| o.as_c_str());
-                        eprintln!("failed save to {}", o.to_string_lossy());
-                        PROGRESULT = XmllintReturnCode::ErrOut;
-                    }
-                } else if let Some(filename) = OUTPUT.lock().unwrap().as_deref() {
-                    let filename = filename.to_string_lossy();
-                    match File::options()
-                        .write(true)
-                        .truncate(true)
-                        .open(filename.as_ref())
-                    {
-                        Ok(mut f) => {
-                            if doc.is_null() || (*doc).dump_file(&mut f) < 0 {
-                                PROGRESULT = XmllintReturnCode::ErrOut;
-                            }
-                        }
-                        _ => {
-                            eprintln!("failed to open {filename}");
-                            PROGRESULT = XmllintReturnCode::ErrOut;
-                        }
-                    }
-                } else if doc.is_null() || (*doc).dump_file(&mut stdout()) < 0 {
-                    PROGRESULT = XmllintReturnCode::ErrOut;
-                }
+            // } else if COMPRESS != 0 {
+            //     let o = OUTPUT.lock().unwrap();
+            //     let o = o.as_deref().unwrap_or(c"-");
+            //     (*doc).save_file(o.to_string_lossy().as_ref());
             } else {
-                let mut save_opts: c_int = 0;
+                let mut save_opts: i32 = 0;
 
-                if FORMAT == 1 {
+                if CMD_ARGS.get().unwrap().format {
                     save_opts |= XmlSaveOption::XmlSaveFormat as i32;
-                } else if FORMAT == 2 {
+                } else if CMD_ARGS.get().unwrap().pretty == Some(2) {
                     save_opts |= XmlSaveOption::XmlSaveWsnonsig as i32;
                 }
 
                 #[cfg(any(feature = "html", feature = "libxml_valid"))]
-                if XMLOUT != 0 {
+                if CMD_ARGS.get().unwrap().xmlout {
                     save_opts |= XmlSaveOption::XmlSaveAsXML as i32;
                 }
 
-                let olock = OUTPUT.lock().unwrap();
-                let outname = olock.as_ref().map(|o| o.to_string_lossy());
-                let elock = ENCODING.lock().unwrap();
-                let encoding = elock.as_deref();
-                let ctxt = if let Some(o) = outname.as_deref() {
+                let encoding = CMD_ARGS.get().unwrap().encode.as_deref();
+                let ctxt = if let Some(o) = CMD_ARGS.get().unwrap().output.as_deref() {
                     xml_save_to_filename(o, encoding, save_opts)
                 } else {
                     xml_save_to_io(stdout(), encoding, save_opts)
@@ -2577,9 +2696,8 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                 if !ctxt.is_null() {
                     if xml_save_doc(ctxt, doc) < 0 {
-                        let lock = OUTPUT.lock().unwrap();
-                        let o = lock.as_ref().map_or(c"-", |o| o.as_c_str());
-                        eprintln!("failed save to {}", o.to_string_lossy());
+                        let o = CMD_ARGS.get().unwrap().output.as_deref().unwrap_or("-");
+                        eprintln!("failed save to {o}");
                         PROGRESULT = XmllintReturnCode::ErrOut;
                     }
                     xml_save_close(ctxt);
@@ -2587,19 +2705,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                     PROGRESULT = XmllintReturnCode::ErrOut;
                 }
             }
-            if TIMING != 0 && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 end_timer!("Saving");
             }
         } else {
             #[cfg(feature = "libxml_debug")]
             {
-                if let Some(filename) = OUTPUT.lock().unwrap().as_deref() {
-                    let filename = filename.to_string_lossy();
-                    match File::options()
-                        .write(true)
-                        .truncate(true)
-                        .open(filename.as_ref())
-                    {
+                if let Some(filename) = CMD_ARGS.get().unwrap().output.as_deref() {
+                    match File::options().write(true).truncate(true).open(filename) {
                         Ok(f) => {
                             xml_debug_dump_document(Some(f), (!doc.is_null()).then(|| &*doc));
                         }
@@ -2617,40 +2730,27 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
     // A posteriori validation test
     #[cfg(feature = "libxml_valid")]
-    if DTDVALID.lock().unwrap().is_some() || DTDVALIDFPI.lock().unwrap().is_some() {
+    if CMD_ARGS.get().unwrap().dtdvalid.is_some() || CMD_ARGS.get().unwrap().dtdvalidfpi.is_some() {
         let dtd: XmlDtdPtr;
 
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
-        if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-            dtd = xml_parse_dtd(None, Some(dtd_valid.to_string_lossy().as_ref()));
+        if let Some(dtd_valid) = CMD_ARGS.get().unwrap().dtdvalid.as_deref() {
+            dtd = xml_parse_dtd(None, Some(dtd_valid));
         } else {
-            dtd = xml_parse_dtd(
-                DTDVALIDFPI
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .map(|d| d.to_string_lossy())
-                    .as_deref(),
-                None,
-            );
+            dtd = xml_parse_dtd(CMD_ARGS.get().unwrap().dtdvalidfpi.as_deref(), None);
         }
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("Parsing DTD");
         }
         if dtd.is_null() {
-            if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-                generic_error!("Could not parse DTD {}\n", dtd_valid.to_string_lossy());
+            if let Some(dtd_valid) = CMD_ARGS.get().unwrap().dtdvalid.as_deref() {
+                generic_error!("Could not parse DTD {}\n", dtd_valid);
             } else {
                 generic_error!(
                     "Could not parse DTD {}\n",
-                    DTDVALIDFPI
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        .unwrap()
-                        .to_string_lossy()
+                    CMD_ARGS.get().unwrap().dtdvalidfpi.as_deref().unwrap()
                 );
             }
             PROGRESULT = XmllintReturnCode::ErrDtd;
@@ -2665,36 +2765,28 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             (*cvp).error = Some(generic_error_default);
             (*cvp).warning = Some(generic_error_default);
 
-            if TIMING != 0 && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 start_timer();
             }
             if xml_validate_dtd(cvp, doc, dtd) == 0 {
                 let filename = filename.unwrap();
-                if let Some(dtd_valid) = DTDVALID.lock().unwrap().as_ref() {
-                    generic_error!(
-                        "Document {filename} does not validate against {}\n",
-                        dtd_valid.to_string_lossy()
-                    );
+                if let Some(dtd_valid) = CMD_ARGS.get().unwrap().dtdvalid.as_deref() {
+                    generic_error!("Document {filename} does not validate against {dtd_valid}\n");
                 } else {
                     generic_error!(
                         "Document {filename} does not validate against {}\n",
-                        DTDVALIDFPI
-                            .lock()
-                            .unwrap()
-                            .as_ref()
-                            .unwrap()
-                            .to_string_lossy()
+                        CMD_ARGS.get().unwrap().dtdvalidfpi.as_deref().unwrap()
                     );
                 }
                 PROGRESULT = XmllintReturnCode::ErrValid;
             }
-            if TIMING != 0 && REPEAT == 0 {
+            if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
                 end_timer!("Validating against DTD");
             }
             xml_free_valid_ctxt(cvp);
             xml_free_dtd(dtd);
         }
-    } else if POSTVALID != 0 {
+    } else if CMD_ARGS.get().unwrap().postvalid {
         let cvp = xml_new_valid_ctxt();
         if cvp.is_null() {
             generic_error!("Couldn't allocate validation context\n");
@@ -2703,7 +2795,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             return;
         }
 
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
         (*cvp).error = Some(generic_error_default);
@@ -2713,23 +2805,23 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             generic_error!("Document {filename} does not validate\n");
             PROGRESULT = XmllintReturnCode::ErrValid;
         }
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("Validating");
         }
         xml_free_valid_ctxt(cvp);
     }
     #[cfg(feature = "schematron")]
     if !WXSCHEMATRON.load(Ordering::Relaxed).is_null() {
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
 
-        let mut flag = if DEBUG != 0 {
+        let mut flag = if CMD_ARGS.get().unwrap().debug {
             XmlSchematronValidOptions::XmlSchematronOutXml as i32
         } else {
             XmlSchematronValidOptions::XmlSchematronOutText as i32
         };
-        if NOOUT != 0 {
+        if CMD_ARGS.get().unwrap().noout {
             flag |= XmlSchematronValidOptions::XmlSchematronOutQuiet as i32;
         }
         let ctxt: XmlSchematronValidCtxtPtr =
@@ -2741,7 +2833,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
         match xml_schematron_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
-                if QUIET == 0 {
+                if !CMD_ARGS.get().unwrap().quiet {
                     eprintln!("{} validates", filename.unwrap());
                 }
             }
@@ -2758,13 +2850,13 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
         xml_schematron_free_valid_ctxt(ctxt);
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("Validating");
         }
     }
     #[cfg(feature = "schema")]
     if !RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
 
@@ -2783,7 +2875,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         );
         match xml_relaxng_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
-                if QUIET == 0 {
+                if !CMD_ARGS.get().unwrap().quiet {
                     eprintln!("{} validates", filename.unwrap());
                 }
             }
@@ -2800,11 +2892,11 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
         xml_relaxng_free_valid_ctxt(ctxt);
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("Validating");
         }
     } else if !WXSCHEMAS.load(Ordering::Relaxed).is_null() {
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
 
@@ -2823,7 +2915,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         );
         match xml_schema_validate_doc(ctxt, doc).cmp(&0) {
             std::cmp::Ordering::Equal => {
-                if QUIET == 0 {
+                if !CMD_ARGS.get().unwrap().quiet {
                     eprintln!("{} validates", filename.unwrap());
                 }
             }
@@ -2840,7 +2932,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
         xml_schema_free_valid_ctxt(ctxt);
-        if TIMING != 0 && REPEAT == 0 {
+        if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             end_timer!("Validating");
         }
     }
@@ -2849,25 +2941,22 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         feature = "libxml_debug",
         any(feature = "html", feature = "libxml_valid")
     ))]
-    if DEBUGENT != 0 && HTML == 0 {
+    if CMD_ARGS.get().unwrap().debugent && !CMD_ARGS.get().unwrap().html {
         xml_debug_dump_entities(stderr(), (!doc.is_null()).then(|| &*doc));
     }
 
     // free it.
-    if TIMING != 0 && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
         start_timer();
     }
     xml_free_doc(doc);
-    if TIMING != 0 && REPEAT == 0 {
+    if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
         end_timer!("Freeing");
     }
 }
 
-/************************************************************************
- *                                    *
- *            Usage and Main                    *
- *                                    *
- ************************************************************************/
+// Usage and Main
+
 fn show_version(name: &str) {
     eprintln!(
         "{}: using libxml version {}",
@@ -2993,256 +3082,6 @@ fn usage(f: &mut impl Write, name: &str) {
         "\t--version : display the version of the XML library used",
     )
     .ok();
-    #[cfg(feature = "libxml_debug")]
-    {
-        writeln!(f, "\t--debug : dump a debug tree of the in-memory document",).ok();
-        writeln!(f, "\t--shell : run a navigating shell").ok();
-        writeln!(
-            f,
-            "\t--debugent : debug the entities defined in the document",
-        )
-        .ok();
-    }
-    #[cfg(not(feature = "libxml_debug"))]
-    {
-        #[cfg(feature = "libxml_reader")]
-        {
-            writeln!(f, "\t--debug : dump the nodes content when using --stream",).ok();
-        }
-    }
-    #[cfg(feature = "libxml_tree")]
-    {
-        writeln!(
-            f,
-            "\t--copy : used to test the internal copy implementation",
-        )
-        .ok();
-    }
-    writeln!(
-        f,
-        "\t--recover : output what was parsable on broken XML documents",
-    )
-    .ok();
-    writeln!(f, "\t--huge : remove any internal arbitrary parser limits",).ok();
-    writeln!(f, "\t--noent : substitute entity references by their value",).ok();
-    writeln!(
-        f,
-        "\t--noenc : ignore any encoding specified inside the document",
-    )
-    .ok();
-    writeln!(f, "\t--noout : don't output the result tree").ok();
-    writeln!(f, "\t--path 'paths': provide a set of paths for resources",).ok();
-    writeln!(
-        f,
-        "\t--load-trace : print trace of all external entities loaded",
-    )
-    .ok();
-    writeln!(
-        f,
-        "\t--nonet : refuse to fetch DTDs or entities over network",
-    )
-    .ok();
-    writeln!(f, "\t--nocompact : do not generate compact text nodes").ok();
-    writeln!(f, "\t--htmlout : output results as HTML").ok();
-    writeln!(f, "\t--nowrap : do not put HTML doc wrapper").ok();
-    #[cfg(feature = "libxml_valid")]
-    {
-        writeln!(
-            f,
-            "\t--valid : validate the document in addition to std well-formed check",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--postvalid : do a posteriori validation, i.e after parsing",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--dtdvalid URL : do a posteriori validation against a given DTD",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--dtdvalidfpi FPI : same but name the DTD with a Public Identifier",
-        )
-        .ok();
-    }
-    writeln!(f, "\t--quiet : be quiet when succeeded").ok();
-    writeln!(f, "\t--timing : print some timings").ok();
-    writeln!(f, "\t--output file or -o file: save to a given file").ok();
-    writeln!(f, "\t--repeat : repeat 100 times, for timing or profiling",).ok();
-    writeln!(f, "\t--insert : ad-hoc test for valid insertions").ok();
-    // #ifdef LIBXML_ZLIB_ENABLED
-    #[cfg(feature = "libxml_output")]
-    {
-        writeln!(f, "\t--compress : turn on gzip compression of output").ok();
-    }
-    // #endif
-    #[cfg(feature = "html")]
-    {
-        writeln!(f, "\t--html : use the HTML parser").ok();
-        writeln!(
-            f,
-            "\t--xmlout : force to use the XML serializer when using --html",
-        )
-        .ok();
-        writeln!(f, "\t--nodefdtd : do not default HTML doctype").ok();
-    }
-    #[cfg(feature = "libxml_push")]
-    {
-        writeln!(f, "\t--push : use the push mode of the parser").ok();
-        writeln!(
-            f,
-            "\t--pushsmall : use the push mode of the parser using tiny increments",
-        )
-        .ok();
-    }
-    writeln!(f, "\t--memory : parse from memory").ok();
-    writeln!(
-        f,
-        "\t--maxmem nbbytes : limits memory allocation to nbbytes bytes",
-    )
-    .ok();
-    writeln!(
-        f,
-        "\t--nowarning : do not emit warnings from parser/validator",
-    )
-    .ok();
-    writeln!(f, "\t--noblanks : drop (ignorable?) blanks spaces").ok();
-    writeln!(f, "\t--nocdata : replace cdata section with text nodes").ok();
-    #[cfg(feature = "libxml_output")]
-    {
-        writeln!(f, "\t--format : reformat/reindent the output").ok();
-        writeln!(f, "\t--encode encoding : output in the given encoding").ok();
-        writeln!(f, "\t--dropdtd : remove the DOCTYPE of the input docs").ok();
-        writeln!(f, "\t--pretty STYLE : pretty-print in a particular style").ok();
-        writeln!(f, "\t                 0 Do not pretty print").ok();
-        writeln!(
-            f,
-            "\t                 1 Format the XML content, as --format",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t                 2 Add whitespace inside tags, preserving content",
-        )
-        .ok();
-    }
-    #[cfg(feature = "c14n")]
-    {
-        writeln!(
-            f,
-            "\t--c14n : save in W3C canonical format v1.0 (with comments)",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--c14n11 : save in W3C canonical format v1.1 (with comments)",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--exc-c14n : save in W3C exclusive canonical format (with comments)",
-        )
-        .ok();
-    }
-    writeln!(f, "\t--nsclean : remove redundant namespace declarations").ok();
-    writeln!(f, "\t--testIO : test user I/O support").ok();
-    #[cfg(feature = "catalog")]
-    {
-        writeln!(
-            f,
-            "\t--catalogs : use SGML catalogs from $SGML_CATALOG_FILES",
-        )
-        .ok();
-        writeln!(f, "\t             otherwise XML Catalogs starting from ").ok();
-        writeln!(
-            f,
-            "\t         {} are activated by default",
-            XML_XML_DEFAULT_CATALOG,
-        )
-        .ok();
-        writeln!(f, "\t--nocatalogs: deactivate all catalogs").ok();
-    }
-    writeln!(f, "\t--auto : generate a small doc on the fly").ok();
-    #[cfg(feature = "xinclude")]
-    {
-        writeln!(f, "\t--xinclude : do XInclude processing").ok();
-        writeln!(
-            f,
-            "\t--noxincludenode : same but do not generate XInclude nodes",
-        )
-        .ok();
-        writeln!(f, "\t--nofixup-base-uris : do not fixup xml:base uris").ok();
-    }
-    writeln!(f, "\t--loaddtd : fetch external DTD").ok();
-    writeln!(
-        f,
-        "\t--dtdattr : loaddtd + populate the tree with inherited attributes ",
-    )
-    .ok();
-    #[cfg(feature = "libxml_reader")]
-    {
-        writeln!(
-            f,
-            "\t--stream : use the streaming interface to process very large files",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--walker : create a reader and walk though the resulting doc",
-        )
-        .ok();
-    }
-    #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-    {
-        writeln!(f, "\t--pattern pattern_value : test the pattern support").ok();
-    }
-    writeln!(f, "\t--chkregister : verify the node registration code").ok();
-    #[cfg(feature = "schema")]
-    {
-        writeln!(
-            f,
-            "\t--relaxng schema : do RelaxNG validation against the schema",
-        )
-        .ok();
-        writeln!(
-            f,
-            "\t--schema schema : do validation against the WXS schema",
-        )
-        .ok();
-    }
-    #[cfg(feature = "schematron")]
-    {
-        writeln!(
-            f,
-            "\t--schematron schema : do validation against a schematron",
-        )
-        .ok();
-    }
-    #[cfg(feature = "sax1")]
-    {
-        writeln!(f, "\t--sax1: use the old SAX1 interfaces for processing").ok();
-    }
-    writeln!(
-        f,
-        "\t--sax: do not build a tree but work just at the SAX level",
-    )
-    .ok();
-    writeln!(
-        f,
-        "\t--oldxml10: use XML-1.0 parsing rules before the 5th edition",
-    )
-    .ok();
-    #[cfg(feature = "xpath")]
-    {
-        writeln!(
-            f,
-            "\t--xpath expr: evaluate the XPath expression, imply --noout",
-        )
-        .ok();
-    }
 }
 
 unsafe extern "C" fn register_node(node: XmlNodePtr) {
@@ -3263,277 +3102,12 @@ unsafe extern "C" fn deregister_node(node: XmlNodePtr) {
 }
 
 fn main() {
-    let mut files: c_int = 0;
-    let mut version: c_int = 0;
+    let mut files: i32 = 0;
+    let mut version: i32 = 0;
 
-    unsafe {
-        let args = args().collect::<Vec<_>>();
-        if args.len() == 1 {
-            usage(&mut stderr(), &args[0]);
-            exit(XmllintReturnCode::ErrUnclass as i32);
-        }
-
-        let mut args = args.into_iter();
-        let program_name = args.next().unwrap();
-        let mut remained = vec![];
-        /* xmlMemSetup must be called before initializing the parser. */
-        while let Some(arg) = args.next() {
-            if !arg.starts_with('-') {
-                remained.push(arg);
-                continue;
-            }
-
-            if arg == "-maxmem" || arg == "--maxmem" {
-                let Some(next) = args.next() else {
-                    eprintln!("maxmem: missing integer value");
-                    exit(XmllintReturnCode::ErrUnclass as i32)
-                };
-
-                match next.parse::<usize>() {
-                    Ok(val) => MAXMEM = val as i32,
-                    Err(e) => match e.kind() {
-                        IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => {
-                            eprintln!("maxmem: integer out of range: {next}");
-                            exit(XmllintReturnCode::ErrUnclass as i32);
-                        }
-                        _ => {
-                            eprintln!("maxmem: invalid integer: {next}");
-                            exit(XmllintReturnCode::ErrUnclass as i32);
-                        }
-                    },
-                };
-            } else if arg == "-debug" || arg == "--debug" {
-                DEBUG += 1;
-            } else if cfg!(feature = "libxml_debug") && (arg == "-shell" || arg == "--shell") {
-                SHELL += 1;
-                NOOUT = 1;
-            } else if cfg!(feature = "libxml_tree") && (arg == "-copy" || arg == "--copy") {
-                COPY += 1;
-            } else if arg == "-recover" || arg == "--recover" {
-                RECOVERY += 1;
-                OPTIONS |= XmlParserOption::XmlParseRecover as i32;
-            } else if arg == "-huge" || arg == "--huge" {
-                OPTIONS |= XmlParserOption::XmlParseHuge as i32;
-            } else if arg == "-noent" || arg == "--noent" {
-                NOENT = 1;
-            } else if arg == "-noenc" || arg == "--noenc" {
-                NOENC += 1;
-                OPTIONS |= XmlParserOption::XmlParseIgnoreEnc as i32;
-            } else if arg == "-nsclean" || arg == "--nsclean" {
-                OPTIONS |= XmlParserOption::XmlParseNsclean as i32;
-            } else if arg == "-nocdata" || arg == "--nocdata" {
-                OPTIONS |= XmlParserOption::XmlParseNocdata as i32;
-            } else if arg == "-nodict" || arg == "--nodict" {
-                OPTIONS |= XmlParserOption::XmlParseNodict as i32;
-            } else if arg == "-version" || arg == "--version" {
-                show_version(&program_name);
-                version = 1;
-            } else if arg == "-noout" || arg == "--noout" {
-                NOOUT += 1;
-            } else if cfg!(feature = "libxml_output")
-                && (arg == "-o" || arg == "-output" || arg == "--output")
-            {
-                *OUTPUT.lock().unwrap() =
-                    CString::new(args.next().expect("--output: file is not specified")).ok();
-            } else if arg == "-htmlout" || arg == "--htmlout" {
-                HTMLOUT += 1;
-            } else if arg == "-nowrap" || arg == "--nowrap" {
-                NOWRAP += 1;
-            } else if cfg!(feature = "html") && (arg == "-html" || arg == "--html") {
-                HTML += 1;
-            } else if cfg!(feature = "html") && (arg == "-xmlout" || arg == "--xmlout") {
-                XMLOUT += 1;
-            } else if cfg!(feature = "html") && (arg == "-nodefdtd" || arg == "--nodefdtd") {
-                NODEFDTD += 1;
-                OPTIONS |= HtmlParserOption::HtmlParseNodefdtd as i32;
-            } else if arg == "-loaddtd" || arg == "--loaddtd" {
-                LOADDTD += 1;
-                OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            } else if arg == "-dtdattr" || arg == "--dtdattr" {
-                LOADDTD += 1;
-                DTDATTRS += 1;
-                OPTIONS |= XmlParserOption::XmlParseDtdattr as i32;
-            } else if cfg!(feature = "libxml_valid") && (arg == "-valid" || arg == "--valid") {
-                VALID += 1;
-                OPTIONS |= XmlParserOption::XmlParseDtdvalid as i32;
-            } else if cfg!(feature = "libxml_valid")
-                && (arg == "-postvalid" || arg == "--postvalid")
-            {
-                POSTVALID += 1;
-                LOADDTD += 1;
-                OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "libxml_valid") && (arg == "-dtdvalid" || arg == "--dtdvalid")
-            {
-                *DTDVALID.lock().unwrap() =
-                    CString::new(args.next().expect("--dtdvalid: DTD is not specified")).ok();
-                LOADDTD += 1;
-                OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "libxml_valid")
-                && (arg == "-dtdvalidfpi" || arg == "--dtdvalidfpi")
-            {
-                *DTDVALIDFPI.lock().unwrap() =
-                    CString::new(args.next().expect("--dtdvalidfpi: DTD is not specified")).ok();
-                LOADDTD += 1;
-                OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            } else if arg == "-dropdtd" || arg == "--dropdtd" {
-                DROPDTD += 1;
-            } else if arg == "-insert" || arg == "--insert" {
-                INSERT += 1;
-            } else if arg == "-quiet" || arg == "--quiet" {
-                QUIET += 1;
-            } else if arg == "-timing" || arg == "--timing" {
-                TIMING += 1;
-            } else if arg == "-auto" || arg == "--auto" {
-                GENERATE += 1;
-            } else if arg == "-repeat" || arg == "--repeat" {
-                if REPEAT != 0 {
-                    REPEAT *= 10;
-                } else {
-                    REPEAT = 100;
-                }
-            } else if cfg!(feature = "libxml_push") && (arg == "-push" || arg == "--push") {
-                PUSH += 1;
-            } else if cfg!(feature = "libxml_push") && (arg == "-pushsmall" || arg == "--pushsmall")
-            {
-                PUSH += 1;
-                PUSHSIZE = 10;
-            } else if arg == "-memory" || arg == "--memory" {
-                MEMORY += 1;
-            } else if arg == "-testIO" || arg == "--testIO" {
-                TEST_IO += 1;
-            } else if cfg!(feature = "xinclude") && (arg == "-xinclude" || arg == "--xinclude") {
-                XINCLUDE += 1;
-                OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
-            } else if cfg!(feature = "xinclude")
-                && (arg == "-noxincludenode" || arg == "--noxincludenode")
-            {
-                XINCLUDE += 1;
-                OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
-                OPTIONS |= XmlParserOption::XmlParseNoxincnode as i32;
-            } else if cfg!(feature = "xinclude")
-                && (arg == "-nofixup-base-uris" || arg == "--nofixup-base-uris")
-            {
-                XINCLUDE += 1;
-                OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
-                OPTIONS |= XmlParserOption::XmlParseNobasefix as i32;
-            } else if cfg!(feature = "libxml_output")
-                // && cfg!(feature = "libxml_zlib")
-                && (arg == "-compress" || arg == "--compress")
-            {
-                COMPRESS += 1;
-                set_compress_mode(9);
-            } else if arg == "-nowarning" || arg == "--nowarning" {
-                OPTIONS |= XmlParserOption::XmlParseNowarning as i32;
-                OPTIONS &= !(XmlParserOption::XmlParsePedantic as i32);
-            } else if arg == "-pedantic" || arg == "--pedantic" {
-                OPTIONS |= XmlParserOption::XmlParsePedantic as i32;
-                OPTIONS &= !(XmlParserOption::XmlParseNowarning as i32);
-            } else if cfg!(feature = "libxml_debug") && (arg == "-debugent" || arg == "--debugent")
-            {
-                DEBUGENT += 1;
-                set_parser_debug_entities(1);
-            } else if cfg!(feature = "c14n") && (arg == "-c14n" || arg == "--c14n") {
-                CANONICAL += 1;
-                OPTIONS |= XmlParserOption::XmlParseNoent as i32
-                    | XmlParserOption::XmlParseDtdattr as i32
-                    | XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "c14n") && (arg == "-c14n11" || arg == "--c14n11") {
-                CANONICAL_11 += 1;
-                OPTIONS |= XmlParserOption::XmlParseNoent as i32
-                    | XmlParserOption::XmlParseDtdattr as i32
-                    | XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "c14n") && (arg == "-exc-c14n" || arg == "--exc-c14n") {
-                EXC_CANONICAL += 1;
-                OPTIONS |= XmlParserOption::XmlParseNoent as i32
-                    | XmlParserOption::XmlParseDtdattr as i32
-                    | XmlParserOption::XmlParseDtdload as i32;
-            } else if cfg!(feature = "catalog") && (arg == "-catalogs" || arg == "--catalogs") {
-                #[cfg(feature = "catalog")]
-                {
-                    CATALOGS += 1;
-                }
-            } else if cfg!(feature = "catalog") && (arg == "-nocatalogs" || arg == "--nocatalogs") {
-                #[cfg(feature = "catalog")]
-                {
-                    NOCATALOGS += 1;
-                }
-            } else if arg == "-encode" || arg == "--encode" {
-                *ENCODING.lock().unwrap() =
-                    Some(args.next().expect("--encode: Encoding is not specified"));
-                // OK it's for testing purposes
-                add_encoding_alias("UTF-8", "DVEnc");
-            } else if arg == "-noblanks" || arg == "--noblanks" {
-                NOBLANKS = 1;
-            } else if arg == "-format" || arg == "--format" {
-                #[cfg(feature = "libxml_output")]
-                {
-                    FORMAT = 1;
-                }
-            } else if arg == "-pretty" || arg == "--pretty" {
-                if let Some(next) = args.next() {
-                    #[cfg(feature = "libxml_output")]
-                    {
-                        FORMAT = next.parse().expect("--pretty: Failed to parse integer");
-                    }
-                }
-            } else if cfg!(feature = "libxml_reader") && (arg == "-stream" || arg == "--stream") {
-                STREAM += 1;
-            } else if cfg!(feature = "libxml_reader") && (arg == "-walker" || arg == "--walker") {
-                WALKER += 1;
-                NOOUT += 1;
-            } else if cfg!(feature = "libxml_reader")
-                && cfg!(feature = "libxml_pattern")
-                && (arg == "-pattern" || arg == "--pattern")
-            {
-                *PATTERN.lock().unwrap() =
-                    CString::new(args.next().expect("--pattern: Pattern is not specified")).ok();
-            } else if cfg!(feature = "sax1") && (arg == "-sax1" || arg == "--sax1") {
-                SAX1 += 1;
-                OPTIONS |= XmlParserOption::XmlParseSax1 as i32;
-            } else if arg == "-sax" || arg == "--sax" {
-                SAX += 1;
-            } else if arg == "-chkregister" || arg == "--chkregister" {
-                CHKREGISTER += 1;
-            } else if cfg!(feature = "schema") && (arg == "-relaxng" || arg == "--relaxng") {
-                *RELAXNG.lock().unwrap() =
-                    CString::new(args.next().expect("--relaxng: RelaxNG is not specified")).ok();
-                NOENT = 1;
-            } else if cfg!(feature = "schema") && (arg == "-schema" || arg == "--schema") {
-                *SCHEMA.lock().unwrap() =
-                    CString::new(args.next().expect("--schema: Schema is not specified")).ok();
-                NOENT = 1;
-            } else if cfg!(feature = "schematron")
-                && (arg == "-schematron" || arg == "--schematron")
-            {
-                *SCHEMATRON.lock().unwrap() = CString::new(
-                    args.next()
-                        .expect("--schematron: Schematron is not specified"),
-                )
-                .ok();
-                NOENT = 1;
-            } else if arg == "-nonet" || arg == "--nonet" {
-                OPTIONS |= XmlParserOption::XmlParseNonet as i32;
-                xml_set_external_entity_loader(xml_no_net_external_entity_loader);
-            } else if arg == "-nocompact" || arg == "--nocompact" {
-                OPTIONS &= !(XmlParserOption::XmlParseCompact as i32);
-            } else if arg == "-load-trace" || arg == "--load-trace" {
-                LOAD_TRACE += 1;
-            } else if arg == "-path" || arg == "--path" {
-                parse_path(&args.next().expect("--path: Path is not specified"));
-            } else if cfg!(feature = "xpath") && (arg == "-xpath" || arg == "--xpath") {
-                NOOUT += 1;
-                *XPATHQUERY.lock().unwrap() =
-                    CString::new(args.next().expect("--xpath: XPath is not specified")).ok();
-            } else if arg == "-oldxml10" || arg == "--oldxml10" {
-                OLDXML10 += 1;
-                OPTIONS |= XmlParserOption::XmlParseOld10 as i32;
-            } else {
-                eprintln!("Unknown option {}", arg);
-                usage(&mut stderr(), &program_name);
-                exit(XmllintReturnCode::ErrUnclass as i32);
-            }
-        }
-        if MAXMEM != 0 {
+    let mut cmd_args = CmdArgs::parse();
+    if let Some(maxmem) = cmd_args.maxmem.filter(|&m| m > 0) {
+        unsafe {
             xml_mem_setup(
                 Some(my_free_func),
                 Some(my_malloc_func),
@@ -3541,74 +3115,267 @@ fn main() {
                 Some(my_strdup_func),
             );
         }
-
-        #[cfg(feature = "catalog")]
-        if NOCATALOGS == 0 && CATALOGS != 0 {
-            if let Some(catal) = option_env!("SGML_CATALOG_FILES") {
-                xml_load_catalogs(catal);
-            } else {
-                eprintln!("Variable $SGML_CATALOG_FILES not set");
-            }
+    }
+    if cmd_args.shell {
+        cmd_args.noout = true;
+    }
+    if cmd_args.recover {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseRecover as i32;
         }
+    }
+    if cmd_args.huge {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseHuge as i32;
+        }
+    }
+    if cmd_args.noenc {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseIgnoreEnc as i32;
+        }
+    }
+    if cmd_args.nsclean {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNsclean as i32;
+        }
+    }
+    if cmd_args.nocdata {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNocdata as i32;
+        }
+    }
+    if cmd_args.nodict {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNodict as i32;
+        }
+    }
+    if cmd_args.nodefdtd {
+        unsafe {
+            OPTIONS |= HtmlParserOption::HtmlParseNodefdtd as i32;
+        }
+    }
+    if cmd_args.loaddtd {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.dtdattr {
+        cmd_args.loaddtd = true;
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseDtdattr as i32;
+        }
+    }
+    if cmd_args.valid {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseDtdvalid as i32;
+        }
+    }
+    if cmd_args.postvalid {
+        cmd_args.loaddtd = true;
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.dtdvalid.is_some() {
+        cmd_args.loaddtd = true;
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.dtdvalidfpi.is_some() {
+        cmd_args.loaddtd = true;
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.repeat > 0 {
+        unsafe {
+            REPEAT = 100 * 10i32.pow(cmd_args.repeat as u32 - 1);
+        }
+    }
+    if cmd_args.pushsmall {
+        unsafe {
+            PUSHSIZE = 10;
+        }
+    }
+    if cmd_args.xinclude {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
+        }
+    }
+    if cmd_args.noxincludenode {
+        cmd_args.xinclude = true;
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
+            OPTIONS |= XmlParserOption::XmlParseNoxincnode as i32;
+        }
+    }
+    if cmd_args.nofixup_base_uris {
+        cmd_args.xinclude = true;
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
+            OPTIONS |= XmlParserOption::XmlParseNobasefix as i32;
+        }
+    }
+    // if cmd_args.compress {
+    //     set_compress_mode(9);
+    // }
+    if cmd_args.nowarning {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNowarning as i32;
+            OPTIONS &= !(XmlParserOption::XmlParsePedantic as i32);
+        }
+    }
+    if cmd_args.pedantic {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParsePedantic as i32;
+            OPTIONS &= !(XmlParserOption::XmlParseNowarning as i32);
+        }
+    }
+    if cmd_args.debugent {
+        set_parser_debug_entities(1);
+    }
+    if cmd_args.c14n {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNoent as i32
+                | XmlParserOption::XmlParseDtdattr as i32
+                | XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.c14n11 {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNoent as i32
+                | XmlParserOption::XmlParseDtdattr as i32
+                | XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.exc_c14n {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNoent as i32
+                | XmlParserOption::XmlParseDtdattr as i32
+                | XmlParserOption::XmlParseDtdload as i32;
+        }
+    }
+    if cmd_args.encode.is_some() {
+        // OK it's for testing purposes
+        add_encoding_alias("UTF-8", "DVEnc");
+    }
+    if cmd_args.walker {
+        cmd_args.noout = true;
+    }
+    if cmd_args.sax1 {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseSax1 as i32;
+        }
+    }
+    if cmd_args.relaxng.is_some() {
+        cmd_args.noent = true;
+    }
+    if cmd_args.schema.is_some() {
+        cmd_args.noent = true;
+    }
+    if cmd_args.schematron.is_some() {
+        cmd_args.noent = true;
+    }
+    if cmd_args.nonet {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseNonet as i32;
+            xml_set_external_entity_loader(xml_no_net_external_entity_loader);
+        }
+    }
+    if cmd_args.nocompact {
+        unsafe {
+            OPTIONS &= !(XmlParserOption::XmlParseCompact as i32);
+        }
+    }
+    if let Some(path) = cmd_args.path.as_deref() {
+        parse_path(path);
+    }
+    if cmd_args.xpath.is_some() {
+        cmd_args.noout = true;
+    }
+    if cmd_args.oldxml10 {
+        unsafe {
+            OPTIONS |= XmlParserOption::XmlParseOld10 as i32;
+        }
+    }
 
-        if CHKREGISTER != 0 {
+    if !cmd_args.nocatalogs && cmd_args.catalogs {
+        if let Some(catal) = option_env!("SGML_CATALOG_FILES") {
+            unsafe {
+                xml_load_catalogs(catal);
+            }
+        } else {
+            eprintln!("Variable $SGML_CATALOG_FILES not set");
+        }
+    }
+
+    if cmd_args.chkregister {
+        unsafe {
             xml_register_node_default(Some(register_node));
             xml_deregister_node_default(deregister_node);
         }
+    }
 
-        if let Some(indent) = option_env!("XMLLINT_INDENT") {
-            set_tree_indent_string(indent.into());
-        }
+    if let Ok(indent) = std::env::var("XMLLINT_INDENT") {
+        set_tree_indent_string(indent.into());
+    }
 
+    unsafe {
         DEFAULT_ENTITY_LOADER = Some(xml_get_external_entity_loader());
         xml_set_external_entity_loader(xmllint_external_entity_loader);
+    }
 
-        if LOADDTD != 0 {
-            let mut old = get_load_ext_dtd_default_value();
-            old |= XML_DETECT_IDS as i32;
-            set_load_ext_dtd_default_value(old);
-        }
-        if DTDATTRS != 0 {
-            let mut old = get_load_ext_dtd_default_value();
-            old |= XML_COMPLETE_ATTRS as i32;
-            set_load_ext_dtd_default_value(old);
-        }
-        if NOENT != 0 {
+    if cmd_args.loaddtd {
+        let mut old = get_load_ext_dtd_default_value();
+        old |= XML_DETECT_IDS as i32;
+        set_load_ext_dtd_default_value(old);
+    }
+    if cmd_args.dtdattr {
+        let mut old = get_load_ext_dtd_default_value();
+        old |= XML_COMPLETE_ATTRS as i32;
+        set_load_ext_dtd_default_value(old);
+    }
+    if cmd_args.noent {
+        unsafe {
             OPTIONS |= XmlParserOption::XmlParseNoent as i32;
         }
-        if NOBLANKS != 0 || FORMAT == 1 {
+    }
+    if cmd_args.noblanks || cmd_args.format {
+        unsafe {
             OPTIONS |= XmlParserOption::XmlParseNoblanks as i32;
         }
-        if HTMLOUT != 0 && NOWRAP == 0 {
-            let program_name =
-                CString::new(program_name.as_bytes()).expect("Failed to construct program name");
-            generic_error!("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\"\n");
-            generic_error!("\t\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n");
-            generic_error!(
-                "<html><head><title>{} output</title></head>\n",
-                program_name.to_string_lossy()
-            );
-            generic_error!(
-                "<body bgcolor=\"#ffffff\"><h1 align=\"center\">{} output</h1>\n",
-                program_name.to_string_lossy()
-            );
-        }
+    }
+    if cmd_args.htmlout && !cmd_args.nowrap {
+        let program_name = args().next().expect("Failed to acquire program name");
+        generic_error!("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\"\n");
+        generic_error!("\t\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n");
+        generic_error!("<html><head><title>{program_name} output</title></head>\n");
+        generic_error!(
+            "<body bgcolor=\"#ffffff\"><h1 align=\"center\">{program_name} output</h1>\n",
+        );
+    }
 
-        #[cfg(feature = "libxml_reader")]
-        let not_stream = STREAM == 0;
-        #[cfg(not(feature = "libxml_reader"))]
-        let not_stream = true;
-        #[cfg(feature = "schematron")]
-        if SAX == 0 && not_stream {
-            let mut schematron = SCHEMATRON.lock().unwrap();
-            if let Some(s) = schematron.as_ref() {
-                /* forces loading the DTDs */
-                let load_ext = get_load_ext_dtd_default_value() | 1;
-                set_load_ext_dtd_default_value(load_ext);
+    #[cfg(feature = "libxml_reader")]
+    let not_stream = !cmd_args.stream;
+    #[cfg(not(feature = "libxml_reader"))]
+    let not_stream = true;
+    #[cfg(feature = "schematron")]
+    if !cmd_args.sax && not_stream {
+        if let Some(s) = cmd_args.schematron.as_deref() {
+            // forces loading the DTDs
+            let load_ext = get_load_ext_dtd_default_value() | 1;
+            set_load_ext_dtd_default_value(load_ext);
+            unsafe {
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-                if TIMING != 0 {
+            }
+            if cmd_args.timing {
+                unsafe {
                     start_timer();
                 }
+            }
+            unsafe {
+                let s = CString::new(s).unwrap();
                 let ctxt: XmlSchematronParserCtxtPtr = xml_schematron_new_parser_ctxt(s.as_ptr());
                 if ctxt.is_null() {
                     PROGRESULT = XmllintReturnCode::ErrMem;
@@ -3624,26 +3391,27 @@ fn main() {
                         s.to_string_lossy()
                     );
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
-                    *schematron = None;
                 }
                 xml_schematron_free_parser_ctxt(ctxt);
-                if TIMING != 0 {
+                if cmd_args.timing {
                     end_timer!("Compiling the schemas");
                 }
             }
         }
-        #[cfg(feature = "schema")]
-        if RELAXNG.lock().unwrap().is_some() && SAX == 0 && not_stream {
-            let mut relaxng = RELAXNG.lock().unwrap();
-            if let Some(r) = relaxng.as_ref() {
-                /* forces loading the DTDs */
-                let load_ext = get_load_ext_dtd_default_value() | 1;
-                set_load_ext_dtd_default_value(load_ext);
+    }
+    #[cfg(feature = "schema")]
+    if cmd_args.relaxng.is_some() && !cmd_args.sax && not_stream {
+        if let Some(r) = cmd_args.relaxng.as_deref() {
+            // forces loading the DTDs
+            let load_ext = get_load_ext_dtd_default_value() | 1;
+            set_load_ext_dtd_default_value(load_ext);
+            unsafe {
                 OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-                if TIMING != 0 {
+                if cmd_args.timing {
                     start_timer();
                 }
-                let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(r.as_ptr());
+                let relaxng = CString::new(r).unwrap();
+                let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(relaxng.as_ptr());
                 if ctxt.is_null() {
                     PROGRESULT = XmllintReturnCode::ErrMem;
                     // goto error;
@@ -3659,25 +3427,23 @@ fn main() {
                 );
                 RELAXNGSCHEMAS.store(xml_relaxng_parse(ctxt), Ordering::Relaxed);
                 if RELAXNGSCHEMAS.load(Ordering::Relaxed).is_null() {
-                    generic_error!(
-                        "Relax-NG schema {} failed to compile\n",
-                        r.to_string_lossy()
-                    );
+                    generic_error!("Relax-NG schema {r} failed to compile\n");
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
-                    *relaxng = None;
                 }
                 xml_relaxng_free_parser_ctxt(ctxt);
-                if TIMING != 0 {
+                if cmd_args.timing {
                     end_timer!("Compiling the schemas");
                 }
             }
-        } else if SCHEMA.lock().unwrap().is_some() && not_stream {
-            let mut schema = SCHEMA.lock().unwrap();
-            if let Some(s) = schema.as_ref() {
-                if TIMING != 0 {
+        }
+    } else if cmd_args.schema.is_some() && not_stream {
+        if let Some(s) = cmd_args.schema.as_deref() {
+            unsafe {
+                if cmd_args.timing {
                     start_timer();
                 }
-                let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(s.as_ptr());
+                let schema = CString::new(s).unwrap();
+                let ctxt: XmlSchemaParserCtxtPtr = xml_schema_new_parser_ctxt(schema.as_ptr());
                 if ctxt.is_null() {
                     PROGRESULT = XmllintReturnCode::ErrMem;
                     // goto error;
@@ -3693,39 +3459,43 @@ fn main() {
                 );
                 let wxschemas = xml_schema_parse(ctxt);
                 if wxschemas.is_null() {
-                    generic_error!("WXS schema {} failed to compile\n", s.to_string_lossy());
+                    generic_error!("WXS schema {s} failed to compile\n");
                     PROGRESULT = XmllintReturnCode::ErrSchemacomp;
-                    *schema = None;
                 }
                 WXSCHEMAS.store(wxschemas, Ordering::Relaxed);
                 xml_schema_free_parser_ctxt(ctxt);
-                if TIMING != 0 {
+                if cmd_args.timing {
                     end_timer!("Compiling the schemas");
                 }
             }
         }
+    }
 
-        #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-        if PATTERN.lock().unwrap().is_some() && WALKER == 0 {
-            let mut pattern = PATTERN.lock().unwrap();
-            if let Some(p) = pattern.as_ref() {
+    #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
+    if cmd_args.pattern.is_some() && !cmd_args.walker {
+        if let Some(p) = cmd_args.pattern.as_deref() {
+            unsafe {
+                let pattern = CString::new(p).unwrap();
                 PATTERNC.store(
                     xml_patterncompile(p.as_ptr() as _, null_mut(), 0, None),
                     Ordering::Relaxed,
                 );
                 if PATTERNC.load(Ordering::Relaxed).is_null() {
-                    generic_error!("Pattern {} failed to compile\n", p.to_string_lossy());
+                    generic_error!("Pattern {p} failed to compile\n");
                     PROGRESULT = XmllintReturnCode::ErrSchemapat;
-                    *pattern = None;
                 }
             }
         }
+    }
 
-        for arg in remained {
-            if TIMING != 0 && REPEAT != 0 {
+    let xml_files = take(&mut cmd_args.xml_files);
+    CMD_ARGS.set(cmd_args).expect("Internal Error");
+    for arg in xml_files {
+        unsafe {
+            if CMD_ARGS.get().unwrap().timing && REPEAT != 0 {
                 start_timer();
             }
-            /* Remember file names.  "-" means stdin.  <sven@zen.org> */
+            // Remember file names.  "-" means stdin.  <sven@zen.org>
             if !arg.starts_with('-') || arg == "-" {
                 if REPEAT != 0 {
                     let mut ctxt: XmlParserCtxtPtr = null_mut();
@@ -3735,9 +3505,9 @@ fn main() {
                         {
                             let carg =
                                 CString::new(arg.as_str()).expect("Failed to construct argument");
-                            if STREAM != 0 {
+                            if CMD_ARGS.get().unwrap().stream {
                                 stream_file(carg.as_ptr() as _);
-                            } else if SAX != 0 {
+                            } else if CMD_ARGS.get().unwrap().sax {
                                 test_sax(arg.as_str());
                             } else {
                                 if ctxt.is_null() {
@@ -3748,13 +3518,15 @@ fn main() {
                         }
                         #[cfg(not(feature = "libxml_reader"))]
                         {
-                            if SAX != 0 {
-                                test_sax(arg.as_ptr() as _);
+                            let carg =
+                                CString::new(arg.as_str()).expect("Failed to construct argument");
+                            if cmd_args.sax {
+                                test_sax(carg.as_ptr() as _);
                             } else {
                                 if ctxt.is_null() {
                                     ctxt = xml_new_parser_ctxt();
                                 }
-                                parse_and_print_file(arg.as_ptr() as _, ctxt);
+                                parse_and_print_file(carg.as_ptr() as _, ctxt);
                             }
                         }
                     }
@@ -3765,66 +3537,74 @@ fn main() {
                     NBREGISTER = 0;
                     let carg = CString::new(arg.as_str()).expect("Failed to construct argument");
 
-                    if cfg!(feature = "libxml_reader") && STREAM != 0 {
+                    if cfg!(feature = "libxml_reader") && CMD_ARGS.get().unwrap().stream {
                         #[cfg(feature = "libxml_reader")]
                         {
                             stream_file(carg.as_ptr() as _);
                         }
-                    } else if SAX != 0 {
+                    } else if CMD_ARGS.get().unwrap().sax {
                         test_sax(arg.as_str());
                     } else {
                         parse_and_print_file(Some(&arg), null_mut());
                     }
 
-                    if CHKREGISTER != 0 && NBREGISTER != 0 {
+                    if CMD_ARGS.get().unwrap().chkregister && NBREGISTER != 0 {
                         eprintln!("Registration count off: {}", NBREGISTER);
                         PROGRESULT = XmllintReturnCode::ErrRdregis;
                     }
                 }
                 files += 1;
-                if TIMING != 0 && REPEAT != 0 {
+                if CMD_ARGS.get().unwrap().timing && REPEAT != 0 {
                     end_timer!("{} iterations", REPEAT);
                 }
             }
         }
-        if GENERATE != 0 {
+    }
+    if CMD_ARGS.get().unwrap().auto {
+        unsafe {
             parse_and_print_file(None, null_mut());
         }
-        if HTMLOUT != 0 && NOWRAP == 0 {
-            generic_error!("</body></html>\n");
-        }
-        if files == 0 && GENERATE == 0 && version == 0 {
-            usage(&mut stderr(), &program_name);
-            PROGRESULT = XmllintReturnCode::ErrUnclass;
-        }
-        #[cfg(feature = "schematron")]
-        {
-            let wxschematron = WXSCHEMATRON.load(Ordering::Relaxed);
-            if !wxschematron.is_null() {
+    }
+    if CMD_ARGS.get().unwrap().htmlout && !CMD_ARGS.get().unwrap().nowrap {
+        generic_error!("</body></html>\n");
+    }
+    #[cfg(feature = "schematron")]
+    {
+        let wxschematron = WXSCHEMATRON.load(Ordering::Relaxed);
+        if !wxschematron.is_null() {
+            unsafe {
                 xml_schematron_free(wxschematron);
             }
         }
-        #[cfg(feature = "schema")]
-        {
-            let relaxngschemas = RELAXNGSCHEMAS.load(Ordering::Relaxed);
-            if !relaxngschemas.is_null() {
+    }
+    #[cfg(feature = "schema")]
+    {
+        let relaxngschemas = RELAXNGSCHEMAS.load(Ordering::Relaxed);
+        if !relaxngschemas.is_null() {
+            unsafe {
                 xml_relaxng_free(relaxngschemas);
             }
         }
-        #[cfg(feature = "schema")]
-        {
-            let wxschemas = WXSCHEMAS.load(Ordering::Relaxed);
-            if !wxschemas.is_null() {
+    }
+    #[cfg(feature = "schema")]
+    {
+        let wxschemas = WXSCHEMAS.load(Ordering::Relaxed);
+        if !wxschemas.is_null() {
+            unsafe {
                 xml_schema_free(wxschemas);
             }
         }
-        #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
-        {
+    }
+    #[cfg(all(feature = "libxml_reader", feature = "libxml_pattern"))]
+    {
+        unsafe {
             if !PATTERNC.load(Ordering::Relaxed).is_null() {
                 xml_free_pattern(PATTERNC.load(Ordering::Relaxed));
             }
         }
+    }
 
+    unsafe {
         xml_cleanup_parser();
         xml_memory_dump();
 
