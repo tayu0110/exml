@@ -20,7 +20,7 @@ use std::{
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::{
-        atomic::{AtomicPtr, Ordering},
+        atomic::{AtomicI32, AtomicPtr, Ordering},
         Mutex, OnceLock,
     },
 };
@@ -398,8 +398,9 @@ static mut PATSTREAM: AtomicPtr<XmlStreamCtxt> = AtomicPtr::new(null_mut());
 static mut NBREGISTER: i32 = 0;
 #[cfg(feature = "xpath")]
 static XPATHQUERY: Mutex<Option<CString>> = Mutex::new(None);
-static mut OPTIONS: i32 =
-    XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32;
+static OPTIONS: AtomicI32 = AtomicI32::new(
+    XmlParserOption::XmlParseCompact as i32 | XmlParserOption::XmlParseBigLines as i32,
+);
 
 // Entity loading control and customization.
 
@@ -1593,7 +1594,7 @@ unsafe fn test_sax(filename: &str) {
             PROGRESULT = XmllintReturnCode::ErrMem;
             return;
         };
-        xml_ctxt_read_file(ctxt, filename, None, OPTIONS);
+        xml_ctxt_read_file(ctxt, filename, None, OPTIONS.load(Ordering::Relaxed));
 
         if !(*ctxt).my_doc.is_null() {
             eprintln!("SAX generated a doc !");
@@ -1768,9 +1769,9 @@ unsafe fn stream_file(filename: *mut c_char) {
         }
 
         let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-        reader = xml_reader_for_memory(mem, filename, null_mut(), OPTIONS);
+        reader = xml_reader_for_memory(mem, filename, null_mut(), OPTIONS.load(Ordering::Relaxed));
     } else {
-        reader = xml_reader_for_file(filename, null_mut(), OPTIONS);
+        reader = xml_reader_for_file(filename, null_mut(), OPTIONS.load(Ordering::Relaxed));
     }
     #[cfg(feature = "libxml_pattern")]
     if !PATTERNC.load(Ordering::Relaxed).is_null() {
@@ -2195,7 +2196,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         }
                         return;
                     }
-                    html_ctxt_use_options(ctxt, OPTIONS);
+                    html_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
                     while {
                         res = fread(chars.as_mut_ptr() as _, 1, PUSHSIZE as _, f) as _;
                         res > 0
@@ -2236,7 +2237,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
 
             let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-            doc = html_read_memory(mem, filename, None, OPTIONS);
+            doc = html_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
 
             munmap(base as _, info.st_size as _);
             close(fd);
@@ -2244,7 +2245,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     } else if cfg!(feature = "html") && CMD_ARGS.get().unwrap().html {
         #[cfg(feature = "html")]
         {
-            doc = html_read_file(filename.unwrap(), None, OPTIONS);
+            doc = html_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed));
         }
     } else if cfg!(feature = "libxml_push") && CMD_ARGS.get().unwrap().push {
         // build an XML tree from a string;
@@ -2288,7 +2289,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                         }
                         return;
                     }
-                    xml_ctxt_use_options(ctxt, OPTIONS);
+                    xml_ctxt_use_options(ctxt, OPTIONS.load(Ordering::Relaxed));
                     while {
                         res = fread(chars.as_mut_ptr() as _, 1, size as _, f) as i32;
                         res > 0
@@ -2311,12 +2312,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         }
     } else if CMD_ARGS.get().unwrap().test_io {
         if filename == Some("-") {
-            doc = xml_read_io(stdin(), None, None, OPTIONS);
+            doc = xml_read_io(stdin(), None, None, OPTIONS.load(Ordering::Relaxed));
         } else if let Some(Ok(f)) = filename.map(File::open) {
             if rectxt.is_null() {
-                doc = xml_read_io(f, filename, None, OPTIONS);
+                doc = xml_read_io(f, filename, None, OPTIONS.load(Ordering::Relaxed));
             } else {
-                doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS);
+                doc = xml_ctxt_read_io(rectxt, f, filename, None, OPTIONS.load(Ordering::Relaxed));
             }
         } else {
             doc = null_mut();
@@ -2341,7 +2342,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         (*ctxt).vctxt.error = Some(xml_html_validity_error);
         (*ctxt).vctxt.warning = Some(xml_html_validity_warning);
 
-        doc = xml_ctxt_read_file(ctxt, filename.unwrap(), None, OPTIONS);
+        doc = xml_ctxt_read_file(
+            ctxt,
+            filename.unwrap(),
+            None,
+            OPTIONS.load(Ordering::Relaxed),
+        );
 
         if rectxt.is_null() {
             xml_free_parser_ctxt(ctxt);
@@ -2372,9 +2378,10 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
         let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
         if rectxt.is_null() {
-            doc = xml_read_memory(mem, filename, None, OPTIONS);
+            doc = xml_read_memory(mem, filename, None, OPTIONS.load(Ordering::Relaxed));
         } else {
-            doc = xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS);
+            doc =
+                xml_ctxt_read_memory(rectxt, mem, filename, None, OPTIONS.load(Ordering::Relaxed));
         }
 
         munmap(base as _, info.st_size as _);
@@ -2394,7 +2401,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 ctxt = rectxt;
             }
 
-            doc = xml_ctxt_read_file(ctxt, filename.unwrap(), None, OPTIONS);
+            doc = xml_ctxt_read_file(
+                ctxt,
+                filename.unwrap(),
+                None,
+                OPTIONS.load(Ordering::Relaxed),
+            );
 
             if (*ctxt).valid == 0 {
                 PROGRESULT = XmllintReturnCode::ErrRdfile;
@@ -2404,9 +2416,14 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             }
         }
     } else if !rectxt.is_null() {
-        doc = xml_ctxt_read_file(rectxt, filename.unwrap(), None, OPTIONS);
+        doc = xml_ctxt_read_file(
+            rectxt,
+            filename.unwrap(),
+            None,
+            OPTIONS.load(Ordering::Relaxed),
+        );
     } else {
-        doc = xml_read_file(filename.unwrap(), None, OPTIONS);
+        doc = xml_read_file(filename.unwrap(), None, OPTIONS.load(Ordering::Relaxed));
     }
 
     // If we don't have a document we might as well give up.
@@ -2435,7 +2452,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
         if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
             start_timer();
         }
-        if xml_xinclude_process_flags(doc, OPTIONS) < 0 {
+        if xml_xinclude_process_flags(doc, OPTIONS.load(Ordering::Relaxed)) < 0 {
             PROGRESULT = XmllintReturnCode::ErrUnclass;
         }
         if CMD_ARGS.get().unwrap().timing && REPEAT == 0 {
@@ -3116,77 +3133,55 @@ fn main() {
             );
         }
     }
+
     if cmd_args.shell {
         cmd_args.noout = true;
     }
     if cmd_args.recover {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseRecover as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseRecover as i32, Ordering::Relaxed);
     }
     if cmd_args.huge {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseHuge as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseHuge as i32, Ordering::Relaxed);
     }
     if cmd_args.noenc {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseIgnoreEnc as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseIgnoreEnc as i32, Ordering::Relaxed);
     }
     if cmd_args.nsclean {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNsclean as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNsclean as i32, Ordering::Relaxed);
     }
     if cmd_args.nocdata {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNocdata as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNocdata as i32, Ordering::Relaxed);
     }
     if cmd_args.nodict {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNodict as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNodict as i32, Ordering::Relaxed);
     }
     if cmd_args.nodefdtd {
-        unsafe {
-            OPTIONS |= HtmlParserOption::HtmlParseNodefdtd as i32;
-        }
+        OPTIONS.fetch_or(
+            HtmlParserOption::HtmlParseNodefdtd as i32,
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.loaddtd {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
     }
     if cmd_args.dtdattr {
         cmd_args.loaddtd = true;
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseDtdattr as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdattr as i32, Ordering::Relaxed);
     }
     if cmd_args.valid {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseDtdvalid as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdvalid as i32, Ordering::Relaxed);
     }
     if cmd_args.postvalid {
         cmd_args.loaddtd = true;
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
     }
     if cmd_args.dtdvalid.is_some() {
         cmd_args.loaddtd = true;
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
     }
     if cmd_args.dtdvalidfpi.is_some() {
         cmd_args.loaddtd = true;
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
     }
     if cmd_args.repeat > 0 {
         unsafe {
@@ -3199,62 +3194,64 @@ fn main() {
         }
     }
     if cmd_args.xinclude {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
     }
     if cmd_args.noxincludenode {
         cmd_args.xinclude = true;
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
-            OPTIONS |= XmlParserOption::XmlParseNoxincnode as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(
+            XmlParserOption::XmlParseNoxincnode as i32,
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.nofixup_base_uris {
         cmd_args.xinclude = true;
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseXinclude as i32;
-            OPTIONS |= XmlParserOption::XmlParseNobasefix as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNobasefix as i32, Ordering::Relaxed);
     }
     // if cmd_args.compress {
     //     set_compress_mode(9);
     // }
     if cmd_args.nowarning {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNowarning as i32;
-            OPTIONS &= !(XmlParserOption::XmlParsePedantic as i32);
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNowarning as i32, Ordering::Relaxed);
+        OPTIONS.fetch_and(
+            !(XmlParserOption::XmlParsePedantic as i32),
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.pedantic {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParsePedantic as i32;
-            OPTIONS &= !(XmlParserOption::XmlParseNowarning as i32);
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParsePedantic as i32, Ordering::Relaxed);
+        OPTIONS.fetch_and(
+            !(XmlParserOption::XmlParseNowarning as i32),
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.debugent {
         set_parser_debug_entities(1);
     }
     if cmd_args.c14n {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNoent as i32
+        OPTIONS.fetch_or(
+            XmlParserOption::XmlParseNoent as i32
                 | XmlParserOption::XmlParseDtdattr as i32
-                | XmlParserOption::XmlParseDtdload as i32;
-        }
+                | XmlParserOption::XmlParseDtdload as i32,
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.c14n11 {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNoent as i32
+        OPTIONS.fetch_or(
+            XmlParserOption::XmlParseNoent as i32
                 | XmlParserOption::XmlParseDtdattr as i32
-                | XmlParserOption::XmlParseDtdload as i32;
-        }
+                | XmlParserOption::XmlParseDtdload as i32,
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.exc_c14n {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNoent as i32
+        OPTIONS.fetch_or(
+            XmlParserOption::XmlParseNoent as i32
                 | XmlParserOption::XmlParseDtdattr as i32
-                | XmlParserOption::XmlParseDtdload as i32;
-        }
+                | XmlParserOption::XmlParseDtdload as i32,
+            Ordering::Relaxed,
+        );
     }
     if cmd_args.encode.is_some() {
         // OK it's for testing purposes
@@ -3264,9 +3261,7 @@ fn main() {
         cmd_args.noout = true;
     }
     if cmd_args.sax1 {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseSax1 as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseSax1 as i32, Ordering::Relaxed);
     }
     if cmd_args.relaxng.is_some() {
         cmd_args.noent = true;
@@ -3278,15 +3273,16 @@ fn main() {
         cmd_args.noent = true;
     }
     if cmd_args.nonet {
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNonet as i32, Ordering::Relaxed);
         unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNonet as i32;
             xml_set_external_entity_loader(xml_no_net_external_entity_loader);
         }
     }
     if cmd_args.nocompact {
-        unsafe {
-            OPTIONS &= !(XmlParserOption::XmlParseCompact as i32);
-        }
+        OPTIONS.fetch_and(
+            !(XmlParserOption::XmlParseCompact as i32),
+            Ordering::Relaxed,
+        );
     }
     if let Some(path) = cmd_args.path.as_deref() {
         parse_path(path);
@@ -3295,9 +3291,7 @@ fn main() {
         cmd_args.noout = true;
     }
     if cmd_args.oldxml10 {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseOld10 as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseOld10 as i32, Ordering::Relaxed);
     }
 
     if !cmd_args.nocatalogs && cmd_args.catalogs {
@@ -3337,14 +3331,10 @@ fn main() {
         set_load_ext_dtd_default_value(old);
     }
     if cmd_args.noent {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNoent as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoent as i32, Ordering::Relaxed);
     }
     if cmd_args.noblanks || cmd_args.format {
-        unsafe {
-            OPTIONS |= XmlParserOption::XmlParseNoblanks as i32;
-        }
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoblanks as i32, Ordering::Relaxed);
     }
     if cmd_args.htmlout && !cmd_args.nowrap {
         let program_name = args().next().expect("Failed to acquire program name");
@@ -3366,9 +3356,7 @@ fn main() {
             // forces loading the DTDs
             let load_ext = get_load_ext_dtd_default_value() | 1;
             set_load_ext_dtd_default_value(load_ext);
-            unsafe {
-                OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
-            }
+            OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
             if cmd_args.timing {
                 unsafe {
                     start_timer();
@@ -3405,8 +3393,8 @@ fn main() {
             // forces loading the DTDs
             let load_ext = get_load_ext_dtd_default_value() | 1;
             set_load_ext_dtd_default_value(load_ext);
+            OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
             unsafe {
-                OPTIONS |= XmlParserOption::XmlParseDtdload as i32;
                 if cmd_args.timing {
                     start_timer();
                 }
