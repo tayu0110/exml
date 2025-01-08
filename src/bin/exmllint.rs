@@ -13,21 +13,19 @@ use std::{
     env::args,
     ffi::{c_char, c_long, c_void, CStr, CString},
     fs::File,
-    io::{stderr, stdin, stdout, Write},
-    mem::{take, zeroed},
-    num::IntErrorKind,
+    io::{stderr, stdin, stdout},
+    mem::zeroed,
     process::exit,
     ptr::{addr_of_mut, null, null_mut},
     slice::from_raw_parts,
     sync::{
         atomic::{AtomicI32, AtomicPtr, AtomicUsize, Ordering},
-        LazyLock, Mutex, OnceLock,
+        LazyLock, Mutex,
     },
     time::Instant,
 };
 
 use clap::Parser;
-use const_format::concatcp;
 #[cfg(feature = "catalog")]
 use exml::libxml::catalog::xml_load_catalogs;
 use exml::{
@@ -49,11 +47,11 @@ use exml::{
             html_parse_chunk, html_read_file, html_read_memory, HtmlParserCtxtPtr,
             HtmlParserOption,
         },
-        htmltree::{html_doc_dump, html_save_file, html_save_file_format},
+        htmltree::{html_doc_dump, html_save_file_format},
         parser::{
             xml_cleanup_parser, xml_create_push_parser_ctxt, xml_ctxt_use_options,
-            xml_get_external_entity_loader, xml_has_feature, xml_parse_chunk, xml_parse_dtd,
-            xml_set_external_entity_loader, XmlExternalEntityLoader, XmlFeature, XmlParserOption,
+            xml_get_external_entity_loader, xml_parse_chunk, xml_parse_dtd,
+            xml_set_external_entity_loader, XmlExternalEntityLoader, XmlParserOption,
             XmlSAXHandler, XmlSAXHandlerPtr, XmlSAXLocatorPtr, XML_COMPLETE_ATTRS, XML_DETECT_IDS,
             XML_SAX2_MAGIC,
         },
@@ -98,19 +96,16 @@ use exml::{
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
     tree::{
-        set_compress_mode, xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node,
-        NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
-        XmlElementContentPtr, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
+        xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node, NodeCommon,
+        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
-    SYSCONFDIR,
 };
 use libc::{
-    close, fclose, fopen, fread, free, gettimeofday, malloc, memset, mmap, munmap, open, snprintf,
-    stat, strlen, timeval, write, FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ,
+    close, fclose, fopen, fread, free, malloc, memset, mmap, munmap, open, snprintf, stat, strlen,
+    write, FILE, MAP_FAILED, MAP_SHARED, O_RDONLY, PROT_READ,
 };
-
-const XML_XML_DEFAULT_CATALOG: &str = concatcp!("file://", SYSCONFDIR, "/xml/catalog");
 
 // Error codes.
 // These are similar to `xmllintReturnCode` in original xmllint.
@@ -129,8 +124,6 @@ const ERR_XPATH: i32 = 10; // XPath evaluation error
 // Internal timing routines to remove the necessity to have
 // unix-specific function calls.
 static TIMER: Mutex<Option<Instant>> = Mutex::new(None);
-static mut BEGIN: timeval = unsafe { zeroed() };
-static mut END: timeval = unsafe { zeroed() };
 
 // startTimer: call where you want to start timing
 fn start_timer() {
@@ -405,7 +398,7 @@ struct CmdArgs {
 
 static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     let mut cmd_args = CmdArgs::parse();
-    if let Some(maxmem) = cmd_args.maxmem.filter(|&m| m > 0) {
+    if let Some(_maxmem) = cmd_args.maxmem.filter(|&m| m > 0) {
         unsafe {
             xml_mem_setup(
                 Some(my_free_func),
@@ -821,7 +814,7 @@ unsafe fn xmllint_external_entity_loader(
     let mut err: Option<GenericError> = None;
     let paths = PATHS.lock().unwrap();
     let mut lastsegment = url;
-    let mut iter = url;
+    let iter = url;
 
     if let Some(mut iter) = iter.filter(|_| !paths.is_empty()) {
         while !iter.is_empty() {
@@ -1278,14 +1271,14 @@ static mut EMPTY_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 // static xmlSAXHandlerPtr emptySAXHandler = &emptySAXHandlerStruct;
 // extern xmlSAXHandlerPtr debugSAXHandler;
-static mut CALLBACKS: i32 = 0;
+static CALLBACKS: AtomicUsize = AtomicUsize::new(0);
 
 /// Is this document tagged standalone ?
 ///
 /// Returns 1 if true
 #[doc(alias = "isStandaloneDebug")]
-unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
-    CALLBACKS += 1;
+fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return 0;
     }
@@ -1297,8 +1290,8 @@ unsafe fn is_standalone_debug(_ctx: Option<GenericErrorContext>) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasInternalSubsetDebug")]
-unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
-    CALLBACKS += 1;
+fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return 0;
     }
@@ -1310,8 +1303,8 @@ unsafe fn has_internal_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
 ///
 /// Returns 1 if true
 #[doc(alias = "hasExternalSubsetDebug")]
-unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
-    CALLBACKS += 1;
+fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return 0;
     }
@@ -1321,13 +1314,13 @@ unsafe fn has_external_subset_debug(_ctx: Option<GenericErrorContext>) -> i32 {
 
 /// Does this document has an internal subset
 #[doc(alias = "internalSubsetDebug")]
-unsafe fn internal_subset_debug(
+fn internal_subset_debug(
     _ctx: Option<GenericErrorContext>,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1346,13 +1339,13 @@ unsafe fn internal_subset_debug(
 
 /// Does this document has an external subset
 #[doc(alias = "externalSubsetDebug")]
-unsafe fn external_subset_debug(
+fn external_subset_debug(
     _ctx: Option<GenericErrorContext>,
     name: Option<&str>,
     external_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1376,12 +1369,12 @@ unsafe fn external_subset_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "resolveEntityDebug")]
-unsafe fn resolve_entity_debug(
+fn resolve_entity_debug(
     _ctx: Option<GenericErrorContext>,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) -> XmlParserInputPtr {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return null_mut();
     }
@@ -1405,8 +1398,8 @@ unsafe fn resolve_entity_debug(
 ///
 /// Returns the xmlParserInputPtr if inlined or NULL for DOM behaviour.
 #[doc(alias = "getEntityDebug")]
-unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
-    CALLBACKS += 1;
+fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return null_mut();
     }
@@ -1418,11 +1411,8 @@ unsafe fn get_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> Xml
 ///
 /// Returns the xmlParserInputPtr
 #[doc(alias = "getParameterEntityDebug")]
-unsafe fn get_parameter_entity_debug(
-    _ctx: Option<GenericErrorContext>,
-    name: &str,
-) -> XmlEntityPtr {
-    CALLBACKS += 1;
+fn get_parameter_entity_debug(_ctx: Option<GenericErrorContext>, name: &str) -> XmlEntityPtr {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return null_mut();
     }
@@ -1432,15 +1422,15 @@ unsafe fn get_parameter_entity_debug(
 
 /// An entity definition has been parsed
 #[doc(alias = "entityDeclDebug")]
-unsafe fn entity_decl_debug(
+fn entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     typ: XmlEntityType,
-    mut public_id: Option<&str>,
-    mut system_id: Option<&str>,
-    mut content: Option<&str>,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
+    content: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1464,7 +1454,7 @@ unsafe fn attribute_decl_debug(
     default_value: Option<&str>,
     tree: XmlEnumerationPtr,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1484,13 +1474,13 @@ unsafe fn attribute_decl_debug(
 
 /// An element definition has been parsed
 #[doc(alias = "elementDeclDebug")]
-unsafe fn element_decl_debug(
+fn element_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     typ: Option<XmlElementTypeVal>,
     _content: XmlElementContentPtr,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1502,13 +1492,13 @@ unsafe fn element_decl_debug(
 
 /// What to do when a notation declaration has been parsed.
 #[doc(alias = "notationDeclDebug")]
-unsafe fn notation_decl_debug(
+fn notation_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1521,14 +1511,14 @@ unsafe fn notation_decl_debug(
 
 /// What to do when an unparsed entity declaration is parsed
 #[doc(alias = "unparsedEntityDeclDebug")]
-unsafe fn unparsed_entity_decl_debug(
+fn unparsed_entity_decl_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
-    mut public_id: Option<&str>,
-    mut system_id: Option<&str>,
-    mut notation_name: Option<&str>,
+    public_id: Option<&str>,
+    system_id: Option<&str>,
+    notation_name: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1543,8 +1533,8 @@ unsafe fn unparsed_entity_decl_debug(
 /// Receive the document locator at startup, actually xmlDefaultSAXLocator
 /// Everything is available on the context, so this is useless in our case.
 #[doc(alias = "setDocumentLocatorDebug")]
-unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
-    CALLBACKS += 1;
+fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: XmlSAXLocatorPtr) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1553,8 +1543,8 @@ unsafe fn set_document_locator_debug(_ctx: Option<GenericErrorContext>, _loc: Xm
 
 /// called when the document start being processed.
 #[doc(alias = "startDocumentDebug")]
-unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS += 1;
+fn start_document_debug(_ctx: Option<GenericErrorContext>) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1563,8 +1553,8 @@ unsafe fn start_document_debug(_ctx: Option<GenericErrorContext>) {
 
 /// called when the document end has been detected.
 #[doc(alias = "endDocumentDebug")]
-unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
-    CALLBACKS += 1;
+fn end_document_debug(_ctx: Option<GenericErrorContext>) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1573,12 +1563,12 @@ unsafe fn end_document_debug(_ctx: Option<GenericErrorContext>) {
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementDebug")]
-unsafe fn start_element_debug(
+fn start_element_debug(
     _ctx: Option<GenericErrorContext>,
     name: &str,
     atts: &[(String, Option<String>)],
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1594,8 +1584,8 @@ unsafe fn start_element_debug(
 
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementDebug")]
-unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
-    CALLBACKS += 1;
+fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1605,8 +1595,8 @@ unsafe fn end_element_debug(_ctx: Option<GenericErrorContext>, name: &str) {
 /// receiving some chars from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "charactersDebug")]
-unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
-    CALLBACKS += 1;
+fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1615,8 +1605,8 @@ unsafe fn characters_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
 
 /// called when an entity reference is detected.
 #[doc(alias = "referenceDebug")]
-unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
-    CALLBACKS += 1;
+fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1626,8 +1616,8 @@ unsafe fn reference_debug(_ctx: Option<GenericErrorContext>, name: &str) {
 /// receiving some ignorable whitespaces from the parser.
 /// Question: how much at a time ???
 #[doc(alias = "ignorableWhitespaceDebug")]
-unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
-    CALLBACKS += 1;
+fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1636,12 +1626,12 @@ unsafe fn ignorable_whitespace_debug(_ctx: Option<GenericErrorContext>, ch: &str
 
 /// A processing instruction has been parsed.
 #[doc(alias = "processingInstructionDebug")]
-unsafe fn processing_instruction_debug(
+fn processing_instruction_debug(
     _ctx: Option<GenericErrorContext>,
     target: &str,
     data: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1654,8 +1644,8 @@ unsafe fn processing_instruction_debug(
 
 /// called when a pcdata block has been parsed
 #[doc(alias = "cdataBlockDebug")]
-unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
-    CALLBACKS += 1;
+fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1664,8 +1654,8 @@ unsafe fn cdata_block_debug(_ctx: Option<GenericErrorContext>, value: &str) {
 
 /// A comment has been parsed.
 #[doc(alias = "commentDebug")]
-unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
-    CALLBACKS += 1;
+fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1677,7 +1667,7 @@ unsafe fn comment_debug(_ctx: Option<GenericErrorContext>, value: &str) {
 #[doc(alias = "warningDebug")]
 fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
-        CALLBACKS += 1;
+        CALLBACKS.fetch_add(1, Ordering::Relaxed);
         if CMD_ARGS.noout {
             return;
         }
@@ -1690,7 +1680,7 @@ fn warning_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
 #[doc(alias = "errorDebug")]
 fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
-        CALLBACKS += 1;
+        CALLBACKS.fetch_add(1, Ordering::Relaxed);
         if CMD_ARGS.noout {
             return;
         }
@@ -1703,7 +1693,7 @@ fn error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
 #[doc(alias = "fatalErrorDebug")]
 fn fatal_error_debug(_ctx: Option<GenericErrorContext>, msg: &str) {
     unsafe {
-        CALLBACKS += 1;
+        CALLBACKS.fetch_add(1, Ordering::Relaxed);
         if CMD_ARGS.noout {
             return;
         }
@@ -1750,7 +1740,7 @@ static mut DEBUG_SAXHANDLER_STRUCT: XmlSAXHandler = XmlSAXHandler {
 
 /// called when an opening tag has been processed.
 #[doc(alias = "startElementNsDebug")]
-unsafe fn start_element_ns_debug(
+fn start_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
@@ -1759,7 +1749,7 @@ unsafe fn start_element_ns_debug(
     nb_defaulted: usize,
     attributes: &[(String, Option<String>, Option<String>, String)],
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1801,13 +1791,13 @@ unsafe fn start_element_ns_debug(
 
 /// called when the end of an element has been detected.
 #[doc(alias = "endElementDebug")]
-unsafe fn end_element_ns_debug(
+fn end_element_ns_debug(
     _ctx: Option<GenericErrorContext>,
     localname: &str,
     prefix: Option<&str>,
     uri: Option<&str>,
 ) {
-    CALLBACKS += 1;
+    CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
         return;
     }
@@ -1865,7 +1855,7 @@ unsafe fn test_sax(filename: &str) {
     let handler: XmlSAXHandlerPtr;
     let user_data: &CStr = c"user_data"; /* mostly for debugging */
 
-    CALLBACKS = 0;
+    CALLBACKS.store(0, Ordering::Relaxed);
 
     if CMD_ARGS.noout {
         handler = addr_of_mut!(EMPTY_SAXHANDLER_STRUCT);
@@ -2158,7 +2148,7 @@ unsafe fn stream_file(filename: *mut c_char) {
             xml_text_reader_set_parser_prop(reader, XmlParserProperties::XmlParserLoaddtd, 1);
         }
         #[cfg(feature = "schema")]
-        if let Some(mut relaxng) = CMD_ARGS.relaxng.as_deref() {
+        if let Some(relaxng) = CMD_ARGS.relaxng.as_deref() {
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
@@ -2173,7 +2163,7 @@ unsafe fn stream_file(filename: *mut c_char) {
             }
         }
         #[cfg(feature = "schema")]
-        if let Some(mut schema) = CMD_ARGS.schema.as_deref() {
+        if let Some(schema) = CMD_ARGS.schema.as_deref() {
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
                 start_timer();
             }
@@ -2385,13 +2375,11 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
 
     use exml::{
         io::XmlOutputBuffer,
-        tree::XmlNodePtr,
         xpath::{xml_xpath_is_inf, xml_xpath_is_nan, XmlXPathObjectType},
     };
 
     match (*cur).typ {
         XmlXPathObjectType::XPathNodeset => {
-            let mut node: XmlNodePtr;
             #[cfg(feature = "libxml_output")]
             {
                 if let Some(nodeset) = (*cur).nodesetval.as_deref() {
@@ -2404,7 +2392,7 @@ unsafe fn do_xpath_dump(cur: XmlXPathObjectPtr) {
                         let buf = Rc::new(RefCell::new(buf));
                         for &node in &nodeset.node_tab {
                             (*node).dump_output(buf.clone(), null_mut(), 0, 0, None);
-                            buf.borrow_mut().write_bytes(b"\n");
+                            buf.borrow_mut().write_bytes(b"\n").ok();
                         }
                         buf.borrow_mut().flush();
                     } else if !CMD_ARGS.quiet {
@@ -2892,8 +2880,6 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
     }
     #[cfg(feature = "libxml_output")]
     if !CMD_ARGS.noout {
-        let ret: i32;
-
         // print it.
         if !cfg!(feature = "libxml_debug") || !CMD_ARGS.debug {
             if CMD_ARGS.timing && REPEAT.load(Ordering::Relaxed) == 0 {
