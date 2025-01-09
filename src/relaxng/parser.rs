@@ -51,9 +51,7 @@ pub struct XmlRelaxNGParserCtxt {
 
     // the document stack
     pub(crate) doc: XmlRelaxNGDocumentPtr, // Current parsed external ref
-    pub(crate) doc_nr: i32,                // Depth of the parsing stack
-    pub(crate) doc_max: i32,               // Max depth of the parsing stack
-    pub(crate) doc_tab: *mut XmlRelaxNGDocumentPtr, // array of docs
+    pub(crate) doc_tab: Vec<XmlRelaxNGDocumentPtr>, // array of docs
 
     // the include stack
     pub(crate) inc: XmlRelaxNGIncludePtr, // Current parsed include
@@ -72,6 +70,28 @@ pub struct XmlRelaxNGParserCtxt {
 }
 
 impl XmlRelaxNGParserCtxt {
+    /// Pushes a new doc on top of the doc stack.
+    ///
+    /// Returns the index in the stack.
+    #[doc(alias = "xmlRelaxNGDocumentPush")]
+    pub(crate) fn document_push(&mut self, value: XmlRelaxNGDocumentPtr) -> usize {
+        self.doc_tab.push(value);
+        self.doc = value;
+        self.doc_tab.len() - 1
+    }
+
+    /// Pops the top doc from the doc stack
+    ///
+    /// Returns the doc just removed
+    #[doc(alias = "xmlRelaxNGDocumentPop")]
+    pub(crate) fn document_pop(&mut self) -> XmlRelaxNGDocumentPtr {
+        let Some(doc) = self.doc_tab.pop() else {
+            return null_mut();
+        };
+        self.doc = *self.doc_tab.last().unwrap_or(&null_mut());
+        doc
+    }
+
     /// Semi private function used to pass information to a parser context
     /// which are a combination of xmlRelaxNGParserFlag .
     ///
@@ -156,15 +176,11 @@ impl Default for XmlRelaxNGParserCtxt {
             includes: null_mut(),
             url: None,
             document: null_mut(),
-            // def_nr: 0,
-            // def_max: 0,
             def_tab: vec![],
             buffer: null_mut(),
             size: 0,
             doc: null_mut(),
-            doc_nr: 0,
-            doc_max: 0,
-            doc_tab: null_mut(),
+            doc_tab: vec![],
             inc: null_mut(),
             inc_nr: 0,
             inc_max: 0,
@@ -276,9 +292,6 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     }
     if !(*ctxt).includes.is_null() {
         xml_relaxng_free_include_list((*ctxt).includes);
-    }
-    if !(*ctxt).doc_tab.is_null() {
-        xml_free((*ctxt).doc_tab as _);
     }
     if !(*ctxt).inc_tab.is_null() {
         xml_free((*ctxt).inc_tab as _);

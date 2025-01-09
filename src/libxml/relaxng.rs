@@ -1198,60 +1198,6 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
     }
 }
 
-/// Pushes a new doc on top of the doc stack
-///
-/// Returns 0 in case of error, the index in the stack otherwise
-#[doc(alias = "xmlRelaxNGDocumentPush")]
-unsafe fn xml_relaxng_document_push(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    value: XmlRelaxNGDocumentPtr,
-) -> i32 {
-    if (*ctxt).doc_tab.is_null() {
-        (*ctxt).doc_max = 4;
-        (*ctxt).doc_nr = 0;
-        (*ctxt).doc_tab =
-            xml_malloc((*ctxt).doc_max as usize * size_of_val(&*(*ctxt).doc_tab.add(0))) as _;
-        if (*ctxt).doc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, Some("adding document\n"));
-            return 0;
-        }
-    }
-    if (*ctxt).doc_nr >= (*ctxt).doc_max {
-        (*ctxt).doc_max *= 2;
-        (*ctxt).doc_tab = xml_realloc(
-            (*ctxt).doc_tab as _,
-            (*ctxt).doc_max as usize * size_of_val(&*(*ctxt).doc_tab.add(0)),
-        ) as _;
-        if (*ctxt).doc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, Some("adding document\n"));
-            return 0;
-        }
-    }
-    *(*ctxt).doc_tab.add((*ctxt).doc_nr as usize) = value;
-    (*ctxt).doc = value;
-    (*ctxt).doc_nr += 1;
-    (*ctxt).doc_nr - 1
-}
-
-/// Pops the top doc from the doc stack
-///
-/// Returns the doc just removed
-#[doc(alias = "xmlRelaxNGDocumentPop")]
-unsafe fn xml_relaxng_document_pop(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGDocumentPtr {
-    if (*ctxt).doc_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).doc_nr -= 1;
-    if (*ctxt).doc_nr > 0 {
-        (*ctxt).doc = *(*ctxt).doc_tab.add((*ctxt).doc_nr as usize - 1);
-    } else {
-        (*ctxt).doc = null_mut();
-    }
-    let ret: XmlRelaxNGDocumentPtr = *(*ctxt).doc_tab.add((*ctxt).doc_nr as usize);
-    *(*ctxt).doc_tab.add((*ctxt).doc_nr as usize) = null_mut();
-    ret
-}
-
 /// First lookup if the document is already loaded into the parser context,
 /// check against recursion. If not found the resource is loaded and
 /// the content is preprocessed before being returned back to the caller.
@@ -1267,12 +1213,9 @@ unsafe fn xml_relaxng_load_external_ref(
     let root: XmlNodePtr;
 
     // check against recursion in the stack
-    for i in 0..(*ctxt).doc_nr {
+    for &doc in &(*ctxt).doc_tab {
         let curl = CString::new(url).unwrap();
-        if xml_str_equal(
-            (*(*(*ctxt).doc_tab.add(i as usize))).href,
-            curl.as_ptr() as *const u8,
-        ) {
+        if xml_str_equal((*doc).href, curl.as_ptr() as *const u8) {
             xml_rng_perr!(
                 ctxt,
                 null_mut(),
@@ -1327,7 +1270,7 @@ unsafe fn xml_relaxng_load_external_ref(
     }
 
     // push it on the stack and register it in the hash table
-    xml_relaxng_document_push(ctxt, ret);
+    (*ctxt).document_push(ret);
 
     // Some preprocessing of the document content
     doc = xml_relaxng_cleanup_doc(ctxt, doc);
@@ -1336,7 +1279,7 @@ unsafe fn xml_relaxng_load_external_ref(
         return null_mut();
     }
 
-    xml_relaxng_document_pop(ctxt);
+    (*ctxt).document_pop();
 
     ret
 }
