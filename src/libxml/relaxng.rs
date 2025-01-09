@@ -66,9 +66,9 @@ use crate::{
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
         is_relaxng, relaxng_normalize, xml_relaxng_dump_valid_error, xml_relaxng_free_define,
-        xml_relaxng_free_states, xml_relaxng_free_valid_state, xml_relaxng_new_states,
-        xml_relaxng_new_valid_state, xml_relaxng_pop_errors, xml_relaxng_valid_error_pop,
-        xml_rng_perr, xml_rng_perr_memory, xml_rng_verr_memory, XmlRelaxNGDefine,
+        xml_relaxng_free_states, xml_relaxng_free_valid_state, xml_relaxng_new_define,
+        xml_relaxng_new_states, xml_relaxng_new_valid_state, xml_relaxng_pop_errors,
+        xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory, xml_rng_verr_memory,
         XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxtPtr, XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt,
         XmlRelaxNGValidCtxtPtr, XmlRelaxNGValidState, XmlRelaxNGValidStatePtr, VALID_ERR,
         VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
@@ -202,30 +202,31 @@ pub struct XmlRelaxNGGrammar {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum XmlRelaxNGType {
-    Noop = -1,   // a no operation from simplification
-    Empty = 0,   // an empty pattern
-    NotAllowed,  // not allowed top
-    Except,      // except present in nameclass defs
-    Text,        // textual content
-    Element,     // an element
-    Datatype,    // external data type definition
-    Param,       // external data type parameter
-    Value,       // value from an external data type definition
-    List,        // a list of patterns
-    Attribute,   // an attribute following a pattern
-    Def,         // a definition
-    Ref,         // reference to a definition
+    Noop = -1, // a no operation from simplification
+    #[default]
+    Empty = 0, // an empty pattern
+    NotAllowed, // not allowed top
+    Except,    // except present in nameclass defs
+    Text,      // textual content
+    Element,   // an element
+    Datatype,  // external data type definition
+    Param,     // external data type parameter
+    Value,     // value from an external data type definition
+    List,      // a list of patterns
+    Attribute, // an attribute following a pattern
+    Def,       // a definition
+    Ref,       // reference to a definition
     Externalref, // reference to an external def
-    Parentref,   // reference to a def in the parent grammar
-    Optional,    // optional patterns
-    Zeroormore,  // zero or more non empty patterns
-    Oneormore,   // one or more non empty patterns
-    Choice,      // a choice between non empty patterns
-    Group,       // a pair/group of non empty patterns
-    Interleave,  // interleaving choice of non-empty patterns
-    Start,       // Used to keep track of starts on grammars
+    Parentref, // reference to a def in the parent grammar
+    Optional,  // optional patterns
+    Zeroormore, // zero or more non empty patterns
+    Oneormore, // one or more non empty patterns
+    Choice,    // a choice between non empty patterns
+    Group,     // a pair/group of non empty patterns
+    Interleave, // interleaving choice of non-empty patterns
+    Start,     // Used to keep track of starts on grammars
 }
 
 const IS_NULLABLE: i32 = 1 << 0;
@@ -2607,48 +2608,6 @@ unsafe fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPt
     }
     memset(ret as _, 0, size_of::<XmlRelaxNG>());
 
-    ret
-}
-
-/// Allocate a new RelaxNG define.
-///
-/// Returns the newly allocated structure or NULL in case or error
-#[doc(alias = "xmlRelaxNGNewDefine")]
-unsafe fn xml_relaxng_new_define(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    node: XmlNodePtr,
-) -> XmlRelaxNGDefinePtr {
-    if (*ctxt).def_max == 0 {
-        (*ctxt).def_max = 16;
-        (*ctxt).def_nr = 0;
-        (*ctxt).def_tab =
-            xml_malloc((*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>()) as _;
-        if (*ctxt).def_tab.is_null() {
-            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
-            return null_mut();
-        }
-    } else if (*ctxt).def_max <= (*ctxt).def_nr {
-        (*ctxt).def_max *= 2;
-        let tmp: *mut XmlRelaxNGDefinePtr = xml_realloc(
-            (*ctxt).def_tab as _,
-            (*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
-            return null_mut();
-        }
-        (*ctxt).def_tab = tmp;
-    }
-    let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(ctxt, Some("allocating define\n"));
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlRelaxNGDefine>());
-    *(*ctxt).def_tab.add((*ctxt).def_nr as usize) = ret;
-    (*ctxt).def_nr += 1;
-    (*ret).node = node;
-    (*ret).depth = -1;
     ret
 }
 

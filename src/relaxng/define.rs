@@ -1,9 +1,9 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, ptr::null_mut};
 
 use crate::{
     hash::{xml_hash_free, XmlHashTablePtr},
     libxml::{
-        globals::xml_free,
+        globals::{xml_free, xml_malloc, xml_realloc},
         relaxng::{
             xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType,
             XmlRelaxNGTypeLibraryPtr,
@@ -12,6 +12,8 @@ use crate::{
     },
     tree::XmlNodePtr,
 };
+
+use super::{xml_rng_perr_memory, XmlRelaxNGParserCtxtPtr};
 
 pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 
@@ -63,6 +65,70 @@ impl XmlRelaxNGDefine {
             XmlRelaxNGType::Param => "param",
         }
     }
+}
+
+impl Default for XmlRelaxNGDefine {
+    fn default() -> Self {
+        Self {
+            typ: XmlRelaxNGType::default(),
+            node: null_mut(),
+            name: null_mut(),
+            ns: null_mut(),
+            value: null_mut(),
+            data: null_mut(),
+            content: null_mut(),
+            parent: null_mut(),
+            next: null_mut(),
+            attrs: null_mut(),
+            name_class: null_mut(),
+            next_hash: null_mut(),
+            depth: 0,
+            dflags: 0,
+            cont_model: null_mut(),
+        }
+    }
+}
+
+/// Allocate a new RelaxNG define.
+///
+/// Returns the newly allocated structure or NULL in case or error
+#[doc(alias = "xmlRelaxNGNewDefine")]
+pub(crate) unsafe fn xml_relaxng_new_define(
+    ctxt: XmlRelaxNGParserCtxtPtr,
+    node: XmlNodePtr,
+) -> XmlRelaxNGDefinePtr {
+    if (*ctxt).def_max == 0 {
+        (*ctxt).def_max = 16;
+        (*ctxt).def_nr = 0;
+        (*ctxt).def_tab =
+            xml_malloc((*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>()) as _;
+        if (*ctxt).def_tab.is_null() {
+            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
+            return null_mut();
+        }
+    } else if (*ctxt).def_max <= (*ctxt).def_nr {
+        (*ctxt).def_max *= 2;
+        let tmp: *mut XmlRelaxNGDefinePtr = xml_realloc(
+            (*ctxt).def_tab as _,
+            (*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>(),
+        ) as _;
+        if tmp.is_null() {
+            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
+            return null_mut();
+        }
+        (*ctxt).def_tab = tmp;
+    }
+    let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
+    if ret.is_null() {
+        xml_rng_perr_memory(ctxt, Some("allocating define\n"));
+        return null_mut();
+    }
+    std::ptr::write(&mut *ret, XmlRelaxNGDefine::default());
+    *(*ctxt).def_tab.add((*ctxt).def_nr as usize) = ret;
+    (*ctxt).def_nr += 1;
+    (*ret).node = node;
+    (*ret).depth = -1;
+    ret
 }
 
 /// Deallocate a RelaxNG define structure.
