@@ -26,8 +26,8 @@ use exml::{
             xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
         },
         relaxng::{
-            xml_relaxng_free, xml_relaxng_init_types, xml_relaxng_parse,
-            xml_relaxng_set_valid_errors, xml_relaxng_validate_doc, XmlRelaxNGPtr,
+            xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
+            xml_relaxng_validate_doc, XmlRelaxNGPtr,
         },
         uri::xml_build_uri,
         xmlmemory::{
@@ -48,8 +48,8 @@ use exml::{
         XmlParserInputPtr,
     },
     relaxng::{
-        xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_mem_parser_ctxt,
-        xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
+        xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
+        xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
     tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
     xpath::{

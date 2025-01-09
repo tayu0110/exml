@@ -49,7 +49,7 @@ use exml::{
             XmlSAXLocatorPtr, XML_SAX2_MAGIC,
         },
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
-        relaxng::{xml_relaxng_init_types, XmlRelaxNGPtr},
+        relaxng::XmlRelaxNGPtr,
         valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
         xmlmemory::{
@@ -66,6 +66,7 @@ use exml::{
         xml_create_file_parser_ctxt, xml_free_parser_ctxt, xml_read_file, xml_read_memory,
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
+    relaxng::xml_relaxng_init_types,
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
         XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,

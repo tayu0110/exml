@@ -4,16 +4,13 @@ use crate::{
     hash::{xml_hash_free, XmlHashTablePtr},
     libxml::{
         globals::{xml_free, xml_malloc},
-        relaxng::{
-            xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType,
-            XmlRelaxNGTypeLibraryPtr,
-        },
+        relaxng::{xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType},
         xmlregexp::{xml_reg_free_regexp, XmlRegexpPtr},
     },
     tree::XmlNodePtr,
 };
 
-use super::{xml_rng_perr_memory, XmlRelaxNGParserCtxtPtr};
+use super::{xml_rng_perr_memory, XmlRelaxNGParserCtxtPtr, XmlRelaxNGTypeLibraryPtr};
 
 pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
 

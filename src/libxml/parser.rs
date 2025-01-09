@@ -60,6 +60,8 @@ use libc::{memchr, memcpy, memmove, ptrdiff_t, size_t, strlen, strncmp, strstr};
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::xml_catalog_cleanup;
+#[cfg(feature = "schema")]
+use crate::relaxng::xml_relaxng_cleanup_types;
 use crate::{
     buf::libxml_api::{
         xml_buf_add, xml_buf_create, xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme,
@@ -100,7 +102,6 @@ use crate::{
             xml_parse_system_literal, INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAMELEN,
             XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
-        relaxng::xml_relaxng_cleanup_types,
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         uri::{xml_canonic_path, xml_free_uri, xml_parse_uri},
         valid::{

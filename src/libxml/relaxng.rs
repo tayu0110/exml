@@ -22,7 +22,6 @@
 use std::io::Write;
 use std::{
     any::type_name,
-    cell::Cell,
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, take},
     os::raw::c_void,
@@ -34,7 +33,6 @@ use libc::{memcpy, memset, snprintf};
 
 use crate::{
     error::XmlParserErrors,
-    generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
@@ -42,7 +40,6 @@ use crate::{
         hash::{
             xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTablePtr,
         },
-        schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
         valid::{xml_validate_document_final, XmlValidCtxt},
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_is_determinist,
@@ -55,23 +52,18 @@ use crate::{
             xml_reg_free_regexp, xml_reg_new_exec_ctxt, xml_regexp_is_determinist,
             XmlRegExecCtxtPtr, XmlRegexpPtr,
         },
-        xmlschemastypes::{
-            xml_schema_check_facet, xml_schema_cleanup_types, xml_schema_compare_values,
-            xml_schema_free_facet, xml_schema_free_value, xml_schema_get_predefined_type,
-            xml_schema_new_facet, xml_schema_val_predef_type_node, xml_schema_validate_facet,
-            XmlSchemaValPtr,
-        },
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
         is_relaxng, relaxng_normalize, xml_relaxng_dump_valid_error, xml_relaxng_free_define,
-        xml_relaxng_free_states, xml_relaxng_free_valid_state, xml_relaxng_new_define,
-        xml_relaxng_new_states, xml_relaxng_new_valid_state, xml_relaxng_pop_errors,
-        xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory, xml_rng_verr_memory,
-        XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxtPtr, XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt,
-        XmlRelaxNGValidCtxtPtr, XmlRelaxNGValidState, XmlRelaxNGValidStatePtr, VALID_ERR,
-        VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
+        xml_relaxng_free_states, xml_relaxng_free_valid_state, xml_relaxng_init_types,
+        xml_relaxng_new_define, xml_relaxng_new_states, xml_relaxng_new_valid_state,
+        xml_relaxng_pop_errors, xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory,
+        xml_rng_verr_memory, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxtPtr, XmlRelaxNGStatesPtr,
+        XmlRelaxNGTypeLibraryPtr, XmlRelaxNGValidCtxt, XmlRelaxNGValidCtxtPtr,
+        XmlRelaxNGValidState, XmlRelaxNGValidStatePtr, VALID_ERR, VALID_ERR2, VALID_ERR2P,
+        VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS, XML_RELAXNG_REGISTERED_TYPES,
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
@@ -81,7 +73,7 @@ use crate::{
     uri::{build_uri, escape_url_except, XmlURI},
 };
 
-use super::{chvalid::xml_is_blank_char, xmlstring::xml_strndup};
+use super::chvalid::xml_is_blank_char;
 
 /// Signature of an error callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityErrorFunc")]
@@ -351,424 +343,6 @@ pub struct XmlRelaxNGDocument {
     content: XmlRelaxNGDefinePtr, // the definitions
     schema: XmlRelaxNGPtr,        // the schema
     external_ref: i32,            // 1 if an external ref
-}
-
-/// Function provided by a type library to check if a type is exported
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGTypeHave")]
-type XmlRelaxNGTypeHave = unsafe fn(data: *mut c_void, typ: &str) -> bool;
-
-/// Function provided by a type library to check if a value match a type
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGTypeCheck")]
-type XmlRelaxNGTypeCheck = unsafe fn(
-    data: *mut c_void,
-    typ: &str,
-    value: *const XmlChar,
-    result: *mut *mut c_void,
-    node: XmlNodePtr,
-) -> i32;
-
-/// Function provided by a type library to check a value facet
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGFacetCheck")]
-type XmlRelaxNGFacetCheck = unsafe fn(
-    data: *mut c_void,
-    typ: &str,
-    facet: &str,
-    val: *const XmlChar,
-    strval: *const XmlChar,
-    value: *mut c_void,
-) -> i32;
-
-/// Function provided by a type library to free a returned result
-#[doc(alias = "xmlRelaxNGTypeFree")]
-type XmlRelaxNGTypeFree = unsafe fn(data: *mut c_void, result: *mut c_void);
-
-/// Function provided by a type library to compare two values accordingly to a type.
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGTypeCompare")]
-type XmlRelaxNGTypeCompare = unsafe fn(
-    data: *mut c_void,
-    typ: &str,
-    value1: *const XmlChar,
-    ctxt1: XmlNodePtr,
-    comp1: *mut c_void,
-    value2: *const XmlChar,
-    ctxt2: XmlNodePtr,
-) -> i32;
-pub type XmlRelaxNGTypeLibraryPtr = *mut XmlRelaxNGTypeLibrary;
-#[repr(C)]
-pub struct XmlRelaxNGTypeLibrary {
-    namespace: *const XmlChar,                    // the datatypeLibrary value
-    pub(crate) data: *mut c_void,                 // data needed for the library
-    have: Option<XmlRelaxNGTypeHave>,             // the export function
-    check: Option<XmlRelaxNGTypeCheck>,           // the checking function
-    comp: Option<XmlRelaxNGTypeCompare>,          // the compare function
-    facet: Option<XmlRelaxNGFacetCheck>,          // the facet check function
-    pub(crate) freef: Option<XmlRelaxNGTypeFree>, // the freeing function
-}
-
-thread_local! {
-    static XML_RELAXNG_TYPE_INITIALIZED: Cell<bool> = const { Cell::new(false) };
-    static XML_RELAXNG_REGISTERED_TYPES: Cell<Option<XmlHashTableRef<'static, XmlRelaxNGTypeLibraryPtr>>> =
-        const { Cell::new(None) };
-}
-
-/// Register a new type library
-///
-/// Returns 0 in case of success and -1 in case of error.
-#[doc(alias = "xmlRelaxNGRegisterTypeLibrary")]
-unsafe fn xml_relaxng_register_type_library(
-    namespace: &str,
-    data: *mut c_void,
-    have: Option<XmlRelaxNGTypeHave>,
-    check: Option<XmlRelaxNGTypeCheck>,
-    comp: Option<XmlRelaxNGTypeCompare>,
-    facet: Option<XmlRelaxNGFacetCheck>,
-    freef: Option<XmlRelaxNGTypeFree>,
-) -> i32 {
-    let Some(mut registered_types) = XML_RELAXNG_REGISTERED_TYPES.get() else {
-        return -1;
-    };
-    if check.is_none() || comp.is_none() {
-        return -1;
-    }
-    if registered_types.lookup(namespace).is_some() {
-        generic_error!("Relax-NG types library '{namespace}' already registered\n");
-        return -1;
-    }
-    let lib: XmlRelaxNGTypeLibraryPtr = xml_malloc(size_of::<XmlRelaxNGTypeLibrary>()) as _;
-    if lib.is_null() {
-        xml_rng_verr_memory(null_mut(), "adding types library\n");
-        return -1;
-    }
-    memset(lib as _, 0, size_of::<XmlRelaxNGTypeLibrary>());
-    (*lib).namespace = xml_strndup(namespace.as_ptr(), namespace.len() as i32);
-    (*lib).data = data;
-    (*lib).have = have;
-    (*lib).comp = comp;
-    (*lib).check = check;
-    (*lib).facet = facet;
-    (*lib).freef = freef;
-    match registered_types.add_entry(namespace, lib) {
-        Ok(_) => 0,
-        Err(_) => {
-            generic_error!("Relax-NG types library failed to register '{namespace}'\n");
-            xml_relaxng_free_type_library(lib as _);
-            -1
-        }
-    }
-}
-
-/// Check if the given type is provided by the W3C XMLSchema Datatype library.
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGSchemaTypeHave")]
-unsafe fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: &str) -> bool {
-    let _typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(typ, "http://www.w3.org/2001/XMLSchema");
-    !_typ.is_null()
-}
-
-/// Check if the given type and value are validated by the W3C XMLSchema Datatype library.
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGSchemaTypeCheck")]
-unsafe fn xml_relaxng_schema_type_check(
-    _data: *mut c_void,
-    r#type: &str,
-    value: *const XmlChar,
-    result: *mut *mut c_void,
-    node: XmlNodePtr,
-) -> i32 {
-    if value.is_null() {
-        return -1;
-    }
-    let typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(r#type, "http://www.w3.org/2001/XMLSchema");
-    if typ.is_null() {
-        return -1;
-    }
-    let ret: i32 = xml_schema_val_predef_type_node(typ, value, result as _, node);
-    if ret == 2 {
-        // special ID error code
-        return 2;
-    }
-    if ret == 0 {
-        return 1;
-    }
-    if ret > 0 {
-        return 0;
-    }
-    -1
-}
-
-/// Compare two values for equality accordingly a type from the W3C XMLSchema Datatype library.
-///
-/// Returns 1 if equal, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGSchemaTypeCompare")]
-unsafe fn xml_relaxng_schema_type_compare(
-    _data: *mut c_void,
-    r#type: &str,
-    value1: *const XmlChar,
-    ctxt1: XmlNodePtr,
-    comp1: *mut c_void,
-    value2: *const XmlChar,
-    ctxt2: XmlNodePtr,
-) -> i32 {
-    let mut ret: i32;
-    let mut res1: XmlSchemaValPtr = null_mut();
-    let mut res2: XmlSchemaValPtr = null_mut();
-
-    if value1.is_null() || value2.is_null() {
-        return -1;
-    }
-    let typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(r#type, "http://www.w3.org/2001/XMLSchema");
-    if typ.is_null() {
-        return -1;
-    }
-    if comp1.is_null() {
-        ret = xml_schema_val_predef_type_node(typ, value1, addr_of_mut!(res1), ctxt1);
-        if ret != 0 {
-            return -1;
-        }
-        if res1.is_null() {
-            return -1;
-        }
-    } else {
-        res1 = comp1 as _;
-    }
-    ret = xml_schema_val_predef_type_node(typ, value2, addr_of_mut!(res2), ctxt2);
-    if ret != 0 {
-        if res1 != comp1 as _ {
-            xml_schema_free_value(res1);
-        }
-        return -1;
-    }
-    ret = xml_schema_compare_values(res1, res2);
-    if res1 != comp1 as _ {
-        xml_schema_free_value(res1);
-    }
-    xml_schema_free_value(res2);
-    if ret == -2 {
-        return -1;
-    }
-    if ret == 0 {
-        return 1;
-    }
-    0
-}
-
-/// Function provided by a type library to check a value facet
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGSchemaFacetCheck")]
-unsafe fn xml_relaxng_schema_facet_check(
-    _data: *mut c_void,
-    r#type: &str,
-    facetname: &str,
-    val: *const XmlChar,
-    strval: *const XmlChar,
-    value: *mut c_void,
-) -> i32 {
-    let mut ret: i32;
-
-    if strval.is_null() {
-        return -1;
-    }
-    let typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(r#type, "http://www.w3.org/2001/XMLSchema");
-    if typ.is_null() {
-        return -1;
-    }
-
-    let facet: XmlSchemaFacetPtr = xml_schema_new_facet();
-    if facet.is_null() {
-        return -1;
-    }
-
-    if facetname == "minInclusive" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMininclusive;
-    } else if facetname == "minExclusive" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinexclusive;
-    } else if facetname == "maxInclusive" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxinclusive;
-    } else if facetname == "maxExclusive" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxexclusive;
-    } else if facetname == "totalDigits" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotaldigits;
-    } else if facetname == "fractionDigits" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractiondigits;
-    } else if facetname == "pattern" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetPattern;
-    } else if facetname == "enumeration" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetEnumeration;
-    } else if facetname == "whiteSpace" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetWhitespace;
-    } else if facetname == "length" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetLength;
-    } else if facetname == "maxLength" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxlength;
-    } else if facetname == "minLength" {
-        (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
-    } else {
-        xml_schema_free_facet(facet);
-        return -1;
-    }
-    (*facet).value = val;
-    ret = xml_schema_check_facet(facet, typ, null_mut(), typ as _);
-    if ret != 0 {
-        xml_schema_free_facet(facet);
-        return -1;
-    }
-    ret = xml_schema_validate_facet(typ, facet, strval, value as _);
-    xml_schema_free_facet(facet);
-    if ret != 0 {
-        return -1;
-    }
-    0
-}
-
-/// Function provided by a type library to free a Schemas value
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGSchemaFreeValue")]
-unsafe fn xml_relaxng_schema_free_value(_data: *mut c_void, value: *mut c_void) {
-    xml_schema_free_value(value as _);
-}
-
-/// Check if the given type is provided by the default datatype library.
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGDefaultTypeHave")]
-fn xml_relaxng_default_type_have(_data: *mut c_void, typ: &str) -> bool {
-    typ == "string" || typ == "token"
-}
-
-/// Check if the given type and value are validated by the default datatype library.
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGDefaultTypeCheck")]
-unsafe fn xml_relaxng_default_type_check(
-    _data: *mut c_void,
-    typ: &str,
-    value: *const XmlChar,
-    _result: *mut *mut c_void,
-    _node: XmlNodePtr,
-) -> i32 {
-    if value.is_null() {
-        return -1;
-    }
-    if typ == "string" || typ == "token" {
-        return 1;
-    }
-
-    0
-}
-
-/// Compare two values accordingly a type from the default datatype library.
-///
-/// Returns 1 if yes, 0 if no and -1 in case of error.
-#[doc(alias = "xmlRelaxNGDefaultTypeCompare")]
-unsafe fn xml_relaxng_default_type_compare(
-    _data: *mut c_void,
-    typ: &str,
-    value1: *const XmlChar,
-    _ctxt1: XmlNodePtr,
-    _comp1: *mut c_void,
-    value2: *const XmlChar,
-    _ctxt2: XmlNodePtr,
-) -> i32 {
-    let mut ret: i32 = -1;
-
-    if typ == "string" {
-        ret = xml_str_equal(value1, value2) as i32;
-    } else if typ == "token" {
-        if !xml_str_equal(value1, value2) {
-            let value1 = CStr::from_ptr(value1 as *const i8).to_string_lossy();
-            let value2 = CStr::from_ptr(value2 as *const i8).to_string_lossy();
-            // TODO: trivial optimizations are possible by
-            // computing at compile-time
-            let nval = relaxng_normalize(&value1);
-            let nvalue = relaxng_normalize(&value2);
-            ret = (nval == nvalue) as i32;
-        } else {
-            ret = 1;
-        }
-    }
-    ret
-}
-
-/// Initialize the default type libraries.
-///
-/// Returns 0 in case of success and -1 in case of error.
-#[doc(alias = "xmlRelaxNGInitTypes")]
-pub unsafe fn xml_relaxng_init_types() -> i32 {
-    if XML_RELAXNG_TYPE_INITIALIZED.get() {
-        return 0;
-    }
-
-    let Some(registered_types) = XmlHashTableRef::with_capacity(10) else {
-        generic_error!("Failed to allocate sh table for Relax-NG types\n");
-        return -1;
-    };
-
-    XML_RELAXNG_REGISTERED_TYPES.set(Some(registered_types));
-    xml_relaxng_register_type_library(
-        "http://www.w3.org/2001/XMLSchema-datatypes",
-        null_mut(),
-        Some(xml_relaxng_schema_type_have),
-        Some(xml_relaxng_schema_type_check),
-        Some(xml_relaxng_schema_type_compare),
-        Some(xml_relaxng_schema_facet_check),
-        Some(xml_relaxng_schema_free_value),
-    );
-    xml_relaxng_register_type_library(
-        XML_RELAXNG_NS,
-        null_mut(),
-        Some(xml_relaxng_default_type_have),
-        Some(xml_relaxng_default_type_check),
-        Some(xml_relaxng_default_type_compare),
-        None,
-        None,
-    );
-    XML_RELAXNG_TYPE_INITIALIZED.set(true);
-    0
-}
-
-/// Free the structure associated to the type library
-#[doc(alias = "xmlRelaxNGFreeTypeLibrary")]
-extern "C" fn xml_relaxng_free_type_library(lib: XmlRelaxNGTypeLibraryPtr) {
-    if lib.is_null() {
-        return;
-    }
-    unsafe {
-        if !(*lib).namespace.is_null() {
-            xml_free((*lib).namespace as _);
-        }
-        xml_free(lib as _);
-    }
-}
-
-/// Cleanup the default Schemas type library associated to RelaxNG
-#[doc(alias = "xmlRelaxNGCleanupTypes")]
-pub(crate) unsafe fn xml_relaxng_cleanup_types() {
-    xml_schema_cleanup_types();
-    if !XML_RELAXNG_TYPE_INITIALIZED.get() {
-        return;
-    }
-    if let Some(mut table) = XML_RELAXNG_REGISTERED_TYPES.take().map(|t| t.into_inner()) {
-        table.clear_with(|data, _| {
-            xml_relaxng_free_type_library(data);
-        });
-    }
-    XML_RELAXNG_TYPE_INITIALIZED.set(false);
 }
 
 /// Deallocate RelaxNG partition set structures.
