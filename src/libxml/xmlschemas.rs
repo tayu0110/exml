@@ -12468,7 +12468,7 @@ unsafe fn xml_schema_parse_simple_type(
                     CStr::from_ptr(attr_value as *const i8)
                         .to_string_lossy()
                         .as_ref(),
-                    XML_SCHEMA_NS.as_ptr() as _,
+                    XML_SCHEMA_NS.to_str().unwrap(),
                 );
                 if !bi_type.is_null() {
                     return bi_type;
@@ -13937,7 +13937,7 @@ unsafe extern "C" fn xml_schema_parse_schema_top_level(
     -1
 }
 
-unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
+unsafe fn xml_schema_parse_new_doc_with_context(
     pctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     bucket: XmlSchemaBucketPtr,
@@ -13946,12 +13946,10 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
     let old_errs: i32;
     let oldbucket: XmlSchemaBucketPtr = (*(*pctxt).constructor).bucket;
 
-    /*
-     * Save old values; reset the *main* schema.
-     * URGENT TODO: This is not good; move the per-document information
-     * to the parser. Get rid of passing the main schema to the
-     * parsing functions.
-     */
+    // Save old values; reset the *main* schema.
+    // URGENT TODO: This is not good; move the per-document information
+    // to the parser. Get rid of passing the main schema to the
+    // parsing functions.
     let old_flags: i32 = (*schema).flags;
     let old_doc: XmlDocPtr = (*schema).doc;
     if (*schema).flags != 0 {
@@ -13959,24 +13957,19 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
     }
     (*schema).doc = (*bucket).doc;
     (*pctxt).schema = schema;
-    /*
-     * Keep the current target namespace on the parser *not* on the
-     * main schema.
-     */
+    // Keep the current target namespace on the parser *not* on the main schema.
     (*pctxt).target_namespace = (*bucket).target_namespace;
     (*WXS_CONSTRUCTOR!(pctxt)).bucket = bucket;
 
     if !(*bucket).target_namespace.is_null()
         && xml_str_equal((*bucket).target_namespace, XML_SCHEMA_NS.as_ptr() as _)
     {
-        /*
-         * We are parsing the schema for schemas!
-         */
+        // We are parsing the schema for schemas!
         (*pctxt).is_s4_s = 1;
     }
-    /* Mark it as parsed, even if parsing fails. */
+    // Mark it as parsed, even if parsing fails.
     (*bucket).parsed += 1;
-    /* Compile the schema doc. */
+    // Compile the schema doc.
     let node: XmlNodePtr = if (*bucket).doc.is_null() {
         null_mut()
     } else {
@@ -13986,18 +13979,16 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
     if ret != 0 {
         // goto exit;
     } else {
-        /* An empty schema; just get out. */
+        // An empty schema; just get out.
         if let Some(children) = (*node).children() {
             old_errs = (*pctxt).nberrors;
             ret = xml_schema_parse_schema_top_level(pctxt, schema, children.as_ptr());
             if ret != 0 {
                 // goto exit;
             } else {
-                /*
-                 * TODO: Not nice, but I'm not 100% sure we will get always an error
-                 * as a result of the above functions; so better rely on (*pctxt).err
-                 * as well.
-                 */
+                // TODO: Not nice, but I'm not 100% sure we will get always an error
+                // as a result of the above functions; so better rely on (*pctxt).err
+                // as well.
                 if ret == 0 && old_errs != (*pctxt).nberrors {
                     ret = (*pctxt).err;
                     // goto exit;
@@ -14010,7 +14001,7 @@ unsafe extern "C" fn xml_schema_parse_new_doc_with_context(
 
     // exit:
     (*WXS_CONSTRUCTOR!(pctxt)).bucket = oldbucket;
-    /* Restore schema values. */
+    // Restore schema values.
     (*schema).doc = old_doc;
     (*schema).flags = old_flags;
     ret
@@ -14478,7 +14469,9 @@ unsafe fn xml_schema_get_type(
     if !ns_name.is_null() && xml_str_equal(ns_name, XML_SCHEMA_NS.as_ptr() as _) {
         ret = xml_schema_get_predefined_type(
             CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
-            ns_name,
+            CStr::from_ptr(ns_name as *const i8)
+                .to_string_lossy()
+                .as_ref(),
         );
         if !ret.is_null() {
             // goto exit;

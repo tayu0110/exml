@@ -455,7 +455,7 @@ unsafe fn xml_relaxng_register_type_library(
 #[doc(alias = "xmlRelaxNGSchemaTypeHave")]
 unsafe fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: &str) -> bool {
     let _typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(typ, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
+        xml_schema_get_predefined_type(typ, "http://www.w3.org/2001/XMLSchema");
     !_typ.is_null()
 }
 
@@ -474,7 +474,7 @@ unsafe fn xml_relaxng_schema_type_check(
         return -1;
     }
     let typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(r#type, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
+        xml_schema_get_predefined_type(r#type, "http://www.w3.org/2001/XMLSchema");
     if typ.is_null() {
         return -1;
     }
@@ -513,7 +513,7 @@ unsafe fn xml_relaxng_schema_type_compare(
         return -1;
     }
     let typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(r#type, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
+        xml_schema_get_predefined_type(r#type, "http://www.w3.org/2001/XMLSchema");
     if typ.is_null() {
         return -1;
     }
@@ -567,7 +567,7 @@ unsafe fn xml_relaxng_schema_facet_check(
         return -1;
     }
     let typ: XmlSchemaTypePtr =
-        xml_schema_get_predefined_type(r#type, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
+        xml_schema_get_predefined_type(r#type, "http://www.w3.org/2001/XMLSchema");
     if typ.is_null() {
         return -1;
     }

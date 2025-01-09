@@ -1014,13 +1014,17 @@ pub(crate) unsafe fn xml_schema_cleanup_types() {
 ///
 /// Returns the type if found, NULL otherwise
 #[doc(alias = "xmlSchemaGetPredefinedType")]
-pub unsafe fn xml_schema_get_predefined_type(name: &str, ns: *const XmlChar) -> XmlSchemaTypePtr {
+pub unsafe fn xml_schema_get_predefined_type(name: &str, ns: &str) -> XmlSchemaTypePtr {
     if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
         return null_mut();
     }
     let name = CString::new(name).unwrap();
-    xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.get(), name.as_ptr() as *const u8, ns)
-        as XmlSchemaTypePtr
+    let ns = CString::new(ns).unwrap();
+    xml_hash_lookup2(
+        XML_SCHEMA_TYPES_BANK.get(),
+        name.as_ptr() as *const u8,
+        ns.as_ptr() as *const u8,
+    ) as XmlSchemaTypePtr
 }
 
 /// Check that a value conforms to the lexical space of the predefined type.
