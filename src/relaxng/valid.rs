@@ -50,6 +50,21 @@ pub struct XmlRelaxNGValidState {
     pub(crate) attrs: *mut XmlAttrPtr, // the array of attributes
 }
 
+impl Default for XmlRelaxNGValidState {
+    fn default() -> Self {
+        Self {
+            node: null_mut(),
+            seq: null_mut(),
+            nb_attrs: 0,
+            max_attrs: 0,
+            nb_attr_left: 0,
+            value: null_mut(),
+            endvalue: null_mut(),
+            attrs: null_mut(),
+        }
+    }
+}
+
 pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
 /// A RelaxNGs validation context
 // TODO: all fieleds are used in only relaxng module.
@@ -244,6 +259,42 @@ impl XmlRelaxNGValidCtxt {
         }
         xml_reg_free_exec_ctxt(exec);
         ret
+    }
+}
+
+impl Default for XmlRelaxNGValidCtxt {
+    fn default() -> Self {
+        Self {
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+            nb_errors: 0,
+            schema: null_mut(),
+            doc: null_mut(),
+            flags: 0,
+            depth: 0,
+            idref: 0,
+            err_no: 0,
+            err: null_mut(),
+            err_nr: 0,
+            err_max: 0,
+            err_tab: null_mut(),
+            state: null_mut(),
+            states: null_mut(),
+            free_state: null_mut(),
+            free_states_nr: 0,
+            free_states_max: 0,
+            free_states: null_mut(),
+            elem: null_mut(),
+            elem_nr: 0,
+            elem_max: 0,
+            elem_tab: null_mut(),
+            pstate: 0,
+            pnode: null_mut(),
+            pdef: null_mut(),
+            perr: 0,
+        }
     }
 }
 

@@ -24,7 +24,7 @@ use std::{
     any::type_name,
     cell::Cell,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val, zeroed},
+    mem::{size_of, size_of_val},
     os::raw::c_void,
     ptr::{addr_of_mut, null_mut},
     slice::from_raw_parts,
@@ -1127,9 +1127,7 @@ unsafe fn xml_relaxng_compare_name_classes(
     let mut ret: i32;
     let mut node = XmlNode::default();
     let mut ns = XmlNs::default();
-    let mut ctxt: XmlRelaxNGValidCtxt = unsafe { zeroed() };
-
-    memset(addr_of_mut!(ctxt) as _, 0, size_of::<XmlRelaxNGValidCtxt>());
+    let mut ctxt: XmlRelaxNGValidCtxt = XmlRelaxNGValidCtxt::default();
 
     ctxt.flags = FLAGS_IGNORABLE | FLAGS_NOERROR;
 
@@ -1677,7 +1675,7 @@ unsafe fn xml_relaxng_document_pop(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGD
 unsafe fn xml_relaxng_load_external_ref(
     ctxt: XmlRelaxNGParserCtxtPtr,
     url: &str,
-    ns: *const XmlChar,
+    ns: Option<&str>,
 ) -> XmlRelaxNGDocumentPtr {
     let mut doc: XmlDocPtr;
     let root: XmlNodePtr;
@@ -1735,13 +1733,10 @@ unsafe fn xml_relaxng_load_external_ref(
     (*ctxt).documents = ret;
 
     // transmit the ns if needed
-    if !ns.is_null() {
+    if let Some(ns) = ns {
         root = (*doc).get_root_element();
         if !root.is_null() && (*root).has_prop("ns").is_null() {
-            (*root).set_prop(
-                "ns",
-                Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
-            );
+            (*root).set_prop("ns", Some(ns));
         }
     }
 
@@ -1953,7 +1948,7 @@ unsafe fn xml_relaxng_load_include(
     ctxt: XmlRelaxNGParserCtxtPtr,
     url: &str,
     node: XmlNodePtr,
-    ns: *const XmlChar,
+    ns: Option<&str>,
 ) -> XmlRelaxNGIncludePtr {
     let mut doc: XmlDocPtr;
     let mut root: XmlNodePtr;
@@ -2005,13 +2000,10 @@ unsafe fn xml_relaxng_load_include(
     (*ctxt).includes = ret;
 
     // transmit the ns if needed
-    if !ns.is_null() {
+    if let Some(ns) = ns {
         root = (*doc).get_root_element();
         if !root.is_null() && (*root).has_prop("ns").is_null() {
-            (*root).set_prop(
-                "ns",
-                Some(CStr::from_ptr(ns as *const i8).to_string_lossy().as_ref()),
-            );
+            (*root).set_prop("ns", Some(ns));
         }
     }
 
@@ -2230,12 +2222,8 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             delete = cur;
                             break 'skip_children;
                         };
-                        let ns = ns.map(|n| CString::new(n).unwrap());
-                        let docu: XmlRelaxNGDocumentPtr = xml_relaxng_load_external_ref(
-                            ctxt,
-                            &url,
-                            ns.as_ref().map_or(null_mut(), |n| n.as_ptr() as *const u8),
-                        );
+                        let docu: XmlRelaxNGDocumentPtr =
+                            xml_relaxng_load_external_ref(ctxt, &url, ns.as_deref());
                         if docu.is_null() {
                             xml_rng_perr!(
                                 ctxt,
@@ -2289,13 +2277,8 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 tmp = (*tmp).parent().map_or(null_mut(), |p| p.as_ptr());
                             }
                         }
-                        let ns = ns.map(|n| CString::new(n).unwrap());
-                        let incl: XmlRelaxNGIncludePtr = xml_relaxng_load_include(
-                            ctxt,
-                            &url,
-                            cur,
-                            ns.as_ref().map_or(null_mut(), |n| n.as_ptr() as *const u8),
-                        );
+                        let incl: XmlRelaxNGIncludePtr =
+                            xml_relaxng_load_include(ctxt, &url, cur, ns.as_deref());
                         if incl.is_null() {
                             xml_rng_perr!(
                                 ctxt,
@@ -2393,16 +2376,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                             prefix
                                         );
                                     } else {
-                                        let href = (*ns).href;
-                                        (*cur).set_prop(
-                                            "ns",
-                                            (!href.is_null())
-                                                .then(|| {
-                                                    CStr::from_ptr(href as *const i8)
-                                                        .to_string_lossy()
-                                                })
-                                                .as_deref(),
-                                        );
+                                        (*cur).set_prop("ns", (*ns).href().as_deref());
                                         let local = CString::new(local).unwrap();
                                         (*cur).set_content(local.as_ptr() as *const u8);
                                     }
@@ -7925,7 +7899,7 @@ unsafe fn xml_relaxng_copy_valid_state(
             xml_rng_verr_memory(ctxt, "allocating states\n");
             return null_mut();
         }
-        memset(ret as _, 0, size_of::<XmlRelaxNGValidState>());
+        std::ptr::write(&mut *ret, XmlRelaxNGValidState::default());
     }
     let attrs: *mut XmlAttrPtr = (*ret).attrs;
     let max_attrs: u32 = (*ret).max_attrs as _;
@@ -9352,7 +9326,6 @@ unsafe fn xml_relaxng_validate_document(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDo
             valid: 1,
             ..Default::default()
         };
-        // memset(addr_of_mut!(vctxt) as _, 0, size_of::<XmlValidCtxt>());
         vctxt.valid = 1;
         vctxt.error = (*ctxt).error;
         vctxt.warning = (*ctxt).warning;
