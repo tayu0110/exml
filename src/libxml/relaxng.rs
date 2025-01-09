@@ -38,7 +38,7 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
-        globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
+        globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTablePtr,
         },
@@ -65,13 +65,13 @@ use crate::{
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
-        is_relaxng, xml_relaxng_dump_valid_error, xml_relaxng_free_define, xml_relaxng_free_states,
-        xml_relaxng_free_valid_state, xml_relaxng_new_states, xml_relaxng_new_valid_state,
-        xml_relaxng_pop_errors, xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory,
-        xml_rng_verr_memory, XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxtPtr,
-        XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt, XmlRelaxNGValidCtxtPtr, XmlRelaxNGValidState,
-        XmlRelaxNGValidStatePtr, VALID_ERR, VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P,
-        XML_RELAXNG_NS,
+        is_relaxng, relaxng_normalize, xml_relaxng_dump_valid_error, xml_relaxng_free_define,
+        xml_relaxng_free_states, xml_relaxng_free_valid_state, xml_relaxng_new_states,
+        xml_relaxng_new_valid_state, xml_relaxng_pop_errors, xml_relaxng_valid_error_pop,
+        xml_rng_perr, xml_rng_perr_memory, xml_rng_verr_memory, XmlRelaxNGDefine,
+        XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxtPtr, XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt,
+        XmlRelaxNGValidCtxtPtr, XmlRelaxNGValidState, XmlRelaxNGValidStatePtr, VALID_ERR,
+        VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
     },
     tree::{
         xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
@@ -656,55 +656,6 @@ unsafe fn xml_relaxng_default_type_check(
     0
 }
 
-/// Implements the  normalizeWhiteSpace( s ) function from section 6.2.9 of the spec
-///
-/// Returns the new string or NULL in case of error.
-#[doc(alias = "xmlRelaxNGNormalize")]
-unsafe fn xml_relaxng_normalize(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    mut str: *const XmlChar,
-) -> *mut XmlChar {
-    let mut p: *mut XmlChar;
-    let mut tmp: *const XmlChar;
-
-    if str.is_null() {
-        return null_mut();
-    }
-    tmp = str;
-    while *tmp != 0 {
-        tmp = tmp.add(1);
-    }
-    let len: i32 = tmp.offset_from(str) as _;
-
-    let ret: *mut XmlChar = xml_malloc_atomic(len as usize + 1) as _;
-    if ret.is_null() {
-        xml_rng_verr_memory(ctxt, "validating\n");
-        return null_mut();
-    }
-    p = ret;
-    while xml_is_blank_char(*str as u32) {
-        str = str.add(1);
-    }
-    while *str != 0 {
-        if xml_is_blank_char(*str as u32) {
-            while xml_is_blank_char(*str as u32) {
-                str = str.add(1);
-            }
-            if *str == 0 {
-                break;
-            }
-            *p = b' ';
-            p = p.add(1);
-        } else {
-            *p = *str;
-            p = p.add(1);
-            str = str.add(1);
-        }
-    }
-    *p = 0;
-    ret
-}
-
 /// Compare two values accordingly a type from the default datatype library.
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
@@ -724,24 +675,13 @@ unsafe fn xml_relaxng_default_type_compare(
         ret = xml_str_equal(value1, value2) as i32;
     } else if typ == "token" {
         if !xml_str_equal(value1, value2) {
+            let value1 = CStr::from_ptr(value1 as *const i8).to_string_lossy();
+            let value2 = CStr::from_ptr(value2 as *const i8).to_string_lossy();
             // TODO: trivial optimizations are possible by
             // computing at compile-time
-            let nval: *mut XmlChar = xml_relaxng_normalize(null_mut(), value1);
-            let nvalue: *mut XmlChar = xml_relaxng_normalize(null_mut(), value2);
-
-            if nval.is_null() || nvalue.is_null() {
-                ret = -1;
-            } else if xml_str_equal(nval, nvalue) {
-                ret = 1;
-            } else {
-                ret = 0;
-            }
-            if !nval.is_null() {
-                xml_free(nval as _);
-            }
-            if !nvalue.is_null() {
-                xml_free(nvalue as _);
-            }
+            let nval = relaxng_normalize(&value1);
+            let nvalue = relaxng_normalize(&value2);
+            ret = (nval == nvalue) as i32;
         } else {
             ret = 1;
         }
@@ -7304,17 +7244,17 @@ unsafe fn xml_relaxng_validate_value(
                 } else {
                     // TODO: trivial optimizations are possible by
                     // computing at compile-time
-                    let nval: *mut XmlChar = xml_relaxng_normalize(ctxt, (*define).value);
-                    let nvalue: *mut XmlChar = xml_relaxng_normalize(ctxt, value);
-
-                    if nval.is_null() || nvalue.is_null() || !xml_str_equal(nval, nvalue) {
+                    let defval = CStr::from_ptr((*define).value as *const i8).to_string_lossy();
+                    if value.is_null() {
                         ret = -1;
-                    }
-                    if !nval.is_null() {
-                        xml_free(nval as _);
-                    }
-                    if !nvalue.is_null() {
-                        xml_free(nvalue as _);
+                    } else {
+                        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+                        let nval = relaxng_normalize(&defval);
+                        let nvalue = relaxng_normalize(&value);
+
+                        if nval != nvalue {
+                            ret = -1;
+                        }
                     }
                 }
             }

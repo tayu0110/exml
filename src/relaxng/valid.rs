@@ -1,10 +1,11 @@
-use std::ptr::null_mut;
+use std::{borrow::Cow, ptr::null_mut};
 
 use libc::{memcpy, memset};
 
 use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     libxml::{
+        chvalid::xml_is_blank_char,
         globals::{xml_free, xml_malloc, xml_realloc},
         relaxng::{
             xml_relaxng_add_states_uniq, xml_relaxng_validate_progressive_callback,
@@ -516,4 +517,40 @@ pub(crate) unsafe fn xml_relaxng_free_valid_state(
     } else {
         xml_relaxng_add_states_uniq(ctxt, (*ctxt).free_state, state);
     }
+}
+
+/// Implements the  normalizeWhiteSpace( s ) function from section 6.2.9 of the spec
+///
+/// If `s` is not modified or only its head or tail is trimed, return `s` wrapped `Cow::Borrowed`.  
+/// Otherwise, return normalized string wrapped `Cow::Owned`.
+#[doc(alias = "xmlRelaxNGNormalize")]
+pub(crate) fn relaxng_normalize(mut s: &str) -> Cow<'_, str> {
+    s = s.trim_start_matches(|c| xml_is_blank_char(c as u32));
+    s = s.trim_end_matches(|c| xml_is_blank_char(c as u32));
+    let mut chars = s.chars().peekable();
+    let mut pending = 0;
+    let mut buf = None::<String>;
+    while let Some(c) = chars.next() {
+        if xml_is_blank_char(c as u32) {
+            if chars.next_if(|c| xml_is_blank_char(*c as u32)).is_some() {
+                while chars.next_if(|c| xml_is_blank_char(*c as u32)).is_some() {}
+                let buf = buf.get_or_insert_with(String::new);
+                if pending > 0 {
+                    buf.push_str(&s[..pending]);
+                    pending = 0;
+                }
+                buf.push(' ');
+            } else if let Some(buf) = buf.as_mut() {
+                buf.push(c);
+            } else {
+                pending += c.len_utf8();
+            }
+        } else if let Some(buf) = buf.as_mut() {
+            buf.push(c);
+        } else {
+            pending += c.len_utf8();
+        }
+    }
+
+    buf.map(Cow::Owned).unwrap_or(Cow::Borrowed(s))
 }
