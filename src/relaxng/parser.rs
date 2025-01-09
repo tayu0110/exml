@@ -44,9 +44,7 @@ pub struct XmlRelaxNGParserCtxt {
     pub(crate) url: Option<String>,
     pub(crate) document: XmlDocPtr,
 
-    pub(crate) def_nr: i32,                       // number of defines used
-    pub(crate) def_max: i32,                      // number of defines allocated
-    pub(crate) def_tab: *mut XmlRelaxNGDefinePtr, // pointer to the allocated definitions
+    pub(crate) def_tab: Vec<XmlRelaxNGDefinePtr>, // pointer to the allocated definitions
 
     pub(crate) buffer: *const i8,
     pub(crate) size: i32,
@@ -158,9 +156,9 @@ impl Default for XmlRelaxNGParserCtxt {
             includes: null_mut(),
             url: None,
             document: null_mut(),
-            def_nr: 0,
-            def_max: 0,
-            def_tab: null_mut(),
+            // def_nr: 0,
+            // def_max: 0,
+            def_tab: vec![],
             buffer: null_mut(),
             size: 0,
             doc: null_mut(),
@@ -285,11 +283,8 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     if !(*ctxt).inc_tab.is_null() {
         xml_free((*ctxt).inc_tab as _);
     }
-    if !(*ctxt).def_tab.is_null() {
-        for i in 0..(*ctxt).def_nr {
-            xml_relaxng_free_define(*(*ctxt).def_tab.add(i as usize));
-        }
-        xml_free((*ctxt).def_tab as _);
+    for def in (*ctxt).def_tab.drain(..) {
+        xml_relaxng_free_define(def);
     }
     if !(*ctxt).document.is_null() && (*ctxt).freedoc != 0 {
         xml_free_doc((*ctxt).document);

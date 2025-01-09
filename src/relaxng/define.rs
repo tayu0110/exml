@@ -3,7 +3,7 @@ use std::{ffi::c_void, ptr::null_mut};
 use crate::{
     hash::{xml_hash_free, XmlHashTablePtr},
     libxml::{
-        globals::{xml_free, xml_malloc, xml_realloc},
+        globals::{xml_free, xml_malloc},
         relaxng::{
             xml_relaxng_free_partition, XmlRelaxNGPartitionPtr, XmlRelaxNGType,
             XmlRelaxNGTypeLibraryPtr,
@@ -97,35 +97,13 @@ pub(crate) unsafe fn xml_relaxng_new_define(
     ctxt: XmlRelaxNGParserCtxtPtr,
     node: XmlNodePtr,
 ) -> XmlRelaxNGDefinePtr {
-    if (*ctxt).def_max == 0 {
-        (*ctxt).def_max = 16;
-        (*ctxt).def_nr = 0;
-        (*ctxt).def_tab =
-            xml_malloc((*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>()) as _;
-        if (*ctxt).def_tab.is_null() {
-            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
-            return null_mut();
-        }
-    } else if (*ctxt).def_max <= (*ctxt).def_nr {
-        (*ctxt).def_max *= 2;
-        let tmp: *mut XmlRelaxNGDefinePtr = xml_realloc(
-            (*ctxt).def_tab as _,
-            (*ctxt).def_max as usize * size_of::<XmlRelaxNGDefinePtr>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_rng_perr_memory(ctxt, Some("allocating define\n"));
-            return null_mut();
-        }
-        (*ctxt).def_tab = tmp;
-    }
     let ret: XmlRelaxNGDefinePtr = xml_malloc(size_of::<XmlRelaxNGDefine>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(ctxt, Some("allocating define\n"));
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlRelaxNGDefine::default());
-    *(*ctxt).def_tab.add((*ctxt).def_nr as usize) = ret;
-    (*ctxt).def_nr += 1;
+    (*ctxt).def_tab.push(ret);
     (*ret).node = node;
     (*ret).depth = -1;
     ret

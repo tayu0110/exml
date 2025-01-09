@@ -24,9 +24,9 @@ use std::{
     any::type_name,
     cell::Cell,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val},
+    mem::{size_of, size_of_val, take},
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null_mut},
     slice::from_raw_parts,
 };
 
@@ -255,8 +255,23 @@ pub struct XmlRelaxNG {
     refs: Option<XmlHashTableRef<'static, ()>>, // references
     documents: XmlRelaxNGDocumentPtr,           // all the documents loaded
     includes: XmlRelaxNGIncludePtr,             // all the includes loaded
-    def_nr: i32,                                // number of defines used
-    def_tab: *mut XmlRelaxNGDefinePtr,          // pointer to the allocated definitions
+    def_tab: Vec<XmlRelaxNGDefinePtr>,          // pointer to the allocated definitions
+}
+
+impl Default for XmlRelaxNG {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            topgrammar: null_mut(),
+            doc: null_mut(),
+            idref: 0,
+            defs: None,
+            refs: None,
+            documents: null_mut(),
+            includes: null_mut(),
+            def_tab: vec![],
+        }
+    }
 }
 
 const XML_RELAXNG_IN_ATTRIBUTE: i32 = 1 << 0;
@@ -794,13 +809,10 @@ unsafe fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
     if !(*schema).doc.is_null() {
         xml_free_doc((*schema).doc);
     }
-    if !(*schema).def_tab.is_null() {
-        for i in 0..(*schema).def_nr {
-            xml_relaxng_free_define(*(*schema).def_tab.add(i as usize));
-        }
-        xml_free((*schema).def_tab as _);
+    for def in (*schema).def_tab.drain(..) {
+        xml_relaxng_free_define(def);
     }
-
+    drop_in_place(schema);
     xml_free(schema as _);
 }
 
@@ -2580,7 +2592,7 @@ unsafe fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPt
         xml_rng_perr_memory(ctxt, None);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRelaxNG>());
+    std::ptr::write(&mut *ret, XmlRelaxNG::default());
 
     ret
 }
@@ -6572,9 +6584,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
 
     (*ret).includes = (*ctxt).includes;
     (*ctxt).includes = null_mut();
-    (*ret).def_nr = (*ctxt).def_nr;
-    (*ret).def_tab = (*ctxt).def_tab;
-    (*ctxt).def_tab = null_mut();
+    (*ret).def_tab = take(&mut (*ctxt).def_tab);
     if (*ctxt).idref == 1 {
         (*ret).idref = 1;
     }
@@ -6624,13 +6634,11 @@ pub unsafe fn xml_relaxng_free(schema: XmlRelaxNGPtr) {
     if !(*schema).includes.is_null() {
         xml_relaxng_free_include_list((*schema).includes);
     }
-    if !(*schema).def_tab.is_null() {
-        for i in 0..(*schema).def_nr {
-            xml_relaxng_free_define(*(*schema).def_tab.add(i as usize));
-        }
-        xml_free((*schema).def_tab as _);
+    for def in (*schema).def_tab.drain(..) {
+        xml_relaxng_free_define(def);
     }
 
+    drop_in_place(schema);
     xml_free(schema as _);
 }
 
