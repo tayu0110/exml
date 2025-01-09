@@ -2581,10 +2581,10 @@ unsafe fn xml_shell_rng_validate(
         globals::GLOBAL_STATE,
         libxml::relaxng::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-            xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
-            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
-            XmlRelaxNGValidCtxtPtr,
+            xml_relaxng_new_valid_ctxt, xml_relaxng_parse, xml_relaxng_set_parser_errors,
+            xml_relaxng_set_valid_errors, xml_relaxng_validate_doc, XmlRelaxNGValidCtxtPtr,
         },
+        relaxng::xml_relaxng_new_parser_ctxt,
     };
 
     use super::relaxng::XmlRelaxNGPtr;

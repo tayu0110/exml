@@ -33,7 +33,7 @@ use std::{
 use libc::{memcpy, memset, snprintf};
 
 use crate::{
-    error::{XmlParserErrors, __xml_raise_error},
+    error::XmlParserErrors,
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
     hash::XmlHashTableRef,
@@ -62,15 +62,14 @@ use crate::{
             xml_schema_new_facet, xml_schema_val_predef_type_node, xml_schema_validate_facet,
             XmlSchemaValPtr,
         },
-        xmlstring::{
-            xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strcat, xml_strdup,
-            xml_strlen, XmlChar,
-        },
+        xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strlen, XmlChar},
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
-        is_relaxng, xml_relaxng_free_define, XmlRelaxNGDefine, XmlRelaxNGDefinePtr,
-        XmlRelaxNGParserCtxt, XmlRelaxNGParserCtxtPtr, XML_RELAXNG_NS,
+        is_relaxng, xml_relaxng_dump_valid_error, xml_relaxng_free_define, xml_relaxng_pop_errors,
+        xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory, xml_rng_verr_memory,
+        XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxt, XmlRelaxNGParserCtxtPtr,
+        VALID_ERR, VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
@@ -267,10 +266,10 @@ const XML_RELAXNG_IN_EXTERNALREF: i32 = 1 << 7;
 const XML_RELAXNG_IN_ANYEXCEPT: i32 = 1 << 8;
 const XML_RELAXNG_IN_NSEXCEPT: i32 = 1 << 9;
 
-const FLAGS_IGNORABLE: i32 = 1;
-const FLAGS_NEGATIVE: i32 = 2;
+pub(crate) const FLAGS_IGNORABLE: i32 = 1;
+pub(crate) const FLAGS_NEGATIVE: i32 = 2;
 const FLAGS_MIXED_CONTENT: i32 = 4;
-const FLAGS_NOERROR: i32 = 8;
+pub(crate) const FLAGS_NOERROR: i32 = 8;
 
 pub type XmlRelaxNGInterleaveGroupPtr = *mut XmlRelaxNGInterleaveGroup;
 /// A RelaxNGs partition set associated to lists of definitions
@@ -299,17 +298,18 @@ pub struct XmlRelaxNGPartition {
 const MAX_ATTR: usize = 20;
 pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
 /// A RelaxNGs validation state
+// TODO: all fieleds are used in only relaxng module.
 #[doc(alias = "xmlRelaxNGValidState")]
 #[repr(C)]
 pub struct XmlRelaxNGValidState {
-    node: XmlNodePtr,       // the current node
-    seq: XmlNodePtr,        // the sequence of children left to validate
-    nb_attrs: i32,          // the number of attributes
-    max_attrs: i32,         // the size of attrs
-    nb_attr_left: i32,      // the number of attributes left to validate
-    value: *mut XmlChar,    // the value when operating on string
-    endvalue: *mut XmlChar, // the end value when operating on string
-    attrs: *mut XmlAttrPtr, // the array of attributes
+    pub(crate) node: XmlNodePtr, // the current node
+    pub(crate) seq: XmlNodePtr,  // the sequence of children left to validate
+    nb_attrs: i32,               // the number of attributes
+    max_attrs: i32,              // the size of attrs
+    nb_attr_left: i32,           // the number of attributes left to validate
+    value: *mut XmlChar,         // the value when operating on string
+    endvalue: *mut XmlChar,      // the end value when operating on string
+    attrs: *mut XmlAttrPtr,      // the array of attributes
 }
 
 pub type XmlRelaxNGStatesPtr = *mut XmlRelaxNGStates;
@@ -322,48 +322,48 @@ pub struct XmlRelaxNGStates {
     tab_state: *mut XmlRelaxNGValidStatePtr,
 }
 
-const ERROR_IS_DUP: i32 = 1;
-
 pub type XmlRelaxNGValidErrorPtr = *mut XmlRelaxNGValidError;
 /// A RelaxNGs validation error
+// TODO: all fieleds are used in only relaxng module.
 #[doc(alias = "xmlRelaxNGValidError")]
 #[repr(C)]
 pub struct XmlRelaxNGValidError {
-    err: XmlRelaxNGValidErr, // the error number
-    flags: i32,              // flags
-    node: XmlNodePtr,        // the current node
-    seq: XmlNodePtr,         // the current child
-    arg1: *const XmlChar,    // first arg
-    arg2: *const XmlChar,    // second arg
+    pub(crate) err: XmlRelaxNGValidErr, // the error number
+    pub(crate) flags: i32,              // flags
+    pub(crate) node: XmlNodePtr,        // the current node
+    pub(crate) seq: XmlNodePtr,         // the current child
+    pub(crate) arg1: *const XmlChar,    // first arg
+    pub(crate) arg2: *const XmlChar,    // second arg
 }
 
 pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
 /// A RelaxNGs validation context
+// TODO: all fieleds are used in only relaxng module.
 #[doc(alias = "xmlRelaxNGValidCtxt")]
 #[repr(C)]
 pub struct XmlRelaxNGValidCtxt {
-    user_data: Option<GenericErrorContext>, // user specific data block
-    error: Option<GenericError>,            // the callback in case of errors
-    warning: Option<GenericError>,          // the callback in case of warning
-    serror: Option<StructuredError>,
-    nb_errors: i32, // number of errors in validation
+    pub(crate) user_data: Option<GenericErrorContext>, // user specific data block
+    pub(crate) error: Option<GenericError>,            // the callback in case of errors
+    warning: Option<GenericError>,                     // the callback in case of warning
+    pub(crate) serror: Option<StructuredError>,
+    pub(crate) nb_errors: i32, // number of errors in validation
 
-    schema: XmlRelaxNGPtr, // The schema in use
-    doc: XmlDocPtr,        // the document being validated
-    flags: i32,            // validation flags
-    depth: i32,            // validation depth
-    idref: i32,            // requires idref checking
-    err_no: i32,           // the first error found
+    schema: XmlRelaxNGPtr,  // The schema in use
+    doc: XmlDocPtr,         // the document being validated
+    pub(crate) flags: i32,  // validation flags
+    depth: i32,             // validation depth
+    idref: i32,             // requires idref checking
+    pub(crate) err_no: i32, // the first error found
 
     // Errors accumulated in branches may have to be stacked to be
     // provided back when it's sure they affect validation.
-    err: XmlRelaxNGValidErrorPtr,     // Last error
-    err_nr: i32,                      // Depth of the error stack
-    err_max: i32,                     // Max depth of the error stack
-    err_tab: XmlRelaxNGValidErrorPtr, // stack of errors
+    pub(crate) err: XmlRelaxNGValidErrorPtr,     // Last error
+    pub(crate) err_nr: i32,                      // Depth of the error stack
+    pub(crate) err_max: i32,                     // Max depth of the error stack
+    pub(crate) err_tab: XmlRelaxNGValidErrorPtr, // stack of errors
 
-    state: XmlRelaxNGValidStatePtr, // the current validation state
-    states: XmlRelaxNGStatesPtr,    // the accumulated state list
+    pub(crate) state: XmlRelaxNGValidStatePtr, // the current validation state
+    states: XmlRelaxNGStatesPtr,               // the accumulated state list
 
     free_state: XmlRelaxNGStatesPtr, // the pool of free valid states
     free_states_nr: i32,
@@ -376,7 +376,7 @@ pub struct XmlRelaxNGValidCtxt {
     elem_max: i32,                    // the max depth of elements
     elem_tab: *mut XmlRegExecCtxtPtr, // the stack of regexp runtime
     pstate: i32,                      // progressive state
-    pnode: XmlNodePtr,                // the current node
+    pub(crate) pnode: XmlNodePtr,     // the current node
     pdef: XmlRelaxNGDefinePtr,        // the non-streamable definition
     perr: i32,                        // signal error in content model outside the regexp
 }
@@ -470,581 +470,6 @@ thread_local! {
     static XML_RELAXNG_TYPE_INITIALIZED: Cell<bool> = const { Cell::new(false) };
     static XML_RELAXNG_REGISTERED_TYPES: Cell<Option<XmlHashTableRef<'static, XmlRelaxNGTypeLibraryPtr>>> =
         const { Cell::new(None) };
-}
-
-macro_rules! VALID_ERR {
-    ($ctxt:expr, $a:expr) => {
-        xml_relaxng_add_valid_error($ctxt, $a, null_mut(), null_mut(), 0);
-    };
-}
-macro_rules! VALID_ERR2 {
-    ($ctxt:expr, $a:expr, $b:expr) => {
-        xml_relaxng_add_valid_error($ctxt, $a, $b, null_mut(), 0);
-    };
-}
-macro_rules! VALID_ERR3 {
-    ($ctxt:expr, $a:expr, $b:expr, $c:expr) => {
-        xml_relaxng_add_valid_error($ctxt, $a, $b, $c, 0);
-    };
-}
-macro_rules! VALID_ERR2P {
-    ($ctxt:expr, $a:expr, $b:expr) => {
-        xml_relaxng_add_valid_error($ctxt, $a, $b, null_mut(), 1);
-    };
-}
-macro_rules! VALID_ERR3P {
-    ($ctxt:expr, $a:expr, $b:expr, $c:expr) => {
-        xml_relaxng_add_valid_error($ctxt, $a, $b, $c, 1);
-    };
-}
-
-/// Computes a formatted error string for the given error code and args
-///
-/// Returns the error string, it must be deallocated by the caller
-#[doc(alias = "xmlRelaxNGGetErrorString")]
-unsafe fn xml_relaxng_get_error_string(
-    err: XmlRelaxNGValidErr,
-    mut arg1: *const XmlChar,
-    mut arg2: *const XmlChar,
-) -> *mut XmlChar {
-    let mut msg: [c_char; 1000] = [0; 1000];
-    let mut result: *mut XmlChar;
-
-    if arg1.is_null() {
-        arg1 = c"".as_ptr() as _;
-    }
-    if arg2.is_null() {
-        arg2 = c"".as_ptr() as _;
-    }
-
-    msg[0] = 0;
-    match err {
-        XmlRelaxNGValidErr::XmlRelaxngOk => return null_mut(),
-        XmlRelaxNGValidErr::XmlRelaxngErrMemory => {
-            return xml_char_strdup(c"out of memory\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrType => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"failed to validate type %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrTypeval => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Type %s doesn't allow value '%s'\n".as_ptr() as _,
-                arg1,
-                arg2,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrDupid => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"ID %s redefined\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrTypecmp => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"failed to compare type %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrNostate => {
-            return xml_char_strdup(c"Internal error: no state\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrNodefine => {
-            return xml_char_strdup(c"Internal error: no define\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrInternal => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Internal error: %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrListextra => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Extra data in list: %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrInternodata => {
-            return xml_char_strdup(c"Internal: interleave block has no data\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrInterseq => {
-            return xml_char_strdup(c"Invalid sequence in interleave\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrInterextra => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Extra element %s in interleave\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrElemname => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Expecting element %s, got %s\n".as_ptr() as _,
-                arg1,
-                arg2,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrElemnons => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Expecting a namespace for element %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrElemwrongns => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Element %s has wrong namespace: expecting %s\n".as_ptr() as _,
-                arg1,
-                arg2,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrElemwrong => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Did not expect element %s there\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrTextwrong => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Did not expect text in element %s content\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrElemextrans => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Expecting no namespace for element %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrElemnotempty => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Expecting element %s to be empty\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrNoelem => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Expecting an element %s, got nothing\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrNotelem => {
-            return xml_char_strdup(c"Expecting an element got text\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrAttrvalid => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Element %s failed to validate attributes\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrContentvalid => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Element %s failed to validate content\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrExtracontent => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Element %s has extra content: %s\n".as_ptr() as _,
-                arg1,
-                arg2,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrInvalidattr => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Invalid attribute %s for element %s\n".as_ptr() as _,
-                arg1,
-                arg2,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrLackdata => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Datatype element %s contains no data\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrDataelem => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Datatype element %s has child elements\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrValelem => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Value element %s has child elements\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrListelem => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"List element %s has child elements\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrDatatype => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Error validating datatype %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrValue => {
-            snprintf(
-                msg.as_mut_ptr() as _,
-                1000,
-                c"Error validating value %s\n".as_ptr() as _,
-                arg1,
-            );
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrList => {
-            return xml_char_strdup(c"Error validating list\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrNogrammar => {
-            return xml_char_strdup(c"No top grammar defined\n".as_ptr() as _)
-        }
-        XmlRelaxNGValidErr::XmlRelaxngErrExtradata => {
-            return xml_char_strdup(c"Extra data in the document\n".as_ptr() as _)
-        }
-        _ => return xml_char_strdup(c"Unknown error !\n".as_ptr() as _),
-    }
-    if msg[0] == 0 {
-        snprintf(
-            msg.as_mut_ptr() as _,
-            1000,
-            c"Unknown error code %d\n".as_ptr() as _,
-            err,
-        );
-    }
-    msg[1000 - 1] = 0;
-    result = xml_char_strdup(msg.as_ptr() as _);
-    xml_escape_format_string(addr_of_mut!(result))
-}
-
-/// Handle a Relax NG Validation error
-///
-/// # Note
-/// This method does not format the string.  
-#[doc(alias = "xmlRngVErr")]
-unsafe fn xml_rng_verr(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    node: XmlNodePtr,
-    error: i32,
-    msg: &str,
-    str1: Option<&str>,
-    str2: Option<&str>,
-) {
-    let mut schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut data = None;
-
-    if !ctxt.is_null() {
-        if (*ctxt).serror.is_some() {
-            schannel = (*ctxt).serror;
-        } else {
-            channel = (*ctxt).error;
-        }
-        data = (*ctxt).user_data.clone();
-        (*ctxt).nb_errors += 1;
-    }
-    let error = XmlParserErrors::try_from(error).unwrap();
-    __xml_raise_error!(
-        schannel,
-        channel,
-        data,
-        null_mut(),
-        node as _,
-        XmlErrorDomain::XmlFromRelaxngv,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        str1.map(|s| s.to_owned().into()),
-        str2.map(|s| s.to_owned().into()),
-        None,
-        0,
-        0,
-        msg,
-    );
-}
-
-/// Show a validation error.
-#[doc(alias = "xmlRelaxNGShowValidError")]
-unsafe fn xml_relaxng_show_valid_error(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    err: XmlRelaxNGValidErr,
-    node: XmlNodePtr,
-    child: XmlNodePtr,
-    arg1: *const XmlChar,
-    arg2: *const XmlChar,
-) {
-    if (*ctxt).flags & FLAGS_NOERROR != 0 {
-        return;
-    }
-
-    let msg: *mut XmlChar = xml_relaxng_get_error_string(err, arg1, arg2);
-    if msg.is_null() {
-        return;
-    }
-    let message = CStr::from_ptr(msg as *const i8)
-        .to_string_lossy()
-        .into_owned();
-    xml_free(msg as _);
-
-    if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
-        (*ctxt).err_no = err as i32;
-    }
-    xml_rng_verr(
-        ctxt,
-        if child.is_null() { node } else { child },
-        err as _,
-        message.as_str(),
-        (!arg1.is_null())
-            .then(|| CStr::from_ptr(arg1 as *const i8).to_string_lossy())
-            .as_deref(),
-        (!arg2.is_null())
-            .then(|| CStr::from_ptr(arg2 as *const i8).to_string_lossy())
-            .as_deref(),
-    );
-}
-
-const MAX_ERROR: usize = 5;
-
-/// Show all validation error over a given index.
-#[doc(alias = "xmlRelaxNGDumpValidError")]
-unsafe fn xml_relaxng_dump_valid_error(ctxt: XmlRelaxNGValidCtxtPtr) {
-    let mut k: usize;
-    let mut err: XmlRelaxNGValidErrorPtr;
-    let mut dup: XmlRelaxNGValidErrorPtr;
-
-    k = 0;
-    'main: for i in 0..(*ctxt).err_nr {
-        err = (*ctxt).err_tab.add(i as usize);
-        if k < MAX_ERROR {
-            for j in 0..i {
-                dup = (*ctxt).err_tab.add(j as usize);
-                if (*err).err == (*dup).err
-                    && (*err).node == (*dup).node
-                    && xml_str_equal((*err).arg1, (*dup).arg1)
-                    && xml_str_equal((*err).arg2, (*dup).arg2)
-                {
-                    if (*err).flags & ERROR_IS_DUP != 0 {
-                        if !(*err).arg1.is_null() {
-                            xml_free((*err).arg1 as _);
-                        }
-                        (*err).arg1 = null_mut();
-                        if !(*err).arg2.is_null() {
-                            xml_free((*err).arg2 as _);
-                        }
-                        (*err).arg2 = null_mut();
-                        (*err).flags = 0;
-                    }
-                    continue 'main;
-                }
-            }
-            xml_relaxng_show_valid_error(
-                ctxt,
-                (*err).err,
-                (*err).node,
-                (*err).seq,
-                (*err).arg1,
-                (*err).arg2,
-            );
-            k += 1;
-        }
-    }
-    (*ctxt).err_nr = 0;
-}
-
-/// Pushes a new error on top of the error stack
-///
-/// Returns 0 in case of error, the index in the stack otherwise
-#[doc(alias = "xmlRelaxNGValidErrorPush")]
-unsafe fn xml_relaxng_valid_error_push(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    err: XmlRelaxNGValidErr,
-    arg1: *const XmlChar,
-    arg2: *const XmlChar,
-    dup: i32,
-) -> i32 {
-    if (*ctxt).err_tab.is_null() {
-        (*ctxt).err_max = 8;
-        (*ctxt).err_nr = 0;
-        (*ctxt).err_tab =
-            xml_malloc((*ctxt).err_max as usize * size_of::<XmlRelaxNGValidError>()) as _;
-        if (*ctxt).err_tab.is_null() {
-            xml_rng_verr_memory(ctxt, "pushing error\n");
-            return 0;
-        }
-        (*ctxt).err = null_mut();
-    }
-    if (*ctxt).err_nr >= (*ctxt).err_max {
-        (*ctxt).err_max *= 2;
-        (*ctxt).err_tab = xml_realloc(
-            (*ctxt).err_tab as _,
-            (*ctxt).err_max as usize * size_of::<XmlRelaxNGValidError>(),
-        ) as _;
-        if (*ctxt).err_tab.is_null() {
-            xml_rng_verr_memory(ctxt, "pushing error\n");
-            return 0;
-        }
-        (*ctxt).err = (*ctxt).err_tab.add((*ctxt).err_nr as usize - 1);
-    }
-    if !(*ctxt).err.is_null()
-        && !(*ctxt).state.is_null()
-        && (*(*ctxt).err).node == (*(*ctxt).state).node
-        && (*(*ctxt).err).err == err
-    {
-        return (*ctxt).err_nr;
-    }
-    let cur: XmlRelaxNGValidErrorPtr = (*ctxt).err_tab.add((*ctxt).err_nr as usize);
-    (*cur).err = err;
-    if dup != 0 {
-        (*cur).arg1 = xml_strdup(arg1);
-        (*cur).arg2 = xml_strdup(arg2);
-        (*cur).flags = ERROR_IS_DUP;
-    } else {
-        (*cur).arg1 = arg1;
-        (*cur).arg2 = arg2;
-        (*cur).flags = 0;
-    }
-    if !(*ctxt).state.is_null() {
-        (*cur).node = (*(*ctxt).state).node;
-        (*cur).seq = (*(*ctxt).state).seq;
-    } else {
-        (*cur).node = null_mut();
-        (*cur).seq = null_mut();
-    }
-    (*ctxt).err = cur;
-    (*ctxt).err_nr += 1;
-    (*ctxt).err_nr - 1
-}
-
-/// Register a validation error, either generating it if it's sure
-/// or stacking it for later handling if unsure.
-#[doc(alias = "xmlRelaxNGAddValidError")]
-unsafe fn xml_relaxng_add_valid_error(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    err: XmlRelaxNGValidErr,
-    arg1: *const XmlChar,
-    arg2: *const XmlChar,
-    dup: i32,
-) {
-    if ctxt.is_null() {
-        return;
-    }
-    if (*ctxt).flags & FLAGS_NOERROR != 0 {
-        return;
-    }
-
-    // generate the error directly
-    if (*ctxt).flags & FLAGS_IGNORABLE == 0 || (*ctxt).flags & FLAGS_NEGATIVE != 0 {
-        let mut node: XmlNodePtr;
-        let seq: XmlNodePtr;
-
-        // Flush first any stacked error which might be the
-        // real cause of the problem.
-        if (*ctxt).err_nr != 0 {
-            xml_relaxng_dump_valid_error(ctxt);
-        }
-        if !(*ctxt).state.is_null() {
-            node = (*(*ctxt).state).node;
-            seq = (*(*ctxt).state).seq;
-        } else {
-            node = null_mut();
-            seq = node;
-        }
-        if node.is_null() && seq.is_null() {
-            node = (*ctxt).pnode;
-        }
-        xml_relaxng_show_valid_error(ctxt, err, node, seq, arg1, arg2);
-    } else {
-        // Stack the error for later processing if needed
-        xml_relaxng_valid_error_push(ctxt, err, arg1, arg2, dup);
-    }
-}
-
-/// Handle a redefinition of attribute error
-#[doc(alias = "xmlRngVErrMemory")]
-unsafe fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: &str) {
-    let mut schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut data = None;
-
-    if !ctxt.is_null() {
-        if let Some(serror) = (*ctxt).serror {
-            schannel = Some(serror);
-        } else {
-            channel = (*ctxt).error;
-        }
-        data = (*ctxt).user_data.clone();
-        (*ctxt).nb_errors += 1;
-    }
-    __xml_raise_error!(
-        schannel,
-        channel,
-        data,
-        null_mut(),
-        null_mut(),
-        XmlErrorDomain::XmlFromRelaxngv,
-        XmlParserErrors::XmlErrNoMemory,
-        XmlErrorLevel::XmlErrFatal,
-        None,
-        0,
-        Some(extra.to_owned().into()),
-        None,
-        None,
-        0,
-        0,
-        "Memory allocation failed : {}\n",
-        extra
-    );
 }
 
 /// Register a new type library
@@ -1483,88 +908,6 @@ pub(crate) unsafe fn xml_relaxng_cleanup_types() {
     XML_RELAXNG_TYPE_INITIALIZED.set(false);
 }
 
-/// Handle a redefinition of attribute error
-#[doc(alias = "xmlRngPErrMemory")]
-unsafe fn xml_rng_perr_memory(ctxt: XmlRelaxNGParserCtxtPtr, extra: Option<&str>) {
-    let mut schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut data = None;
-
-    if !ctxt.is_null() {
-        if (*ctxt).serror.is_some() {
-            schannel = (*ctxt).serror;
-        } else {
-            channel = (*ctxt).error;
-        }
-        data = (*ctxt).user_data.clone();
-        (*ctxt).nb_errors += 1;
-    }
-    if let Some(extra) = extra {
-        __xml_raise_error!(
-            schannel,
-            channel,
-            data,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromRelaxngp,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            Some(extra.to_owned().into()),
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed : {}\n",
-            extra
-        );
-    } else {
-        __xml_raise_error!(
-            schannel,
-            channel,
-            data,
-            null_mut(),
-            null_mut(),
-            XmlErrorDomain::XmlFromRelaxngp,
-            XmlParserErrors::XmlErrNoMemory,
-            XmlErrorLevel::XmlErrFatal,
-            None,
-            0,
-            None,
-            None,
-            None,
-            0,
-            0,
-            "Memory allocation failed\n",
-        );
-    }
-}
-
-/// Create an XML RelaxNGs parse context for that file/resource expected
-/// to contain an XML RelaxNGs file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlRelaxNGNewParserCtxt")]
-pub unsafe fn xml_relaxng_new_parser_ctxt(url: *const c_char) -> XmlRelaxNGParserCtxtPtr {
-    if url.is_null() {
-        return null_mut();
-    }
-
-    let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
-    (*ret).url = xml_strdup(url as _) as _;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).error = Some(state.generic_error);
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    ret
-}
-
 /// Create an XML RelaxNGs parse context for that memory buffer expected
 /// to contain an XML RelaxNGs file.
 ///
@@ -1968,31 +1311,6 @@ unsafe fn xml_relaxng_get_elements(
     ret
 }
 
-/// pop and discard all errors until the given level is reached
-#[doc(alias = "xmlRelaxNGPopErrors")]
-unsafe fn xml_relaxng_pop_errors(ctxt: XmlRelaxNGValidCtxtPtr, level: i32) {
-    let mut err: XmlRelaxNGValidErrorPtr;
-
-    for i in level..(*ctxt).err_nr {
-        err = (*ctxt).err_tab.add(i as usize);
-        if (*err).flags & ERROR_IS_DUP != 0 {
-            if !(*err).arg1.is_null() {
-                xml_free((*err).arg1 as _);
-            }
-            (*err).arg1 = null_mut();
-            if !(*err).arg2.is_null() {
-                xml_free((*err).arg2 as _);
-            }
-            (*err).arg2 = null_mut();
-            (*err).flags = 0;
-        }
-    }
-    (*ctxt).err_nr = level;
-    if (*ctxt).err_nr <= 0 {
-        (*ctxt).err = null_mut();
-    }
-}
-
 const INVALID_NAME: &CStr = c"\u{1}";
 
 /// Check if the element matches the definition nameClass
@@ -2263,83 +1581,6 @@ unsafe fn xml_relaxng_compare_elem_def_lists(
         def1 = def1.add(1);
     }
     1
-}
-
-unsafe fn xml_rng_err_internal(
-    ctxt: *mut XmlRelaxNGParserCtxt,
-    node: *mut XmlNode,
-    error: XmlParserErrors,
-    msg: &str,
-    str1: Option<std::borrow::Cow<'static, str>>,
-    str2: Option<std::borrow::Cow<'static, str>>,
-) {
-    let mut schannel: Option<StructuredError> = None;
-    let mut channel: Option<GenericError> = None;
-    let mut data = None;
-
-    if !ctxt.is_null() {
-        if (*ctxt).serror.is_some() {
-            schannel = (*ctxt).serror;
-        } else {
-            channel = (*ctxt).error;
-        }
-        data = (*ctxt).user_data.clone();
-        (*ctxt).nb_errors += 1;
-    }
-    __xml_raise_error!(
-        schannel,
-        channel,
-        data,
-        null_mut(),
-        node as _,
-        XmlErrorDomain::XmlFromRelaxngp,
-        error,
-        XmlErrorLevel::XmlErrError,
-        None,
-        0,
-        str1,
-        str2,
-        None,
-        0,
-        0,
-        msg,
-    );
-}
-
-/// Handle a Relax NG Parsing error
-#[doc(alias = "xmlRngPErr")]
-macro_rules! xml_rng_perr {
-    ($ctxt:expr, $node:expr, $error:expr, $msg:literal) => {
-        xml_rng_perr!(@inner, $ctxt, $node, $error, $msg, None, None);
-    };
-    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr) => {
-        let msg = format!($msg, $str1);
-        xml_rng_perr!(
-            @inner,
-            $ctxt,
-            $node,
-            $error,
-            &msg,
-            Some($str1.to_owned().into()),
-            None
-        );
-    };
-    ($ctxt:expr, $node:expr, $error:expr, $msg:literal, $str1:expr, $str2:expr) => {
-        let msg = format!($msg, $str1, $str2);
-        xml_rng_perr!(
-            @inner,
-            $ctxt,
-            $node,
-            $error,
-            &msg,
-            Some($str1.to_owned().into()),
-            Some($str2.to_owned().into())
-        );
-    };
-    (@inner, $ctxt:expr, $node:expr, $error:expr, $msg:expr, $str1:expr, $str2:expr) => {
-        // If this function is expanded at here,  stack overflow occurs...
-        xml_rng_err_internal($ctxt as _, $node as _, $error, $msg, $str1, $str2);
-    };
 }
 
 /// A lot of work for preprocessing interleave definitions
@@ -8418,33 +7659,6 @@ unsafe fn xml_relaxng_skip_ignored(
     node
 }
 
-/// Pops the top error from the error stack
-#[doc(alias = "xmlRelaxNGValidErrorPop")]
-unsafe fn xml_relaxng_valid_error_pop(ctxt: XmlRelaxNGValidCtxtPtr) {
-    if (*ctxt).err_nr <= 0 {
-        (*ctxt).err = null_mut();
-        return;
-    }
-    (*ctxt).err_nr -= 1;
-    if (*ctxt).err_nr > 0 {
-        (*ctxt).err = (*ctxt).err_tab.add((*ctxt).err_nr as usize - 1);
-    } else {
-        (*ctxt).err = null_mut();
-    }
-    let cur: XmlRelaxNGValidErrorPtr = (*ctxt).err_tab.add((*ctxt).err_nr as usize);
-    if (*cur).flags & ERROR_IS_DUP != 0 {
-        if !(*cur).arg1.is_null() {
-            xml_free((*cur).arg1 as _);
-        }
-        (*cur).arg1 = null_mut();
-        if !(*cur).arg2.is_null() {
-            xml_free((*cur).arg2 as _);
-        }
-        (*cur).arg2 = null_mut();
-        (*cur).flags = 0;
-    }
-}
-
 /// Skip to the next value when validating within a list
 ///
 /// Returns 0 if the operation succeeded or an error code.
@@ -11244,7 +10458,10 @@ pub unsafe fn xml_relaxng_validate_full_element(
 
 #[cfg(test)]
 mod tests {
-    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
+    use crate::{
+        globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks,
+        relaxng::xml_relaxng_new_parser_ctxt, test_util::*,
+    };
 
     use super::*;
 

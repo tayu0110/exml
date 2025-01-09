@@ -34,6 +34,8 @@ use std::{
 
 use libc::memset;
 
+#[cfg(feature = "schema")]
+use crate::relaxng::xml_relaxng_new_parser_ctxt;
 use crate::{
     buf::libxml_api::{
         xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_empty, xml_buf_free,
@@ -56,11 +58,11 @@ use crate::{
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-            xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
-            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
-            xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
-            xml_relaxng_validate_pop_element, xml_relaxng_validate_push_cdata,
-            xml_relaxng_validate_push_element, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
+            xml_relaxng_new_valid_ctxt, xml_relaxng_parse, xml_relaxng_set_parser_errors,
+            xml_relaxng_set_valid_errors, xml_relaxng_set_valid_structured_errors,
+            xml_relaxng_validate_full_element, xml_relaxng_validate_pop_element,
+            xml_relaxng_validate_push_cdata, xml_relaxng_validate_push_element, XmlRelaxNGPtr,
+            XmlRelaxNGValidCtxtPtr,
         },
         sax2::xml_sax_version,
         uri::xml_canonic_path,

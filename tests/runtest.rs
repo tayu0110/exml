@@ -3640,9 +3640,12 @@ unsafe fn rng_test(
 ) -> i32 {
     use std::mem::zeroed;
 
-    use exml::libxml::relaxng::{
-        xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt,
-        xml_relaxng_parse, xml_relaxng_set_parser_errors,
+    use exml::{
+        libxml::relaxng::{
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
+            xml_relaxng_set_parser_errors,
+        },
+        relaxng::xml_relaxng_new_parser_ctxt,
     };
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
