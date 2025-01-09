@@ -11,7 +11,6 @@ use crate::{
             XmlRelaxNGIncludePtr, XmlRelaxNGParserFlag, XmlRelaxNGPtr, XmlRelaxNGValidErr,
         },
         xmlautomata::{XmlAutomataPtr, XmlAutomataStatePtr},
-        xmlstring::xml_strdup,
     },
     tree::{xml_copy_doc, xml_free_doc, XmlDocPtr},
 };
@@ -42,7 +41,7 @@ pub struct XmlRelaxNGParserCtxt {
 
     pub(crate) documents: XmlRelaxNGDocumentPtr, // all the documents loaded
     pub(crate) includes: XmlRelaxNGIncludePtr,   // all the includes loaded
-    pub(crate) url: *mut u8,
+    pub(crate) url: Option<String>,
     pub(crate) document: XmlDocPtr,
 
     pub(crate) def_nr: i32,                       // number of defines used
@@ -157,7 +156,7 @@ impl Default for XmlRelaxNGParserCtxt {
             interleaves: None,
             documents: null_mut(),
             includes: null_mut(),
-            url: null_mut(),
+            url: None,
             document: null_mut(),
             def_nr: 0,
             def_max: 0,
@@ -186,18 +185,14 @@ impl Default for XmlRelaxNGParserCtxt {
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlRelaxNGNewParserCtxt")]
-pub unsafe fn xml_relaxng_new_parser_ctxt(url: *const i8) -> XmlRelaxNGParserCtxtPtr {
-    if url.is_null() {
-        return null_mut();
-    }
-
+pub unsafe fn xml_relaxng_new_parser_ctxt(url: &str) -> XmlRelaxNGParserCtxtPtr {
     let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
     if ret.is_null() {
         xml_rng_perr_memory(null_mut(), Some("building parser\n"));
         return null_mut();
     }
     std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
-    (*ret).url = xml_strdup(url as _) as _;
+    (*ret).url = Some(url.to_owned());
     GLOBAL_STATE.with_borrow(|state| {
         (*ret).error = Some(state.generic_error);
         (*ret).user_data = state.generic_error_context.clone();
@@ -271,9 +266,7 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
-    if !(*ctxt).url.is_null() {
-        xml_free((*ctxt).url as _);
-    }
+    (*ctxt).url.take();
     if !(*ctxt).doc.is_null() {
         xml_relaxng_free_document((*ctxt).doc);
     }

@@ -4809,6 +4809,8 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _options: i32,
 ) -> i32 {
+    use std::ffi::CStr;
+
     use crate::relaxng::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt,
     };
@@ -4849,7 +4851,7 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
     if !rng.is_null() {
         // Parse the schema and create validation environment.
 
-        let pctxt = xml_relaxng_new_parser_ctxt(rng);
+        let pctxt = xml_relaxng_new_parser_ctxt(CStr::from_ptr(rng).to_string_lossy().as_ref());
         let ctx = GenericErrorContext::new(reader);
         if (*reader).error_func.is_some() {
             (*pctxt).set_parser_errors(

@@ -2573,7 +2573,7 @@ pub unsafe fn xml_shell_pwd(
 #[cfg(feature = "schema")]
 unsafe fn xml_shell_rng_validate(
     sctxt: XmlShellCtxtPtr,
-    schemas: *mut c_char,
+    schemas: &str,
     _node: XmlNodePtr,
     _node2: XmlNodePtr,
 ) -> i32 {
@@ -2597,10 +2597,7 @@ unsafe fn xml_shell_rng_validate(
     let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);
     xml_relaxng_free_parser_ctxt(ctxt);
     if relaxngschemas.is_null() {
-        generic_error!(
-            "Relax-NG schema {} failed to compile\n",
-            CStr::from_ptr(schemas as *const i8).to_string_lossy()
-        );
+        generic_error!("Relax-NG schema {} failed to compile\n", schemas);
         return -1;
     }
     let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
@@ -3160,7 +3157,12 @@ pub unsafe fn xml_shell<'a>(
         } {
             #[cfg(feature = "schema")]
             {
-                xml_shell_rng_validate(ctxt, arg.as_mut_ptr(), null_mut(), null_mut());
+                xml_shell_rng_validate(
+                    ctxt,
+                    CStr::from_ptr(arg.as_mut_ptr()).to_string_lossy().as_ref(),
+                    null_mut(),
+                    null_mut(),
+                );
             }
         } else if {
             #[cfg(feature = "libxml_output")]

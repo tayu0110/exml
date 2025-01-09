@@ -679,8 +679,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                 if cmd_args.timing {
                     start_timer();
                 }
-                let relaxng = CString::new(r).unwrap();
-                let ctxt = xml_relaxng_new_parser_ctxt(relaxng.as_ptr());
+                let ctxt = xml_relaxng_new_parser_ctxt(r);
                 if ctxt.is_null() {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;

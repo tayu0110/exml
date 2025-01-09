@@ -3660,7 +3660,7 @@ unsafe fn rng_test(
     let mut count: c_char;
 
     // first compile the schemas if possible
-    let ctxt = xml_relaxng_new_parser_ctxt(cfilename.as_ptr());
+    let ctxt = xml_relaxng_new_parser_ctxt(filename);
     (*ctxt).set_parser_errors(
         Some(test_error_handler),
         Some(test_error_handler),

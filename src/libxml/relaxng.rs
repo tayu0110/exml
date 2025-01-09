@@ -2647,7 +2647,7 @@ unsafe fn xml_relaxng_cleanup_doc(ctxt: XmlRelaxNGParserCtxtPtr, doc: XmlDocPtr)
             doc,
             XmlParserErrors::XmlRngpEmpty,
             "xmlRelaxNGParse: {} is empty\n",
-            CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy()
+            (*ctxt).url.as_deref().unwrap()
         );
         return null_mut();
     }
@@ -3937,7 +3937,7 @@ unsafe fn xml_relaxng_process_external_ref(
                 (*(*docu).doc).get_root_element()
             };
             if root.is_null() {
-                let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
+                let url = (*ctxt).url.as_deref().unwrap();
                 xml_rng_perr!(
                     ctxt,
                     node,
@@ -6607,9 +6607,8 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
     }
 
     // First step is to parse the input document into an DOM/Infoset
-    if !(*ctxt).url.is_null() {
-        let url = CStr::from_ptr((*ctxt).url as *const i8).to_string_lossy();
-        doc = xml_read_file(&url, None, 0);
+    if let Some(url) = (*ctxt).url.as_deref() {
+        doc = xml_read_file(url, None, 0);
         if doc.is_null() {
             xml_rng_perr!(
                 ctxt,
@@ -6633,7 +6632,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
             return null_mut();
         }
         (*doc).url = Some("in_memory_buffer".to_owned());
-        (*ctxt).url = xml_strdup(c"in_memory_buffer".as_ptr() as _);
+        (*ctxt).url = Some("in_memory_buffer".to_owned());
     } else if !(*ctxt).document.is_null() {
         doc = (*ctxt).document;
     } else {
@@ -6663,13 +6662,7 @@ pub unsafe fn xml_relaxng_parse(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPtr 
             doc,
             XmlParserErrors::XmlRngpEmpty,
             "xmlRelaxNGParse: {} is empty\n",
-            if !(*ctxt).url.is_null() {
-                CStr::from_ptr((*ctxt).url as *const i8)
-                    .to_string_lossy()
-                    .into_owned()
-            } else {
-                "schemas".to_owned()
-            }
+            (*ctxt).url.as_deref().unwrap_or("schemas")
         );
 
         xml_free_doc((*ctxt).document);
@@ -9784,10 +9777,7 @@ pub unsafe fn xml_relaxng_validate_full_element(
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks,
-        relaxng::xml_relaxng_new_parser_ctxt, test_util::*,
-    };
+    use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
 
@@ -9875,36 +9865,6 @@ mod tests {
                     leaks == 0,
                     "{leaks} Leaks are found in xmlRelaxNGInitTypes()"
                 );
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_relaxng_new_parser_ctxt() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_url in 0..GEN_NB_CONST_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let url = gen_const_char_ptr(n_url, 0);
-
-                let ret_val = xml_relaxng_new_parser_ctxt(url);
-                desret_xml_relaxng_parser_ctxt_ptr(ret_val);
-                des_const_char_ptr(n_url, url, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRelaxNGNewParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlRelaxNGNewParserCtxt()"
-                    );
-                    eprintln!(" {}", n_url);
-                }
             }
         }
     }
