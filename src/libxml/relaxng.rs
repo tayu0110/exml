@@ -68,6 +68,7 @@ use crate::{
         },
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
+    relaxng::{xml_relaxng_free_define, XmlRelaxNGDefine, XmlRelaxNGDefinePtr},
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
         xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,
@@ -197,7 +198,7 @@ pub struct XmlRelaxNGGrammar {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum XmlRelaxNGType {
+pub(crate) enum XmlRelaxNGType {
     Noop = -1,   // a no operation from simplification
     Empty = 0,   // an empty pattern
     NotAllowed,  // not allowed top
@@ -231,27 +232,6 @@ const IS_PROCESSED: i32 = 1 << 5;
 const IS_COMPILABLE: i32 = 1 << 6;
 const IS_NOT_COMPILABLE: i32 = 1 << 7;
 const IS_EXTERNAL_REF: i32 = 1 << 8;
-
-pub type XmlRelaxNGDefinePtr = *mut XmlRelaxNGDefine;
-
-#[repr(C)]
-pub struct XmlRelaxNGDefine {
-    typ: XmlRelaxNGType,             // the type of definition
-    node: XmlNodePtr,                // the node in the source
-    name: *mut XmlChar,              // the element local name if present
-    ns: *mut XmlChar,                // the namespace local name if present
-    value: *mut XmlChar,             // value when available
-    data: *mut c_void,               // data lib or specific pointer
-    content: XmlRelaxNGDefinePtr,    // the expected content
-    parent: XmlRelaxNGDefinePtr,     // the parent definition, if any
-    next: XmlRelaxNGDefinePtr,       // list within grouping sequences
-    attrs: XmlRelaxNGDefinePtr,      // list of attributes for elements
-    name_class: XmlRelaxNGDefinePtr, // the nameClass definition if any
-    next_hash: XmlRelaxNGDefinePtr,  // next define in defs/refs hash tables
-    depth: i16,                      // used for the cycle detection
-    dflags: i16,                     // define related flags
-    cont_model: XmlRegexpPtr,        // a compiled content model if available
-}
 
 pub type XmlRelaxNGPtr = *mut XmlRelaxNG;
 /// A RelaxNGs definition
@@ -529,13 +509,13 @@ type XmlRelaxNGTypeCompare = unsafe fn(
 pub type XmlRelaxNGTypeLibraryPtr = *mut XmlRelaxNGTypeLibrary;
 #[repr(C)]
 pub struct XmlRelaxNGTypeLibrary {
-    namespace: *const XmlChar,           // the datatypeLibrary value
-    data: *mut c_void,                   // data needed for the library
-    have: Option<XmlRelaxNGTypeHave>,    // the export function
-    check: Option<XmlRelaxNGTypeCheck>,  // the checking function
-    comp: Option<XmlRelaxNGTypeCompare>, // the compare function
-    facet: Option<XmlRelaxNGFacetCheck>, // the facet check function
-    freef: Option<XmlRelaxNGTypeFree>,   // the freeing function
+    namespace: *const XmlChar,                    // the datatypeLibrary value
+    pub(crate) data: *mut c_void,                 // data needed for the library
+    have: Option<XmlRelaxNGTypeHave>,             // the export function
+    check: Option<XmlRelaxNGTypeCheck>,           // the checking function
+    comp: Option<XmlRelaxNGTypeCompare>,          // the compare function
+    facet: Option<XmlRelaxNGFacetCheck>,          // the facet check function
+    pub(crate) freef: Option<XmlRelaxNGTypeFree>, // the freeing function
 }
 
 thread_local! {
@@ -1753,7 +1733,7 @@ pub unsafe fn xml_relax_parser_set_flag(ctxt: XmlRelaxNGParserCtxtPtr, mut flags
 
 /// Deallocate RelaxNG partition set structures.
 #[doc(alias = "xmlRelaxNGFreePartition")]
-unsafe fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
+pub(crate) unsafe fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
     let mut group: XmlRelaxNGInterleaveGroupPtr;
 
     if !partitions.is_null() {
@@ -1777,42 +1757,6 @@ unsafe fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
         }
         xml_free(partitions as _);
     }
-}
-
-/// Deallocate a RelaxNG define structure.
-#[doc(alias = "xmlRelaxNGFreeDefine")]
-unsafe fn xml_relaxng_free_define(define: XmlRelaxNGDefinePtr) {
-    if define.is_null() {
-        return;
-    }
-
-    if (*define).typ == XmlRelaxNGType::Value && !(*define).attrs.is_null() {
-        let lib: XmlRelaxNGTypeLibraryPtr = (*define).data as _;
-        if !lib.is_null() {
-            if let Some(freef) = (*lib).freef {
-                freef((*lib).data, (*define).attrs as _);
-            }
-        }
-    }
-    if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Interleave {
-        xml_relaxng_free_partition((*define).data as XmlRelaxNGPartitionPtr);
-    }
-    if !(*define).data.is_null() && (*define).typ == XmlRelaxNGType::Choice {
-        xml_hash_free((*define).data as XmlHashTablePtr, None);
-    }
-    if !(*define).name.is_null() {
-        xml_free((*define).name as _);
-    }
-    if !(*define).ns.is_null() {
-        xml_free((*define).ns as _);
-    }
-    if !(*define).value.is_null() {
-        xml_free((*define).value as _);
-    }
-    if !(*define).cont_model.is_null() {
-        xml_reg_free_regexp((*define).cont_model);
-    }
-    xml_free(define as _);
 }
 
 /// Deallocate a RelaxNG schema structure.
@@ -7506,33 +7450,6 @@ unsafe fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 {
     ret
 }
 
-fn xml_relaxng_def_name(def: &XmlRelaxNGDefine) -> &'static str {
-    match def.typ {
-        XmlRelaxNGType::Empty => "empty",
-        XmlRelaxNGType::NotAllowed => "notAllowed",
-        XmlRelaxNGType::Except => "except",
-        XmlRelaxNGType::Text => "text",
-        XmlRelaxNGType::Element => "element",
-        XmlRelaxNGType::Datatype => "datatype",
-        XmlRelaxNGType::Value => "value",
-        XmlRelaxNGType::List => "list",
-        XmlRelaxNGType::Attribute => "attribute",
-        XmlRelaxNGType::Def => "def",
-        XmlRelaxNGType::Ref => "ref",
-        XmlRelaxNGType::Externalref => "externalRef",
-        XmlRelaxNGType::Parentref => "parentRef",
-        XmlRelaxNGType::Optional => "optional",
-        XmlRelaxNGType::Zeroormore => "zeroOrMore",
-        XmlRelaxNGType::Oneormore => "oneOrMore",
-        XmlRelaxNGType::Choice => "choice",
-        XmlRelaxNGType::Group => "group",
-        XmlRelaxNGType::Interleave => "interleave",
-        XmlRelaxNGType::Start => "start",
-        XmlRelaxNGType::Noop => "noop",
-        XmlRelaxNGType::Param => "param",
-    }
-}
-
 /// Compile the set of definitions, it works recursively, till the
 /// element boundaries, where it tries to compile the content if possible
 ///
@@ -7727,10 +7644,7 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
         | XmlRelaxNGType::Param
         | XmlRelaxNGType::Value => {
             // This should not happen and generate an internal error
-            eprintln!(
-                "RNG internal error trying to compile {}",
-                xml_relaxng_def_name(&*def)
-            );
+            eprintln!("RNG internal error trying to compile {}", (*def).name());
         }
     }
     ret

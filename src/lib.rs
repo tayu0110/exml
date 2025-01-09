@@ -24,6 +24,7 @@ pub mod list;
 #[cfg(feature = "http")]
 pub mod nanohttp;
 pub mod parser;
+pub mod relaxng;
 #[cfg(test)]
 pub(crate) mod test_util;
 pub mod tree;
