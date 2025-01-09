@@ -485,7 +485,7 @@ type XmlRelaxNGTypeCheck = unsafe fn(
 type XmlRelaxNGFacetCheck = unsafe fn(
     data: *mut c_void,
     typ: *const XmlChar,
-    facet: *const XmlChar,
+    facet: &str,
     val: *const XmlChar,
     strval: *const XmlChar,
     value: *mut c_void,
@@ -1264,7 +1264,7 @@ unsafe fn xml_relaxng_schema_type_compare(
 unsafe fn xml_relaxng_schema_facet_check(
     _data: *mut c_void,
     r#type: *const XmlChar,
-    facetname: *const XmlChar,
+    facetname: &str,
     val: *const XmlChar,
     strval: *const XmlChar,
     value: *mut c_void,
@@ -1287,29 +1287,29 @@ unsafe fn xml_relaxng_schema_facet_check(
         return -1;
     }
 
-    if xml_str_equal(facetname, c"minInclusive".as_ptr() as _) {
+    if facetname == "minInclusive" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMininclusive;
-    } else if xml_str_equal(facetname, c"minExclusive".as_ptr() as _) {
+    } else if facetname == "minExclusive" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinexclusive;
-    } else if xml_str_equal(facetname, c"maxInclusive".as_ptr() as _) {
+    } else if facetname == "maxInclusive" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxinclusive;
-    } else if xml_str_equal(facetname, c"maxExclusive".as_ptr() as _) {
+    } else if facetname == "maxExclusive" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxexclusive;
-    } else if xml_str_equal(facetname, c"totalDigits".as_ptr() as _) {
+    } else if facetname == "totalDigits" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetTotaldigits;
-    } else if xml_str_equal(facetname, c"fractionDigits".as_ptr() as _) {
+    } else if facetname == "fractionDigits" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetFractiondigits;
-    } else if xml_str_equal(facetname, c"pattern".as_ptr() as _) {
+    } else if facetname == "pattern" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetPattern;
-    } else if xml_str_equal(facetname, c"enumeration".as_ptr() as _) {
+    } else if facetname == "enumeration" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetEnumeration;
-    } else if xml_str_equal(facetname, c"whiteSpace".as_ptr() as _) {
+    } else if facetname == "whiteSpace" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetWhitespace;
-    } else if xml_str_equal(facetname, c"length".as_ptr() as _) {
+    } else if facetname == "length" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetLength;
-    } else if xml_str_equal(facetname, c"maxLength".as_ptr() as _) {
+    } else if facetname == "maxLength" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMaxlength;
-    } else if xml_str_equal(facetname, c"minLength".as_ptr() as _) {
+    } else if facetname == "minLength" {
         (*facet).typ = XmlSchemaTypeType::XmlSchemaFacetMinlength;
     } else {
         xml_schema_free_facet(facet);
@@ -8605,7 +8605,9 @@ unsafe fn xml_relaxng_validate_datatype(
             tmp = facet(
                 (*lib).data,
                 (*define).name,
-                (*cur).name,
+                CStr::from_ptr((*cur).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 (*cur).value,
                 value,
                 result,
