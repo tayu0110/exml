@@ -3552,9 +3552,9 @@ unsafe fn rng_one_test(
     options: i32,
     schemas: XmlRelaxNGPtr,
 ) -> i32 {
-    use exml::libxml::relaxng::{
-        xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_set_valid_errors,
-        xml_relaxng_validate_doc, XmlRelaxNGValidCtxtPtr,
+    use exml::{
+        libxml::relaxng::{xml_relaxng_set_valid_errors, xml_relaxng_validate_doc},
+        relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt},
     };
 
     let mut ret: i32;
@@ -3584,7 +3584,7 @@ unsafe fn rng_one_test(
         return -1;
     };
 
-    let ctxt: XmlRelaxNGValidCtxtPtr = xml_relaxng_new_valid_ctxt(schemas);
+    let ctxt = xml_relaxng_new_valid_ctxt(schemas);
     xml_relaxng_set_valid_errors(
         ctxt,
         Some(test_error_handler),

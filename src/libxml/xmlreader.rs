@@ -35,7 +35,7 @@ use std::{
 use libc::memset;
 
 #[cfg(feature = "schema")]
-use crate::relaxng::xml_relaxng_new_parser_ctxt;
+use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
 use crate::{
     buf::libxml_api::{
         xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_empty, xml_buf_free,
@@ -57,12 +57,11 @@ use crate::{
         },
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-            xml_relaxng_new_valid_ctxt, xml_relaxng_parse, xml_relaxng_set_parser_errors,
-            xml_relaxng_set_valid_errors, xml_relaxng_set_valid_structured_errors,
-            xml_relaxng_validate_full_element, xml_relaxng_validate_pop_element,
-            xml_relaxng_validate_push_cdata, xml_relaxng_validate_push_element, XmlRelaxNGPtr,
-            XmlRelaxNGValidCtxtPtr,
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
+            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
+            xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
+            xml_relaxng_validate_pop_element, xml_relaxng_validate_push_cdata,
+            xml_relaxng_validate_push_element, XmlRelaxNGPtr,
         },
         sax2::xml_sax_version,
         uri::xml_canonic_path,
@@ -3306,6 +3305,8 @@ pub unsafe fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderP
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
     use crate::parser::xml_free_parser_ctxt;
+    #[cfg(feature = "schema")]
+    use crate::relaxng::xml_relaxng_free_valid_ctxt;
 
     use super::xinclude::xml_xinclude_free_context;
 
@@ -4811,6 +4812,8 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _options: i32,
 ) -> i32 {
+    use crate::relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt};
+
     if reader.is_null() {
         return -1;
     }
@@ -4948,6 +4951,8 @@ pub unsafe fn xml_text_reader_relaxng_set_schema(
     reader: XmlTextReaderPtr,
     schema: XmlRelaxNGPtr,
 ) -> i32 {
+    use crate::relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt};
+
     if reader.is_null() {
         return -1;
     }

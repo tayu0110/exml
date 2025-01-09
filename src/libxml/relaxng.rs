@@ -65,10 +65,13 @@ use crate::{
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
-        is_relaxng, xml_relaxng_dump_valid_error, xml_relaxng_free_define, xml_relaxng_pop_errors,
-        xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory, xml_rng_verr_memory,
-        XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxt, XmlRelaxNGParserCtxtPtr,
-        VALID_ERR, VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
+        is_relaxng, xml_relaxng_dump_valid_error, xml_relaxng_free_define, xml_relaxng_free_states,
+        xml_relaxng_free_valid_state, xml_relaxng_new_states, xml_relaxng_new_valid_state,
+        xml_relaxng_pop_errors, xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory,
+        xml_rng_verr_memory, XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxt,
+        XmlRelaxNGParserCtxtPtr, XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt, XmlRelaxNGValidCtxtPtr,
+        XmlRelaxNGValidState, XmlRelaxNGValidStatePtr, VALID_ERR, VALID_ERR2, VALID_ERR2P,
+        VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
@@ -243,7 +246,7 @@ pub struct XmlRelaxNG {
     topgrammar: XmlRelaxNGGrammarPtr,
     doc: XmlDocPtr,
 
-    idref: i32, // requires idref checking
+    pub(crate) idref: i32, // requires idref checking
 
     // It seems that these tables are unused...
     defs: Option<XmlHashTableRef<'static, ()>>, // define
@@ -294,33 +297,6 @@ pub struct XmlRelaxNGPartition {
     groups: *mut XmlRelaxNGInterleaveGroupPtr,
 }
 
-const MAX_ATTR: usize = 20;
-pub type XmlRelaxNGValidStatePtr = *mut XmlRelaxNGValidState;
-/// A RelaxNGs validation state
-// TODO: all fieleds are used in only relaxng module.
-#[doc(alias = "xmlRelaxNGValidState")]
-#[repr(C)]
-pub struct XmlRelaxNGValidState {
-    pub(crate) node: XmlNodePtr, // the current node
-    pub(crate) seq: XmlNodePtr,  // the sequence of children left to validate
-    nb_attrs: i32,               // the number of attributes
-    max_attrs: i32,              // the size of attrs
-    nb_attr_left: i32,           // the number of attributes left to validate
-    value: *mut XmlChar,         // the value when operating on string
-    endvalue: *mut XmlChar,      // the end value when operating on string
-    attrs: *mut XmlAttrPtr,      // the array of attributes
-}
-
-pub type XmlRelaxNGStatesPtr = *mut XmlRelaxNGStates;
-/// A RelaxNGs container for validation state
-#[doc(alias = "xmlRelaxNGStates")]
-#[repr(C)]
-pub struct XmlRelaxNGStates {
-    nb_state: i32,  // the number of states
-    max_state: i32, // the size of the array
-    tab_state: *mut XmlRelaxNGValidStatePtr,
-}
-
 pub type XmlRelaxNGValidErrorPtr = *mut XmlRelaxNGValidError;
 /// A RelaxNGs validation error
 // TODO: all fieleds are used in only relaxng module.
@@ -333,51 +309,6 @@ pub struct XmlRelaxNGValidError {
     pub(crate) seq: XmlNodePtr,         // the current child
     pub(crate) arg1: *const XmlChar,    // first arg
     pub(crate) arg2: *const XmlChar,    // second arg
-}
-
-pub type XmlRelaxNGValidCtxtPtr = *mut XmlRelaxNGValidCtxt;
-/// A RelaxNGs validation context
-// TODO: all fieleds are used in only relaxng module.
-#[doc(alias = "xmlRelaxNGValidCtxt")]
-#[repr(C)]
-pub struct XmlRelaxNGValidCtxt {
-    pub(crate) user_data: Option<GenericErrorContext>, // user specific data block
-    pub(crate) error: Option<GenericError>,            // the callback in case of errors
-    warning: Option<GenericError>,                     // the callback in case of warning
-    pub(crate) serror: Option<StructuredError>,
-    pub(crate) nb_errors: i32, // number of errors in validation
-
-    schema: XmlRelaxNGPtr,  // The schema in use
-    doc: XmlDocPtr,         // the document being validated
-    pub(crate) flags: i32,  // validation flags
-    depth: i32,             // validation depth
-    idref: i32,             // requires idref checking
-    pub(crate) err_no: i32, // the first error found
-
-    // Errors accumulated in branches may have to be stacked to be
-    // provided back when it's sure they affect validation.
-    pub(crate) err: XmlRelaxNGValidErrorPtr,     // Last error
-    pub(crate) err_nr: i32,                      // Depth of the error stack
-    pub(crate) err_max: i32,                     // Max depth of the error stack
-    pub(crate) err_tab: XmlRelaxNGValidErrorPtr, // stack of errors
-
-    pub(crate) state: XmlRelaxNGValidStatePtr, // the current validation state
-    states: XmlRelaxNGStatesPtr,               // the accumulated state list
-
-    free_state: XmlRelaxNGStatesPtr, // the pool of free valid states
-    free_states_nr: i32,
-    free_states_max: i32,
-    free_states: *mut XmlRelaxNGStatesPtr, // the pool of free state groups
-
-    // This is used for "progressive" validation
-    elem: XmlRegExecCtxtPtr,          // the current element regexp
-    elem_nr: i32,                     // the number of element validated
-    elem_max: i32,                    // the max depth of elements
-    elem_tab: *mut XmlRegExecCtxtPtr, // the stack of regexp runtime
-    pstate: i32,                      // progressive state
-    pub(crate) pnode: XmlNodePtr,     // the current node
-    pdef: XmlRelaxNGDefinePtr,        // the non-streamable definition
-    perr: i32,                        // signal error in content model outside the regexp
 }
 
 pub type XmlRelaxNGIncludePtr = *mut XmlRelaxNGInclude;
@@ -7297,116 +7228,11 @@ pub unsafe fn xml_relaxng_set_valid_structured_errors(
     (*ctxt).user_data = ctx;
 }
 
-/// Free a RelaxNG validation state container
-#[doc(alias = "xmlRelaxNGFreeStates")]
-unsafe fn xml_relaxng_free_states(ctxt: XmlRelaxNGValidCtxtPtr, states: XmlRelaxNGStatesPtr) {
-    if states.is_null() {
-        return;
-    }
-    if !ctxt.is_null() && (*ctxt).free_states.is_null() {
-        (*ctxt).free_states_max = 40;
-        (*ctxt).free_states_nr = 0;
-        (*ctxt).free_states =
-            xml_malloc((*ctxt).free_states_max as usize * size_of::<XmlRelaxNGStatesPtr>()) as _;
-        if (*ctxt).free_states.is_null() {
-            xml_rng_verr_memory(ctxt, "storing states\n");
-        }
-    } else if !ctxt.is_null() && (*ctxt).free_states_nr >= (*ctxt).free_states_max {
-        let tmp: *mut XmlRelaxNGStatesPtr = xml_realloc(
-            (*ctxt).free_states as _,
-            2 * (*ctxt).free_states_max as usize * size_of::<XmlRelaxNGStatesPtr>(),
-        ) as _;
-        if tmp.is_null() {
-            xml_rng_verr_memory(ctxt, "storing states\n");
-            xml_free((*states).tab_state as _);
-            xml_free(states as _);
-            return;
-        }
-        (*ctxt).free_states = tmp;
-        (*ctxt).free_states_max *= 2;
-    }
-    if ctxt.is_null() || (*ctxt).free_states.is_null() {
-        xml_free((*states).tab_state as _);
-        xml_free(states as _);
-    } else {
-        *(*ctxt).free_states.add((*ctxt).free_states_nr as usize) = states;
-        (*ctxt).free_states_nr += 1;
-    }
-}
-
-/// Create an XML RelaxNGs validation context based on the given schema
-///
-/// Returns the validation context or NULL in case of error
-#[doc(alias = "xmlRelaxNGNewValidCtxt")]
-pub unsafe fn xml_relaxng_new_valid_ctxt(schema: XmlRelaxNGPtr) -> XmlRelaxNGValidCtxtPtr {
-    let ret: XmlRelaxNGValidCtxtPtr = xml_malloc(size_of::<XmlRelaxNGValidCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_verr_memory(null_mut(), "building context\n");
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlRelaxNGValidCtxt>());
-    (*ret).schema = schema;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).error = Some(state.generic_error);
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    (*ret).err_nr = 0;
-    (*ret).err_max = 0;
-    (*ret).err = null_mut();
-    (*ret).err_tab = null_mut();
-    if !schema.is_null() {
-        (*ret).idref = (*schema).idref;
-    }
-    (*ret).states = null_mut();
-    (*ret).free_state = null_mut();
-    (*ret).free_states = null_mut();
-    (*ret).err_no = XmlRelaxNGValidErr::XmlRelaxngOk as i32;
-    ret
-}
-
-/// Allocate a new RelaxNG validation state container
-///
-/// Returns the newly allocated structure or NULL in case or error
-#[doc(alias = "xmlRelaxNGNewStates")]
-unsafe fn xml_relaxng_new_states(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    mut size: i32,
-) -> XmlRelaxNGStatesPtr {
-    let ret: XmlRelaxNGStatesPtr;
-
-    if !ctxt.is_null() && !(*ctxt).free_states.is_null() && (*ctxt).free_states_nr > 0 {
-        (*ctxt).free_states_nr -= 1;
-        ret = *(*ctxt).free_states.add((*ctxt).free_states_nr as usize);
-        (*ret).nb_state = 0;
-        return ret;
-    }
-    if size < 16 {
-        size = 16;
-    }
-
-    ret = xml_malloc(
-        size_of::<XmlRelaxNGStates>() + (size as usize - 1) * size_of::<XmlRelaxNGValidStatePtr>(),
-    ) as _;
-    if ret.is_null() {
-        xml_rng_verr_memory(ctxt, "allocating states\n");
-        return null_mut();
-    }
-    (*ret).nb_state = 0;
-    (*ret).max_state = size;
-    (*ret).tab_state = xml_malloc(size as usize * size_of::<XmlRelaxNGValidStatePtr>()) as _;
-    if (*ret).tab_state.is_null() {
-        xml_rng_verr_memory(ctxt, "allocating states\n");
-        xml_free(ret as _);
-        return null_mut();
-    }
-    ret
-}
-
 /// Add a RelaxNG validation state to the container without checking for unicity.
 ///
 /// Return 1 in case of success and 0 if this is a duplicate and -1 on error
 #[doc(alias = "xmlRelaxNGAddStateUniq")]
-unsafe fn xml_relaxng_add_states_uniq(
+pub(crate) unsafe fn xml_relaxng_add_states_uniq(
     ctxt: XmlRelaxNGValidCtxtPtr,
     states: XmlRelaxNGStatesPtr,
     state: XmlRelaxNGValidStatePtr,
@@ -7432,34 +7258,11 @@ unsafe fn xml_relaxng_add_states_uniq(
     1
 }
 
-/// Deallocate a RelaxNG validation state structure.
-#[doc(alias = "xmlRelaxNGFreeValidState")]
-unsafe fn xml_relaxng_free_valid_state(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    state: XmlRelaxNGValidStatePtr,
-) {
-    if state.is_null() {
-        return;
-    }
-
-    if !ctxt.is_null() && (*ctxt).free_state.is_null() {
-        (*ctxt).free_state = xml_relaxng_new_states(ctxt, 40);
-    }
-    if ctxt.is_null() || (*ctxt).free_state.is_null() {
-        if !(*state).attrs.is_null() {
-            xml_free((*state).attrs as _);
-        }
-        xml_free(state as _);
-    } else {
-        xml_relaxng_add_states_uniq(ctxt, (*ctxt).free_state, state);
-    }
-}
-
 /// Pop the regexp of the current node content model from the stack
 ///
 /// Returns the exec or NULL if empty
 #[doc(alias = "xmlRelaxNGElemPop")]
-unsafe fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPtr {
+pub(crate) unsafe fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPtr {
     if (*ctxt).elem_nr <= 0 {
         return null_mut();
     }
@@ -7471,147 +7274,6 @@ unsafe fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPt
     } else {
         (*ctxt).elem = null_mut();
     }
-    ret
-}
-
-/// Free the resources associated to the schema validation context
-#[doc(alias = "xmlRelaxNGFreeValidCtxt")]
-pub unsafe fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    if !(*ctxt).states.is_null() {
-        xml_relaxng_free_states(null_mut(), (*ctxt).states);
-    }
-    if !(*ctxt).free_state.is_null() {
-        for k in 0..(*(*ctxt).free_state).nb_state {
-            xml_relaxng_free_valid_state(
-                null_mut(),
-                *(*(*ctxt).free_state).tab_state.add(k as usize),
-            );
-        }
-        xml_relaxng_free_states(null_mut(), (*ctxt).free_state);
-    }
-    if !(*ctxt).free_states.is_null() {
-        for k in 0..(*ctxt).free_states_nr {
-            xml_relaxng_free_states(null_mut(), *(*ctxt).free_states.add(k as usize));
-        }
-        xml_free((*ctxt).free_states as _);
-    }
-    if !(*ctxt).err_tab.is_null() {
-        xml_free((*ctxt).err_tab as _);
-    }
-    if !(*ctxt).elem_tab.is_null() {
-        let mut exec: XmlRegExecCtxtPtr;
-
-        exec = xml_relaxng_elem_pop(ctxt);
-        while !exec.is_null() {
-            xml_reg_free_exec_ctxt(exec);
-            exec = xml_relaxng_elem_pop(ctxt);
-        }
-        xml_free((*ctxt).elem_tab as _);
-    }
-    xml_free(ctxt as _);
-}
-
-/// Allocate a new RelaxNG validation state
-///
-/// Returns the newly allocated structure or NULL in case or error
-#[doc(alias = "xmlRelaxNGNewValidState")]
-unsafe fn xml_relaxng_new_valid_state(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    node: XmlNodePtr,
-) -> XmlRelaxNGValidStatePtr {
-    let ret: XmlRelaxNGValidStatePtr;
-    let mut attr: XmlAttrPtr;
-    let mut attrs: [XmlAttrPtr; MAX_ATTR] = [null_mut(); MAX_ATTR];
-    let mut nb_attrs: usize = 0;
-    let mut root: XmlNodePtr = null_mut();
-
-    if node.is_null() {
-        root = if (*ctxt).doc.is_null() {
-            null_mut()
-        } else {
-            (*(*ctxt).doc).get_root_element()
-        };
-        if root.is_null() {
-            return null_mut();
-        }
-    } else {
-        attr = (*node).properties;
-        while !attr.is_null() {
-            if nb_attrs < MAX_ATTR {
-                attrs[nb_attrs] = attr;
-                nb_attrs += 1;
-            } else {
-                nb_attrs += 1;
-            }
-            attr = (*attr).next;
-        }
-    }
-    if !(*ctxt).free_state.is_null() && (*(*ctxt).free_state).nb_state > 0 {
-        (*(*ctxt).free_state).nb_state -= 1;
-        ret = *(*(*ctxt).free_state)
-            .tab_state
-            .add((*(*ctxt).free_state).nb_state as usize);
-    } else {
-        ret = xml_malloc(size_of::<XmlRelaxNGValidState>()) as _;
-        if ret.is_null() {
-            xml_rng_verr_memory(ctxt, "allocating states\n");
-            return null_mut();
-        }
-        memset(ret as _, 0, size_of::<XmlRelaxNGValidState>());
-    }
-    (*ret).value = null_mut();
-    (*ret).endvalue = null_mut();
-    if node.is_null() {
-        (*ret).node = (*ctxt).doc as _;
-        (*ret).seq = root;
-    } else {
-        (*ret).node = node;
-        (*ret).seq = (*node).children().map_or(null_mut(), |c| c.as_ptr());
-    }
-    (*ret).nb_attrs = 0;
-    if nb_attrs > 0 {
-        if (*ret).attrs.is_null() {
-            if nb_attrs < 4 {
-                (*ret).max_attrs = 4;
-            } else {
-                (*ret).max_attrs = nb_attrs as _;
-            }
-            (*ret).attrs = xml_malloc((*ret).max_attrs as usize * size_of::<XmlAttrPtr>()) as _;
-            if (*ret).attrs.is_null() {
-                xml_rng_verr_memory(ctxt, "allocating states\n");
-                return ret;
-            }
-        } else if (*ret).max_attrs < nb_attrs as i32 {
-            let tmp: *mut XmlAttrPtr =
-                xml_realloc((*ret).attrs as _, nb_attrs * size_of::<XmlAttrPtr>()) as _;
-            if tmp.is_null() {
-                xml_rng_verr_memory(ctxt, "allocating states\n");
-                return ret;
-            }
-            (*ret).attrs = tmp;
-            (*ret).max_attrs = nb_attrs as _;
-        }
-        (*ret).nb_attrs = nb_attrs as _;
-        if nb_attrs < MAX_ATTR {
-            memcpy(
-                (*ret).attrs as _,
-                attrs.as_ptr() as _,
-                size_of::<XmlAttrPtr>() * nb_attrs,
-            );
-        } else {
-            attr = (*node).properties;
-            nb_attrs = 0;
-            while !attr.is_null() {
-                *(*ret).attrs.add(nb_attrs) = attr;
-                nb_attrs += 1;
-                attr = (*attr).next;
-            }
-        }
-    }
-    (*ret).nb_attr_left = (*ret).nb_attrs;
     ret
 }
 

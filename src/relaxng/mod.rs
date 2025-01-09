@@ -1,10 +1,12 @@
 mod define;
 mod error;
 mod parser;
+mod valid;
 
 pub(crate) use define::*;
 pub(crate) use error::*;
 pub use parser::*;
+pub use valid::*;
 
 use crate::tree::{NodeCommon, XmlElementType, XmlNodePtr};
 

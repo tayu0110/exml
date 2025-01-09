@@ -2580,11 +2580,12 @@ unsafe fn xml_shell_rng_validate(
     use crate::{
         globals::GLOBAL_STATE,
         libxml::relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-            xml_relaxng_new_valid_ctxt, xml_relaxng_parse, xml_relaxng_set_parser_errors,
-            xml_relaxng_set_valid_errors, xml_relaxng_validate_doc, XmlRelaxNGValidCtxtPtr,
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
+            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
         },
-        relaxng::xml_relaxng_new_parser_ctxt,
+        relaxng::{
+            xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
+        },
     };
 
     use super::relaxng::XmlRelaxNGPtr;
@@ -2601,7 +2602,7 @@ unsafe fn xml_shell_rng_validate(
         );
         return -1;
     }
-    let vctxt: XmlRelaxNGValidCtxtPtr = xml_relaxng_new_valid_ctxt(relaxngschemas);
+    let vctxt = xml_relaxng_new_valid_ctxt(relaxngschemas);
     xml_relaxng_set_valid_errors(vctxt, Some(generic_error), Some(generic_error), None);
     let ret: i32 = xml_relaxng_validate_doc(vctxt, (*sctxt).doc);
 

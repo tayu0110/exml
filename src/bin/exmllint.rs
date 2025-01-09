@@ -57,10 +57,9 @@ use exml::{
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
-            xml_relaxng_new_valid_ctxt, xml_relaxng_parse, xml_relaxng_set_parser_errors,
-            xml_relaxng_set_valid_errors, xml_relaxng_validate_doc, XmlRelaxNG,
-            XmlRelaxNGValidCtxtPtr,
+            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
+            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
+            XmlRelaxNG,
         },
         schematron::{
             xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
@@ -95,7 +94,9 @@ use exml::{
         xml_new_parser_ctxt, xml_new_sax_parser_ctxt, xml_read_file, xml_read_io, xml_read_memory,
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
-    relaxng::xml_relaxng_new_parser_ctxt,
+    relaxng::{
+        xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
+    },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node, NodeCommon,
         XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
@@ -3210,8 +3211,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
             start_timer();
         }
 
-        let ctxt: XmlRelaxNGValidCtxtPtr =
-            xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
+        let ctxt = xml_relaxng_new_valid_ctxt(RELAXNGSCHEMAS.load(Ordering::Relaxed));
         if ctxt.is_null() {
             PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
             xml_free_doc(doc);

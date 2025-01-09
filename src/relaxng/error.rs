@@ -8,8 +8,8 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc, xml_realloc},
         relaxng::{
-            XmlRelaxNGValidCtxtPtr, XmlRelaxNGValidErr, XmlRelaxNGValidError,
-            XmlRelaxNGValidErrorPtr, FLAGS_IGNORABLE, FLAGS_NEGATIVE, FLAGS_NOERROR,
+            XmlRelaxNGValidErr, XmlRelaxNGValidError, XmlRelaxNGValidErrorPtr, FLAGS_IGNORABLE,
+            FLAGS_NEGATIVE, FLAGS_NOERROR,
         },
         xmlstring::{xml_char_strdup, xml_escape_format_string, xml_str_equal, xml_strdup},
     },
@@ -786,4 +786,4 @@ pub(crate) use VALID_ERR2P;
 pub(crate) use VALID_ERR3;
 pub(crate) use VALID_ERR3P;
 
-use super::{XmlRelaxNGParserCtxt, XmlRelaxNGParserCtxtPtr};
+use super::{XmlRelaxNGParserCtxt, XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr};
