@@ -2614,10 +2614,10 @@ unsafe fn xml_relaxng_new_relaxng(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGPt
 /// Applies the 4.17. combine attribute rule for all the define
 /// element of a given grammar using the same name.
 #[doc(alias = "xmlRelaxNGCheckCombine")]
-extern "C" fn xml_relaxng_check_combine(
+unsafe fn xml_relaxng_check_combine(
     define: XmlRelaxNGDefinePtr,
     ctxt: XmlRelaxNGParserCtxtPtr,
-    name: *const XmlChar,
+    name: &str,
 ) {
     let mut choice_or_interleave: i32 = -1;
     let mut missing: i32 = 0;
@@ -2626,141 +2626,135 @@ extern "C" fn xml_relaxng_check_combine(
     let mut tmp: XmlRelaxNGDefinePtr;
     let mut tmp2: XmlRelaxNGDefinePtr;
 
-    unsafe {
-        if (*define).next_hash.is_null() {
-            return;
-        }
-        cur = define;
-        while !cur.is_null() {
-            if let Some(combine) = (*(*cur).node).get_prop("combine") {
-                if combine == "choice" {
-                    if choice_or_interleave == -1 {
-                        choice_or_interleave = 1;
-                    } else if choice_or_interleave == 0 {
-                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                        xml_rng_perr!(
-                            ctxt,
-                            (*define).node,
-                            XmlParserErrors::XmlRngpDefChoiceAndInterleave,
-                            "Defines for {} use both 'choice' and 'interleave'\n",
-                            name
-                        );
-                    }
-                } else if combine == "interleave" {
-                    if choice_or_interleave == -1 {
-                        choice_or_interleave = 0;
-                    } else if choice_or_interleave == 1 {
-                        let name = CStr::from_ptr(name as *const i8).to_string_lossy();
-                        xml_rng_perr!(
-                            ctxt,
-                            (*define).node,
-                            XmlParserErrors::XmlRngpDefChoiceAndInterleave,
-                            "Defines for {} use both 'choice' and 'interleave'\n",
-                            name
-                        );
-                    }
-                } else {
-                    let name = CStr::from_ptr(name as *const i8).to_string_lossy();
+    if (*define).next_hash.is_null() {
+        return;
+    }
+    cur = define;
+    while !cur.is_null() {
+        if let Some(combine) = (*(*cur).node).get_prop("combine") {
+            if combine == "choice" {
+                if choice_or_interleave == -1 {
+                    choice_or_interleave = 1;
+                } else if choice_or_interleave == 0 {
                     xml_rng_perr!(
                         ctxt,
                         (*define).node,
-                        XmlParserErrors::XmlRngpUnknownCombine,
-                        "Defines for {} use unknown combine value '{}''\n",
-                        name,
-                        combine
+                        XmlParserErrors::XmlRngpDefChoiceAndInterleave,
+                        "Defines for {} use both 'choice' and 'interleave'\n",
+                        name
                     );
                 }
-            } else if missing == 0 {
-                missing = 1;
+            } else if combine == "interleave" {
+                if choice_or_interleave == -1 {
+                    choice_or_interleave = 0;
+                } else if choice_or_interleave == 1 {
+                    xml_rng_perr!(
+                        ctxt,
+                        (*define).node,
+                        XmlParserErrors::XmlRngpDefChoiceAndInterleave,
+                        "Defines for {} use both 'choice' and 'interleave'\n",
+                        name
+                    );
+                }
             } else {
-                let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
                     (*define).node,
-                    XmlParserErrors::XmlRngpNeedCombine,
-                    "Some defines for {} needs the combine attribute\n",
-                    name
+                    XmlParserErrors::XmlRngpUnknownCombine,
+                    "Defines for {} use unknown combine value '{}''\n",
+                    name,
+                    combine
                 );
             }
-
-            cur = (*cur).next_hash;
-        }
-        if choice_or_interleave == -1 {
-            choice_or_interleave = 0;
-        }
-        cur = xml_relaxng_new_define(ctxt, (*define).node);
-        if cur.is_null() {
-            return;
-        }
-        if choice_or_interleave == 0 {
-            (*cur).typ = XmlRelaxNGType::Interleave;
+        } else if missing == 0 {
+            missing = 1;
         } else {
-            (*cur).typ = XmlRelaxNGType::Choice;
+            xml_rng_perr!(
+                ctxt,
+                (*define).node,
+                XmlParserErrors::XmlRngpNeedCombine,
+                "Some defines for {} needs the combine attribute\n",
+                name
+            );
         }
-        tmp = define;
-        last = null_mut();
-        while !tmp.is_null() {
-            if !(*tmp).content.is_null() {
-                if !(*(*tmp).content).next.is_null() {
-                    // we need first to create a wrapper.
-                    tmp2 = xml_relaxng_new_define(ctxt, (*(*tmp).content).node);
-                    if tmp2.is_null() {
-                        break;
-                    }
-                    (*tmp2).typ = XmlRelaxNGType::Group;
-                    (*tmp2).content = (*tmp).content;
-                } else {
-                    tmp2 = (*tmp).content;
-                }
-                if last.is_null() {
-                    (*cur).content = tmp2;
-                } else {
-                    (*last).next = tmp2;
-                }
-                last = tmp2;
-            }
-            (*tmp).content = cur;
-            tmp = (*tmp).next_hash;
-        }
-        (*define).content = cur;
-        if choice_or_interleave == 0 {
-            if (*ctxt).interleaves.is_none() {
-                (*ctxt).interleaves = XmlHashTableRef::with_capacity(10);
-            }
-            if let Some(mut table) = (*ctxt).interleaves {
-                let mut tmpname: [c_char; 32] = [0; 32];
 
-                snprintf(
-                    tmpname.as_mut_ptr(),
-                    32,
-                    c"interleave%d".as_ptr() as _,
-                    (*ctxt).nb_interleaves,
-                );
-                (*ctxt).nb_interleaves += 1;
-                if table
-                    .add_entry(
-                        CStr::from_ptr(tmpname.as_ptr()).to_string_lossy().as_ref(),
-                        cur,
-                    )
-                    .is_err()
-                {
-                    let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
-                    xml_rng_perr!(
-                        ctxt,
-                        (*define).node,
-                        XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                        "Failed to add {} to hash table\n",
-                        tmpname
-                    );
+        cur = (*cur).next_hash;
+    }
+    if choice_or_interleave == -1 {
+        choice_or_interleave = 0;
+    }
+    cur = xml_relaxng_new_define(ctxt, (*define).node);
+    if cur.is_null() {
+        return;
+    }
+    if choice_or_interleave == 0 {
+        (*cur).typ = XmlRelaxNGType::Interleave;
+    } else {
+        (*cur).typ = XmlRelaxNGType::Choice;
+    }
+    tmp = define;
+    last = null_mut();
+    while !tmp.is_null() {
+        if !(*tmp).content.is_null() {
+            if !(*(*tmp).content).next.is_null() {
+                // we need first to create a wrapper.
+                tmp2 = xml_relaxng_new_define(ctxt, (*(*tmp).content).node);
+                if tmp2.is_null() {
+                    break;
                 }
+                (*tmp2).typ = XmlRelaxNGType::Group;
+                (*tmp2).content = (*tmp).content;
             } else {
+                tmp2 = (*tmp).content;
+            }
+            if last.is_null() {
+                (*cur).content = tmp2;
+            } else {
+                (*last).next = tmp2;
+            }
+            last = tmp2;
+        }
+        (*tmp).content = cur;
+        tmp = (*tmp).next_hash;
+    }
+    (*define).content = cur;
+    if choice_or_interleave == 0 {
+        if (*ctxt).interleaves.is_none() {
+            (*ctxt).interleaves = XmlHashTableRef::with_capacity(10);
+        }
+        if let Some(mut table) = (*ctxt).interleaves {
+            let mut tmpname: [c_char; 32] = [0; 32];
+
+            snprintf(
+                tmpname.as_mut_ptr(),
+                32,
+                c"interleave%d".as_ptr() as _,
+                (*ctxt).nb_interleaves,
+            );
+            (*ctxt).nb_interleaves += 1;
+            if table
+                .add_entry(
+                    CStr::from_ptr(tmpname.as_ptr()).to_string_lossy().as_ref(),
+                    cur,
+                )
+                .is_err()
+            {
+                let tmpname = CStr::from_ptr(tmpname.as_ptr()).to_string_lossy();
                 xml_rng_perr!(
                     ctxt,
                     (*define).node,
                     XmlParserErrors::XmlRngpInterleaveCreateFailed,
-                    "Failed to create interleaves hash table\n"
+                    "Failed to add {} to hash table\n",
+                    tmpname
                 );
             }
+        } else {
+            xml_rng_perr!(
+                ctxt,
+                (*define).node,
+                XmlParserErrors::XmlRngpInterleaveCreateFailed,
+                "Failed to create interleaves hash table\n"
+            );
         }
     }
 }
@@ -4942,15 +4936,7 @@ unsafe fn xml_relaxng_parse_grammar(
     // Apply 4.17 merging rules to defines and starts
     xml_relaxng_combine_start(ctxt, ret);
     if let Some(defs) = (*ret).defs {
-        defs.scan(|data, name, _, _| {
-            let name = name.map(|n| CString::new(n.as_ref()).unwrap());
-            xml_relaxng_check_combine(
-                *data,
-                ctxt,
-                name.as_deref()
-                    .map_or(null_mut(), |p| p.as_ptr() as *const u8),
-            )
-        });
+        defs.scan(|data, name, _, _| xml_relaxng_check_combine(*data, ctxt, name.unwrap()));
     }
 
     // link together defines and refs in this grammar
