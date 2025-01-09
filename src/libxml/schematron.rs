@@ -266,7 +266,7 @@ impl Default for XmlSchematronParserCtxt {
 const XML_STRON_CTXT_PARSER: i32 = 1;
 const XML_STRON_CTXT_VALIDATOR: i32 = 2;
 
-const SCHEMATRON_PARSE_OPTIONS: XmlParserOption = XmlParserOption::XmlParseNoent;
+const SCHEMATRON_PARSE_OPTIONS: XmlParserOption = XmlParserOption::XmlParseNoEnt;
 
 const SCT_OLD_NS: &CStr = c"http://www.ascc.net/xml/schematron";
 

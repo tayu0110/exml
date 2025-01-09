@@ -10849,8 +10849,8 @@ pub unsafe fn html_ctxt_use_options(ctxt: HtmlParserCtxtPtr, mut options: i32) -
             sax.warning = None;
         }
         (*ctxt).vctxt.warning = None;
-        options -= XmlParserOption::XmlParseNowarning as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNowarning as i32;
+        options -= XmlParserOption::XmlParseNoWarning as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseNoWarning as i32;
     }
     if options & HtmlParserOption::HtmlParseNoerror as i32 != 0 {
         if let Some(sax) = (*ctxt).sax.as_deref_mut() {
@@ -10858,8 +10858,8 @@ pub unsafe fn html_ctxt_use_options(ctxt: HtmlParserCtxtPtr, mut options: i32) -
             sax.fatal_error = None;
         }
         (*ctxt).vctxt.error = None;
-        options -= XmlParserOption::XmlParseNoerror as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNoerror as i32;
+        options -= XmlParserOption::XmlParseNoError as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseNoError as i32;
     }
     if options & HtmlParserOption::HtmlParsePedantic as i32 != 0 {
         (*ctxt).pedantic = 1;
@@ -10868,13 +10868,13 @@ pub unsafe fn html_ctxt_use_options(ctxt: HtmlParserCtxtPtr, mut options: i32) -
     } else {
         (*ctxt).pedantic = 0;
     }
-    if options & XmlParserOption::XmlParseNoblanks as i32 != 0 {
+    if options & XmlParserOption::XmlParseNoBlanks as i32 != 0 {
         (*ctxt).keep_blanks = 0;
         if let Some(sax) = (*ctxt).sax.as_deref_mut() {
             sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         }
-        options -= XmlParserOption::XmlParseNoblanks as i32;
-        (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
+        options -= XmlParserOption::XmlParseNoBlanks as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseNoBlanks as i32;
     } else {
         (*ctxt).keep_blanks = 1;
     }

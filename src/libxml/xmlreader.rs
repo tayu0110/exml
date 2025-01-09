@@ -637,7 +637,7 @@ impl XmlTextReader {
                         self.xincctxt = xml_xinclude_new_context((*self.ctxt).my_doc);
                         xml_xinclude_set_flags(
                             self.xincctxt,
-                            self.parser_flags & !(XmlParserOption::XmlParseNoxincnode as i32),
+                            self.parser_flags & !(XmlParserOption::XmlParseNoXIncnode as i32),
                         );
                         xml_xinclude_set_streaming_mode(self.xincctxt, 1);
                     }
@@ -3572,11 +3572,11 @@ pub unsafe fn xml_text_reader_setup(
             xml_xinclude_free_context((*reader).xincctxt);
             (*reader).xincctxt = null_mut();
         }
-        if options & XmlParserOption::XmlParseXinclude as i32 != 0 {
+        if options & XmlParserOption::XmlParseXInclude as i32 != 0 {
             (*reader).xinclude = 1;
             (*reader).xinclude_name =
                 xml_dict_lookup((*reader).dict, XINCLUDE_NODE.as_ptr() as _, -1);
-            options -= XmlParserOption::XmlParseXinclude as i32;
+            options -= XmlParserOption::XmlParseXInclude as i32;
         } else {
             (*reader).xinclude = 0;
         }
@@ -3597,7 +3597,7 @@ pub unsafe fn xml_text_reader_setup(
         }
     }
 
-    if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 {
+    if options & XmlParserOption::XmlParseDTDValid as i32 != 0 {
         (*reader).validate = XmlTextReaderValidate::ValidateDtd;
     }
 
@@ -4527,21 +4527,21 @@ pub unsafe extern "C" fn xml_text_reader_set_parser_prop(
         }
         Ok(XmlParserProperties::XmlParserValidate) => {
             if value != 0 {
-                (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
+                (*ctxt).options |= XmlParserOption::XmlParseDTDValid as i32;
                 (*ctxt).validate = 1;
                 reader.validate = XmlTextReaderValidate::ValidateDtd;
             } else {
-                (*ctxt).options &= !(XmlParserOption::XmlParseDtdvalid as i32);
+                (*ctxt).options &= !(XmlParserOption::XmlParseDTDValid as i32);
                 (*ctxt).validate = 0;
             }
             0
         }
         Ok(XmlParserProperties::XmlParserSubstEntities) => {
             if value != 0 {
-                (*ctxt).options |= XmlParserOption::XmlParseNoent as i32;
+                (*ctxt).options |= XmlParserOption::XmlParseNoEnt as i32;
                 (*ctxt).replace_entities = 1;
             } else {
-                (*ctxt).options &= !(XmlParserOption::XmlParseNoent as i32);
+                (*ctxt).options &= !(XmlParserOption::XmlParseNoEnt as i32);
                 (*ctxt).replace_entities = 0;
             }
             0

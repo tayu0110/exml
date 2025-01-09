@@ -1047,7 +1047,7 @@ impl XmlParserCtxt {
     /// Returns -1 in case of error, -2 if the namespace should be discarded and the index in the stack otherwise.
     #[doc(alias = "nsPush")]
     pub(crate) fn ns_push(&mut self, prefix: Option<&str>, url: &str) -> i32 {
-        if self.options & XmlParserOption::XmlParseNsclean as i32 != 0 {
+        if self.options & XmlParserOption::XmlParseNsClean as i32 != 0 {
             for (pre, href) in self.ns_tab.iter().rev() {
                 if pre.as_deref() == prefix {
                     // in scope
@@ -1194,23 +1194,23 @@ impl XmlParserCtxt {
         } else {
             self.recovery = 0;
         }
-        if options & XmlParserOption::XmlParseDtdload as i32 != 0 {
+        if options & XmlParserOption::XmlParseDTDLoad as i32 != 0 {
             self.loadsubset = XML_DETECT_IDS as i32;
-            options -= XmlParserOption::XmlParseDtdload as i32;
-            self.options |= XmlParserOption::XmlParseDtdload as i32;
+            options -= XmlParserOption::XmlParseDTDLoad as i32;
+            self.options |= XmlParserOption::XmlParseDTDLoad as i32;
         } else {
             self.loadsubset = 0;
         }
-        if options & XmlParserOption::XmlParseDtdattr as i32 != 0 {
+        if options & XmlParserOption::XmlParseDTDAttr as i32 != 0 {
             self.loadsubset |= XML_COMPLETE_ATTRS as i32;
-            options -= XmlParserOption::XmlParseDtdattr as i32;
-            self.options |= XmlParserOption::XmlParseDtdattr as i32;
+            options -= XmlParserOption::XmlParseDTDAttr as i32;
+            self.options |= XmlParserOption::XmlParseDTDAttr as i32;
         }
-        if options & XmlParserOption::XmlParseNoent as i32 != 0 {
+        if options & XmlParserOption::XmlParseNoEnt as i32 != 0 {
             self.replace_entities = 1;
             // self.loadsubset |= XML_DETECT_IDS;
-            options -= XmlParserOption::XmlParseNoent as i32;
-            self.options |= XmlParserOption::XmlParseNoent as i32;
+            options -= XmlParserOption::XmlParseNoEnt as i32;
+            self.options |= XmlParserOption::XmlParseNoEnt as i32;
         } else {
             self.replace_entities = 0;
         }
@@ -1221,44 +1221,44 @@ impl XmlParserCtxt {
         } else {
             self.pedantic = 0;
         }
-        if options & XmlParserOption::XmlParseNoblanks as i32 != 0 {
+        if options & XmlParserOption::XmlParseNoBlanks as i32 != 0 {
             self.keep_blanks = 0;
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
             }
-            options -= XmlParserOption::XmlParseNoblanks as i32;
-            self.options |= XmlParserOption::XmlParseNoblanks as i32;
+            options -= XmlParserOption::XmlParseNoBlanks as i32;
+            self.options |= XmlParserOption::XmlParseNoBlanks as i32;
         } else {
             self.keep_blanks = 1;
         }
-        if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 {
+        if options & XmlParserOption::XmlParseDTDValid as i32 != 0 {
             self.validate = 1;
-            if options & XmlParserOption::XmlParseNowarning as i32 != 0 {
+            if options & XmlParserOption::XmlParseNoWarning as i32 != 0 {
                 self.vctxt.warning = None;
             }
-            if options & XmlParserOption::XmlParseNoerror as i32 != 0 {
+            if options & XmlParserOption::XmlParseNoError as i32 != 0 {
                 self.vctxt.error = None;
             }
-            options -= XmlParserOption::XmlParseDtdvalid as i32;
-            self.options |= XmlParserOption::XmlParseDtdvalid as i32;
+            options -= XmlParserOption::XmlParseDTDValid as i32;
+            self.options |= XmlParserOption::XmlParseDTDValid as i32;
         } else {
             self.validate = 0;
         }
-        if options & XmlParserOption::XmlParseNowarning as i32 != 0 {
+        if options & XmlParserOption::XmlParseNoWarning as i32 != 0 {
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.warning = None;
             }
-            options -= XmlParserOption::XmlParseNowarning as i32;
+            options -= XmlParserOption::XmlParseNoWarning as i32;
         }
-        if options & XmlParserOption::XmlParseNoerror as i32 != 0 {
+        if options & XmlParserOption::XmlParseNoError as i32 != 0 {
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.error = None;
                 sax.fatal_error = None;
             }
-            options -= XmlParserOption::XmlParseNoerror as i32;
+            options -= XmlParserOption::XmlParseNoError as i32;
         }
         #[cfg(feature = "sax1")]
-        if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
+        if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.start_element = Some(xml_sax2_start_element);
                 sax.end_element = Some(xml_sax2_end_element);
@@ -1266,30 +1266,30 @@ impl XmlParserCtxt {
                 sax.end_element_ns = None;
                 sax.initialized = 1;
             }
-            options -= XmlParserOption::XmlParseSax1 as i32;
-            self.options |= XmlParserOption::XmlParseSax1 as i32;
+            options -= XmlParserOption::XmlParseSAX1 as i32;
+            self.options |= XmlParserOption::XmlParseSAX1 as i32;
         }
-        if options & XmlParserOption::XmlParseNodict as i32 != 0 {
+        if options & XmlParserOption::XmlParseNoDict as i32 != 0 {
             self.dict_names = 0;
-            options -= XmlParserOption::XmlParseNodict as i32;
-            self.options |= XmlParserOption::XmlParseNodict as i32;
+            options -= XmlParserOption::XmlParseNoDict as i32;
+            self.options |= XmlParserOption::XmlParseNoDict as i32;
         } else {
             self.dict_names = 1;
         }
-        if options & XmlParserOption::XmlParseNocdata as i32 != 0 {
+        if options & XmlParserOption::XmlParseNoCDATA as i32 != 0 {
             if let Some(sax) = self.sax.as_deref_mut() {
                 sax.cdata_block = None;
             }
-            options -= XmlParserOption::XmlParseNocdata as i32;
-            self.options |= XmlParserOption::XmlParseNocdata as i32;
+            options -= XmlParserOption::XmlParseNoCDATA as i32;
+            self.options |= XmlParserOption::XmlParseNoCDATA as i32;
         }
-        if options & XmlParserOption::XmlParseNsclean as i32 != 0 {
-            self.options |= XmlParserOption::XmlParseNsclean as i32;
-            options -= XmlParserOption::XmlParseNsclean as i32;
+        if options & XmlParserOption::XmlParseNsClean as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseNsClean as i32;
+            options -= XmlParserOption::XmlParseNsClean as i32;
         }
-        if options & XmlParserOption::XmlParseNonet as i32 != 0 {
-            self.options |= XmlParserOption::XmlParseNonet as i32;
-            options -= XmlParserOption::XmlParseNonet as i32;
+        if options & XmlParserOption::XmlParseNoNet as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseNoNet as i32;
+            options -= XmlParserOption::XmlParseNoNet as i32;
         }
         if options & XmlParserOption::XmlParseCompact as i32 != 0 {
             self.options |= XmlParserOption::XmlParseCompact as i32;
@@ -1299,9 +1299,9 @@ impl XmlParserCtxt {
             self.options |= XmlParserOption::XmlParseOld10 as i32;
             options -= XmlParserOption::XmlParseOld10 as i32;
         }
-        if options & XmlParserOption::XmlParseNobasefix as i32 != 0 {
-            self.options |= XmlParserOption::XmlParseNobasefix as i32;
-            options -= XmlParserOption::XmlParseNobasefix as i32;
+        if options & XmlParserOption::XmlParseNoBasefix as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseNoBasefix as i32;
+            options -= XmlParserOption::XmlParseNoBasefix as i32;
         }
         if options & XmlParserOption::XmlParseHuge as i32 != 0 {
             self.options |= XmlParserOption::XmlParseHuge as i32;
@@ -1310,9 +1310,9 @@ impl XmlParserCtxt {
                 xml_dict_set_limit(self.dict, 0);
             }
         }
-        if options & XmlParserOption::XmlParseOldsax as i32 != 0 {
-            self.options |= XmlParserOption::XmlParseOldsax as i32;
-            options -= XmlParserOption::XmlParseOldsax as i32;
+        if options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
+            self.options |= XmlParserOption::XmlParseOldSAX as i32;
+            options -= XmlParserOption::XmlParseOldSAX as i32;
         }
         if options & XmlParserOption::XmlParseIgnoreEnc as i32 != 0 {
             self.options |= XmlParserOption::XmlParseIgnoreEnc as i32;
@@ -1753,7 +1753,7 @@ unsafe fn xml_init_sax_parser_ctxt(
     (*ctxt).valid = 1;
     (*ctxt).loadsubset = get_load_ext_dtd_default_value();
     if (*ctxt).loadsubset != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
     }
     (*ctxt).validate = get_do_validity_checking_default_value();
     (*ctxt).pedantic = get_pedantic_parser_default_value();
@@ -1766,7 +1766,7 @@ unsafe fn xml_init_sax_parser_ctxt(
         if let Some(sax) = (*ctxt).sax.as_deref_mut() {
             sax.ignorable_whitespace = Some(xml_sax2_ignorable_whitespace);
         }
-        (*ctxt).options |= XmlParserOption::XmlParseNoblanks as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseNoBlanks as i32;
     }
 
     (*ctxt).vctxt.flags = XML_VCTXT_USE_PCTXT as _;
@@ -1780,11 +1780,11 @@ unsafe fn xml_init_sax_parser_ctxt(
             (*ctxt).vctxt.warning = Some(parser_validity_warning);
         }
         (*ctxt).vctxt.node_max = 0;
-        (*ctxt).options |= XmlParserOption::XmlParseDtdvalid as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseDTDValid as i32;
     }
     (*ctxt).replace_entities = get_substitute_entities_default_value();
     if (*ctxt).replace_entities != 0 {
-        (*ctxt).options |= XmlParserOption::XmlParseNoent as i32;
+        (*ctxt).options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     (*ctxt).record_info = 0;
     (*ctxt).check_index = 0;

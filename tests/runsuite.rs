@@ -727,7 +727,7 @@ unsafe fn xsd_test(logfile: &mut Option<File>) -> c_int {
     let filename = "test/xsdtest/xsdtestsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoent as _);
+    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {}", filename);
         return -1;
@@ -794,7 +794,7 @@ unsafe fn rng_test1(logfile: &mut Option<File>) -> c_int {
     let filename = "test/relaxng/OASIS/spectest.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoent as _);
+    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {}", filename);
         return -1;
@@ -837,7 +837,7 @@ unsafe fn rng_test2(logfile: &mut Option<File>) -> c_int {
     let filename = "test/relaxng/testsuite.xml";
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoent as _);
+    let doc: XmlDocPtr = xml_read_file(filename, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {}", filename);
         return -1;
@@ -941,7 +941,7 @@ unsafe fn xstc_test_instance(
                 doc = xml_read_file(
                     CStr::from_ptr(path as *const i8).to_string_lossy().as_ref(),
                     None,
-                    XmlParserOption::XmlParseNoent as i32,
+                    XmlParserOption::XmlParseNoEnt as i32,
                 );
                 if doc.is_null() {
                     eprintln!(
@@ -1228,7 +1228,7 @@ unsafe fn xstc_metadata(logfile: &mut Option<File>, metadata: &str, base: *const
     let mut cur: XmlNodePtr;
     let mut ret: c_int = 0;
 
-    let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoent as _);
+    let doc: XmlDocPtr = xml_read_file(metadata, None, XmlParserOption::XmlParseNoEnt as _);
     if doc.is_null() {
         eprintln!("Failed to parse {metadata}");
         return -1;

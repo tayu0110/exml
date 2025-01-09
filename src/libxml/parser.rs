@@ -1793,7 +1793,7 @@ pub(crate) unsafe fn xml_sax_parse_dtd(
     };
 
     // We are loading a DTD
-    (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
+    (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
 
     // Canonicalise the system ID
     let system_id_canonic = system_id.map(|s| canonic_path(s));
@@ -1903,7 +1903,7 @@ pub unsafe fn xml_io_parse_dtd(
     };
 
     // We are loading a DTD
-    (*ctxt).options |= XmlParserOption::XmlParseDtdload as i32;
+    (*ctxt).options |= XmlParserOption::XmlParseDTDLoad as i32;
 
     (*ctxt).detect_sax2();
 
@@ -2114,7 +2114,7 @@ pub unsafe fn xml_parse_in_node_context(
         }
         (*ctxt).dict = (*doc).dict;
     } else {
-        options |= XmlParserOption::XmlParseNodict as i32;
+        options |= XmlParserOption::XmlParseNoDict as i32;
     }
 
     if let Some(encoding) = (*doc).encoding.as_deref() {
@@ -2299,7 +2299,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
         (*ctxt).dict_names = 1;
     } else {
-        (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNodict as i32, None);
+        (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
     }
     // doc.is_null() is only supported for historic reasons
     if !doc.is_null() {
@@ -3435,7 +3435,7 @@ unsafe fn xml_parse_string_entity_ref(
     ptr = ptr.add(1);
 
     // Predefined entities override any extra definition
-    if (*ctxt).options & XmlParserOption::XmlParseOldsax as i32 == 0 {
+    if (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
         ent = xml_get_predefined_entity(&name);
         if !ent.is_null() {
             *str = ptr;
@@ -3449,7 +3449,7 @@ unsafe fn xml_parse_string_entity_ref(
         if let Some(get_entity) = sax.get_entity {
             ent = get_entity((*ctxt).user_data.clone(), &name);
         }
-        if ent.is_null() && (*ctxt).options & XmlParserOption::XmlParseOldsax as i32 != 0 {
+        if ent.is_null() && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0 {
             ent = xml_get_predefined_entity(&name);
         }
         if ent.is_null()
@@ -4035,8 +4035,8 @@ pub(crate) unsafe fn xml_string_decode_entities_int(
                             // it is not required for a non-validating parser to
                             // complete external PEReferences coming from the
                             // internal subset
-                            if (*ctxt).options & XmlParserOption::XmlParseNoent as i32 != 0
-                                || (*ctxt).options & XmlParserOption::XmlParseDtdvalid as i32 != 0
+                            if (*ctxt).options & XmlParserOption::XmlParseNoEnt as i32 != 0
+                                || (*ctxt).options & XmlParserOption::XmlParseDTDValid as i32 != 0
                                 || (*ctxt).validate != 0
                             {
                                 xml_load_entity_content(ctxt, ent);
@@ -7330,28 +7330,28 @@ pub unsafe fn xml_load_external_entity(
 #[repr(C)]
 pub enum XmlParserOption {
     XmlParseRecover = 1 << 0,     /* recover on errors */
-    XmlParseNoent = 1 << 1,       /* substitute entities */
-    XmlParseDtdload = 1 << 2,     /* load the external subset */
-    XmlParseDtdattr = 1 << 3,     /* default DTD attributes */
-    XmlParseDtdvalid = 1 << 4,    /* validate with the DTD */
-    XmlParseNoerror = 1 << 5,     /* suppress error reports */
-    XmlParseNowarning = 1 << 6,   /* suppress warning reports */
+    XmlParseNoEnt = 1 << 1,       /* substitute entities */
+    XmlParseDTDLoad = 1 << 2,     /* load the external subset */
+    XmlParseDTDAttr = 1 << 3,     /* default DTD attributes */
+    XmlParseDTDValid = 1 << 4,    /* validate with the DTD */
+    XmlParseNoError = 1 << 5,     /* suppress error reports */
+    XmlParseNoWarning = 1 << 6,   /* suppress warning reports */
     XmlParsePedantic = 1 << 7,    /* pedantic error reporting */
-    XmlParseNoblanks = 1 << 8,    /* remove blank nodes */
-    XmlParseSax1 = 1 << 9,        /* use the SAX1 interface internally */
-    XmlParseXinclude = 1 << 10,   /* Implement XInclude substitution  */
-    XmlParseNonet = 1 << 11,      /* Forbid network access */
-    XmlParseNodict = 1 << 12,     /* Do not reuse the context dictionary */
-    XmlParseNsclean = 1 << 13,    /* remove redundant namespaces declarations */
-    XmlParseNocdata = 1 << 14,    /* merge CDATA as text nodes */
-    XmlParseNoxincnode = 1 << 15, /* do not generate XINCLUDE START/END nodes */
+    XmlParseNoBlanks = 1 << 8,    /* remove blank nodes */
+    XmlParseSAX1 = 1 << 9,        /* use the SAX1 interface internally */
+    XmlParseXInclude = 1 << 10,   /* Implement XInclude substitution  */
+    XmlParseNoNet = 1 << 11,      /* Forbid network access */
+    XmlParseNoDict = 1 << 12,     /* Do not reuse the context dictionary */
+    XmlParseNsClean = 1 << 13,    /* remove redundant namespaces declarations */
+    XmlParseNoCDATA = 1 << 14,    /* merge CDATA as text nodes */
+    XmlParseNoXIncnode = 1 << 15, /* do not generate XINCLUDE START/END nodes */
     XmlParseCompact = 1 << 16,    /* compact small text nodes; no modification of
                                                   the tree allowed afterwards (will possibly
                                   crash if you try to modify the tree) */
     XmlParseOld10 = 1 << 17,     /* parse using XML-1.0 before update 5 */
-    XmlParseNobasefix = 1 << 18, /* do not fixup XINCLUDE xml:base uris */
+    XmlParseNoBasefix = 1 << 18, /* do not fixup XINCLUDE xml:base uris */
     XmlParseHuge = 1 << 19,      /* relax any hardcoded limit from the parser */
-    XmlParseOldsax = 1 << 20,    /* parse using SAX2 interface before 2.7.0 */
+    XmlParseOldSAX = 1 << 20,    /* parse using SAX2 interface before 2.7.0 */
     XmlParseIgnoreEnc = 1 << 21, /* ignore internal document encoding hint */
     XmlParseBigLines = 1 << 22,  /* Store big lines numbers in text PSVI field */
 }

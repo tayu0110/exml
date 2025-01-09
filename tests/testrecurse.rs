@@ -489,7 +489,7 @@ unsafe fn recursive_detect_test(
     let res: c_int = 0;
     // xmlParserOption::XML_PARSE_DTDVALID is the only way to load external entities
     // without xmlParserOption::XML_PARSE_NOENT. The validation result doesn't matter anyway.
-    let mut parser_options: c_int = XmlParserOption::XmlParseDtdvalid as i32;
+    let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
 
     NB_TESTS += 1;
 
@@ -498,7 +498,7 @@ unsafe fn recursive_detect_test(
         init_sax(ctxt);
     }
     if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoent as i32;
+        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     // base of the test, parse with the old API
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
@@ -525,7 +525,7 @@ unsafe fn not_recursive_detect_test(
     options: c_int,
 ) -> c_int {
     let res: c_int = 0;
-    let mut parser_options: c_int = XmlParserOption::XmlParseDtdload as i32;
+    let mut parser_options: c_int = XmlParserOption::XmlParseDTDLoad as i32;
 
     NB_TESTS += 1;
 
@@ -534,7 +534,7 @@ unsafe fn not_recursive_detect_test(
         init_sax(ctxt);
     }
     if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoent as i32;
+        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     // base of the test, parse with the old API
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, filename, None, parser_options);
@@ -560,7 +560,7 @@ unsafe fn not_recursive_huge_test(
     options: c_int,
 ) -> c_int {
     let mut res: c_int = 0;
-    let mut parser_options: c_int = XmlParserOption::XmlParseDtdvalid as i32;
+    let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
 
     NB_TESTS += 1;
 
@@ -569,7 +569,7 @@ unsafe fn not_recursive_huge_test(
         init_sax(ctxt);
     }
     if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoent as i32;
+        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     let doc: XmlDocPtr = xml_ctxt_read_file(ctxt, "test/recurse/huge.xml", None, parser_options);
     if doc.is_null() {
@@ -668,7 +668,7 @@ unsafe fn huge_dtd_test(
     options: c_int,
 ) -> c_int {
     let mut res: c_int = 0;
-    let mut parser_options: c_int = XmlParserOption::XmlParseDtdvalid as i32;
+    let mut parser_options: c_int = XmlParserOption::XmlParseDTDValid as i32;
 
     NB_TESTS += 1;
 
@@ -677,7 +677,7 @@ unsafe fn huge_dtd_test(
         init_sax(ctxt);
     }
     if options & OPT_NO_SUBST == 0 {
-        parser_options |= XmlParserOption::XmlParseNoent as i32;
+        parser_options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     let doc: XmlDocPtr =
         xml_ctxt_read_file(ctxt, "test/recurse/huge_dtd.xml", None, parser_options);

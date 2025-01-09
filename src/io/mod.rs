@@ -447,10 +447,10 @@ pub(crate) unsafe fn xml_default_external_entity_loader(
 ) -> XmlParserInputPtr {
     let ret: XmlParserInputPtr;
 
-    if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNonet as i32 != 0 {
+    if !ctxt.is_null() && (*ctxt).options & XmlParserOption::XmlParseNoNet as i32 != 0 {
         let options = (*ctxt).options;
 
-        (*ctxt).options -= XmlParserOption::XmlParseNonet as i32;
+        (*ctxt).options -= XmlParserOption::XmlParseNoNet as i32;
         ret = xml_no_net_external_entity_loader(url, id, ctxt);
         (*ctxt).options = options;
         return ret;

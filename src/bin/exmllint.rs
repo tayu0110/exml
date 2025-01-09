@@ -424,13 +424,13 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
         OPTIONS.fetch_or(XmlParserOption::XmlParseIgnoreEnc as i32, Ordering::Relaxed);
     }
     if cmd_args.nsclean {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNsclean as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNsClean as i32, Ordering::Relaxed);
     }
     if cmd_args.nocdata {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNocdata as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoCDATA as i32, Ordering::Relaxed);
     }
     if cmd_args.nodict {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNodict as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoDict as i32, Ordering::Relaxed);
     }
     if cmd_args.nodefdtd {
         OPTIONS.fetch_or(
@@ -439,26 +439,26 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
         );
     }
     if cmd_args.loaddtd {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
     }
     if cmd_args.dtdattr {
         cmd_args.loaddtd = true;
-        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdattr as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDTDAttr as i32, Ordering::Relaxed);
     }
     if cmd_args.valid {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdvalid as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDTDValid as i32, Ordering::Relaxed);
     }
     if cmd_args.postvalid {
         cmd_args.loaddtd = true;
-        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
     }
     if cmd_args.dtdvalid.is_some() {
         cmd_args.loaddtd = true;
-        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
     }
     if cmd_args.dtdvalidfpi.is_some() {
         cmd_args.loaddtd = true;
-        OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
     }
     if cmd_args.repeat > 0 {
         REPEAT.store(
@@ -470,26 +470,26 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
         PUSHSIZE.store(10, Ordering::Relaxed);
     }
     if cmd_args.xinclude {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseXInclude as i32, Ordering::Relaxed);
     }
     if cmd_args.noxincludenode {
         cmd_args.xinclude = true;
-        OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseXInclude as i32, Ordering::Relaxed);
         OPTIONS.fetch_or(
-            XmlParserOption::XmlParseNoxincnode as i32,
+            XmlParserOption::XmlParseNoXIncnode as i32,
             Ordering::Relaxed,
         );
     }
     if cmd_args.nofixup_base_uris {
         cmd_args.xinclude = true;
-        OPTIONS.fetch_or(XmlParserOption::XmlParseXinclude as i32, Ordering::Relaxed);
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNobasefix as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseXInclude as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoBasefix as i32, Ordering::Relaxed);
     }
     // if cmd_args.compress {
     //     set_compress_mode(9);
     // }
     if cmd_args.nowarning {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNowarning as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoWarning as i32, Ordering::Relaxed);
         OPTIONS.fetch_and(
             !(XmlParserOption::XmlParsePedantic as i32),
             Ordering::Relaxed,
@@ -498,7 +498,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     if cmd_args.pedantic {
         OPTIONS.fetch_or(XmlParserOption::XmlParsePedantic as i32, Ordering::Relaxed);
         OPTIONS.fetch_and(
-            !(XmlParserOption::XmlParseNowarning as i32),
+            !(XmlParserOption::XmlParseNoWarning as i32),
             Ordering::Relaxed,
         );
     }
@@ -507,25 +507,25 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
     }
     if cmd_args.c14n {
         OPTIONS.fetch_or(
-            XmlParserOption::XmlParseNoent as i32
-                | XmlParserOption::XmlParseDtdattr as i32
-                | XmlParserOption::XmlParseDtdload as i32,
+            XmlParserOption::XmlParseNoEnt as i32
+                | XmlParserOption::XmlParseDTDAttr as i32
+                | XmlParserOption::XmlParseDTDLoad as i32,
             Ordering::Relaxed,
         );
     }
     if cmd_args.c14n11 {
         OPTIONS.fetch_or(
-            XmlParserOption::XmlParseNoent as i32
-                | XmlParserOption::XmlParseDtdattr as i32
-                | XmlParserOption::XmlParseDtdload as i32,
+            XmlParserOption::XmlParseNoEnt as i32
+                | XmlParserOption::XmlParseDTDAttr as i32
+                | XmlParserOption::XmlParseDTDLoad as i32,
             Ordering::Relaxed,
         );
     }
     if cmd_args.exc_c14n {
         OPTIONS.fetch_or(
-            XmlParserOption::XmlParseNoent as i32
-                | XmlParserOption::XmlParseDtdattr as i32
-                | XmlParserOption::XmlParseDtdload as i32,
+            XmlParserOption::XmlParseNoEnt as i32
+                | XmlParserOption::XmlParseDTDAttr as i32
+                | XmlParserOption::XmlParseDTDLoad as i32,
             Ordering::Relaxed,
         );
     }
@@ -542,7 +542,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
         cmd_args.noout = true;
     }
     if cmd_args.sax1 {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseSax1 as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseSAX1 as i32, Ordering::Relaxed);
     }
     if cmd_args.relaxng.is_some() {
         cmd_args.noent = true;
@@ -554,7 +554,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
         cmd_args.noent = true;
     }
     if cmd_args.nonet {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNonet as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoNet as i32, Ordering::Relaxed);
         unsafe {
             xml_set_external_entity_loader(xml_no_net_external_entity_loader);
         }
@@ -612,10 +612,10 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
         set_load_ext_dtd_default_value(old);
     }
     if cmd_args.noent {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNoent as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoEnt as i32, Ordering::Relaxed);
     }
     if cmd_args.noblanks || cmd_args.format {
-        OPTIONS.fetch_or(XmlParserOption::XmlParseNoblanks as i32, Ordering::Relaxed);
+        OPTIONS.fetch_or(XmlParserOption::XmlParseNoBlanks as i32, Ordering::Relaxed);
     }
     if cmd_args.htmlout && !cmd_args.nowrap {
         let program_name = args().next().expect("Failed to acquire program name");
@@ -637,7 +637,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             // forces loading the DTDs
             let load_ext = get_load_ext_dtd_default_value() | 1;
             set_load_ext_dtd_default_value(load_ext);
-            OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
+            OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
             if cmd_args.timing {
                 unsafe {
                     start_timer();
@@ -674,7 +674,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             // forces loading the DTDs
             let load_ext = get_load_ext_dtd_default_value() | 1;
             set_load_ext_dtd_default_value(load_ext);
-            OPTIONS.fetch_or(XmlParserOption::XmlParseDtdload as i32, Ordering::Relaxed);
+            OPTIONS.fetch_or(XmlParserOption::XmlParseDTDLoad as i32, Ordering::Relaxed);
             unsafe {
                 if cmd_args.timing {
                     start_timer();

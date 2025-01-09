@@ -887,7 +887,7 @@ pub struct XmlSchemaConstructionCtxt {
 }
 
 const XML_SCHEMAS_PARSE_ERROR: i32 = 1;
-const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoent as i32;
+const SCHEMAS_PARSE_OPTIONS: i32 = XmlParserOption::XmlParseNoEnt as i32;
 
 /// A schemas validation context
 pub type XmlSchemaParserCtxtPtr = *mut XmlSchemaParserCtxt;

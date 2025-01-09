@@ -4975,7 +4975,7 @@ unsafe fn xml_relaxng_check_choice_determinism(
 ///
 /// Returns the content type
 #[doc(alias = "xmlRelaxNGMaxContentType")]
-unsafe fn xml_relaxng_max_content_type(
+fn xml_relaxng_max_content_type(
     ct1: XmlRelaxNGContentType,
     ct2: XmlRelaxNGContentType,
 ) -> XmlRelaxNGContentType {

@@ -338,8 +338,8 @@ unsafe extern "C" fn xmlconf_test_item(
     let version = (*cur).get_prop("VERSION");
     let entities = (*cur).get_prop("ENTITIES");
     if entities.as_deref() != Some("none") {
-        options |= XmlParserOption::XmlParseDtdload as i32;
-        options |= XmlParserOption::XmlParseNoent as i32;
+        options |= XmlParserOption::XmlParseDTDLoad as i32;
+        options |= XmlParserOption::XmlParseNoEnt as i32;
     }
     let rec = (*cur).get_prop("RECOMMENDATION");
     if rec.as_deref().map_or(true, |rec| {
@@ -386,10 +386,10 @@ unsafe extern "C" fn xmlconf_test_item(
             xmlconf_test_not_nswf(logfile, &id, &filename, options);
         }
     } else if typ == "valid" {
-        options |= XmlParserOption::XmlParseDtdvalid as i32;
+        options |= XmlParserOption::XmlParseDTDValid as i32;
         xmlconf_test_valid(logfile, &id, &filename, options);
     } else if typ == "invalid" {
-        options |= XmlParserOption::XmlParseDtdvalid as i32;
+        options |= XmlParserOption::XmlParseDTDValid as i32;
         xmlconf_test_invalid(logfile, &id, &filename, options);
     } else if typ == "error" {
         test_log!(logfile, "Skipping error test {id} \n",);
@@ -513,7 +513,7 @@ unsafe fn xmlconf_test(logfile: &mut Option<File>) -> c_int {
         xmlconf_info();
         return -1;
     }
-    let doc: XmlDocPtr = xml_read_file(confxml, None, XmlParserOption::XmlParseNoent as i32);
+    let doc: XmlDocPtr = xml_read_file(confxml, None, XmlParserOption::XmlParseNoEnt as i32);
     if doc.is_null() {
         eprintln!("{} is corrupted ", confxml);
         xmlconf_info();

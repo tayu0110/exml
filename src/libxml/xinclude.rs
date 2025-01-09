@@ -609,7 +609,7 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Xm
 
     xml_ctxt_use_options(
         pctxt,
-        (*ctxt).parse_flags | XmlParserOption::XmlParseDtdload as i32,
+        (*ctxt).parse_flags | XmlParserOption::XmlParseDTDLoad as i32,
     );
 
     // Don't read from stdin.
@@ -1462,7 +1462,7 @@ unsafe fn xml_xinclude_load_doc(
                 save_flags = (*ctxt).parse_flags;
                 if !fragment.is_null() {
                     /* if this is an XPointer eval */
-                    (*ctxt).parse_flags |= XmlParserOption::XmlParseNoent as i32;
+                    (*ctxt).parse_flags |= XmlParserOption::XmlParseNoEnt as i32;
                 }
             }
 
@@ -1700,8 +1700,8 @@ unsafe fn xml_xinclude_load_doc(
         // Do the xml:base fixup if needed
         if !doc.is_null()
             && !url.is_null()
-            && (*ctxt).parse_flags & XmlParserOption::XmlParseNobasefix as i32 == 0
-            && (*doc).parse_flags & XmlParserOption::XmlParseNobasefix as i32 == 0
+            && (*ctxt).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
+            && (*doc).parse_flags & XmlParserOption::XmlParseNoBasefix as i32 == 0
         {
             let mut node: XmlNodePtr;
 
@@ -2304,7 +2304,7 @@ unsafe fn xml_xinclude_include_node(ctxt: XmlXincludeCtxtPtr, refe: XmlXincludeR
         }
     }
 
-    if (*ctxt).parse_flags & XmlParserOption::XmlParseNoxincnode as i32 != 0 {
+    if (*ctxt).parse_flags & XmlParserOption::XmlParseNoXIncnode as i32 != 0 {
         // Add the list of nodes
         while !list.is_null() {
             end = list;

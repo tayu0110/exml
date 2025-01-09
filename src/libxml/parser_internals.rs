@@ -1722,7 +1722,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> XmlEntityPt
     (*ctxt).skip_char();
 
     // Predefined entities override any extra definition
-    if (*ctxt).options & XmlParserOption::XmlParseOldsax as i32 == 0 {
+    if (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 == 0 {
         ent = xml_get_predefined_entity(&name);
         if !ent.is_null() {
             return ent;
@@ -1737,7 +1737,7 @@ pub(crate) unsafe fn xml_parse_entity_ref(ctxt: XmlParserCtxtPtr) -> XmlEntityPt
         }
         if (*ctxt).well_formed == 1
             && ent.is_null()
-            && (*ctxt).options & XmlParserOption::XmlParseOldsax as i32 != 0
+            && (*ctxt).options & XmlParserOption::XmlParseOldSAX as i32 != 0
         {
             ent = xml_get_predefined_entity(&name);
         }
@@ -2193,8 +2193,8 @@ pub(crate) unsafe fn xml_parse_reference(ctxt: XmlParserCtxtPtr) {
     if (*ent).flags & XML_ENT_PARSED as i32 == 0
         && (!matches!((*ent).etype, XmlEntityType::XmlExternalGeneralParsedEntity)
             || (*ctxt).options
-                & (XmlParserOption::XmlParseNoent as i32
-                    | XmlParserOption::XmlParseDtdvalid as i32)
+                & (XmlParserOption::XmlParseNoEnt as i32
+                    | XmlParserOption::XmlParseDTDValid as i32)
                 != 0)
     {
         let oldsizeentcopy: u64 = (*ctxt).sizeentcopy;
@@ -2675,10 +2675,10 @@ pub(crate) unsafe fn xml_parse_pe_reference(ctxt: XmlParserCtxtPtr) {
             let mut parent_consumed: u64;
 
             if matches!((*entity).etype, XmlEntityType::XmlExternalParameterEntity)
-                && (*ctxt).options & XmlParserOption::XmlParseNoent as i32 == 0
-                && (*ctxt).options & XmlParserOption::XmlParseDtdvalid as i32 == 0
-                && (*ctxt).options & XmlParserOption::XmlParseDtdload as i32 == 0
-                && (*ctxt).options & XmlParserOption::XmlParseDtdattr as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseNoEnt as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseDTDValid as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseDTDLoad as i32 == 0
+                && (*ctxt).options & XmlParserOption::XmlParseDTDAttr as i32 == 0
                 && (*ctxt).replace_entities == 0
                 && (*ctxt).validate == 0
             {

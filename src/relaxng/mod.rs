@@ -28,7 +28,7 @@ pub(crate) unsafe fn is_relaxng(node: XmlNodePtr, typ: &str) -> bool {
 
 /// Removes the leading and ending spaces of the value.
 #[doc(alias = "xmlRelaxNGNormExtSpace")]
-pub fn normalize_external_space(value: &str) -> &str {
+pub(crate) fn normalize_external_space(value: &str) -> &str {
     value
         .trim_start_matches(|c| xml_is_blank_char(c as u32))
         .trim_end_matches(|c| xml_is_blank_char(c as u32))

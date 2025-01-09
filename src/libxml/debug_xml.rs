@@ -205,8 +205,8 @@ impl XmlDebugCtxt<'_> {
                 && xml_dict_owns(self.dict, cname.as_ptr() as *const u8) == 0
                 && (self.doc.is_null()
                     || (*self.doc).parse_flags
-                        & (XmlParserOption::XmlParseSax1 as i32
-                            | XmlParserOption::XmlParseNodict as i32)
+                        & (XmlParserOption::XmlParseSAX1 as i32
+                            | XmlParserOption::XmlParseNoDict as i32)
                         == 0)
             {
                 xml_debug_err!(

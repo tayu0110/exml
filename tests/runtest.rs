@@ -1477,9 +1477,9 @@ unsafe fn sax_parse_test(
         } else {
             let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(Some(filename));
             let mut sax = XmlSAXHandler::default();
-            if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
+            if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
                 std::ptr::copy(&DEBUG_SAXHANDLER_STRUCT, &mut sax, 1);
-                options -= XmlParserOption::XmlParseSax1 as i32;
+                options -= XmlParserOption::XmlParseSAX1 as i32;
             } else {
                 std::ptr::copy(&DEBUG_SAX2_HANDLER_STRUCT, &mut sax, 1);
             }
@@ -1497,13 +1497,13 @@ unsafe fn sax_parse_test(
         #[cfg(not(feature = "html"))]
         {
             let ctxt: XmlParserCtxtPtr = xml_create_file_parser_ctxt(filename);
-            if options & XmlParserOption::XmlParseSax1 as i32 != 0 {
+            if options & XmlParserOption::XmlParseSAX1 as i32 != 0 {
                 memcpy(
                     (*ctxt).sax as _,
                     addr_of_mut!(DEBUG_SAXHANDLER_STRUCT) as _,
                     size_of::<XmlSAXHandler>(),
                 );
-                options -= XmlParserOption::XmlParseSax1 as i32;
+                options -= XmlParserOption::XmlParseSAX1 as i32;
             } else {
                 memcpy(
                     (*ctxt).sax as _,
@@ -2279,7 +2279,7 @@ unsafe fn err_parse_test(
         {
             doc = html_read_file(filename, None, options);
         }
-    } else if cfg!(feature = "xinclude") && options & XmlParserOption::XmlParseXinclude as i32 != 0
+    } else if cfg!(feature = "xinclude") && options & XmlParserOption::XmlParseXInclude as i32 != 0
     {
         #[cfg(feature = "xinclude")]
         {
@@ -2338,7 +2338,7 @@ unsafe fn err_parse_test(
             eprintln!("Error for {filename} failed",);
             return -1;
         }
-    } else if options & XmlParserOption::XmlParseDtdvalid as i32 != 0 && TEST_ERRORS_SIZE.get() != 0
+    } else if options & XmlParserOption::XmlParseDTDValid as i32 != 0 && TEST_ERRORS_SIZE.get() != 0
     {
         eprintln!("Validation for {filename} failed",);
     }
@@ -2789,7 +2789,7 @@ unsafe fn xpath_doc_test(
     let xpath_document = xml_read_file(
         filename,
         None,
-        options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        options | XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     );
     if xpath_document.is_null() {
         eprintln!("Failed to load {filename}",);
@@ -2869,7 +2869,7 @@ unsafe fn xptr_doc_test(
     let xpath_document = xml_read_file(
         filename,
         None,
-        XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     );
     if xpath_document.is_null() {
         eprintln!("Failed to load {filename}",);
@@ -2939,7 +2939,7 @@ unsafe fn xmlid_doc_test(
     let xpath_document = xml_read_file(
         filename,
         None,
-        options | XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        options | XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     );
     if xpath_document.is_null() {
         eprintln!("Failed to load {filename}",);
@@ -4186,7 +4186,7 @@ unsafe fn load_xpath_expr(parent_doc: XmlDocPtr, filename: &str) -> XmlXPathObje
     let doc: XmlDocPtr = xml_read_file(
         filename,
         None,
-        XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     );
     if doc.is_null() {
         eprintln!("Error: unable to parse file \"{filename}\"");
@@ -4303,7 +4303,7 @@ unsafe fn c14n_run_test(
     let doc: XmlDocPtr = xml_read_file(
         xml_filename,
         None,
-        XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     );
     if doc.is_null() {
         let last_error = get_last_error();
@@ -5152,7 +5152,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         out: Some("./result/noent/"),
         suffix: Some(""),
         err: None,
-        options: XmlParserOption::XmlParseNoent as i32,
+        options: XmlParserOption::XmlParseNoEnt as i32,
     },
     TestDesc {
         desc: "XML Namespaces regression tests",
@@ -5181,7 +5181,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         out: Some("./result/errors/"),
         suffix: None,
         err: Some(".ent"),
-        options: XmlParserOption::XmlParseNoent as i32,
+        options: XmlParserOption::XmlParseNoEnt as i32,
     },
     #[cfg(feature = "libxml_valid")]
     TestDesc {
@@ -5221,7 +5221,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         out: Some("./result/"),
         suffix: Some(".rde"),
         err: None,
-        options: XmlParserOption::XmlParseNoent as i32,
+        options: XmlParserOption::XmlParseNoEnt as i32,
     },
     #[cfg(feature = "libxml_reader")]
     TestDesc {
@@ -5251,7 +5251,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         out: Some("./result/"),
         suffix: Some(".sax"),
         err: None,
-        options: XmlParserOption::XmlParseSax1 as i32,
+        options: XmlParserOption::XmlParseSAX1 as i32,
     },
     TestDesc {
         desc: "SAX2 callbacks regression tests",
@@ -5269,7 +5269,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         out: Some("./result/noent/"),
         suffix: Some(".sax2"),
         err: None,
-        options: XmlParserOption::XmlParseNoent as i32,
+        options: XmlParserOption::XmlParseNoEnt as i32,
     },
     #[cfg(all(feature = "xinclude", feature = "libxml_reader"))]
     TestDesc {
@@ -5279,7 +5279,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
         out: Some("./result/XInclude/"),
         suffix: Some(".rdr"),
         err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32,
+        options: XmlParserOption::XmlParseXInclude as i32,
     },
     #[cfg(all(
         feature = "xpath",
@@ -5495,7 +5495,7 @@ fn xinclude_regression_test() {
         out: Some("./result/XInclude/"),
         suffix: Some(""),
         err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32,
+        options: XmlParserOption::XmlParseXInclude as i32,
     });
 }
 
@@ -5509,8 +5509,8 @@ fn xinclude_regression_stripping_include_nodes_test() {
         out: Some("./result/XInclude/"),
         suffix: Some(""),
         err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32
-            | XmlParserOption::XmlParseNoxincnode as i32,
+        options: XmlParserOption::XmlParseXInclude as i32
+            | XmlParserOption::XmlParseNoXIncnode as i32,
     });
 }
 
@@ -5524,8 +5524,8 @@ fn xinclude_xmlreader_regression_stripping_include_nodes_test() {
         out: Some("./result/XInclude/"),
         suffix: Some(".rdr"),
         err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32
-            | XmlParserOption::XmlParseNoxincnode as i32,
+        options: XmlParserOption::XmlParseXInclude as i32
+            | XmlParserOption::XmlParseNoXIncnode as i32,
     });
 }
 
@@ -5539,7 +5539,7 @@ fn xinclude_regression_without_reader_test() {
         out: Some("./result/XInclude/"),
         suffix: Some(""),
         err: Some(".err"),
-        options: XmlParserOption::XmlParseXinclude as i32,
+        options: XmlParserOption::XmlParseXInclude as i32,
     });
 }
 
@@ -5637,7 +5637,7 @@ fn valid_documents_regression_test() {
         out: None,
         suffix: None,
         err: None,
-        options: XmlParserOption::XmlParseDtdvalid as i32,
+        options: XmlParserOption::XmlParseDTDValid as i32,
     });
 }
 
@@ -5651,7 +5651,7 @@ fn validity_checking_regression_test() {
         out: Some("./result/VC/"),
         suffix: None,
         err: Some(""),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
+        options: XmlParserOption::XmlParseDTDValid as i32,
     });
 }
 
@@ -5665,7 +5665,7 @@ fn streaming_validity_checking_regression_test() {
         out: Some("./result/valid/"),
         suffix: None,
         err: Some(".err.rdr"),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
+        options: XmlParserOption::XmlParseDTDValid as i32,
     });
 }
 
@@ -5679,7 +5679,7 @@ fn streaming_validity_error_checking_regression_test() {
         out: Some("./result/VC/"),
         suffix: None,
         err: Some(".rdr"),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
+        options: XmlParserOption::XmlParseDTDValid as i32,
     });
 }
 
@@ -5693,7 +5693,7 @@ fn general_documents_valid_regression_test() {
         out: Some("./result/valid/"),
         suffix: Some(""),
         err: Some(".err"),
-        options: XmlParserOption::XmlParseDtdvalid as i32,
+        options: XmlParserOption::XmlParseDTDValid as i32,
     });
 }
 
@@ -5803,7 +5803,7 @@ fn relaxng_regression_test() {
         out: None,
         suffix: None,
         err: None,
-        options: XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        options: XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     });
 }
 
@@ -5817,7 +5817,7 @@ fn relaxng_streaming_regression_test() {
         out: None,
         suffix: None,
         err: None,
-        options: XmlParserOption::XmlParseDtdattr as i32 | XmlParserOption::XmlParseNoent as i32,
+        options: XmlParserOption::XmlParseDTDAttr as i32 | XmlParserOption::XmlParseNoEnt as i32,
     });
 }
 

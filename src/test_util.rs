@@ -1494,24 +1494,24 @@ pub(crate) fn des_int(_no: i32, _val: i32, _nr: i32) {}
 
 pub(crate) fn gen_parseroptions(no: i32, _nr: i32) -> i32 {
     if no == 0 {
-        return XmlParserOption::XmlParseNoblanks as i32 | XmlParserOption::XmlParseRecover as i32;
+        return XmlParserOption::XmlParseNoBlanks as i32 | XmlParserOption::XmlParseRecover as i32;
     }
     if no == 1 {
-        return XmlParserOption::XmlParseNoent as i32
-            | XmlParserOption::XmlParseDtdload as i32
-            | XmlParserOption::XmlParseDtdattr as i32
-            | XmlParserOption::XmlParseDtdvalid as i32
-            | XmlParserOption::XmlParseNocdata as i32;
+        return XmlParserOption::XmlParseNoEnt as i32
+            | XmlParserOption::XmlParseDTDLoad as i32
+            | XmlParserOption::XmlParseDTDAttr as i32
+            | XmlParserOption::XmlParseDTDValid as i32
+            | XmlParserOption::XmlParseNoCDATA as i32;
     }
     if no == 2 {
-        return XmlParserOption::XmlParseXinclude as i32
-            | XmlParserOption::XmlParseNoxincnode as i32
-            | XmlParserOption::XmlParseNsclean as i32;
+        return XmlParserOption::XmlParseXInclude as i32
+            | XmlParserOption::XmlParseNoXIncnode as i32
+            | XmlParserOption::XmlParseNsClean as i32;
     }
     if no == 3 {
-        return XmlParserOption::XmlParseXinclude as i32 | XmlParserOption::XmlParseNodict as i32;
+        return XmlParserOption::XmlParseXInclude as i32 | XmlParserOption::XmlParseNoDict as i32;
     }
-    XmlParserOption::XmlParseSax1 as i32
+    XmlParserOption::XmlParseSAX1 as i32
 }
 
 pub(crate) fn des_parseroptions(_no: i32, _val: i32, _nr: i32) {}
