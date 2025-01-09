@@ -79,7 +79,7 @@ use crate::{
     uri::{build_uri, escape_url_except, XmlURI},
 };
 
-use super::chvalid::xml_is_blank_char;
+use super::{chvalid::xml_is_blank_char, xmlstring::xml_strndup};
 
 /// Signature of an error callback from a Relax-NG validation
 #[doc(alias = "xmlRelaxNGValidityErrorFunc")]
@@ -1106,7 +1106,7 @@ unsafe fn xml_rng_verr_memory(ctxt: XmlRelaxNGValidCtxtPtr, extra: &str) {
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlRelaxNGRegisterTypeLibrary")]
 unsafe fn xml_relaxng_register_type_library(
-    namespace: *const XmlChar,
+    namespace: &str,
     data: *mut c_void,
     have: Option<XmlRelaxNGTypeHave>,
     check: Option<XmlRelaxNGTypeCheck>,
@@ -1117,21 +1117,11 @@ unsafe fn xml_relaxng_register_type_library(
     let Some(mut registered_types) = XML_RELAXNG_REGISTERED_TYPES.get() else {
         return -1;
     };
-    if namespace.is_null() || check.is_none() || comp.is_none() {
+    if check.is_none() || comp.is_none() {
         return -1;
     }
-    if registered_types
-        .lookup(
-            CStr::from_ptr(namespace as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        )
-        .is_some()
-    {
-        generic_error!(
-            "Relax-NG types library '{}' already registered\n",
-            CStr::from_ptr(namespace as *const i8).to_string_lossy()
-        );
+    if registered_types.lookup(namespace).is_some() {
+        generic_error!("Relax-NG types library '{namespace}' already registered\n");
         return -1;
     }
     let lib: XmlRelaxNGTypeLibraryPtr = xml_malloc(size_of::<XmlRelaxNGTypeLibrary>()) as _;
@@ -1140,25 +1130,17 @@ unsafe fn xml_relaxng_register_type_library(
         return -1;
     }
     memset(lib as _, 0, size_of::<XmlRelaxNGTypeLibrary>());
-    (*lib).namespace = xml_strdup(namespace);
+    (*lib).namespace = xml_strndup(namespace.as_ptr(), namespace.len() as i32);
     (*lib).data = data;
     (*lib).have = have;
     (*lib).comp = comp;
     (*lib).check = check;
     (*lib).facet = facet;
     (*lib).freef = freef;
-    match registered_types.add_entry(
-        CStr::from_ptr(namespace as *const i8)
-            .to_string_lossy()
-            .as_ref(),
-        lib,
-    ) {
+    match registered_types.add_entry(namespace, lib) {
         Ok(_) => 0,
         Err(_) => {
-            generic_error!(
-                "Relax-NG types library failed to register '{}'\n",
-                CStr::from_ptr(namespace as *const i8).to_string_lossy()
-            );
+            generic_error!("Relax-NG types library failed to register '{namespace}'\n");
             xml_relaxng_free_type_library(lib as _);
             -1
         }
@@ -1505,7 +1487,7 @@ pub unsafe fn xml_relaxng_init_types() -> i32 {
 
     XML_RELAXNG_REGISTERED_TYPES.set(Some(registered_types));
     xml_relaxng_register_type_library(
-        c"http://www.w3.org/2001/XMLSchema-datatypes".as_ptr() as _,
+        "http://www.w3.org/2001/XMLSchema-datatypes",
         null_mut(),
         Some(xml_relaxng_schema_type_have),
         Some(xml_relaxng_schema_type_check),
@@ -1514,7 +1496,7 @@ pub unsafe fn xml_relaxng_init_types() -> i32 {
         Some(xml_relaxng_schema_free_value),
     );
     xml_relaxng_register_type_library(
-        XML_RELAXNG_NS.as_ptr() as _,
+        XML_RELAXNG_NS,
         null_mut(),
         Some(xml_relaxng_default_type_have),
         Some(xml_relaxng_default_type_check),
@@ -2669,9 +2651,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
     cur = (*node).properties;
     while !cur.is_null() {
         next = (*cur).next;
-        if (*cur).ns.is_null()
-            || (*(*cur).ns).href().as_deref() == Some(XML_RELAXNG_NS.to_str().unwrap())
-        {
+        if (*cur).ns.is_null() || (*(*cur).ns).href().as_deref() == Some(XML_RELAXNG_NS) {
             if (*cur).name().as_deref() == Some("name") {
                 if (*node).name().as_deref() != Some("element")
                     && (*node).name().as_deref() != Some("attribute")
@@ -3319,9 +3299,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
         'skip_children: {
             if (*cur).element_type() == XmlElementType::XmlElementNode {
                 // Simplification 4.1. Annotations
-                if (*cur).ns.is_null()
-                    || (*(*cur).ns).href().as_deref() != Some(XML_RELAXNG_NS.to_str().unwrap())
-                {
+                if (*cur).ns.is_null() || (*(*cur).ns).href().as_deref() != Some(XML_RELAXNG_NS) {
                     if let Some(parent) = (*cur).parent().filter(|p| {
                         p.element_type() == XmlElementType::XmlElementNode
                             && (xml_str_equal(p.name, c"name".as_ptr() as _)
