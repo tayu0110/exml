@@ -190,12 +190,12 @@ pub type XmlRelaxNGGrammarPtr = *mut XmlRelaxNGGrammar;
 
 #[repr(C)]
 pub struct XmlRelaxNGGrammar {
-    parent: XmlRelaxNGGrammarPtr,    // the parent grammar if any
-    children: XmlRelaxNGGrammarPtr,  // the children grammar if any
-    next: XmlRelaxNGGrammarPtr,      // the next grammar if any
-    start: XmlRelaxNGDefinePtr,      // <start> content
-    combine: XmlRelaxNGCombine,      // the default combine value
-    start_list: XmlRelaxNGDefinePtr, // list of <start> definitions
+    parent: XmlRelaxNGGrammarPtr,          // the parent grammar if any
+    children: XmlRelaxNGGrammarPtr,        // the children grammar if any
+    next: XmlRelaxNGGrammarPtr,            // the next grammar if any
+    pub(crate) start: XmlRelaxNGDefinePtr, // <start> content
+    combine: XmlRelaxNGCombine,            // the default combine value
+    start_list: XmlRelaxNGDefinePtr,       // list of <start> definitions
     defs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, // define
     refs: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, // references
 }
@@ -243,7 +243,7 @@ pub type XmlRelaxNGPtr = *mut XmlRelaxNG;
 #[repr(C)]
 pub struct XmlRelaxNG {
     _private: *mut c_void, // unused by the library for users or bindings
-    topgrammar: XmlRelaxNGGrammarPtr,
+    pub(crate) topgrammar: XmlRelaxNGGrammarPtr,
     doc: XmlDocPtr,
 
     pub(crate) idref: i32, // requires idref checking
@@ -7258,25 +7258,6 @@ pub(crate) unsafe fn xml_relaxng_add_states_uniq(
     1
 }
 
-/// Pop the regexp of the current node content model from the stack
-///
-/// Returns the exec or NULL if empty
-#[doc(alias = "xmlRelaxNGElemPop")]
-pub(crate) unsafe fn xml_relaxng_elem_pop(ctxt: XmlRelaxNGValidCtxtPtr) -> XmlRegExecCtxtPtr {
-    if (*ctxt).elem_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).elem_nr -= 1;
-    let ret: XmlRegExecCtxtPtr = *(*ctxt).elem_tab.add((*ctxt).elem_nr as usize);
-    *(*ctxt).elem_tab.add((*ctxt).elem_nr as usize) = null_mut();
-    if (*ctxt).elem_nr > 0 {
-        (*ctxt).elem = *(*ctxt).elem_tab.add((*ctxt).elem_nr as usize - 1);
-    } else {
-        (*ctxt).elem = null_mut();
-    }
-    ret
-}
-
 /// Skip ignorable nodes in that context
 ///
 /// Returns the new sibling or NULL in case of error.
@@ -9775,7 +9756,7 @@ pub unsafe fn xml_relaxng_validate_doc(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDoc
 /// Handle the callback and if needed validate the element children.
 /// some of the in/out information are passed via the context in @inputdata.
 #[doc(alias = "xmlRelaxNGValidateProgressiveCallback")]
-unsafe fn xml_relaxng_validate_progressive_callback(
+pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
     _exec: XmlRegExecCtxtPtr,
     token: *const XmlChar,
     transdata: *mut c_void,
@@ -9846,7 +9827,7 @@ unsafe fn xml_relaxng_validate_progressive_callback(
         (*ctxt).pstate = -1;
         return;
     }
-    xml_relaxng_elem_push(ctxt, exec);
+    (*ctxt).elem_push(exec);
 
     // Validate the attributes part of the content.
     state = xml_relaxng_new_valid_state(ctxt, node);
@@ -9910,102 +9891,6 @@ unsafe fn xml_relaxng_validate_progressive_callback(
     (*ctxt).state = oldstate;
 }
 
-/// Push a new regexp for the current node content model on the stack
-///
-/// Returns 0 in case of success and -1 in case of error.
-#[doc(alias = "xmlRelaxNGElemPush")]
-unsafe fn xml_relaxng_elem_push(ctxt: XmlRelaxNGValidCtxtPtr, exec: XmlRegExecCtxtPtr) -> i32 {
-    if (*ctxt).elem_tab.is_null() {
-        (*ctxt).elem_max = 10;
-        (*ctxt).elem_tab =
-            xml_malloc((*ctxt).elem_max as usize * size_of::<XmlRegExecCtxtPtr>()) as _;
-        if (*ctxt).elem_tab.is_null() {
-            xml_rng_verr_memory(ctxt, "validating\n");
-            return -1;
-        }
-    }
-    if (*ctxt).elem_nr >= (*ctxt).elem_max {
-        (*ctxt).elem_max *= 2;
-        (*ctxt).elem_tab = xml_realloc(
-            (*ctxt).elem_tab as _,
-            (*ctxt).elem_max as usize * size_of::<XmlRegExecCtxtPtr>(),
-        ) as _;
-        if (*ctxt).elem_tab.is_null() {
-            xml_rng_verr_memory(ctxt, "validating\n");
-            return -1;
-        }
-    }
-    *(*ctxt).elem_tab.add((*ctxt).elem_nr as usize) = exec;
-    (*ctxt).elem_nr += 1;
-    (*ctxt).elem = exec;
-    0
-}
-
-/// Push a new element start on the RelaxNG validation stack.
-///
-/// returns 1 if no validation problem was found or 0 if validating the
-/// element requires a full node, and -1 in case of error.
-#[doc(alias = "xmlRelaxNGValidatePushElement")]
-pub unsafe fn xml_relaxng_validate_push_element(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    _doc: XmlDocPtr,
-    elem: XmlNodePtr,
-) -> i32 {
-    let mut ret: i32;
-
-    if ctxt.is_null() || elem.is_null() {
-        return -1;
-    }
-
-    if (*ctxt).elem.is_null() {
-        let schema: XmlRelaxNGPtr = (*ctxt).schema;
-        if schema.is_null() {
-            VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
-            return -1;
-        }
-        let grammar: XmlRelaxNGGrammarPtr = (*schema).topgrammar;
-        if grammar.is_null() || (*grammar).start.is_null() {
-            VALID_ERR!(ctxt, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
-            return -1;
-        }
-        let define: XmlRelaxNGDefinePtr = (*grammar).start;
-        if (*define).cont_model.is_null() {
-            (*ctxt).pdef = define;
-            return 0;
-        }
-        let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(
-            (*define).cont_model,
-            Some(xml_relaxng_validate_progressive_callback),
-            ctxt as _,
-        );
-        if exec.is_null() {
-            return -1;
-        }
-        xml_relaxng_elem_push(ctxt, exec);
-    }
-    (*ctxt).pnode = elem;
-    (*ctxt).pstate = 0;
-    if !(*elem).ns.is_null() {
-        ret = xml_reg_exec_push_string2((*ctxt).elem, (*elem).name, (*(*elem).ns).href, ctxt as _);
-    } else {
-        ret = xml_reg_exec_push_string((*ctxt).elem, (*elem).name, ctxt as _);
-    }
-    if ret < 0 {
-        VALID_ERR2!(
-            ctxt,
-            XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
-            (*elem).name
-        );
-    } else if (*ctxt).pstate == 0 {
-        ret = 0;
-    } else if (*ctxt).pstate < 0 {
-        ret = -1;
-    } else {
-        ret = 1;
-    }
-    ret
-}
-
 /// Check the CData parsed for validation in the current stack
 ///
 /// Returns 1 if no validation problem was found or -1 otherwise
@@ -10040,44 +9925,6 @@ pub unsafe extern "C" fn xml_relaxng_validate_push_cdata(
         return -1;
     }
     1
-}
-
-/// Pop the element end from the RelaxNG validation stack.
-///
-/// returns 1 if no validation problem was found or 0 otherwise
-#[doc(alias = "xmlRelaxNGValidatePopElement")]
-pub unsafe fn xml_relaxng_validate_pop_element(
-    ctxt: XmlRelaxNGValidCtxtPtr,
-    _doc: XmlDocPtr,
-    elem: XmlNodePtr,
-) -> i32 {
-    let mut ret: i32;
-
-    if ctxt.is_null() || (*ctxt).elem.is_null() || elem.is_null() {
-        return -1;
-    }
-    // verify that we reached a terminal state of the content model.
-    let exec: XmlRegExecCtxtPtr = xml_relaxng_elem_pop(ctxt);
-    ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
-    match ret.cmp(&0) {
-        std::cmp::Ordering::Equal => {
-            // TODO: get some of the names needed to exit the current state of exec
-            VALID_ERR2!(
-                ctxt,
-                XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
-                c"".as_ptr() as _
-            );
-            ret = -1;
-        }
-        std::cmp::Ordering::Less => {
-            ret = -1;
-        }
-        std::cmp::Ordering::Greater => {
-            ret = 1;
-        }
-    }
-    xml_reg_free_exec_ctxt(exec);
-    ret
 }
 
 /// Validate a full subtree when xmlRelaxNGValidatePushElement() returned
@@ -10385,46 +10232,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relaxng_validate_pop_element() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let elem = gen_xml_node_ptr(n_elem, 2);
-
-                        let ret_val = xml_relaxng_validate_pop_element(ctxt, doc, elem);
-                        desret_int(ret_val);
-                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_node_ptr(n_elem, elem, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlRelaxNGValidatePopElement",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlRelaxNGValidatePopElement()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_elem);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_relaxng_validate_push_cdata() {
         #[cfg(feature = "schema")]
         unsafe {
@@ -10460,46 +10267,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_data);
                             eprintln!(" {}", n_len);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_relaxng_validate_push_element() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_RELAXNG_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_elem in 0..GEN_NB_XML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_relaxng_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let elem = gen_xml_node_ptr(n_elem, 2);
-
-                        let ret_val = xml_relaxng_validate_push_element(ctxt, doc, elem);
-                        desret_int(ret_val);
-                        des_xml_relaxng_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_node_ptr(n_elem, elem, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlRelaxNGValidatePushElement",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlRelaxNGValidatePushElement()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_elem);
                         }
                     }
                 }

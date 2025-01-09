@@ -60,8 +60,7 @@ use crate::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
-            xml_relaxng_validate_pop_element, xml_relaxng_validate_push_cdata,
-            xml_relaxng_validate_push_element, XmlRelaxNGPtr,
+            xml_relaxng_validate_push_cdata, XmlRelaxNGPtr,
         },
         sax2::xml_sax_version,
         uri::xml_canonic_path,
@@ -1291,7 +1290,7 @@ impl XmlTextReader {
             if !self.rng_full_node.is_null() {
                 return;
             }
-            ret = xml_relaxng_validate_push_element(self.rng_valid_ctxt, (*self.ctxt).my_doc, node);
+            ret = (*self.rng_valid_ctxt).push_element((*self.ctxt).my_doc, node);
             if ret == 0 {
                 // this element requires a full tree
                 node = self.expand();
@@ -1356,8 +1355,7 @@ impl XmlTextReader {
                 }
                 return;
             }
-            let ret: i32 =
-                xml_relaxng_validate_pop_element(self.rng_valid_ctxt, (*self.ctxt).my_doc, node);
+            let ret: i32 = (*self.rng_valid_ctxt).pop_element((*self.ctxt).my_doc, node);
             if ret != 1 {
                 self.rng_valid_errors += 1;
             }

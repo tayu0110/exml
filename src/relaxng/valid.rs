@@ -7,11 +7,15 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc, xml_realloc},
         relaxng::{
-            xml_relaxng_add_states_uniq, xml_relaxng_elem_pop, XmlRelaxNGPtr, XmlRelaxNGValidErr,
-            XmlRelaxNGValidErrorPtr,
+            xml_relaxng_add_states_uniq, xml_relaxng_validate_progressive_callback,
+            XmlRelaxNGGrammarPtr, XmlRelaxNGPtr, XmlRelaxNGValidErr, XmlRelaxNGValidErrorPtr,
         },
-        xmlregexp::{xml_reg_free_exec_ctxt, XmlRegExecCtxtPtr},
+        xmlregexp::{
+            xml_reg_exec_push_string, xml_reg_exec_push_string2, xml_reg_free_exec_ctxt,
+            xml_reg_new_exec_ctxt, XmlRegExecCtxtPtr,
+        },
     },
+    relaxng::{VALID_ERR, VALID_ERR2},
     tree::{NodeCommon, XmlAttrPtr, XmlDocPtr, XmlNodePtr},
 };
 
@@ -90,6 +94,158 @@ pub struct XmlRelaxNGValidCtxt {
     pub(crate) perr: i32,               // signal error in content model outside the regexp
 }
 
+impl XmlRelaxNGValidCtxt {
+    /// Push a new regexp for the current node content model on the stack
+    ///
+    /// Returns 0 in case of success and -1 in case of error.
+    #[doc(alias = "xmlRelaxNGElemPush")]
+    pub(crate) unsafe fn elem_push(&mut self, exec: XmlRegExecCtxtPtr) -> i32 {
+        if self.elem_tab.is_null() {
+            self.elem_max = 10;
+            self.elem_tab =
+                xml_malloc(self.elem_max as usize * size_of::<XmlRegExecCtxtPtr>()) as _;
+            if self.elem_tab.is_null() {
+                xml_rng_verr_memory(self, "validating\n");
+                return -1;
+            }
+        }
+        if self.elem_nr >= self.elem_max {
+            self.elem_max *= 2;
+            self.elem_tab = xml_realloc(
+                self.elem_tab as _,
+                self.elem_max as usize * size_of::<XmlRegExecCtxtPtr>(),
+            ) as _;
+            if self.elem_tab.is_null() {
+                xml_rng_verr_memory(self, "validating\n");
+                return -1;
+            }
+        }
+        *self.elem_tab.add(self.elem_nr as usize) = exec;
+        self.elem_nr += 1;
+        self.elem = exec;
+        0
+    }
+
+    /// Pop the regexp of the current node content model from the stack
+    ///
+    /// Returns the exec or NULL if empty
+    #[doc(alias = "xmlRelaxNGElemPop")]
+    pub(crate) unsafe fn elem_pop(&mut self) -> XmlRegExecCtxtPtr {
+        if self.elem_nr <= 0 {
+            return null_mut();
+        }
+        self.elem_nr -= 1;
+        let ret: XmlRegExecCtxtPtr = *self.elem_tab.add(self.elem_nr as usize);
+        *self.elem_tab.add(self.elem_nr as usize) = null_mut();
+        if self.elem_nr > 0 {
+            self.elem = *self.elem_tab.add(self.elem_nr as usize - 1);
+        } else {
+            self.elem = null_mut();
+        }
+        ret
+    }
+
+    /// Push a new element start on the RelaxNG validation stack.
+    ///
+    /// returns 1 if no validation problem was found or 0 if validating the
+    /// element requires a full node, and -1 in case of error.
+    #[doc(alias = "xmlRelaxNGValidatePushElement")]
+    pub unsafe fn push_element(&mut self, _doc: XmlDocPtr, elem: XmlNodePtr) -> i32 {
+        let mut ret: i32;
+
+        if elem.is_null() {
+            return -1;
+        }
+
+        if self.elem.is_null() {
+            let schema: XmlRelaxNGPtr = self.schema;
+            if schema.is_null() {
+                VALID_ERR!(self, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
+                return -1;
+            }
+            let grammar: XmlRelaxNGGrammarPtr = (*schema).topgrammar;
+            if grammar.is_null() || (*grammar).start.is_null() {
+                VALID_ERR!(self, XmlRelaxNGValidErr::XmlRelaxngErrNogrammar);
+                return -1;
+            }
+            let define: XmlRelaxNGDefinePtr = (*grammar).start;
+            if (*define).cont_model.is_null() {
+                self.pdef = define;
+                return 0;
+            }
+            let exec: XmlRegExecCtxtPtr = xml_reg_new_exec_ctxt(
+                (*define).cont_model,
+                Some(xml_relaxng_validate_progressive_callback),
+                self as *mut Self as _,
+            );
+            if exec.is_null() {
+                return -1;
+            }
+            self.elem_push(exec);
+        }
+        self.pnode = elem;
+        self.pstate = 0;
+        if !(*elem).ns.is_null() {
+            ret = xml_reg_exec_push_string2(
+                self.elem,
+                (*elem).name,
+                (*(*elem).ns).href,
+                self as *mut Self as _,
+            );
+        } else {
+            ret = xml_reg_exec_push_string(self.elem, (*elem).name, self as *mut Self as _);
+        }
+        if ret < 0 {
+            VALID_ERR2!(
+                self,
+                XmlRelaxNGValidErr::XmlRelaxngErrElemwrong,
+                (*elem).name
+            );
+        } else if self.pstate == 0 {
+            ret = 0;
+        } else if self.pstate < 0 {
+            ret = -1;
+        } else {
+            ret = 1;
+        }
+        ret
+    }
+
+    /// Pop the element end from the RelaxNG validation stack.
+    ///
+    /// returns 1 if no validation problem was found or 0 otherwise
+    #[doc(alias = "xmlRelaxNGValidatePopElement")]
+    pub unsafe fn pop_element(&mut self, _doc: XmlDocPtr, elem: XmlNodePtr) -> i32 {
+        let mut ret: i32;
+
+        if self.elem.is_null() || elem.is_null() {
+            return -1;
+        }
+        // verify that we reached a terminal state of the content model.
+        let exec: XmlRegExecCtxtPtr = self.elem_pop();
+        ret = xml_reg_exec_push_string(exec, null_mut(), null_mut());
+        match ret.cmp(&0) {
+            std::cmp::Ordering::Equal => {
+                // TODO: get some of the names needed to exit the current state of exec
+                VALID_ERR2!(
+                    self,
+                    XmlRelaxNGValidErr::XmlRelaxngErrNoelem,
+                    c"".as_ptr() as _
+                );
+                ret = -1;
+            }
+            std::cmp::Ordering::Less => {
+                ret = -1;
+            }
+            std::cmp::Ordering::Greater => {
+                ret = 1;
+            }
+        }
+        xml_reg_free_exec_ctxt(exec);
+        ret
+    }
+}
+
 /// Create an XML RelaxNGs validation context based on the given schema
 ///
 /// Returns the validation context or NULL in case of error
@@ -150,10 +306,10 @@ pub unsafe fn xml_relaxng_free_valid_ctxt(ctxt: XmlRelaxNGValidCtxtPtr) {
     if !(*ctxt).elem_tab.is_null() {
         let mut exec: XmlRegExecCtxtPtr;
 
-        exec = xml_relaxng_elem_pop(ctxt);
+        exec = (*ctxt).elem_pop();
         while !exec.is_null() {
             xml_reg_free_exec_ctxt(exec);
-            exec = xml_relaxng_elem_pop(ctxt);
+            exec = (*ctxt).elem_pop();
         }
         xml_free((*ctxt).elem_tab as _);
     }
