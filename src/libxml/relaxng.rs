@@ -43,7 +43,6 @@ use crate::{
             xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTablePtr,
         },
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaTypeType},
-        uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
         valid::{xml_validate_document_final, XmlValidCtxt},
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_is_determinist,
@@ -1433,8 +1432,8 @@ unsafe fn xml_relaxng_compare_name_classes(
     def2: XmlRelaxNGDefinePtr,
 ) -> i32 {
     let mut ret: i32;
-    let mut node: XmlNode = unsafe { zeroed() };
-    let mut ns: XmlNs = unsafe { zeroed() };
+    let mut node = XmlNode::default();
+    let mut ns = XmlNs::default();
     let mut ctxt: XmlRelaxNGValidCtxt = unsafe { zeroed() };
 
     memset(addr_of_mut!(ctxt) as _, 0, size_of::<XmlRelaxNGValidCtxt>());
@@ -1872,23 +1871,10 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                     );
                 }
             } else if (*cur).name().as_deref() == Some("datatypeLibrary") {
-                let uri: XmlURIPtr;
-
                 if let Some(val) = (*cur).children.and_then(|c| c.get_string((*node).doc, 1)) {
                     if !val.is_empty() {
-                        let v = CString::new(val.as_str()).unwrap();
-                        uri = xml_parse_uri(v.as_ptr());
-                        if uri.is_null() {
-                            xml_rng_perr!(
-                                ctxt,
-                                node,
-                                XmlParserErrors::XmlRngpInvalidURI,
-                                "Attribute {} contains invalid URI {}\n",
-                                (*cur).name().unwrap(),
-                                val
-                            );
-                        } else {
-                            if (*uri).scheme.is_null() {
+                        if let Some(uri) = XmlURI::parse(&val) {
+                            if uri.scheme.is_none() {
                                 xml_rng_perr!(
                                     ctxt,
                                     node,
@@ -1898,7 +1884,7 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                                     val
                                 );
                             }
-                            if !(*uri).fragment.is_null() {
+                            if uri.fragment.is_some() {
                                 xml_rng_perr!(
                                     ctxt,
                                     node,
@@ -1908,7 +1894,15 @@ unsafe fn xml_relaxng_cleanup_attributes(ctxt: XmlRelaxNGParserCtxtPtr, node: Xm
                                     val
                                 );
                             }
-                            xml_free_uri(uri);
+                        } else {
+                            xml_rng_perr!(
+                                ctxt,
+                                node,
+                                XmlParserErrors::XmlRngpInvalidURI,
+                                "Attribute {} contains invalid URI {}\n",
+                                (*cur).name().unwrap(),
+                                val
+                            );
                         }
                     }
                 }
