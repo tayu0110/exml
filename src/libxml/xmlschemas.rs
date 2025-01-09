@@ -1524,7 +1524,7 @@ unsafe fn xml_schema_internal_err2(
     }
 }
 
-unsafe extern "C" fn xml_schema_item_list_add_size(
+unsafe fn xml_schema_item_list_add_size(
     list: XmlSchemaItemListPtr,
     mut initial_size: i32,
     item: *mut c_void,
@@ -1557,7 +1557,7 @@ unsafe extern "C" fn xml_schema_item_list_add_size(
     0
 }
 
-unsafe extern "C" fn xml_schema_add_item_size(
+unsafe fn xml_schema_add_item_size(
     list: *mut XmlSchemaItemListPtr,
     initial_size: i32,
     item: *mut c_void,
@@ -1573,7 +1573,7 @@ unsafe extern "C" fn xml_schema_add_item_size(
 
 /// Returns the component name of a schema item.
 #[doc(alias = "xmlSchemaItemTypeToStr")]
-unsafe extern "C" fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *const XmlChar {
+unsafe fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *const XmlChar {
     match typ {
         XmlSchemaTypeType::XmlSchemaTypeBasic => c"simple type definition".as_ptr() as _,
         XmlSchemaTypeType::XmlSchemaTypeSimple => c"simple type definition".as_ptr() as _,
@@ -1614,9 +1614,7 @@ unsafe extern "C" fn xml_schema_item_type_to_str(typ: XmlSchemaTypeType) -> *con
 }
 
 /// Returns the component name of a schema item.
-unsafe extern "C" fn xml_schema_get_component_type_str(
-    item: XmlSchemaBasicItemPtr,
-) -> *const XmlChar {
+unsafe fn xml_schema_get_component_type_str(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
     match (*item).typ {
         XmlSchemaTypeType::XmlSchemaTypeBasic => {
             if WXS_IS_COMPLEX!(item as XmlSchemaTypePtr) {
@@ -1629,9 +1627,7 @@ unsafe extern "C" fn xml_schema_get_component_type_str(
     }
 }
 
-unsafe extern "C" fn xml_schema_get_component_target_ns(
-    item: XmlSchemaBasicItemPtr,
-) -> *const XmlChar {
+unsafe fn xml_schema_get_component_target_ns(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
     if item.is_null() {
         return null_mut();
     }
@@ -1665,7 +1661,7 @@ unsafe extern "C" fn xml_schema_get_component_target_ns(
                     WXS_ATTRUSE_DECL!(item) as XmlSchemaBasicItemPtr
                 );
             }
-            /* TODO: Will returning NULL break something? */
+            // TODO: Will returning NULL break something?
         }
         XmlSchemaTypeType::XmlSchemaExtraQnameref => {
             return (*(item as XmlSchemaQnameRefPtr)).target_namespace;
@@ -1674,15 +1670,13 @@ unsafe extern "C" fn xml_schema_get_component_target_ns(
             return (*(item as XmlSchemaNotationPtr)).target_namespace;
         }
         _ => {
-            /*
-             * Other components cannot have names.
-             */
+            // Other components cannot have names.
         }
     }
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
+unsafe fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) -> *const XmlChar {
     if item.is_null() {
         return null_mut();
     }
@@ -1725,15 +1719,13 @@ unsafe extern "C" fn xml_schema_get_component_name(item: XmlSchemaBasicItemPtr) 
             return (*(item as XmlSchemaNotationPtr)).name;
         }
         _ => {
-            /*
-             * Other components cannot have names.
-             */
+            // Other components cannot have names.
         }
     }
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_get_component_qname(
+unsafe fn xml_schema_get_component_qname(
     buf: *mut *mut XmlChar,
     item: *mut c_void,
 ) -> *const XmlChar {
@@ -1744,7 +1736,7 @@ unsafe extern "C" fn xml_schema_get_component_qname(
     )
 }
 
-unsafe extern "C" fn xml_schema_get_component_designation(
+unsafe fn xml_schema_get_component_designation(
     buf: *mut *mut XmlChar,
     item: *mut c_void,
 ) -> *const XmlChar {
@@ -1763,7 +1755,7 @@ unsafe extern "C" fn xml_schema_get_component_designation(
 
 /// Returns a string representation of the type of processContents.
 #[doc(alias = "xmlSchemaWildcardPCToString")]
-unsafe extern "C" fn xml_schema_wildcard_pcto_string(pc: i32) -> *const XmlChar {
+unsafe fn xml_schema_wildcard_pcto_string(pc: i32) -> *const XmlChar {
     match pc {
         _ if XML_SCHEMAS_ANY_SKIP == pc => c"skip".as_ptr() as _,
         _ if XML_SCHEMAS_ANY_LAX == pc => c"lax".as_ptr() as _,
@@ -1788,7 +1780,7 @@ unsafe extern "C" fn xml_schema_wildcard_pcto_string(pc: i32) -> *const XmlChar 
 ///
 /// Returns the formatted string and sets @buf to the resulting value.
 #[doc(alias = "xmlSchemaFormatItemForReport")]
-unsafe extern "C" fn xml_schema_format_item_for_report(
+unsafe fn xml_schema_format_item_for_report(
     buf: *mut *mut XmlChar,
     item_des: *const XmlChar,
     item: XmlSchemaBasicItemPtr,
@@ -2019,7 +2011,7 @@ unsafe extern "C" fn xml_schema_format_item_for_report(
     xml_escape_format_string(buf)
 }
 
-unsafe extern "C" fn xml_schema_format_node_for_error(
+unsafe fn xml_schema_format_node_for_error(
     msg: *mut *mut XmlChar,
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
@@ -2077,9 +2069,7 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
         *msg = xml_strcat(*msg, c"': ".as_ptr() as _);
     } else if (*actxt).typ == XML_SCHEMA_CTXT_VALIDATOR {
         let vctxt: XmlSchemaValidCtxtPtr = actxt as XmlSchemaValidCtxtPtr;
-        /*
-         * Work on node infos.
-         */
+        // Work on node infos.
         if (*(*vctxt).inode).node_type == XmlElementType::XmlAttributeNode as i32 {
             let ielem: XmlSchemaNodeInfoPtr = *(*vctxt).elem_infos.add((*vctxt).depth as usize);
 
@@ -2105,26 +2095,19 @@ unsafe extern "C" fn xml_schema_format_node_for_error(
         FREE_AND_NULL!(str);
         *msg = xml_strcat(*msg, c"': ".as_ptr() as _);
     } else if (*actxt).typ == XML_SCHEMA_CTXT_PARSER {
-        /*
-         * Hmm, no node while parsing?
-         * Return an empty string, in case NULL will break something.
-         */
+        // Hmm, no node while parsing?
+        // Return an empty string, in case NULL will break something.
         *msg = xml_strdup(c"".as_ptr() as _);
     } else {
         // TODO
         return null_mut();
     }
 
-    /*
-     * xmlSchemaFormatItemForReport() also returns an escaped format
-     * string, so do this before calling it below (in the future).
-     */
+    // xmlSchemaFormatItemForReport() also returns an escaped format string,
+    // so do this before calling it below (in the future).
     xml_escape_format_string(msg);
 
-    /*
-     * VAL TODO: The output of the given schema component is currently
-     * disabled.
-     */
+    // VAL TODO: The output of the given schema component is currently disabled.
     // #if 0
     // if ((type != null_mut()) && (xmlSchemaIsGlobalItem(type))) {
     //     *msg = xmlStrcat(*msg, c" [".as_ptr() as _);
@@ -2276,14 +2259,10 @@ macro_rules! AERROR_INT {
 unsafe fn xml_schema_get_white_space_facet_value(
     typ: XmlSchemaTypePtr,
 ) -> Option<XmlSchemaWhitespaceValueType> {
-    /*
-     * The normalization type can be changed only for types which are derived
-     * from xsd:string.
-     */
+    // The normalization type can be changed only for types which are derived
+    // from xsd:string.
     if (*typ).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
-        /*
-         * Note that we assume a whitespace of preserve for anySimpleType.
-         */
+        // Note that we assume a whitespace of preserve for anySimpleType.
         if (*typ).built_in_type == XmlSchemaValType::XmlSchemasString as i32
             || (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
         {
@@ -2291,18 +2270,14 @@ unsafe fn xml_schema_get_white_space_facet_value(
         } else if (*typ).built_in_type == XmlSchemaValType::XmlSchemasNormstring as i32 {
             return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceReplace);
         } else {
-            /*
-             * For all `atomic` datatypes other than string (and types `derived`
-             * by `restriction` from it) the value of whiteSpace is fixed to
-             * collapse
-             * Note that this includes built-in list datatypes.
-             */
+            // For all `atomic` datatypes other than string (and types `derived`
+            // by `restriction` from it) the value of whiteSpace is fixed to
+            // collapse
+            // Note that this includes built-in list datatypes.
             return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse);
         }
     } else if WXS_IS_LIST!(typ) {
-        /*
-         * For list types the facet "whiteSpace" is fixed to "collapse".
-         */
+        // For list types the facet "whiteSpace" is fixed to "collapse".
         return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse);
     } else if WXS_IS_UNION!(typ) {
         return Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceUnknown);
@@ -2318,10 +2293,7 @@ unsafe fn xml_schema_get_white_space_facet_value(
     None
 }
 
-unsafe extern "C" fn xml_schema_normalize_value(
-    typ: XmlSchemaTypePtr,
-    value: *const XmlChar,
-) -> *mut XmlChar {
+unsafe fn xml_schema_normalize_value(typ: XmlSchemaTypePtr, value: *const XmlChar) -> *mut XmlChar {
     match xml_schema_get_white_space_facet_value(typ) {
         Some(XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse) => {
             xml_schema_collapse_string(value)
@@ -2338,7 +2310,7 @@ unsafe extern "C" fn xml_schema_normalize_value(
 /// node need not to reflect the component directly, since there is no
 /// one-to-one relationship between the XML Schema representation and
 /// the component representation.
-unsafe extern "C" fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> XmlNodePtr {
+unsafe fn xml_schema_get_component_node(item: XmlSchemaBasicItemPtr) -> XmlNodePtr {
     match (*item).typ {
         XmlSchemaTypeType::XmlSchemaTypeElement => (*(item as XmlSchemaElementPtr)).node,
         XmlSchemaTypeType::XmlSchemaTypeAttribute => (*(item as XmlSchemaAttributePtr)).node,
@@ -2463,7 +2435,7 @@ macro_rules! WXS_FIND_GLOBAL_ITEM {
     };
 }
 
-unsafe extern "C" fn xml_schema_get_notation(
+unsafe fn xml_schema_get_notation(
     schema: XmlSchemaPtr,
     name: *const XmlChar,
     ns_name: *const XmlChar,
@@ -2480,7 +2452,7 @@ unsafe extern "C" fn xml_schema_get_notation(
 }
 
 // This one works on the schema of the validation context.
-unsafe extern "C" fn xml_schema_validate_notation(
+unsafe fn xml_schema_validate_notation(
     vctxt: XmlSchemaValidCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -2557,7 +2529,7 @@ unsafe extern "C" fn xml_schema_validate_notation(
     ret
 }
 
-unsafe extern "C" fn xml_schema_validate_qname(
+unsafe fn xml_schema_validate_qname(
     vctxt: XmlSchemaValidCtxtPtr,
     value: *const XmlChar,
     val: *mut XmlSchemaValPtr,
@@ -2579,11 +2551,8 @@ unsafe extern "C" fn xml_schema_validate_qname(
         }
         return XmlParserErrors::XmlSchemavCvcDatatypeValid1_2_1 as i32;
     }
-    /*
-     * NOTE: xmlSplitQName2 will always return a duplicated
-     * strings.
-     */
-    /* TODO: Export and use xmlSchemaStrip instead */
+    // NOTE: xmlSplitQName2 will always return a duplicated strings.
+    // TODO: Export and use xmlSchemaStrip instead
     let stripped: *mut XmlChar = xml_schema_collapse_string(value);
     local = xml_split_qname2(
         if !stripped.is_null() { stripped } else { value },
@@ -2593,11 +2562,9 @@ unsafe extern "C" fn xml_schema_validate_qname(
     if local.is_null() {
         local = xml_strdup(value);
     }
-    /*
-     * OPTIMIZE TODO: Use flags for:
-     *  - is there any namespace binding?
-     *  - is there a default namespace?
-     */
+    // OPTIMIZE TODO: Use flags for:
+    //  - is there any namespace binding?
+    //  - is there a default namespace?
     let ns_name: *const XmlChar = xml_schema_lookup_namespace(vctxt, prefix);
 
     if !prefix.is_null() {
@@ -2638,12 +2605,10 @@ unsafe extern "C" fn xml_schema_validate_qname(
 
 /// Returns the primitive type of the given type or NULL in case of error.
 #[doc(alias = "xmlSchemaGetPrimitiveType")]
-unsafe extern "C" fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) -> XmlSchemaTypePtr {
+unsafe fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) -> XmlSchemaTypePtr {
     while !typ.is_null() {
-        /*
-         * Note that anySimpleType is actually not a primitive type
-         * but we need that here.
-         */
+        // Note that anySimpleType is actually not a primitive type
+        // but we need that here.
         if (*typ).built_in_type == XmlSchemaValType::XmlSchemasAnysimpletype as i32
             || (*typ).flags & XML_SCHEMAS_TYPE_BUILTIN_PRIMITIVE != 0
         {
@@ -2655,7 +2620,7 @@ unsafe extern "C" fn xml_schema_get_primitive_type(mut typ: XmlSchemaTypePtr) ->
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_eval_error_node_type(
+unsafe fn xml_schema_eval_error_node_type(
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
 ) -> i32 {
@@ -2689,7 +2654,7 @@ unsafe fn xml_schema_err(
 /// Returns 0 if the value could be built and -1 in case of
 /// API errors or if the value type is not supported yet.
 #[doc(alias = "xmlSchemaGetCanonValueWhtspExt")]
-unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
+unsafe fn xml_schema_get_canon_value_whtsp_ext_1(
     mut val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
     ret_value: *mut *mut XmlChar,
@@ -2738,15 +2703,15 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
                     return -1;
                 }
                 if for_hash != 0 && val_type == XmlSchemaValType::XmlSchemasDecimal {
-                    /* We can mostly use the canonical value for hashing,
-                    except in the case of decimal.  There the canonical
-                    representation requires a trailing '.0' even for
-                    non-fractional numbers, but for the derived integer
-                    types it forbids any decimal point.  Nevertheless they
-                    compare equal if the value is equal.  We need to generate
-                    the same hash value for this to work, and it's easiest
-                    to just cut off the useless '.0' suffix for the
-                    decimal type.  */
+                    // We can mostly use the canonical value for hashing,
+                    // except in the case of decimal.  There the canonical
+                    // representation requires a trailing '.0' even for
+                    // non-fractional numbers, but for the derived integer
+                    // types it forbids any decimal point.  Nevertheless they
+                    // compare equal if the value is equal.  We need to generate
+                    // the same hash value for this to work, and it's easiest
+                    // to just cut off the useless '.0' suffix for the
+                    // decimal type.
                     let len: i32 = xml_strlen(value2);
                     if len > 2
                         && *value2.add(len as usize - 1) == b'0'
@@ -2767,7 +2732,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
                 *ret_value = xml_strdup(value);
             }
         } else if !value.is_null() {
-            /* List. */
+            // List.
             *ret_value = xml_strcat(*ret_value, c" ".as_ptr() as _);
             *ret_value = xml_strcat(*ret_value, value);
         }
@@ -2788,7 +2753,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext_1(
     //     return -1;
 }
 
-unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext(
+unsafe fn xml_schema_get_canon_value_whtsp_ext(
     val: XmlSchemaValPtr,
     ws: XmlSchemaWhitespaceValueType,
     ret_value: *mut *mut XmlChar,
@@ -2800,7 +2765,7 @@ unsafe extern "C" fn xml_schema_get_canon_value_whtsp_ext(
 ///
 /// Returns a string of all enumeration elements.
 #[doc(alias = "xmlSchemaFormatFacetEnumSet")]
-unsafe extern "C" fn xml_schema_format_facet_enum_set(
+unsafe fn xml_schema_format_facet_enum_set(
     actxt: XmlSchemaAbstractCtxtPtr,
     buf: *mut *mut XmlChar,
     mut typ: XmlSchemaTypePtr,
@@ -2817,9 +2782,7 @@ unsafe extern "C" fn xml_schema_format_facet_enum_set(
     *buf = null_mut();
 
     loop {
-        /*
-         * Use the whitespace type of the base type.
-         */
+        // Use the whitespace type of the base type.
         ws = xml_schema_get_white_space_facet_value((*typ).base_type).unwrap();
         facet = (*typ).facets;
         while !facet.is_null() {
@@ -2854,12 +2817,10 @@ unsafe extern "C" fn xml_schema_format_facet_enum_set(
             }
             facet = (*facet).next;
         }
-        /*
-         * The enumeration facet of a type restricts the enumeration
-         * facet of the ancestor type; i.e., such restricted enumerations
-         * do not belong to the set of the given type. Thus we break
-         * on the first found enumeration.
-         */
+        // The enumeration facet of a type restricts the enumeration
+        // facet of the ancestor type; i.e., such restricted enumerations
+        // do not belong to the set of the given type. Thus we break
+        // on the first found enumeration.
         if found != 0 {
             break;
         }
@@ -3082,10 +3043,7 @@ unsafe fn xml_schema_facet_err(
     FREE_AND_NULL!(str);
 }
 
-unsafe extern "C" fn xml_schema_are_values_equal(
-    mut x: XmlSchemaValPtr,
-    mut y: XmlSchemaValPtr,
-) -> i32 {
+unsafe fn xml_schema_are_values_equal(mut x: XmlSchemaValPtr, mut y: XmlSchemaValPtr) -> i32 {
     let mut tx: XmlSchemaTypePtr;
     let mut ty: XmlSchemaTypePtr;
     let mut ptx: XmlSchemaTypePtr;
@@ -3093,27 +3051,22 @@ unsafe extern "C" fn xml_schema_are_values_equal(
     let mut ret: i32;
 
     while !x.is_null() {
-        /* Same types. */
+        // Same types.
         tx = xml_schema_get_built_in_type(xml_schema_get_val_type(x));
         ty = xml_schema_get_built_in_type(xml_schema_get_val_type(y));
         ptx = xml_schema_get_primitive_type(tx);
         pty = xml_schema_get_primitive_type(ty);
-        /*
-        	* (1) if a datatype T' is `derived` by `restriction` from an
-        	* atomic datatype T then the `value space` of T' is a subset of
-        	* the `value space` of T. */
-        /*
-        	* (2) if datatypes T' and T'' are `derived` by `restriction`
-        	* from a common atomic ancestor T then the `value space`s of T'
-        	* and T'' may overlap.
-        	*/
+        // (1) if a datatype T' is `derived` by `restriction` from an
+        // atomic datatype T then the `value space` of T' is a subset of
+        // the `value space` of T.
+        // (2) if datatypes T' and T'' are `derived` by `restriction`
+        // from a common atomic ancestor T then the `value space`s of T'
+        // and T'' may overlap.
         if ptx != pty {
             return 0;
         }
-        /*
-        	* We assume computed values to be normalized, so do a fast
-        	* string comparison for string based types.
-        	*/
+        // We assume computed values to be normalized, so do a fast
+        // string comparison for string based types.
         if (*ptx).built_in_type == XmlSchemaValType::XmlSchemasString as i32
             || WXS_IS_ANY_SIMPLE_TYPE!(ptx)
         {
@@ -3137,9 +3090,7 @@ unsafe extern "C" fn xml_schema_are_values_equal(
                 return 0;
             }
         }
-        /*
-        	* Lists.
-        	*/
+        // Lists.
         x = xml_schema_value_get_next(x);
         if !x.is_null() {
             y = xml_schema_value_get_next(y);
@@ -3171,7 +3122,8 @@ macro_rules! ACTIVATE_PARENT_ELEM {
     };
 }
 
-unsafe extern "C" fn xml_schema_validate_facets(
+#[allow(clippy::too_many_arguments)]
+unsafe fn xml_schema_validate_facets(
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
     typ: XmlSchemaTypePtr,
@@ -3190,18 +3142,14 @@ unsafe extern "C" fn xml_schema_validate_facets(
     let mut len: u64 = 0;
     let ws: XmlSchemaWhitespaceValueType;
 
-    /*
-     * In Libxml2, derived built-in types have currently no explicit facets.
-     */
+    // In Libxml2, derived built-in types have currently no explicit facets.
     if (*typ).typ == XmlSchemaTypeType::XmlSchemaTypeBasic {
         return 0;
     }
 
-    /*
-     * NOTE: Do not jump away, if the facetSet of the given type is
-     * empty: until now, "pattern" and "enumeration" facets of the
-     * *base types* need to be checked as well.
-     */
+    // NOTE: Do not jump away, if the facetSet of the given type is
+    // empty: until now, "pattern" and "enumeration" facets of the
+    // *base types* need to be checked as well.
     'pattern_and_enum: {
         if (*typ).facet_set.is_null() {
             break 'pattern_and_enum;
@@ -3214,10 +3162,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
                     break 'pattern_and_enum;
                 }
             }
-            /*
-             * Whitespace handling is only of importance for string-based
-             * types.
-             */
+            // Whitespace handling is only of importance for string-based types.
             tmp_type = xml_schema_get_primitive_type(typ);
             if (*tmp_type).built_in_type == XmlSchemaValType::XmlSchemasString as i32
                 || WXS_IS_ANY_SIMPLE_TYPE!(tmp_type)
@@ -3227,11 +3172,8 @@ unsafe extern "C" fn xml_schema_validate_facets(
                 ws = XmlSchemaWhitespaceValueType::XmlSchemaWhitespaceCollapse;
             }
 
-            /*
-             * If the value was not computed (for string or
-             * anySimpleType based types), then use the provided
-             * type.
-             */
+            // If the value was not computed (for string or
+            // anySimpleType based types), then use the provided type.
             if !val.is_null() {
                 val_type = xml_schema_get_val_type(val);
             }
@@ -3240,10 +3182,8 @@ unsafe extern "C" fn xml_schema_validate_facets(
             facet_link = (*typ).facet_set;
             while !facet_link.is_null() {
                 'to_continue: {
-                    /*
-                     * Skip the pattern "whiteSpace": it is used to
-                     * format the character content beforehand.
-                     */
+                    // Skip the pattern "whiteSpace": it is used to
+                    // format the character content beforehand.
                     match (*(*facet_link).facet).typ {
                         XmlSchemaTypeType::XmlSchemaFacetWhitespace
                         | XmlSchemaTypeType::XmlSchemaFacetPattern
@@ -3316,9 +3256,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
         if !WXS_IS_LIST!(typ) {
             break 'pattern_and_enum;
         }
-        /*
-         * "length", "minLength" and "maxLength" of list types.
-         */
+        // "length", "minLength" and "maxLength" of list types.
         // ret = 0;
         facet_link = (*typ).facet_set;
         while !facet_link.is_null() {
@@ -3410,12 +3348,10 @@ unsafe extern "C" fn xml_schema_validate_facets(
         if ret != 0 {
             break;
         }
-        /*
-         * Break on the first set of enumerations. Any additional
-         *  enumerations which might be existent on the ancestors
-         *  of the current type are restricted by this set; thus
-         *  *must* *not* be taken into account.
-         */
+        // Break on the first set of enumerations. Any additional
+        //  enumerations which might be existent on the ancestors
+        //  of the current type are restricted by this set; thus
+        //  *must* *not* be taken into account.
         if found != 0 {
             break;
         }
@@ -3449,10 +3385,8 @@ unsafe extern "C" fn xml_schema_validate_facets(
         }
     }
 
-    /*
-     * Process patters. Pattern facets are ORed at type level
-     * and ANDed if derived. Walk the base type axis.
-     */
+    // Process patters. Pattern facets are ORed at type level
+    // and ANDed if derived. Walk the base type axis.
     tmp_type = typ;
     facet = null_mut();
     loop {
@@ -3464,10 +3398,7 @@ unsafe extern "C" fn xml_schema_validate_facets(
                 continue;
             }
             found = 1;
-            /*
-             * NOTE that for patterns, @value needs to be the
-             * normalized value.
-             */
+            // NOTE that for patterns, @value needs to be the normalized value.
             ret = xml_regexp_exec((*(*facet_link).facet).regexp, value);
             if ret == 1 {
                 break;
@@ -3623,7 +3554,7 @@ unsafe fn xml_schema_simple_type_err(
 /// Returns a list of member types of @type if existing,
 /// returns NULL otherwise.
 #[doc(alias = "xmlSchemaGetUnionSimpleTypeMemberTypes")]
-unsafe extern "C" fn xml_schema_get_union_simple_type_member_types(
+unsafe fn xml_schema_get_union_simple_type_member_types(
     mut typ: XmlSchemaTypePtr,
 ) -> XmlSchemaTypeLinkPtr {
     while !typ.is_null() && (*typ).typ == XmlSchemaTypeType::XmlSchemaTypeSimple {
@@ -3657,7 +3588,8 @@ macro_rules! NORMALIZE {
 }
 
 // cvc-simple-type
-pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn xml_schema_vcheck_cvc_simple_type(
     actxt: XmlSchemaAbstractCtxtPtr,
     node: XmlNodePtr,
     typ: XmlSchemaTypePtr,
@@ -3678,28 +3610,18 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
         *ret_val = null_mut();
     }
 
-    /*
-     * 3.14.4 Simple Type Definition Validation Rules
-     * Validation Rule: String Valid
-     */
-    /*
-     * 1 It is schema-valid with respect to that definition as defined
-     * by Datatype Valid in [XML Schemas: Datatypes].
-     */
-    /*
-     * 2.1 If The definition is ENTITY or is validly derived from ENTITY given
-     * the empty set, as defined in Type Derivation OK (Simple) ($3.14.6), then
-     * the string must be a `declared entity name`.
-     */
-    /*
-     * 2.2 If The definition is ENTITIES or is validly derived from ENTITIES
-     * given the empty set, as defined in Type Derivation OK (Simple) ($3.14.6),
-     * then every whitespace-delimited substring of the string must be a `declared
-     * entity name`.
-     */
-    /*
-     * 2.3 otherwise no further condition applies.
-     */
+    // 3.14.4 Simple Type Definition Validation Rules
+    // Validation Rule: String Valid
+    // 1 It is schema-valid with respect to that definition as defined
+    // by Datatype Valid in [XML Schemas: Datatypes].
+    // 2.1 If The definition is ENTITY or is validly derived from ENTITY given
+    // the empty set, as defined in Type Derivation OK (Simple) ($3.14.6), then
+    // the string must be a `declared entity name`.
+    // 2.2 If The definition is ENTITIES or is validly derived from ENTITIES
+    // given the empty set, as defined in Type Derivation OK (Simple) ($3.14.6),
+    // then every whitespace-delimited substring of the string must be a `declared
+    // entity name`.
+    // 2.3 otherwise no further condition applies.
     if val_needed == 0 && (*typ).flags & XML_SCHEMAS_TYPE_FACETSNEEDVALUE != 0 {
         val_needed = 1;
     }
@@ -3709,18 +3631,13 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
     'internal_error: {
         if WXS_IS_ANY_SIMPLE_TYPE!(typ) || WXS_IS_ATOMIC!(typ) {
             let mut bi_type: XmlSchemaTypePtr; /* The built-in type. */
-            /*
-             * SPEC (1.2.1) "if {variety} is `atomic` then the string must `match`
-             * a literal in the `lexical space` of {base type definition}"
-             */
-            /*
-             * Whitespace-normalize.
-             */
+            // SPEC (1.2.1) "if {variety} is `atomic` then the string must `match`
+            // a literal in the `lexical space` of {base type definition}"
+
+            // Whitespace-normalize.
             NORMALIZE!(typ, value, norm_value, typ, is_normalized, normalize);
             if (*typ).typ != XmlSchemaTypeType::XmlSchemaTypeBasic {
-                /*
-                 * Get the built-in type.
-                 */
+                // Get the built-in type.
                 bi_type = (*typ).base_type;
                 while !bi_type.is_null() && (*bi_type).typ != XmlSchemaTypeType::XmlSchemaTypeBasic
                 {
@@ -3811,9 +3728,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
                     }
                 }
             } else {
-                /*
-                 * Validation via a public API is not implemented yet.
-                 */
+                // Validation via a public API is not implemented yet.
                 // TODO
                 break 'internal_error;
             }
@@ -3949,9 +3864,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
             }
             FREE_AND_NULL!(tmp_value);
             if ret == 0 && (*typ).flags & XML_SCHEMAS_TYPE_HAS_FACETS != 0 {
-                /*
-                 * Apply facets (pattern, enumeration).
-                 */
+                // Apply facets (pattern, enumeration).
                 ret = xml_schema_validate_facets(
                     actxt,
                     node,
@@ -3975,9 +3888,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
                 }
             }
             if fire_errors != 0 && ret > 0 {
-                /*
-                 * Report the normalized value.
-                 */
+                // Report the normalized value.
                 normalize = 1;
                 NORMALIZE!(typ, value, norm_value, typ, is_normalized, normalize);
                 let value = CStr::from_ptr(value as *const i8).to_string_lossy();
@@ -3985,22 +3896,18 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
             }
         } else if WXS_IS_UNION!(typ) {
             let mut member_link: XmlSchemaTypeLinkPtr;
-            /*
-             * TODO: For all datatypes `derived` by `union`  whiteSpace does
-             * not apply directly; however, the normalization behavior of `union`
-             * types is controlled by the value of whiteSpace on that one of the
-             * `memberTypes` against which the `union` is successfully validated.
-             *
-             * This means that the value is normalized by the first validating
-             * member type, then the facets of the union type are applied. This
-             * needs changing of the value!
-             */
+            // TODO: For all datatypes `derived` by `union`  whiteSpace does
+            // not apply directly; however, the normalization behavior of `union`
+            // types is controlled by the value of whiteSpace on that one of the
+            // `memberTypes` against which the `union` is successfully validated.
+            //
+            // This means that the value is normalized by the first validating
+            // member type, then the facets of the union type are applied. This
+            // needs changing of the value!
 
-            /*
-             * 1.2.3 if {variety} is `union` then the string must `match` a
-             * literal in the `lexical space` of at least one member of
-             * {member type definitions}
-             */
+            // 1.2.3 if {variety} is `union` then the string must `match` a
+            // literal in the `lexical space` of at least one member of
+            // {member type definitions}
             member_link = xml_schema_get_union_simple_type_member_types(typ);
             if member_link.is_null() {
                 AERROR_INT!(
@@ -4010,12 +3917,9 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
                 );
                 break 'internal_error;
             }
-            /*
-             * Always normalize union type values, since we currently
-             * cannot store the whitespace information with the value
-             * itself; otherwise a later value-comparison would be
-             * not possible.
-             */
+            // Always normalize union type values, since we currently
+            // cannot store the whitespace information with the value
+            // itself; otherwise a later value-comparison would be not possible.
             while !member_link.is_null() {
                 if val_needed != 0 {
                     ret = xml_schema_vcheck_cvc_simple_type(
@@ -4126,7 +4030,7 @@ pub(crate) unsafe extern "C" fn xml_schema_vcheck_cvc_simple_type(
 ///
 /// Returns the localName if @namespaceName is NULL, a formatted string otherwise.
 #[doc(alias = "xmlSchemaFormatQName")]
-pub(crate) unsafe extern "C" fn xml_schema_format_qname(
+pub(crate) unsafe fn xml_schema_format_qname(
     buf: *mut *mut XmlChar,
     namespace_name: *const XmlChar,
     local_name: *const XmlChar,
@@ -4152,9 +4056,7 @@ pub(crate) unsafe extern "C" fn xml_schema_format_qname(
 ///
 /// Returns the c_char string representation of the facet type if the
 /// type is a facet and an "Internal Error" string otherwise.
-pub(crate) unsafe extern "C" fn xml_schema_facet_type_to_string(
-    typ: XmlSchemaTypeType,
-) -> *const XmlChar {
+pub(crate) unsafe fn xml_schema_facet_type_to_string(typ: XmlSchemaTypeType) -> *const XmlChar {
     match typ {
         XmlSchemaTypeType::XmlSchemaFacetPattern => {
             return c"pattern".as_ptr() as _;
@@ -4206,7 +4108,7 @@ unsafe fn xml_schema_perr_memory(ctxt: XmlSchemaParserCtxtPtr, extra: &str, node
     __xml_simple_oom_error(XmlErrorDomain::XmlFromSchemasp, node, Some(extra));
 }
 
-unsafe extern "C" fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
+unsafe fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
     let ret: XmlSchemaItemListPtr = xml_malloc(size_of::<XmlSchemaItemList>()) as _;
     if ret.is_null() {
         xml_schema_perr_memory(null_mut(), "allocating an item list structure", null_mut());
@@ -4216,7 +4118,7 @@ unsafe extern "C" fn xml_schema_item_list_create() -> XmlSchemaItemListPtr {
     ret
 }
 
-unsafe extern "C" fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
+unsafe fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
     let ret: XmlSchemaParserCtxtPtr =
         xml_malloc(size_of::<XmlSchemaParserCtxt>()) as XmlSchemaParserCtxtPtr;
     if ret.is_null() {
@@ -4238,7 +4140,7 @@ unsafe extern "C" fn xml_schema_parser_ctxt_create() -> XmlSchemaParserCtxtPtr {
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewParserCtxt")]
-pub unsafe extern "C" fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSchemaParserCtxtPtr {
+pub unsafe fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSchemaParserCtxtPtr {
     if url.is_null() {
         return null_mut();
     }
@@ -4257,7 +4159,7 @@ pub unsafe extern "C" fn xml_schema_new_parser_ctxt(url: *const c_char) -> XmlSc
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewMemParserCtxt")]
-pub unsafe extern "C" fn xml_schema_new_mem_parser_ctxt(
+pub unsafe fn xml_schema_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: i32,
 ) -> XmlSchemaParserCtxtPtr {
@@ -4279,7 +4181,7 @@ pub unsafe extern "C" fn xml_schema_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchemaNewDocParserCtxt")]
-pub unsafe extern "C" fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchemaParserCtxtPtr {
+pub unsafe fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchemaParserCtxtPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -4289,7 +4191,7 @@ pub unsafe extern "C" fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSc
     }
     (*ret).doc = doc;
     (*ret).dict = xml_dict_create();
-    /* The application has responsibility for the document */
+    // The application has responsibility for the document
     (*ret).preserve = 1;
 
     ret
@@ -4297,7 +4199,7 @@ pub unsafe extern "C" fn xml_schema_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSc
 
 /// Free the resources associated to the schema parser context
 #[doc(alias = "xmlSchemaFreeParserCtxt")]
-pub unsafe extern "C" fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
+pub unsafe fn xml_schema_free_parser_ctxt(ctxt: XmlSchemaParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -4359,7 +4261,7 @@ pub unsafe fn xml_schema_set_parser_structured_errors(
 ///
 /// Returns -1 in case of failure, 0 otherwise
 #[doc(alias = "xmlSchemaGetParserErrors")]
-pub unsafe extern "C" fn xml_schema_get_parser_errors(
+pub unsafe fn xml_schema_get_parser_errors(
     ctxt: XmlSchemaParserCtxtPtr,
     err: *mut Option<GenericError>,
     warn: *mut Option<GenericError>,
@@ -4384,7 +4286,7 @@ pub unsafe extern "C" fn xml_schema_get_parser_errors(
 ///
 /// Returns 1 if valid so far, 0 if errors were detected, and -1 in case of internal error.
 #[doc(alias = "xmlSchemaIsValid")]
-pub unsafe extern "C" fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
+pub unsafe fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return -1;
     }
@@ -4395,7 +4297,7 @@ pub unsafe extern "C" fn xml_schema_is_valid(ctxt: XmlSchemaValidCtxtPtr) -> i32
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlSchemaNewSchema")]
-unsafe extern "C" fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
+unsafe fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlSchemaPtr {
     let ret: XmlSchemaPtr = xml_malloc(size_of::<XmlSchema>()) as _;
     if ret.is_null() {
         xml_schema_perr_memory(ctxt, "allocating schema", null_mut());
@@ -4408,7 +4310,7 @@ unsafe extern "C" fn xml_schema_new_schema(ctxt: XmlSchemaParserCtxtPtr) -> XmlS
     ret
 }
 
-unsafe extern "C" fn xml_schema_subst_group_free(group: XmlSchemaSubstGroupPtr) {
+unsafe fn xml_schema_subst_group_free(group: XmlSchemaSubstGroupPtr) {
     if group.is_null() {
         return;
     }
@@ -4424,7 +4326,7 @@ extern "C" fn xml_schema_subst_group_free_entry(group: *mut c_void, _name: *cons
     }
 }
 
-unsafe extern "C" fn xml_schema_redef_list_free(mut redef: XmlSchemaRedefPtr) {
+unsafe fn xml_schema_redef_list_free(mut redef: XmlSchemaRedefPtr) {
     let mut prev: XmlSchemaRedefPtr;
 
     while !redef.is_null() {
@@ -4434,13 +4336,11 @@ unsafe extern "C" fn xml_schema_redef_list_free(mut redef: XmlSchemaRedefPtr) {
     }
 }
 
-unsafe extern "C" fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructionCtxtPtr) {
-    /*
-     * After the construction context has been freed, there will be
-     * no schema graph available any more. Only the schema buckets
-     * will stay alive, which are put into the "schemas_imports" and
-     * "includes" slots of the xmlSchema.
-     */
+unsafe fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructionCtxtPtr) {
+    // After the construction context has been freed, there will be
+    // no schema graph available any more. Only the schema buckets
+    // will stay alive, which are put into the "schemas_imports" and
+    // "includes" slots of the xmlSchema.
     if !(*con).buckets.is_null() {
         xml_schema_item_list_free((*con).buckets);
     }
@@ -4459,9 +4359,7 @@ unsafe extern "C" fn xml_schema_construction_ctxt_free(con: XmlSchemaConstructio
     xml_free(con as _);
 }
 
-unsafe extern "C" fn xml_schema_construction_ctxt_create(
-    dict: XmlDictPtr,
-) -> XmlSchemaConstructionCtxtPtr {
+unsafe fn xml_schema_construction_ctxt_create(dict: XmlDictPtr) -> XmlSchemaConstructionCtxtPtr {
     let ret: XmlSchemaConstructionCtxtPtr =
         xml_malloc(size_of::<XmlSchemaConstructionCtxt>()) as XmlSchemaConstructionCtxtPtr;
     if ret.is_null() {
@@ -4499,7 +4397,7 @@ unsafe extern "C" fn xml_schema_construction_ctxt_create(
 ///
 /// Returns a schema bucket if it was already parsed from @schemaLocation, NULL otherwise.
 #[doc(alias = "xmlSchemaGetSchemaBucket")]
-unsafe extern "C" fn xml_schema_get_schema_bucket(
+unsafe fn xml_schema_get_schema_bucket(
     pctxt: XmlSchemaParserCtxtPtr,
     schema_location: *const XmlChar,
 ) -> XmlSchemaBucketPtr {
@@ -4511,7 +4409,7 @@ unsafe extern "C" fn xml_schema_get_schema_bucket(
     } else {
         for i in 0..(*list).nb_items {
             cur = *(*list).items.add(i as usize) as _;
-            /* Pointer comparison! */
+            // Pointer comparison!
             if (*cur).schema_location == schema_location {
                 return cur;
             }
@@ -4520,7 +4418,7 @@ unsafe extern "C" fn xml_schema_get_schema_bucket(
     null_mut()
 }
 
-unsafe extern "C" fn xml_schema_schema_relation_create() -> XmlSchemaSchemaRelationPtr {
+unsafe fn xml_schema_schema_relation_create() -> XmlSchemaSchemaRelationPtr {
     let ret: XmlSchemaSchemaRelationPtr =
         xml_malloc(size_of::<XmlSchemaSchemaRelation>()) as XmlSchemaSchemaRelationPtr;
     if ret.is_null() {
@@ -4531,7 +4429,7 @@ unsafe extern "C" fn xml_schema_schema_relation_create() -> XmlSchemaSchemaRelat
     ret
 }
 
-unsafe extern "C" fn xml_schema_schema_relation_add_child(
+unsafe fn xml_schema_schema_relation_add_child(
     bucket: XmlSchemaBucketPtr,
     rel: XmlSchemaSchemaRelationPtr,
 ) {
@@ -4553,7 +4451,7 @@ macro_rules! IS_BAD_SCHEMA_DOC {
     };
 }
 
-unsafe extern "C" fn xml_schema_get_schema_bucket_by_tns(
+unsafe fn xml_schema_get_schema_bucket_by_tns(
     pctxt: XmlSchemaParserCtxtPtr,
     target_namespace: *const XmlChar,
     imported: i32,
@@ -4605,7 +4503,7 @@ unsafe fn xml_schema_custom_warning(
     };
     writeln!(msg, "{message}.").ok();
 
-    /* URGENT TODO: Set the error code to something sane. */
+    // URGENT TODO: Set the error code to something sane.
     xml_schema_err4_line(
         actxt,
         XmlErrorLevel::XmlErrWarning,
@@ -4620,7 +4518,7 @@ unsafe fn xml_schema_custom_warning(
     );
 }
 
-unsafe extern "C" fn xml_schema_get_chameleon_schema_bucket(
+unsafe fn xml_schema_get_chameleon_schema_bucket(
     pctxt: XmlSchemaParserCtxtPtr,
     schema_location: *const XmlChar,
     target_namespace: *const XmlChar,
@@ -4633,7 +4531,7 @@ unsafe extern "C" fn xml_schema_get_chameleon_schema_bucket(
     } else {
         for i in 0..(*list).nb_items {
             cur = *(*list).items.add(i as usize) as _;
-            /* Pointer comparison! */
+            // Pointer comparison!
             if (*cur).orig_target_namespace.is_null()
                 && (*cur).schema_location == schema_location
                 && (*cur).target_namespace == target_namespace
@@ -4699,7 +4597,7 @@ macro_rules! IS_BLANK_NODE {
 /// Check if a string is ignorable
 ///
 /// Returns 1 if the string is NULL or made of blanks chars, 0 otherwise
-unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) -> i32 {
+unsafe fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) -> i32 {
     if str.is_null() {
         return 1;
     }
@@ -4725,7 +4623,7 @@ unsafe extern "C" fn xml_schema_is_blank(mut str: *mut XmlChar, mut len: i32) ->
 
 /// Removes unwanted nodes in a schemas document tree
 #[doc(alias = "xmlSchemaCleanupDoc")]
-unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr) {
+unsafe fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: XmlNodePtr) {
     let mut delete: XmlNodePtr;
     let mut cur: XmlNodePtr;
 
@@ -4733,9 +4631,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
         return;
     }
 
-    /*
-     * Remove all the blank text nodes
-     */
+    // Remove all the blank text nodes
     delete = null_mut();
     cur = root;
     'main: while !cur.is_null() {
@@ -4805,7 +4701,7 @@ unsafe extern "C" fn xml_schema_cleanup_doc(ctxt: XmlSchemaParserCtxtPtr, root: 
 
 /// Deallocates an attribute declaration structure.
 #[doc(alias = "xmlSchemaFreeAttribute")]
-unsafe extern "C" fn xml_schema_free_attribute(attr: XmlSchemaAttributePtr) {
+unsafe fn xml_schema_free_attribute(attr: XmlSchemaAttributePtr) {
     if attr.is_null() {
         return;
     }
@@ -4820,7 +4716,7 @@ unsafe extern "C" fn xml_schema_free_attribute(attr: XmlSchemaAttributePtr) {
 
 /// Deallocates an attribute use structure.
 #[doc(alias = "xmlSchemaFreeAttributeUse")]
-unsafe extern "C" fn xml_schema_free_attribute_use(using: XmlSchemaAttributeUsePtr) {
+unsafe fn xml_schema_free_attribute_use(using: XmlSchemaAttributeUsePtr) {
     if using.is_null() {
         return;
     }
@@ -4835,7 +4731,7 @@ unsafe extern "C" fn xml_schema_free_attribute_use(using: XmlSchemaAttributeUseP
 
 /// Deallocate a Schema Element structure.
 #[doc(alias = "xmlSchemaFreeElement")]
-unsafe extern "C" fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
+unsafe fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
     if elem.is_null() {
         return;
     }
@@ -4853,7 +4749,7 @@ unsafe extern "C" fn xml_schema_free_element(elem: XmlSchemaElementPtr) {
 
 /// Deallocates an attribute use structure.
 #[doc(alias = "xmlSchemaFreeAttributeUseProhib")]
-unsafe extern "C" fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttributeUseProhibPtr) {
+unsafe fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttributeUseProhibPtr) {
     if prohib.is_null() {
         return;
     }
@@ -4862,7 +4758,7 @@ unsafe extern "C" fn xml_schema_free_attribute_use_prohib(prohib: XmlSchemaAttri
 
 /// Deallocates a schema model group structure.
 #[doc(alias = "xmlSchemaFreeModelGroup")]
-unsafe extern "C" fn xml_schema_free_model_group(item: XmlSchemaModelGroupPtr) {
+unsafe fn xml_schema_free_model_group(item: XmlSchemaModelGroupPtr) {
     if !(*item).annot.is_null() {
         xml_schema_free_annot((*item).annot);
     }
@@ -4871,7 +4767,7 @@ unsafe extern "C" fn xml_schema_free_model_group(item: XmlSchemaModelGroupPtr) {
 
 /// Deallocate a Schema Attribute Group structure.
 #[doc(alias = "xmlSchemaFreeAttributeGroup")]
-unsafe extern "C" fn xml_schema_free_attribute_group(attr_gr: XmlSchemaAttributeGroupPtr) {
+unsafe fn xml_schema_free_attribute_group(attr_gr: XmlSchemaAttributeGroupPtr) {
     if attr_gr.is_null() {
         return;
     }
@@ -4886,7 +4782,7 @@ unsafe extern "C" fn xml_schema_free_attribute_group(attr_gr: XmlSchemaAttribute
 
 /// Deallocates a schema model group definition.
 #[doc(alias = "xmlSchemaFreeModelGroupDef")]
-unsafe extern "C" fn xml_schema_free_model_group_def(item: XmlSchemaModelGroupDefPtr) {
+unsafe fn xml_schema_free_model_group_def(item: XmlSchemaModelGroupDefPtr) {
     if !(*item).annot.is_null() {
         xml_schema_free_annot((*item).annot);
     }
@@ -4895,7 +4791,7 @@ unsafe extern "C" fn xml_schema_free_model_group_def(item: XmlSchemaModelGroupDe
 
 /// Deallocates an identity-constraint definition.
 #[doc(alias = "xmlSchemaFreeIDC")]
-unsafe extern "C" fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
+unsafe fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
     let mut cur: XmlSchemaIdcselectPtr;
     let mut prev: XmlSchemaIdcselectPtr;
 
@@ -4905,14 +4801,14 @@ unsafe extern "C" fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
     if !(*idc_def).annot.is_null() {
         xml_schema_free_annot((*idc_def).annot);
     }
-    /* Selector */
+    // Selector
     if !(*idc_def).selector.is_null() {
         if !(*(*idc_def).selector).xpath_comp.is_null() {
             xml_free_pattern((*(*idc_def).selector).xpath_comp as XmlPatternPtr);
         }
         xml_free((*idc_def).selector as _);
     }
-    /* Fields */
+    // Fields
     if !(*idc_def).fields.is_null() {
         cur = (*idc_def).fields;
         while {
@@ -4931,7 +4827,7 @@ unsafe extern "C" fn xml_schema_free_idc(idc_def: XmlSchemaIDCPtr) {
 
 /// Deallocate a Schema Notation structure.
 #[doc(alias = "xmlSchemaFreeNotation")]
-unsafe extern "C" fn xml_schema_free_notation(nota: XmlSchemaNotationPtr) {
+unsafe fn xml_schema_free_notation(nota: XmlSchemaNotationPtr) {
     if nota.is_null() {
         return;
     }
@@ -4940,7 +4836,7 @@ unsafe extern "C" fn xml_schema_free_notation(nota: XmlSchemaNotationPtr) {
 
 /// Deallocatea a QName reference structure.
 #[doc(alias = "xmlSchemaFreeQNameRef")]
-unsafe extern "C" fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
+unsafe fn xml_schema_free_qname_ref(item: XmlSchemaQnameRefPtr) {
     xml_free(item as _);
 }
 
@@ -4953,7 +4849,7 @@ unsafe fn xml_schema_psimple_internal_err(node: XmlNodePtr, msg: &str) {
     );
 }
 
-unsafe extern "C" fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
+unsafe fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) {
     if list.is_null() || (*list).nb_items == 0 {
         return;
     }
@@ -5031,7 +4927,7 @@ unsafe extern "C" fn xml_schema_component_list_free(list: XmlSchemaItemListPtr) 
     }
 }
 
-unsafe extern "C" fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
+unsafe fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
     if bucket.is_null() {
         return;
     }
@@ -5066,7 +4962,7 @@ unsafe extern "C" fn xml_schema_bucket_free(bucket: XmlSchemaBucketPtr) {
 ///
 /// Returns the string or NULL if not present.
 #[doc(alias = "xmlSchemaGetProp")]
-unsafe extern "C" fn xml_schema_get_prop(
+unsafe fn xml_schema_get_prop(
     ctxt: XmlSchemaParserCtxtPtr,
     node: XmlNodePtr,
     name: *const c_char,
@@ -5079,10 +4975,7 @@ unsafe extern "C" fn xml_schema_get_prop(
     ret
 }
 
-unsafe extern "C" fn xml_schema_item_list_add(
-    list: XmlSchemaItemListPtr,
-    item: *mut c_void,
-) -> i32 {
+unsafe fn xml_schema_item_list_add(list: XmlSchemaItemListPtr, item: *mut c_void) -> i32 {
     if (*list).size_items <= (*list).nb_items {
         let new_size: usize = if (*list).size_items == 0 {
             20
@@ -5245,7 +5138,8 @@ unsafe fn xml_schema_bucket_create(
 /// Returns 0 on success, a positive error code on errors and
 /// -1 in case of an internal or API error.
 #[doc(alias = "xmlSchemaAddSchemaDoc")]
-unsafe extern "C" fn xml_schema_add_schema_doc(
+#[allow(clippy::too_many_arguments)]
+unsafe fn xml_schema_add_schema_doc(
     pctxt: XmlSchemaParserCtxtPtr,
     typ: i32, /* import or include or redefine */
     mut schema_location: *const XmlChar,
@@ -5286,18 +5180,17 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
     'exit_failure: {
         'exit_error: {
             'exit: {
-                /* Special handling for the main schema:
-                 * skip the location and relation logic and just parse the doc.
-                 * We need just a bucket to be returned in this case.
-                 */
+                // Special handling for the main schema:
+                // skip the location and relation logic and just parse the doc.
+                // We need just a bucket to be returned in this case.
                 if typ == XML_SCHEMA_SCHEMA_MAIN || !WXS_HAS_BUCKETS!(pctxt) {
                     // goto doc_load;
                 } else {
-                    /* Note that we expect the location to be an absolute URI. */
+                    // Note that we expect the location to be an absolute URI.
                     if !schema_location.is_null() {
                         bkt = xml_schema_get_schema_bucket(pctxt, schema_location);
                         if !bkt.is_null() && (*(*pctxt).constructor).bucket == bkt {
-                            /* Report self-imports/inclusions/redefinitions. */
+                            // Report self-imports/inclusions/redefinitions.
 
                             xml_schema_custom_err(
                                 pctxt as XmlSchemaAbstractCtxtPtr,
@@ -5323,17 +5216,15 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                     if WXS_IS_BUCKET_IMPMAIN!(typ) {
                         (*relation).import_namespace = import_namespace;
                         if schema_location.is_null() {
-                            /*
-                             * No location; this is just an import of the namespace.
-                             * Note that we don't assign a bucket to the relation
-                             * in this case.
-                             */
+                            // No location; this is just an import of the namespace.
+                            // Note that we don't assign a bucket to the relation
+                            // in this case.
                             break 'exit;
                         }
                         target_namespace = import_namespace;
                     }
 
-                    /* Did we already fetch the doc? */
+                    // Did we already fetch the doc?
                     if !bkt.is_null() {
                         if WXS_IS_BUCKET_IMPMAIN!(typ) && (*bkt).imported == 0 {
                             // We included/redefined and then try to import a schema,
@@ -5379,26 +5270,24 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                     }
 
                     if WXS_IS_BUCKET_IMPMAIN!(typ) {
-                        /*
-                         * Given that the schemaLocation [attribute] is only a hint, it is open
-                         * to applications to ignore all but the first <import> for a given
-                         * namespace, regardless of the `actual value` of schemaLocation, but
-                         * such a strategy risks missing useful information when new
-                         * schemaLocations are offered.
-                         *
-                         * We will use the first <import> that comes with a location.
-                         * Further <import>s *with* a location, will result in an error.
-                         * TODO: Better would be to just report a warning here, but
-                         * we'll try it this way until someone complains.
-                         *
-                         * Schema Document Location Strategy:
-                         * 3 Based on the namespace name, identify an existing schema document,
-                         * either as a resource which is an XML document or a <schema> element
-                         * information item, in some local schema repository;
-                         * 5 Attempt to resolve the namespace name to locate such a resource.
-                         *
-                         * NOTE: (3) and (5) are not supported.
-                         */
+                        // Given that the schemaLocation [attribute] is only a hint, it is open
+                        // to applications to ignore all but the first <import> for a given
+                        // namespace, regardless of the `actual value` of schemaLocation, but
+                        // such a strategy risks missing useful information when new
+                        // schemaLocations are offered.
+                        //
+                        // We will use the first <import> that comes with a location.
+                        // Further <import>s *with* a location, will result in an error.
+                        // TODO: Better would be to just report a warning here, but
+                        // we'll try it this way until someone complains.
+                        //
+                        // Schema Document Location Strategy:
+                        // 3 Based on the namespace name, identify an existing schema document,
+                        // either as a resource which is an XML document or a <schema> element
+                        // information item, in some local schema repository;
+                        // 5 Attempt to resolve the namespace name to locate such a resource.
+                        //
+                        // NOTE: (3) and (5) are not supported.
                         if !bkt.is_null() {
                             (*relation).bucket = bkt;
                             break 'exit;
@@ -5408,15 +5297,13 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                         if !bkt.is_null() {
                             (*relation).bucket = bkt;
                             if (*bkt).schema_location.is_null() {
-                                /* First given location of the schema; load the doc. */
+                                // First given location of the schema; load the doc.
                                 (*bkt).schema_location = schema_location;
                             } else {
                                 if !xml_str_equal(schema_location, (*bkt).schema_location) {
-                                    /*
-                                     * Additional location given; just skip it.
-                                     * URGENT TODO: We should report a warning here.
-                                     * res = XML_SCHEMAP_SRC_IMPORT;
-                                     */
+                                    // Additional location given; just skip it.
+                                    // URGENT TODO: We should report a warning here.
+                                    // res = XML_SCHEMAP_SRC_IMPORT;
                                     if schema_location.is_null() {
                                         schema_location = c"in_memory_buffer".as_ptr() as _;
                                     }
@@ -5445,33 +5332,26 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                                 break 'exit;
                             }
                         }
-                        /*
-                         * No bucket + first location: load the doc and create a
-                         * bucket.
-                         */
+                        // No bucket + first location: load the doc and create a bucket.
                     } else {
                         /* <include> and <redefine> */
                         if !bkt.is_null() {
                             if (*bkt).orig_target_namespace.is_null()
                                 && (*bkt).target_namespace != source_target_namespace
                             {
-                                /*
-                                 * Chameleon include/redefine: skip loading only if it was
-                                 * already build for the target_namespace of the including
-                                 * schema.
-                                 */
-                                /*
-                                 * URGENT TODO: If the schema is a chameleon-include then copy
-                                 * the components into the including schema and modify the
-                                 * target_namespace of those components, do nothing otherwise.
-                                 * NOTE: This is currently worked-around by compiling the
-                                 * chameleon for every distinct including target_namespace; thus
-                                 * not performant at the moment.
-                                 * TODO: Check when the namespace in wildcards for chameleons
-                                 * needs to be converted: before we built wildcard intersections
-                                 * or after.
-                                 *   Answer: after!
-                                 */
+                                // Chameleon include/redefine: skip loading only if it was
+                                // already build for the target_namespace of the including schema.
+
+                                // URGENT TODO: If the schema is a chameleon-include then copy
+                                // the components into the including schema and modify the
+                                // target_namespace of those components, do nothing otherwise.
+                                // NOTE: This is currently worked-around by compiling the
+                                // chameleon for every distinct including target_namespace; thus
+                                // not performant at the moment.
+                                // TODO: Check when the namespace in wildcards for chameleons
+                                // needs to be converted: before we built wildcard intersections
+                                // or after.
+                                //   Answer: after!
                                 let chamel: XmlSchemaBucketPtr =
                                     xml_schema_get_chameleon_schema_bucket(
                                         pctxt,
@@ -5479,17 +5359,15 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
                                         source_target_namespace,
                                     );
                                 if !chamel.is_null() {
-                                    /* A fitting chameleon was already parsed; NOP. */
+                                    // A fitting chameleon was already parsed; NOP.
                                     (*relation).bucket = chamel;
                                     break 'exit;
                                 }
-                                /*
-                                 * We need to parse the chameleon again for a different
-                                 * target_namespace.
-                                 * CHAMELEON TODO: Optimize this by only parsing the
-                                 * chameleon once, and then copying the components to
-                                 * the new target_namespace.
-                                 */
+                                // We need to parse the chameleon again for a different
+                                // target_namespace.
+                                // CHAMELEON TODO: Optimize this by only parsing the
+                                // chameleon once, and then copying the components to
+                                // the new target_namespace.
                                 bkt = null_mut();
                             } else {
                                 (*relation).bucket = bkt;
@@ -5697,10 +5575,7 @@ unsafe extern "C" fn xml_schema_add_schema_doc(
             }
 
             //  exit:
-            /*
-             * Return the bucket explicitly; this is needed for the
-             * main schema.
-             */
+            // Return the bucket explicitly; this is needed for the main schema.
             if !bucket.is_null() {
                 *bucket = bkt;
             }
@@ -12190,7 +12065,7 @@ unsafe extern "C" fn xml_schema_parse_list(
 /// Returns -1 in case of internal error, 0 in case of success and a positive
 /// error code otherwise.
 #[doc(alias = "xmlSchemaParseUnion")]
-unsafe extern "C" fn xml_schema_parse_union(
+unsafe fn xml_schema_parse_union(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -12202,20 +12077,14 @@ unsafe extern "C" fn xml_schema_parse_union(
     if ctxt.is_null() || schema.is_null() || node.is_null() {
         return -1;
     }
-    /* Not a component, don't create it. */
+    // Not a component, don't create it.
     let typ: XmlSchemaTypePtr = (*ctxt).ctxt_type;
-    /*
-     * Mark the simple typ as being of variety "union".
-     */
+    // Mark the simple typ as being of variety "union".
     (*typ).flags |= XML_SCHEMAS_TYPE_VARIETY_UNION;
-    /*
-     * SPEC (Base type) (2) "If the <list> or <union> alternative is chosen,
-     * then the `simple ur-type definition`."
-     */
+    // SPEC (Base type) (2) "If the <list> or <union> alternative is chosen,
+    // then the `simple ur-type definition`."
     (*typ).base_type = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnysimpletype);
-    /*
-     * Check for illegal attributes.
-     */
+    // Check for illegal attributes.
     attr = (*node).properties;
     while !attr.is_null() {
         if (*attr).ns.is_null() {
@@ -12240,10 +12109,8 @@ unsafe extern "C" fn xml_schema_parse_union(
         attr = (*attr).next;
     }
     xml_schema_pval_attr_id(ctxt, node, c"id".as_ptr() as _);
-    /*
-     * Attribute "memberTypes". This is a list of QNames.
-     * TODO: Check the value to contain anything.
-     */
+    // Attribute "memberTypes". This is a list of QNames.
+    // TODO: Check the value to contain anything.
     attr = xml_schema_get_prop_node(node, c"memberTypes".as_ptr() as _);
     if !attr.is_null() {
         let mut end: *const XmlChar;
@@ -12289,9 +12156,7 @@ unsafe extern "C" fn xml_schema_parse_union(
                 addr_of_mut!(local_name),
             ) == 0
             {
-                /*
-                 * Create the member type link.
-                 */
+                // Create the member type link.
                 link = xml_malloc(size_of::<XmlSchemaTypeLink>()) as XmlSchemaTypeLinkPtr;
                 if link.is_null() {
                     xml_schema_perr_memory(
@@ -12310,9 +12175,7 @@ unsafe extern "C" fn xml_schema_parse_union(
                     (*last_link).next = link;
                 }
                 last_link = link;
-                /*
-                 * Create a reference item.
-                 */
+                // Create a reference item.
                 refe = xml_schema_new_qname_ref(
                     ctxt,
                     XmlSchemaTypeType::XmlSchemaTypeSimple,
@@ -12323,10 +12186,8 @@ unsafe extern "C" fn xml_schema_parse_union(
                     FREE_AND_NULL!(tmp);
                     return -1;
                 }
-                /*
-                 * Assign the reference to the link, it will be resolved
-                 * later during fixup of the union simple type.
-                 */
+                // Assign the reference to the link, it will be resolved
+                // later during fixup of the union simple type.
                 (*link).typ = refe as XmlSchemaTypePtr;
             }
             FREE_AND_NULL!(tmp);
@@ -12337,14 +12198,10 @@ unsafe extern "C" fn xml_schema_parse_union(
             }
         }
     }
-    /*
-     * And now for the children...
-     */
+    // And now for the children...
     child = (*node).children().map_or(null_mut(), |c| c.as_ptr());
     if IS_SCHEMA!(child, c"annotation".as_ptr()) {
-        /*
-         * Add the annotation to the simple type ancestor.
-         */
+        // Add the annotation to the simple type ancestor.
         xml_schema_add_annotation(
             typ as XmlSchemaAnnotItemPtr,
             xml_schema_parse_annotation(ctxt, child, 1),
@@ -12355,10 +12212,7 @@ unsafe extern "C" fn xml_schema_parse_union(
         let mut subtype: XmlSchemaTypePtr;
         let mut last: XmlSchemaTypePtr = null_mut();
 
-        /*
-         * Anchor the member types in the "subtypes" field of the
-         * simple type.
-         */
+        // Anchor the member types in the "subtypes" field of the simple type.
         while IS_SCHEMA!(child, c"simpleType".as_ptr()) {
             subtype = xml_schema_parse_simple_type(ctxt, schema, child, 0) as XmlSchemaTypePtr;
             if !subtype.is_null() {
@@ -12386,11 +12240,9 @@ unsafe extern "C" fn xml_schema_parse_union(
         );
     }
     if attr.is_null() && (*typ).subtypes.is_null() {
-        /*
-         * src-union-memberTypes-or-simpleTypes
-         * Either the memberTypes [attribute] of the <union> element must
-         * be non-empty or there must be at least one simpleType [child].
-         */
+        // src-union-memberTypes-or-simpleTypes
+        // Either the memberTypes [attribute] of the <union> element must
+        // be non-empty or there must be at least one simpleType [child].
         xml_schema_pcustom_err(
             ctxt,
             XmlParserErrors::XmlSchemapSrcUnionMembertypesOrSimpletypes,
