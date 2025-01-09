@@ -3641,11 +3641,8 @@ unsafe fn rng_test(
     use std::mem::zeroed;
 
     use exml::{
-        libxml::relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
-            xml_relaxng_set_parser_errors,
-        },
-        relaxng::xml_relaxng_new_parser_ctxt,
+        libxml::relaxng::{xml_relaxng_free, xml_relaxng_parse},
+        relaxng::{xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt},
     };
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
@@ -3664,8 +3661,7 @@ unsafe fn rng_test(
 
     // first compile the schemas if possible
     let ctxt = xml_relaxng_new_parser_ctxt(cfilename.as_ptr());
-    xml_relaxng_set_parser_errors(
-        ctxt,
+    (*ctxt).set_parser_errors(
         Some(test_error_handler),
         Some(test_error_handler),
         Some(GenericErrorContext::new(ctxt)),

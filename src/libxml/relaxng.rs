@@ -35,7 +35,7 @@ use libc::{memcpy, memset, snprintf};
 use crate::{
     error::XmlParserErrors,
     generic_error,
-    globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
+    globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
@@ -68,15 +68,15 @@ use crate::{
         is_relaxng, xml_relaxng_dump_valid_error, xml_relaxng_free_define, xml_relaxng_free_states,
         xml_relaxng_free_valid_state, xml_relaxng_new_states, xml_relaxng_new_valid_state,
         xml_relaxng_pop_errors, xml_relaxng_valid_error_pop, xml_rng_perr, xml_rng_perr_memory,
-        xml_rng_verr_memory, XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxt,
-        XmlRelaxNGParserCtxtPtr, XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt, XmlRelaxNGValidCtxtPtr,
-        XmlRelaxNGValidState, XmlRelaxNGValidStatePtr, VALID_ERR, VALID_ERR2, VALID_ERR2P,
-        VALID_ERR3, VALID_ERR3P, XML_RELAXNG_NS,
+        xml_rng_verr_memory, XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XmlRelaxNGParserCtxtPtr,
+        XmlRelaxNGStatesPtr, XmlRelaxNGValidCtxt, XmlRelaxNGValidCtxtPtr, XmlRelaxNGValidState,
+        XmlRelaxNGValidStatePtr, VALID_ERR, VALID_ERR2, VALID_ERR2P, VALID_ERR3, VALID_ERR3P,
+        XML_RELAXNG_NS,
     },
     tree::{
-        xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
-        xml_new_doc_text, xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr,
-        XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node, xml_new_doc_text,
+        xml_validate_ncname, NodeCommon, NodePtr, XmlAttrPtr, XmlDocPtr, XmlElementType, XmlNode,
+        XmlNodePtr, XmlNs, XmlNsPtr,
     },
     uri::{build_uri, escape_url_except, XmlURI},
 };
@@ -142,7 +142,7 @@ pub enum XmlRelaxNGValidErr {
 #[doc(alias = "xmlRelaxNGParserFlags")]
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum XmlRelaxNGParserFlag {
+pub enum XmlRelaxNGParserFlag {
     #[allow(unused)]
     None = 0,
     FreeDoc = 1,
@@ -814,89 +814,6 @@ pub(crate) unsafe fn xml_relaxng_cleanup_types() {
     XML_RELAXNG_TYPE_INITIALIZED.set(false);
 }
 
-/// Create an XML RelaxNGs parse context for that memory buffer expected
-/// to contain an XML RelaxNGs file.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlRelaxNGNewMemParserCtxt")]
-pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
-    buffer: *const c_char,
-    size: i32,
-) -> XmlRelaxNGParserCtxtPtr {
-    if buffer.is_null() || size <= 0 {
-        return null_mut();
-    }
-
-    let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
-    (*ret).buffer = buffer;
-    (*ret).size = size;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).error = Some(state.generic_error);
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    ret
-}
-
-/// Create an XML RelaxNGs parser context for that document.
-///
-/// # Note
-/// since the process of compiling a RelaxNG schemas modifies the document,
-/// the @doc parameter is duplicated internally.
-///
-/// Returns the parser context or NULL in case of error
-#[doc(alias = "xmlRelaxNGNewDocParserCtxt")]
-pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParserCtxtPtr {
-    if doc.is_null() {
-        return null_mut();
-    }
-    let copy: XmlDocPtr = xml_copy_doc(doc, 1);
-    if copy.is_null() {
-        return null_mut();
-    }
-
-    let ret: XmlRelaxNGParserCtxtPtr = xml_malloc(size_of::<XmlRelaxNGParserCtxt>()) as _;
-    if ret.is_null() {
-        xml_rng_perr_memory(null_mut(), Some("building parser\n"));
-        xml_free_doc(copy);
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
-    (*ret).document = copy;
-    (*ret).freedoc = 1;
-    GLOBAL_STATE.with_borrow(|state| {
-        (*ret).user_data = state.generic_error_context.clone();
-    });
-    ret
-}
-
-/// Semi private function used to pass information to a parser context
-/// which are a combination of xmlRelaxNGParserFlag .
-///
-/// Returns 0 if success and -1 in case of error
-#[doc(alias = "xmlRelaxParserSetFlag")]
-pub unsafe fn xml_relax_parser_set_flag(ctxt: XmlRelaxNGParserCtxtPtr, mut flags: i32) -> i32 {
-    if ctxt.is_null() {
-        return -1;
-    }
-    if flags & XmlRelaxNGParserFlag::FreeDoc as i32 != 0 {
-        (*ctxt).crng |= XmlRelaxNGParserFlag::FreeDoc as i32;
-        flags -= XmlRelaxNGParserFlag::FreeDoc as i32;
-    }
-    if flags & XmlRelaxNGParserFlag::Crng as i32 != 0 {
-        (*ctxt).crng |= XmlRelaxNGParserFlag::Crng as i32;
-        flags -= XmlRelaxNGParserFlag::Crng as i32;
-    }
-    if flags != 0 {
-        return -1;
-    }
-    0
-}
-
 /// Deallocate RelaxNG partition set structures.
 #[doc(alias = "xmlRelaxNGFreePartition")]
 pub(crate) unsafe fn xml_relaxng_free_partition(partitions: XmlRelaxNGPartitionPtr) {
@@ -947,7 +864,7 @@ unsafe fn xml_relaxng_free_inner_schema(schema: XmlRelaxNGPtr) {
 
 /// Deallocate a RelaxNG document structure.
 #[doc(alias = "xmlRelaxNGFreeDocument")]
-unsafe fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
+pub(crate) unsafe fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
     if docu.is_null() {
         return;
     }
@@ -966,7 +883,7 @@ unsafe fn xml_relaxng_free_document(docu: XmlRelaxNGDocumentPtr) {
 
 /// Deallocate a RelaxNG document structures.
 #[doc(alias = "xmlRelaxNGFreeDocumentList")]
-unsafe fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocumentPtr) {
+pub(crate) unsafe fn xml_relaxng_free_document_list(mut docu: XmlRelaxNGDocumentPtr) {
     let mut next: XmlRelaxNGDocumentPtr;
 
     while !docu.is_null() {
@@ -997,7 +914,7 @@ unsafe fn xml_relaxng_free_include(incl: XmlRelaxNGIncludePtr) {
 
 /// Deallocate a RelaxNG include structure.
 #[doc(alias = "xmlRelaxNGFreeIncludeList")]
-unsafe fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePtr) {
+pub(crate) unsafe fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePtr) {
     let mut next: XmlRelaxNGIncludePtr;
 
     while !incl.is_null() {
@@ -1005,103 +922,6 @@ unsafe fn xml_relaxng_free_include_list(mut incl: XmlRelaxNGIncludePtr) {
         xml_relaxng_free_include(incl);
         incl = next;
     }
-}
-
-/// Free the resources associated to the schema parser context
-#[doc(alias = "xmlRelaxNGFreeParserCtxt")]
-pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    if !(*ctxt).url.is_null() {
-        xml_free((*ctxt).url as _);
-    }
-    if !(*ctxt).doc.is_null() {
-        xml_relaxng_free_document((*ctxt).doc);
-    }
-    if let Some(mut table) = (*ctxt).interleaves.take().map(|t| t.into_inner()) {
-        table.clear();
-    }
-    if !(*ctxt).documents.is_null() {
-        xml_relaxng_free_document_list((*ctxt).documents);
-    }
-    if !(*ctxt).includes.is_null() {
-        xml_relaxng_free_include_list((*ctxt).includes);
-    }
-    if !(*ctxt).doc_tab.is_null() {
-        xml_free((*ctxt).doc_tab as _);
-    }
-    if !(*ctxt).inc_tab.is_null() {
-        xml_free((*ctxt).inc_tab as _);
-    }
-    if !(*ctxt).def_tab.is_null() {
-        for i in 0..(*ctxt).def_nr {
-            xml_relaxng_free_define(*(*ctxt).def_tab.add(i as usize));
-        }
-        xml_free((*ctxt).def_tab as _);
-    }
-    if !(*ctxt).document.is_null() && (*ctxt).freedoc != 0 {
-        xml_free_doc((*ctxt).document);
-    }
-    xml_free(ctxt as _);
-}
-
-/// Set the callback functions used to handle errors for a validation context
-#[doc(alias = "xmlRelaxNGSetParserErrors")]
-pub unsafe fn xml_relaxng_set_parser_errors(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    err: Option<GenericError>,
-    warn: Option<GenericError>,
-    ctx: Option<GenericErrorContext>,
-) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).error = err;
-    (*ctxt).warning = warn;
-    (*ctxt).serror = None;
-    (*ctxt).user_data = ctx;
-}
-
-/// Get the callback information used to handle errors for a validation context
-///
-/// Returns -1 in case of failure, 0 otherwise.
-#[doc(alias = "xmlRelaxNGGetParserErrors")]
-pub unsafe fn xml_relaxng_get_parser_errors(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    err: *mut Option<GenericError>,
-    warn: *mut Option<GenericError>,
-    ctx: *mut Option<GenericErrorContext>,
-) -> i32 {
-    if ctxt.is_null() {
-        return -1;
-    }
-    if !err.is_null() {
-        *err = (*ctxt).error;
-    }
-    if !warn.is_null() {
-        *warn = (*ctxt).warning;
-    }
-    if !ctx.is_null() {
-        *ctx = (*ctxt).user_data.clone();
-    }
-    0
-}
-
-/// Set the callback functions used to handle errors for a parsing context
-#[doc(alias = "xmlRelaxNGSetParserStructuredErrors")]
-pub unsafe fn xml_relaxng_set_parser_structured_errors(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    serror: Option<StructuredError>,
-    ctx: Option<GenericErrorContext>,
-) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).serror = serror;
-    (*ctxt).error = None;
-    (*ctxt).warning = None;
-    (*ctxt).user_data = ctx;
 }
 
 /// Compute the list of top elements a definition can generate
@@ -10059,74 +9879,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_relaxng_new_doc_parser_ctxt() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                let mem_base = xml_mem_blocks();
-                let doc = gen_xml_doc_ptr(n_doc, 0);
-
-                let ret_val = xml_relaxng_new_doc_parser_ctxt(doc);
-                desret_xml_relaxng_parser_ctxt_ptr(ret_val);
-                des_xml_doc_ptr(n_doc, doc, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlRelaxNGNewDocParserCtxt",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlRelaxNGNewDocParserCtxt()"
-                    );
-                    eprintln!(" {}", n_doc);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_relaxng_new_mem_parser_ctxt() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buffer in 0..GEN_NB_CONST_CHAR_PTR {
-                for n_size in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let buffer = gen_const_char_ptr(n_buffer, 0);
-                    let mut size = gen_int(n_size, 1);
-                    if !buffer.is_null() && size > xml_strlen(buffer as _) {
-                        size = 0;
-                    }
-
-                    let ret_val = xml_relaxng_new_mem_parser_ctxt(buffer, size);
-                    desret_xml_relaxng_parser_ctxt_ptr(ret_val);
-                    des_const_char_ptr(n_buffer, buffer, 0);
-                    des_int(n_size, size, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRelaxNGNewMemParserCtxt",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlRelaxNGNewMemParserCtxt()"
-                        );
-                        eprint!(" {}", n_buffer);
-                        eprintln!(" {}", n_size);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_relaxng_new_parser_ctxt() {
         #[cfg(feature = "schema")]
         unsafe {
@@ -10268,41 +10020,6 @@ mod tests {
                             eprint!(" {}", n_data);
                             eprintln!(" {}", n_len);
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_relax_parser_set_flag() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_RELAXNG_PARSER_CTXT_PTR {
-                for n_flags in 0..GEN_NB_INT {
-                    let mem_base = xml_mem_blocks();
-                    let ctxt = gen_xml_relaxng_parser_ctxt_ptr(n_ctxt, 0);
-                    let flags = gen_int(n_flags, 1);
-
-                    let ret_val = xml_relax_parser_set_flag(ctxt, flags);
-                    desret_int(ret_val);
-                    des_xml_relaxng_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                    des_int(n_flags, flags, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlRelaxParserSetFlag",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlRelaxParserSetFlag()"
-                        );
-                        eprint!(" {}", n_ctxt);
-                        eprintln!(" {}", n_flags);
                     }
                 }
             }

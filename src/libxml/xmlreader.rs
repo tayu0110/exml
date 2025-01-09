@@ -57,8 +57,7 @@ use crate::{
         },
         pattern::{xml_free_pattern, xml_pattern_match, xml_patterncompile, XmlPatternPtr},
         relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
-            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
+            xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
             xml_relaxng_validate_push_cdata, XmlRelaxNGPtr,
         },
@@ -4810,7 +4809,9 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
     ctxt: XmlRelaxNGValidCtxtPtr,
     _options: i32,
 ) -> i32 {
-    use crate::relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt};
+    use crate::relaxng::{
+        xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt,
+    };
 
     if reader.is_null() {
         return -1;
@@ -4851,8 +4852,7 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
         let pctxt = xml_relaxng_new_parser_ctxt(rng);
         let ctx = GenericErrorContext::new(reader);
         if (*reader).error_func.is_some() {
-            xml_relaxng_set_parser_errors(
-                pctxt,
+            (*pctxt).set_parser_errors(
                 Some(xml_text_reader_validity_error_relay),
                 Some(xml_text_reader_validity_warning_relay),
                 Some(ctx.clone()),

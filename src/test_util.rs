@@ -914,7 +914,7 @@ pub(crate) fn desret_xml_schema_type_ptr(_val: XmlSchemaTypePtr) {}
 
 #[cfg(feature = "schema")]
 pub(crate) unsafe fn desret_xml_relaxng_parser_ctxt_ptr(val: XmlRelaxNGParserCtxtPtr) {
-    use crate::libxml::relaxng::xml_relaxng_free_parser_ctxt;
+    use crate::relaxng::xml_relaxng_free_parser_ctxt;
 
     xml_relaxng_free_parser_ctxt(val);
 }

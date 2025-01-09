@@ -57,9 +57,8 @@ use exml::{
         },
         pattern::{xml_free_pattern, xml_patterncompile, XmlPattern, XmlStreamCtxt},
         relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_parse,
-            xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
-            XmlRelaxNG,
+            xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
+            xml_relaxng_validate_doc, XmlRelaxNG,
         },
         schematron::{
             xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
@@ -95,7 +94,8 @@ use exml::{
         XmlParserCtxtPtr, XmlParserInputPtr,
     },
     relaxng::{
-        xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt,
+        xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
+        xml_relaxng_new_valid_ctxt,
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node, NodeCommon,
@@ -688,8 +688,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     xml_memory_dump();
                     exit(PROGRESULT.load(Ordering::Relaxed));
                 }
-                xml_relaxng_set_parser_errors(
-                    ctxt,
+                (*ctxt).set_parser_errors(
                     Some(generic_error_default),
                     Some(generic_error_default),
                     None,

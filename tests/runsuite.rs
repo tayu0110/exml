@@ -26,8 +26,7 @@ use exml::{
             xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
         },
         relaxng::{
-            xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_init_types,
-            xml_relaxng_new_mem_parser_ctxt, xml_relaxng_parse, xml_relaxng_set_parser_errors,
+            xml_relaxng_free, xml_relaxng_init_types, xml_relaxng_parse,
             xml_relaxng_set_valid_errors, xml_relaxng_validate_doc, XmlRelaxNGPtr,
         },
         uri::xml_build_uri,
@@ -48,7 +47,10 @@ use exml::{
         xml_new_string_input_stream, xml_read_file, xml_read_memory, XmlParserCtxtPtr,
         XmlParserInputPtr,
     },
-    relaxng::{xml_relaxng_free_valid_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr},
+    relaxng::{
+        xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_mem_parser_ctxt,
+        xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
+    },
     tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -347,8 +349,7 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
         xml_buf_content(buf) as *const c_char,
         xml_buf_use(buf) as _,
     );
-    xml_relaxng_set_parser_errors(
-        pctxt,
+    (*pctxt).set_parser_errors(
         Some(test_error_handler),
         Some(test_error_handler),
         Some(GenericErrorContext::new(pctxt)) as _,
@@ -499,8 +500,7 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
         xml_buf_content(buf) as *const c_char,
         xml_buf_use(buf) as _,
     );
-    xml_relaxng_set_parser_errors(
-        pctxt,
+    (*pctxt).set_parser_errors(
         Some(test_error_handler),
         Some(test_error_handler),
         Some(GenericErrorContext::new(pctxt)) as _,
