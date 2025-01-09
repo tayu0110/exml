@@ -410,7 +410,7 @@ pub struct XmlRelaxNGDocument {
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGTypeHave")]
-type XmlRelaxNGTypeHave = unsafe fn(data: *mut c_void, typ: *const XmlChar) -> i32;
+type XmlRelaxNGTypeHave = unsafe fn(data: *mut c_void, typ: &str) -> bool;
 
 /// Function provided by a type library to check if a value match a type
 ///
@@ -418,7 +418,7 @@ type XmlRelaxNGTypeHave = unsafe fn(data: *mut c_void, typ: *const XmlChar) -> i
 #[doc(alias = "xmlRelaxNGTypeCheck")]
 type XmlRelaxNGTypeCheck = unsafe fn(
     data: *mut c_void,
-    typ: *const XmlChar,
+    typ: &str,
     value: *const XmlChar,
     result: *mut *mut c_void,
     node: XmlNodePtr,
@@ -430,7 +430,7 @@ type XmlRelaxNGTypeCheck = unsafe fn(
 #[doc(alias = "xmlRelaxNGFacetCheck")]
 type XmlRelaxNGFacetCheck = unsafe fn(
     data: *mut c_void,
-    typ: *const XmlChar,
+    typ: &str,
     facet: &str,
     val: *const XmlChar,
     strval: *const XmlChar,
@@ -447,7 +447,7 @@ type XmlRelaxNGTypeFree = unsafe fn(data: *mut c_void, result: *mut c_void);
 #[doc(alias = "xmlRelaxNGTypeCompare")]
 type XmlRelaxNGTypeCompare = unsafe fn(
     data: *mut c_void,
-    typ: *const XmlChar,
+    typ: &str,
     value1: *const XmlChar,
     ctxt1: XmlNodePtr,
     comp1: *mut c_void,
@@ -522,16 +522,10 @@ unsafe fn xml_relaxng_register_type_library(
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGSchemaTypeHave")]
-unsafe fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
-    if typ.is_null() {
-        return -1;
-    }
+unsafe fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: &str) -> bool {
     let _typ: XmlSchemaTypePtr =
         xml_schema_get_predefined_type(typ, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
-    if _typ.is_null() {
-        return 0;
-    }
-    1
+    !_typ.is_null()
 }
 
 /// Check if the given type and value are validated by the W3C XMLSchema Datatype library.
@@ -540,18 +534,16 @@ unsafe fn xml_relaxng_schema_type_have(_data: *mut c_void, typ: *const XmlChar) 
 #[doc(alias = "xmlRelaxNGSchemaTypeCheck")]
 unsafe fn xml_relaxng_schema_type_check(
     _data: *mut c_void,
-    r#type: *const XmlChar,
+    r#type: &str,
     value: *const XmlChar,
     result: *mut *mut c_void,
     node: XmlNodePtr,
 ) -> i32 {
-    if r#type.is_null() || value.is_null() {
+    if value.is_null() {
         return -1;
     }
-    let typ: XmlSchemaTypePtr = xml_schema_get_predefined_type(
-        r#type as _,
-        c"http://www.w3.org/2001/XMLSchema".as_ptr() as _,
-    );
+    let typ: XmlSchemaTypePtr =
+        xml_schema_get_predefined_type(r#type, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
     if typ.is_null() {
         return -1;
     }
@@ -575,7 +567,7 @@ unsafe fn xml_relaxng_schema_type_check(
 #[doc(alias = "xmlRelaxNGSchemaTypeCompare")]
 unsafe fn xml_relaxng_schema_type_compare(
     _data: *mut c_void,
-    r#type: *const XmlChar,
+    r#type: &str,
     value1: *const XmlChar,
     ctxt1: XmlNodePtr,
     comp1: *mut c_void,
@@ -586,13 +578,11 @@ unsafe fn xml_relaxng_schema_type_compare(
     let mut res1: XmlSchemaValPtr = null_mut();
     let mut res2: XmlSchemaValPtr = null_mut();
 
-    if r#type.is_null() || value1.is_null() || value2.is_null() {
+    if value1.is_null() || value2.is_null() {
         return -1;
     }
-    let typ: XmlSchemaTypePtr = xml_schema_get_predefined_type(
-        r#type as _,
-        c"http://www.w3.org/2001/XMLSchema".as_ptr() as _,
-    );
+    let typ: XmlSchemaTypePtr =
+        xml_schema_get_predefined_type(r#type, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
     if typ.is_null() {
         return -1;
     }
@@ -634,7 +624,7 @@ unsafe fn xml_relaxng_schema_type_compare(
 #[doc(alias = "xmlRelaxNGSchemaFacetCheck")]
 unsafe fn xml_relaxng_schema_facet_check(
     _data: *mut c_void,
-    r#type: *const XmlChar,
+    r#type: &str,
     facetname: &str,
     val: *const XmlChar,
     strval: *const XmlChar,
@@ -642,13 +632,11 @@ unsafe fn xml_relaxng_schema_facet_check(
 ) -> i32 {
     let mut ret: i32;
 
-    if r#type.is_null() || strval.is_null() {
+    if strval.is_null() {
         return -1;
     }
-    let typ: XmlSchemaTypePtr = xml_schema_get_predefined_type(
-        r#type as _,
-        c"http://www.w3.org/2001/XMLSchema".as_ptr() as _,
-    );
+    let typ: XmlSchemaTypePtr =
+        xml_schema_get_predefined_type(r#type, c"http://www.w3.org/2001/XMLSchema".as_ptr() as _);
     if typ.is_null() {
         return -1;
     }
@@ -712,17 +700,8 @@ unsafe fn xml_relaxng_schema_free_value(_data: *mut c_void, value: *mut c_void) 
 ///
 /// Returns 1 if yes, 0 if no and -1 in case of error.
 #[doc(alias = "xmlRelaxNGDefaultTypeHave")]
-unsafe fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *const XmlChar) -> i32 {
-    if typ.is_null() {
-        return -1;
-    }
-    if xml_str_equal(typ, c"string".as_ptr() as _) {
-        return 1;
-    }
-    if xml_str_equal(typ, c"token".as_ptr() as _) {
-        return 1;
-    }
-    0
+fn xml_relaxng_default_type_have(_data: *mut c_void, typ: &str) -> bool {
+    typ == "string" || typ == "token"
 }
 
 /// Check if the given type and value are validated by the default datatype library.
@@ -731,7 +710,7 @@ unsafe fn xml_relaxng_default_type_have(_data: *mut c_void, typ: *const XmlChar)
 #[doc(alias = "xmlRelaxNGDefaultTypeCheck")]
 unsafe fn xml_relaxng_default_type_check(
     _data: *mut c_void,
-    typ: *const XmlChar,
+    typ: &str,
     value: *const XmlChar,
     _result: *mut *mut c_void,
     _node: XmlNodePtr,
@@ -739,10 +718,7 @@ unsafe fn xml_relaxng_default_type_check(
     if value.is_null() {
         return -1;
     }
-    if xml_str_equal(typ, c"string".as_ptr() as _) {
-        return 1;
-    }
-    if xml_str_equal(typ, c"token".as_ptr() as _) {
+    if typ == "string" || typ == "token" {
         return 1;
     }
 
@@ -804,7 +780,7 @@ unsafe fn xml_relaxng_normalize(
 #[doc(alias = "xmlRelaxNGDefaultTypeCompare")]
 unsafe fn xml_relaxng_default_type_compare(
     _data: *mut c_void,
-    typ: *const XmlChar,
+    typ: &str,
     value1: *const XmlChar,
     _ctxt1: XmlNodePtr,
     _comp1: *mut c_void,
@@ -813,9 +789,9 @@ unsafe fn xml_relaxng_default_type_compare(
 ) -> i32 {
     let mut ret: i32 = -1;
 
-    if xml_str_equal(typ, c"string".as_ptr() as _) {
+    if typ == "string" {
         ret = xml_str_equal(value1, value2) as i32;
-    } else if xml_str_equal(typ, c"token".as_ptr() as _) {
+    } else if typ == "token" {
         if !xml_str_equal(value1, value2) {
             // TODO: trivial optimizations are possible by
             // computing at compile-time
@@ -3617,7 +3593,12 @@ unsafe fn xml_relaxng_parse_data(
     } else {
         (*def).data = lib as _;
         if let Some(have) = (*lib).have {
-            tmp = have((*lib).data, (*def).name);
+            tmp = have(
+                (*lib).data,
+                CStr::from_ptr((*def).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ) as i32;
             if tmp != 1 {
                 let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                 let library = CStr::from_ptr(library as *const i8).to_string_lossy();
@@ -3909,7 +3890,12 @@ unsafe fn xml_relaxng_parse_value(
         } else {
             (*def).data = lib as _;
             if let Some(have) = (*lib).have {
-                success = have((*lib).data, (*def).name);
+                success = have(
+                    (*lib).data,
+                    CStr::from_ptr((*def).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ) as i32;
                 if success != 1 {
                     let name = CStr::from_ptr((*def).name as *const i8).to_string_lossy();
                     let library = CStr::from_ptr(library as *const i8).to_string_lossy();
@@ -3969,7 +3955,9 @@ unsafe fn xml_relaxng_parse_value(
 
             success = (*lib).check.unwrap()(
                 (*lib).data,
-                (*def).name,
+                CStr::from_ptr((*def).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 (*def).value,
                 addr_of_mut!(val),
                 node,
@@ -7729,13 +7717,23 @@ unsafe fn xml_relaxng_validate_datatype(
         if !(*define).attrs.is_null() && (*(*define).attrs).typ == XmlRelaxNGType::Param {
             ret = check(
                 (*lib).data,
-                (*define).name,
+                CStr::from_ptr((*define).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 value,
                 addr_of_mut!(result),
                 node,
             );
         } else {
-            ret = check((*lib).data, (*define).name, value, null_mut(), node);
+            ret = check(
+                (*lib).data,
+                CStr::from_ptr((*define).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                value,
+                null_mut(),
+                node,
+            );
         }
     } else {
         ret = -1;
@@ -7764,7 +7762,9 @@ unsafe fn xml_relaxng_validate_datatype(
         if let Some(facet) = (*lib).facet {
             tmp = facet(
                 (*lib).data,
-                (*define).name,
+                CStr::from_ptr((*define).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 CStr::from_ptr((*cur).name as *const i8)
                     .to_string_lossy()
                     .as_ref(),
@@ -7826,7 +7826,9 @@ unsafe fn xml_relaxng_validate_value(
                     if !lib.is_null() && (*lib).comp.is_some() {
                         ret = (*lib).comp.unwrap()(
                             (*lib).data,
-                            (*define).name,
+                            CStr::from_ptr((*define).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
                             (*define).value,
                             (*define).node,
                             (*define).attrs as _,

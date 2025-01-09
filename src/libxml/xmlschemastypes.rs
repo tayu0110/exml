@@ -21,7 +21,7 @@
 
 use std::{
     cell::Cell,
-    ffi::{c_char, CStr},
+    ffi::{c_char, CStr, CString},
     mem::size_of,
     os::raw::c_void,
     ptr::{addr_of_mut, null, null_mut},
@@ -1032,17 +1032,13 @@ pub(crate) unsafe extern "C" fn xml_schema_cleanup_types() {
 ///
 /// Returns the type if found, NULL otherwise
 #[doc(alias = "xmlSchemaGetPredefinedType")]
-pub unsafe extern "C" fn xml_schema_get_predefined_type(
-    name: *const XmlChar,
-    ns: *const XmlChar,
-) -> XmlSchemaTypePtr {
+pub unsafe fn xml_schema_get_predefined_type(name: &str, ns: *const XmlChar) -> XmlSchemaTypePtr {
     if !XML_SCHEMA_TYPES_INITIALIZED.get() && xml_schema_init_types() < 0 {
         return null_mut();
     }
-    if name.is_null() {
-        return null_mut();
-    }
-    xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.get(), name, ns) as XmlSchemaTypePtr
+    let name = CString::new(name).unwrap();
+    xml_hash_lookup2(XML_SCHEMA_TYPES_BANK.get(), name.as_ptr() as *const u8, ns)
+        as XmlSchemaTypePtr
 }
 
 /// Check that a value conforms to the lexical space of the predefined type.
@@ -7753,41 +7749,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlSchemaGetFacetValueAsULong()"
                     );
                     eprintln!(" {}", n_facet);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_schema_get_predefined_type() {
-        #[cfg(feature = "schema")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_ns in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let name = gen_const_xml_char_ptr(n_name, 0);
-                    let ns = gen_const_xml_char_ptr(n_ns, 1);
-
-                    let ret_val = xml_schema_get_predefined_type(name as *const XmlChar, ns);
-                    desret_xml_schema_type_ptr(ret_val);
-                    des_const_xml_char_ptr(n_name, name, 0);
-                    des_const_xml_char_ptr(n_ns, ns, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlSchemaGetPredefinedType",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlSchemaGetPredefinedType()"
-                        );
-                        eprint!(" {}", n_name);
-                        eprintln!(" {}", n_ns);
-                    }
                 }
             }
         }

@@ -12409,7 +12409,7 @@ unsafe extern "C" fn xml_schema_parse_union(
 /// Returns -1 in case of error, 0 if the declaration is improper and
 /// 1 in case of success.
 #[doc(alias = "xmlSchemaParseSimpleType")]
-unsafe extern "C" fn xml_schema_parse_simple_type(
+unsafe fn xml_schema_parse_simple_type(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     node: XmlNodePtr,
@@ -12448,16 +12448,12 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
             {
                 return null_mut();
             }
-            /*
-             * Skip built-in types.
-             */
+            // Skip built-in types.
             if (*ctxt).is_s4_s != 0 {
                 if (*ctxt).is_redefine != 0 {
-                    /*
-                     * REDEFINE: Disallow redefinition of built-in-types.
-                     * TODO: It seems that the spec does not say anything
-                     * about this case.
-                     */
+                    // REDEFINE: Disallow redefinition of built-in-types.
+                    // TODO: It seems that the spec does not say anything
+                    // about this case.
                     xml_schema_pcustom_err(
                         ctxt,
                         XmlParserErrors::XmlSchemapSrcRedefine,
@@ -12468,27 +12464,27 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
                     );
                     return null_mut();
                 }
-                let bi_type: XmlSchemaTypePtr =
-                    xml_schema_get_predefined_type(attr_value, XML_SCHEMA_NS.as_ptr() as _);
+                let bi_type: XmlSchemaTypePtr = xml_schema_get_predefined_type(
+                    CStr::from_ptr(attr_value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    XML_SCHEMA_NS.as_ptr() as _,
+                );
                 if !bi_type.is_null() {
                     return bi_type;
                 }
             }
         }
     }
-    /*
-     * TargetNamespace:
-     * SPEC "The `actual value` of the target_namespace [attribute]
-     * of the <schema> ancestor element information item if present,
-     * otherwise `absent`.
-     */
+    // TargetNamespace:
+    // SPEC "The `actual value` of the target_namespace [attribute]
+    // of the <schema> ancestor element information item if present,
+    // otherwise `absent`.
     if top_level == 0 {
         // #ifdef ENABLE_NAMED_LOCALS
         //         let buf: [c_char; 40];
         // #endif
-        /*
-         * Parse as local simple type definition.
-         */
+        // Parse as local simple type definition.
         // #ifdef ENABLE_NAMED_LOCALS
         //         snprintf(buf, 39, "#ST%d".as_ptr() as _, (*ctxt).counter++ + 1);
         //     	typ = xmlSchemaAddType(ctxt, schema, XmlSchemaTypeType::XmlSchemaTypeSimple, xmlDictLookup((*ctxt).dict, buf, -1), (*ctxt).target_namespace, node, 0);
@@ -12508,9 +12504,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
         }
         (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeSimple;
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
-        /*
-         * Check for illegal attributes.
-         */
+        // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
             if (*attr).ns.is_null() {
@@ -12533,11 +12527,9 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
             attr = (*attr).next;
         }
     } else {
-        /*
-         * Parse as global simple type definition.
-         *
-         * Note that attrValue is the value of the attribute "name" here.
-         */
+        // Parse as global simple type definition.
+        //
+        // Note that attrValue is the value of the attribute "name" here.
         typ = xml_schema_add_type(
             ctxt,
             schema,
@@ -12553,9 +12545,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
         (*typ).typ = XmlSchemaTypeType::XmlSchemaTypeSimple;
         (*typ).content_type = XmlSchemaContentType::XmlSchemaContentSimple;
         (*typ).flags |= XML_SCHEMAS_TYPE_GLOBAL;
-        /*
-         * Check for illegal attributes.
-         */
+        // Check for illegal attributes.
         attr = (*node).properties;
         while !attr.is_null() {
             if (*attr).ns.is_null() {
@@ -12580,9 +12570,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
             }
             attr = (*attr).next;
         }
-        /*
-         * Attribute "final".
-         */
+        // Attribute "final".
         attr = xml_schema_get_prop_node(node, c"final".as_ptr() as _);
         if attr.is_null() {
             if (*schema).flags & XML_SCHEMAS_FINAL_DEFAULT_RESTRICTION != 0 {
@@ -12667,13 +12655,11 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
             c"(annotation?, (restriction | list | union))".as_ptr() as _,
         );
     }
-    /*
-     * REDEFINE: SPEC src-redefine (5)
-     * "Within the [children], each <simpleType> must have a
-     * <restriction> among its [children] ... the `actual value` of whose
-     * base [attribute] must be the same as the `actual value` of its own
-     * name attribute plus target namespace;"
-     */
+    // REDEFINE: SPEC src-redefine (5)
+    // "Within the [children], each <simpleType> must have a
+    // <restriction> among its [children] ... the `actual value` of whose
+    // base [attribute] must be the same as the `actual value` of its own
+    // name attribute plus target namespace;"
     if top_level != 0 && (*ctxt).is_redefine != 0 && has_restriction == 0 {
         xml_schema_pcustom_err(
             ctxt,
@@ -12693,7 +12679,7 @@ unsafe extern "C" fn xml_schema_parse_simple_type(
 ///
 /// Returns the new structure or NULL in case of error
 #[doc(alias = "xmlSchemaAddModelGroupDefinition")]
-unsafe extern "C" fn xml_schema_add_model_group_definition(
+unsafe fn xml_schema_add_model_group_definition(
     ctxt: XmlSchemaParserCtxtPtr,
     schema: XmlSchemaPtr,
     name: *const XmlChar,
@@ -14490,7 +14476,10 @@ unsafe fn xml_schema_get_type(
     }
     // First try the built-in types.
     if !ns_name.is_null() && xml_str_equal(ns_name, XML_SCHEMA_NS.as_ptr() as _) {
-        ret = xml_schema_get_predefined_type(name, ns_name);
+        ret = xml_schema_get_predefined_type(
+            CStr::from_ptr(name as *const i8).to_string_lossy().as_ref(),
+            ns_name,
+        );
         if !ret.is_null() {
             // goto exit;
             return ret;
