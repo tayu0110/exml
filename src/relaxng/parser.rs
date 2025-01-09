@@ -1,6 +1,4 @@
-use std::ptr::null_mut;
-
-use libc::memset;
+use std::ptr::{drop_in_place, null_mut};
 
 use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError, GLOBAL_STATE},
@@ -139,6 +137,50 @@ impl XmlRelaxNGParserCtxt {
     }
 }
 
+impl Default for XmlRelaxNGParserCtxt {
+    fn default() -> Self {
+        Self {
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+            err: XmlRelaxNGValidErr::default(),
+            schema: null_mut(),
+            grammar: null_mut(),
+            parentgrammar: null_mut(),
+            flags: 0,
+            nb_errors: 0,
+            nb_warnings: 0,
+            define: null_mut(),
+            def: null_mut(),
+            nb_interleaves: 0,
+            interleaves: None,
+            documents: null_mut(),
+            includes: null_mut(),
+            url: null_mut(),
+            document: null_mut(),
+            def_nr: 0,
+            def_max: 0,
+            def_tab: null_mut(),
+            buffer: null_mut(),
+            size: 0,
+            doc: null_mut(),
+            doc_nr: 0,
+            doc_max: 0,
+            doc_tab: null_mut(),
+            inc: null_mut(),
+            inc_nr: 0,
+            inc_max: 0,
+            inc_tab: null_mut(),
+            idref: 0,
+            am: null_mut(),
+            state: null_mut(),
+            crng: 0,
+            freedoc: 0,
+        }
+    }
+}
+
 /// Create an XML RelaxNGs parse context for that file/resource expected
 /// to contain an XML RelaxNGs file.
 ///
@@ -154,7 +196,7 @@ pub unsafe fn xml_relaxng_new_parser_ctxt(url: *const i8) -> XmlRelaxNGParserCtx
         xml_rng_perr_memory(null_mut(), Some("building parser\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
+    std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
     (*ret).url = xml_strdup(url as _) as _;
     GLOBAL_STATE.with_borrow(|state| {
         (*ret).error = Some(state.generic_error);
@@ -181,7 +223,7 @@ pub unsafe fn xml_relaxng_new_mem_parser_ctxt(
         xml_rng_perr_memory(null_mut(), Some("building parser\n"));
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
+    std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
     (*ret).buffer = buffer;
     (*ret).size = size;
     GLOBAL_STATE.with_borrow(|state| {
@@ -214,7 +256,7 @@ pub unsafe fn xml_relaxng_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlRelaxNGParse
         xml_free_doc(copy);
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRelaxNGParserCtxt>());
+    std::ptr::write(&mut *ret, XmlRelaxNGParserCtxt::default());
     (*ret).document = copy;
     (*ret).freedoc = 1;
     GLOBAL_STATE.with_borrow(|state| {
@@ -259,5 +301,6 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     if !(*ctxt).document.is_null() && (*ctxt).freedoc != 0 {
         xml_free_doc((*ctxt).document);
     }
+    drop_in_place(ctxt);
     xml_free(ctxt as _);
 }

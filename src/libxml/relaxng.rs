@@ -94,8 +94,9 @@ pub type XmlRelaxNGValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const
 // List of possible Relax NG validation errors
 #[doc(alias = "xmlRelaxNGValidErr")]
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRelaxNGValidErr {
+    #[default]
     XmlRelaxngOk = 0,
     XmlRelaxngErrMemory,
     XmlRelaxngErrType,
