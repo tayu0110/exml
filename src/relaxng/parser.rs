@@ -94,7 +94,7 @@ impl XmlRelaxNGParserCtxt {
     ///
     /// Returns the index in the stack.
     #[doc(alias = "xmlRelaxNGIncludePush")]
-    pub(crate) unsafe fn include_push(&mut self, value: XmlRelaxNGIncludePtr) -> usize {
+    pub(crate) fn include_push(&mut self, value: XmlRelaxNGIncludePtr) -> usize {
         self.inc_tab.push(value);
         self.inc = value;
         self.inc_tab.len() - 1
