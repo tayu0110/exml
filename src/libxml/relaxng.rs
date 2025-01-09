@@ -3302,9 +3302,9 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                 if (*cur).ns.is_null() || (*(*cur).ns).href().as_deref() != Some(XML_RELAXNG_NS) {
                     if let Some(parent) = (*cur).parent().filter(|p| {
                         p.element_type() == XmlElementType::XmlElementNode
-                            && (xml_str_equal(p.name, c"name".as_ptr() as _)
-                                || xml_str_equal(p.name, c"value".as_ptr() as _)
-                                || xml_str_equal(p.name, c"param".as_ptr() as _))
+                            && (p.name().as_deref() == Some("name")
+                                || p.name().as_deref() == Some("value")
+                                || p.name().as_deref() == Some("param"))
                     }) {
                         xml_rng_perr!(
                             ctxt,
@@ -3318,7 +3318,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                     break 'skip_children;
                 } else {
                     xml_relaxng_cleanup_attributes(ctxt, cur);
-                    if xml_str_equal((*cur).name, c"externalRef".as_ptr() as _) {
+                    if (*cur).name().as_deref() == Some("externalRef") {
                         let mut tmp: XmlNodePtr;
 
                         let mut ns = (*cur).get_prop("ns");
@@ -3398,7 +3398,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             break 'skip_children;
                         }
                         (*cur).psvi = docu as _;
-                    } else if xml_str_equal((*cur).name, c"include".as_ptr() as _) {
+                    } else if (*cur).name().as_deref() == Some("include") {
                         let mut tmp: XmlNodePtr;
 
                         let Some(href) = (*cur).get_prop("href") else {
@@ -3458,8 +3458,8 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             break 'skip_children;
                         }
                         (*cur).psvi = incl as _;
-                    } else if xml_str_equal((*cur).name, c"element".as_ptr() as _)
-                        || xml_str_equal((*cur).name, c"attribute".as_ptr() as _)
+                    } else if (*cur).name().as_deref() == Some("element")
+                        || (*cur).name().as_deref() == Some("attribute")
                     {
                         let mut text: XmlNodePtr = null_mut();
 
@@ -3504,9 +3504,9 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 (*text).set_prop("ns", Some(""));
                             }
                         }
-                    } else if xml_str_equal((*cur).name, c"name".as_ptr() as _)
-                        || xml_str_equal((*cur).name, c"nsName".as_ptr() as _)
-                        || xml_str_equal((*cur).name, c"value".as_ptr() as _)
+                    } else if (*cur).name().as_deref() == Some("name")
+                        || (*cur).name().as_deref() == Some("nsName")
+                        || (*cur).name().as_deref() == Some("value")
                     {
                         // Simplification 4.8. name attribute of element
                         // and attribute elements
@@ -3529,7 +3529,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 (*cur).set_prop("ns", Some(""));
                             }
                         }
-                        if xml_str_equal((*cur).name, c"name".as_ptr() as _) {
+                        if (*cur).name().as_deref() == Some("name") {
                             // Simplification: 4.10. QNames
                             if let Some(name) = (*cur).get_content() {
                                 if let Some((prefix, local)) = split_qname2(&name) {
@@ -3560,7 +3560,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             }
                         }
                         // 4.16
-                        if xml_str_equal((*cur).name, c"nsName".as_ptr() as _)
+                        if (*cur).name().as_deref() == Some("nsName")
                             && (*ctxt).flags & XML_RELAXNG_IN_NSEXCEPT != 0
                         {
                             xml_rng_perr!(
@@ -3570,13 +3570,13 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                                 "Found nsName/except//nsName forbidden construct\n"
                             );
                         }
-                    } else if xml_str_equal((*cur).name, c"except".as_ptr() as _) && cur != root {
+                    } else if (*cur).name().as_deref() == Some("except") && cur != root {
                         let oldflags: i32 = (*ctxt).flags;
 
                         // 4.16
                         if (*cur)
                             .parent()
-                            .filter(|p| xml_str_equal(p.name, c"anyName".as_ptr() as _))
+                            .filter(|p| p.name().as_deref() == Some("anyName"))
                             .is_some()
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_ANYEXCEPT;
@@ -3585,7 +3585,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             break 'skip_children;
                         } else if (*cur)
                             .parent()
-                            .filter(|p| xml_str_equal(p.name, c"nsName".as_ptr() as _))
+                            .filter(|p| p.name().as_deref() == Some("nsName"))
                             .is_some()
                         {
                             (*ctxt).flags |= XML_RELAXNG_IN_NSEXCEPT;
@@ -3593,7 +3593,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                             (*ctxt).flags = oldflags;
                             break 'skip_children;
                         }
-                    } else if xml_str_equal((*cur).name, c"anyName".as_ptr() as _) {
+                    } else if (*cur).name().as_deref() == Some("anyName") {
                         // 4.16
                         if (*ctxt).flags & XML_RELAXNG_IN_ANYEXCEPT != 0 {
                             xml_rng_perr!(
@@ -3612,7 +3612,7 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                         }
                     }
                     // This is not an else since "include" is transformed into a div
-                    if xml_str_equal((*cur).name, c"div".as_ptr() as _) {
+                    if (*cur).name().as_deref() == Some("div") {
                         let mut ins: XmlNodePtr;
                         let mut tmp: XmlNodePtr;
 
@@ -3660,8 +3660,8 @@ unsafe fn xml_relaxng_cleanup_tree(ctxt: XmlRelaxNGParserCtxtPtr, root: XmlNodeP
                         .parent()
                         .filter(|p| p.element_type() == XmlElementType::XmlElementNode)
                     {
-                        if !xml_str_equal(parent.name, c"value".as_ptr() as _)
-                            && !xml_str_equal(parent.name, c"param".as_ptr() as _)
+                        if parent.name().as_deref() != Some("value")
+                            && parent.name().as_deref() != Some("param")
                         {
                             delete = cur;
                         }
