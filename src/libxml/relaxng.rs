@@ -69,7 +69,8 @@ use crate::{
     },
     parser::{split_qname2, xml_read_file, xml_read_memory},
     relaxng::{
-        is_relaxng, xml_relaxng_free_define, XmlRelaxNGDefine, XmlRelaxNGDefinePtr, XML_RELAXNG_NS,
+        is_relaxng, xml_relaxng_free_define, XmlRelaxNGDefine, XmlRelaxNGDefinePtr,
+        XmlRelaxNGParserCtxt, XmlRelaxNGParserCtxtPtr, XML_RELAXNG_NS,
     },
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_node, xml_new_child, xml_new_doc_node,
@@ -265,61 +266,6 @@ const XML_RELAXNG_IN_OOMINTERLEAVE: i32 = 1 << 6;
 const XML_RELAXNG_IN_EXTERNALREF: i32 = 1 << 7;
 const XML_RELAXNG_IN_ANYEXCEPT: i32 = 1 << 8;
 const XML_RELAXNG_IN_NSEXCEPT: i32 = 1 << 9;
-
-pub type XmlRelaxNGParserCtxtPtr = *mut XmlRelaxNGParserCtxt;
-#[repr(C)]
-pub struct XmlRelaxNGParserCtxt {
-    user_data: Option<GenericErrorContext>, // user specific data block
-    error: Option<GenericError>,            // the callback in case of errors
-    warning: Option<GenericError>,          // the callback in case of warning
-    serror: Option<StructuredError>,
-    err: XmlRelaxNGValidErr,
-
-    schema: XmlRelaxNGPtr,               // The schema in use
-    grammar: XmlRelaxNGGrammarPtr,       // the current grammar
-    parentgrammar: XmlRelaxNGGrammarPtr, // the parent grammar
-    flags: i32,                          // parser flags
-    nb_errors: i32,                      // number of errors at parse time
-    nb_warnings: i32,                    // number of warnings at parse time
-    define: *const XmlChar,              // the current define scope
-    def: XmlRelaxNGDefinePtr,            // the current define
-
-    nb_interleaves: i32,
-    interleaves: Option<XmlHashTableRef<'static, XmlRelaxNGDefinePtr>>, // keep track of all the interleaves
-
-    documents: XmlRelaxNGDocumentPtr, // all the documents loaded
-    includes: XmlRelaxNGIncludePtr,   // all the includes loaded
-    url: *mut XmlChar,
-    document: XmlDocPtr,
-
-    def_nr: i32,                       // number of defines used
-    def_max: i32,                      // number of defines allocated
-    def_tab: *mut XmlRelaxNGDefinePtr, // pointer to the allocated definitions
-
-    buffer: *const c_char,
-    size: i32,
-
-    // the document stack
-    doc: XmlRelaxNGDocumentPtr,          // Current parsed external ref
-    doc_nr: i32,                         // Depth of the parsing stack
-    doc_max: i32,                        // Max depth of the parsing stack
-    doc_tab: *mut XmlRelaxNGDocumentPtr, // array of docs
-
-    // the include stack
-    inc: XmlRelaxNGIncludePtr,          // Current parsed include
-    inc_nr: i32,                        // Depth of the include parsing stack
-    inc_max: i32,                       // Max depth of the parsing stack
-    inc_tab: *mut XmlRelaxNGIncludePtr, // array of incs
-
-    idref: i32, // requires idref checking
-
-    // used to compile content models
-    am: XmlAutomataPtr,         // the automata
-    state: XmlAutomataStatePtr, // used to build the automata
-
-    crng: i32,    // compact syntax and other flags
-    freedoc: i32, // need to free the document
-}
 
 const FLAGS_IGNORABLE: i32 = 1;
 const FLAGS_NEGATIVE: i32 = 2;

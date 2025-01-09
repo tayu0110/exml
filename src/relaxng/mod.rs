@@ -1,6 +1,8 @@
 mod define;
+mod parser;
 
 pub(crate) use define::*;
+pub use parser::*;
 
 use crate::tree::{NodeCommon, XmlElementType, XmlNodePtr};
 

@@ -11,6 +11,8 @@ use libc::snprintf;
 
 #[cfg(feature = "catalog")]
 use crate::libxml::catalog::{XmlCatalogAllow, XmlCatalogPrefer, XmlCatalogPtr};
+#[cfg(feature = "schema")]
+use crate::relaxng::XmlRelaxNGParserCtxtPtr;
 use crate::{
     buf::XmlBuf,
     io::XmlOutputBuffer,
@@ -24,7 +26,7 @@ use crate::{
         },
         parser::{XmlFeature, XmlParserOption, XmlSAXHandlerPtr},
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
-        relaxng::{XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr},
+        relaxng::{XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr},
         schemas_internals::{XmlSchemaFacetPtr, XmlSchemaTypePtr, XmlSchemaValType},
         schematron::XmlSchematronValidCtxtPtr,
         uri::XmlURIPtr,

@@ -3642,7 +3642,7 @@ unsafe fn rng_test(
 
     use exml::libxml::relaxng::{
         xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_new_parser_ctxt,
-        xml_relaxng_parse, xml_relaxng_set_parser_errors, XmlRelaxNGParserCtxtPtr,
+        xml_relaxng_parse, xml_relaxng_set_parser_errors,
     };
     use libc::{glob, glob_t, globfree, GLOB_DOOFFS};
 
@@ -3660,7 +3660,7 @@ unsafe fn rng_test(
     let mut count: c_char;
 
     // first compile the schemas if possible
-    let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(cfilename.as_ptr());
+    let ctxt = xml_relaxng_new_parser_ctxt(cfilename.as_ptr());
     xml_relaxng_set_parser_errors(
         ctxt,
         Some(test_error_handler),

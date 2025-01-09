@@ -2583,13 +2583,13 @@ unsafe fn xml_shell_rng_validate(
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
             xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
-            XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
+            XmlRelaxNGValidCtxtPtr,
         },
     };
 
     use super::relaxng::XmlRelaxNGPtr;
 
-    let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(schemas);
+    let ctxt = xml_relaxng_new_parser_ctxt(schemas);
     let generic_error = GLOBAL_STATE.with_borrow(|state| state.generic_error);
     xml_relaxng_set_parser_errors(ctxt, Some(generic_error), Some(generic_error), None);
     let relaxngschemas: XmlRelaxNGPtr = xml_relaxng_parse(ctxt);

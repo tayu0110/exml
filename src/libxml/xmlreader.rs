@@ -60,8 +60,7 @@ use crate::{
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors,
             xml_relaxng_set_valid_structured_errors, xml_relaxng_validate_full_element,
             xml_relaxng_validate_pop_element, xml_relaxng_validate_push_cdata,
-            xml_relaxng_validate_push_element, XmlRelaxNGParserCtxtPtr, XmlRelaxNGPtr,
-            XmlRelaxNGValidCtxtPtr,
+            xml_relaxng_validate_push_element, XmlRelaxNGPtr, XmlRelaxNGValidCtxtPtr,
         },
         sax2::xml_sax_version,
         uri::xml_canonic_path,
@@ -4846,7 +4845,7 @@ unsafe fn xml_text_reader_relaxng_validate_internal(
     if !rng.is_null() {
         // Parse the schema and create validation environment.
 
-        let pctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(rng);
+        let pctxt = xml_relaxng_new_parser_ctxt(rng);
         let ctx = GenericErrorContext::new(reader);
         if (*reader).error_func.is_some() {
             xml_relaxng_set_parser_errors(

@@ -60,7 +60,7 @@ use exml::{
             xml_relaxng_free, xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt,
             xml_relaxng_new_parser_ctxt, xml_relaxng_new_valid_ctxt, xml_relaxng_parse,
             xml_relaxng_set_parser_errors, xml_relaxng_set_valid_errors, xml_relaxng_validate_doc,
-            XmlRelaxNG, XmlRelaxNGParserCtxtPtr, XmlRelaxNGValidCtxtPtr,
+            XmlRelaxNG, XmlRelaxNGValidCtxtPtr,
         },
         schematron::{
             xml_schematron_free, xml_schematron_free_parser_ctxt, xml_schematron_free_valid_ctxt,
@@ -678,7 +678,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
                     start_timer();
                 }
                 let relaxng = CString::new(r).unwrap();
-                let ctxt: XmlRelaxNGParserCtxtPtr = xml_relaxng_new_parser_ctxt(relaxng.as_ptr());
+                let ctxt = xml_relaxng_new_parser_ctxt(relaxng.as_ptr());
                 if ctxt.is_null() {
                     PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                     // goto error;
