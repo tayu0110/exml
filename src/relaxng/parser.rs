@@ -55,9 +55,7 @@ pub struct XmlRelaxNGParserCtxt {
 
     // the include stack
     pub(crate) inc: XmlRelaxNGIncludePtr, // Current parsed include
-    pub(crate) inc_nr: i32,               // Depth of the include parsing stack
-    pub(crate) inc_max: i32,              // Max depth of the parsing stack
-    pub(crate) inc_tab: *mut XmlRelaxNGIncludePtr, // array of incs
+    pub(crate) inc_tab: Vec<XmlRelaxNGIncludePtr>, // array of incs
 
     pub(crate) idref: i32, // requires idref checking
 
@@ -90,6 +88,28 @@ impl XmlRelaxNGParserCtxt {
         };
         self.doc = *self.doc_tab.last().unwrap_or(&null_mut());
         doc
+    }
+
+    /// Pushes a new include on top of the include stack
+    ///
+    /// Returns the index in the stack.
+    #[doc(alias = "xmlRelaxNGIncludePush")]
+    pub(crate) unsafe fn include_push(&mut self, value: XmlRelaxNGIncludePtr) -> usize {
+        self.inc_tab.push(value);
+        self.inc = value;
+        self.inc_tab.len() - 1
+    }
+
+    /// Pops the top include from the include stack
+    ///
+    /// Returns the include just removed
+    #[doc(alias = "xmlRelaxNGIncludePop")]
+    pub(crate) fn include_pop(&mut self) -> XmlRelaxNGIncludePtr {
+        let Some(inc) = self.inc_tab.pop() else {
+            return null_mut();
+        };
+        self.inc = *self.inc_tab.last().unwrap_or(&null_mut());
+        inc
     }
 
     /// Semi private function used to pass information to a parser context
@@ -182,9 +202,7 @@ impl Default for XmlRelaxNGParserCtxt {
             doc: null_mut(),
             doc_tab: vec![],
             inc: null_mut(),
-            inc_nr: 0,
-            inc_max: 0,
-            inc_tab: null_mut(),
+            inc_tab: vec![],
             idref: 0,
             am: null_mut(),
             state: null_mut(),
@@ -292,9 +310,6 @@ pub unsafe fn xml_relaxng_free_parser_ctxt(ctxt: XmlRelaxNGParserCtxtPtr) {
     }
     if !(*ctxt).includes.is_null() {
         xml_relaxng_free_include_list((*ctxt).includes);
-    }
-    if !(*ctxt).inc_tab.is_null() {
-        xml_free((*ctxt).inc_tab as _);
     }
     for def in (*ctxt).def_tab.drain(..) {
         xml_relaxng_free_define(def);

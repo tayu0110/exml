@@ -23,7 +23,7 @@ use std::io::Write;
 use std::{
     any::type_name,
     ffi::{c_char, CStr, CString},
-    mem::{size_of, size_of_val, take},
+    mem::{size_of, take},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null_mut},
     slice::from_raw_parts,
@@ -1284,60 +1284,6 @@ unsafe fn xml_relaxng_load_external_ref(
     ret
 }
 
-/// Pushes a new include on top of the include stack
-///
-/// Returns 0 in case of error, the index in the stack otherwise
-#[doc(alias = "xmlRelaxNGIncludePush")]
-unsafe fn xml_relaxng_include_push(
-    ctxt: XmlRelaxNGParserCtxtPtr,
-    value: XmlRelaxNGIncludePtr,
-) -> i32 {
-    if (*ctxt).inc_tab.is_null() {
-        (*ctxt).inc_max = 4;
-        (*ctxt).inc_nr = 0;
-        (*ctxt).inc_tab =
-            xml_malloc((*ctxt).inc_max as usize * size_of_val(&*(*ctxt).inc_tab.add(0))) as _;
-        if (*ctxt).inc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, Some("allocating include\n"));
-            return 0;
-        }
-    }
-    if (*ctxt).inc_nr >= (*ctxt).inc_max {
-        (*ctxt).inc_max *= 2;
-        (*ctxt).inc_tab = xml_realloc(
-            (*ctxt).inc_tab as _,
-            (*ctxt).inc_max as usize * size_of_val(&*(*ctxt).inc_tab.add(0)),
-        ) as _;
-        if (*ctxt).inc_tab.is_null() {
-            xml_rng_perr_memory(ctxt, Some("allocating include\n"));
-            return 0;
-        }
-    }
-    *(*ctxt).inc_tab.add((*ctxt).inc_nr as usize) = value;
-    (*ctxt).inc = value;
-    (*ctxt).inc_nr += 1;
-    (*ctxt).inc_nr - 1
-}
-
-/// Pops the top include from the include stack
-///
-/// Returns the include just removed
-#[doc(alias = "xmlRelaxNGIncludePop")]
-unsafe fn xml_relaxng_include_pop(ctxt: XmlRelaxNGParserCtxtPtr) -> XmlRelaxNGIncludePtr {
-    if (*ctxt).inc_nr <= 0 {
-        return null_mut();
-    }
-    (*ctxt).inc_nr -= 1;
-    if (*ctxt).inc_nr > 0 {
-        (*ctxt).inc = *(*ctxt).inc_tab.add((*ctxt).inc_nr as usize - 1);
-    } else {
-        (*ctxt).inc = null_mut();
-    }
-    let ret: XmlRelaxNGIncludePtr = *(*ctxt).inc_tab.add((*ctxt).inc_nr as usize);
-    *(*ctxt).inc_tab.add((*ctxt).inc_nr as usize) = null_mut();
-    ret
-}
-
 /// Removes the leading and ending spaces of the value
 /// The string is modified "in situ"
 #[doc(alias = "xmlRelaxNGNormExtSpace")]
@@ -1484,12 +1430,9 @@ unsafe fn xml_relaxng_load_include(
     let mut cur: XmlNodePtr;
 
     // check against recursion in the stack
-    for i in 0..(*ctxt).inc_nr {
+    for &inc in &(*ctxt).inc_tab {
         let curl = CString::new(url).unwrap();
-        if xml_str_equal(
-            (*(*(*ctxt).inc_tab.add(i as usize))).href,
-            curl.as_ptr() as *const u8,
-        ) {
+        if xml_str_equal((*inc).href, curl.as_ptr() as *const u8) {
             xml_rng_perr!(
                 ctxt,
                 null_mut(),
@@ -1537,7 +1480,7 @@ unsafe fn xml_relaxng_load_include(
     }
 
     // push it on the stack
-    xml_relaxng_include_push(ctxt, ret);
+    (*ctxt).include_push(ret);
 
     // Some preprocessing of the document content, this include recursing
     // in the include stack.
@@ -1549,7 +1492,7 @@ unsafe fn xml_relaxng_load_include(
     }
 
     // Pop up the include from the stack
-    xml_relaxng_include_pop(ctxt);
+    (*ctxt).include_pop();
 
     // Check that the top element is a grammar
     root = (*doc).get_root_element();
