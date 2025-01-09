@@ -7506,35 +7506,31 @@ unsafe fn xml_relaxng_is_compilable(def: XmlRelaxNGDefinePtr) -> i32 {
     ret
 }
 
-unsafe fn xml_relaxng_def_name(def: XmlRelaxNGDefinePtr) -> *const c_char {
-    if def.is_null() {
-        return c"none".as_ptr() as _;
+fn xml_relaxng_def_name(def: &XmlRelaxNGDefine) -> &'static str {
+    match def.typ {
+        XmlRelaxNGType::Empty => "empty",
+        XmlRelaxNGType::NotAllowed => "notAllowed",
+        XmlRelaxNGType::Except => "except",
+        XmlRelaxNGType::Text => "text",
+        XmlRelaxNGType::Element => "element",
+        XmlRelaxNGType::Datatype => "datatype",
+        XmlRelaxNGType::Value => "value",
+        XmlRelaxNGType::List => "list",
+        XmlRelaxNGType::Attribute => "attribute",
+        XmlRelaxNGType::Def => "def",
+        XmlRelaxNGType::Ref => "ref",
+        XmlRelaxNGType::Externalref => "externalRef",
+        XmlRelaxNGType::Parentref => "parentRef",
+        XmlRelaxNGType::Optional => "optional",
+        XmlRelaxNGType::Zeroormore => "zeroOrMore",
+        XmlRelaxNGType::Oneormore => "oneOrMore",
+        XmlRelaxNGType::Choice => "choice",
+        XmlRelaxNGType::Group => "group",
+        XmlRelaxNGType::Interleave => "interleave",
+        XmlRelaxNGType::Start => "start",
+        XmlRelaxNGType::Noop => "noop",
+        XmlRelaxNGType::Param => "param",
     }
-    match (*def).typ {
-        XmlRelaxNGType::Empty => c"empty".as_ptr() as _,
-        XmlRelaxNGType::NotAllowed => c"notAllowed".as_ptr() as _,
-        XmlRelaxNGType::Except => c"except".as_ptr() as _,
-        XmlRelaxNGType::Text => c"text".as_ptr() as _,
-        XmlRelaxNGType::Element => c"element".as_ptr() as _,
-        XmlRelaxNGType::Datatype => c"datatype".as_ptr() as _,
-        XmlRelaxNGType::Value => c"value".as_ptr() as _,
-        XmlRelaxNGType::List => c"list".as_ptr() as _,
-        XmlRelaxNGType::Attribute => c"attribute".as_ptr() as _,
-        XmlRelaxNGType::Def => c"def".as_ptr() as _,
-        XmlRelaxNGType::Ref => c"ref".as_ptr() as _,
-        XmlRelaxNGType::Externalref => c"externalRef".as_ptr() as _,
-        XmlRelaxNGType::Parentref => c"parentRef".as_ptr() as _,
-        XmlRelaxNGType::Optional => c"optional".as_ptr() as _,
-        XmlRelaxNGType::Zeroormore => c"zeroOrMore".as_ptr() as _,
-        XmlRelaxNGType::Oneormore => c"oneOrMore".as_ptr() as _,
-        XmlRelaxNGType::Choice => c"choice".as_ptr() as _,
-        XmlRelaxNGType::Group => c"group".as_ptr() as _,
-        XmlRelaxNGType::Interleave => c"interleave".as_ptr() as _,
-        XmlRelaxNGType::Start => c"start".as_ptr() as _,
-        XmlRelaxNGType::Noop => c"noop".as_ptr() as _,
-        XmlRelaxNGType::Param => c"param".as_ptr() as _,
-    }
-    // c"unknown".as_ptr() as _
 }
 
 /// Compile the set of definitions, it works recursively, till the
@@ -7733,9 +7729,7 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
             // This should not happen and generate an internal error
             eprintln!(
                 "RNG internal error trying to compile {}",
-                CStr::from_ptr(xml_relaxng_def_name(def))
-                    .to_string_lossy()
-                    .as_ref()
+                xml_relaxng_def_name(&*def)
             );
         }
     }
