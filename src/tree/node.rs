@@ -1994,9 +1994,7 @@ impl XmlNode {
     #[doc(alias = "xmlNodeSetBase")]
     #[cfg(any(feature = "libxml_tree", feature = "xinclude"))]
     pub unsafe fn set_base(&mut self, uri: Option<&str>) {
-        use std::ffi::CStr;
-
-        use crate::libxml::uri::xml_path_to_uri;
+        use crate::uri::path_to_uri;
 
         match self.element_type() {
             XmlElementType::XmlTextNode
@@ -2020,18 +2018,8 @@ impl XmlNode {
             XmlElementType::XmlElementNode | XmlElementType::XmlAttributeNode => {}
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
                 let doc = self.as_document_node().unwrap().as_mut();
-
-                doc.url = uri.and_then(|uri| {
-                    let uri = CString::new(uri).unwrap();
-                    let uri = xml_path_to_uri(uri.as_ptr() as *const u8);
-                    (!uri.is_null()).then(|| {
-                        let url = CStr::from_ptr(uri as *const i8)
-                            .to_string_lossy()
-                            .into_owned();
-                        xml_free(uri as _);
-                        url
-                    })
-                });
+                let url = uri.map(path_to_uri);
+                doc.url = url.map(|url| url.into_owned());
                 return;
             }
             _ => unreachable!(),
@@ -2042,22 +2030,8 @@ impl XmlNode {
             return;
         }
         if let Some(uri) = uri {
-            let curi = CString::new(uri).unwrap();
-            let fixed: *mut XmlChar = xml_path_to_uri(curi.as_ptr() as *const u8);
-            if !fixed.is_null() {
-                self.set_ns_prop(
-                    ns,
-                    "base",
-                    Some(
-                        CStr::from_ptr(fixed as *const i8)
-                            .to_string_lossy()
-                            .as_ref(),
-                    ),
-                );
-                xml_free(fixed as _);
-            } else {
-                self.set_ns_prop(ns, "base", Some(uri));
-            }
+            let fixed = path_to_uri(uri);
+            self.set_ns_prop(ns, "base", Some(&fixed));
         } else {
             self.set_ns_prop(ns, "base", None);
         }
