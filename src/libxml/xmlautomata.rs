@@ -98,13 +98,13 @@ pub struct XmlAutomataState {
 ///
 /// Returns the new object or NULL in case of failure
 #[doc(alias = "xmlNewAutomata")]
-pub unsafe extern "C" fn xml_new_automata() -> XmlAutomataPtr {
+pub unsafe fn xml_new_automata() -> XmlAutomataPtr {
     let ctxt: XmlAutomataPtr = xml_reg_new_parser_ctxt(null());
     if ctxt.is_null() {
         return null_mut();
     }
 
-    /* initialize the parser */
+    // initialize the parser
     (*ctxt).state = xml_reg_state_push(ctxt);
     if (*ctxt).state.is_null() {
         xml_free_automata(ctxt);
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn xml_new_automata() -> XmlAutomataPtr {
 
 /// Free an automata
 #[doc(alias = "xmlFreeAutomata")]
-pub unsafe extern "C" fn xml_free_automata(am: XmlAutomataPtr) {
+pub unsafe fn xml_free_automata(am: XmlAutomataPtr) {
     if am.is_null() {
         return;
     }
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn xml_free_automata(am: XmlAutomataPtr) {
 ///
 /// Returns the initial state of the automata
 #[doc(alias = "xmlAutomataGetInitState")]
-pub unsafe extern "C" fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
+pub unsafe fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
     if am.is_null() {
         return null_mut();
     }
@@ -143,10 +143,7 @@ pub unsafe extern "C" fn xml_automata_get_init_state(am: XmlAutomataPtr) -> XmlA
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlAutomataSetFinalState")]
-pub unsafe extern "C" fn xml_automata_set_final_state(
-    am: XmlAutomataPtr,
-    state: XmlAutomataStatePtr,
-) -> i32 {
+pub unsafe fn xml_automata_set_final_state(am: XmlAutomataPtr, state: XmlAutomataStatePtr) -> i32 {
     if am.is_null() || state.is_null() {
         return -1;
     }
@@ -158,7 +155,7 @@ pub unsafe extern "C" fn xml_automata_set_final_state(
 ///
 /// Returns the new state or NULL in case of error
 #[doc(alias = "xmlAutomataNewState")]
-pub unsafe extern "C" fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
+pub unsafe fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutomataStatePtr {
     if am.is_null() {
         return null_mut();
     }
@@ -171,7 +168,7 @@ pub unsafe extern "C" fn xml_automata_new_state(am: XmlAutomataPtr) -> XmlAutoma
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewTransition")]
-pub unsafe extern "C" fn xml_automata_new_transition(
+pub unsafe fn xml_automata_new_transition(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -204,7 +201,7 @@ pub unsafe extern "C" fn xml_automata_new_transition(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewTransition2")]
-pub unsafe extern "C" fn xml_automata_new_transition2(
+pub unsafe fn xml_automata_new_transition2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -257,7 +254,7 @@ pub unsafe extern "C" fn xml_automata_new_transition2(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewNegTrans")]
-pub unsafe extern "C" fn xml_automata_new_neg_trans(
+pub unsafe fn xml_automata_new_neg_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -321,7 +318,7 @@ pub unsafe extern "C" fn xml_automata_new_neg_trans(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewCountTrans")]
-pub unsafe extern "C" fn xml_automata_new_count_trans(
+pub unsafe fn xml_automata_new_count_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
@@ -357,9 +354,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans(
     }
     (*atom).max = max;
 
-    /*
-     * associate a counter to the transition.
-     */
+    // associate a counter to the transition.
     let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
@@ -369,7 +364,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans(
     (*(*am).counters.add(counter as usize)).min = min;
     (*(*am).counters.add(counter as usize)).max = max;
 
-    /* xmlFAGenerateTransitions(am, from, to, atom); */
+    // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
         to = xml_reg_state_push(am);
         if to.is_null() {
@@ -409,7 +404,8 @@ pub unsafe extern "C" fn xml_automata_new_count_trans(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewCountTrans2")]
-pub unsafe extern "C" fn xml_automata_new_count_trans2(
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn xml_automata_new_count_trans2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
@@ -464,9 +460,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
     }
     (*atom).max = max;
 
-    /*
-     * associate a counter to the transition.
-     */
+    // associate a counter to the transition.
     let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
@@ -476,7 +470,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
     (*(*am).counters.add(counter as usize)).min = min;
     (*(*am).counters.add(counter as usize)).max = max;
 
-    /* xmlFAGenerateTransitions(am, from, to, atom); */
+    // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
         to = xml_reg_state_push(am);
         if to.is_null() {
@@ -516,7 +510,7 @@ pub unsafe extern "C" fn xml_automata_new_count_trans2(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewOnceTrans")]
-pub unsafe extern "C" fn xml_automata_new_once_trans(
+pub unsafe fn xml_automata_new_once_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
@@ -543,9 +537,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans(
     (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
     (*atom).min = min;
     (*atom).max = max;
-    /*
-     * associate a counter to the transition.
-     */
+    // associate a counter to the transition.
     let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
@@ -555,7 +547,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans(
     (*(*am).counters.add(counter as usize)).min = 1;
     (*(*am).counters.add(counter as usize)).max = 1;
 
-    /* xmlFAGenerateTransitions(am, from, to, atom); */
+    // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
         to = xml_reg_state_push(am);
         if to.is_null() {
@@ -585,7 +577,8 @@ pub unsafe extern "C" fn xml_automata_new_once_trans(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewOnceTrans2")]
-pub unsafe extern "C" fn xml_automata_new_once_trans2(
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn xml_automata_new_once_trans2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
@@ -636,9 +629,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
     (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
     (*atom).min = min;
     (*atom).max = max;
-    /*
-     * associate a counter to the transition.
-     */
+    // associate a counter to the transition.
     let counter: i32 = xml_reg_get_counter(am);
     if counter < 0 {
         // goto error;
@@ -648,7 +639,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
     (*(*am).counters.add(counter as usize)).min = 1;
     (*(*am).counters.add(counter as usize)).max = 1;
 
-    /* xmlFAGenerateTransitions(am, from, to, atom); */
+    // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
         to = xml_reg_state_push(am);
         if to.is_null() {
@@ -672,7 +663,7 @@ pub unsafe extern "C" fn xml_automata_new_once_trans2(
 }
 
 #[doc(alias = "xmlFAGenerateAllTransition")]
-unsafe extern "C" fn xml_fa_generate_all_transition(
+unsafe fn xml_fa_generate_all_transition(
     ctxt: XmlRegParserCtxtPtr,
     from: XmlRegStatePtr,
     mut to: XmlRegStatePtr,
@@ -700,7 +691,7 @@ unsafe extern "C" fn xml_fa_generate_all_transition(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewAllTrans")]
-pub unsafe extern "C" fn xml_automata_new_all_trans(
+pub unsafe fn xml_automata_new_all_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -721,7 +712,7 @@ pub unsafe extern "C" fn xml_automata_new_all_trans(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewEpsilon")]
-pub unsafe extern "C" fn xml_automata_new_epsilon(
+pub unsafe fn xml_automata_new_epsilon(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -742,7 +733,7 @@ pub unsafe extern "C" fn xml_automata_new_epsilon(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewCountedTrans")]
-pub unsafe extern "C" fn xml_automata_new_counted_trans(
+pub unsafe fn xml_automata_new_counted_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -764,7 +755,7 @@ pub unsafe extern "C" fn xml_automata_new_counted_trans(
 ///
 /// Returns the target state or NULL in case of error
 #[doc(alias = "xmlAutomataNewCounterTrans")]
-pub unsafe extern "C" fn xml_automata_new_counter_trans(
+pub unsafe fn xml_automata_new_counter_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
@@ -784,7 +775,7 @@ pub unsafe extern "C" fn xml_automata_new_counter_trans(
 ///
 /// Returns the counter number or -1 in case of error
 #[doc(alias = "xmlAutomataNewCounter")]
-pub unsafe extern "C" fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -> i32 {
+pub unsafe fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -> i32 {
     if am.is_null() {
         return -1;
     }
@@ -803,7 +794,7 @@ pub unsafe extern "C" fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, 
 ///
 /// Returns the compiled regexp or NULL in case of error
 #[doc(alias = "xmlAutomataCompile")]
-pub unsafe extern "C" fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlRegexp {
+pub unsafe fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlRegexp {
     if am.is_null() || (*am).error != 0 {
         return null_mut();
     }
@@ -816,7 +807,7 @@ pub unsafe extern "C" fn xml_automata_compile(am: XmlAutomataPtr) -> *mut XmlReg
 ///
 /// Returns 1 if true, 0 if not, and -1 in case of error
 #[doc(alias = "xmlAutomataIsDeterminist")]
-pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 {
+pub unsafe fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 {
     if am.is_null() {
         return -1;
     }
@@ -827,7 +818,7 @@ pub unsafe extern "C" fn xml_automata_is_determinist(am: XmlAutomataPtr) -> i32 
 
 /// Set some flags on the automata
 #[doc(alias = "xmlAutomataSetFlags")]
-pub(crate) unsafe extern "C" fn xml_automata_set_flags(am: XmlAutomataPtr, flags: i32) {
+pub(crate) unsafe fn xml_automata_set_flags(am: XmlAutomataPtr, flags: i32) {
     if am.is_null() {
         return;
     }
@@ -839,18 +830,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_automata_compile() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_get_init_state() {
-
-        /* missing type support */
-    }
 
     #[test]
     fn test_xml_automata_is_determinist() {
@@ -880,30 +859,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_automata_new_all_trans() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_count_trans() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_count_trans2() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_counted_trans() {
-
-        /* missing type support */
     }
 
     #[test]
@@ -947,54 +902,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_automata_new_counter_trans() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_epsilon() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_neg_trans() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_once_trans() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_once_trans2() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_state() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_transition() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_automata_new_transition2() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_automata_set_final_state() {
         #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
         unsafe {
@@ -1027,11 +934,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_new_automata() {
-
-        /* missing type support */
     }
 }
