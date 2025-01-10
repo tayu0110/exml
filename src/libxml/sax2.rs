@@ -55,7 +55,7 @@ use crate::{
         XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
         XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
-    uri::{build_uri, canonic_path},
+    uri::{build_uri, canonic_path, path_to_uri},
 };
 
 use super::{
@@ -73,7 +73,7 @@ use super::{
         xml_parse_external_subset, xml_string_decode_entities, xml_string_len_decode_entities,
         XML_MAX_TEXT_LENGTH, XML_STRING_TEXT, XML_SUBSTITUTE_REF, XML_VCTXT_DTD_VALIDATED,
     },
-    uri::{xml_free_uri, xml_parse_uri, xml_path_to_uri, XmlURIPtr},
+    uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     valid::{
         xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
         xml_add_ref, xml_free_enumeration, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
@@ -1143,25 +1143,10 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
             xml_dict_reference((*doc).dict);
         }
     }
-    if !(*ctxt).my_doc.is_null()
-        && (*(*ctxt).my_doc).url.is_none()
-        && !(*ctxt).input.is_null()
-        && (*(*ctxt).input).filename.is_some()
-    {
-        let filename = CString::new((*(*ctxt).input).filename.as_deref().unwrap()).unwrap();
-        let url = xml_path_to_uri(filename.as_ptr() as _);
-        if !url.is_null() {
-            (*(*ctxt).my_doc).url = Some(
-                CStr::from_ptr(url as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(url as _);
-        } else {
-            (*(*ctxt).my_doc).url = None;
-        }
-        if (*(*ctxt).my_doc).url.is_none() {
-            xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");
+    if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).url.is_none() && !(*ctxt).input.is_null() {
+        if let Some(filename) = (*(*ctxt).input).filename.as_deref() {
+            let url = path_to_uri(filename);
+            (*(*ctxt).my_doc).url = Some(url.into_owned());
         }
     }
 }

@@ -1288,3 +1288,36 @@ pub fn canonic_path(mut path: &str) -> Cow<'_, str> {
         Cow::Borrowed(path)
     }
 }
+
+/// Constructs an URI expressing the existing path
+///
+/// Return a new URI or the path parameter if the construction fails.
+#[doc(alias = "xmlPathToURI")]
+pub fn path_to_uri(path: &str) -> Cow<'_, str> {
+    if XmlURI::parse(path).is_some() {
+        return Cow::Borrowed(path);
+    }
+    #[cfg(not(target_os = "windows"))]
+    let cal = canonic_path(path);
+    #[cfg(target_os = "windows")]
+    let mut cal = canonic_path(path);
+    #[cfg(target_os = "windows")]
+    {
+        // xmlCanonicPath can return an URI on Windows (is that the intended behaviour?)
+        // If 'cal' is a valid URI already then we are done here, as continuing would make
+        // it invalid.
+        if XmlURI::parse(&cal).is_some() {
+            return cal;
+        }
+        // 'cal' can contain a relative path with backslashes. If that is processed
+        // by xmlSaveURI, they will be escaped and the external entity loader machinery
+        // will fail. So convert them to slashes. Misuse 'ret' for walking.
+        let ret = cal.replace('\\', '/');
+        cal = Cow::Owned(ret);
+    }
+    let temp = XmlURI {
+        path: Some(cal.into_owned().into()),
+        ..Default::default()
+    };
+    Cow::Owned(temp.save())
+}
