@@ -35,8 +35,7 @@ use crate::{error::__xml_raise_error, libxml::xmlstring::xml_strcat};
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
     xmlstring::{
-        xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strndup, xml_strstr,
-        XmlChar,
+        xml_str_equal, xml_strchr, xml_strcmp, xml_strdup, xml_strlen, xml_strndup, XmlChar,
     },
 };
 
@@ -2714,155 +2713,6 @@ macro_rules! IS_WINDOWS_PATH {
     };
 }
 
-/// Returns a new canonic path, or a duplicate of the path parameter if the
-/// construction fails. The caller is responsible for freeing the memory occupied
-/// by the returned string. If there is insufficient memory available, or the
-/// argument is NULL, the function returns NULL.
-#[doc(alias = "xmlCanonicPath")]
-pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlChar {
-    /*
-     * For Windows implementations, additional work needs to be done to
-     * replace backslashes in pathnames with "forward slashes"
-     */
-    #[cfg(target_os = "windows")]
-    let mut len: i32 = 0;
-    #[cfg(target_os = "windows")]
-    let mut p: *mut c_char = null_mut();
-    let mut uri: XmlURIPtr;
-    let ret: *mut XmlChar;
-
-    if path.is_null() {
-        return null_mut();
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        /*
-         * We must not change the backslashes to slashes if the the path
-         * starts with \\?\
-         * Those paths can be up to 32k characters long.
-         * Was added specifically for OpenOffice, those paths can't be converted
-         * to URIs anyway.
-         */
-        if ((*path.add(0) == b'\\')
-            && (*path.add(1) == b'\\')
-            && (*path.add(2) == b'?')
-            && (*path.add(3) == b'\\'))
-        {
-            return xml_strdup(path as *const XmlChar);
-        }
-    }
-
-    /* sanitize filename starting with // so it can be used as URI */
-    if *path.add(0) == b'/' && *path.add(1) == b'/' && *path.add(2) != b'/' {
-        path = path.add(1);
-    }
-
-    uri = xml_parse_uri(path as *const c_char);
-    if !uri.is_null() {
-        xml_free_uri(uri);
-        return xml_strdup(path);
-    }
-
-    /* Check if this is an "absolute uri" */
-    let absuri: *const XmlChar = xml_strstr(path, c"://".as_ptr() as _);
-    if !absuri.is_null() {
-        let mut c: u8;
-        let esc_uri: *mut XmlChar;
-
-        /*
-         * this looks like an URI where some parts have not been
-         * escaped leading to a parsing problem.  Check that the first
-         * part matches a protocol.
-         */
-        let l: i32 = absuri.offset_from(path) as _;
-        'goto_path_processing: {
-            /* Bypass if first part (part before the '://') is > 20 chars */
-            if l <= 0 || l > 20 {
-                break 'goto_path_processing;
-            } else {
-                /* Bypass if any non-alpha characters are present in first part */
-                for j in 0..l {
-                    c = *path.add(j as usize);
-                    if !c.is_ascii_lowercase() && !c.is_ascii_uppercase() {
-                        break 'goto_path_processing;
-                    }
-                }
-
-                /* Escape all except the characters specified in the supplied path */
-                esc_uri = xml_uri_escape_str(path, c":/?_.#&;=".as_ptr() as _);
-                if !esc_uri.is_null() {
-                    /* Try parsing the escaped path */
-                    uri = xml_parse_uri(esc_uri as *const c_char);
-                    /* If successful, return the escaped string */
-                    if !uri.is_null() {
-                        xml_free_uri(uri);
-                        return esc_uri;
-                    }
-                    xml_free(esc_uri as _);
-                }
-            }
-        }
-    }
-
-    // path_processing:
-    /* For Windows implementations, replace backslashes with 'forward slashes' */
-    #[cfg(target_os = "windows")]
-    {
-        /*
-         * Create a URI structure
-         */
-        uri = xml_create_uri();
-        if uri.is_null() {
-            /* Guard against 'out of memory' */
-            return null_mut();
-        }
-
-        len = xml_strlen(path);
-        if len > 2 && IS_WINDOWS_PATH!(path) {
-            /* make the scheme 'file' */
-            (*uri).scheme = xml_strdup(c"file".as_ptr() as _) as *mut c_char;
-            /* allocate space for leading '/' + path + string terminator */
-            (*uri).path = xml_malloc_atomic(len as usize + 2) as _;
-            if (*uri).path.is_null() {
-                xml_free_uri(uri); /* Guard against 'out of memory' */
-                return null_mut();
-            }
-            /* Put in leading '/' plus path */
-            *(*uri).path.add(0) = b'/' as i8;
-            p = (*uri).path.add(1);
-            strncpy(p as _, path as _, len as usize + 1);
-        } else {
-            (*uri).path = xml_strdup(path as _) as _;
-            if (*uri).path.is_null() {
-                xml_free_uri(uri);
-                return null_mut();
-            }
-            p = (*uri).path;
-        }
-        /* Now change all occurrences of '\' to '/' */
-        while *p != b'\0' as i8 {
-            if *p == b'\\' as i8 {
-                *p = b'/' as i8;
-            }
-            p = p.add(1);
-        }
-
-        if (*uri).scheme.is_null() {
-            ret = xml_strdup((*uri).path as *const XmlChar);
-        } else {
-            ret = xml_save_uri(uri);
-        }
-
-        xml_free_uri(uri);
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        ret = xml_strdup(path as *const XmlChar);
-    }
-    ret
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
@@ -2929,32 +2779,6 @@ mod tests {
                         eprint!(" {}", n_uri);
                         eprintln!(" {}", n_base);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_canonic_path() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_path in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let path = gen_const_xml_char_ptr(n_path, 0);
-
-                let ret_val = xml_canonic_path(path as *const XmlChar);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_char_ptr(n_path, path, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlCanonicPath",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlCanonicPath()");
-                    eprintln!(" {}", n_path);
                 }
             }
         }
