@@ -30,7 +30,7 @@ use std::{
 
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
 
-use crate::{error::__xml_raise_error, libxml::xmlstring::xml_strcat};
+use crate::error::__xml_raise_error;
 
 use super::{
     globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_mem_strdup, xml_realloc},
@@ -2549,122 +2549,6 @@ macro_rules! NULLCHK {
     };
 }
 
-/// Escaping routine, does not do validity checks !
-/// It will try to escape the chars needing this, but this is heuristic
-/// based it's impossible to be sure.
-///
-/// Returns an copy of the string, but escaped
-#[doc(alias = "xmlURIEscape")]
-pub unsafe extern "C" fn xml_uri_escape(str: *const XmlChar) -> *mut XmlChar {
-    let mut ret: *mut XmlChar;
-    let mut segment: *mut XmlChar;
-
-    let ret2: i32;
-
-    if str.is_null() {
-        return null_mut();
-    }
-
-    let uri: XmlURIPtr = xml_create_uri();
-    if !uri.is_null() {
-        /*
-         * Allow escaping errors in the unescaped form
-         */
-        (*uri).cleanup = 1;
-        ret2 = xml_parse_uri_reference(uri, str as *const c_char);
-        if ret2 != 0 {
-            xml_free_uri(uri);
-            return null_mut();
-        }
-    }
-
-    if uri.is_null() {
-        return null_mut();
-    }
-
-    ret = null_mut();
-
-    if !(*uri).scheme.is_null() {
-        segment = xml_uri_escape_str((*uri).scheme as _, c"+-.".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, segment);
-        ret = xml_strcat(ret, c":".as_ptr() as _);
-        xml_free(segment as _);
-    }
-
-    if !(*uri).authority.is_null() {
-        segment = xml_uri_escape_str((*uri).authority as _, c"/?;:@".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, c"//".as_ptr() as _);
-        ret = xml_strcat(ret, segment);
-        xml_free(segment as _);
-    }
-
-    if !(*uri).user.is_null() {
-        segment = xml_uri_escape_str((*uri).user as _, c";:&=+$,".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, c"//".as_ptr() as _);
-        ret = xml_strcat(ret, segment);
-        ret = xml_strcat(ret, c"@".as_ptr() as _);
-        xml_free(segment as _);
-    }
-
-    if !(*uri).server.is_null() {
-        segment = xml_uri_escape_str((*uri).server as _, c"/?;:@".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        if (*uri).user.is_null() {
-            ret = xml_strcat(ret, c"//".as_ptr() as _);
-        }
-        ret = xml_strcat(ret, segment);
-        xml_free(segment as _);
-    }
-
-    if (*uri).port > 0 {
-        let mut port: [XmlChar; 11] = [0; 11];
-
-        snprintf(port.as_mut_ptr() as _, 11, c"%d".as_ptr(), (*uri).port);
-        ret = xml_strcat(ret, c":".as_ptr() as _);
-        ret = xml_strcat(ret, port.as_ptr() as _);
-    }
-
-    if !(*uri).path.is_null() {
-        segment = xml_uri_escape_str((*uri).path as _, c":@&=+$,/?;".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, segment);
-        xml_free(segment as _);
-    }
-
-    if !(*uri).query_raw.is_null() {
-        ret = xml_strcat(ret, c"?".as_ptr() as _);
-        ret = xml_strcat(ret, (*uri).query_raw as _);
-    } else if !(*uri).query.is_null() {
-        segment = xml_uri_escape_str((*uri).query as _, c";/?:@&=+,$".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, c"?".as_ptr() as _);
-        ret = xml_strcat(ret, segment);
-        xml_free(segment as _);
-    }
-
-    if !(*uri).opaque.is_null() {
-        segment = xml_uri_escape_str((*uri).opaque as _, c"".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, segment);
-        xml_free(segment as _);
-    }
-
-    if !(*uri).fragment.is_null() {
-        segment = xml_uri_escape_str((*uri).fragment as _, c"#".as_ptr() as _);
-        NULLCHK!(segment, uri, ret);
-        ret = xml_strcat(ret, c"#".as_ptr() as _);
-        ret = xml_strcat(ret, segment);
-        xml_free(segment as _);
-    }
-
-    xml_free_uri(uri);
-
-    ret
-}
-
 /// Free up the xmlURI struct
 #[doc(alias = "xmlFreeURI")]
 pub unsafe extern "C" fn xml_free_uri(uri: XmlURIPtr) {
@@ -2700,17 +2584,6 @@ pub unsafe extern "C" fn xml_free_uri(uri: XmlURIPtr) {
         xml_free((*uri).query_raw as _);
     }
     xml_free(uri as _);
-}
-
-#[cfg(target_os = "windows")]
-macro_rules! IS_WINDOWS_PATH {
-    ($p:expr) => {
-        !$p.is_null()
-            && ((*$p.add(0) >= b'a' && *$p.add(0) <= b'z')
-                || (*$p.add(0) >= b'A' && *$p.add(0) <= b'Z'))
-            && *$p.add(1) == b':'
-            && (*$p.add(2) == b'/' || *$p.add(2) == b'\\')
-    };
 }
 
 #[cfg(test)]
@@ -2897,32 +2770,6 @@ mod tests {
                     );
                     assert!(leaks == 0, "{leaks} Leaks are found in xmlSaveUri()");
                     eprintln!(" {}", n_uri);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_uriescape() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_str in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let str = gen_const_xml_char_ptr(n_str, 0);
-
-                let ret_val = xml_uri_escape(str as *const XmlChar);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_char_ptr(n_str, str, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlURIEscape",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlURIEscape()");
-                    eprintln!(" {}", n_str);
                 }
             }
         }
