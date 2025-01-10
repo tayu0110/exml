@@ -2517,13 +2517,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                 res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                 if res > 0 {
-                    let filename = filename.map(|f| CString::new(f).unwrap());
                     ctxt = html_create_push_parser_ctxt(
                         None,
                         None,
                         chars.as_ptr(),
                         res,
-                        filename.map_or(null(), |f| f.as_ptr()),
+                        filename,
                         XmlCharEncoding::None,
                     );
                     if ctxt.is_null() {

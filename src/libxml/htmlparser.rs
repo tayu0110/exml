@@ -52,7 +52,6 @@ use crate::{
             INPUT_CHUNK, XML_MAX_HUGE_LENGTH, XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH,
         },
         sax2::{xml_sax2_ignorable_whitespace, xml_sax2_init_html_default_sax_handler},
-        uri::xml_canonic_path,
         xmlstring::{
             xml_str_equal, xml_strcasestr, xml_strcmp, xml_strlen, xml_strncasecmp, xml_strndup,
             XmlChar,
@@ -9763,7 +9762,7 @@ pub unsafe fn html_create_push_parser_ctxt(
     user_data: Option<GenericErrorContext>,
     chunk: *const c_char,
     size: i32,
-    filename: *const c_char,
+    filename: Option<&str>,
     enc: XmlCharEncoding,
 ) -> HtmlParserCtxtPtr {
     use std::slice::from_raw_parts;
@@ -9781,11 +9780,9 @@ pub unsafe fn html_create_push_parser_ctxt(
     if matches!(enc, XmlCharEncoding::UTF8) || buf.encoder.is_some() {
         (*ctxt).charset = XmlCharEncoding::UTF8;
     }
-    if filename.is_null() {
+    if filename.is_none() {
         (*ctxt).directory = None;
-    } else if let Some(dir) =
-        xml_parser_get_directory(CStr::from_ptr(filename).to_string_lossy().as_ref())
-    {
+    } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
         (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
@@ -9795,16 +9792,11 @@ pub unsafe fn html_create_push_parser_ctxt(
         return null_mut();
     }
 
-    if filename.is_null() {
-        (*input_stream).filename = None;
+    if let Some(filename) = filename {
+        let canonic = canonic_path(filename);
+        (*input_stream).filename = Some(canonic.into_owned());
     } else {
-        let canonic = xml_canonic_path(filename as _);
-        (*input_stream).filename = Some(
-            CStr::from_ptr(canonic as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-        xml_free(canonic as _);
+        (*input_stream).filename = None;
     }
     // (*input_stream).buf = Some(buf);
     std::ptr::write(

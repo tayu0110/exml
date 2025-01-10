@@ -1655,7 +1655,7 @@ unsafe fn push_parse_test(
             None,
             base.add(cur as _),
             chunk_size,
-            cfilename.as_ptr(),
+            Some(filename),
             XmlCharEncoding::None,
         )
     } else {
@@ -1979,7 +1979,7 @@ unsafe fn push_boundary_test(
             None,
             base,
             1,
-            cfilename.as_ptr(),
+            Some(filename),
             XmlCharEncoding::None,
         )
     } else {
