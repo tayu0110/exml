@@ -21,12 +21,7 @@
 //
 // daniel@veillard.com
 
-use std::{
-    ffi::{c_char, CStr},
-    io::Write,
-    mem::size_of,
-    ptr::null_mut,
-};
+use std::{ffi::c_char, mem::size_of, ptr::null_mut};
 
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
 
@@ -1838,17 +1833,6 @@ pub unsafe extern "C" fn xml_save_uri(uri: XmlURIPtr) -> *mut XmlChar {
     null_mut()
 }
 
-/// Prints the URI in the stream @stream.
-#[doc(alias = "xmlPrintURI")]
-pub unsafe extern "C" fn xml_print_uri<'a>(stream: &mut (impl Write + 'a), uri: XmlURIPtr) {
-    let out: *mut XmlChar = xml_save_uri(uri);
-    if !out.is_null() {
-        let o = CStr::from_ptr(out as *const i8).to_string_lossy();
-        write!(stream, "{o}");
-        xml_free(out as _);
-    }
-}
-
 /// This routine escapes a string to hex, ignoring reserved characters
 /// (a-z, A-Z, 0-9, "@-_.!~*'()") and the characters in the exception list.
 ///
@@ -2369,35 +2353,6 @@ mod tests {
                         );
                         eprint!(" {}", n_uri);
                         eprintln!(" {}", n_str);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_print_uri() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_stream in 0..GEN_NB_FILE_PTR {
-                for n_uri in 0..GEN_NB_XML_URIPTR {
-                    let mem_base = xml_mem_blocks();
-                    let mut stream = gen_file_ptr(n_stream, 0).unwrap();
-                    let uri = gen_xml_uriptr(n_uri, 1);
-
-                    xml_print_uri(&mut stream, uri);
-                    des_xml_uriptr(n_uri, uri, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlPrintURI",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlPrintURI()");
-                        eprint!(" {}", n_stream);
-                        eprintln!(" {}", n_uri);
                     }
                 }
             }
