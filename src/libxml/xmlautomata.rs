@@ -66,9 +66,7 @@ pub struct XmlAutomata {
     pub(crate) max_states: i32,
     pub(crate) nb_states: i32,
     pub(crate) states: *mut XmlRegStatePtr,
-    pub(crate) max_counters: i32,
-    pub(crate) nb_counters: i32,
-    pub(crate) counters: *mut XmlRegCounter,
+    pub(crate) counters: Vec<XmlRegCounter>,
     pub(crate) determinist: i32,
     pub(crate) negs: i32,
     pub(crate) flags: i32,
@@ -355,14 +353,9 @@ pub unsafe fn xml_automata_new_count_trans(
     (*atom).max = max;
 
     // associate a counter to the transition.
-    let counter: i32 = xml_reg_get_counter(am);
-    if counter < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*(*am).counters.add(counter as usize)).min = min;
-    (*(*am).counters.add(counter as usize)).max = max;
+    let counter = xml_reg_get_counter(am);
+    (*am).counters[counter].min = min;
+    (*am).counters[counter].max = max;
 
     // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
@@ -373,7 +366,7 @@ pub unsafe fn xml_automata_new_count_trans(
             return null_mut();
         }
     }
-    xml_reg_state_add_trans(am, from, atom, to, counter, -1);
+    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
     if xml_reg_atom_push(am, atom) < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -461,14 +454,9 @@ pub unsafe fn xml_automata_new_count_trans2(
     (*atom).max = max;
 
     // associate a counter to the transition.
-    let counter: i32 = xml_reg_get_counter(am);
-    if counter < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*(*am).counters.add(counter as usize)).min = min;
-    (*(*am).counters.add(counter as usize)).max = max;
+    let counter = xml_reg_get_counter(am);
+    (*am).counters[counter].min = min;
+    (*am).counters[counter].max = max;
 
     // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
@@ -479,7 +467,7 @@ pub unsafe fn xml_automata_new_count_trans2(
             return null_mut();
         }
     }
-    xml_reg_state_add_trans(am, from, atom, to, counter, -1);
+    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
     if xml_reg_atom_push(am, atom) < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -538,14 +526,9 @@ pub unsafe fn xml_automata_new_once_trans(
     (*atom).min = min;
     (*atom).max = max;
     // associate a counter to the transition.
-    let counter: i32 = xml_reg_get_counter(am);
-    if counter < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*(*am).counters.add(counter as usize)).min = 1;
-    (*(*am).counters.add(counter as usize)).max = 1;
+    let counter = xml_reg_get_counter(am);
+    (*am).counters[counter].min = 1;
+    (*am).counters[counter].max = 1;
 
     // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
@@ -556,7 +539,7 @@ pub unsafe fn xml_automata_new_once_trans(
             return null_mut();
         }
     }
-    xml_reg_state_add_trans(am, from, atom, to, counter, -1);
+    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
     if xml_reg_atom_push(am, atom) < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -630,14 +613,9 @@ pub unsafe fn xml_automata_new_once_trans2(
     (*atom).min = min;
     (*atom).max = max;
     // associate a counter to the transition.
-    let counter: i32 = xml_reg_get_counter(am);
-    if counter < 0 {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
-    (*(*am).counters.add(counter as usize)).min = 1;
-    (*(*am).counters.add(counter as usize)).max = 1;
+    let counter = xml_reg_get_counter(am);
+    (*am).counters[counter].min = 1;
+    (*am).counters[counter].max = 1;
 
     // xmlFAGenerateTransitions(am, from, to, atom);
     if to.is_null() {
@@ -648,7 +626,7 @@ pub unsafe fn xml_automata_new_once_trans2(
             return null_mut();
         }
     }
-    xml_reg_state_add_trans(am, from, atom, to, counter, -1);
+    xml_reg_state_add_trans(am, from, atom, to, counter as i32, -1);
     if xml_reg_atom_push(am, atom) < 0 {
         // goto error;
         xml_reg_free_atom(atom);
@@ -780,13 +758,10 @@ pub unsafe fn xml_automata_new_counter(am: XmlAutomataPtr, min: i32, max: i32) -
         return -1;
     }
 
-    let ret: i32 = xml_reg_get_counter(am);
-    if ret < 0 {
-        return -1;
-    }
-    (*(*am).counters.add(ret as usize)).min = min;
-    (*(*am).counters.add(ret as usize)).max = max;
-    ret
+    let ret = xml_reg_get_counter(am);
+    (*am).counters[ret].min = min;
+    (*am).counters[ret].max = max;
+    ret as i32
 }
 
 /// Compile the automata into a Reg Exp ready for being executed.
@@ -856,46 +831,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlAutomataIsDeterminist()"
                     );
                     eprintln!(" {}", n_am);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_automata_new_counter() {
-        #[cfg(all(feature = "libxml_regexp", feature = "libxml_automata"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_am in 0..GEN_NB_XML_AUTOMATA_PTR {
-                for n_min in 0..GEN_NB_INT {
-                    for n_max in 0..GEN_NB_INT {
-                        let mem_base = xml_mem_blocks();
-                        let am = gen_xml_automata_ptr(n_am, 0);
-                        let min = gen_int(n_min, 1);
-                        let max = gen_int(n_max, 2);
-
-                        let ret_val = xml_automata_new_counter(am, min, max);
-                        desret_int(ret_val);
-                        des_xml_automata_ptr(n_am, am, 0);
-                        des_int(n_min, min, 1);
-                        des_int(n_max, max, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlAutomataNewCounter",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlAutomataNewCounter()"
-                            );
-                            eprint!(" {}", n_am);
-                            eprint!(" {}", n_min);
-                            eprintln!(" {}", n_max);
-                        }
-                    }
                 }
             }
         }

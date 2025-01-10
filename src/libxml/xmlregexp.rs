@@ -30,9 +30,9 @@
 use std::{
     ffi::{c_char, CStr},
     io::Write,
-    mem::{size_of, zeroed},
+    mem::{size_of, take, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut},
 };
 
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
@@ -194,8 +194,7 @@ pub struct XmlRegAtom {
     pub(crate) data: *mut c_void,
 }
 
-pub type XmlRegCounterPtr = *mut XmlRegCounter;
-#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct XmlRegCounter {
     pub(crate) min: i32,
     pub(crate) max: i32,
@@ -227,8 +226,7 @@ pub struct XmlRegexp {
     states: *mut XmlRegStatePtr,
     nb_atoms: i32,
     atoms: *mut XmlRegAtomPtr,
-    nb_counters: i32,
-    counters: *mut XmlRegCounter,
+    counters: Vec<XmlRegCounter>,
     determinist: i32,
     flags: i32,
     // That's the compact form for determinists automatas
@@ -461,9 +459,7 @@ pub(crate) unsafe fn xml_reg_free_parser_ctxt(ctxt: XmlRegParserCtxtPtr) {
         }
         xml_free((*ctxt).atoms as _);
     }
-    if !(*ctxt).counters.is_null() {
-        xml_free((*ctxt).counters as _);
-    }
+    drop_in_place(ctxt);
     xml_free(ctxt as _);
 }
 
@@ -1685,34 +1681,9 @@ unsafe fn xml_reg_copy_atom(ctxt: XmlRegParserCtxtPtr, atom: XmlRegAtomPtr) -> X
     //     return(NULL);
 }
 
-pub(crate) unsafe fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -> i32 {
-    if (*ctxt).max_counters == 0 {
-        (*ctxt).max_counters = 4;
-        (*ctxt).counters = xml_malloc((*ctxt).max_counters as usize * size_of::<XmlRegCounter>())
-            as *mut XmlRegCounter;
-        if (*ctxt).counters.is_null() {
-            xml_regexp_err_memory(ctxt, "allocating counter");
-            (*ctxt).max_counters = 0;
-            return -1;
-        }
-    } else if (*ctxt).nb_counters >= (*ctxt).max_counters {
-        (*ctxt).max_counters *= 2;
-        let tmp: *mut XmlRegCounter = xml_realloc(
-            (*ctxt).counters as _,
-            (*ctxt).max_counters as usize * size_of::<XmlRegCounter>(),
-        ) as *mut XmlRegCounter;
-        if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, "allocating counter");
-            (*ctxt).max_counters /= 2;
-            return -1;
-        }
-        (*ctxt).counters = tmp;
-    }
-    (*(*ctxt).counters.add((*ctxt).nb_counters as usize)).min = -1;
-    (*(*ctxt).counters.add((*ctxt).nb_counters as usize)).max = -1;
-    let res = (*ctxt).nb_counters;
-    (*ctxt).nb_counters += 1;
-    res
+pub(crate) unsafe fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -> usize {
+    (*ctxt).counters.push(XmlRegCounter { min: -1, max: -1 });
+    (*ctxt).counters.len() - 1
 }
 
 #[doc(alias = "xmlFAGenerateCountedEpsilonTransition")]
@@ -1825,7 +1796,6 @@ pub(crate) unsafe fn xml_fa_generate_transitions(
                 xml_fa_generate_epsilon_transition(ctxt, (*atom).stop, (*atom).start);
             }
             XmlRegQuantType::XmlRegexpQuantRange => {
-                let counter: i32;
                 let inter: XmlRegStatePtr;
                 let newstate: XmlRegStatePtr;
 
@@ -1864,36 +1834,40 @@ pub(crate) unsafe fn xml_fa_generate_transitions(
                         return -1;
                     }
                     inter = (*ctxt).state;
-                    counter = xml_reg_get_counter(ctxt);
-                    if counter < 0 {
-                        return -1;
-                    }
-                    (*(*ctxt).counters.add(counter as usize)).min = (*atom).min - 1;
-                    (*(*ctxt).counters.add(counter as usize)).max = (*atom).max - 1;
+                    let counter = xml_reg_get_counter(ctxt);
+                    (*ctxt).counters[counter].min = (*atom).min - 1;
+                    (*ctxt).counters[counter].max = (*atom).max - 1;
                     // count the number of times we see it again
-                    xml_fa_generate_counted_epsilon_transition(ctxt, inter, (*atom).stop, counter);
+                    xml_fa_generate_counted_epsilon_transition(
+                        ctxt,
+                        inter,
+                        (*atom).stop,
+                        counter as i32,
+                    );
                     // allow a way out based on the count
-                    xml_fa_generate_counted_transition(ctxt, inter, newstate, counter);
+                    xml_fa_generate_counted_transition(ctxt, inter, newstate, counter as i32);
                     // and also allow a direct exit for 0
                     xml_fa_generate_epsilon_transition(ctxt, (*atom).start, newstate);
                 } else {
                     // either we need the atom at least once or there
                     // is an (*atom).start0 allowing to easily plug the
                     // epsilon transition.
-                    counter = xml_reg_get_counter(ctxt);
-                    if counter < 0 {
-                        return -1;
-                    }
-                    (*(*ctxt).counters.add(counter as usize)).min = (*atom).min - 1;
-                    (*(*ctxt).counters.add(counter as usize)).max = (*atom).max - 1;
+                    let counter = xml_reg_get_counter(ctxt);
+                    (*ctxt).counters[counter].min = (*atom).min - 1;
+                    (*ctxt).counters[counter].max = (*atom).max - 1;
                     // allow a way out based on the count
-                    xml_fa_generate_counted_transition(ctxt, (*atom).stop, newstate, counter);
+                    xml_fa_generate_counted_transition(
+                        ctxt,
+                        (*atom).stop,
+                        newstate,
+                        counter as i32,
+                    );
                     // count the number of times we see it again
                     xml_fa_generate_counted_epsilon_transition(
                         ctxt,
                         (*atom).stop,
                         (*atom).start,
-                        counter,
+                        counter as i32,
                     );
                     // and if needed allow a direct exit for 0
                     if (*atom).min == 0 {
@@ -2406,8 +2380,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     (*ret).states = (*ctxt).states;
     (*ret).nb_atoms = (*ctxt).nb_atoms;
     (*ret).atoms = (*ctxt).atoms;
-    (*ret).nb_counters = (*ctxt).nb_counters;
-    (*ret).counters = (*ctxt).counters;
+    (*ret).counters = take(&mut (*ctxt).counters);
     (*ret).determinist = (*ctxt).determinist;
     (*ret).flags = (*ctxt).flags;
     if (*ret).determinist == -1 {
@@ -2415,7 +2388,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     }
 
     if (*ret).determinist != 0
-        && (*ret).nb_counters == 0
+        && (*ret).counters.is_empty()
         && (*ctxt).negs == 0
         && !(*ret).atoms.is_null()
         && !(*(*ret).atoms.add(0)).is_null()
@@ -2583,8 +2556,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         (*ctxt).states = null_mut();
                         (*ctxt).nb_atoms = 0;
                         (*ctxt).atoms = null_mut();
-                        (*ctxt).nb_counters = 0;
-                        (*ctxt).counters = null_mut();
+                        (*ctxt).counters.clear();
                         return ret;
                     }
                 } else {
@@ -2630,8 +2602,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     (*ctxt).states = null_mut();
     (*ctxt).nb_atoms = 0;
     (*ctxt).atoms = null_mut();
-    (*ctxt).nb_counters = 0;
-    (*ctxt).counters = null_mut();
+    (*ctxt).counters.clear();
     ret
 }
 
@@ -2710,9 +2681,6 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
         }
         xml_free((*regexp).atoms as _);
     }
-    if !(*regexp).counters.is_null() {
-        xml_free((*regexp).counters as _);
-    }
     if !(*regexp).compact.is_null() {
         xml_free((*regexp).compact as _);
     }
@@ -2726,6 +2694,7 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
         xml_free((*regexp).string_map as _);
     }
 
+    drop_in_place(regexp);
     xml_free(regexp as _);
 }
 
@@ -2738,7 +2707,7 @@ unsafe fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
     (*exec).state = (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).state;
     (*exec).index = (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).index;
     (*exec).transno = (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).nextbranch;
-    if (*(*exec).comp).nb_counters > 0 {
+    if !(*(*exec).comp).counters.is_empty() {
         if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
             .counts
             .is_null()
@@ -2751,7 +2720,7 @@ unsafe fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
             memcpy(
                 (*exec).counts as _,
                 (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts as _,
-                (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
+                (*(*exec).comp).counters.len() * size_of::<i32>(),
             );
         }
     }
@@ -3062,13 +3031,13 @@ unsafe fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
     (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).state = (*exec).state;
     (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).index = (*exec).index;
     (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).nextbranch = (*exec).transno + 1;
-    if (*(*exec).comp).nb_counters > 0 {
+    if !(*(*exec).comp).counters.is_empty() {
         if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
             .counts
             .is_null()
         {
             (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts =
-                xml_malloc((*(*exec).comp).nb_counters as usize * size_of::<i32>()) as *mut i32;
+                xml_malloc((*(*exec).comp).counters.len() * size_of::<i32>()) as *mut i32;
             if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
                 .counts
                 .is_null()
@@ -3081,7 +3050,7 @@ unsafe fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
         memcpy(
             (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts as _,
             (*exec).counts as _,
-            (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
+            (*(*exec).comp).counters.len() * size_of::<i32>(),
         );
     }
     (*exec).nb_rollbacks += 1;
@@ -3111,8 +3080,8 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     (*exec).transcount = 0;
     (*exec).input_stack = null_mut();
     (*exec).input_stack_max = 0;
-    if (*comp).nb_counters > 0 {
-        (*exec).counts = xml_malloc((*comp).nb_counters as usize * size_of::<i32>()) as *mut i32;
+    if !(*comp).counters.is_empty() {
+        (*exec).counts = xml_malloc((*comp).counters.len() * size_of::<i32>()) as *mut i32;
         if (*exec).counts.is_null() {
             xml_regexp_err_memory(null_mut(), "running regexp");
             return -1;
@@ -3120,7 +3089,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
         memset(
             (*exec).counts as _,
             0,
-            (*comp).nb_counters as usize * size_of::<i32>(),
+            (*comp).counters.len() * size_of::<i32>(),
         );
     } else {
         (*exec).counts = null_mut();
@@ -3181,10 +3150,9 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                         // A counted transition.
 
                         let count: i32 = *(*exec).counts.add((*trans).count as usize);
-                        let counter: XmlRegCounterPtr =
-                            (*(*exec).comp).counters.add((*trans).count as usize);
-                        ret = (count >= (*counter).min && count <= (*counter).max) as i32;
-                        if ret != 0 && (*counter).min != (*counter).max {
+                        let counter = (*(*exec).comp).counters[(*trans).count as usize];
+                        ret = (count >= counter.min && count <= counter.max) as i32;
+                        if ret != 0 && counter.min != counter.max {
                             deter = 0;
                         }
                     } else if atom.is_null() {
@@ -3203,18 +3171,14 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             // do not increment if the counter is already over the
                             // maximum limit in which case get to next transition
                             if (*trans).counter >= 0 {
-                                if (*exec).counts.is_null()
-                                    || (*exec).comp.is_null()
-                                    || (*(*exec).comp).counters.is_null()
-                                {
+                                if (*exec).counts.is_null() || (*exec).comp.is_null() {
                                     (*exec).status = -1;
                                     break 'error;
                                 }
-                                let counter: XmlRegCounterPtr =
-                                    (*(*exec).comp).counters.add((*trans).counter as usize);
-                                if *(*exec).counts.add((*trans).counter as usize) >= (*counter).max
-                                {
-                                    continue; /* for loop on transitions */
+                                let counter = (*(*exec).comp).counters[(*trans).counter as usize];
+                                if *(*exec).counts.add((*trans).counter as usize) >= counter.max {
+                                    // for loop on transitions
+                                    continue;
                                 }
                             }
                             // Save before incrementing
@@ -3298,17 +3262,14 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                         }
                         if (*trans).counter >= 0 {
                             // make sure we don't go over the counter maximum value
-                            if (*exec).counts.is_null()
-                                || (*exec).comp.is_null()
-                                || (*(*exec).comp).counters.is_null()
-                            {
+                            if (*exec).counts.is_null() || (*exec).comp.is_null() {
                                 (*exec).status = -1;
                                 break 'error;
                             }
-                            let counter: XmlRegCounterPtr =
-                                (*(*exec).comp).counters.add((*trans).counter as usize);
-                            if *(*exec).counts.add((*trans).counter as usize) >= (*counter).max {
-                                continue; /* for loop on transitions */
+                            let counter = (*(*exec).comp).counters[(*trans).counter as usize];
+                            if *(*exec).counts.add((*trans).counter as usize) >= counter.max {
+                                // for loop on transitions
+                                continue;
                             }
                             *(*exec).counts.add((*trans).counter as usize) += 1;
                         }
@@ -3719,14 +3680,9 @@ pub unsafe fn xml_regexp_print<'a>(output: &mut (impl Write + 'a), regexp: XmlRe
     for i in 0..(*regexp).nb_states {
         xml_reg_print_state(output, *(*regexp).states.add(i as usize));
     }
-    writeln!(output, "{} counters:", (*regexp).nb_counters);
-    for i in 0..(*regexp).nb_counters {
-        writeln!(
-            output,
-            " {i}: min {} max {}",
-            (*(*regexp).counters.add(i as usize)).min,
-            (*(*regexp).counters.add(i as usize)).max,
-        );
+    writeln!(output, "{} counters:", (*regexp).counters.len());
+    for (i, counter) in (*regexp).counters.iter().enumerate() {
+        writeln!(output, " {i}: min {} max {}", counter.min, counter.max);
     }
 }
 
@@ -4658,11 +4614,10 @@ pub unsafe fn xml_reg_new_exec_ctxt(
     (*exec).transcount = 0;
     (*exec).callback = callback;
     (*exec).data = data;
-    if (*comp).nb_counters > 0 {
+    if !(*comp).counters.is_empty() {
         // For error handling, (*exec).counts is allocated twice the size
         // the second half is used to store the data in case of rollback
-        (*exec).counts =
-            xml_malloc((*comp).nb_counters as usize * size_of::<i32>() * 2) as *mut i32;
+        (*exec).counts = xml_malloc((*comp).counters.len() * size_of::<i32>() * 2) as *mut i32;
         if (*exec).counts.is_null() {
             xml_regexp_err_memory(null_mut(), "creating execution context");
             xml_free(exec as _);
@@ -4671,9 +4626,9 @@ pub unsafe fn xml_reg_new_exec_ctxt(
         memset(
             (*exec).counts as _,
             0,
-            (*comp).nb_counters as usize * size_of::<i32>() * 2,
+            (*comp).counters.len() * size_of::<i32>() * 2,
         );
-        (*exec).err_counts = (*exec).counts.add((*comp).nb_counters as usize);
+        (*exec).err_counts = (*exec).counts.add((*comp).counters.len());
     } else {
         (*exec).counts = null_mut();
         (*exec).err_counts = null_mut();
@@ -4915,7 +4870,6 @@ unsafe fn xml_reg_exec_push_string_internal(
                     if (*trans).count as usize == REGEXP_ALL_LAX_COUNTER {
                         let mut count: i32;
                         let mut t: XmlRegTransPtr;
-                        let mut counter: XmlRegCounterPtr;
 
                         ret = 0;
 
@@ -4928,17 +4882,17 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 if (*t).counter < 0 || t == trans {
                                     continue;
                                 }
-                                counter = (*(*exec).comp).counters.add((*t).counter as usize);
+                                let counter = (*(*exec).comp).counters[(*t).counter as usize];
                                 count = *(*exec).counts.add((*t).counter as usize);
-                                if count < (*counter).max
+                                if count < counter.max
                                     && !(*t).atom.is_null()
                                     && xml_str_equal(value, (*(*t).atom).valuep as _)
                                 {
                                     ret = 0;
                                     break;
                                 }
-                                if count >= (*counter).min
-                                    && count < (*counter).max
+                                if count >= counter.min
+                                    && count < counter.max
                                     && !(*t).atom.is_null()
                                     && xml_str_equal(value, (*(*t).atom).valuep as _)
                                 {
@@ -4950,7 +4904,6 @@ unsafe fn xml_reg_exec_push_string_internal(
                     } else if (*trans).count as usize == REGEXP_ALL_COUNTER {
                         let mut count: i32;
                         let mut t: XmlRegTransPtr;
-                        let mut counter: XmlRegCounterPtr;
 
                         ret = 1;
 
@@ -4960,20 +4913,18 @@ unsafe fn xml_reg_exec_push_string_internal(
                             if (*t).counter < 0 || t == trans {
                                 continue;
                             }
-                            counter = (*(*exec).comp).counters.add((*t).counter as usize);
+                            let counter = (*(*exec).comp).counters[(*t).counter as usize];
                             count = *(*exec).counts.add((*t).counter as usize);
-                            if count < (*counter).min || count > (*counter).max {
+                            if count < counter.min || count > counter.max {
                                 ret = 0;
                                 break;
                             }
                         }
                     } else if (*trans).count >= 0 {
                         // A counted transition.
-
                         let count: i32 = *(*exec).counts.add((*trans).count as usize);
-                        let counter: XmlRegCounterPtr =
-                            (*(*exec).comp).counters.add((*trans).count as usize);
-                        ret = (count >= (*counter).min && count <= (*counter).max) as _;
+                        let counter = (*(*exec).comp).counters[(*trans).count as usize];
+                        ret = (count >= counter.min && count <= counter.max) as _;
                     } else if atom.is_null() {
                         eprintln!("epsilon transition left at runtime");
                         (*exec).status = -2;
@@ -4988,9 +4939,8 @@ unsafe fn xml_reg_exec_push_string_internal(
                         }
                         if ret == 1 && (*trans).counter >= 0 {
                             let count: i32 = *(*exec).counts.add((*trans).counter as usize);
-                            let counter: XmlRegCounterPtr =
-                                (*(*exec).comp).counters.add((*trans).counter as usize);
-                            if count >= (*counter).max {
+                            let counter = (*(*exec).comp).counters[(*trans).counter as usize];
+                            if count >= counter.max {
                                 ret = 0;
                             }
                         }
@@ -5091,7 +5041,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             memcpy(
                                 (*exec).err_counts as _,
                                 (*exec).counts as _,
-                                (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
+                                (*(*exec).comp).counters.len() * size_of::<i32>(),
                             );
                         }
                         (*exec).state = *(*(*exec).comp).states.add((*trans).to as usize);
@@ -5139,11 +5089,11 @@ unsafe fn xml_reg_exec_push_string_internal(
             }
             (*exec).err_string = xml_strdup(value);
             (*exec).err_state = (*exec).state;
-            if (*(*exec).comp).nb_counters != 0 {
+            if !(*(*exec).comp).counters.is_empty() {
                 memcpy(
                     (*exec).err_counts as _,
                     (*exec).counts as _,
-                    (*(*exec).comp).nb_counters as usize * size_of::<i32>(),
+                    (*(*exec).comp).counters.len() * size_of::<i32>(),
                 );
             }
         }
@@ -5361,7 +5311,7 @@ unsafe fn xml_reg_exec_get_values(
                     // this should not be reached but ...
                     todo!()
                 } else if (*trans).counter >= 0 {
-                    let mut counter: XmlRegCounterPtr = null_mut();
+                    let mut counter = None;
 
                     let count = if err != 0 {
                         *(*exec).err_counts.add((*trans).counter as usize)
@@ -5369,9 +5319,9 @@ unsafe fn xml_reg_exec_get_values(
                         *(*exec).counts.add((*trans).counter as usize)
                     };
                     if !(*exec).comp.is_null() {
-                        counter = (*(*exec).comp).counters.add((*trans).counter as usize);
+                        counter = Some((*(*exec).comp).counters[(*trans).counter as usize]);
                     }
-                    if counter.is_null() || count < (*counter).max {
+                    if counter.map_or(true, |c| count < c.max) {
                         if (*atom).neg != 0 {
                             *values.add(nb as usize) = (*atom).valuep2 as *mut XmlChar;
                             nb += 1;
