@@ -24,7 +24,7 @@
 use std::{
     ffi::{c_char, CStr},
     io::Write,
-    mem::{size_of, size_of_val, zeroed},
+    mem::size_of,
     ptr::null_mut,
 };
 
@@ -2863,59 +2863,6 @@ pub unsafe extern "C" fn xml_canonic_path(mut path: *const XmlChar) -> *mut XmlC
     ret
 }
 
-/// Constructs an URI expressing the existing path
-///
-/// Returns a new URI, or a duplicate of the path parameter if the
-/// construction fails. The caller is responsible for freeing the memory
-/// occupied by the returned string. If there is insufficient memory available,
-/// or the argument is NULL, the function returns NULL.
-#[doc(alias = "xmlPathToURI")]
-pub unsafe extern "C" fn xml_path_to_uri(path: *const XmlChar) -> *mut XmlChar {
-    let mut temp: XmlURI = unsafe { zeroed() };
-
-    if path.is_null() {
-        return null_mut();
-    }
-
-    let uri: XmlURIPtr = xml_parse_uri(path as *const c_char);
-    if !uri.is_null() {
-        xml_free_uri(uri);
-        return xml_strdup(path);
-    }
-    let cal: *mut XmlChar = xml_canonic_path(path);
-    if cal.is_null() {
-        return null_mut();
-    }
-    #[cfg(target_os = "windows")]
-    {
-        /* xmlCanonicPath can return an URI on Windows (is that the intended behaviour?)
-        If 'cal' is a valid URI already then we are done here, as continuing would make
-        it invalid. */
-        if {
-            uri = xml_parse_uri(cal as *const c_char);
-            !uri.is_null()
-        } {
-            xml_free_uri(uri);
-            return cal;
-        }
-        /* 'cal' can contain a relative path with backslashes. If that is processed
-        by xmlSaveURI, they will be escaped and the external entity loader machinery
-        will fail. So convert them to slashes. Misuse 'ret' for walking. */
-        ret = cal;
-        while *ret != b'\0' {
-            if *ret == b'\\' {
-                *ret = b'/';
-            }
-            ret = ret.add(1);
-        }
-    }
-    memset(&raw mut temp as _, 0, size_of_val(&temp));
-    temp.path = cal as *mut c_char;
-    let ret: *mut XmlChar = xml_save_uri(&raw mut temp);
-    xml_free(cal as _);
-    ret
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
@@ -3014,12 +2961,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_create_uri() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_normalize_uripath() {
         unsafe {
             let mut leaks = 0;
@@ -3046,18 +2987,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_parse_uri() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_parse_uriraw() {
-
-        /* missing type support */
     }
 
     #[test]
@@ -3089,32 +3018,6 @@ mod tests {
                         eprint!(" {}", n_uri);
                         eprintln!(" {}", n_str);
                     }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_path_to_uri() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_path in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                let mem_base = xml_mem_blocks();
-                let path = gen_const_xml_char_ptr(n_path, 0);
-
-                let ret_val = xml_path_to_uri(path as *const XmlChar);
-                desret_xml_char_ptr(ret_val);
-                des_const_xml_char_ptr(n_path, path, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlPathToURI",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(leaks == 0, "{leaks} Leaks are found in xmlPathToURI()");
-                    eprintln!(" {}", n_path);
                 }
             }
         }
