@@ -29,7 +29,6 @@ use exml::{
             xml_relaxng_free, xml_relaxng_parse, xml_relaxng_set_valid_errors,
             xml_relaxng_validate_doc, XmlRelaxNGPtr,
         },
-        uri::xml_build_uri,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
             xml_memory_dump, xml_memory_strdup,
@@ -52,6 +51,7 @@ use exml::{
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
     tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
+    uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
         xml_xpath_context_set_cache, xml_xpath_free_comp_expr, xml_xpath_free_context,
@@ -882,7 +882,6 @@ unsafe fn xstc_test_instance(
     spath: *const XmlChar,
     base: *const c_char,
 ) -> c_int {
-    let mut path: *mut XmlChar = null_mut();
     let mut validity: *mut XmlChar = null_mut();
     let mut ctxt: XmlSchemaValidCtxtPtr = null_mut();
     let mut doc: XmlDocPtr = null_mut();
@@ -904,26 +903,16 @@ unsafe fn xstc_test_instance(
         );
         ret = -1;
     // goto done;
-    } else {
-        path = xml_build_uri(href, base as _);
-        if path.is_null() {
-            eprintln!(
-                "Failed to build path to schemas testGroup line {} : {}",
-                (*cur).get_line_no(),
-                CStr::from_ptr(href as _).to_string_lossy()
-            );
-            ret = -1;
-            // goto done;
-        } else if !check_test_file(
-            CStr::from_ptr(path as *const c_char)
-                .to_string_lossy()
-                .as_ref(),
-        ) {
+    } else if let Some(path) = build_uri(
+        &CStr::from_ptr(href as *const i8).to_string_lossy(),
+        &CStr::from_ptr(base).to_string_lossy(),
+    ) {
+        if !check_test_file(&path) {
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
                 (*cur).get_line_no(),
-                CStr::from_ptr(path as _).to_string_lossy()
+                path
             );
             ret = -1;
             // goto done;
@@ -938,16 +927,9 @@ unsafe fn xstc_test_instance(
                 // goto done;
             } else {
                 NB_TESTS += 1;
-                doc = xml_read_file(
-                    CStr::from_ptr(path as *const i8).to_string_lossy().as_ref(),
-                    None,
-                    XmlParserOption::XmlParseNoEnt as i32,
-                );
+                doc = xml_read_file(&path, None, XmlParserOption::XmlParseNoEnt as i32);
                 if doc.is_null() {
-                    eprintln!(
-                        "instance {} fails to parse",
-                        CStr::from_ptr(path as _).to_string_lossy()
-                    );
+                    eprintln!("instance {} fails to parse", path);
                     ret = -1;
                     NB_ERRORS += 1;
                     // goto done;
@@ -967,7 +949,7 @@ unsafe fn xstc_test_instance(
                                 test_log!(
                                     logfile,
                                     "valid instance {} failed to validate against {}\n",
-                                    CStr::from_ptr(path as _).to_string_lossy(),
+                                    path,
                                     CStr::from_ptr(spath as _).to_string_lossy()
                                 );
                                 NB_ERRORS += 1;
@@ -976,7 +958,7 @@ unsafe fn xstc_test_instance(
                                 test_log!(
                                     logfile,
                                     "valid instance {} got internal error validating {}\n",
-                                    CStr::from_ptr(path as _).to_string_lossy(),
+                                    path,
                                     CStr::from_ptr(spath as _).to_string_lossy()
                                 );
                                 NB_INTERNALS += 1;
@@ -989,7 +971,7 @@ unsafe fn xstc_test_instance(
                             test_log!(
                                 logfile,
                                 "Failed to detect invalid instance {} against {}\n",
-                                CStr::from_ptr(path as _).to_string_lossy(),
+                                path,
                                 CStr::from_ptr(spath as _).to_string_lossy()
                             );
                             NB_ERRORS += 1;
@@ -1007,14 +989,18 @@ unsafe fn xstc_test_instance(
                 }
             }
         }
+    } else {
+        eprintln!(
+            "Failed to build path to schemas testGroup line {} : {}",
+            (*cur).get_line_no(),
+            CStr::from_ptr(href as _).to_string_lossy()
+        );
+        ret = -1;
     }
 
     // done:
     if !href.is_null() {
         xml_free(href as _);
-    }
-    if !path.is_null() {
-        xml_free(path as _);
     }
     if !validity.is_null() {
         xml_free(validity as _);
@@ -1043,7 +1029,7 @@ unsafe fn xstc_test_group(
     cur: XmlNodePtr,
     base: *const c_char,
 ) -> c_int {
-    let mut path: *mut XmlChar = null_mut();
+    let mut p = None::<String>;
     let mut validity: *mut XmlChar = null_mut();
     let mut schemas: XmlSchemaPtr = null_mut();
     let ctxt: XmlSchemaParserCtxtPtr;
@@ -1066,27 +1052,16 @@ unsafe fn xstc_test_group(
         );
         ret = -1;
     // goto done;
-    } else {
-        path = xml_build_uri(href, base as _);
-        if path.is_null() {
-            test_log!(
-                logfile,
-                "Failed to build path to schemas testGroup line {} : {}\n",
-                (*cur).get_line_no(),
-                CStr::from_ptr(href as _).to_string_lossy()
-            );
-            ret = -1;
-            // goto done;
-        } else if !check_test_file(
-            CStr::from_ptr(path as *const c_char)
-                .to_string_lossy()
-                .as_ref(),
-        ) {
+    } else if let Some(path) = build_uri(
+        &CStr::from_ptr(href as *const i8).to_string_lossy(),
+        &CStr::from_ptr(base).to_string_lossy(),
+    ) {
+        if !check_test_file(&path) {
             test_log!(
                 logfile,
                 "schemas for testGroup line {} is missing: {}\n",
                 (*cur).get_line_no(),
-                CStr::from_ptr(path as _).to_string_lossy()
+                path
             );
             ret = -1;
             // goto done;
@@ -1107,7 +1082,8 @@ unsafe fn xstc_test_group(
                 NB_TESTS += 1;
                 if xml_str_equal(validity, c"valid".as_ptr() as _) {
                     NB_SCHEMATAS += 1;
-                    ctxt = xml_schema_new_parser_ctxt(path as *const c_char);
+                    let cpath = CString::new(path.as_str()).unwrap();
+                    ctxt = xml_schema_new_parser_ctxt(cpath.as_ptr());
                     xml_schema_set_parser_errors(
                         ctxt,
                         Some(test_error_handler),
@@ -1117,11 +1093,7 @@ unsafe fn xstc_test_group(
                     schemas = xml_schema_parse(ctxt);
                     xml_schema_free_parser_ctxt(ctxt);
                     if schemas.is_null() {
-                        test_log!(
-                            logfile,
-                            "valid schemas {} failed to parse\n",
-                            CStr::from_ptr(path as _).to_string_lossy()
-                        );
+                        test_log!(logfile, "valid schemas {} failed to parse\n", path);
                         ret = 1;
                         NB_ERRORS += 1;
                     }
@@ -1131,7 +1103,7 @@ unsafe fn xstc_test_group(
                         test_log!(
                             logfile,
                             "valid schemas {} hit an unimplemented block\n",
-                            CStr::from_ptr(path as _).to_string_lossy()
+                            path
                         );
                         ret = 1;
                         NB_UNIMPLEMENTED += 1;
@@ -1140,7 +1112,13 @@ unsafe fn xstc_test_group(
                     instance = get_next(cur, c"./ts:instanceTest[1]".as_ptr() as _);
                     while !instance.is_null() {
                         if !schemas.is_null() {
-                            xstc_test_instance(logfile, instance, schemas, path, base);
+                            xstc_test_instance(
+                                logfile,
+                                instance,
+                                schemas,
+                                cpath.as_ptr() as *const u8,
+                                base,
+                            );
                         } else {
                             // We'll automatically mark the instances as failed
                             // if the schema was broken.
@@ -1153,7 +1131,8 @@ unsafe fn xstc_test_group(
                     }
                 } else if xml_str_equal(validity, c"invalid".as_ptr() as _) {
                     NB_SCHEMATAS += 1;
-                    ctxt = xml_schema_new_parser_ctxt(path as *const c_char);
+                    let cpath = CString::new(path.as_str()).unwrap();
+                    ctxt = xml_schema_new_parser_ctxt(cpath.as_ptr());
                     xml_schema_set_parser_errors(
                         ctxt,
                         Some(test_error_handler),
@@ -1163,11 +1142,7 @@ unsafe fn xstc_test_group(
                     schemas = xml_schema_parse(ctxt);
                     xml_schema_free_parser_ctxt(ctxt);
                     if !schemas.is_null() {
-                        test_log!(
-                            logfile,
-                            "Failed to detect error in schemas {}\n",
-                            CStr::from_ptr(path as _).to_string_lossy()
-                        );
+                        test_log!(logfile, "Failed to detect error in schemas {}\n", path);
                         NB_ERRORS += 1;
                         ret = 1;
                     }
@@ -1178,7 +1153,7 @@ unsafe fn xstc_test_group(
                         test_log!(
                             logfile,
                             "invalid schemas {} hit an unimplemented block\n",
-                            CStr::from_ptr(path as _).to_string_lossy()
+                            path
                         );
                         ret = 1;
                         NB_ERRORS += 1;
@@ -1195,14 +1170,20 @@ unsafe fn xstc_test_group(
                 }
             }
         }
+        p = Some(path);
+    } else {
+        test_log!(
+            logfile,
+            "Failed to build path to schemas testGroup line {} : {}\n",
+            (*cur).get_line_no(),
+            CStr::from_ptr(href as _).to_string_lossy()
+        );
+        ret = -1;
     }
 
     // done:
     if !href.is_null() {
         xml_free(href as _);
-    }
-    if !path.is_null() {
-        xml_free(path as _);
     }
     if !validity.is_null() {
         xml_free(validity as _);
@@ -1216,7 +1197,7 @@ unsafe fn xstc_test_group(
             logfile,
             "Processing test line {} {} leaked {}\n",
             (*cur).get_line_no(),
-            CStr::from_ptr(path as _).to_string_lossy(),
+            p.as_deref().unwrap_or("(null)"),
             xml_mem_used() - mem
         );
         NB_LEAKS += 1;
