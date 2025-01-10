@@ -498,7 +498,7 @@ unsafe fn xml_fa_is_char(ctxt: XmlRegParserCtxtPtr) -> i32 {
 #[doc(alias = "xmlRegNewAtom")]
 pub(crate) unsafe fn xml_reg_new_atom(
     ctxt: XmlRegParserCtxtPtr,
-    typ: Option<XmlRegAtomType>,
+    typ: XmlRegAtomType,
 ) -> XmlRegAtomPtr {
     let ret: XmlRegAtomPtr = xml_malloc(size_of::<XmlRegAtom>()) as XmlRegAtomPtr;
     if ret.is_null() {
@@ -506,7 +506,7 @@ pub(crate) unsafe fn xml_reg_new_atom(
         return null_mut();
     }
     memset(ret as _, 0, size_of::<XmlRegAtom>());
-    (*ret).typ = typ.expect("Invalid value: xmlRegAtomType");
+    (*ret).typ = typ;
     (*ret).quant = XmlRegQuantType::XmlRegexpQuantOnce;
     (*ret).min = 0;
     (*ret).max = 0;
@@ -695,7 +695,7 @@ pub(crate) unsafe fn xml_fa_generate_epsilon_transition(
 unsafe fn xml_reg_new_range(
     ctxt: XmlRegParserCtxtPtr,
     neg: i32,
-    typ: Option<XmlRegAtomType>,
+    typ: XmlRegAtomType,
     start: i32,
     end: i32,
 ) -> XmlRegRangePtr {
@@ -705,7 +705,7 @@ unsafe fn xml_reg_new_range(
         return null_mut();
     }
     (*ret).neg = neg;
-    (*ret).typ = typ.expect("Invalid value: xmlRegAtomType");
+    (*ret).typ = typ;
     (*ret).start = start;
     (*ret).end = end;
     ret
@@ -715,7 +715,7 @@ unsafe fn xml_reg_atom_add_range(
     ctxt: XmlRegParserCtxtPtr,
     atom: XmlRegAtomPtr,
     neg: i32,
-    typ: Option<XmlRegAtomType>,
+    typ: XmlRegAtomType,
     start: i32,
     end: i32,
     block_name: *mut XmlChar,
@@ -777,168 +777,167 @@ unsafe fn xml_reg_atom_add_range(
 #[doc(alias = "xmlFAParseCharProp")]
 unsafe fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
     let mut cur: i32;
-    let typ: Option<XmlRegAtomType>;
     let mut block_name: *mut XmlChar = null_mut();
 
     cur = CUR!(ctxt) as _;
-    if cur == b'L' as _ {
+    let typ = if cur == b'L' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b'u' as _ {
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpLetterUppercase);
+            XmlRegAtomType::XmlRegexpLetterUppercase
         } else if cur == b'l' as _ {
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpLetterLowercase);
+            XmlRegAtomType::XmlRegexpLetterLowercase
         } else if cur == b't' as _ {
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpLetterTitlecase);
+            XmlRegAtomType::XmlRegexpLetterTitlecase
         } else if cur == b'm' as _ {
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpLetterModifier);
+            XmlRegAtomType::XmlRegexpLetterModifier
         } else if cur == b'o' as _ {
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpLetterOthers);
+            XmlRegAtomType::XmlRegexpLetterOthers
         } else {
-            typ = Some(XmlRegAtomType::XmlRegexpLetter);
+            XmlRegAtomType::XmlRegexpLetter
         }
     } else if cur == b'M' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b'n' as _ {
             NEXT!(ctxt);
-            /* nonspacing */
-            typ = Some(XmlRegAtomType::XmlRegexpMarkNonspacing);
+            // nonspacing
+            XmlRegAtomType::XmlRegexpMarkNonspacing
         } else if cur == b'c' as _ {
             NEXT!(ctxt);
-            /* spacing combining */
-            typ = Some(XmlRegAtomType::XmlRegexpMarkSpacecombining);
+            // spacing combining
+            XmlRegAtomType::XmlRegexpMarkSpacecombining
         } else if cur == b'e' as _ {
             NEXT!(ctxt);
-            /* enclosing */
-            typ = Some(XmlRegAtomType::XmlRegexpMarkEnclosing);
+            // enclosing
+            XmlRegAtomType::XmlRegexpMarkEnclosing
         } else {
-            /* all marks */
-            typ = Some(XmlRegAtomType::XmlRegexpMark);
+            // all marks
+            XmlRegAtomType::XmlRegexpMark
         }
     } else if cur == b'N' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b'd' as _ {
             NEXT!(ctxt);
-            /* digital */
-            typ = Some(XmlRegAtomType::XmlRegexpNumberDecimal);
+            // digital
+            XmlRegAtomType::XmlRegexpNumberDecimal
         } else if cur == b'l' as _ {
             NEXT!(ctxt);
-            /* letter */
-            typ = Some(XmlRegAtomType::XmlRegexpNumberLetter);
+            // letter
+            XmlRegAtomType::XmlRegexpNumberLetter
         } else if cur == b'o' as _ {
             NEXT!(ctxt);
-            /* other */
-            typ = Some(XmlRegAtomType::XmlRegexpNumberOthers);
+            // other
+            XmlRegAtomType::XmlRegexpNumberOthers
         } else {
-            /* all numbers */
-            typ = Some(XmlRegAtomType::XmlRegexpNumber);
+            // all numbers
+            XmlRegAtomType::XmlRegexpNumber
         }
     } else if cur == b'P' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b'c' as _ {
             NEXT!(ctxt);
-            /* connector */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctConnector);
+            // connector
+            XmlRegAtomType::XmlRegexpPunctConnector
         } else if cur == b'd' as _ {
             NEXT!(ctxt);
-            /* dash */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctDash);
+            // dash
+            XmlRegAtomType::XmlRegexpPunctDash
         } else if cur == b's' as _ {
             NEXT!(ctxt);
-            /* open */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctOpen);
+            // open
+            XmlRegAtomType::XmlRegexpPunctOpen
         } else if cur == b'e' as _ {
             NEXT!(ctxt);
-            /* close */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctClose);
+            // close
+            XmlRegAtomType::XmlRegexpPunctClose
         } else if cur == b'i' as _ {
             NEXT!(ctxt);
-            /* initial quote */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctInitquote);
+            // initial quote
+            XmlRegAtomType::XmlRegexpPunctInitquote
         } else if cur == b'f' as _ {
             NEXT!(ctxt);
-            /* final quote */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctFinquote);
+            // final quote
+            XmlRegAtomType::XmlRegexpPunctFinquote
         } else if cur == b'o' as _ {
             NEXT!(ctxt);
-            /* other */
-            typ = Some(XmlRegAtomType::XmlRegexpPunctOthers);
+            // other
+            XmlRegAtomType::XmlRegexpPunctOthers
         } else {
-            /* all punctuation */
-            typ = Some(XmlRegAtomType::XmlRegexpPunct);
+            // all punctuation
+            XmlRegAtomType::XmlRegexpPunct
         }
     } else if cur == b'Z' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b's' as _ {
             NEXT!(ctxt);
-            /* space */
-            typ = Some(XmlRegAtomType::XmlRegexpSeparSpace);
+            // space
+            XmlRegAtomType::XmlRegexpSeparSpace
         } else if cur == b'l' as _ {
             NEXT!(ctxt);
-            /* line */
-            typ = Some(XmlRegAtomType::XmlRegexpSeparLine);
+            // line
+            XmlRegAtomType::XmlRegexpSeparLine
         } else if cur == b'p' as _ {
             NEXT!(ctxt);
-            /* paragraph */
-            typ = Some(XmlRegAtomType::XmlRegexpSeparPara);
+            // paragraph
+            XmlRegAtomType::XmlRegexpSeparPara
         } else {
-            /* all separators */
-            typ = Some(XmlRegAtomType::XmlRegexpSepar);
+            // all separators
+            XmlRegAtomType::XmlRegexpSepar
         }
     } else if cur == b'S' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b'm' as _ {
+            // math
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpSymbolMath);
-            /* math */
+            XmlRegAtomType::XmlRegexpSymbolMath
         } else if cur == b'c' as _ {
+            // currency
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpSymbolCurrency);
-            /* currency */
+            XmlRegAtomType::XmlRegexpSymbolCurrency
         } else if cur == b'k' as _ {
+            // modifiers
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpSymbolModifier);
-            /* modifiers */
+            XmlRegAtomType::XmlRegexpSymbolModifier
         } else if cur == b'o' as _ {
+            // other
             NEXT!(ctxt);
-            typ = Some(XmlRegAtomType::XmlRegexpSymbolOthers);
-            /* other */
+            XmlRegAtomType::XmlRegexpSymbolOthers
         } else {
-            /* all symbols */
-            typ = Some(XmlRegAtomType::XmlRegexpSymbol);
+            // all symbols
+            XmlRegAtomType::XmlRegexpSymbol
         }
     } else if cur == b'C' as _ {
         NEXT!(ctxt);
         cur = CUR!(ctxt) as _;
         if cur == b'c' as _ {
             NEXT!(ctxt);
-            /* control */
-            typ = Some(XmlRegAtomType::XmlRegexpOtherControl);
+            // control
+            XmlRegAtomType::XmlRegexpOtherControl
         } else if cur == b'f' as _ {
             NEXT!(ctxt);
-            /* format */
-            typ = Some(XmlRegAtomType::XmlRegexpOtherFormat);
+            // format
+            XmlRegAtomType::XmlRegexpOtherFormat
         } else if cur == b'o' as _ {
             NEXT!(ctxt);
-            /* private use */
-            typ = Some(XmlRegAtomType::XmlRegexpOtherPrivate);
+            // private use
+            XmlRegAtomType::XmlRegexpOtherPrivate
         } else if cur == b'n' as _ {
             NEXT!(ctxt);
-            /* not assigned */
-            typ = Some(XmlRegAtomType::XmlRegexpOtherNa);
+            // not assigned
+            XmlRegAtomType::XmlRegexpOtherNa
         } else {
-            /* all others */
-            typ = Some(XmlRegAtomType::XmlRegexpOther);
+            // all others
+            XmlRegAtomType::XmlRegexpOther
         }
     } else if cur == b'I' as _ {
         NEXT!(ctxt);
@@ -966,12 +965,12 @@ unsafe fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
                 cur = CUR!(ctxt) as _;
             }
         }
-        typ = Some(XmlRegAtomType::XmlRegexpBlockName);
         block_name = xml_strndup(start, (*ctxt).cur.offset_from(start) as _);
+        XmlRegAtomType::XmlRegexpBlockName
     } else {
         ERROR!(ctxt, "Unknown char property");
         return;
-    }
+    };
     if (*ctxt).atom.is_null() {
         (*ctxt).atom = xml_reg_new_atom(ctxt, typ);
         if (*ctxt).atom.is_null() {
@@ -1042,13 +1041,13 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
 
     if CUR!(ctxt) == b'.' {
         if (*ctxt).atom.is_null() {
-            (*ctxt).atom = xml_reg_new_atom(ctxt, Some(XmlRegAtomType::XmlRegexpAnychar));
+            (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpAnychar);
         } else if matches!((*(*ctxt).atom).typ, XmlRegAtomType::XmlRegexpRanges) {
             xml_reg_atom_add_range(
                 ctxt,
                 (*ctxt).atom,
                 (*ctxt).neg,
-                Some(XmlRegAtomType::XmlRegexpAnychar),
+                XmlRegAtomType::XmlRegexpAnychar,
                 0,
                 0,
                 null_mut(),
@@ -1129,7 +1128,7 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
     /*      |     +       |    +   */
     {
         if (*ctxt).atom.is_null() {
-            (*ctxt).atom = xml_reg_new_atom(ctxt, Some(XmlRegAtomType::XmlRegexpCharval));
+            (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpCharval);
             if !(*ctxt).atom.is_null() {
                 match TryInto::<u8>::try_into(cur) {
                     Ok(b'n') => {
@@ -1170,7 +1169,7 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
                 ctxt,
                 (*ctxt).atom,
                 (*ctxt).neg,
-                Some(XmlRegAtomType::XmlRegexpCharval),
+                XmlRegAtomType::XmlRegexpCharval,
                 cur,
                 cur,
                 null_mut(),
@@ -1225,9 +1224,9 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
         }
         NEXT!(ctxt);
         if (*ctxt).atom.is_null() {
-            (*ctxt).atom = xml_reg_new_atom(ctxt, Some(typ));
+            (*ctxt).atom = xml_reg_new_atom(ctxt, typ);
         } else if matches!((*(*ctxt).atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-            xml_reg_atom_add_range(ctxt, (*ctxt).atom, (*ctxt).neg, Some(typ), 0, 0, null_mut());
+            xml_reg_atom_add_range(ctxt, (*ctxt).atom, (*ctxt).neg, typ, 0, 0, null_mut());
         }
     } else {
         ERROR!(ctxt, "Wrong escape sequence, misuse of character '\\'");
@@ -1312,7 +1311,7 @@ unsafe fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
             ctxt,
             (*ctxt).atom,
             (*ctxt).neg,
-            Some(XmlRegAtomType::XmlRegexpCharval),
+            XmlRegAtomType::XmlRegexpCharval,
             start,
             end,
             null_mut(),
@@ -1360,7 +1359,7 @@ unsafe fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
             ctxt,
             (*ctxt).atom,
             (*ctxt).neg,
-            Some(XmlRegAtomType::XmlRegexpCharval),
+            XmlRegAtomType::XmlRegexpCharval,
             start,
             end,
             null_mut(),
@@ -1424,7 +1423,7 @@ unsafe fn xml_fa_parse_char_group(ctxt: XmlRegParserCtxtPtr) {
 unsafe fn xml_fa_parse_char_class(ctxt: XmlRegParserCtxtPtr) {
     if CUR!(ctxt) == b'[' {
         NEXT!(ctxt);
-        (*ctxt).atom = xml_reg_new_atom(ctxt, Some(XmlRegAtomType::XmlRegexpRanges));
+        (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpRanges);
         if (*ctxt).atom.is_null() {
             return;
         }
@@ -1447,7 +1446,7 @@ unsafe fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
 
     codepoint = xml_fa_is_char(ctxt);
     if codepoint > 0 {
-        (*ctxt).atom = xml_reg_new_atom(ctxt, Some(XmlRegAtomType::XmlRegexpCharval));
+        (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpCharval);
         if (*ctxt).atom.is_null() {
             return -1;
         }
@@ -1480,7 +1479,7 @@ unsafe fn xml_fa_parse_atom(ctxt: XmlRegParserCtxtPtr) -> i32 {
         } else {
             ERROR!(ctxt, "xmlFAParseAtom: expecting ')'");
         }
-        (*ctxt).atom = xml_reg_new_atom(ctxt, Some(XmlRegAtomType::XmlRegexpSubreg));
+        (*ctxt).atom = xml_reg_new_atom(ctxt, XmlRegAtomType::XmlRegexpSubreg);
         if (*ctxt).atom.is_null() {
             return -1;
         }
@@ -1621,7 +1620,7 @@ unsafe fn xml_reg_copy_range(ctxt: XmlRegParserCtxtPtr, range: XmlRegRangePtr) -
     let ret: XmlRegRangePtr = xml_reg_new_range(
         ctxt,
         (*range).neg,
-        Some((*range).typ),
+        (*range).typ,
         (*range).start,
         (*range).end,
     );

@@ -176,7 +176,7 @@ pub unsafe fn xml_automata_new_transition(
     if am.is_null() || from.is_null() || token.is_null() {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
@@ -210,7 +210,7 @@ pub unsafe fn xml_automata_new_transition2(
     if am.is_null() || from.is_null() || token.is_null() {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
@@ -265,7 +265,7 @@ pub unsafe fn xml_automata_new_neg_trans(
     if am.is_null() || from.is_null() || token.is_null() {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
@@ -334,7 +334,7 @@ pub unsafe fn xml_automata_new_count_trans(
     if max < min || max < 1 {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
@@ -417,7 +417,7 @@ pub unsafe fn xml_automata_new_count_trans2(
     if max < min || max < 1 {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
@@ -516,7 +516,7 @@ pub unsafe fn xml_automata_new_once_trans(
     if max < min {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
@@ -580,7 +580,7 @@ pub unsafe fn xml_automata_new_once_trans2(
     if max < min {
         return null_mut();
     }
-    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, Some(XmlRegAtomType::XmlRegexpString));
+    let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
     if atom.is_null() {
         return null_mut();
     }
