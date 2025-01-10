@@ -103,7 +103,7 @@ use crate::{
             XML_MAX_NAME_LENGTH, XML_MAX_TEXT_LENGTH, XML_SUBSTITUTE_PEREF, XML_SUBSTITUTE_REF,
         },
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
-        uri::{xml_canonic_path, xml_free_uri, xml_parse_uri},
+        uri::{xml_free_uri, xml_parse_uri},
         valid::{
             xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
             xml_new_doc_element_content, xml_validate_root,
@@ -2695,7 +2695,7 @@ pub unsafe fn xml_parse_ctxt_external_entity(
 pub(crate) unsafe fn xml_setup_parser_for_buffer(
     ctxt: XmlParserCtxtPtr,
     buffer: *const XmlChar,
-    filename: *const c_char,
+    filename: Option<&str>,
 ) {
     use crate::parser::{xml_clear_parser_ctxt, xml_new_input_stream};
 
@@ -2711,16 +2711,9 @@ pub(crate) unsafe fn xml_setup_parser_for_buffer(
     }
 
     xml_clear_parser_ctxt(ctxt);
-    if !filename.is_null() {
-        let canonic = xml_canonic_path(filename as _);
-        if !canonic.is_null() {
-            (*input).filename = Some(
-                CStr::from_ptr(canonic as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(canonic as _);
-        }
+    if let Some(filename) = filename {
+        let canonic = canonic_path(filename);
+        (*input).filename = Some(canonic.into_owned());
     }
     (*input).base = buffer;
     (*input).cur = buffer;
@@ -2755,11 +2748,11 @@ pub unsafe fn xml_create_push_parser_ctxt(
     user_data: Option<GenericErrorContext>,
     chunk: *const c_char,
     size: i32,
-    filename: *const c_char,
+    filename: Option<&str>,
 ) -> XmlParserCtxtPtr {
     use crate::{
         io::xml_parser_get_directory,
-        parser::{xml_free_input_stream, xml_new_input_stream, xml_new_sax_parser_ctxt},
+        parser::{xml_new_input_stream, xml_new_sax_parser_ctxt},
     };
 
     let buf = Rc::new(RefCell::new(XmlParserInputBuffer::new(
@@ -2771,11 +2764,9 @@ pub unsafe fn xml_create_push_parser_ctxt(
         return null_mut();
     };
     (*ctxt).dict_names = 1;
-    if filename.is_null() {
+    if filename.is_none() {
         (*ctxt).directory = None;
-    } else if let Some(dir) =
-        xml_parser_get_directory(CStr::from_ptr(filename).to_string_lossy().as_ref())
-    {
+    } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
         (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
@@ -2786,21 +2777,11 @@ pub unsafe fn xml_create_push_parser_ctxt(
         return null_mut();
     }
 
-    if filename.is_null() {
-        (*input_stream).filename = None;
+    if let Some(filename) = filename {
+        let canonic = canonic_path(filename);
+        (*input_stream).filename = Some(canonic.into_owned());
     } else {
-        let canonic = xml_canonic_path(filename as _);
-        if canonic.is_null() {
-            xml_free_input_stream(input_stream);
-            xml_free_parser_ctxt(ctxt);
-            return null_mut();
-        }
-        (*input_stream).filename = Some(
-            CStr::from_ptr(canonic as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        );
-        xml_free(canonic as _);
+        (*input_stream).filename = None;
     }
     (*input_stream).buf = Some(buf);
     (*input_stream).reset_base();
@@ -7364,7 +7345,7 @@ pub unsafe fn xml_ctxt_reset_push(
     ctxt: XmlParserCtxtPtr,
     chunk: *const c_char,
     size: i32,
-    filename: *const c_char,
+    filename: Option<&str>,
     encoding: *const c_char,
 ) -> i32 {
     if ctxt.is_null() {
@@ -7386,11 +7367,9 @@ pub unsafe fn xml_ctxt_reset_push(
 
     (*ctxt).reset();
 
-    if filename.is_null() {
+    if filename.is_none() {
         (*ctxt).directory = None;
-    } else if let Some(dir) =
-        xml_parser_get_directory(CStr::from_ptr(filename).to_string_lossy().as_ref())
-    {
+    } else if let Some(dir) = filename.and_then(xml_parser_get_directory) {
         (*ctxt).directory = Some(dir.to_string_lossy().into_owned());
     }
 
@@ -7400,18 +7379,11 @@ pub unsafe fn xml_ctxt_reset_push(
         return 1;
     }
 
-    if filename.is_null() {
-        (*input_stream).filename = None;
+    if let Some(filename) = filename {
+        let canonic = canonic_path(filename);
+        (*input_stream).filename = Some(canonic.into_owned());
     } else {
-        let canonic = xml_canonic_path(filename as _);
-        if !canonic.is_null() {
-            (*input_stream).filename = Some(
-                CStr::from_ptr(canonic as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            );
-            xml_free(canonic as _);
-        }
+        (*input_stream).filename = None;
     }
     (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
     (*input_stream).reset_base();
@@ -9192,62 +9164,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_ctxt_reset_push() {
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_chunk in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_size in 0..GEN_NB_INT {
-                        for n_filename in 0..GEN_NB_FILEPATH {
-                            for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                                let chunk = gen_const_char_ptr(n_chunk, 1);
-                                let mut size = gen_int(n_size, 2);
-                                let filename = gen_filepath(n_filename, 3);
-                                let encoding = gen_const_char_ptr(n_encoding, 4);
-                                if !chunk.is_null() && size > xml_strlen(chunk as _) {
-                                    size = 0;
-                                }
-
-                                let ret_val =
-                                    xml_ctxt_reset_push(ctxt, chunk, size, filename, encoding);
-                                desret_int(ret_val);
-                                des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                                des_const_char_ptr(n_chunk, chunk, 1);
-                                des_int(n_size, size, 2);
-                                des_filepath(n_filename, filename, 3);
-                                des_const_char_ptr(n_encoding, encoding, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlCtxtResetPush",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    eprint!(" {}", n_ctxt);
-                                    eprint!(" {}", n_chunk);
-                                    eprint!(" {}", n_size);
-                                    eprint!(" {}", n_filename);
-                                    eprintln!(" {}", n_encoding);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlCtxtResetPush()");
-        }
-    }
-
-    #[test]
-    fn test_xml_get_external_entity_loader() {
-
-        /* missing type support */
-    }
-
-    #[test]
     fn test_xml_has_feature() {
         unsafe {
             let mut leaks = 0;
@@ -9604,45 +9520,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in xmlRecoverDoc()");
-        }
-    }
-
-    #[test]
-    fn test_xml_setup_parser_for_buffer() {
-        #[cfg(feature = "sax1")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_PARSER_CTXT_PTR {
-                for n_buffer in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_filename in 0..GEN_NB_FILEPATH {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_parser_ctxt_ptr(n_ctxt, 0);
-                        let buffer = gen_const_xml_char_ptr(n_buffer, 1);
-                        let filename = gen_filepath(n_filename, 2);
-
-                        xml_setup_parser_for_buffer(ctxt, buffer, filename);
-                        des_xml_parser_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_const_xml_char_ptr(n_buffer, buffer, 1);
-                        des_filepath(n_filename, filename, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlSetupParserForBuffer",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_buffer);
-                            eprintln!(" {}", n_filename);
-                        }
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlSetupParserForBuffer()"
-            );
         }
     }
 

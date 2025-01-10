@@ -1634,7 +1634,6 @@ unsafe fn push_parse_test(
     let mut res: i32;
     let mut cur: i32 = 0;
     let mut chunk_size: i32 = 4;
-    let cfilename = CString::new(filename).unwrap();
 
     NB_TESTS.set(NB_TESTS.get() + 1);
 
@@ -1659,13 +1658,7 @@ unsafe fn push_parse_test(
             XmlCharEncoding::None,
         )
     } else {
-        xml_create_push_parser_ctxt(
-            None,
-            None,
-            base.add(cur as _),
-            chunk_size,
-            cfilename.as_ptr(),
-        )
+        xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, Some(filename))
     };
     #[cfg(not(feature = "html"))]
     let ctxt = xml_create_push_parser_ctxt(None, None, base.add(cur as _), chunk_size, filename);
@@ -1933,7 +1926,6 @@ unsafe fn push_boundary_test(
     let mut avail: u64;
     let mut old_consumed: u64 = 0;
     let mut consumed: u64;
-    let cfilename = CString::new(filename).unwrap();
 
     // If the parser made progress, check that exactly one construct was
     // processed and that the input buffer is (almost) empty.
@@ -1983,7 +1975,7 @@ unsafe fn push_boundary_test(
             XmlCharEncoding::None,
         )
     } else {
-        xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), None, base, 1, cfilename.as_ptr())
+        xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), None, base, 1, Some(filename))
     };
     #[cfg(not(feature = "html"))]
     let ctxt = xml_create_push_parser_ctxt(Some(Box::new(bnd_sax)), null_mut(), base, 1, filename);
@@ -2490,9 +2482,7 @@ unsafe fn stream_parse_test(
 ) -> i32 {
     use exml::libxml::xmlreader::{xml_free_text_reader, xml_reader_for_file};
 
-    let cfilename = CString::new(filename).unwrap();
-
-    let reader: XmlTextReaderPtr = xml_reader_for_file(cfilename.as_ptr(), null_mut(), options);
+    let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
     let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     xml_free_text_reader(reader);
     ret
@@ -2538,7 +2528,6 @@ unsafe fn stream_mem_parse_test(
 
     let mut base: *const c_char = null();
     let mut size: i32 = 0;
-    let cfilename = CString::new(filename).unwrap();
 
     // load and parse the memory
     if load_mem(filename, addr_of_mut!(base), addr_of_mut!(size)) != 0 {
@@ -2547,7 +2536,7 @@ unsafe fn stream_mem_parse_test(
     }
     let buffer = from_raw_parts(base as *const u8, size as usize).to_vec();
     let reader: XmlTextReaderPtr =
-        xml_reader_for_memory(buffer, cfilename.as_ptr(), null_mut(), options);
+        xml_reader_for_memory(buffer, Some(filename), null_mut(), options);
     let ret: i32 = stream_process_test(filename, result, err, reader, null_mut(), options);
     free(base as _);
     xml_free_text_reader(reader);
@@ -3866,7 +3855,11 @@ unsafe fn rng_stream_test(
             );
             continue;
         }
-        reader = xml_reader_for_file(instance, null_mut(), options);
+        reader = xml_reader_for_file(
+            &CStr::from_ptr(instance).to_string_lossy(),
+            null_mut(),
+            options,
+        );
         if reader.is_null() {
             eprintln!(
                 "Failed to build reader for {}",

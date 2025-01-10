@@ -556,13 +556,13 @@ pub(crate) unsafe fn gen_xml_text_reader_ptr(no: i32, _nr: i32) -> XmlTextReader
     use crate::libxml::xmlreader::xml_new_text_reader_filename;
 
     if no == 0 {
-        return xml_new_text_reader_filename(c"test/ent2".as_ptr() as _);
+        return xml_new_text_reader_filename("test/ent2");
     }
     if no == 1 {
-        return xml_new_text_reader_filename(c"test/valid/REC-xml-19980210.xml".as_ptr() as _);
+        return xml_new_text_reader_filename("test/valid/REC-xml-19980210.xml");
     }
     if no == 2 {
-        return xml_new_text_reader_filename(c"test/valid/dtds/xhtml1-strict.dtd".as_ptr() as _);
+        return xml_new_text_reader_filename("test/valid/dtds/xhtml1-strict.dtd");
     }
     null_mut()
 }

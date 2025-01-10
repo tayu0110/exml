@@ -62,7 +62,6 @@ use crate::{
             xml_relaxng_validate_push_cdata, XmlRelaxNGPtr,
         },
         sax2::xml_sax_version,
-        uri::xml_canonic_path,
         valid::{
             xml_free_id_table, xml_free_ref_table, xml_validate_pop_element,
             xml_validate_push_cdata, xml_validate_push_element, XmlIDTablePtr, XmlRefTablePtr,
@@ -3136,7 +3135,7 @@ unsafe fn xml_text_reader_cdata_block(ctx: Option<GenericErrorContext>, ch: &str
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_new_text_reader(
     input: XmlParserInputBuffer,
-    uri: *const c_char,
+    uri: Option<&str>,
 ) -> XmlTextReaderPtr {
     use crate::generic_error;
 
@@ -3267,30 +3266,19 @@ pub unsafe fn xml_new_text_reader(
 /// Returns the new xmlTextReaderPtr or NULL in case of error
 #[doc(alias = "xmlNewTextReaderFilename")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe fn xml_new_text_reader_filename(uri: *const c_char) -> XmlTextReaderPtr {
-    use std::ffi::CStr;
-
+pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
     use crate::{encoding::XmlCharEncoding, io::xml_parser_get_directory};
 
-    if uri.is_null() {
-        return null_mut();
-    }
-
-    let Some(input) = XmlParserInputBuffer::from_uri(
-        CStr::from_ptr(uri).to_string_lossy().as_ref(),
-        XmlCharEncoding::None,
-    ) else {
+    let Some(input) = XmlParserInputBuffer::from_uri(uri, XmlCharEncoding::None) else {
         return null_mut();
     };
-    let ret: XmlTextReaderPtr = xml_new_text_reader(input, uri);
+    let ret: XmlTextReaderPtr = xml_new_text_reader(input, Some(uri));
     if ret.is_null() {
         return null_mut();
     }
     (*ret).allocs |= XML_TEXTREADER_INPUT;
     if (*(*ret).ctxt).directory.is_none() {
-        if let Some(directory) =
-            xml_parser_get_directory(CStr::from_ptr(uri).to_string_lossy().as_ref())
-        {
+        if let Some(directory) = xml_parser_get_directory(uri) {
             (*(*ret).ctxt).directory = Some(directory.to_string_lossy().into_owned());
         }
     }
@@ -3381,7 +3369,7 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
 pub unsafe fn xml_text_reader_setup(
     reader: XmlTextReaderPtr,
     input: Option<XmlParserInputBuffer>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     mut options: i32,
 ) -> i32 {
@@ -3392,6 +3380,7 @@ pub unsafe fn xml_text_reader_setup(
         generic_error,
         libxml::xinclude::{xml_xinclude_free_context, XINCLUDE_NODE},
         parser::{xml_new_input_stream, XmlParserInputPtr},
+        uri::canonic_path,
     };
 
     if reader.is_null() {
@@ -3520,18 +3509,11 @@ pub unsafe fn xml_text_reader_setup(
                 return -1;
             }
 
-            if url.is_null() {
-                (*input_stream).filename = None;
+            if let Some(url) = url {
+                let canonic = canonic_path(url);
+                (*input_stream).filename = Some(canonic.into_owned());
             } else {
-                let canonic = xml_canonic_path(url as _);
-                if !canonic.is_null() {
-                    (*input_stream).filename = Some(
-                        CStr::from_ptr(canonic as *const i8)
-                            .to_string_lossy()
-                            .into_owned(),
-                    );
-                    xml_free(canonic as _);
-                }
+                (*input_stream).filename = None;
             }
             (*input_stream).buf = Some(Rc::new(RefCell::new(buf)));
             (*input_stream).reset_base();
@@ -3607,12 +3589,10 @@ pub unsafe fn xml_text_reader_setup(
             (*(*reader).ctxt).switch_to_encoding(handler);
         }
     }
-    if !url.is_null()
-        && !(*(*reader).ctxt).input.is_null()
-        && (*(*(*reader).ctxt).input).filename.is_none()
-    {
-        (*(*(*reader).ctxt).input).filename =
-            Some(CStr::from_ptr(url).to_string_lossy().into_owned());
+    if !(*(*reader).ctxt).input.is_null() && (*(*(*reader).ctxt).input).filename.is_none() {
+        if let Some(url) = url {
+            (*(*(*reader).ctxt).input).filename = Some(url.to_owned());
+        }
     }
 
     (*reader).doc = null_mut();
@@ -5386,9 +5366,9 @@ pub unsafe extern "C" fn xml_reader_walker(doc: XmlDocPtr) -> XmlTextReaderPtr {
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForDoc")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_for_doc(
+pub unsafe fn xml_reader_for_doc(
     cur: *const XmlChar,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     options: i32,
 ) -> XmlTextReaderPtr {
@@ -5412,8 +5392,8 @@ pub unsafe extern "C" fn xml_reader_for_doc(
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForFile")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_for_file(
-    filename: *const c_char,
+pub unsafe fn xml_reader_for_file(
+    filename: &str,
     encoding: *const c_char,
     options: i32,
 ) -> XmlTextReaderPtr {
@@ -5421,7 +5401,7 @@ pub unsafe extern "C" fn xml_reader_for_file(
     if reader.is_null() {
         return null_mut();
     }
-    xml_text_reader_setup(reader, None, null_mut(), encoding, options);
+    xml_text_reader_setup(reader, None, None, encoding, options);
     reader
 }
 
@@ -5433,7 +5413,7 @@ pub unsafe extern "C" fn xml_reader_for_file(
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_reader_for_memory(
     buffer: Vec<u8>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     options: i32,
 ) -> XmlTextReaderPtr {
@@ -5457,9 +5437,9 @@ pub unsafe fn xml_reader_for_memory(
 /// Returns the new reader or NULL in case of error.
 #[doc(alias = "xmlReaderForIO")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_for_io(
+pub unsafe fn xml_reader_for_io(
     ioctx: impl Read + 'static,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     options: i32,
 ) -> XmlTextReaderPtr {
@@ -5481,7 +5461,7 @@ pub unsafe extern "C" fn xml_reader_for_io(
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewWalker")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: XmlDocPtr) -> i32 {
     if doc.is_null() {
         return -1;
     }
@@ -5490,7 +5470,6 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
     }
 
     if (*reader).input.is_some() {
-        // xml_free_parser_input_buffer((*reader).input);
         let _ = (*reader).input.take();
     }
     if !(*reader).ctxt.is_null() {
@@ -5524,10 +5503,10 @@ pub unsafe extern "C" fn xml_reader_new_walker(reader: XmlTextReaderPtr, doc: Xm
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewDoc")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_doc(
+pub unsafe fn xml_reader_new_doc(
     reader: XmlTextReaderPtr,
     cur: *const XmlChar,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     options: i32,
 ) -> i32 {
@@ -5556,30 +5535,22 @@ pub unsafe extern "C" fn xml_reader_new_doc(
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewFile")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_file(
+pub unsafe fn xml_reader_new_file(
     reader: XmlTextReaderPtr,
-    filename: *const c_char,
+    filename: &str,
     encoding: *const c_char,
     options: i32,
 ) -> i32 {
-    use std::ffi::CStr;
-
     use crate::encoding::XmlCharEncoding;
 
-    if filename.is_null() {
-        return -1;
-    }
     if reader.is_null() {
         return -1;
     }
 
-    let Some(input) = XmlParserInputBuffer::from_uri(
-        CStr::from_ptr(filename).to_string_lossy().as_ref(),
-        XmlCharEncoding::None,
-    ) else {
+    let Some(input) = XmlParserInputBuffer::from_uri(filename, XmlCharEncoding::None) else {
         return -1;
     };
-    xml_text_reader_setup(reader, Some(input), filename, encoding, options)
+    xml_text_reader_setup(reader, Some(input), Some(filename), encoding, options)
 }
 
 /// Setup an xmltextReader to parse an XML in-memory document.
@@ -5592,7 +5563,7 @@ pub unsafe extern "C" fn xml_reader_new_file(
 pub unsafe fn xml_reader_new_memory(
     reader: XmlTextReaderPtr,
     buffer: Vec<u8>,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     options: i32,
 ) -> i32 {
@@ -5615,10 +5586,10 @@ pub unsafe fn xml_reader_new_memory(
 /// Returns 0 in case of success and -1 in case of error
 #[doc(alias = "xmlReaderNewIO")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_reader_new_io(
+pub unsafe fn xml_reader_new_io(
     reader: XmlTextReaderPtr,
     ioctx: impl Read + 'static,
-    url: *const c_char,
+    url: Option<&str>,
     encoding: *const c_char,
     options: i32,
 ) -> i32 {
@@ -5920,212 +5891,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_new_text_reader_filename() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_uri in 0..GEN_NB_FILEPATH {
-                let mem_base = xml_mem_blocks();
-                let uri = gen_filepath(n_uri, 0);
-
-                let ret_val = xml_new_text_reader_filename(uri);
-                desret_xml_text_reader_ptr(ret_val);
-                des_filepath(n_uri, uri, 0);
-                reset_last_error();
-                if mem_base != xml_mem_blocks() {
-                    leaks += 1;
-                    eprint!(
-                        "Leak of {} blocks found in xmlNewTextReaderFilename",
-                        xml_mem_blocks() - mem_base
-                    );
-                    assert!(
-                        leaks == 0,
-                        "{leaks} Leaks are found in xmlNewTextReaderFilename()"
-                    );
-                    eprintln!(" {}", n_uri);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reader_for_doc() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                for n_url in 0..GEN_NB_FILEPATH {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_options in 0..GEN_NB_PARSEROPTIONS {
-                            let mem_base = xml_mem_blocks();
-                            let cur = gen_const_xml_char_ptr(n_cur, 0);
-                            let url = gen_filepath(n_url, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let options = gen_parseroptions(n_options, 3);
-
-                            let ret_val =
-                                xml_reader_for_doc(cur as *const XmlChar, url, encoding, options);
-                            desret_xml_text_reader_ptr(ret_val);
-                            des_const_xml_char_ptr(n_cur, cur, 0);
-                            des_filepath(n_url, url, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_parseroptions(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlReaderForDoc",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlReaderForDoc()");
-                                eprint!(" {}", n_cur);
-                                eprint!(" {}", n_url);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reader_for_file() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_filename in 0..GEN_NB_FILEPATH {
-                for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_options in 0..GEN_NB_PARSEROPTIONS {
-                        let mem_base = xml_mem_blocks();
-                        let filename = gen_filepath(n_filename, 0);
-                        let encoding = gen_const_char_ptr(n_encoding, 1);
-                        let options = gen_parseroptions(n_options, 2);
-
-                        let ret_val = xml_reader_for_file(filename, encoding, options);
-                        desret_xml_text_reader_ptr(ret_val);
-                        des_filepath(n_filename, filename, 0);
-                        des_const_char_ptr(n_encoding, encoding, 1);
-                        des_parseroptions(n_options, options, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlReaderForFile",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(leaks == 0, "{leaks} Leaks are found in xmlReaderForFile()");
-                            eprint!(" {}", n_filename);
-                            eprint!(" {}", n_encoding);
-                            eprintln!(" {}", n_options);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reader_new_doc() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_cur in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_url in 0..GEN_NB_FILEPATH {
-                        for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                            for n_options in 0..GEN_NB_PARSEROPTIONS {
-                                let mem_base = xml_mem_blocks();
-                                let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                                let cur = gen_const_xml_char_ptr(n_cur, 1);
-                                let url = gen_filepath(n_url, 2);
-                                let encoding = gen_const_char_ptr(n_encoding, 3);
-                                let options = gen_parseroptions(n_options, 4);
-
-                                let ret_val =
-                                    xml_reader_new_doc(reader, cur, url, encoding, options);
-                                desret_int(ret_val);
-                                des_xml_text_reader_ptr(n_reader, reader, 0);
-                                des_const_xml_char_ptr(n_cur, cur, 1);
-                                des_filepath(n_url, url, 2);
-                                des_const_char_ptr(n_encoding, encoding, 3);
-                                des_parseroptions(n_options, options, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlReaderNewDoc",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlReaderNewDoc()"
-                                    );
-                                    eprint!(" {}", n_reader);
-                                    eprint!(" {}", n_cur);
-                                    eprint!(" {}", n_url);
-                                    eprint!(" {}", n_encoding);
-                                    eprintln!(" {}", n_options);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reader_new_file() {
-        #[cfg(feature = "libxml_reader")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_reader in 0..GEN_NB_XML_TEXT_READER_PTR {
-                for n_filename in 0..GEN_NB_FILEPATH {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_options in 0..GEN_NB_PARSEROPTIONS {
-                            let mem_base = xml_mem_blocks();
-                            let reader = gen_xml_text_reader_ptr(n_reader, 0);
-                            let filename = gen_filepath(n_filename, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let options = gen_parseroptions(n_options, 3);
-
-                            let ret_val = xml_reader_new_file(reader, filename, encoding, options);
-                            desret_int(ret_val);
-                            des_xml_text_reader_ptr(n_reader, reader, 0);
-                            des_filepath(n_filename, filename, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_parseroptions(n_options, options, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlReaderNewFile",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlReaderNewFile()"
-                                );
-                                eprint!(" {}", n_reader);
-                                eprint!(" {}", n_filename);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_options);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     #[test]
     fn test_xml_reader_new_walker() {

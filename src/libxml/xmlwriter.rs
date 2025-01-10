@@ -623,7 +623,7 @@ pub unsafe fn xml_new_text_writer_doc(
     sax_handler.end_element = Some(xml_sax2_end_element);
 
     let ctxt: XmlParserCtxtPtr =
-        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, null_mut());
+        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),
@@ -693,7 +693,7 @@ pub unsafe fn xml_new_text_writer_tree(
     sax_handler.end_element = Some(xml_sax2_end_element);
 
     let ctxt: XmlParserCtxtPtr =
-        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, null_mut());
+        xml_create_push_parser_ctxt(Some(Box::new(sax_handler)), None, null_mut(), 0, None);
     if ctxt.is_null() {
         xml_writer_err_msg(
             null_mut(),

@@ -2108,9 +2108,20 @@ unsafe fn stream_file(filename: *mut c_char) {
         }
 
         let mem = from_raw_parts(base as *const u8, info.st_size as usize).to_vec();
-        reader = xml_reader_for_memory(mem, filename, null_mut(), OPTIONS.load(Ordering::Relaxed));
+        reader = xml_reader_for_memory(
+            mem,
+            (!filename.is_null())
+                .then(|| CStr::from_ptr(filename as *const i8).to_string_lossy())
+                .as_deref(),
+            null_mut(),
+            OPTIONS.load(Ordering::Relaxed),
+        );
     } else {
-        reader = xml_reader_for_file(filename, null_mut(), OPTIONS.load(Ordering::Relaxed));
+        reader = xml_reader_for_file(
+            &CStr::from_ptr(filename as *const i8).to_string_lossy(),
+            null_mut(),
+            OPTIONS.load(Ordering::Relaxed),
+        );
     }
     #[cfg(feature = "libxml_pattern")]
     if !PATTERNC.load(Ordering::Relaxed).is_null() {
@@ -2613,13 +2624,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 // if (repeat) size = 1024;
                 res = fread(chars.as_mut_ptr() as _, 1, 4, f) as _;
                 if res > 0 {
-                    ctxt = xml_create_push_parser_ctxt(
-                        None,
-                        None,
-                        chars.as_ptr(),
-                        res,
-                        fname.map_or(null(), |s| s.as_ptr()),
-                    );
+                    ctxt = xml_create_push_parser_ctxt(None, None, chars.as_ptr(), res, filename);
                     if ctxt.is_null() {
                         PROGRESULT.store(ERR_MEM, Ordering::Relaxed);
                         if f != stdin {

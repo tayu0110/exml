@@ -986,7 +986,11 @@ unsafe fn reader_test(filename: *const i8, limit: usize, options: i32, fail: i32
     NB_TESTS.set(NB_TESTS.get() + 1);
 
     DOCUMENT_CONTEXT.with_borrow_mut(|context| context.maxlen = limit);
-    let reader: XmlTextReaderPtr = xml_reader_for_file(filename, null_mut(), options);
+    let reader: XmlTextReaderPtr = xml_reader_for_file(
+        &CStr::from_ptr(filename).to_string_lossy(),
+        null_mut(),
+        options,
+    );
     if reader.is_null() {
         eprintln!(
             "Failed to open '{}' test",

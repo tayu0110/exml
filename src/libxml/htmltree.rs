@@ -47,50 +47,27 @@ use super::{
     xmlstring::{xml_str_equal, xml_strcasecmp, xml_strstr, XmlChar},
 };
 
-/**
- * HTML_TEXT_NODE:
- *
- * Macro. A text node in a HTML document is really implemented
- * the same way as a text node in an XML document.
- */
+/// Macro. A text node in a HTML document is really implemented
+/// the same way as a text node in an XML document.
 const HTML_TEXT_NODE: XmlElementType = XmlElementType::XmlTextNode;
-/**
- * HTML_ENTITY_REF_NODE:
- *
- * Macro. An entity reference in a HTML document is really implemented
- * the same way as an entity reference in an XML document.
- */
+/// Macro. An entity reference in a HTML document is really implemented
+/// the same way as an entity reference in an XML document.
 const HTML_ENTITY_REF_NODE: XmlElementType = XmlElementType::XmlEntityRefNode;
-/**
- * HTML_COMMENT_NODE:
- *
- * Macro. A comment in a HTML document is really implemented
- * the same way as a comment in an XML document.
- */
+/// Macro. A comment in a HTML document is really implemented
+/// the same way as a comment in an XML document.
 const HTML_COMMENT_NODE: XmlElementType = XmlElementType::XmlCommentNode;
-/**
- * HTML_PRESERVE_NODE:
- *
- * Macro. A preserved node in a HTML document is really implemented
- * the same way as a CDATA section in an XML document.
- */
+/// Macro. A preserved node in a HTML document is really implemented
+/// the same way as a CDATA section in an XML document.
 const HTML_PRESERVE_NODE: XmlElementType = XmlElementType::XmlCDATASectionNode;
-/**
- * HTML_PI_NODE:
- *
- * Macro. A processing instruction in a HTML document is really implemented
- * the same way as a processing instruction in an XML document.
- */
+/// Macro. A processing instruction in a HTML document is really implemented
+/// the same way as a processing instruction in an XML document.
 const HTML_PI_NODE: XmlElementType = XmlElementType::XmlPINode;
 
 /// Creates a new HTML document
 ///
 /// Returns a new document
 #[doc(alias = "htmlNewDoc")]
-pub unsafe extern "C" fn html_new_doc(
-    uri: *const XmlChar,
-    external_id: *const XmlChar,
-) -> HtmlDocPtr {
+pub unsafe fn html_new_doc(uri: *const XmlChar, external_id: *const XmlChar) -> HtmlDocPtr {
     if uri.is_null() && external_id.is_null() {
         return html_new_doc_no_dtd(
             c"http://www.w3.org/TR/REC-html40/loose.dtd".as_ptr() as _,
@@ -105,10 +82,7 @@ pub unsafe extern "C" fn html_new_doc(
 ///
 /// Returns a new document, do not initialize the DTD if not provided
 #[doc(alias = "htmlNewDocNoDtD")]
-pub unsafe extern "C" fn html_new_doc_no_dtd(
-    uri: *const XmlChar,
-    external_id: *const XmlChar,
-) -> HtmlDocPtr {
+pub unsafe fn html_new_doc_no_dtd(uri: *const XmlChar, external_id: *const XmlChar) -> HtmlDocPtr {
     // Allocate a new document and fill the fields.
     let cur: XmlDocPtr = xml_malloc(size_of::<XmlDoc>()) as XmlDocPtr;
     if cur.is_null() {
@@ -214,11 +188,9 @@ pub unsafe fn html_get_meta_encoding(doc: HtmlDocPtr) -> Option<String> {
         cur = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
     }
 
-    /*
-     * Search the meta elements
-     */
-    // found_meta:
+    // Search the meta elements
 
+    // found_meta:
     while !cur.is_null() {
         if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
             && !(*cur).name.is_null())
@@ -303,7 +275,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
         return -1;
     }
 
-    /* html isn't a real encoding it's just libxml2 way to get entities */
+    // html isn't a real encoding it's just libxml2 way to get entities
     if encoding.as_ref().map(|e| e.to_ascii_lowercase()).as_deref() == Some("html") {
         return -1;
     }
@@ -395,7 +367,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
                 (*meta).unlink();
                 xml_free_node(meta);
             }
-            /* change the document only if there is a real encoding change */
+            // change the document only if there is a real encoding change
             else if content.map_or(true, |c| {
                 !c.to_ascii_lowercase()
                     .contains(&encoding.unwrap().to_ascii_lowercase())
@@ -473,11 +445,7 @@ pub unsafe fn html_set_meta_encoding(doc: HtmlDocPtr, encoding: Option<&str>) ->
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemory")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_doc_dump_memory(
-    cur: XmlDocPtr,
-    mem: *mut *mut XmlChar,
-    size: *mut i32,
-) {
+pub unsafe fn html_doc_dump_memory(cur: XmlDocPtr, mem: *mut *mut XmlChar, size: *mut i32) {
     html_doc_dump_memory_format(cur, mem, size, 1);
 }
 
@@ -505,7 +473,7 @@ unsafe fn html_save_err(code: XmlParserErrors, node: XmlNodePtr, extra: Option<&
 /// It's up to the caller to free the memory.
 #[doc(alias = "htmlDocDumpMemoryFormat")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_doc_dump_memory_format(
+pub unsafe fn html_doc_dump_memory_format(
     cur: XmlDocPtr,
     mem: *mut *mut XmlChar,
     size: *mut i32,
@@ -643,7 +611,7 @@ pub unsafe fn html_doc_dump<'a>(f: &mut (impl Write + 'a), cur: XmlDocPtr) -> i3
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlSaveFile")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
+pub unsafe fn html_save_file(filename: *const c_char, cur: XmlDocPtr) -> i32 {
     use std::{cell::RefCell, rc::Rc};
 
     use crate::{
@@ -712,7 +680,7 @@ unsafe fn html_save_err_memory(extra: &str) {
 /// Returns the number of byte written or -1 in case of error
 #[doc(alias = "htmlBufNodeDumpFormat")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn html_buf_node_dump_format(
+unsafe fn html_buf_node_dump_format(
     buf: XmlBufPtr,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
@@ -742,7 +710,7 @@ unsafe extern "C" fn html_buf_node_dump_format(
 /// Returns the number of byte written or -1 in case of error
 #[doc(alias = "htmlNodeDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
+pub unsafe fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
     use crate::libxml::parser::xml_init_parser;
 
     if buf.is_null() || cur.is_null() {
@@ -750,26 +718,14 @@ pub unsafe extern "C" fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: Xml
     }
 
     xml_init_parser();
-    // let buffer: XmlBufPtr = xml_buf_from_buffer(buf);
-    // if buffer.is_null() {
-    //     return -1;
-    // }
 
-    // let ret: usize = html_buf_node_dump_format(buffer, doc, cur, 1);
-    let ret: usize = html_buf_node_dump_format(buf, doc, cur, 1);
-
-    // xml_buf_back_to_buffer(buffer);
-
-    // if ret > i32::MAX as usize {
-    //     return -1;
-    // }
-    ret as _
+    html_buf_node_dump_format(buf, doc, cur, 1) as _
 }
 
 /// Dump an HTML node, recursive behaviour,children are printed too, and formatting returns are added.
 #[doc(alias = "htmlNodeDumpFile")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_node_dump_file<'a>(
+pub unsafe fn html_node_dump_file<'a>(
     out: &mut (impl Write + 'a),
     doc: XmlDocPtr,
     cur: XmlNodePtr,
@@ -784,7 +740,7 @@ pub unsafe extern "C" fn html_node_dump_file<'a>(
 /// returns: the number of byte written or -1 in case of failure.
 #[doc(alias = "htmlNodeDumpFileFormat")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_node_dump_file_format<'a>(
+pub unsafe fn html_node_dump_file_format<'a>(
     out: &mut (impl Write + 'a),
     doc: XmlDocPtr,
     cur: XmlNodePtr,
@@ -822,9 +778,7 @@ pub unsafe extern "C" fn html_node_dump_file_format<'a>(
             find_encoding_handler("ascii")
         };
 
-    /*
-     * save the content to a temp buffer.
-     */
+    // save the content to a temp buffer.
     let Some(mut buf) = XmlOutputBuffer::from_writer(out, handler) else {
         return 0;
     };
@@ -920,7 +874,7 @@ pub unsafe fn html_save_file_format(
 /// Dump the HTML document DTD, if any.
 #[doc(alias = "htmlDtdDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn html_dtd_dump_output(
+unsafe fn html_dtd_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: XmlDocPtr,
     _encoding: *const c_char,
@@ -968,11 +922,7 @@ unsafe extern "C" fn html_dtd_dump_output(
 /// Dump an HTML attribute
 #[doc(alias = "htmlAttrDumpOutput")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn html_attr_dump_output(
-    buf: &mut XmlOutputBuffer,
-    doc: XmlDocPtr,
-    cur: XmlAttrPtr,
-) {
+unsafe fn html_attr_dump_output(buf: &mut XmlOutputBuffer, doc: XmlDocPtr, cur: XmlAttrPtr) {
     use std::ffi::CStr;
 
     use crate::{libxml::chvalid::xml_is_blank_char, uri::escape_url_except};
@@ -1142,7 +1092,7 @@ pub unsafe fn html_node_dump_format_output(
                         && !(*cur).name.is_null()
                         && *(*cur).name.add(0) != b'p'
                     {
-                        /* p, pre, param */
+                        // p, pre, param
                         buf.write_str("\n");
                     }
                     parent = cur;
@@ -1324,7 +1274,7 @@ pub unsafe fn html_node_dump_format_output(
 /// Dump an HTML document. Formatting return/spaces are added.
 #[doc(alias = "htmlDocContentDumpOutput")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_doc_content_dump_output(
+pub unsafe fn html_doc_content_dump_output(
     buf: &mut XmlOutputBuffer,
     cur: XmlDocPtr,
     _encoding: *const c_char,
@@ -1356,7 +1306,7 @@ pub unsafe fn html_doc_content_dump_format_output(
 /// and formatting returns/spaces are added.
 #[doc(alias = "htmlNodeDumpOutput")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn html_node_dump_output(
+pub unsafe fn html_node_dump_output(
     buf: &mut XmlOutputBuffer,
     doc: XmlDocPtr,
     cur: XmlNodePtr,
@@ -1389,7 +1339,7 @@ const HTML_BOOLEAN_ATTRS: &[*const c_char] = &[
 ///
 /// returns: false if the attribute is not boolean, true otherwise.
 #[doc(alias = "htmlIsBooleanAttr")]
-pub unsafe extern "C" fn html_is_boolean_attr(name: *const XmlChar) -> i32 {
+pub unsafe fn html_is_boolean_attr(name: *const XmlChar) -> i32 {
     let mut i: usize = 0;
 
     while !HTML_BOOLEAN_ATTRS[i].is_null() {
