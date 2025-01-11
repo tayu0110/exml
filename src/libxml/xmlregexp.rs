@@ -72,8 +72,9 @@ const MAX_PUSH: usize = 10000000;
 
 // Note: the order of the enums below is significant, do not shuffle
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum XmlRegAtomType {
+    #[default]
     XmlRegexpEpsilon = 1,
     XmlRegexpCharval,
     XmlRegexpRanges,
@@ -130,8 +131,9 @@ pub enum XmlRegAtomType {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRegQuantType {
+    #[default]
     XmlRegexpQuantEpsilon = 1,
     XmlRegexpQuantOnce,
     XmlRegexpQuantOpt,
@@ -143,8 +145,9 @@ pub enum XmlRegQuantType {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRegStateType {
+    #[default]
     XmlRegexpStartState = 1,
     XmlRegexpFinalState,
     XmlRegexpTransState,
@@ -153,8 +156,9 @@ pub enum XmlRegStateType {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum XmlRegMarkedType {
+    #[default]
     XmlRegexpMarkNormal = 0,
     XmlRegexpMarkStart,
     XmlRegexpMarkVisited,
@@ -188,10 +192,29 @@ pub struct XmlRegAtom {
     pub(crate) start: XmlRegStatePtr,
     pub(crate) start0: XmlRegStatePtr,
     pub(crate) stop: XmlRegStatePtr,
-    max_ranges: i32,
-    nb_ranges: i32,
-    pub(crate) ranges: *mut XmlRegRangePtr,
+    pub(crate) ranges: Vec<XmlRegRangePtr>,
     pub(crate) data: *mut c_void,
+}
+
+impl Default for XmlRegAtom {
+    fn default() -> Self {
+        Self {
+            no: 0,
+            typ: XmlRegAtomType::default(),
+            quant: XmlRegQuantType::default(),
+            min: 0,
+            max: 0,
+            valuep: null_mut(),
+            valuep2: null_mut(),
+            neg: 0,
+            codepoint: 0,
+            start: null_mut(),
+            start0: null_mut(),
+            stop: null_mut(),
+            ranges: vec![],
+            data: null_mut(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -418,11 +441,8 @@ pub(crate) unsafe fn xml_reg_free_atom(atom: XmlRegAtomPtr) {
         return;
     }
 
-    for i in 0..(*atom).nb_ranges {
-        xml_reg_free_range(*(*atom).ranges.add(i as usize));
-    }
-    if !(*atom).ranges.is_null() {
-        xml_free((*atom).ranges as _);
+    for range in (*atom).ranges.drain(..) {
+        xml_reg_free_range(range);
     }
     if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString) && !(*atom).valuep.is_null() {
         xml_free((*atom).valuep as _);
@@ -433,6 +453,7 @@ pub(crate) unsafe fn xml_reg_free_atom(atom: XmlRegAtomPtr) {
     if matches!((*atom).typ, XmlRegAtomType::XmlRegexpBlockName) && !(*atom).valuep.is_null() {
         xml_free((*atom).valuep as _);
     }
+    drop_in_place(atom);
     xml_free(atom as _);
 }
 
@@ -501,7 +522,7 @@ pub(crate) unsafe fn xml_reg_new_atom(
         xml_regexp_err_memory(ctxt, "allocating atom");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRegAtom>());
+    std::ptr::write(&mut *ret, XmlRegAtom::default());
     (*ret).typ = typ;
     (*ret).quant = XmlRegQuantType::XmlRegexpQuantOnce;
     (*ret).min = 0;
@@ -724,36 +745,12 @@ unsafe fn xml_reg_atom_add_range(
         ERROR!(ctxt, "add range: atom is not ranges");
         return null_mut();
     }
-    if (*atom).max_ranges == 0 {
-        (*atom).max_ranges = 4;
-        (*atom).ranges = xml_malloc((*atom).max_ranges as usize * size_of::<XmlRegRangePtr>())
-            as *mut XmlRegRangePtr;
-        if (*atom).ranges.is_null() {
-            xml_regexp_err_memory(ctxt, "adding ranges");
-            (*atom).max_ranges = 0;
-            return null_mut();
-        }
-    } else if (*atom).nb_ranges >= (*atom).max_ranges {
-        (*atom).max_ranges *= 2;
-        let tmp: *mut XmlRegRangePtr = xml_realloc(
-            (*atom).ranges as _,
-            (*atom).max_ranges as usize * size_of::<XmlRegRangePtr>(),
-        ) as *mut XmlRegRangePtr;
-        if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, "adding ranges");
-            (*atom).max_ranges /= 2;
-            return null_mut();
-        }
-        (*atom).ranges = tmp;
-    }
     let range: XmlRegRangePtr = xml_reg_new_range(ctxt, neg, typ, start, end);
     if range.is_null() {
         return null_mut();
     }
     (*range).block_name = block_name;
-    *(*atom).ranges.add((*atom).nb_ranges as _) = range;
-    (*atom).nb_ranges += 1;
-
+    (*atom).ranges.push(range);
     range
 }
 
@@ -1644,36 +1641,22 @@ unsafe fn xml_reg_copy_atom(ctxt: XmlRegParserCtxtPtr, atom: XmlRegAtomPtr) -> X
         xml_regexp_err_memory(ctxt, "copying atom");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRegAtom>());
+    std::ptr::write(&mut *ret, XmlRegAtom::default());
     (*ret).typ = (*atom).typ;
     (*ret).quant = (*atom).quant;
     (*ret).min = (*atom).min;
     (*ret).max = (*atom).max;
-    if (*atom).nb_ranges > 0 {
-        (*ret).ranges = xml_malloc(size_of::<XmlRegRangePtr>() * (*atom).nb_ranges as usize)
-            as *mut XmlRegRangePtr;
-        if (*ret).ranges.is_null() {
-            xml_regexp_err_memory(ctxt, "copying atom");
-            // goto error;
-            xml_reg_free_atom(ret);
-            return null_mut();
-        }
-        for i in 0..(*atom).nb_ranges {
-            *(*ret).ranges.add(i as usize) =
-                xml_reg_copy_range(ctxt, *(*atom).ranges.add(i as usize));
-            if (*(*ret).ranges.add(i as usize)).is_null() {
-                // goto error;
+    if !(*atom).ranges.is_empty() {
+        (*ret).ranges.reserve((*atom).ranges.len());
+        for &range in &(*atom).ranges {
+            (*ret).ranges.push(xml_reg_copy_range(ctxt, range));
+            if (*(*ret).ranges.last().unwrap()).is_null() {
                 xml_reg_free_atom(ret);
                 return null_mut();
             }
-            (*ret).nb_ranges = i + 1;
         }
     }
     ret
-
-    // error:
-    //     xmlRegFreeAtom(ret);
-    //     return(NULL);
 }
 
 pub(crate) unsafe fn xml_reg_get_counter(ctxt: XmlRegParserCtxtPtr) -> usize {
@@ -2831,7 +2814,6 @@ unsafe fn xml_reg_check_character_range(
 
 unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
     let mut ret: i32;
-    let mut range: XmlRegRangePtr;
 
     if atom.is_null() || !xml_is_char(codepoint as u32) {
         return -1;
@@ -2847,8 +2829,7 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
         XmlRegAtomType::XmlRegexpRanges => {
             let mut accept: i32 = 0;
 
-            for i in 0..(*atom).nb_ranges {
-                range = *(*atom).ranges.add(i as usize);
+            for &range in &(*atom).ranges {
                 if (*range).neg == 2 {
                     ret = xml_reg_check_character_range(
                         (*range).typ,
@@ -3551,9 +3532,9 @@ unsafe fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: XmlRegAto
             char::from_u32((*atom).codepoint as u32).unwrap()
         );
     } else if matches!((*atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-        writeln!(output, "{} entries", (*atom).nb_ranges);
-        for i in 0..(*atom).nb_ranges {
-            xml_reg_print_range(output, *(*atom).ranges.add(i as usize));
+        writeln!(output, "{} entries", (*atom).ranges.len());
+        for &range in &(*atom).ranges {
+            xml_reg_print_range(output, range);
         }
     } else if matches!((*atom).typ, XmlRegAtomType::XmlRegexpSubreg) {
         writeln!(
@@ -4257,14 +4238,10 @@ unsafe fn xml_fa_compare_atoms(
             XmlRegAtomType::XmlRegexpRanges => {
                 if matches!((*atom2).typ, XmlRegAtomType::XmlRegexpRanges) {
                     let mut res: i32;
-                    let mut r1: XmlRegRangePtr;
-                    let mut r2: XmlRegRangePtr;
 
                     // need to check that none of the ranges eventually matches
-                    for i in 0..(*atom1).nb_ranges {
-                        for j in 0..(*atom2).nb_ranges {
-                            r1 = *(*atom1).ranges.add(i as usize);
-                            r2 = *(*atom2).ranges.add(j as usize);
+                    for &r1 in &(*atom1).ranges {
+                        for &r2 in &(*atom2).ranges {
                             res = xml_fa_compare_ranges(r1, r2);
                             if res == 1 {
                                 ret = 1;
