@@ -246,8 +246,7 @@ pub type XmlRegexpPtr = *mut XmlRegexp;
 pub struct XmlRegexp {
     string: *mut XmlChar,
     states: Vec<XmlRegStatePtr>,
-    nb_atoms: i32,
-    atoms: *mut XmlRegAtomPtr,
+    atoms: Vec<XmlRegAtomPtr>,
     counters: Vec<XmlRegCounter>,
     determinist: i32,
     flags: i32,
@@ -264,8 +263,7 @@ impl Default for XmlRegexp {
         Self {
             string: null_mut(),
             states: vec![],
-            nb_atoms: 0,
-            atoms: null_mut(),
+            atoms: vec![],
             counters: vec![],
             determinist: 0,
             flags: 0,
@@ -341,7 +339,7 @@ pub(crate) unsafe fn xml_reg_new_parser_ctxt(string: *const XmlChar) -> XmlRegPa
     if ret.is_null() {
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRegParserCtxt>());
+    std::ptr::write(&mut *ret, XmlRegParserCtxt::default());
     if !string.is_null() {
         (*ret).string = xml_strdup(string);
     }
@@ -470,11 +468,8 @@ pub(crate) unsafe fn xml_reg_free_parser_ctxt(ctxt: XmlRegParserCtxtPtr) {
     for state in (*ctxt).states.drain(..) {
         xml_reg_free_state(state);
     }
-    if !(*ctxt).atoms.is_null() {
-        for i in 0..(*ctxt).nb_atoms {
-            xml_reg_free_atom(*(*ctxt).atoms.add(i as usize));
-        }
-        xml_free((*ctxt).atoms as _);
+    for atom in (*ctxt).atoms.drain(..) {
+        xml_reg_free_atom(atom);
     }
     drop_in_place(ctxt);
     xml_free(ctxt as _);
@@ -1705,25 +1700,8 @@ pub(crate) unsafe fn xml_reg_atom_push(ctxt: XmlRegParserCtxtPtr, atom: XmlRegAt
         ERROR!(ctxt, "atom push: atom is NULL");
         return -1;
     }
-    if (*ctxt).nb_atoms >= (*ctxt).max_atoms {
-        let new_size: usize = if (*ctxt).max_atoms != 0 {
-            (*ctxt).max_atoms as usize * 2
-        } else {
-            4
-        };
-
-        let tmp: *mut XmlRegAtomPtr =
-            xml_realloc((*ctxt).atoms as _, new_size * size_of::<XmlRegAtomPtr>()) as _;
-        if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, "allocating counter");
-            return -1;
-        }
-        (*ctxt).atoms = tmp;
-        (*ctxt).max_atoms = new_size as _;
-    }
-    (*atom).no = (*ctxt).nb_atoms;
-    *(*ctxt).atoms.add((*ctxt).nb_atoms as usize) = atom;
-    (*ctxt).nb_atoms += 1;
+    (*atom).no = (*ctxt).atoms.len() as i32;
+    (*ctxt).atoms.push(atom);
     0
 }
 
@@ -2335,8 +2313,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     std::ptr::write(&mut *ret, XmlRegexp::default());
     (*ret).string = (*ctxt).string;
     (*ret).states = take(&mut (*ctxt).states);
-    (*ret).nb_atoms = (*ctxt).nb_atoms;
-    (*ret).atoms = (*ctxt).atoms;
+    (*ret).atoms = take(&mut (*ctxt).atoms);
     (*ret).counters = take(&mut (*ctxt).counters);
     (*ret).determinist = (*ctxt).determinist;
     (*ret).flags = (*ctxt).flags;
@@ -2347,12 +2324,9 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     if (*ret).determinist != 0
         && (*ret).counters.is_empty()
         && (*ctxt).negs == 0
-        && !(*ret).atoms.is_null()
-        && !(*(*ret).atoms.add(0)).is_null()
-        && matches!(
-            (*(*(*ret).atoms.add(0))).typ,
-            XmlRegAtomType::XmlRegexpString
-        )
+        && !(*ret).atoms.is_empty()
+        && !(*ret).atoms[0].is_null()
+        && matches!((*(*ret).atoms[0]).typ, XmlRegAtomType::XmlRegexpString)
     {
         let mut nbstates: i32 = 0;
         let mut nbatoms: i32 = 0;
@@ -2369,6 +2343,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         if state_remap.is_null() {
             xml_regexp_err_memory(ctxt, "compiling regexp");
             (*ctxt).states = take(&mut (*ret).states);
+            (*ctxt).atoms = take(&mut (*ret).atoms);
             (*ctxt).counters = take(&mut (*ret).counters);
             xml_free(ret as _);
             return null_mut();
@@ -2382,44 +2357,42 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
             }
         }
         let string_map: *mut *mut XmlChar =
-            xml_malloc((*ret).nb_atoms as usize * size_of::<*mut c_char>()) as _;
+            xml_malloc((*ret).atoms.len() * size_of::<*mut c_char>()) as _;
         if string_map.is_null() {
             xml_regexp_err_memory(ctxt, "compiling regexp");
             (*ctxt).states = take(&mut (*ret).states);
             (*ctxt).counters = take(&mut (*ret).counters);
+            (*ctxt).atoms = take(&mut (*ret).atoms);
             xml_free(state_remap as _);
             xml_free(ret as _);
             return null_mut();
         }
-        let string_remap: *mut i32 = xml_malloc((*ret).nb_atoms as usize * size_of::<i32>()) as _;
+        let string_remap: *mut i32 = xml_malloc((*ret).atoms.len() * size_of::<i32>()) as _;
         if string_remap.is_null() {
             xml_regexp_err_memory(ctxt, "compiling regexp");
             (*ctxt).states = take(&mut (*ret).states);
             (*ctxt).counters = take(&mut (*ret).counters);
+            (*ctxt).atoms = take(&mut (*ret).atoms);
             xml_free(string_map as _);
             xml_free(state_remap as _);
             xml_free(ret as _);
             return null_mut();
         }
-        for i in 0..(*ret).nb_atoms {
-            if matches!(
-                (*(*(*ret).atoms.add(i as usize))).typ,
-                XmlRegAtomType::XmlRegexpString
-            ) && matches!(
-                (*(*(*ret).atoms.add(i as usize))).quant,
-                XmlRegQuantType::XmlRegexpQuantOnce
-            ) {
-                value = (*(*(*ret).atoms.add(i as usize))).valuep as _;
+        for (i, &atom) in (*ret).atoms.iter().enumerate() {
+            if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString)
+                && matches!((*atom).quant, XmlRegQuantType::XmlRegexpQuantOnce)
+            {
+                value = (*atom).valuep as _;
                 let mut k = nbatoms;
                 for j in 0..nbatoms {
                     if xml_str_equal(*string_map.add(j as usize), value) {
-                        *string_remap.add(i as usize) = j;
+                        *string_remap.add(i) = j;
                         k = j;
                         break;
                     }
                 }
                 if k >= nbatoms {
-                    *string_remap.add(i as usize) = nbatoms;
+                    *string_remap.add(i) = nbatoms;
                     *string_map.add(nbatoms as usize) = xml_strdup(value);
                     if (*string_map.add(nbatoms as usize)).is_null() {
                         for i in 0..nbatoms {
@@ -2430,6 +2403,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         xml_free(state_remap as _);
                         (*ctxt).states = take(&mut (*ret).states);
                         (*ctxt).counters = take(&mut (*ret).counters);
+                        (*ctxt).atoms = take(&mut (*ret).atoms);
                         xml_free(ret as _);
                         return null_mut();
                     }
@@ -2438,6 +2412,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
             } else {
                 (*ctxt).states = take(&mut (*ret).states);
                 (*ctxt).counters = take(&mut (*ret).counters);
+                (*ctxt).atoms = take(&mut (*ret).atoms);
                 xml_free(state_remap as _);
                 xml_free(string_remap as _);
                 for i in 0..nbatoms {
@@ -2521,8 +2496,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         // goto not_determ;
                         (*ctxt).string = null_mut();
                         (*ctxt).states.clear();
-                        (*ctxt).nb_atoms = 0;
-                        (*ctxt).atoms = null_mut();
+                        (*ctxt).atoms.clear();
                         (*ctxt).counters.clear();
                         return ret;
                     }
@@ -2541,14 +2515,9 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         for state in (*ret).states.drain(..) {
             xml_reg_free_state(state);
         }
-        if !(*ret).atoms.is_null() {
-            for i in 0..(*ret).nb_atoms {
-                xml_reg_free_atom(*(*ret).atoms.add(i as usize));
-            }
-            xml_free((*ret).atoms as _);
+        for atom in (*ret).atoms.drain(..) {
+            xml_reg_free_atom(atom);
         }
-        (*ret).atoms = null_mut();
-        (*ret).nb_atoms = 0;
         (*ret).compact = transitions;
         (*ret).transdata = transdata;
         (*ret).string_map = string_map;
@@ -2560,8 +2529,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     // not_determ:
     (*ctxt).string = null_mut();
     (*ctxt).states.clear();
-    (*ctxt).nb_atoms = 0;
-    (*ctxt).atoms = null_mut();
+    (*ctxt).atoms.clear();
     (*ctxt).counters.clear();
     ret
 }
@@ -2632,11 +2600,8 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
     for state in (*regexp).states.drain(..) {
         xml_reg_free_state(state);
     }
-    if !(*regexp).atoms.is_null() {
-        for i in 0..(*regexp).nb_atoms {
-            xml_reg_free_atom(*(*regexp).atoms.add(i as usize));
-        }
-        xml_free((*regexp).atoms as _);
+    for atom in (*regexp).atoms.drain(..) {
+        xml_reg_free_atom(atom);
     }
     if !(*regexp).compact.is_null() {
         xml_free((*regexp).compact as _);
@@ -3625,10 +3590,10 @@ pub unsafe fn xml_regexp_print<'a>(output: &mut (impl Write + 'a), regexp: XmlRe
         CStr::from_ptr((*regexp).string as *const i8).to_string_lossy()
     );
     writeln!(output);
-    writeln!(output, "{} atoms:", (*regexp).nb_atoms);
-    for i in 0..(*regexp).nb_atoms {
+    writeln!(output, "{} atoms:", (*regexp).atoms.len());
+    for (i, &atom) in (*regexp).atoms.iter().enumerate() {
         write!(output, " {i:02} ");
-        xml_reg_print_atom(output, *(*regexp).atoms.add(i as usize));
+        xml_reg_print_atom(output, atom);
     }
     write!(output, "{} states:", (*regexp).states.len());
     writeln!(output);
@@ -4499,13 +4464,12 @@ pub unsafe fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
     for state in (*am).states.drain(..) {
         xml_reg_free_state(state);
     }
-    (*am).nb_atoms = (*comp).nb_atoms;
-    (*am).atoms = (*comp).atoms;
+    (*am).atoms = take(&mut (*comp).atoms);
     (*am).states = take(&mut (*comp).states);
     (*am).determinist = -1;
     (*am).flags = (*comp).flags;
     let ret: i32 = xml_fa_computes_determinism(am);
-    (*am).atoms = null_mut();
+    (*comp).atoms = take(&mut (*am).atoms);
     (*comp).states = take(&mut (*am).states);
     xml_free_automata(am);
     (*comp).determinist = ret;

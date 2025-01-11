@@ -60,15 +60,35 @@ pub struct XmlAutomata {
     pub(crate) end: XmlRegStatePtr,
     pub(crate) state: XmlRegStatePtr,
     pub(crate) atom: XmlRegAtomPtr,
-    pub(crate) max_atoms: i32,
-    pub(crate) nb_atoms: i32,
-    pub(crate) atoms: *mut XmlRegAtomPtr,
+    pub(crate) atoms: Vec<XmlRegAtomPtr>,
     pub(crate) states: Vec<XmlRegStatePtr>,
     pub(crate) counters: Vec<XmlRegCounter>,
     pub(crate) determinist: i32,
     pub(crate) negs: i32,
     pub(crate) flags: i32,
     pub(crate) depth: i32,
+}
+
+impl Default for XmlAutomata {
+    fn default() -> Self {
+        Self {
+            string: null_mut(),
+            cur: null_mut(),
+            error: 0,
+            neg: 0,
+            start: null_mut(),
+            end: null_mut(),
+            state: null_mut(),
+            atom: null_mut(),
+            atoms: vec![],
+            states: vec![],
+            counters: vec![],
+            determinist: 0,
+            negs: 0,
+            flags: 0,
+            depth: 0,
+        }
+    }
 }
 
 /// A state int the automata description,
