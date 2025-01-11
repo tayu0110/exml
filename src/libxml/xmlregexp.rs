@@ -412,7 +412,7 @@ unsafe fn xml_reg_new_state(ctxt: XmlRegParserCtxtPtr) -> XmlRegStatePtr {
         xml_regexp_err_memory(ctxt, "allocating state");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRegState>());
+    std::ptr::write(&mut *ret, XmlRegState::default());
     (*ret).typ = XmlRegStateType::XmlRegexpTransState;
     (*ret).mark = XmlRegMarkedType::XmlRegexpMarkNormal;
     ret
@@ -439,9 +439,7 @@ unsafe fn xml_reg_free_state(state: XmlRegStatePtr) {
     if !(*state).trans.is_null() {
         xml_free((*state).trans as _);
     }
-    if !(*state).trans_to.is_null() {
-        xml_free((*state).trans_to as _);
-    }
+    drop_in_place(state);
     xml_free(state as _);
 }
 
@@ -619,31 +617,12 @@ macro_rules! ERROR {
     };
 }
 
-unsafe fn xml_reg_state_add_trans_to(ctxt: XmlRegParserCtxtPtr, target: XmlRegStatePtr, from: i32) {
-    if (*target).max_trans_to == 0 {
-        (*target).max_trans_to = 8;
-        (*target).trans_to =
-            xml_malloc((*target).max_trans_to as usize * size_of::<i32>()) as *mut i32;
-        if (*target).trans_to.is_null() {
-            xml_regexp_err_memory(ctxt, "adding transition");
-            (*target).max_trans_to = 0;
-            return;
-        }
-    } else if (*target).nb_trans_to >= (*target).max_trans_to {
-        (*target).max_trans_to *= 2;
-        let tmp: *mut i32 = xml_realloc(
-            (*target).trans_to as _,
-            (*target).max_trans_to as usize * size_of::<i32>(),
-        ) as *mut i32;
-        if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, "adding transition");
-            (*target).max_trans_to /= 2;
-            return;
-        }
-        (*target).trans_to = tmp;
-    }
-    *(*target).trans_to.add((*target).nb_trans_to as usize) = from;
-    (*target).nb_trans_to += 1;
+unsafe fn xml_reg_state_add_trans_to(
+    _ctxt: XmlRegParserCtxtPtr,
+    target: XmlRegStatePtr,
+    from: i32,
+) {
+    (*target).trans_to.push(from);
 }
 
 pub(crate) unsafe fn xml_reg_state_add_trans(
@@ -2072,8 +2051,8 @@ unsafe fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegParserCtxtPtr)
 
             if matches!((*state).typ, XmlRegStateType::XmlRegexpStartState) {
             } else {
-                for i in 0..(*state).nb_trans_to {
-                    let tmp = (*ctxt).states[*(*state).trans_to.add(i as usize) as usize];
+                for &index in &(*state).trans_to {
+                    let tmp = (*ctxt).states[index as usize];
                     for j in 0..(*tmp).nb_trans {
                         if (*(*tmp).trans.add(j as usize)).to == statenr as i32 {
                             (*(*tmp).trans.add(j as usize)).to = -1;

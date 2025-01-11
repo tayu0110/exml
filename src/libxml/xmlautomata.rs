@@ -105,9 +105,23 @@ pub struct XmlAutomataState {
     pub(crate) nb_trans: i32,
     pub(crate) trans: *mut XmlRegTrans,
     // knowing states pointing to us can speed things up
-    pub(crate) max_trans_to: i32,
-    pub(crate) nb_trans_to: i32,
-    pub(crate) trans_to: *mut i32,
+    pub(crate) trans_to: Vec<i32>,
+}
+
+impl Default for XmlAutomataState {
+    fn default() -> Self {
+        Self {
+            typ: XmlRegStateType::default(),
+            mark: XmlRegMarkedType::default(),
+            markd: XmlRegMarkedType::default(),
+            reached: XmlRegMarkedType::default(),
+            no: 0,
+            max_trans: 0,
+            nb_trans: 0,
+            trans: null_mut(),
+            trans_to: vec![],
+        }
+    }
 }
 
 /// Create a new automata
