@@ -2329,17 +2329,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
             xml_free(ret as _);
             return null_mut();
         }
-        let string_remap: *mut i32 = xml_malloc((*ret).atoms.len() * size_of::<i32>()) as _;
-        if string_remap.is_null() {
-            xml_regexp_err_memory(ctxt, "compiling regexp");
-            (*ctxt).states = take(&mut (*ret).states);
-            (*ctxt).counters = take(&mut (*ret).counters);
-            (*ctxt).atoms = take(&mut (*ret).atoms);
-            xml_free(string_map as _);
-            xml_free(state_remap as _);
-            xml_free(ret as _);
-            return null_mut();
-        }
+        let mut string_remap = vec![0; (*ret).atoms.len()];
         for (i, &atom) in (*ret).atoms.iter().enumerate() {
             if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString)
                 && matches!((*atom).quant, XmlRegQuantType::XmlRegexpQuantOnce)
@@ -2352,20 +2342,19 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         .as_ref()
                         == value
                     {
-                        *string_remap.add(i) = j;
+                        string_remap[i] = j;
                         k = j;
                         break;
                     }
                 }
                 if k >= nbatoms {
-                    *string_remap.add(i) = nbatoms;
+                    string_remap[i] = nbatoms;
                     *string_map.add(nbatoms as usize) =
                         xml_strndup(value.as_ptr(), value.len() as i32);
                     if (*string_map.add(nbatoms as usize)).is_null() {
                         for i in 0..nbatoms {
                             xml_free(*string_map.add(i as usize) as _);
                         }
-                        xml_free(string_remap as _);
                         xml_free(string_map as _);
                         xml_free(state_remap as _);
                         (*ctxt).states = take(&mut (*ret).states);
@@ -2381,7 +2370,6 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                 (*ctxt).counters = take(&mut (*ret).counters);
                 (*ctxt).atoms = take(&mut (*ret).atoms);
                 xml_free(state_remap as _);
-                xml_free(string_remap as _);
                 for i in 0..nbatoms {
                     xml_free(*string_map.add(i as usize) as _);
                 }
@@ -2399,7 +2387,6 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
             (*ctxt).states = take(&mut (*ret).states);
             (*ctxt).counters = take(&mut (*ret).counters);
             xml_free(state_remap as _);
-            xml_free(string_remap as _);
             for i in 0..nbatoms {
                 xml_free(*string_map.add(i as usize) as _);
             }
@@ -2428,7 +2415,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                 if trans.to == -1 || trans.atom.is_null() {
                     continue;
                 }
-                atomno = *string_remap.add((*trans.atom).no as usize);
+                atomno = string_remap[(*trans.atom).no as usize];
                 if !(*trans.atom).data.is_null() && transdata.is_null() {
                     transdata = xml_reg_calloc2(
                         nbstates as usize,
@@ -2453,7 +2440,6 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         }
                         xml_free(transitions as _);
                         xml_free(state_remap as _);
-                        xml_free(string_remap as _);
                         for i in 0..nbatoms {
                             xml_free(*string_map.add(i as usize) as _);
                         }
@@ -2488,7 +2474,6 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         (*ret).nbstrings = nbatoms;
         (*ret).nbstates = nbstates;
         xml_free(state_remap as _);
-        xml_free(string_remap as _);
     }
     // not_determ:
     (*ctxt).string = null_mut();
