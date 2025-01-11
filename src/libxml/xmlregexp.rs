@@ -222,8 +222,7 @@ pub type XmlRegexpPtr = *mut XmlRegexp;
 #[repr(C)]
 pub struct XmlRegexp {
     string: *mut XmlChar,
-    nb_states: i32,
-    states: *mut XmlRegStatePtr,
+    states: Vec<XmlRegStatePtr>,
     nb_atoms: i32,
     atoms: *mut XmlRegAtomPtr,
     counters: Vec<XmlRegCounter>,
@@ -235,6 +234,25 @@ pub struct XmlRegexp {
     transdata: *mut *mut c_void,
     nbstrings: i32,
     string_map: *mut *mut XmlChar,
+}
+
+impl Default for XmlRegexp {
+    fn default() -> Self {
+        Self {
+            string: null_mut(),
+            states: vec![],
+            nb_atoms: 0,
+            atoms: null_mut(),
+            counters: vec![],
+            determinist: 0,
+            flags: 0,
+            nbstates: 0,
+            compact: null_mut(),
+            transdata: null_mut(),
+            nbstrings: 0,
+            string_map: null_mut(),
+        }
+    }
 }
 
 pub type XmlRegExecRollbackPtr = *mut XmlRegExecRollback;
@@ -354,32 +372,13 @@ unsafe fn xml_reg_new_state(ctxt: XmlRegParserCtxtPtr) -> XmlRegStatePtr {
 }
 
 pub(crate) unsafe fn xml_reg_state_push(ctxt: XmlRegParserCtxtPtr) -> XmlRegStatePtr {
-    if (*ctxt).nb_states >= (*ctxt).max_states {
-        let new_size: usize = if (*ctxt).max_states != 0 {
-            (*ctxt).max_states as usize * 2
-        } else {
-            4
-        };
-
-        let tmp: *mut XmlRegStatePtr =
-            xml_realloc((*ctxt).states as _, new_size * size_of::<XmlRegStatePtr>()) as _;
-        if tmp.is_null() {
-            xml_regexp_err_memory(ctxt, "adding state");
-            return null_mut();
-        }
-        (*ctxt).states = tmp;
-        (*ctxt).max_states = new_size as _;
-    }
-
     let state: XmlRegStatePtr = xml_reg_new_state(ctxt);
     if state.is_null() {
         return null_mut();
     }
 
-    (*state).no = (*ctxt).nb_states;
-    *(*ctxt).states.add((*ctxt).nb_states as _) = state;
-    (*ctxt).nb_states += 1;
-
+    (*state).no = (*ctxt).states.len() as i32;
+    (*ctxt).states.push(state);
     state
 }
 
@@ -447,11 +446,8 @@ pub(crate) unsafe fn xml_reg_free_parser_ctxt(ctxt: XmlRegParserCtxtPtr) {
     if !(*ctxt).string.is_null() {
         xml_free((*ctxt).string as _);
     }
-    if !(*ctxt).states.is_null() {
-        for i in 0..(*ctxt).nb_states {
-            xml_reg_free_state(*(*ctxt).states.add(i as usize));
-        }
-        xml_free((*ctxt).states as _);
+    for state in (*ctxt).states.drain(..) {
+        xml_reg_free_state(state);
     }
     if !(*ctxt).atoms.is_null() {
         for i in 0..(*ctxt).nb_atoms {
@@ -2065,12 +2061,7 @@ unsafe fn xml_fa_parse_reg_exp(ctxt: XmlRegParserCtxtPtr, top: i32) {
 /// State 2 is final and has an epsilon transition to state 1.
 #[doc(alias = "xmlFAEliminateSimpleEpsilonTransitions")]
 unsafe fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegParserCtxtPtr) {
-    let mut newto: i32;
-    let mut state: XmlRegStatePtr;
-    let mut tmp: XmlRegStatePtr;
-
-    for statenr in 0..(*ctxt).nb_states {
-        state = *(*ctxt).states.add(statenr as usize);
+    for (statenr, &state) in (*ctxt).states.iter().enumerate() {
         if state.is_null() {
             continue;
         }
@@ -2086,26 +2077,24 @@ unsafe fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegParserCtxtPtr)
         // is the only transition out a basic transition
         if (*(*state).trans.add(0)).atom.is_null()
             && (*(*state).trans.add(0)).to >= 0
-            && (*(*state).trans.add(0)).to != statenr
+            && (*(*state).trans.add(0)).to != statenr as i32
             && (*(*state).trans.add(0)).counter < 0
             && (*(*state).trans.add(0)).count < 0
         {
-            newto = (*(*state).trans.add(0)).to;
+            let newto = (*(*state).trans.add(0)).to;
 
             if matches!((*state).typ, XmlRegStateType::XmlRegexpStartState) {
             } else {
                 for i in 0..(*state).nb_trans_to {
-                    tmp = *(*ctxt)
-                        .states
-                        .add(*(*state).trans_to.add(i as usize) as usize);
+                    let tmp = (*ctxt).states[*(*state).trans_to.add(i as usize) as usize];
                     for j in 0..(*tmp).nb_trans {
-                        if (*(*tmp).trans.add(j as usize)).to == statenr {
+                        if (*(*tmp).trans.add(j as usize)).to == statenr as i32 {
                             (*(*tmp).trans.add(j as usize)).to = -1;
                             xml_reg_state_add_trans(
                                 ctxt,
                                 tmp,
                                 (*(*tmp).trans.add(j as usize)).atom,
-                                *(*ctxt).states.add(newto as usize),
+                                (*ctxt).states[newto as usize],
                                 (*(*tmp).trans.add(j as usize)).counter,
                                 (*(*tmp).trans.add(j as usize)).count,
                             );
@@ -2113,8 +2102,7 @@ unsafe fn xml_fa_eliminate_simple_epsilon_transitions(ctxt: XmlRegParserCtxtPtr)
                     }
                 }
                 if matches!((*state).typ, XmlRegStateType::XmlRegexpFinalState) {
-                    (*(*(*ctxt).states.add(newto as usize))).typ =
-                        XmlRegStateType::XmlRegexpFinalState;
+                    (*(*ctxt).states[newto as usize]).typ = XmlRegStateType::XmlRegexpFinalState;
                 }
                 // eliminate the transition completely
                 (*state).nb_trans = 0;
@@ -2132,11 +2120,11 @@ unsafe fn xml_fa_reduce_epsilon_transitions(
     tonr: i32,
     counter: i32,
 ) {
-    let from: XmlRegStatePtr = *(*ctxt).states.add(fromnr as usize);
+    let from: XmlRegStatePtr = (*ctxt).states[fromnr as usize];
     if from.is_null() {
         return;
     }
-    let to: XmlRegStatePtr = *(*ctxt).states.add(tonr as usize);
+    let to: XmlRegStatePtr = (*ctxt).states[tonr as usize];
     if to.is_null() {
         return;
     }
@@ -2166,7 +2154,7 @@ unsafe fn xml_fa_reduce_epsilon_transitions(
                         ctxt,
                         from,
                         null_mut(),
-                        *(*ctxt).states.add(newto as usize),
+                        (*ctxt).states[newto as usize],
                         -1,
                         (*(*to).trans.add(transnr as usize)).count,
                     );
@@ -2194,7 +2182,7 @@ unsafe fn xml_fa_reduce_epsilon_transitions(
                     ctxt,
                     from,
                     (*(*to).trans.add(transnr as usize)).atom,
-                    *(*ctxt).states.add(newto as usize),
+                    (*ctxt).states[newto as usize],
                     (*(*to).trans.add(transnr as usize)).counter,
                     -1,
                 );
@@ -2203,7 +2191,7 @@ unsafe fn xml_fa_reduce_epsilon_transitions(
                     ctxt,
                     from,
                     (*(*to).trans.add(transnr as usize)).atom,
-                    *(*ctxt).states.add(newto as usize),
+                    (*ctxt).states[newto as usize],
                     counter,
                     -1,
                 );
@@ -2215,24 +2203,16 @@ unsafe fn xml_fa_reduce_epsilon_transitions(
 
 #[doc(alias = "xmlFAEliminateEpsilonTransitions")]
 pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxtPtr) {
-    let mut state: XmlRegStatePtr;
-    let mut has_epsilon: i32;
-
-    if (*ctxt).states.is_null() {
-        return;
-    }
-
     // Eliminate simple epsilon transition and the associated unreachable states.
     xml_fa_eliminate_simple_epsilon_transitions(ctxt);
-    for statenr in 0..(*ctxt).nb_states {
-        state = *(*ctxt).states.add(statenr as usize);
-        if !state.is_null() && matches!((*state).typ, XmlRegStateType::XmlRegexpUnreachState) {
-            xml_reg_free_state(state);
-            *(*ctxt).states.add(statenr as usize) = null_mut();
+    for state in (*ctxt).states.iter_mut() {
+        if !(*state).is_null() && matches!((**state).typ, XmlRegStateType::XmlRegexpUnreachState) {
+            xml_reg_free_state(*state);
+            *state = null_mut();
         }
     }
 
-    has_epsilon = 0;
+    let mut has_epsilon = 0;
 
     // Build the completed transitions bypassing the epsilons
     // Use a marking algorithm to avoid loops
@@ -2240,8 +2220,7 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
     // Process from the latest states backward to the start when
     // there is long cascading epsilon chains this minimize the
     // recursions and transition compares when adding the new ones
-    for statenr in (0..(*ctxt).nb_states).rev() {
-        state = *(*ctxt).states.add(statenr as usize);
+    for (statenr, &state) in (*ctxt).states.iter().enumerate().rev() {
         if state.is_null() {
             continue;
         }
@@ -2252,7 +2231,7 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
             if (*(*state).trans.add(transnr as usize)).atom.is_null()
                 && (*(*state).trans.add(transnr as usize)).to >= 0
             {
-                if (*(*state).trans.add(transnr as usize)).to == statenr {
+                if (*(*state).trans.add(transnr as usize)).to == statenr as i32 {
                     (*(*state).trans.add(transnr as usize)).to = -1;
                 } else if (*(*state).trans.add(transnr as usize)).count < 0 {
                     let newto: i32 = (*(*state).trans.add(transnr as usize)).to;
@@ -2262,7 +2241,7 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
                     (*state).mark = XmlRegMarkedType::XmlRegexpMarkStart;
                     xml_fa_reduce_epsilon_transitions(
                         ctxt,
-                        statenr,
+                        statenr as i32,
                         newto,
                         (*(*state).trans.add(transnr as usize)).counter,
                     );
@@ -2273,8 +2252,7 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
     }
     // Eliminate the epsilon transitions
     if has_epsilon != 0 {
-        for statnr in 0..(*ctxt).nb_states {
-            state = *(*ctxt).states.add(statnr as usize);
+        for &state in &(*ctxt).states {
             if state.is_null() {
                 continue;
             }
@@ -2288,13 +2266,12 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
     }
 
     // Use this pass to detect unreachable states too
-    for statenr in 0..(*ctxt).nb_states {
-        state = *(*ctxt).states.add(statenr as usize);
+    for &state in &(*ctxt).states {
         if !state.is_null() {
             (*state).reached = XmlRegMarkedType::XmlRegexpMarkNormal;
         }
     }
-    state = *(*ctxt).states.add(0);
+    let mut state = *(*ctxt).states.first().unwrap_or(&null_mut());
     if !state.is_null() {
         (*state).reached = XmlRegMarkedType::XmlRegexpMarkStart;
     }
@@ -2307,26 +2284,25 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
                 && (!(*(*state).trans.add(transnr as usize)).atom.is_null()
                     || (*(*state).trans.add(transnr as usize)).count >= 0)
             {
-                let newto: i32 = (*(*state).trans.add(transnr as usize)).to;
+                let newto = (*(*state).trans.add(transnr as usize)).to;
 
-                if (*(*ctxt).states.add(newto as usize)).is_null() {
+                if (*ctxt).states[newto as usize].is_null() {
                     continue;
                 }
                 if matches!(
-                    (*(*(*ctxt).states.add(newto as usize))).reached,
+                    (*(*ctxt).states[newto as usize]).reached,
                     XmlRegMarkedType::XmlRegexpMarkNormal
                 ) {
-                    (*(*(*ctxt).states.add(newto as usize))).reached =
+                    (*(*ctxt).states[newto as usize]).reached =
                         XmlRegMarkedType::XmlRegexpMarkStart;
-                    target = *(*ctxt).states.add(newto as usize);
+                    target = (*ctxt).states[newto as usize];
                 }
             }
         }
 
         // find the next accessible state not explored
         if target.is_null() {
-            for statenr in 1..(*ctxt).nb_states {
-                state = *(*ctxt).states.add(statenr as usize);
+            for &state in (*ctxt).states.iter().skip(1) {
                 if !state.is_null()
                     && matches!((*state).reached, XmlRegMarkedType::XmlRegexpMarkStart)
                 {
@@ -2337,11 +2313,11 @@ pub(crate) unsafe fn xml_fa_eliminate_epsilon_transitions(ctxt: XmlRegParserCtxt
         }
         state = target;
     }
-    for statenr in 0..(*ctxt).nb_states {
-        state = *(*ctxt).states.add(statenr as usize);
-        if !state.is_null() && matches!((*state).reached, XmlRegMarkedType::XmlRegexpMarkNormal) {
-            xml_reg_free_state(state);
-            *(*ctxt).states.add(statenr as usize) = null_mut();
+    for state in (*ctxt).states.iter_mut() {
+        if !(*state).is_null() && matches!((**state).reached, XmlRegMarkedType::XmlRegexpMarkNormal)
+        {
+            xml_reg_free_state(*state);
+            *state = null_mut();
         }
     }
 }
@@ -2373,10 +2349,9 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         xml_regexp_err_memory(ctxt, "compiling regexp");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlRegexp>());
+    std::ptr::write(&mut *ret, XmlRegexp::default());
     (*ret).string = (*ctxt).string;
-    (*ret).nb_states = (*ctxt).nb_states;
-    (*ret).states = (*ctxt).states;
+    (*ret).states = take(&mut (*ctxt).states);
     (*ret).nb_atoms = (*ctxt).nb_atoms;
     (*ret).atoms = (*ctxt).atoms;
     (*ret).counters = take(&mut (*ctxt).counters);
@@ -2407,24 +2382,28 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         //    they are all of the string type
         // 3/ build a table state x atom for the transitions
 
-        let state_remap: *mut i32 = xml_malloc((*ret).nb_states as usize * size_of::<i32>()) as _;
+        let state_remap: *mut i32 = xml_malloc((*ret).states.len() * size_of::<i32>()) as _;
         if state_remap.is_null() {
             xml_regexp_err_memory(ctxt, "compiling regexp");
+            (*ctxt).states = take(&mut (*ret).states);
+            (*ctxt).counters = take(&mut (*ret).counters);
             xml_free(ret as _);
             return null_mut();
         }
-        for i in 0..(*ret).nb_states {
-            if !(*(*ret).states.add(i as usize)).is_null() {
-                *state_remap.add(i as usize) = nbstates;
+        for (i, &state) in (*ret).states.iter().enumerate() {
+            if !state.is_null() {
+                *state_remap.add(i) = nbstates;
                 nbstates += 1;
             } else {
-                *state_remap.add(i as usize) = -1;
+                *state_remap.add(i) = -1;
             }
         }
         let string_map: *mut *mut XmlChar =
             xml_malloc((*ret).nb_atoms as usize * size_of::<*mut c_char>()) as _;
         if string_map.is_null() {
             xml_regexp_err_memory(ctxt, "compiling regexp");
+            (*ctxt).states = take(&mut (*ret).states);
+            (*ctxt).counters = take(&mut (*ret).counters);
             xml_free(state_remap as _);
             xml_free(ret as _);
             return null_mut();
@@ -2432,6 +2411,8 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         let string_remap: *mut i32 = xml_malloc((*ret).nb_atoms as usize * size_of::<i32>()) as _;
         if string_remap.is_null() {
             xml_regexp_err_memory(ctxt, "compiling regexp");
+            (*ctxt).states = take(&mut (*ret).states);
+            (*ctxt).counters = take(&mut (*ret).counters);
             xml_free(string_map as _);
             xml_free(state_remap as _);
             xml_free(ret as _);
@@ -2464,12 +2445,16 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         xml_free(string_remap as _);
                         xml_free(string_map as _);
                         xml_free(state_remap as _);
+                        (*ctxt).states = take(&mut (*ret).states);
+                        (*ctxt).counters = take(&mut (*ret).counters);
                         xml_free(ret as _);
                         return null_mut();
                     }
                     nbatoms += 1;
                 }
             } else {
+                (*ctxt).states = take(&mut (*ret).states);
+                (*ctxt).counters = take(&mut (*ret).counters);
                 xml_free(state_remap as _);
                 xml_free(string_remap as _);
                 for i in 0..nbatoms {
@@ -2486,6 +2471,8 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
             size_of::<i32>(),
         ) as *mut i32;
         if transitions.is_null() {
+            (*ctxt).states = take(&mut (*ret).states);
+            (*ctxt).counters = take(&mut (*ret).counters);
             xml_free(state_remap as _);
             xml_free(string_remap as _);
             for i in 0..nbatoms {
@@ -2500,17 +2487,16 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         // state corresponds to the state type.
         transdata = null_mut();
 
-        for i in 0..(*ret).nb_states {
+        for (i, &state) in (*ret).states.iter().enumerate() {
             let mut atomno: i32;
             let mut targetno: i32;
             let mut prev: i32;
             let mut trans: XmlRegTransPtr;
 
-            let stateno: i32 = *state_remap.add(i as usize);
+            let stateno: i32 = *state_remap.add(i);
             if stateno == -1 {
                 continue;
             }
-            let state: XmlRegStatePtr = *(*ret).states.add(i as usize);
 
             *transitions.add((stateno * (nbatoms + 1)) as usize) = (*state).typ as _;
 
@@ -2551,8 +2537,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                         xml_free(string_map as _);
                         // goto not_determ;
                         (*ctxt).string = null_mut();
-                        (*ctxt).nb_states = 0;
-                        (*ctxt).states = null_mut();
+                        (*ctxt).states.clear();
                         (*ctxt).nb_atoms = 0;
                         (*ctxt).atoms = null_mut();
                         (*ctxt).counters.clear();
@@ -2570,14 +2555,9 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         }
         (*ret).determinist = 1;
         // Cleanup of the old data
-        if !(*ret).states.is_null() {
-            for i in 0..(*ret).nb_states {
-                xml_reg_free_state(*(*ret).states.add(i as usize));
-            }
-            xml_free((*ret).states as _);
+        for state in (*ret).states.drain(..) {
+            xml_reg_free_state(state);
         }
-        (*ret).states = null_mut();
-        (*ret).nb_states = 0;
         if !(*ret).atoms.is_null() {
             for i in 0..(*ret).nb_atoms {
                 xml_reg_free_atom(*(*ret).atoms.add(i as usize));
@@ -2586,7 +2566,6 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
         }
         (*ret).atoms = null_mut();
         (*ret).nb_atoms = 0;
-
         (*ret).compact = transitions;
         (*ret).transdata = transdata;
         (*ret).string_map = string_map;
@@ -2597,8 +2576,7 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     }
     // not_determ:
     (*ctxt).string = null_mut();
-    (*ctxt).nb_states = 0;
-    (*ctxt).states = null_mut();
+    (*ctxt).states.clear();
     (*ctxt).nb_atoms = 0;
     (*ctxt).atoms = null_mut();
     (*ctxt).counters.clear();
@@ -2668,11 +2646,8 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
     if !(*regexp).string.is_null() {
         xml_free((*regexp).string as _);
     }
-    if !(*regexp).states.is_null() {
-        for i in 0..(*regexp).nb_states {
-            xml_reg_free_state(*(*regexp).states.add(i as usize));
-        }
-        xml_free((*regexp).states as _);
+    for state in (*regexp).states.drain(..) {
+        xml_reg_free_state(state);
     }
     if !(*regexp).atoms.is_null() {
         for i in 0..(*regexp).nb_atoms {
@@ -3074,7 +3049,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     (*exec).rollbacks = null_mut();
     (*exec).status = 0;
     (*exec).comp = comp;
-    (*exec).state = *(*comp).states.add(0);
+    (*exec).state = *(*comp).states.first().unwrap_or(&null_mut());
     (*exec).transno = 0;
     (*exec).transcount = 0;
     (*exec).input_stack = null_mut();
@@ -3163,7 +3138,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             CUR_SCHAR!((*exec).input_string.add((*exec).index as usize), len);
                         ret = xml_reg_check_character(atom, codepoint);
                         if ret == 1 && (*atom).min >= 0 && (*atom).max > 0 {
-                            let to: XmlRegStatePtr = *(*comp).states.add((*trans).to as usize);
+                            let to: XmlRegStatePtr = (*comp).states[(*trans).to as usize];
 
                             // this is a multiple input sequence
                             // If there is a counter associated increment it now.
@@ -3279,7 +3254,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             }
                             *(*exec).counts.add((*trans).count as usize) = 0;
                         }
-                        (*exec).state = *(*comp).states.add((*trans).to as usize);
+                        (*exec).state = (*comp).states[(*trans).to as usize];
                         (*exec).transno = 0;
                         if !(*trans).atom.is_null() {
                             (*exec).index += len;
@@ -3674,10 +3649,10 @@ pub unsafe fn xml_regexp_print<'a>(output: &mut (impl Write + 'a), regexp: XmlRe
         write!(output, " {i:02} ");
         xml_reg_print_atom(output, *(*regexp).atoms.add(i as usize));
     }
-    write!(output, "{} states:", (*regexp).nb_states);
+    write!(output, "{} states:", (*regexp).states.len());
     writeln!(output);
-    for i in 0..(*regexp).nb_states {
-        xml_reg_print_state(output, *(*regexp).states.add(i as usize));
+    for &state in &(*regexp).states {
+        xml_reg_print_state(output, state);
     }
     writeln!(output, "{} counters:", (*regexp).counters.len());
     for (i, counter) in (*regexp).counters.iter().enumerate() {
@@ -4352,8 +4327,7 @@ unsafe fn xml_fa_recurse_determinism(
                 continue;
             }
             (*state).markd = XmlRegMarkedType::XmlRegexpMarkVisited;
-            res =
-                xml_fa_recurse_determinism(ctxt, *(*ctxt).states.add((*t1).to as usize), to, atom);
+            res = xml_fa_recurse_determinism(ctxt, (*ctxt).states[(*t1).to as usize], to, atom);
             if res == 0 {
                 ret = 0;
                 // (*t1).nd = 1;
@@ -4387,7 +4361,7 @@ unsafe fn xml_fa_finish_recurse_determinism(ctxt: XmlRegParserCtxtPtr, state: Xm
     for transnr in 0..nb_trans {
         let t1: XmlRegTransPtr = (*state).trans.add(transnr as usize);
         if (*t1).atom.is_null() && (*t1).to >= 0 {
-            xml_fa_finish_recurse_determinism(ctxt, *(*ctxt).states.add((*t1).to as usize));
+            xml_fa_finish_recurse_determinism(ctxt, (*ctxt).states[(*t1).to as usize]);
         }
     }
 }
@@ -4396,7 +4370,6 @@ unsafe fn xml_fa_finish_recurse_determinism(ctxt: XmlRegParserCtxtPtr, state: Xm
 /// should be called after xmlFAEliminateEpsilonTransitions()
 #[doc(alias = "xmlFAComputesDeterminism")]
 pub(crate) unsafe fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> i32 {
-    let mut state: XmlRegStatePtr;
     let mut t1: XmlRegTransPtr;
     let mut t2: XmlRegTransPtr;
     let mut last: XmlRegTransPtr;
@@ -4412,8 +4385,7 @@ pub(crate) unsafe fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> i
     }
 
     // First cleanup the automata removing cancelled transitions
-    for statenr in 0..(*ctxt).nb_states {
-        state = *(*ctxt).states.add(statenr as usize);
+    for &state in &(*ctxt).states {
         if state.is_null() {
             continue;
         }
@@ -4454,8 +4426,7 @@ pub(crate) unsafe fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> i
 
     // Check for all states that there aren't 2 transitions
     // with the same atom and a different target.
-    for statenr in 0..(*ctxt).nb_states {
-        state = *(*ctxt).states.add(statenr as usize);
+    for &state in &(*ctxt).states {
         if state.is_null() {
             continue;
         }
@@ -4495,11 +4466,11 @@ pub(crate) unsafe fn xml_fa_computes_determinism(ctxt: XmlRegParserCtxtPtr) -> i
                     // epsilon transitions like choices or all
                     ret = xml_fa_recurse_determinism(
                         ctxt,
-                        *(*ctxt).states.add((*t1).to as usize),
+                        (*ctxt).states[(*t1).to as usize],
                         (*t2).to,
                         (*t2).atom,
                     );
-                    xml_fa_finish_recurse_determinism(ctxt, *(*ctxt).states.add((*t1).to as usize));
+                    xml_fa_finish_recurse_determinism(ctxt, (*ctxt).states[(*t1).to as usize]);
                     // don't shortcut the computation so all non deterministic
                     // transition get marked down
                     // if (ret == 0)
@@ -4548,21 +4519,17 @@ pub unsafe fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
     if am.is_null() {
         return -1;
     }
-    if !(*am).states.is_null() {
-        for i in 0..(*am).nb_states {
-            xml_reg_free_state(*(*am).states.add(i as usize));
-        }
-        xml_free((*am).states as _);
+    for state in (*am).states.drain(..) {
+        xml_reg_free_state(state);
     }
     (*am).nb_atoms = (*comp).nb_atoms;
     (*am).atoms = (*comp).atoms;
-    (*am).nb_states = (*comp).nb_states;
-    (*am).states = (*comp).states;
+    (*am).states = take(&mut (*comp).states);
     (*am).determinist = -1;
     (*am).flags = (*comp).flags;
     let ret: i32 = xml_fa_computes_determinism(am);
     (*am).atoms = null_mut();
-    (*am).states = null_mut();
+    (*comp).states = take(&mut (*am).states);
     xml_free_automata(am);
     (*comp).determinist = ret;
     ret
@@ -4589,7 +4556,7 @@ pub unsafe fn xml_reg_new_exec_ctxt(
     if comp.is_null() {
         return null_mut();
     }
-    if (*comp).compact.is_null() && (*comp).states.is_null() {
+    if (*comp).compact.is_null() && (*comp).states.is_empty() {
         return null_mut();
     }
     let exec: XmlRegExecCtxtPtr = xml_malloc(size_of::<XmlRegExecCtxt>()) as XmlRegExecCtxtPtr;
@@ -4607,7 +4574,7 @@ pub unsafe fn xml_reg_new_exec_ctxt(
     (*exec).status = 0;
     (*exec).comp = comp;
     if (*comp).compact.is_null() {
-        (*exec).state = *(*comp).states.add(0);
+        (*exec).state = *(*comp).states.first().unwrap_or(&null_mut());
     }
     (*exec).transno = 0;
     (*exec).transcount = 0;
@@ -4945,8 +4912,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                         }
 
                         if ret == 1 && (*atom).min > 0 && (*atom).max > 0 {
-                            let to: XmlRegStatePtr =
-                                *(*(*exec).comp).states.add((*trans).to as usize);
+                            let to: XmlRegStatePtr = (*(*exec).comp).states[(*trans).to as usize];
 
                             // this is a multiple input sequence
                             if (*(*exec).state).nb_trans > (*exec).transno + 1 {
@@ -5025,9 +4991,9 @@ unsafe fn xml_reg_exec_push_string_internal(
                         if (*trans).count >= 0 && ((*trans).count as usize) < REGEXP_ALL_COUNTER {
                             *(*exec).counts.add((*trans).count as usize) = 0;
                         }
-                        if !(*(*(*exec).comp).states.add((*trans).to as usize)).is_null()
+                        if !(*(*exec).comp).states[(*trans).to as usize].is_null()
                             && matches!(
-                                (*(*(*(*exec).comp).states.add((*trans).to as usize))).typ,
+                                (*((*(*exec).comp).states[(*trans).to as usize])).typ,
                                 XmlRegStateType::XmlRegexpSinkState
                             )
                         {
@@ -5043,7 +5009,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 (*(*exec).comp).counters.len() * size_of::<i32>(),
                             );
                         }
-                        (*exec).state = *(*(*exec).comp).states.add((*trans).to as usize);
+                        (*exec).state = (*(*exec).comp).states[(*trans).to as usize];
                         (*exec).transno = 0;
                         if !(*trans).atom.is_null() {
                             if !(*exec).input_stack.is_null() {
@@ -5331,9 +5297,9 @@ unsafe fn xml_reg_exec_get_values(
                         (*nbval) += 1;
                     }
                 } else if !(*exec).comp.is_null()
-                    && !(*(*(*exec).comp).states.add((*trans).to as usize)).is_null()
+                    && !((*(*exec).comp).states[(*trans).to as usize]).is_null()
                     && !matches!(
-                        (*(*(*(*exec).comp).states.add((*trans).to as usize))).typ,
+                        (*((*(*exec).comp).states[(*trans).to as usize])).typ,
                         XmlRegStateType::XmlRegexpSinkState,
                     )
                 {
@@ -5366,9 +5332,9 @@ unsafe fn xml_reg_exec_get_values(
                     || (*trans).counter >= 0
                 {
                     continue;
-                } else if !(*(*(*exec).comp).states.add((*trans).to as usize)).is_null()
+                } else if !((*(*exec).comp).states[(*trans).to as usize]).is_null()
                     && matches!(
-                        (*(*(*(*exec).comp).states.add((*trans).to as usize))).typ,
+                        (*((*(*exec).comp).states[(*trans).to as usize])).typ,
                         XmlRegStateType::XmlRegexpSinkState
                     )
                 {

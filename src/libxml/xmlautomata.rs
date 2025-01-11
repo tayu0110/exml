@@ -63,9 +63,7 @@ pub struct XmlAutomata {
     pub(crate) max_atoms: i32,
     pub(crate) nb_atoms: i32,
     pub(crate) atoms: *mut XmlRegAtomPtr,
-    pub(crate) max_states: i32,
-    pub(crate) nb_states: i32,
-    pub(crate) states: *mut XmlRegStatePtr,
+    pub(crate) states: Vec<XmlRegStatePtr>,
     pub(crate) counters: Vec<XmlRegCounter>,
     pub(crate) determinist: i32,
     pub(crate) negs: i32,
@@ -86,7 +84,7 @@ pub struct XmlAutomataState {
     pub(crate) max_trans: i32,
     pub(crate) nb_trans: i32,
     pub(crate) trans: *mut XmlRegTrans,
-    /*  knowing states pointing to us can speed things up */
+    // knowing states pointing to us can speed things up
     pub(crate) max_trans_to: i32,
     pub(crate) nb_trans_to: i32,
     pub(crate) trans_to: *mut i32,
