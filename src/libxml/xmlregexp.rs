@@ -30,7 +30,7 @@
 use std::{
     ffi::{c_char, CStr},
     io::Write,
-    mem::{size_of, take, zeroed},
+    mem::{size_of, take},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut},
 };
@@ -282,7 +282,7 @@ pub struct XmlRegExecRollback {
     state: XmlRegStatePtr, /* the current state */
     index: i32,            /* the index in the input stack */
     nextbranch: i32,       /* the next transition to explore in that state */
-    counts: *mut i32,      /* save the automata state if it has some */
+    counts: Vec<i32>,      /* save the automata state if it has some */
 }
 
 pub type XmlRegInputTokenPtr = *mut XmlRegInputToken;
@@ -307,12 +307,10 @@ pub struct XmlRegExecCtxt {
     transno: i32,          /* the current transition on that state */
     transcount: i32,       /* the number of chars in c_char counted transitions */
     // A stack of rollback states
-    max_rollbacks: i32,
-    nb_rollbacks: i32,
-    rollbacks: *mut XmlRegExecRollback,
+    rollbacks: Vec<XmlRegExecRollback>,
 
     // The state of the automata if any
-    counts: *mut i32,
+    counts: Vec<i32>,
 
     // The input stack
     input_stack_max: i32,
@@ -326,8 +324,36 @@ pub struct XmlRegExecCtxt {
     err_state_no: i32,         /* the error state number */
     err_state: XmlRegStatePtr, /* the error state */
     err_string: *mut XmlChar,  /* the string raising the error */
-    err_counts: *mut i32,      /* counters at the error state */
+    err_counts: Vec<i32>,      /* counters at the error state */
     nb_push: i32,
+}
+
+impl Default for XmlRegExecCtxt {
+    fn default() -> Self {
+        Self {
+            status: 0,
+            determinist: 0,
+            comp: null_mut(),
+            callback: None,
+            data: null_mut(),
+            state: null_mut(),
+            transno: 0,
+            transcount: 0,
+            rollbacks: vec![],
+            counts: vec![],
+            input_stack_max: 0,
+            input_stack_nr: 0,
+            index: 0,
+            char_stack: null_mut(),
+            input_string: null(),
+            input_stack: null_mut(),
+            err_state_no: 0,
+            err_state: null_mut(),
+            err_string: null_mut(),
+            err_counts: vec![],
+            nb_push: 0,
+        }
+    }
 }
 
 /// Allocate a new regexp parser context
@@ -2620,31 +2646,19 @@ pub unsafe fn xml_reg_free_regexp(regexp: XmlRegexpPtr) {
     xml_free(regexp as _);
 }
 
-unsafe fn xml_fa_reg_exec_roll_back(exec: XmlRegExecCtxtPtr) {
-    if (*exec).nb_rollbacks <= 0 {
+unsafe fn xml_fa_reg_exec_rollback(exec: XmlRegExecCtxtPtr) {
+    let Some(rollback) = (*exec).rollbacks.pop() else {
         (*exec).status = -1;
         return;
-    }
-    (*exec).nb_rollbacks -= 1;
-    (*exec).state = (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).state;
-    (*exec).index = (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).index;
-    (*exec).transno = (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).nextbranch;
+    };
+    (*exec).state = rollback.state;
+    (*exec).index = rollback.index;
+    (*exec).transno = rollback.nextbranch;
     if !(*(*exec).comp).counters.is_empty() {
-        if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
+        (*exec).counts.clear();
+        (*exec)
             .counts
-            .is_null()
-        {
-            eprint!("exec save: allocation failed");
-            (*exec).status = -6;
-            return;
-        }
-        if !(*exec).counts.is_null() {
-            memcpy(
-                (*exec).counts as _,
-                (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts as _,
-                (*(*exec).comp).counters.len() * size_of::<i32>(),
-            );
-        }
+            .extend_from_slice(&rollback.counts[..(*(*exec).comp).counters.len()]);
     }
 }
 
@@ -2911,75 +2925,24 @@ unsafe fn xml_fa_reg_exec_save(exec: XmlRegExecCtxtPtr) {
     }
     (*exec).nb_push += 1;
 
-    if (*exec).max_rollbacks == 0 {
-        (*exec).max_rollbacks = 4;
-        (*exec).rollbacks =
-            xml_malloc((*exec).max_rollbacks as usize * size_of::<XmlRegExecRollback>())
-                as *mut XmlRegExecRollback;
-        if (*exec).rollbacks.is_null() {
-            xml_regexp_err_memory(null_mut(), "saving regexp");
-            (*exec).max_rollbacks = 0;
-            return;
-        }
-        memset(
-            (*exec).rollbacks as _,
-            0,
-            (*exec).max_rollbacks as usize * size_of::<XmlRegExecRollback>(),
-        );
-    } else if (*exec).nb_rollbacks >= (*exec).max_rollbacks {
-        let mut tmp: *mut XmlRegExecRollback;
-        let len: i32 = (*exec).max_rollbacks;
-
-        (*exec).max_rollbacks *= 2;
-        tmp = xml_realloc(
-            (*exec).rollbacks as _,
-            (*exec).max_rollbacks as usize * size_of::<XmlRegExecRollback>(),
-        ) as *mut XmlRegExecRollback;
-        if tmp.is_null() {
-            xml_regexp_err_memory(null_mut(), "saving regexp");
-            (*exec).max_rollbacks /= 2;
-            return;
-        }
-        (*exec).rollbacks = tmp;
-        tmp = (*exec).rollbacks.add(len as usize);
-        memset(
-            tmp as _,
-            0,
-            ((*exec).max_rollbacks - len) as usize * size_of::<XmlRegExecRollback>(),
-        );
-    }
-    (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).state = (*exec).state;
-    (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).index = (*exec).index;
-    (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).nextbranch = (*exec).transno + 1;
+    let mut rollback = XmlRegExecRollback {
+        state: (*exec).state,
+        index: (*exec).index,
+        nextbranch: (*exec).transno + 1,
+        counts: vec![],
+    };
     if !(*(*exec).comp).counters.is_empty() {
-        if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
+        rollback
             .counts
-            .is_null()
-        {
-            (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts =
-                xml_malloc((*(*exec).comp).counters.len() * size_of::<i32>()) as *mut i32;
-            if (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize))
-                .counts
-                .is_null()
-            {
-                xml_regexp_err_memory(null_mut(), "saving regexp");
-                (*exec).status = -5;
-                return;
-            }
-        }
-        memcpy(
-            (*(*exec).rollbacks.add((*exec).nb_rollbacks as usize)).counts as _,
-            (*exec).counts as _,
-            (*(*exec).comp).counters.len() * size_of::<i32>(),
-        );
+            .extend_from_slice(&(*exec).counts[..(*(*exec).comp).counters.len()]);
     }
-    (*exec).nb_rollbacks += 1;
+    (*exec).rollbacks.push(rollback);
 }
 
 pub(crate) const REGEXP_ALL_COUNTER: usize = 0x123456;
 
 unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
-    let mut execval: XmlRegExecCtxt = unsafe { zeroed() };
+    let mut execval = XmlRegExecCtxt::default();
     let exec: XmlRegExecCtxtPtr = addr_of_mut!(execval);
     let mut ret: i32;
     let mut codepoint: i32;
@@ -2990,9 +2953,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     (*exec).index = 0;
     (*exec).nb_push = 0;
     (*exec).determinist = 1;
-    (*exec).max_rollbacks = 0;
-    (*exec).nb_rollbacks = 0;
-    (*exec).rollbacks = null_mut();
+    (*exec).rollbacks.clear();
     (*exec).status = 0;
     (*exec).comp = comp;
     (*exec).state = *(*comp).states.first().unwrap_or(&null_mut());
@@ -3001,18 +2962,10 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
     (*exec).input_stack = null_mut();
     (*exec).input_stack_max = 0;
     if !(*comp).counters.is_empty() {
-        (*exec).counts = xml_malloc((*comp).counters.len() * size_of::<i32>()) as *mut i32;
-        if (*exec).counts.is_null() {
-            xml_regexp_err_memory(null_mut(), "running regexp");
-            return -1;
-        }
-        memset(
-            (*exec).counts as _,
-            0,
-            (*comp).counters.len() * size_of::<i32>(),
-        );
+        (*exec).counts.clear();
+        (*exec).counts.resize((*comp).counters.len(), 0);
     } else {
-        (*exec).counts = null_mut();
+        (*exec).counts.clear();
     }
     'error: {
         'b: while (*exec).status == 0
@@ -3032,7 +2985,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                 // we don't want to break.
                 len = 1;
                 if *(*exec).input_string.add((*exec).index as usize) == 0
-                    && (*exec).counts.is_null()
+                    && (*exec).counts.is_empty()
                 {
                     // if there is a transition, we must check if
                     //  atom allows minOccurs of 0
@@ -3063,13 +3016,13 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                     ret = 0;
                     deter = 1;
                     if (*trans).count >= 0 {
-                        if (*exec).counts.is_null() {
+                        if (*exec).counts.is_empty() {
                             (*exec).status = -1;
                             break 'error;
                         }
                         // A counted transition.
 
-                        let count: i32 = *(*exec).counts.add((*trans).count as usize);
+                        let count = (*exec).counts[(*trans).count as usize];
                         let counter = (*(*exec).comp).counters[(*trans).count as usize];
                         ret = (count >= counter.min && count <= counter.max) as i32;
                         if ret != 0 && counter.min != counter.max {
@@ -3091,12 +3044,12 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                             // do not increment if the counter is already over the
                             // maximum limit in which case get to next transition
                             if (*trans).counter >= 0 {
-                                if (*exec).counts.is_null() || (*exec).comp.is_null() {
+                                if (*exec).counts.is_empty() || (*exec).comp.is_null() {
                                     (*exec).status = -1;
                                     break 'error;
                                 }
                                 let counter = (*(*exec).comp).counters[(*trans).counter as usize];
-                                if *(*exec).counts.add((*trans).counter as usize) >= counter.max {
+                                if (*exec).counts[(*trans).counter as usize] >= counter.max {
                                     // for loop on transitions
                                     continue;
                                 }
@@ -3106,7 +3059,7 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                 xml_fa_reg_exec_save(exec);
                             }
                             if (*trans).counter >= 0 {
-                                *(*exec).counts.add((*trans).counter as usize) += 1;
+                                (*exec).counts[(*trans).counter as usize] += 1;
                             }
                             (*exec).transcount = 1;
                             'inner: while {
@@ -3152,11 +3105,11 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                                 break 'rollback;
                             }
                             if (*trans).counter >= 0 {
-                                if (*exec).counts.is_null() {
+                                if (*exec).counts.is_empty() {
                                     (*exec).status = -1;
                                     break 'error;
                                 }
-                                *(*exec).counts.add((*trans).counter as usize) -= 1;
+                                (*exec).counts[(*trans).counter as usize] -= 1;
                             }
                         } else if ret == 0 && (*atom).min == 0 && (*atom).max > 0 {
                             // we don't match on the codepoint, but minOccurs of 0
@@ -3182,23 +3135,23 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
                         }
                         if (*trans).counter >= 0 {
                             // make sure we don't go over the counter maximum value
-                            if (*exec).counts.is_null() || (*exec).comp.is_null() {
+                            if (*exec).counts.is_empty() || (*exec).comp.is_null() {
                                 (*exec).status = -1;
                                 break 'error;
                             }
                             let counter = (*(*exec).comp).counters[(*trans).counter as usize];
-                            if *(*exec).counts.add((*trans).counter as usize) >= counter.max {
+                            if (*exec).counts[(*trans).counter as usize] >= counter.max {
                                 // for loop on transitions
                                 continue;
                             }
-                            *(*exec).counts.add((*trans).counter as usize) += 1;
+                            (*exec).counts[(*trans).counter as usize] += 1;
                         }
                         if (*trans).count >= 0 && ((*trans).count as usize) < REGEXP_ALL_COUNTER {
-                            if (*exec).counts.is_null() {
+                            if (*exec).counts.is_empty() {
                                 (*exec).status = -1;
                                 break 'error;
                             }
-                            *(*exec).counts.add((*trans).count as usize) = 0;
+                            (*exec).counts[(*trans).count as usize] = 0;
                         }
                         (*exec).state = (*comp).states[(*trans).to as usize];
                         (*exec).transno = 0;
@@ -3219,26 +3172,15 @@ unsafe fn xml_fa_reg_exec(comp: XmlRegexpPtr, content: *const XmlChar) -> i32 {
             }
             // Failed to find a way out
             (*exec).determinist = 0;
-            xml_fa_reg_exec_roll_back(exec);
+            xml_fa_reg_exec_rollback(exec);
         }
     }
     // error:
-    if !(*exec).rollbacks.is_null() {
-        if !(*exec).counts.is_null() {
-            for i in 0..(*exec).max_rollbacks {
-                if !(*(*exec).rollbacks.add(i as usize)).counts.is_null() {
-                    xml_free((*(*exec).rollbacks.add(i as usize)).counts as _);
-                }
-            }
-        }
-        xml_free((*exec).rollbacks as _);
-    }
+    (*exec).rollbacks.clear();
     if (*exec).state.is_null() {
         return -1;
     }
-    if !(*exec).counts.is_null() {
-        xml_free((*exec).counts as _);
-    }
+    (*exec).counts.clear();
     if (*exec).status == 0 {
         return 1;
     }
@@ -4505,13 +4447,11 @@ pub unsafe fn xml_reg_new_exec_ctxt(
         xml_regexp_err_memory(null_mut(), "creating execution context");
         return null_mut();
     }
-    memset(exec as _, 0, size_of::<XmlRegExecCtxt>());
+    std::ptr::write(&mut *exec, XmlRegExecCtxt::default());
     (*exec).input_string = null_mut();
     (*exec).index = 0;
     (*exec).determinist = 1;
-    (*exec).max_rollbacks = 0;
-    (*exec).nb_rollbacks = 0;
-    (*exec).rollbacks = null_mut();
+    (*exec).rollbacks.clear();
     (*exec).status = 0;
     (*exec).comp = comp;
     if (*comp).compact.is_null() {
@@ -4522,23 +4462,13 @@ pub unsafe fn xml_reg_new_exec_ctxt(
     (*exec).callback = callback;
     (*exec).data = data;
     if !(*comp).counters.is_empty() {
-        // For error handling, (*exec).counts is allocated twice the size
-        // the second half is used to store the data in case of rollback
-        (*exec).counts = xml_malloc((*comp).counters.len() * size_of::<i32>() * 2) as *mut i32;
-        if (*exec).counts.is_null() {
-            xml_regexp_err_memory(null_mut(), "creating execution context");
-            xml_free(exec as _);
-            return null_mut();
-        }
-        memset(
-            (*exec).counts as _,
-            0,
-            (*comp).counters.len() * size_of::<i32>() * 2,
-        );
-        (*exec).err_counts = (*exec).counts.add((*comp).counters.len());
+        (*exec).counts.clear();
+        (*exec).counts.resize((*comp).counters.len(), 0);
+        (*exec).err_counts.clear();
+        (*exec).err_counts.resize((*comp).counters.len(), 0);
     } else {
-        (*exec).counts = null_mut();
-        (*exec).err_counts = null_mut();
+        (*exec).counts.clear();
+        (*exec).err_counts.clear();
     }
     (*exec).input_stack_max = 0;
     (*exec).input_stack_nr = 0;
@@ -4556,19 +4486,8 @@ pub unsafe fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
         return;
     }
 
-    if !(*exec).rollbacks.is_null() {
-        if !(*exec).counts.is_null() {
-            for i in 0..(*exec).max_rollbacks {
-                if !(*(*exec).rollbacks.add(i as usize)).counts.is_null() {
-                    xml_free((*(*exec).rollbacks.add(i as usize)).counts as _);
-                }
-            }
-        }
-        xml_free((*exec).rollbacks as _);
-    }
-    if !(*exec).counts.is_null() {
-        xml_free((*exec).counts as _);
-    }
+    (*exec).counts.clear();
+    (*exec).rollbacks.clear();
     if !(*exec).input_stack.is_null() {
         for i in 0..(*exec).input_stack_nr {
             if !(*(*exec).input_stack.add(i as usize)).value.is_null() {
@@ -4580,6 +4499,7 @@ pub unsafe fn xml_reg_free_exec_ctxt(exec: XmlRegExecCtxtPtr) {
     if !(*exec).err_string.is_null() {
         xml_free((*exec).err_string as _);
     }
+    drop_in_place(exec);
     xml_free(exec as _);
 }
 
@@ -4758,7 +4678,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                 // End of input on non-terminal state, rollback, however we may
                 // still have epsilon like transition for counted transitions
                 // on counters, in that case don't break too early.
-                if value.is_null() && (*exec).counts.is_null() {
+                if value.is_null() && (*exec).counts.is_empty() {
                     break 'rollback;
                 }
 
@@ -4790,7 +4710,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                     continue;
                                 }
                                 let counter = (*(*exec).comp).counters[(*t).counter as usize];
-                                count = *(*exec).counts.add((*t).counter as usize);
+                                count = (*exec).counts[(*t).counter as usize];
                                 if count < counter.max
                                     && !(*t).atom.is_null()
                                     && xml_str_equal(value, (*(*t).atom).valuep as _)
@@ -4821,7 +4741,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 continue;
                             }
                             let counter = (*(*exec).comp).counters[(*t).counter as usize];
-                            count = *(*exec).counts.add((*t).counter as usize);
+                            count = (*exec).counts[(*t).counter as usize];
                             if count < counter.min || count > counter.max {
                                 ret = 0;
                                 break;
@@ -4829,7 +4749,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                         }
                     } else if (*trans).count >= 0 {
                         // A counted transition.
-                        let count: i32 = *(*exec).counts.add((*trans).count as usize);
+                        let count = (*exec).counts[(*trans).count as usize];
                         let counter = (*(*exec).comp).counters[(*trans).count as usize];
                         ret = (count >= counter.min && count <= counter.max) as _;
                     } else if atom.is_null() {
@@ -4845,7 +4765,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             }
                         }
                         if ret == 1 && (*trans).counter >= 0 {
-                            let count: i32 = *(*exec).counts.add((*trans).counter as usize);
+                            let count = (*exec).counts[(*trans).counter as usize];
                             let counter = (*(*exec).comp).counters[(*trans).counter as usize];
                             if count >= counter.max {
                                 ret = 0;
@@ -4927,10 +4847,10 @@ unsafe fn xml_reg_exec_push_string_internal(
                             xml_fa_reg_exec_save(exec);
                         }
                         if (*trans).counter >= 0 {
-                            *(*exec).counts.add((*trans).counter as usize) += 1;
+                            (*exec).counts[(*trans).counter as usize] += 1;
                         }
                         if (*trans).count >= 0 && ((*trans).count as usize) < REGEXP_ALL_COUNTER {
-                            *(*exec).counts.add((*trans).count as usize) = 0;
+                            (*exec).counts[(*trans).count as usize] = 0;
                         }
                         if !(*(*exec).comp).states[(*trans).to as usize].is_null()
                             && matches!(
@@ -4944,11 +4864,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             }
                             (*exec).err_string = xml_strdup(value);
                             (*exec).err_state = (*exec).state;
-                            memcpy(
-                                (*exec).err_counts as _,
-                                (*exec).counts as _,
-                                (*(*exec).comp).counters.len() * size_of::<i32>(),
-                            );
+                            (*exec).err_counts.copy_from_slice(&(*exec).counts);
                         }
                         (*exec).state = (*(*exec).comp).states[(*trans).to as usize];
                         (*exec).transno = 0;
@@ -4996,17 +4912,13 @@ unsafe fn xml_reg_exec_push_string_internal(
             (*exec).err_string = xml_strdup(value);
             (*exec).err_state = (*exec).state;
             if !(*(*exec).comp).counters.is_empty() {
-                memcpy(
-                    (*exec).err_counts as _,
-                    (*exec).counts as _,
-                    (*(*exec).comp).counters.len() * size_of::<i32>(),
-                );
+                (*exec).err_counts.copy_from_slice(&(*exec).counts);
             }
         }
 
         // Failed to find a way out
         (*exec).determinist = 0;
-        xml_fa_reg_exec_roll_back(exec);
+        xml_fa_reg_exec_rollback(exec);
         if !(*exec).input_stack.is_null() && (*exec).status == 0 {
             value = (*(*exec).input_stack.add((*exec).index as usize)).value;
             data = (*(*exec).input_stack.add((*exec).index as usize)).data;
@@ -5220,9 +5132,9 @@ unsafe fn xml_reg_exec_get_values(
                     let mut counter = None;
 
                     let count = if err != 0 {
-                        *(*exec).err_counts.add((*trans).counter as usize)
+                        (*exec).err_counts[(*trans).counter as usize]
                     } else {
-                        *(*exec).counts.add((*trans).counter as usize)
+                        (*exec).counts[(*trans).counter as usize]
                     };
                     if !(*exec).comp.is_null() {
                         counter = Some((*(*exec).comp).counters[(*trans).counter as usize]);
