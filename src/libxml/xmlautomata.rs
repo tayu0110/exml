@@ -95,33 +95,16 @@ impl Default for XmlAutomata {
 #[doc(alias = "xmlAutomataStatePtr")]
 pub type XmlAutomataStatePtr = *mut XmlAutomataState;
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlAutomataState {
     pub(crate) typ: XmlRegStateType,
     pub(crate) mark: XmlRegMarkedType,
     pub(crate) markd: XmlRegMarkedType,
     pub(crate) reached: XmlRegMarkedType,
     pub(crate) no: i32,
-    pub(crate) max_trans: i32,
-    pub(crate) nb_trans: i32,
-    pub(crate) trans: *mut XmlRegTrans,
+    pub(crate) trans: Vec<XmlRegTrans>,
     // knowing states pointing to us can speed things up
     pub(crate) trans_to: Vec<i32>,
-}
-
-impl Default for XmlAutomataState {
-    fn default() -> Self {
-        Self {
-            typ: XmlRegStateType::default(),
-            mark: XmlRegMarkedType::default(),
-            markd: XmlRegMarkedType::default(),
-            reached: XmlRegMarkedType::default(),
-            no: 0,
-            max_trans: 0,
-            nb_trans: 0,
-            trans: null_mut(),
-            trans_to: vec![],
-        }
-    }
 }
 
 /// Create a new automata
