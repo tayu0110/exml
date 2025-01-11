@@ -7512,7 +7512,7 @@ pub unsafe extern "C" fn xml_validate_nmtokens_value(value: *const XmlChar) -> i
 ///
 /// Returns 1 if successful or 0 in case of error.
 #[doc(alias = "xmlValidBuildAContentModel")]
-unsafe extern "C" fn xml_valid_build_acontent_model(
+unsafe fn xml_valid_build_acontent_model(
     mut content: XmlElementContentPtr,
     ctxt: XmlValidCtxtPtr,
     name: *const XmlChar,
@@ -7565,7 +7565,9 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                         (*ctxt).am,
                         (*ctxt).state,
                         null_mut(),
-                        fullname,
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         null_mut(),
                     );
                 }
@@ -7574,7 +7576,9 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                         (*ctxt).am,
                         (*ctxt).state,
                         null_mut(),
-                        fullname,
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         null_mut(),
                     );
                     xml_automata_new_epsilon((*ctxt).am, oldstate, (*ctxt).state);
@@ -7584,14 +7588,18 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                         (*ctxt).am,
                         (*ctxt).state,
                         null_mut(),
-                        fullname,
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         null_mut(),
                     );
                     xml_automata_new_transition(
                         (*ctxt).am,
                         (*ctxt).state,
                         (*ctxt).state,
-                        fullname,
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         null_mut(),
                     );
                 }
@@ -7601,7 +7609,9 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
                         (*ctxt).am,
                         (*ctxt).state,
                         (*ctxt).state,
-                        fullname,
+                        CStr::from_ptr(fullname as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
                         null_mut(),
                     );
                 }
@@ -7613,9 +7623,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
         XmlElementContentType::XmlElementContentSeq => {
             let mut oldstate: XmlAutomataStatePtr;
 
-            /*
-             * Simply iterate over the content
-             */
+            // Simply iterate over the content
             oldstate = (*ctxt).state;
             let ocur: XmlElementContentOccur = (*content).ocur;
             if !matches!(ocur, XmlElementContentOccur::XmlElementContentOnce) {
@@ -7660,10 +7668,8 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
             let oldstate: XmlAutomataStatePtr = (*ctxt).state;
             let oldend: XmlAutomataStatePtr = xml_automata_new_state((*ctxt).am);
 
-            /*
-             * iterate over the subtypes and remerge the end with an
-             * epsilon transition
-             */
+            // iterate over the subtypes and remerge the end with an
+            // epsilon transition
             while {
                 (*ctxt).state = oldstate;
                 xml_valid_build_acontent_model((*content).c1, ctxt, name);
@@ -7710,10 +7716,7 @@ unsafe extern "C" fn xml_valid_build_acontent_model(
 /// Returns 1 in case of success, 0 in case of error
 #[doc(alias = "xmlValidBuildContentModel")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe extern "C" fn xml_valid_build_content_model(
-    ctxt: XmlValidCtxtPtr,
-    elem: XmlElementPtr,
-) -> i32 {
+pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr) -> i32 {
     if ctxt.is_null() || elem.is_null() {
         return 0;
     }
@@ -7790,7 +7793,7 @@ pub unsafe extern "C" fn xml_valid_build_content_model(
 /// Returns 1 if yes, 0 if no, -1 in case of error
 #[doc(alias = "xmlValidateCheckMixed")]
 #[cfg(feature = "libxml_regexp")]
-unsafe extern "C" fn xml_validate_check_mixed(
+unsafe fn xml_validate_check_mixed(
     ctxt: XmlValidCtxtPtr,
     mut cont: XmlElementContentPtr,
     qname: *const XmlChar,
@@ -7873,11 +7876,7 @@ unsafe extern "C" fn xml_validate_check_mixed(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe extern "C" fn vstate_vpush(
-    ctxt: XmlValidCtxtPtr,
-    elem_decl: XmlElementPtr,
-    node: XmlNodePtr,
-) -> i32 {
+unsafe fn vstate_vpush(ctxt: XmlValidCtxtPtr, elem_decl: XmlElementPtr, node: XmlNodePtr) -> i32 {
     if (*ctxt).vstate_max == 0 || (*ctxt).vstate_tab.is_null() {
         (*ctxt).vstate_max = 10;
         (*ctxt).vstate_tab =

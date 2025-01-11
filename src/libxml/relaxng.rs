@@ -5650,8 +5650,12 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                     (*ctxt).am,
                     (*ctxt).state,
                     null_mut(),
-                    (*def).name,
-                    (*def).ns,
+                    CStr::from_ptr((*def).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    (!(*def).ns.is_null())
+                        .then(|| CStr::from_ptr((*def).ns as *const i8).to_string_lossy())
+                        .as_deref(),
                     def as _,
                 );
             }
@@ -5771,7 +5775,7 @@ unsafe fn xml_relaxng_compile(ctxt: XmlRelaxNGParserCtxtPtr, def: XmlRelaxNGDefi
                 (*ctxt).am,
                 (*ctxt).state,
                 (*ctxt).state,
-                c"#text".as_ptr() as _,
+                "#text",
                 null_mut(),
             );
             (*ctxt).state = xml_automata_new_epsilon((*ctxt).am, oldstate, null_mut());
@@ -7012,7 +7016,7 @@ unsafe fn xml_relaxng_validate_attribute_list(
 #[doc(alias = "xmlRelaxNGValidateCompiledCallback")]
 unsafe fn xml_relaxng_validate_compiled_callback(
     _exec: XmlRegExecCtxtPtr,
-    token: *const XmlChar,
+    token: &str,
     transdata: *mut c_void,
     inputdata: *mut c_void,
 ) {
@@ -7020,15 +7024,13 @@ unsafe fn xml_relaxng_validate_compiled_callback(
     let define: XmlRelaxNGDefinePtr = transdata as _;
 
     if ctxt.is_null() {
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} missing context");
         return;
     }
     if define.is_null() {
-        if *token.add(0) == b'#' {
+        if token.starts_with('#') {
             return;
         }
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} missing define");
         if !ctxt.is_null() && (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
@@ -7036,7 +7038,6 @@ unsafe fn xml_relaxng_validate_compiled_callback(
         return;
     }
     if (*define).typ != XmlRelaxNGType::Element {
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} define is not element");
         if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
@@ -8826,7 +8827,7 @@ pub unsafe fn xml_relaxng_validate_doc(ctxt: XmlRelaxNGValidCtxtPtr, doc: XmlDoc
 #[doc(alias = "xmlRelaxNGValidateProgressiveCallback")]
 pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
     _exec: XmlRegExecCtxtPtr,
-    token: *const XmlChar,
+    token: &str,
     transdata: *mut c_void,
     inputdata: *mut c_void,
 ) {
@@ -8837,17 +8838,15 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
     let oldflags: i32;
 
     if ctxt.is_null() {
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} missing context");
         return;
     }
     let node: XmlNodePtr = (*ctxt).pnode;
     (*ctxt).pstate = 1;
     if define.is_null() {
-        if *token.add(0) == b'#' {
+        if token.starts_with('#') {
             return;
         }
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} missing define");
         if !ctxt.is_null() && (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
@@ -8856,7 +8855,6 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
         return;
     }
     if ctxt.is_null() || define.is_null() {
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} missing info");
         if !ctxt.is_null() && (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;
@@ -8864,7 +8862,6 @@ pub(crate) unsafe fn xml_relaxng_validate_progressive_callback(
         (*ctxt).pstate = -1;
         return;
     } else if (*define).typ != XmlRelaxNGType::Element {
-        let token = CStr::from_ptr(token as *const i8).to_string_lossy();
         eprintln!("callback on {token} define is not element");
         if (*ctxt).err_no == XmlRelaxNGValidErr::XmlRelaxngOk as i32 {
             (*ctxt).err_no = XmlRelaxNGValidErr::XmlRelaxngErrInternal as i32;

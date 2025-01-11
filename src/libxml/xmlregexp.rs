@@ -28,6 +28,7 @@
 // Daniel Veillard <veillard@redhat.com>
 
 use std::{
+    borrow::Cow,
     ffi::{c_char, CStr},
     io::Write,
     mem::{size_of, take},
@@ -47,7 +48,7 @@ use crate::{
         xmlautomata::{
             xml_free_automata, xml_new_automata, XmlAutomata, XmlAutomataPtr, XmlAutomataState,
         },
-        xmlstring::{xml_str_equal, xml_strchr, xml_strdup, xml_strndup, XmlChar},
+        xmlstring::{xml_strdup, xml_strndup, XmlChar},
         xmlunicode::{
             xml_ucs_is_block, xml_ucs_is_cat_c, xml_ucs_is_cat_cc, xml_ucs_is_cat_cf,
             xml_ucs_is_cat_co, xml_ucs_is_cat_l, xml_ucs_is_cat_ll, xml_ucs_is_cat_lm,
@@ -166,12 +167,13 @@ pub enum XmlRegMarkedType {
 
 pub type XmlRegRangePtr = *mut XmlRegRange;
 #[repr(C)]
+#[derive(Default)]
 pub struct XmlRegRange {
     neg: i32, /* 0 normal, 1 not, 2 exclude */
     typ: XmlRegAtomType,
     start: i32,
     end: i32,
-    block_name: *mut XmlChar,
+    block_name: Option<String>,
 }
 
 pub type XmlRegState = XmlAutomataState;
@@ -185,8 +187,8 @@ pub struct XmlRegAtom {
     pub(crate) quant: XmlRegQuantType,
     pub(crate) min: i32,
     pub(crate) max: i32,
-    pub(crate) valuep: *mut c_void,
-    pub(crate) valuep2: *mut c_void,
+    pub(crate) valuep: Option<String>,
+    pub(crate) valuep2: Option<String>,
     pub(crate) neg: i32,
     pub(crate) codepoint: i32,
     pub(crate) start: XmlRegStatePtr,
@@ -204,8 +206,8 @@ impl Default for XmlRegAtom {
             quant: XmlRegQuantType::default(),
             min: 0,
             max: 0,
-            valuep: null_mut(),
-            valuep2: null_mut(),
+            valuep: None,
+            valuep2: None,
             neg: 0,
             codepoint: 0,
             start: null_mut(),
@@ -446,9 +448,7 @@ unsafe fn xml_reg_free_range(range: XmlRegRangePtr) {
         return;
     }
 
-    if !(*range).block_name.is_null() {
-        xml_free((*range).block_name as _);
-    }
+    drop_in_place(range);
     xml_free(range as _);
 }
 
@@ -461,15 +461,6 @@ pub(crate) unsafe fn xml_reg_free_atom(atom: XmlRegAtomPtr) {
 
     for range in (*atom).ranges.drain(..) {
         xml_reg_free_range(range);
-    }
-    if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString) && !(*atom).valuep.is_null() {
-        xml_free((*atom).valuep as _);
-    }
-    if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString) && !(*atom).valuep2.is_null() {
-        xml_free((*atom).valuep2 as _);
-    }
-    if matches!((*atom).typ, XmlRegAtomType::XmlRegexpBlockName) && !(*atom).valuep.is_null() {
-        xml_free((*atom).valuep as _);
     }
     drop_in_place(atom);
     xml_free(atom as _);
@@ -695,6 +686,7 @@ unsafe fn xml_reg_new_range(
         xml_regexp_err_memory(ctxt, "allocating range");
         return null_mut();
     }
+    std::ptr::write(&mut *ret, XmlRegRange::default());
     (*ret).neg = neg;
     (*ret).typ = typ;
     (*ret).start = start;
@@ -709,7 +701,7 @@ unsafe fn xml_reg_atom_add_range(
     typ: XmlRegAtomType,
     start: i32,
     end: i32,
-    block_name: *mut XmlChar,
+    block_name: Option<&str>,
 ) -> XmlRegRangePtr {
     if atom.is_null() {
         ERROR!(ctxt, "add range: atom is NULL");
@@ -723,7 +715,7 @@ unsafe fn xml_reg_atom_add_range(
     if range.is_null() {
         return null_mut();
     }
-    (*range).block_name = block_name;
+    (*range).block_name = block_name.map(|b| b.to_owned());
     (*atom).ranges.push(range);
     range
 }
@@ -944,12 +936,30 @@ unsafe fn xml_fa_parse_char_prop(ctxt: XmlRegParserCtxtPtr) {
             xml_free(block_name as _);
             return;
         }
-        (*(*ctxt).atom).valuep = block_name as _;
+        (*(*ctxt).atom).valuep = (!block_name.is_null()).then(|| {
+            CStr::from_ptr(block_name as *const i8)
+                .to_string_lossy()
+                .into_owned()
+        });
     } else if matches!((*(*ctxt).atom).typ, XmlRegAtomType::XmlRegexpRanges)
-        && xml_reg_atom_add_range(ctxt, (*ctxt).atom, (*ctxt).neg, typ, 0, 0, block_name).is_null()
+        && xml_reg_atom_add_range(
+            ctxt,
+            (*ctxt).atom,
+            (*ctxt).neg,
+            typ,
+            0,
+            0,
+            Some(
+                CStr::from_ptr(block_name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+        )
+        .is_null()
     {
-        xml_free(block_name as _);
+        // no op
     }
+    xml_free(block_name as _);
 }
 
 // Parser for the Schemas Datatype Regular Expressions
@@ -1017,7 +1027,7 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
                 XmlRegAtomType::XmlRegexpAnychar,
                 0,
                 0,
-                null_mut(),
+                None,
             );
         }
         NEXT!(ctxt);
@@ -1139,7 +1149,7 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
                 XmlRegAtomType::XmlRegexpCharval,
                 cur,
                 cur,
-                null_mut(),
+                None,
             );
         }
         NEXT!(ctxt);
@@ -1193,7 +1203,7 @@ unsafe fn xml_fa_parse_char_class_esc(ctxt: XmlRegParserCtxtPtr) {
         if (*ctxt).atom.is_null() {
             (*ctxt).atom = xml_reg_new_atom(ctxt, typ);
         } else if matches!((*(*ctxt).atom).typ, XmlRegAtomType::XmlRegexpRanges) {
-            xml_reg_atom_add_range(ctxt, (*ctxt).atom, (*ctxt).neg, typ, 0, 0, null_mut());
+            xml_reg_atom_add_range(ctxt, (*ctxt).atom, (*ctxt).neg, typ, 0, 0, None);
         }
     } else {
         ERROR!(ctxt, "Wrong escape sequence, misuse of character '\\'");
@@ -1281,7 +1291,7 @@ unsafe fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
             XmlRegAtomType::XmlRegexpCharval,
             start,
             end,
-            null_mut(),
+            None,
         );
         return;
     }
@@ -1329,7 +1339,7 @@ unsafe fn xml_fa_parse_char_range(ctxt: XmlRegParserCtxtPtr) {
             XmlRegAtomType::XmlRegexpCharval,
             start,
             end,
-            null_mut(),
+            None,
         );
     }
 }
@@ -1594,13 +1604,8 @@ unsafe fn xml_reg_copy_range(ctxt: XmlRegParserCtxtPtr, range: XmlRegRangePtr) -
     if ret.is_null() {
         return null_mut();
     }
-    if !(*range).block_name.is_null() {
-        (*ret).block_name = xml_strdup((*range).block_name);
-        if (*ret).block_name.is_null() {
-            xml_regexp_err_memory(ctxt, "allocating range");
-            xml_reg_free_range(ret);
-            return null_mut();
-        }
+    if let Some(block_name) = (*range).block_name.as_deref() {
+        (*ret).block_name = Some(block_name.to_owned());
     }
     ret
 }
@@ -2288,7 +2293,6 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
     {
         let mut nbstates: i32 = 0;
         let mut nbatoms: i32 = 0;
-        let mut value: *mut XmlChar;
         let mut transdata: *mut *mut c_void;
 
         // Switch to a compact representation
@@ -2340,10 +2344,14 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
             if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString)
                 && matches!((*atom).quant, XmlRegQuantType::XmlRegexpQuantOnce)
             {
-                value = (*atom).valuep as _;
                 let mut k = nbatoms;
+                let value = (*atom).valuep.as_deref().unwrap();
                 for j in 0..nbatoms {
-                    if xml_str_equal(*string_map.add(j as usize), value) {
+                    if CStr::from_ptr(*string_map.add(j as usize) as *const i8)
+                        .to_string_lossy()
+                        .as_ref()
+                        == value
+                    {
                         *string_remap.add(i) = j;
                         k = j;
                         break;
@@ -2351,7 +2359,8 @@ pub(crate) unsafe fn xml_reg_epx_from_parse(ctxt: XmlRegParserCtxtPtr) -> XmlReg
                 }
                 if k >= nbatoms {
                     *string_remap.add(i) = nbatoms;
-                    *string_map.add(nbatoms as usize) = xml_strdup(value);
+                    *string_map.add(nbatoms as usize) =
+                        xml_strndup(value.as_ptr(), value.len() as i32);
                     if (*string_map.add(nbatoms as usize)).is_null() {
                         for i in 0..nbatoms {
                             xml_free(*string_map.add(i as usize) as _);
@@ -2597,7 +2606,7 @@ unsafe fn xml_reg_check_character_range(
     mut neg: i32,
     start: i32,
     end: i32,
-    block_name: *const XmlChar,
+    block_name: Option<&str>,
 ) -> i32 {
     let ret = match typ {
         XmlRegAtomType::XmlRegexpString
@@ -2706,12 +2715,8 @@ unsafe fn xml_reg_check_character_range(
             false
         }
         XmlRegAtomType::XmlRegexpBlockName => {
-            xml_ucs_is_block(
-                codepoint,
-                CStr::from_ptr(block_name as *const i8)
-                    .to_string_lossy()
-                    .as_ref(),
-            ) != 0
+            // Fix the case of block_name is `None`...
+            xml_ucs_is_block(codepoint, block_name.unwrap()) != 0
         }
     };
     if neg != 0 {
@@ -2745,7 +2750,7 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
                         0,
                         (*range).start,
                         (*range).end,
-                        (*range).block_name,
+                        (*range).block_name.as_deref(),
                     );
                     if ret != 0 {
                         return 0; /* excluded char */
@@ -2757,7 +2762,7 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
                         0,
                         (*range).start,
                         (*range).end,
-                        (*range).block_name,
+                        (*range).block_name.as_deref(),
                     );
                     if ret == 0 {
                         accept = 1;
@@ -2771,7 +2776,7 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
                         0,
                         (*range).start,
                         (*range).end,
-                        (*range).block_name,
+                        (*range).block_name.as_deref(),
                     );
                     if ret != 0 {
                         accept = 1; /* might still be excluded */
@@ -2838,7 +2843,7 @@ unsafe fn xml_reg_check_character(atom: XmlRegAtomPtr, codepoint: i32) -> i32 {
                 0,
                 0,
                 0,
-                (*atom).valuep as *const XmlChar,
+                (*atom).valuep.as_deref(),
             );
             if (*atom).neg != 0 {
                 ret = (ret == 0) as i32;
@@ -3354,11 +3359,7 @@ unsafe fn xml_reg_print_atom<'a>(output: &mut (impl Write + 'a), atom: XmlRegAto
         write!(output, "{}-{} ", (*atom).min, (*atom).max);
     }
     if matches!((*atom).typ, XmlRegAtomType::XmlRegexpString) {
-        write!(
-            output,
-            "'{}' ",
-            CStr::from_ptr((*atom).valuep as *const i8).to_string_lossy()
-        );
+        write!(output, "'{}' ", (*atom).valuep.as_deref().unwrap());
     }
     if matches!((*atom).typ, XmlRegAtomType::XmlRegexpCharval) {
         writeln!(
@@ -3496,12 +3497,9 @@ unsafe fn xml_fa_equal_atoms(atom1: XmlRegAtomPtr, atom2: XmlRegAtomPtr, deep: i
         }
         XmlRegAtomType::XmlRegexpString => {
             if deep == 0 {
-                ret = ((*atom1).valuep == (*atom2).valuep) as i32;
+                ret = std::ptr::eq(&(*atom1).valuep, &(*atom2).valuep) as i32;
             } else {
-                ret = xml_str_equal(
-                    (*atom1).valuep as *mut XmlChar,
-                    (*atom2).valuep as *mut XmlChar,
-                ) as i32;
+                ret = ((*atom1).valuep == (*atom2).valuep) as i32;
             }
         }
         XmlRegAtomType::XmlRegexpCharval => {
@@ -3753,53 +3751,36 @@ unsafe fn xml_fa_compare_atom_types(mut type1: XmlRegAtomType, mut type2: XmlReg
 ///
 /// Returns 1 if the comparison is satisfied and the number of substrings is equal, 0 otherwise.
 #[doc(alias = "xmlRegStrEqualWildcard")]
-unsafe fn xml_reg_str_equal_wildcard(
-    mut exp_str: *const XmlChar,
-    mut val_str: *const XmlChar,
-) -> i32 {
+unsafe fn xml_reg_str_equal_wildcard(exp_str: Option<&str>, val_str: Option<&str>) -> i32 {
     if exp_str == val_str {
         return 1;
     }
-    if exp_str.is_null() {
+    let (Some(exp_str), Some(val_str)) = (exp_str, val_str) else {
         return 0;
-    }
-    if val_str.is_null() {
-        return 0;
-    }
-    while {
-        'to_continue: {
-            // Eval if we have a wildcard for the current item.
-            if *exp_str != *val_str {
-                // if one of them starts with a wildcard make valStr be it
-                if *val_str == b'*' {
-                    std::mem::swap(&mut val_str, &mut exp_str);
-                }
-                if *val_str != 0 && *exp_str != 0 && {
-                    exp_str = exp_str.add(1);
-                    *exp_str.sub(1) == b'*'
-                } {
-                    'to_break: while {
-                        if *val_str == XML_REG_STRING_SEPARATOR as _ {
-                            break 'to_break;
-                        }
-                        val_str = val_str.add(1);
-                        *val_str != 0
-                    } {}
-                    break 'to_continue;
-                } else {
-                    return 0;
-                }
+    };
+    let mut exp_str = exp_str.chars().peekable();
+    let mut val_str = val_str.chars().peekable();
+    while val_str.peek().is_some() {
+        // Eval if we have a wildcard for the current item.
+        if exp_str.peek() != val_str.peek() {
+            // if one of them starts with a wildcard make valStr be it
+            if val_str.peek() == Some(&'*') {
+                std::mem::swap(&mut val_str, &mut exp_str);
             }
-            exp_str = exp_str.add(1);
-            val_str = val_str.add(1);
+            if val_str.peek().is_some() && Some('*') == exp_str.next() {
+                while val_str
+                    .next_if(|&v| v != XML_REG_STRING_SEPARATOR)
+                    .is_some()
+                {}
+                continue;
+            } else {
+                return 0;
+            }
         }
-        *val_str != 0
-    } {}
-    if *exp_str != 0 {
-        0
-    } else {
-        1
+        exp_str.next();
+        val_str.next();
     }
+    exp_str.next().is_none() as i32
 }
 
 unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRangePtr) -> i32 {
@@ -3858,7 +3839,7 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
                 0,
                 (*range2).start,
                 (*range2).end,
-                (*range2).block_name,
+                (*range2).block_name.as_deref(),
             );
             if ret < 0 {
                 return -1;
@@ -3872,7 +3853,7 @@ unsafe fn xml_fa_compare_ranges(mut range1: XmlRegRangePtr, mut range2: XmlRegRa
         || (*range2).typ == XmlRegAtomType::XmlRegexpBlockName
     {
         if (*range1).typ == (*range2).typ {
-            ret = xml_str_equal((*range1).block_name, (*range2).block_name) as i32;
+            ret = ((*range1).block_name == (*range2).block_name) as i32;
         } else {
             // comparing a block range with anything else is way
             // too costly, and maintaining the table is like too much
@@ -4039,10 +4020,10 @@ unsafe fn xml_fa_compare_atoms(
                 if deep == 0 {
                     ret = ((*atom1).valuep != (*atom2).valuep) as i32;
                 } else {
-                    let val1: *mut XmlChar = (*atom1).valuep as *mut XmlChar;
-                    let val2: *mut XmlChar = (*atom2).valuep as *mut XmlChar;
-                    let compound1: i32 = !xml_strchr(val1, b'|').is_null() as i32;
-                    let compound2: i32 = !xml_strchr(val2, b'|').is_null() as i32;
+                    let val1 = (*atom1).valuep.as_deref();
+                    let val2 = (*atom2).valuep.as_deref();
+                    let compound1 = val1.map_or(false, |v| v.contains('|'));
+                    let compound2 = val2.map_or(false, |v| v.contains('|'));
 
                     // Ignore negative match flag for ##other namespaces
                     if compound1 != compound2 {
@@ -4336,12 +4317,8 @@ pub unsafe fn xml_regexp_is_determinist(comp: XmlRegexpPtr) -> i32 {
 
 /// Callback function when doing a transition in the automata
 #[doc(alias = "xmlRegExecCallbacks")]
-pub type XmlRegExecCallbacks = unsafe fn(
-    exec: XmlRegExecCtxtPtr,
-    token: *const XmlChar,
-    transdata: *mut c_void,
-    inputdata: *mut c_void,
-);
+pub type XmlRegExecCallbacks =
+    unsafe fn(exec: XmlRegExecCtxtPtr, token: &str, transdata: *mut c_void, inputdata: *mut c_void);
 
 /// Build a context used for progressive evaluation of a regexp.
 ///
@@ -4458,13 +4435,27 @@ unsafe fn xml_reg_compact_push_string(
             .add(state as usize * ((*comp).nbstrings + 1) as usize + i as usize + 1);
         if target > 0 && target <= (*comp).nbstates {
             target -= 1; /* to avoid 0 */
-            if xml_reg_str_equal_wildcard(*(*comp).string_map.add(i as usize), value) != 0 {
+            if xml_reg_str_equal_wildcard(
+                Some(
+                    CStr::from_ptr(*(*comp).string_map.add(i as usize) as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+                Some(
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                ),
+            ) != 0
+            {
                 (*exec).index = target;
                 if let Some(callback) = (*exec).callback {
                     if !(*comp).transdata.is_null() {
                         callback(
                             (*exec).data as _,
-                            value,
+                            CStr::from_ptr(value as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
                             *(*comp)
                                 .transdata
                                 .add(state as usize * (*comp).nbstrings as usize + i as usize),
@@ -4626,7 +4617,11 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 count = (*exec).counts[t.counter as usize];
                                 if count < counter.max
                                     && !t.atom.is_null()
-                                    && xml_str_equal(value, (*t.atom).valuep as _)
+                                    && Some(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    ) == (*t.atom).valuep.as_deref()
                                 {
                                     ret = 0;
                                     break;
@@ -4634,7 +4629,11 @@ unsafe fn xml_reg_exec_push_string_internal(
                                 if count >= counter.min
                                     && count < counter.max
                                     && !t.atom.is_null()
-                                    && xml_str_equal(value, (*t.atom).valuep as _)
+                                    && Some(
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    ) == (*t.atom).valuep.as_deref()
                                 {
                                     ret = 1;
                                     break;
@@ -4668,7 +4667,14 @@ unsafe fn xml_reg_exec_push_string_internal(
                         (*exec).status = -2;
                         break;
                     } else if !value.is_null() {
-                        ret = xml_reg_str_equal_wildcard((*atom).valuep as _, value);
+                        ret = xml_reg_str_equal_wildcard(
+                            (*atom).valuep.as_deref(),
+                            Some(
+                                CStr::from_ptr(value as *const i8)
+                                    .to_string_lossy()
+                                    .as_ref(),
+                            ),
+                        );
                         if (*atom).neg != 0 {
                             ret = (ret == 0) as i32;
                             if compound == 0 {
@@ -4722,7 +4728,12 @@ unsafe fn xml_reg_exec_push_string_internal(
                                     (*exec).transno = transno;
                                     (*exec).state = state;
                                 }
-                                ret = xml_str_equal(value, (*atom).valuep as _) as i32;
+                                ret = (Some(
+                                    CStr::from_ptr(value as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                ) == (*atom).valuep.as_deref())
+                                    as i32;
                                 (*exec).transcount += 1;
                                 ret == 1
                             } {}
@@ -4745,7 +4756,7 @@ unsafe fn xml_reg_exec_push_string_internal(
                             if !atom.is_null() && !data.is_null() {
                                 callback(
                                     (*exec).data as _,
-                                    (*atom).valuep as _,
+                                    (*atom).valuep.as_deref().unwrap(),
                                     (*atom).data as _,
                                     data,
                                 );
@@ -4854,7 +4865,7 @@ pub unsafe fn xml_reg_exec_push_string(
     xml_reg_exec_push_string_internal(exec, value, data, 0)
 }
 
-const XML_REG_STRING_SEPARATOR: c_char = b'|' as _;
+const XML_REG_STRING_SEPARATOR: char = '|';
 
 /// Push one input token in the execution context
 ///
@@ -4916,32 +4927,30 @@ pub unsafe fn xml_reg_exec_push_string2(
 /// Extract information from the regexp execution, internal routine to
 /// implement xmlRegExecNextValues() and xmlRegExecErrInfo()
 ///
-/// Returns: 0 in case of success or -1 in case of error.
+/// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
+/// Otherwise, return `None`.
 #[doc(alias = "xmlRegExecGetValues")]
-unsafe fn xml_reg_exec_get_values(
+unsafe fn xml_reg_exec_get_values<'a>(
     exec: XmlRegExecCtxtPtr,
     err: i32,
-    nbval: *mut i32,
-    nbneg: *mut i32,
-    values: *mut *mut XmlChar,
+    values: &'a mut [Cow<'static, str>],
     terminal: *mut i32,
-) -> i32 {
-    let mut nb: i32 = 0;
-
-    if exec.is_null() || nbval.is_null() || nbneg.is_null() || values.is_null() || *nbval <= 0 {
-        return -1;
+) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
+    if exec.is_null() || values.is_empty() {
+        return None;
     }
 
-    let maxval: i32 = *nbval;
-    *nbval = 0;
-    *nbneg = 0;
+    let maxval = values.len();
+    let mut nb = 0;
+    let mut nbval = 0;
+    let mut nbneg = 0;
     if !(*exec).comp.is_null() && !(*(*exec).comp).compact.is_null() {
         let mut target: i32;
         let comp: XmlRegexpPtr = (*exec).comp;
 
         let state = if err != 0 {
             if (*exec).err_state_no == -1 {
-                return -1;
+                return None;
             }
             (*exec).err_state_no
         } else {
@@ -4970,9 +4979,13 @@ unsafe fn xml_reg_exec_get_values(
                         .add((target - 1) as usize * ((*comp).nbstrings as usize + 1))
                         != XmlRegStateType::XmlRegexpSinkState as i32
                 {
-                    *values.add(nb as usize) = *(*comp).string_map.add(i as usize);
+                    values[nb] = Cow::Owned(
+                        CStr::from_ptr(*(*comp).string_map.add(i as usize) as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
                     nb += 1;
-                    *nbval += 1;
+                    nbval += 1;
                 }
                 if nb >= maxval {
                     break;
@@ -4991,9 +5004,13 @@ unsafe fn xml_reg_exec_get_values(
                         .add((target - 1) as usize * ((*comp).nbstrings as usize + 1))
                         == XmlRegStateType::XmlRegexpSinkState as i32
                 {
-                    *values.add(nb as usize) = *(*comp).string_map.add(i as usize);
+                    values[nb] = Cow::Owned(
+                        CStr::from_ptr(*(*comp).string_map.add(i as usize) as *const i8)
+                            .to_string_lossy()
+                            .into_owned(),
+                    );
                     nb += 1;
-                    *nbneg += 1;
+                    nbneg += 1;
                 }
                 if nb >= maxval {
                     break;
@@ -5013,12 +5030,12 @@ unsafe fn xml_reg_exec_get_values(
 
         let state = if err != 0 {
             if (*exec).err_state.is_null() {
-                return -1;
+                return None;
             }
             (*exec).err_state
         } else {
             if (*exec).state.is_null() {
-                return -1;
+                return None;
             }
             (*exec).state
         };
@@ -5028,7 +5045,7 @@ unsafe fn xml_reg_exec_get_values(
                     continue;
                 }
                 atom = trans.atom;
-                if atom.is_null() || (*atom).valuep.is_null() {
+                if atom.is_null() || (*atom).valuep.is_none() {
                     continue;
                 }
                 if trans.count as usize == REGEXP_ALL_LAX_COUNTER {
@@ -5050,13 +5067,13 @@ unsafe fn xml_reg_exec_get_values(
                     }
                     if counter.map_or(true, |c| count < c.max) {
                         if (*atom).neg != 0 {
-                            *values.add(nb as usize) = (*atom).valuep2 as *mut XmlChar;
+                            values[nb] = Cow::Owned((*atom).valuep2.as_deref().unwrap().to_owned());
                             nb += 1;
                         } else {
-                            *values.add(nb as usize) = (*atom).valuep as *mut XmlChar;
+                            values[nb] = Cow::Owned((*atom).valuep.as_deref().unwrap().to_owned());
                             nb += 1;
                         }
-                        (*nbval) += 1;
+                        nbval += 1;
                     }
                 } else if !(*exec).comp.is_null()
                     && !((*(*exec).comp).states[trans.to as usize]).is_null()
@@ -5066,13 +5083,13 @@ unsafe fn xml_reg_exec_get_values(
                     )
                 {
                     if (*atom).neg != 0 {
-                        *values.add(nb as usize) = (*atom).valuep2 as *mut XmlChar;
+                        values[nb] = Cow::Owned((*atom).valuep2.as_deref().unwrap().to_owned());
                         nb += 1;
                     } else {
-                        *values.add(nb as usize) = (*atom).valuep as *mut XmlChar;
+                        values[nb] = Cow::Owned((*atom).valuep.as_deref().unwrap().to_owned());
                         nb += 1;
                     }
-                    *nbval += 1;
+                    nbval += 1;
                 }
                 if nb >= maxval {
                     break;
@@ -5085,7 +5102,7 @@ unsafe fn xml_reg_exec_get_values(
                     continue;
                 }
                 atom = trans.atom;
-                if atom.is_null() || (*atom).valuep.is_null() {
+                if atom.is_null() || (*atom).valuep.is_none() {
                     continue;
                 }
                 if trans.count as usize == REGEXP_ALL_LAX_COUNTER
@@ -5100,13 +5117,13 @@ unsafe fn xml_reg_exec_get_values(
                     )
                 {
                     if (*atom).neg != 0 {
-                        *values.add(nb as usize) = (*atom).valuep2 as *mut XmlChar;
+                        values[nb] = Cow::Owned((*atom).valuep2.as_deref().unwrap().to_owned());
                         nb += 1
                     } else {
-                        *values.add(nb as usize) = (*atom).valuep as *mut XmlChar;
+                        values[nb] = Cow::Owned((*atom).valuep.as_deref().unwrap().to_owned());
                         nb += 1;
                     }
-                    *nbneg += 1;
+                    nbneg += 1;
                 }
                 if nb >= maxval {
                     break;
@@ -5114,7 +5131,7 @@ unsafe fn xml_reg_exec_get_values(
             }
         }
     }
-    0
+    Some((nbval, nbneg, &values[..nb]))
 }
 
 /// Extract information from the regexp execution,
@@ -5123,16 +5140,15 @@ unsafe fn xml_reg_exec_get_values(
 /// state and the @values array will be updated with them. The string values
 /// returned will be freed with the @exec context and don't need to be deallocated.
 ///
-/// Returns: 0 in case of success or -1 in case of error.
+/// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
+/// Otherwise, return `None`.
 #[doc(alias = "xmlRegExecNextValues")]
-pub unsafe fn xml_reg_exec_next_values(
+pub unsafe fn xml_reg_exec_next_values<'a>(
     exec: XmlRegExecCtxtPtr,
-    nbval: *mut i32,
-    nbneg: *mut i32,
-    values: *mut *mut XmlChar,
+    values: &'a mut [Cow<'static, str>],
     terminal: *mut i32,
-) -> i32 {
-    xml_reg_exec_get_values(exec, 0, nbval, nbneg, values, terminal)
+) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
+    xml_reg_exec_get_values(exec, 0, values, terminal)
 }
 
 /// Extract error information from the regexp execution, the parameter
@@ -5142,18 +5158,17 @@ pub unsafe fn xml_reg_exec_next_values(
 /// state and the @values array will be updated with them. The string values
 /// returned will be freed with the @exec context and don't need to be deallocated.
 ///
-/// Returns: 0 in case of success or -1 in case of error.
+/// If successfully collected, return `Some((num_val, num_neg, values_slice))`.  
+/// Otherwise, return `None`.
 #[doc(alias = "xmlRegExecErrInfo")]
-pub unsafe fn xml_reg_exec_err_info(
+pub unsafe fn xml_reg_exec_err_info<'a>(
     exec: XmlRegExecCtxtPtr,
     string: *mut *const XmlChar,
-    nbval: *mut i32,
-    nbneg: *mut i32,
-    values: *mut *mut XmlChar,
+    values: &'a mut [Cow<'static, str>],
     terminal: *mut i32,
-) -> i32 {
+) -> Option<(usize, usize, &'a [Cow<'static, str>])> {
     if exec.is_null() {
-        return -1;
+        return None;
     }
     if !string.is_null() {
         if (*exec).status != 0 {
@@ -5162,7 +5177,7 @@ pub unsafe fn xml_reg_exec_err_info(
             *string = null_mut();
         }
     }
-    xml_reg_exec_get_values(exec, 1, nbval, nbneg, values, terminal)
+    xml_reg_exec_get_values(exec, 1, values, terminal)
 }
 
 // expressions are used within a context
@@ -7363,123 +7378,6 @@ mod tests {
                             eprint!(" {}", n_ctxt);
                             eprint!(" {}", n_exp);
                             eprintln!(" {}", n_sub);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reg_exec_err_info() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_exec in 0..GEN_NB_XML_REG_EXEC_CTXT_PTR {
-                for n_string in 0..GEN_NB_CONST_XML_CHAR_PTR_PTR {
-                    for n_nbval in 0..GEN_NB_INT_PTR {
-                        for n_nbneg in 0..GEN_NB_INT_PTR {
-                            for n_values in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                                for n_terminal in 0..GEN_NB_INT_PTR {
-                                    let mem_base = xml_mem_blocks();
-                                    let exec = gen_xml_reg_exec_ctxt_ptr(n_exec, 0);
-                                    let string = gen_const_xml_char_ptr_ptr(n_string, 1);
-                                    let nbval = gen_int_ptr(n_nbval, 2);
-                                    let nbneg = gen_int_ptr(n_nbneg, 3);
-                                    let values = gen_xml_char_ptr_ptr(n_values, 4);
-                                    let terminal = gen_int_ptr(n_terminal, 5);
-
-                                    let ret_val = xml_reg_exec_err_info(
-                                        exec,
-                                        string as *mut *const XmlChar,
-                                        nbval,
-                                        nbneg,
-                                        values,
-                                        terminal,
-                                    );
-                                    desret_int(ret_val);
-                                    des_xml_reg_exec_ctxt_ptr(n_exec, exec, 0);
-                                    des_const_xml_char_ptr_ptr(
-                                        n_string,
-                                        string as *mut *const XmlChar,
-                                        1,
-                                    );
-                                    des_int_ptr(n_nbval, nbval, 2);
-                                    des_int_ptr(n_nbneg, nbneg, 3);
-                                    des_xml_char_ptr_ptr(n_values, values, 4);
-                                    des_int_ptr(n_terminal, terminal, 5);
-                                    reset_last_error();
-                                    if mem_base != xml_mem_blocks() {
-                                        leaks += 1;
-                                        eprint!(
-                                            "Leak of {} blocks found in xmlRegExecErrInfo",
-                                            xml_mem_blocks() - mem_base
-                                        );
-                                        assert!(
-                                            leaks == 0,
-                                            "{leaks} Leaks are found in xmlRegExecErrInfo()"
-                                        );
-                                        eprint!(" {}", n_exec);
-                                        eprint!(" {}", n_string);
-                                        eprint!(" {}", n_nbval);
-                                        eprint!(" {}", n_nbneg);
-                                        eprint!(" {}", n_values);
-                                        eprintln!(" {}", n_terminal);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_reg_exec_next_values() {
-        #[cfg(feature = "libxml_regexp")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_exec in 0..GEN_NB_XML_REG_EXEC_CTXT_PTR {
-                for n_nbval in 0..GEN_NB_INT_PTR {
-                    for n_nbneg in 0..GEN_NB_INT_PTR {
-                        for n_values in 0..GEN_NB_XML_CHAR_PTR_PTR {
-                            for n_terminal in 0..GEN_NB_INT_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let exec = gen_xml_reg_exec_ctxt_ptr(n_exec, 0);
-                                let nbval = gen_int_ptr(n_nbval, 1);
-                                let nbneg = gen_int_ptr(n_nbneg, 2);
-                                let values = gen_xml_char_ptr_ptr(n_values, 3);
-                                let terminal = gen_int_ptr(n_terminal, 4);
-
-                                let ret_val =
-                                    xml_reg_exec_next_values(exec, nbval, nbneg, values, terminal);
-                                desret_int(ret_val);
-                                des_xml_reg_exec_ctxt_ptr(n_exec, exec, 0);
-                                des_int_ptr(n_nbval, nbval, 1);
-                                des_int_ptr(n_nbneg, nbneg, 2);
-                                des_xml_char_ptr_ptr(n_values, values, 3);
-                                des_int_ptr(n_terminal, terminal, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlRegExecNextValues",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlRegExecNextValues()"
-                                    );
-                                    eprint!(" {}", n_exec);
-                                    eprint!(" {}", n_nbval);
-                                    eprint!(" {}", n_nbneg);
-                                    eprint!(" {}", n_values);
-                                    eprintln!(" {}", n_terminal);
-                                }
-                            }
                         }
                     }
                 }

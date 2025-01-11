@@ -30,10 +30,7 @@ use std::{
     ptr::{null, null_mut},
 };
 
-use libc::{memcpy, snprintf, strlen};
-
 use crate::libxml::{
-    globals::xml_malloc_atomic,
     xmlregexp::{
         xml_fa_computes_determinism, xml_fa_eliminate_epsilon_transitions,
         xml_fa_generate_counted_epsilon_transition, xml_fa_generate_counted_transition,
@@ -44,7 +41,7 @@ use crate::libxml::{
         XmlRegQuantType, XmlRegStatePtr, XmlRegStateType, XmlRegTrans, XmlRegexp,
         REGEXP_ALL_COUNTER, REGEXP_ALL_LAX_COUNTER,
     },
-    xmlstring::{xml_strdup, XmlChar},
+    xmlstring::XmlChar,
 };
 
 /// A libxml automata description, It can be compiled into a regexp
@@ -185,10 +182,10 @@ pub unsafe fn xml_automata_new_transition(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
-    token: *const XmlChar,
+    token: &str,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
@@ -196,7 +193,7 @@ pub unsafe fn xml_automata_new_transition(
         return null_mut();
     }
     (*atom).data = data;
-    (*atom).valuep = xml_strdup(token as _) as _;
+    (*atom).valuep = Some(token.to_owned());
 
     if xml_fa_generate_transitions(am, from, to, atom) < 0 {
         xml_reg_free_atom(atom);
@@ -218,11 +215,11 @@ pub unsafe fn xml_automata_new_transition2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
-    token: *const XmlChar,
-    token2: *const XmlChar,
+    token: &str,
+    token2: Option<&str>,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
@@ -230,23 +227,10 @@ pub unsafe fn xml_automata_new_transition2(
         return null_mut();
     }
     (*atom).data = data;
-    if token2.is_null() || *token2 == 0 {
-        (*atom).valuep = xml_strdup(token as _) as _;
+    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+        (*atom).valuep = Some(format!("{token}|{token2}"));
     } else {
-        let lenn: i32 = strlen(token2 as _) as _;
-        let lenp: i32 = strlen(token as _) as _;
-
-        let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
-        if str.is_null() {
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        memcpy(str.add(0) as _, token as _, lenp as _);
-        *str.add(lenp as usize) = b'|';
-        memcpy(str.add(lenp as usize + 1) as _, token2 as _, lenn as usize);
-        *str.add(lenn as usize + lenp as usize + 1) = 0;
-
-        (*atom).valuep = str as _;
+        (*atom).valuep = Some(token.to_owned());
     }
 
     if xml_fa_generate_transitions(am, from, to, atom) < 0 {
@@ -271,13 +255,11 @@ pub unsafe fn xml_automata_new_neg_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     to: XmlAutomataStatePtr,
-    token: *const XmlChar,
-    token2: *const XmlChar,
+    token: &str,
+    token2: Option<&str>,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    let mut err_msg: [XmlChar; 200] = [0; 200];
-
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     let atom: XmlRegAtomPtr = xml_reg_new_atom(am, XmlRegAtomType::XmlRegexpString);
@@ -286,32 +268,13 @@ pub unsafe fn xml_automata_new_neg_trans(
     }
     (*atom).data = data;
     (*atom).neg = 1;
-    if token2.is_null() || *token2 == 0 {
-        (*atom).valuep = xml_strdup(token as _) as _;
+    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+        (*atom).valuep = Some(format!("{token}|{token2}"));
     } else {
-        let lenn: i32 = strlen(token2 as _) as _;
-        let lenp: i32 = strlen(token as _) as _;
-
-        let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
-        if str.is_null() {
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        memcpy(str.add(0) as _, token as _, lenp as usize);
-        *str.add(lenp as usize) = b'|';
-        memcpy(str.add(lenp as usize + 1) as _, token2 as _, lenn as usize);
-        *str.add(lenn as usize + lenp as usize + 1) = 0;
-
-        (*atom).valuep = str as _;
+        (*atom).valuep = Some(token.to_owned());
     }
-    snprintf(
-        err_msg.as_mut_ptr() as _,
-        199,
-        c"not %s".as_ptr() as _,
-        (*atom).valuep,
-    );
-    err_msg[199] = 0;
-    (*atom).valuep2 = xml_strdup(err_msg.as_mut_ptr() as _) as _;
+    let err_msg = format!("not {}", (*atom).valuep.as_deref().unwrap());
+    (*atom).valuep2 = Some(err_msg);
 
     if xml_fa_generate_transitions(am, from, to, atom) < 0 {
         xml_reg_free_atom(atom);
@@ -335,12 +298,12 @@ pub unsafe fn xml_automata_new_count_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
-    token: *const XmlChar,
+    token: &str,
     min: i32,
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     if min < 0 {
@@ -353,12 +316,7 @@ pub unsafe fn xml_automata_new_count_trans(
     if atom.is_null() {
         return null_mut();
     }
-    (*atom).valuep = xml_strdup(token as _) as _;
-    if (*atom).valuep.is_null() {
-        // goto error;
-        xml_reg_free_atom(atom);
-        return null_mut();
-    }
+    (*atom).valuep = Some(token.to_owned());
     (*atom).data = data;
     if min == 0 {
         (*atom).min = 1;
@@ -417,13 +375,13 @@ pub unsafe fn xml_automata_new_count_trans2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
-    token: *const XmlChar,
-    token2: *const XmlChar,
+    token: &str,
+    token2: Option<&str>,
     min: i32,
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     if min < 0 {
@@ -436,29 +394,10 @@ pub unsafe fn xml_automata_new_count_trans2(
     if atom.is_null() {
         return null_mut();
     }
-    if token2.is_null() || *token2 == 0 {
-        (*atom).valuep = xml_strdup(token as _) as _;
-        if (*atom).valuep.is_null() {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
+    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+        (*atom).valuep = Some(format!("{token}|{token2}"));
     } else {
-        let lenn: i32 = strlen(token2 as _) as _;
-        let lenp: i32 = strlen(token as _) as _;
-
-        let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
-        if str.is_null() {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        memcpy(str.add(0) as _, token as _, lenp as usize);
-        *str.add(lenp as usize) = b'|';
-        memcpy(str.add(lenp as usize + 1) as _, token2 as _, lenn as usize);
-        *str.add(lenn as usize + lenp as usize + 1) = 0;
-
-        (*atom).valuep = str as _;
+        (*atom).valuep = Some(token.to_owned());
     }
     (*atom).data = data;
     if min == 0 {
@@ -517,12 +456,12 @@ pub unsafe fn xml_automata_new_once_trans(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
-    token: *const XmlChar,
+    token: &str,
     min: i32,
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     if min < 1 {
@@ -535,7 +474,7 @@ pub unsafe fn xml_automata_new_once_trans(
     if atom.is_null() {
         return null_mut();
     }
-    (*atom).valuep = xml_strdup(token as _) as _;
+    (*atom).valuep = Some(token.to_owned());
     (*atom).data = data;
     (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;
     (*atom).min = min;
@@ -580,13 +519,13 @@ pub unsafe fn xml_automata_new_once_trans2(
     am: XmlAutomataPtr,
     from: XmlAutomataStatePtr,
     mut to: XmlAutomataStatePtr,
-    token: *const XmlChar,
-    token2: *const XmlChar,
+    token: &str,
+    token2: Option<&str>,
     min: i32,
     max: i32,
     data: *mut c_void,
 ) -> XmlAutomataStatePtr {
-    if am.is_null() || from.is_null() || token.is_null() {
+    if am.is_null() || from.is_null() {
         return null_mut();
     }
     if min < 1 {
@@ -599,29 +538,10 @@ pub unsafe fn xml_automata_new_once_trans2(
     if atom.is_null() {
         return null_mut();
     }
-    if token2.is_null() || *token2 == 0 {
-        (*atom).valuep = xml_strdup(token as _) as _;
-        if (*atom).valuep.is_null() {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
+    if let Some(token2) = token2.filter(|t| !t.is_empty()) {
+        (*atom).valuep = Some(format!("{token}|{token2}"));
     } else {
-        let lenn: i32 = strlen(token2 as _) as _;
-        let lenp: i32 = strlen(token as _) as _;
-
-        let str: *mut XmlChar = xml_malloc_atomic(lenn as usize + lenp as usize + 2) as _;
-        if str.is_null() {
-            // goto error;
-            xml_reg_free_atom(atom);
-            return null_mut();
-        }
-        memcpy(str.add(0) as _, token as _, lenp as _);
-        *str.add(lenp as usize) = b'|';
-        memcpy(str.add(lenp as usize + 1) as _, token2 as _, lenn as _);
-        *str.add(lenn as usize + lenp as usize + 1) = 0;
-
-        (*atom).valuep = str as _;
+        (*atom).valuep = Some(token.to_owned());
     }
     (*atom).data = data;
     (*atom).quant = XmlRegQuantType::XmlRegexpQuantOnceonly;

@@ -22,6 +22,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
+    borrow::Cow,
     cell::RefCell,
     ffi::{c_char, CStr, CString},
     fmt::Write as _,
@@ -21482,7 +21483,7 @@ unsafe extern "C" fn xml_schema_check_elem_subst_group(
 /// Validates the value constraints of an element declaration.
 /// Adds substitution group members.
 #[doc(alias = "xmlSchemaCheckElementDeclComponent")]
-unsafe extern "C" fn xml_schema_check_element_decl_component(
+unsafe fn xml_schema_check_element_decl_component(
     elem_decl: XmlSchemaElementPtr,
     ctxt: XmlSchemaParserCtxtPtr,
 ) {
@@ -21494,16 +21495,14 @@ unsafe extern "C" fn xml_schema_check_element_decl_component(
     }
     (*elem_decl).flags |= XML_SCHEMAS_ELEM_INTERNAL_CHECKED;
     if xml_schema_check_elem_props_correct(ctxt, elem_decl) == 0 {
-        /*
-         * Adds substitution group members.
-         */
+        // Adds substitution group members.
         xml_schema_check_elem_subst_group(ctxt, elem_decl);
     }
 }
 
 /// Returns 1 if nillable, 0 otherwise
 #[doc(alias = "xmlSchemaBuildContentModelForSubstGroup")]
-unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
+unsafe fn xml_schema_build_content_model_for_subst_group(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
     mut counter: i32,
@@ -21533,75 +21532,89 @@ unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
         return 0;
     }
     if counter >= 0 {
-        /*
-        	* NOTE that we put the declaration in, even if it's abstract.
-        	* However, an error will be raised during *validation* if an element
-        	* information item shall be validated against an abstract element
-        	* declaration.
-        	*/
+        // NOTE that we put the declaration in, even if it's abstract.
+        // However, an error will be raised during *validation* if an element
+        // information item shall be validated against an abstract element
+        // declaration.
         tmp = xml_automata_new_counted_trans((*pctxt).am, start, null_mut(), counter);
         xml_automata_new_transition2(
             (*pctxt).am,
             tmp,
             end,
-            (*elem_decl).name,
-            (*elem_decl).target_namespace,
+            CStr::from_ptr((*elem_decl).name as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            (!(*elem_decl).target_namespace.is_null())
+                .then(|| {
+                    CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                })
+                .as_deref(),
             elem_decl as _,
         );
-        /*
-        	* Add subst. group members.
-        	*/
+        // Add subst. group members.
         for i in 0..(*(*subst_group).members).nb_items {
             member = *(*(*subst_group).members).items.add(i as usize) as XmlSchemaElementPtr;
             xml_automata_new_transition2(
                 (*pctxt).am,
                 tmp,
                 end,
-                (*member).name,
-                (*member).target_namespace,
+                CStr::from_ptr((*member).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*member).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*member).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 member as _,
             );
         }
     } else if (*particle).max_occurs == 1 {
-        /*
-        	* NOTE that we put the declaration in, even if it's abstract,
-        	*/
+        // NOTE that we put the declaration in, even if it's abstract,
         xml_automata_new_epsilon(
             (*pctxt).am,
             xml_automata_new_transition2(
                 (*pctxt).am,
                 start,
                 null_mut(),
-                (*elem_decl).name,
-                (*elem_decl).target_namespace,
+                CStr::from_ptr((*elem_decl).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*elem_decl).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 elem_decl as _,
             ),
             end,
         );
-        /*
-        	* Add subst. group members.
-        	*/
+        // Add subst. group members.
         for i in 0..(*(*subst_group).members).nb_items {
             member = *(*(*subst_group).members).items.add(i as usize) as XmlSchemaElementPtr;
-            /*
-             * NOTE: This fixes bug #341150. xmlAutomataNewOnceTrans2()
-             *  was incorrectly used instead of xmlAutomataNewTransition2()
-             *  (seems like a copy&paste bug from the XmlSchemaTypeType::XmlSchemaTypeAll
-             *  section in xmlSchemaBuildAContentModel() ).
-             * TODO: Check if xmlAutomataNewOnceTrans2() was instead
-             *  intended for the above "counter" section originally. I.e.,
-             *  check xs:all with subst-groups.
-             *
-             * tmp = xmlAutomataNewOnceTrans2((*pctxt).am, start, null_mut(),
-             *                   (*member).name, (*member).target_namespace,
-             *               1, 1, member);
-             */
+            // NOTE: This fixes bug #341150. xmlAutomataNewOnceTrans2()
+            //  was incorrectly used instead of xmlAutomataNewTransition2()
+            //  (seems like a copy&paste bug from the XmlSchemaTypeType::XmlSchemaTypeAll
+            //  section in xmlSchemaBuildAContentModel() ).
+            // TODO: Check if xmlAutomataNewOnceTrans2() was instead
+            //  intended for the above "counter" section originally. I.e.,
+            //  check xs:all with subst-groups.
+            //
+            // tmp = xmlAutomataNewOnceTrans2((*pctxt).am, start, null_mut(),
+            //                   (*member).name, (*member).target_namespace,
+            //               1, 1, member);
             tmp = xml_automata_new_transition2(
                 (*pctxt).am,
                 start,
                 null_mut(),
-                (*member).name,
-                (*member).target_namespace,
+                CStr::from_ptr((*member).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*member).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*member).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 member as _,
             );
             xml_automata_new_epsilon((*pctxt).am, tmp, end);
@@ -21627,15 +21640,19 @@ unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
                 (*pctxt).am,
                 start,
                 null_mut(),
-                (*elem_decl).name,
-                (*elem_decl).target_namespace,
+                CStr::from_ptr((*elem_decl).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*elem_decl).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 elem_decl as _,
             ),
             hop,
         );
-        /*
-         * Add subst. group members.
-         */
+        // Add subst. group members.
         for i in 0..(*(*subst_group).members).nb_items {
             member = *(*(*subst_group).members).items.add(i as usize) as XmlSchemaElementPtr;
             xml_automata_new_epsilon(
@@ -21644,8 +21661,15 @@ unsafe extern "C" fn xml_schema_build_content_model_for_subst_group(
                     (*pctxt).am,
                     start,
                     null_mut(),
-                    (*member).name,
-                    (*member).target_namespace,
+                    CStr::from_ptr((*member).name as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    (!(*member).target_namespace.is_null())
+                        .then(|| {
+                            CStr::from_ptr((*member).target_namespace as *const i8)
+                                .to_string_lossy()
+                        })
+                        .as_deref(),
                     member as _,
                 ),
                 hop,
@@ -21690,8 +21714,14 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
                 (*ctxt).am,
                 start,
                 null_mut(),
-                (*elem_decl).name,
-                (*elem_decl).target_namespace,
+                CStr::from_ptr((*elem_decl).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*elem_decl).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 elem_decl as _,
             );
         } else if (*particle).max_occurs >= UNBOUNDED as i32 && (*particle).min_occurs < 2 {
@@ -21701,16 +21731,28 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
                 (*ctxt).am,
                 start,
                 null_mut(),
-                (*elem_decl).name,
-                (*elem_decl).target_namespace,
+                CStr::from_ptr((*elem_decl).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*elem_decl).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 elem_decl as _,
             );
             (*ctxt).state = xml_automata_new_transition2(
                 (*ctxt).am,
                 (*ctxt).state,
                 (*ctxt).state,
-                (*elem_decl).name,
-                (*elem_decl).target_namespace,
+                CStr::from_ptr((*elem_decl).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*elem_decl).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 elem_decl as _,
             );
         } else {
@@ -21731,8 +21773,14 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
                 (*ctxt).am,
                 start,
                 null_mut(),
-                (*elem_decl).name,
-                (*elem_decl).target_namespace,
+                CStr::from_ptr((*elem_decl).name as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
+                (!(*elem_decl).target_namespace.is_null())
+                    .then(|| {
+                        CStr::from_ptr((*elem_decl).target_namespace as *const i8).to_string_lossy()
+                    })
+                    .as_deref(),
                 elem_decl as _,
             );
             xml_automata_new_counted_trans((*ctxt).am, (*ctxt).state, start, counter);
@@ -21751,7 +21799,7 @@ unsafe extern "C" fn xml_schema_build_content_model_for_element(
 ///
 /// Returns 1 if the content is nillable, 0 otherwise
 #[doc(alias = "xmlSchemaBuildAContentModel")]
-unsafe extern "C" fn xml_schema_build_acontent_model(
+unsafe fn xml_schema_build_acontent_model(
     pctxt: XmlSchemaParserCtxtPtr,
     particle: XmlSchemaParticlePtr,
 ) -> i32 {
@@ -21777,29 +21825,25 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
 
             if (*particle).max_occurs == 1 {
                 if (*wild).any == 1 {
-                    /*
-                     * We need to add both transitions:
-                     *
-                     * 1. the {"*", "*"} for elements in a namespace.
-                     */
+                    // We need to add both transitions:
+                    //
+                    // 1. the {"*", "*"} for elements in a namespace.
                     (*pctxt).state = xml_automata_new_transition2(
                         (*pctxt).am,
                         start,
                         null_mut(),
-                        c"*".as_ptr() as _,
-                        c"*".as_ptr() as _,
+                        "*",
+                        Some("*"),
                         wild as _,
                     );
                     xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
-                    /*
-                     * 2. the {"*"} for elements in no namespace.
-                     */
+                    // 2. the {"*"} for elements in no namespace.
                     (*pctxt).state = xml_automata_new_transition2(
                         (*pctxt).am,
                         start,
                         null_mut(),
-                        c"*".as_ptr() as _,
-                        null_mut(),
+                        "*",
+                        None,
                         wild as _,
                     );
                     xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
@@ -21811,8 +21855,10 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                             (*pctxt).am,
                             (*pctxt).state,
                             null_mut(),
-                            c"*".as_ptr() as _,
-                            (*ns).value,
+                            "*",
+                            (!(*ns).value.is_null())
+                                .then(|| CStr::from_ptr((*ns).value as *const i8).to_string_lossy())
+                                .as_deref(),
                             wild as _,
                         );
                         xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, end);
@@ -21824,8 +21870,13 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                         (*pctxt).am,
                         start,
                         end,
-                        c"*".as_ptr() as _,
-                        (*(*wild).neg_ns_set).value,
+                        "*",
+                        (!(*(*wild).neg_ns_set).value.is_null())
+                            .then(|| {
+                                CStr::from_ptr((*(*wild).neg_ns_set).value as *const i8)
+                                    .to_string_lossy()
+                            })
+                            .as_deref(),
                         wild as _,
                     );
                 }
@@ -21848,8 +21899,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                         (*pctxt).am,
                         start,
                         null_mut(),
-                        c"*".as_ptr() as _,
-                        c"*".as_ptr() as _,
+                        "*",
+                        Some("*"),
                         wild as _,
                     );
                     xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
@@ -21857,8 +21908,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                         (*pctxt).am,
                         start,
                         null_mut(),
-                        c"*".as_ptr() as _,
-                        null_mut(),
+                        "*",
+                        None,
                         wild as _,
                     );
                     xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
@@ -21869,8 +21920,10 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                             (*pctxt).am,
                             start,
                             null_mut(),
-                            c"*".as_ptr() as _,
-                            (*ns).value,
+                            "*",
+                            (!(*ns).value.is_null())
+                                .then(|| CStr::from_ptr((*ns).value as *const i8).to_string_lossy())
+                                .as_deref(),
                             wild as _,
                         );
                         xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, hop);
@@ -21882,8 +21935,13 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                         (*pctxt).am,
                         start,
                         hop,
-                        c"*".as_ptr() as _,
-                        (*(*wild).neg_ns_set).value,
+                        "*",
+                        (!(*(*wild).neg_ns_set).value.is_null())
+                            .then(|| {
+                                CStr::from_ptr((*(*wild).neg_ns_set).value as *const i8)
+                                    .to_string_lossy()
+                            })
+                            .as_deref(),
                         wild as _,
                     );
                 }
@@ -21903,10 +21961,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
             let mut sub: XmlSchemaTreeItemPtr;
 
             ret = 1;
-            /*
-             * If max and min occurrences are default (1) then
-             * simply iterate over the particles of the <sequence>.
-             */
+            // If max and min occurrences are default (1) then
+            // simply iterate over the particles of the <sequence>.
             if (*particle).min_occurs == 1 && (*particle).max_occurs == 1 {
                 sub = (*(*particle).children).children;
 
@@ -21963,11 +22019,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                             sub = (*sub).next;
                         }
                         xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, oldstate);
-                        /*
-                         * epsilon needed to block previous trans from
-                         * being allowed to enter back from another
-                         * construct
-                         */
+                        // epsilon needed to block previous trans from
+                        // being allowed to enter back from another construct
                         (*pctxt).state =
                             xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, null_mut());
                         if (*particle).min_occurs == 0 {
@@ -22011,11 +22064,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                         sub = (*sub).next;
                     }
 
-                    /*
-                     * epsilon needed to block previous trans from
-                     * being allowed to enter back from another
-                     * construct
-                     */
+                    // epsilon needed to block previous trans from
+                    // being allowed to enter back from another construct
                     (*pctxt).state =
                         xml_automata_new_epsilon((*pctxt).am, (*pctxt).state, null_mut());
 
@@ -22033,10 +22083,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
             let start: XmlAutomataStatePtr = (*pctxt).state;
             let end: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
 
-            /*
-             * iterate over the subtypes and remerge the end with an
-             * epsilon transition
-             */
+            // iterate over the subtypes and remerge the end with an
+            // epsilon transition
             if (*particle).max_occurs == 1 {
                 sub = (*(*particle).children).children;
                 while !sub.is_null() {
@@ -22060,10 +22108,8 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                     (*particle).min_occurs - 1
                 };
 
-                /*
-                 * use a counter to keep track of the number of transitions
-                 * which went through the choice.
-                 */
+                // use a counter to keep track of the number of transitions
+                // which went through the choice.
                 let counter: i32 = xml_automata_new_counter((*pctxt).am, min_occurs, max_occurs);
                 let hop: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
                 let base: XmlAutomataStatePtr = xml_automata_new_state((*pctxt).am);
@@ -22121,18 +22167,14 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                         );
                         return ret;
                     };
-                    /*
-                     * NOTE: The {max occurs} of all the particles in the
-                     * {particles} of the group must be 0 or 1; this is
-                     * already ensured during the parse of the content of
-                     * <all>.
-                     */
+                    // NOTE: The {max occurs} of all the particles in the
+                    // {particles} of the group must be 0 or 1; this is
+                    // already ensured during the parse of the content of
+                    // <all>.
                     if (*elem_decl).flags & XML_SCHEMAS_ELEM_SUBST_GROUP_HEAD != 0 {
-                        /*
-                         * This is an abstract group, we need to share
-                         * the same counter for all the element transitions
-                         * derived from the group
-                         */
+                        // This is an abstract group, we need to share
+                        // the same counter for all the element transitions
+                        // derived from the group
                         let counter: i32 = xml_automata_new_counter(
                             (*pctxt).am,
                             (*sub).min_occurs,
@@ -22149,8 +22191,15 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                             (*pctxt).am,
                             (*pctxt).state,
                             (*pctxt).state,
-                            (*elem_decl).name,
-                            (*elem_decl).target_namespace,
+                            CStr::from_ptr((*elem_decl).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                            (!(*elem_decl).target_namespace.is_null())
+                                .then(|| {
+                                    CStr::from_ptr((*elem_decl).target_namespace as *const i8)
+                                        .to_string_lossy()
+                                })
+                                .as_deref(),
                             1,
                             1,
                             elem_decl as _,
@@ -22160,8 +22209,15 @@ unsafe extern "C" fn xml_schema_build_acontent_model(
                             (*pctxt).am,
                             (*pctxt).state,
                             (*pctxt).state,
-                            (*elem_decl).name,
-                            (*elem_decl).target_namespace,
+                            CStr::from_ptr((*elem_decl).name as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                            (!(*elem_decl).target_namespace.is_null())
+                                .then(|| {
+                                    CStr::from_ptr((*elem_decl).target_namespace as *const i8)
+                                        .to_string_lossy()
+                                })
+                                .as_deref(),
                             0,
                             1,
                             elem_decl as _,
@@ -24420,7 +24476,7 @@ unsafe extern "C" fn xml_schema_assemble_by_xsi(vctxt: XmlSchemaValidCtxtPtr) ->
     ret
 }
 
-unsafe extern "C" fn xml_schema_vexpand_qname(
+unsafe fn xml_schema_vexpand_qname(
     vctxt: XmlSchemaValidCtxtPtr,
     value: *const XmlChar,
     ns_name: *mut *const XmlChar,
@@ -24451,10 +24507,7 @@ unsafe extern "C" fn xml_schema_vexpand_qname(
     {
         let mut prefix: *mut XmlChar = null_mut();
 
-        /*
-         * NOTE: xmlSplitQName2 will return a duplicated
-         * string.
-         */
+        // NOTE: xmlSplitQName2 will return a duplicated string.
         let local: *mut XmlChar = xml_split_qname2(value, addr_of_mut!(prefix));
         if local.is_null() {
             *local_name = xml_dict_lookup((*vctxt).dict, value, -1);
@@ -24487,20 +24540,18 @@ unsafe extern "C" fn xml_schema_vexpand_qname(
     0
 }
 
-unsafe extern "C" fn xml_schema_process_xsi_type(
+unsafe fn xml_schema_process_xsi_type(
     vctxt: XmlSchemaValidCtxtPtr,
     iattr: XmlSchemaAttrInfoPtr,
     local_type: *mut XmlSchemaTypePtr,
     elem_decl: XmlSchemaElementPtr,
 ) -> i32 {
     let mut ret: i32;
-    /*
-     * cvc-elt (3.3.4) : (4)
-     * AND
-     * Schema-Validity Assessment (Element) (cvc-assess-elt)
-     *   (1.2.1.2.1) - (1.2.1.2.4)
-     * Handle 'xsi:type'.
-     */
+    // cvc-elt (3.3.4) : (4)
+    // AND
+    // Schema-Validity Assessment (Element) (cvc-assess-elt)
+    //   (1.2.1.2.1) - (1.2.1.2.4)
+    // Handle 'xsi:type'.
     if local_type.is_null() {
         return -1;
     }
@@ -24510,15 +24561,11 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
     } else {
         let mut ns_name: *const XmlChar = null();
         let mut local: *const XmlChar = null();
-        /*
-         * TODO: We should report a *warning* that the type was overridden
-         * by the instance.
-         */
+        // TODO: We should report a *warning* that the type was overridden
+        // by the instance.
         ACTIVATE_ATTRIBUTE!(vctxt, iattr);
-        /*
-         * (cvc-elt) (3.3.4) : (4.1)
-         * (cvc-assess-elt) (1.2.1.2.2)
-         */
+        // (cvc-elt) (3.3.4) : (4.1)
+        // (cvc-assess-elt) (1.2.1.2.2)
         ret = xml_schema_vexpand_qname(
             vctxt,
             (*iattr).value,
@@ -24568,26 +24615,23 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
         if !elem_decl.is_null() {
             let mut set: i32 = 0;
 
-            /*
-             * SPEC cvc-elt (3.3.4) : (4.3) (Type Derivation OK)
-             * "The `local type definition` must be validly
-             * derived from the {type definition} given the union of
-             * the {disallowed substitutions} and the {type definition}'s
-             * {prohibited substitutions}, as defined in
-             * Type Derivation OK (Complex) ($3.4.6)
-             * (if it is a complex type definition),
-             * or given {disallowed substitutions} as defined in Type
-             * Derivation OK (Simple) ($3.14.6) (if it is a simple type
-             * definition)."
-             *
-             * {disallowed substitutions}: the "block" on the element decl.
-             * {prohibited substitutions}: the "block" on the type def.
-             */
-            /*
-             * OPTIMIZE TODO: We could map types already evaluated
-             * to be validly derived from other types to avoid checking
-             * this over and over for the same types.
-             */
+            // SPEC cvc-elt (3.3.4) : (4.3) (Type Derivation OK)
+            // "The `local type definition` must be validly
+            // derived from the {type definition} given the union of
+            // the {disallowed substitutions} and the {type definition}'s
+            // {prohibited substitutions}, as defined in
+            // Type Derivation OK (Complex) ($3.4.6)
+            // (if it is a complex type definition),
+            // or given {disallowed substitutions} as defined in Type
+            // Derivation OK (Simple) ($3.14.6) (if it is a simple type
+            // definition)."
+            //
+            // {disallowed substitutions}: the "block" on the element decl.
+            // {prohibited substitutions}: the "block" on the type def.
+
+            // OPTIMIZE TODO: We could map types already evaluated
+            // to be validly derived from other types to avoid checking
+            // this over and over for the same types.
             if (*elem_decl).flags & XML_SCHEMAS_ELEM_BLOCK_EXTENSION != 0
                 || (*(*elem_decl).subtypes).flags & XML_SCHEMAS_TYPE_BLOCK_EXTENSION != 0
             {
@@ -24600,16 +24644,14 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
                 set |= SUBSET_RESTRICTION;
             }
 
-            /*
-                * REMOVED and CHANGED since this produced a parser context
-                * which adds to the string dict of the schema. So this would
-                * change the schema and we don't want this. We don't need
-                * the parser context anymore.
-                *
-                * if ((*vctxt).pctxt.is_null() &&    *    (xmlSchemaCreatePCtxtOnVCtxt(vctxt) == -1)) {
-                    *        return -1;
-            }
-                */
+            // REMOVED and CHANGED since this produced a parser context
+            // which adds to the string dict of the schema. So this would
+            // change the schema and we don't want this. We don't need
+            // the parser context anymore.
+            //
+            // if ((*vctxt).pctxt.is_null() && (xmlSchemaCreatePCtxtOnVCtxt(vctxt) == -1)) {
+            //     return -1;
+            // }
 
             if xml_schema_check_cos_derived_ok(
                 vctxt as XmlSchemaAbstractCtxtPtr,
@@ -24651,7 +24693,7 @@ unsafe extern "C" fn xml_schema_process_xsi_type(
 
 unsafe fn xml_schema_vcontent_model_callback(
     _exec: XmlRegExecCtxtPtr,
-    _name: *const XmlChar,
+    _name: &str,
     transdata: *mut c_void,
     inputdata: *mut c_void,
 ) {
@@ -24667,16 +24709,14 @@ unsafe fn xml_schema_complex_type_err(
     node: XmlNodePtr,
     _typ: XmlSchemaTypePtr,
     message: &str,
-    nbval: i32,
-    nbneg: i32,
-    values: *mut *mut XmlChar,
+    nbval: usize,
+    nbneg: usize,
+    values: &[Cow<'static, str>],
 ) {
     let mut str: *mut XmlChar;
     let mut msg: *mut XmlChar = null_mut();
     let mut local_name: *mut XmlChar;
     let mut ns_name: *mut XmlChar;
-    let mut cur: *const XmlChar;
-    let mut end: *const XmlChar;
 
     xml_schema_format_node_for_error(addr_of_mut!(msg), actxt, node);
     let mut msg = if msg.is_null() {
@@ -24700,54 +24740,46 @@ unsafe fn xml_schema_complex_type_err(
         // ns_name = null_mut();
 
         for i in 0..nbval + nbneg {
-            cur = *values.add(i as usize);
-            if cur.is_null() {
-                continue;
-            }
-            if *cur.add(0) == b'n'
-                && *cur.add(1) == b'o'
-                && *cur.add(2) == b't'
-                && *cur.add(3) == b' '
-            {
-                cur = cur.add(4);
+            let mut cur = values[i].as_ref();
+            // if cur.is_null() {
+            //     continue;
+            // }
+            if let Some(rem) = cur.strip_prefix("not ") {
+                cur = rem;
                 str = xml_strcat(str, c"##other".as_ptr() as _);
             }
             // Get the local name.
             local_name = null_mut();
 
-            end = cur;
-            if *end == b'*' {
+            let mut end = cur;
+            if let Some(rem) = end.strip_prefix('*') {
                 local_name = xml_strdup(c"*".as_ptr() as _);
-                end = end.add(1);
+                end = rem;
             } else {
-                while *end != 0 && *end != b'|' {
-                    end = end.add(1);
-                }
-                local_name = xml_strncat(local_name, cur, end.offset_from(cur) as _);
+                end = end.trim_start_matches(|c| c != '|');
+                local_name = xml_strncat(
+                    local_name,
+                    cur.as_ptr(),
+                    cur.len() as i32 - end.len() as i32,
+                );
             }
-            if *end != 0 {
-                end = end.add(1);
-                /*
-                 * Skip "*|*" if they come with negated expressions, since
-                 * they represent the same negated wildcard.
-                 */
-                if nbneg == 0 || *end != b'*' || *local_name != b'*' {
+            if !end.is_empty() {
+                end = &end[1..];
+                // Skip "*|*" if they come with negated expressions, since
+                // they represent the same negated wildcard.
+                if nbneg == 0 || !end.starts_with('*') || *local_name != b'*' {
                     // Get the namespace name.
                     cur = end;
-                    if *end == b'*' {
+                    if end.starts_with('*') {
                         ns_name = xml_strdup(c"{*}".as_ptr() as _);
                     } else {
-                        while *end != 0 {
-                            end = end.add(1);
-                        }
-
                         if i >= nbval {
                             ns_name = xml_strdup(c"{##other:".as_ptr() as _);
                         } else {
                             ns_name = xml_strdup(c"{".as_ptr() as _);
                         }
 
-                        ns_name = xml_strncat(ns_name, cur, end.offset_from(cur) as _);
+                        ns_name = xml_strncat(ns_name, cur.as_ptr(), cur.len() as i32);
                         ns_name = xml_strcat(ns_name, c"}".as_ptr() as _);
                     }
                     str = xml_strcat(str, ns_name);
@@ -24779,7 +24811,7 @@ unsafe fn xml_schema_complex_type_err(
 
 // 3.4.4 Complex Type Definition Validation Rules
 // Validation Rule: Element Locally Valid (Complex Type) (cvc-complex-type)
-unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+unsafe fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
 
     if (*vctxt).depth <= 0 {
@@ -24795,13 +24827,9 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
         (*pielem).flags ^= XML_SCHEMA_ELEM_INFO_EMPTY;
     }
     'unexpected_elem: {
-        /*
-         * Handle 'nilled' elements.
-         */
+        // Handle 'nilled' elements.
         if INODE_NILLED!(pielem) {
-            /*
-             * SPEC (cvc-elt) (3.3.4) : (3.2.1)
-             */
+            // SPEC (cvc-elt) (3.3.4) : (3.2.1)
             ACTIVATE_PARENT_ELEM!(vctxt);
             ret = XmlParserErrors::XmlSchemavCvcElt3_2_1 as i32;
             VERROR!(
@@ -24817,11 +24845,9 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
         let ptype: XmlSchemaTypePtr = (*pielem).type_def;
 
         if (*ptype).built_in_type == XmlSchemaValType::XmlSchemasAnytype as i32 {
-            /*
-             * Workaround for "anyType": we have currently no content model
-             * assigned for "anyType", so handle it explicitly.
-             * "anyType" has an unbounded, lax "any" wildcard.
-             */
+            // Workaround for "anyType": we have currently no content model
+            // assigned for "anyType", so handle it explicitly.
+            // "anyType" has an unbounded, lax "any" wildcard.
             (*(*vctxt).inode).decl = xml_schema_get_elem(
                 (*vctxt).schema,
                 (*(*vctxt).inode).local_name,
@@ -24829,10 +24855,8 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
             );
 
             if (*(*vctxt).inode).decl.is_null() {
-                /*
-                 * Process "xsi:type".
-                 * SPEC (cvc-assess-elt) (1.2.1.2.1) - (1.2.1.2.3)
-                 */
+                // Process "xsi:type".
+                // SPEC (cvc-assess-elt) (1.2.1.2.1) - (1.2.1.2.3)
                 let iattr: XmlSchemaAttrInfoPtr =
                     xml_schema_get_meta_attr_info(vctxt, XML_SCHEMA_ATTR_INFO_META_XSI_TYPE);
                 if !iattr.is_null() {
@@ -24854,16 +24878,14 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                         return ret;
                     }
                 } else {
-                    /*
-                     * Fallback to "anyType".
-                     *
-                     * SPEC (cvc-assess-elt)
-                     * "If the item cannot be `strictly assessed`, [...]
-                     * an element information item's schema validity may be laxly
-                     * assessed if its `context-determined declaration` is not
-                     * skip by `validating` with respect to the `ur-type
-                     * definition` as per Element Locally Valid (Type) ($3.3.4)."
-                     */
+                    // Fallback to "anyType".
+                    //
+                    // SPEC (cvc-assess-elt)
+                    // "If the item cannot be `strictly assessed`, [...]
+                    // an element information item's schema validity may be laxly
+                    // assessed if its `context-determined declaration` is not
+                    // skip by `validating` with respect to the `ur-type
+                    // definition` as per Element Locally Valid (Type) ($3.3.4)."
                     (*(*vctxt).inode).type_def =
                         xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnytype);
                 }
@@ -24873,11 +24895,9 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
 
         match (*ptype).content_type {
             XmlSchemaContentType::XmlSchemaContentEmpty => {
-                /*
-                 * SPEC (2.1) "If the {content type} is empty, then the
-                 * element information item has no character or element
-                 * information item [children]."
-                 */
+                // SPEC (2.1) "If the {content type} is empty, then the
+                // element information item has no character or element
+                // information item [children]."
                 ACTIVATE_PARENT_ELEM!(vctxt);
                 ret = XmlParserErrors::XmlSchemavCvcComplexType2_1 as i32;
                 VERROR!(
@@ -24892,12 +24912,10 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
             XmlSchemaContentType::XmlSchemaContentMixed
             | XmlSchemaContentType::XmlSchemaContentElements => {
                 let mut regex_ctxt: XmlRegExecCtxtPtr;
-                let mut values: [*mut XmlChar; 10] = [null_mut(); 10];
+                let mut values = [const { Cow::Borrowed("") }; 10];
                 let mut terminal: i32 = 0;
-                let mut nbval: i32 = 10;
-                let mut nbneg: i32 = 0;
 
-                /* VAL TODO: Optimized "anyType" validation.*/
+                // VAL TODO: Optimized "anyType" validation.
 
                 if (*ptype).cont_model.is_null() {
                     VERROR_INT!(
@@ -24958,24 +24976,23 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                     return -1;
                 }
                 if ret < 0 {
-                    xml_reg_exec_err_info(
+                    if let Some((nbval, nbneg, values)) = xml_reg_exec_err_info(
                         regex_ctxt,
                         null_mut(),
-                        addr_of_mut!(nbval),
-                        addr_of_mut!(nbneg),
-                        addr_of_mut!(values[0]),
+                        &mut values,
                         addr_of_mut!(terminal),
-                    );
-                    xml_schema_complex_type_err(
-                        vctxt as XmlSchemaAbstractCtxtPtr,
-                        XmlParserErrors::XmlSchemavElementContent,
-                        null_mut(),
-                        null_mut(),
-                        "This element is not expected",
-                        nbval,
-                        nbneg,
-                        values.as_mut_ptr(),
-                    );
+                    ) {
+                        xml_schema_complex_type_err(
+                            vctxt as XmlSchemaAbstractCtxtPtr,
+                            XmlParserErrors::XmlSchemavElementContent,
+                            null_mut(),
+                            null_mut(),
+                            "This element is not expected",
+                            nbval,
+                            nbneg,
+                            values,
+                        );
+                    }
                     ret = (*vctxt).err;
                     break 'unexpected_elem;
                 } else {
@@ -24986,12 +25003,10 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
             | XmlSchemaContentType::XmlSchemaContentBasic => {
                 ACTIVATE_PARENT_ELEM!(vctxt);
                 if WXS_IS_COMPLEX!(ptype) {
-                    /*
-                     * SPEC (cvc-complex-type) (2.2)
-                     * "If the {content type} is a simple type definition, then
-                     * the element information item has no element information
-                     * item [children], ..."
-                     */
+                    // SPEC (cvc-complex-type) (2.2)
+                    // "If the {content type} is a simple type definition, then
+                    // the element information item has no element information
+                    // item [children], ..."
                     ret = XmlParserErrors::XmlSchemavCvcComplexType2_2 as i32;
                     VERROR!(
                         vctxt,
@@ -25000,10 +25015,8 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
                         "Element content is not allowed, because the content type is a simple type definition"
                     );
                 } else {
-                    /*
-                     * SPEC (cvc-type) (3.1.2) "The element information item must
-                     * have no element information item [children]."
-                     */
+                    // SPEC (cvc-type) (3.1.2) "The element information item must
+                    // have no element information item [children]."
                     ret = XmlParserErrors::XmlSchemavCvcType3_1_2 as i32;
                     VERROR!(
                         vctxt,
@@ -25021,35 +25034,26 @@ unsafe extern "C" fn xml_schema_validate_child_elem(vctxt: XmlSchemaValidCtxtPtr
         return ret;
     }
     // unexpected_elem:
-    /*
-     * Pop this element and set the skipDepth to skip
-     * all further content of the parent element.
-     */
+    // Pop this element and set the skipDepth to skip
+    // all further content of the parent element.
     (*vctxt).skip_depth = (*vctxt).depth;
     (*(*vctxt).inode).flags |= XML_SCHEMA_NODE_INFO_ERR_NOT_EXPECTED;
     (*pielem).flags |= XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT;
     ret
 }
 
-unsafe extern "C" fn xml_schema_validate_elem_wildcard(
-    vctxt: XmlSchemaValidCtxtPtr,
-    skip: *mut i32,
-) -> i32 {
+unsafe fn xml_schema_validate_elem_wildcard(vctxt: XmlSchemaValidCtxtPtr, skip: *mut i32) -> i32 {
     let wild: XmlSchemaWildcardPtr = (*(*vctxt).inode).decl as XmlSchemaWildcardPtr;
-    /*
-     * The namespace of the element was already identified to be
-     * matching the wildcard.
-     */
+    // The namespace of the element was already identified to be
+    // matching the wildcard.
     if skip.is_null() || wild.is_null() || (*wild).typ != XmlSchemaTypeType::XmlSchemaTypeAny {
         VERROR_INT!(vctxt, "xmlSchemaValidateElemWildcard", "bad arguments");
         return -1;
     }
     *skip = 0;
     if (*wild).process_contents == XML_SCHEMAS_ANY_SKIP {
-        /*
-        	* URGENT VAL TODO: Either we need to position the stream to the
-        	* next sibling, or walk the whole subtree.
-        	*/
+        // URGENT VAL TODO: Either we need to position the stream to the
+        // next sibling, or walk the whole subtree.
         *skip = 1;
         return 0;
     }
@@ -25065,23 +25069,21 @@ unsafe extern "C" fn xml_schema_validate_elem_wildcard(
         }
     }
     if (*wild).process_contents == XML_SCHEMAS_ANY_STRICT {
-        /* VAL TODO: Change to proper error code. */
+        // VAL TODO: Change to proper error code.
         VERROR!(
             vctxt,
             XmlParserErrors::XmlSchemavCvcElt1,
             null_mut(),
-            /* (XmlSchemaBasicItemPtr) wild */
+            // (XmlSchemaBasicItemPtr) wild
             "No matching global element declaration available, but demanded by the strict wildcard"
         );
         return (*vctxt).err;
     }
     if (*vctxt).nb_attr_infos != 0 {
-        /*
-        	* SPEC Validation Rule: Schema-Validity Assessment (Element)
-        	* (1.2.1.2.1) - (1.2.1.2.3 )
-        	*
-        	* Use the xsi:type attribute for the type definition.
-        	*/
+        // SPEC Validation Rule: Schema-Validity Assessment (Element)
+        // (1.2.1.2.1) - (1.2.1.2.3 )
+        //
+        // Use the xsi:type attribute for the type definition.
         let iattr: XmlSchemaAttrInfoPtr =
             xml_schema_get_meta_attr_info(vctxt, XML_SCHEMA_ATTR_INFO_META_XSI_TYPE);
         if !iattr.is_null() {
@@ -25099,17 +25101,13 @@ unsafe extern "C" fn xml_schema_validate_elem_wildcard(
                 );
                 return -1;
             }
-            /*
-             * Don't return an error on purpose.
-             */
+            // Don't return an error on purpose.
             return 0;
         }
     }
-    /*
-     * SPEC Validation Rule: Schema-Validity Assessment (Element)
-     *
-     * Fallback to "anyType".
-     */
+    // SPEC Validation Rule: Schema-Validity Assessment (Element)
+    //
+    // Fallback to "anyType".
     (*(*vctxt).inode).type_def = xml_schema_get_built_in_type(XmlSchemaValType::XmlSchemasAnytype);
     0
 }
@@ -28618,7 +28616,7 @@ unsafe extern "C" fn xml_schema_bubble_idc_node_tables(vctxt: XmlSchemaValidCtxt
 }
 
 // Process END of element.
-unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
+unsafe fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr) -> i32 {
     let mut ret: i32 = 0;
     let inode: XmlSchemaNodeInfoPtr = (*vctxt).inode;
 
@@ -28629,11 +28627,9 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
     'internal_error: {
         'end_elem: {
             if (*inode).flags & XML_SCHEMA_NODE_INFO_ERR_NOT_EXPECTED != 0 {
-                /*
-                 * This element was not expected;
-                 * we will not validate child elements of broken parents.
-                 * Skip validation of all content of the parent.
-                 */
+                // This element was not expected;
+                // we will not validate child elements of broken parents.
+                // Skip validation of all content of the parent.
                 (*vctxt).skip_depth = (*vctxt).depth - 1;
                 break 'end_elem;
             }
@@ -28661,10 +28657,8 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                         }
 
                         if (*inode).flags & XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT == 0 {
-                            let mut values: [*mut XmlChar; 10] = [null_mut(); 10];
+                            let mut values = [const { Cow::Borrowed("") }; 10];
                             let mut terminal: i32 = 0;
-                            let mut nbval: i32 = 10;
-                            let mut nbneg: i32 = 0;
 
                             if (*inode).regex_ctxt.is_null() {
                                 // Create the regex context.
@@ -28690,11 +28684,9 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                             }
                             // Get hold of the still expected content, since a further
                             // call to xmlRegExecPushString() will lose this information.
-                            xml_reg_exec_next_values(
+                            let values = xml_reg_exec_next_values(
                                 (*inode).regex_ctxt,
-                                addr_of_mut!(nbval),
-                                addr_of_mut!(nbneg),
-                                addr_of_mut!(values[0]),
+                                &mut values,
                                 addr_of_mut!(terminal),
                             );
                             ret = xml_reg_exec_push_string(
@@ -28706,20 +28698,20 @@ unsafe extern "C" fn xml_schema_validator_pop_elem(vctxt: XmlSchemaValidCtxtPtr)
                                 // Still missing something.
                                 ret = 1;
                                 (*inode).flags |= XML_SCHEMA_ELEM_INFO_ERR_BAD_CONTENT;
-                                xml_schema_complex_type_err(
-                                    vctxt as XmlSchemaAbstractCtxtPtr,
-                                    XmlParserErrors::XmlSchemavElementContent,
-                                    null_mut(),
-                                    null_mut(),
-                                    "Missing child element(s)",
-                                    nbval,
-                                    nbneg,
-                                    values.as_mut_ptr() as _,
-                                );
+                                if let Some((nbval, nbneg, values)) = values {
+                                    xml_schema_complex_type_err(
+                                        vctxt as XmlSchemaAbstractCtxtPtr,
+                                        XmlParserErrors::XmlSchemavElementContent,
+                                        null_mut(),
+                                        null_mut(),
+                                        "Missing child element(s)",
+                                        nbval,
+                                        nbneg,
+                                        values,
+                                    );
+                                }
                             } else {
-                                /*
-                                 * Content model is satisfied.
-                                 */
+                                // Content model is satisfied.
                                 ret = 0;
                             }
                         }

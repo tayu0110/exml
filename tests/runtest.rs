@@ -3524,6 +3524,10 @@ unsafe fn schemas_test(
             ) != 0
             {
                 eprintln!("Error for {instance} on {filename} failed");
+                eprintln!(
+                    "{}",
+                    CStr::from_ptr(errors.as_ptr() as *const i8).to_string_lossy()
+                );
                 res = 1;
             }
         });
@@ -4972,7 +4976,13 @@ unsafe fn automata_test(
                     states[to] = xml_automata_new_state(am);
                 }
                 ptr = ptr.add(1);
-                xml_automata_new_transition(am, states[from], states[to], ptr as _, null_mut());
+                xml_automata_new_transition(
+                    am,
+                    states[from],
+                    states[to],
+                    CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
+                    null_mut(),
+                );
             } else if !am.is_null() && expr[0] == b'e' && expr[1] == b' ' {
                 let mut ptr: *mut c_char = expr.as_mut_ptr().add(2) as _;
 
@@ -5042,7 +5052,7 @@ unsafe fn automata_test(
                     am,
                     states[from],
                     states[to],
-                    ptr as _,
+                    CStr::from_ptr(ptr as *const i8).to_string_lossy().as_ref(),
                     min,
                     max,
                     null_mut(),
