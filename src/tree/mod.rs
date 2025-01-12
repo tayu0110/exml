@@ -3109,25 +3109,6 @@ macro_rules! XML_TREE_ADOPT_STR {
     };
 }
 
-// XML_TREE_ADOPT_STR_2: If @str was in the source-dict, then
-// put it in dest-dict or copy it.
-macro_rules! XML_TREE_ADOPT_STR_2 {
-    ($str:expr, $adopt_str:expr, $source_doc:expr, $dest_doc:expr, $cur:expr) => {
-        // if $adopt_str != 0
-        //     && !$str.is_null()
-        //     && !$source_doc.is_null()
-        //     && !(*$source_doc).dict.is_null()
-        //     && xml_dict_owns((*$source_doc).dict, (*$cur).content) != 0
-        // {
-        //     if !(*$dest_doc).dict.is_null() {
-        //         (*$cur).content = xml_dict_lookup((*$dest_doc).dict, (*$cur).content, -1) as _;
-        //     } else {
-        //         (*$cur).content = xml_strdup((*$cur).content);
-        //     }
-        // }
-    };
-}
-
 const XML_TREE_NSMAP_PARENT: i32 = -1;
 const XML_TREE_NSMAP_XML: i32 = -2;
 const XML_TREE_NSMAP_DOC: i32 = -3;
@@ -4264,15 +4245,6 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             }
                         }
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                            // This puts the content in the dest dict, only if
-                            // it was previously in the source dict.
-                            XML_TREE_ADOPT_STR_2!(
-                                (*cur).content,
-                                adopt_str,
-                                source_doc,
-                                dest_doc,
-                                cur
-                            );
                             // goto leave_node;
                             leave_node = true;
                         }
@@ -4298,13 +4270,6 @@ unsafe fn xml_dom_wrap_adopt_branch(
                         }
                         XmlElementType::XmlPINode => {
                             XML_TREE_ADOPT_STR!((*cur).name, adopt_str, source_doc, dest_doc);
-                            XML_TREE_ADOPT_STR_2!(
-                                (*cur).content,
-                                adopt_str,
-                                source_doc,
-                                dest_doc,
-                                cur
-                            );
                         }
                         XmlElementType::XmlCommentNode => {}
                         _ => {
@@ -4578,9 +4543,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
     while !cur.is_null() {
         (*cur).doc = dest_doc;
         match (*cur).element_type() {
-            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                XML_TREE_ADOPT_STR_2!((*cur).content, adopt_str, source_doc, dest_doc, cur);
-            }
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
             XmlElementType::XmlEntityRefNode => {
                 // Remove reference to the entity-node.
                 (*cur).content = null_mut();
@@ -4714,9 +4677,7 @@ pub unsafe fn xml_dom_wrap_adopt_node(
         //     adopt_str = 0;
         // }
         match (*node).element_type() {
-            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                XML_TREE_ADOPT_STR_2!((*node).content, adopt_str, source_doc, dest_doc, cur);
-            }
+            XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {}
             XmlElementType::XmlEntityRefNode => {
                 // Remove reference to the entity-node.
                 (*node).content = null_mut();
@@ -4735,7 +4696,6 @@ pub unsafe fn xml_dom_wrap_adopt_node(
             }
             XmlElementType::XmlPINode => {
                 XML_TREE_ADOPT_STR!((*node).name, adopt_str, source_doc, dest_doc);
-                XML_TREE_ADOPT_STR_2!((*node).content, adopt_str, source_doc, dest_doc, cur);
             }
             _ => {}
         }
