@@ -3085,30 +3085,6 @@ macro_rules! XML_NSMAP_POP {
     };
 }
 
-// XML_TREE_ADOPT_STR: If we have a dest-dict, put @str in the dict;
-// otherwise copy it, when it was in the source-dict.
-macro_rules! XML_TREE_ADOPT_STR {
-    ($str:expr, $adopt_str:expr, $source_doc:expr, $dest_doc:expr) => {
-        if $adopt_str != 0 && !$str.is_null() {
-            // if !(*$dest_doc).dict.is_null() {
-            //     let old: *const XmlChar = $str;
-            //     $str = xml_dict_lookup((*$dest_doc).dict, $str, -1);
-            //     if $source_doc.is_null()
-            //         || (*$source_doc).dict.is_null()
-            //         || xml_dict_owns((*$source_doc).dict, old) == 0
-            //     {
-            //         xml_free(old as _);
-            //     }
-            // } else if !$source_doc.is_null()
-            //     && !(*$source_doc).dict.is_null()
-            //     && xml_dict_owns((*$source_doc).dict, $str) != 0
-            // {
-            //     $str = xml_strdup($str);
-            // }
-        }
-    };
-}
-
 const XML_TREE_NSMAP_PARENT: i32 = -1;
 const XML_TREE_NSMAP_XML: i32 = -2;
 const XML_TREE_NSMAP_DOC: i32 = -3;
@@ -4012,14 +3988,6 @@ unsafe fn xml_dom_wrap_adopt_branch(
     // @ancestorsOnly should be set per option.
     let ancestors_only: i32 = 0;
 
-    // Optimize string adoption for equal or none dicts.
-    // let adopt_str = if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
-    //     0
-    // } else {
-    //     1
-    // };
-    let adopt_str = 0;
-
     // Get the ns-map from the context if available.
     if !ctxt.is_null() {
         ns_map = (*ctxt).namespace_map as _;
@@ -4105,10 +4073,6 @@ unsafe fn xml_dom_wrap_adopt_branch(
                                     }
                                     ns = (*cur).ns_def;
                                     while !ns.is_null() {
-                                        // NOTE: (*ns).prefix and (*ns).href are never in the dict.
-                                        // XML_TREE_ADOPT_STR((*ns).prefix)
-                                        // XML_TREE_ADOPT_STR((*ns).href)
-
                                         // Does it shadow any ns-decl?
                                         if XML_NSMAP_NOTEMPTY!(ns_map) {
                                             XML_NSMAP_FOREACH!(ns_map, mi, {
@@ -4219,7 +4183,6 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // ns_end:
                             // Further node properties.
                             // TODO: Is this all?
-                            XML_TREE_ADOPT_STR!((*cur).name, adopt_str, source_doc, dest_doc);
                             if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
                                 (*cur).psvi = null_mut();
                                 (*cur).line = 0;
@@ -4268,9 +4231,7 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // goto leave_node;
                             leave_node = true;
                         }
-                        XmlElementType::XmlPINode => {
-                            XML_TREE_ADOPT_STR!((*cur).name, adopt_str, source_doc, dest_doc);
-                        }
+                        XmlElementType::XmlPINode => {}
                         XmlElementType::XmlCommentNode => {}
                         _ => {
                             break 'internal_error;
@@ -4477,7 +4438,6 @@ unsafe fn xml_dom_wrap_adopt_attr(
     _options: i32,
 ) -> i32 {
     let mut cur: XmlNodePtr;
-    let adopt_str: i32 = 1;
 
     if !attr.is_null() || dest_doc.is_null() {
         return -1;
@@ -4528,7 +4488,6 @@ unsafe fn xml_dom_wrap_adopt_attr(
         (*attr).ns = ns;
     }
 
-    XML_TREE_ADOPT_STR!((*attr).name, adopt_str, source_doc, dest_doc);
     (*attr).atype = None;
     (*attr).psvi = null_mut();
     // Walk content.
@@ -4668,8 +4627,6 @@ pub unsafe fn xml_dom_wrap_adopt_node(
         );
     } else {
         let cur: XmlNodePtr = node;
-        // let mut adopt_str: i32 = 1;
-        let adopt_str = 0;
 
         (*cur).doc = dest_doc;
         // Optimize string adoption.
@@ -4692,11 +4649,8 @@ pub unsafe fn xml_dom_wrap_adopt_node(
                         (*node).set_last(NodePtr::from_ptr(ent as *mut XmlNode));
                     }
                 }
-                XML_TREE_ADOPT_STR!((*node).name, adopt_str, source_doc, dest_doc);
             }
-            XmlElementType::XmlPINode => {
-                XML_TREE_ADOPT_STR!((*node).name, adopt_str, source_doc, dest_doc);
-            }
+            XmlElementType::XmlPINode => {}
             _ => {}
         }
     }
