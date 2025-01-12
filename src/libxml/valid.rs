@@ -18,6 +18,8 @@
 //
 // daniel@veillard.com
 
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
@@ -342,11 +344,7 @@ pub unsafe fn xml_add_notation_decl<'a>(
         .notations
         .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
-    let ret = XmlNotation {
-        name: name.to_owned(),
-        system_id: system_id.map(|s| s.to_owned()),
-        public_id: public_id.map(|p| p.to_owned()),
-    };
+    let ret = XmlNotation::new(name, public_id, system_id);
 
     // Validity Check:
     // Check the DTD for previous declarations of the ATTLIST
@@ -379,18 +377,15 @@ pub unsafe fn xml_copy_notation_table<'a>(
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlDumpNotationTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_notation_table(buf: XmlBufPtr, table: &XmlHashTable<'_, XmlNotation>) {
-    use crate::tree::{xml_buf_cat, xml_dump_notation_decl};
+pub fn xml_dump_notation_table<'a>(
+    out: &mut (impl Write + 'a),
+    table: &XmlHashTable<'_, XmlNotation>,
+) {
+    use crate::tree::xml_dump_notation_decl;
 
-    if buf.is_null() {
-        return;
-    }
-    let mut out = vec![];
     table.scan(|notation, _, _, _| {
-        xml_dump_notation_decl(&mut out, notation);
+        xml_dump_notation_decl(out, notation);
     });
-    out.push(0);
-    xml_buf_cat(buf, out.as_ptr());
 }
 
 /// Allocate an element content structure.

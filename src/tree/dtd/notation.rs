@@ -26,11 +26,21 @@ use std::io::Write;
 #[derive(Clone, Default)]
 pub struct XmlNotation {
     // Notation name
-    pub(crate) name: String,
+    name: String,
     // Public identifier, if any
     pub(crate) public_id: Option<String>,
     // System identifier, if any
     pub(crate) system_id: Option<String>,
+}
+
+impl XmlNotation {
+    pub(crate) fn new(name: &str, public_id: Option<&str>, system_id: Option<&str>) -> Self {
+        Self {
+            name: name.to_owned(),
+            public_id: public_id.map(|p| p.to_owned()),
+            system_id: system_id.map(|s| s.to_owned()),
+        }
+    }
 }
 
 /// This will dump the content the notation declaration as an XML DTD definition

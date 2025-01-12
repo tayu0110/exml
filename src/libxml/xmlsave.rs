@@ -51,9 +51,9 @@ use crate::{
         xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
-        is_xhtml, xml_buf_add, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
-        XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr,
-        XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_buf_add, xml_buf_cat, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr,
+        XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
+        XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -298,7 +298,10 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
 #[doc(alias = "xmlBufDumpNotationTable")]
 unsafe fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: &XmlHashTable<'_, XmlNotation>) {
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_dump_notation_table(buf, table);
+    let mut out = vec![];
+    xml_dump_notation_table(&mut out, table);
+    out.push(0);
+    xml_buf_cat(buf, out.as_ptr());
 }
 
 /// This will dump the content of the element declaration as an XML DTD definition
