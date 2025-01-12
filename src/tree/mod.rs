@@ -1786,11 +1786,11 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
                 XmlEntityType::XmlInternalGeneralEntity
                 | XmlEntityType::XmlExternalGeneralParsedEntity
                 | XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-                    q = (*ret).get_entity((*tmp).name.load(Ordering::Relaxed)) as _;
+                    q = (*ret).get_entity((*tmp).name().as_deref().unwrap()) as _;
                 }
                 XmlEntityType::XmlInternalParameterEntity
                 | XmlEntityType::XmlExternalParameterEntity => {
-                    q = (*ret).get_parameter_entity((*tmp).name.load(Ordering::Relaxed)) as _;
+                    q = (*ret).get_parameter_entity((*tmp).name().as_deref().unwrap()) as _;
                 }
                 XmlEntityType::XmlInternalPredefinedEntity => {}
                 _ => unreachable!(),
