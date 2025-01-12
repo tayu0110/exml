@@ -343,7 +343,7 @@ pub unsafe fn xml_add_notation_decl<'a>(
         .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
     let ret = XmlNotation {
-        name: Some(name.to_owned()),
+        name: name.to_owned(),
         system_id: system_id.map(|s| s.to_owned()),
         public_id: public_id.map(|p| p.to_owned()),
     };
@@ -376,45 +376,21 @@ pub unsafe fn xml_copy_notation_table<'a>(
     table.clone_with(|data, _| data.clone())
 }
 
-/// This will dump the content the notation declaration as an XML DTD definition
-#[doc(alias = "xmlDumpNotationDecl")]
-#[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_notation_decl(buf: XmlBufPtr, nota: &XmlNotation) {
-    use crate::buf::libxml_api::{xml_buf_cat, xml_buf_write_quoted_string};
-
-    if buf.is_null() {
-        return;
-    }
-    xml_buf_cat(buf, c"<!NOTATION ".as_ptr() as _);
-    let name = CString::new(nota.name.as_deref().unwrap()).unwrap();
-    xml_buf_cat(buf, name.as_ptr() as *const u8);
-    if let Some(public_id) = nota.public_id.as_deref() {
-        let public_id = CString::new(public_id).unwrap();
-        xml_buf_cat(buf, c" PUBLIC ".as_ptr() as _);
-        xml_buf_write_quoted_string(buf, public_id.as_ptr() as *const u8);
-        if let Some(system_id) = nota.system_id.as_deref() {
-            let system_id = CString::new(system_id).unwrap();
-            xml_buf_cat(buf, c" ".as_ptr() as _);
-            xml_buf_write_quoted_string(buf, system_id.as_ptr() as *const u8);
-        }
-    } else {
-        let system_id = CString::new(nota.system_id.as_deref().unwrap()).unwrap();
-        xml_buf_cat(buf, c" SYSTEM ".as_ptr() as _);
-        xml_buf_write_quoted_string(buf, system_id.as_ptr() as *const u8);
-    }
-    xml_buf_cat(buf, c" >\n".as_ptr() as _);
-}
-
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlDumpNotationTable")]
 #[cfg(feature = "libxml_output")]
 pub unsafe fn xml_dump_notation_table(buf: XmlBufPtr, table: &XmlHashTable<'_, XmlNotation>) {
+    use crate::tree::{xml_buf_cat, xml_dump_notation_decl};
+
     if buf.is_null() {
         return;
     }
+    let mut out = vec![];
     table.scan(|notation, _, _, _| {
-        xml_dump_notation_decl(buf, notation);
+        xml_dump_notation_decl(&mut out, notation);
     });
+    out.push(0);
+    xml_buf_cat(buf, out.as_ptr());
 }
 
 /// Allocate an element content structure.

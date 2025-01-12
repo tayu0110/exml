@@ -179,9 +179,7 @@ impl XmlBuf {
             self.scheme,
             XmlBufferAllocationScheme::XmlBufferAllocBounded
         ) {
-            /*
-             * Used to provide parsing limits
-             */
+            // Used to provide parsing limits
             if self.next_use + additional + 1 >= XML_MAX_TEXT_LENGTH
                 || self.content.len() >= XML_MAX_TEXT_LENGTH
             {
@@ -219,9 +217,7 @@ impl XmlBuf {
             self.scheme,
             XmlBufferAllocationScheme::XmlBufferAllocBounded
         ) {
-            /*
-             * Used to provide parsing limits
-             */
+            // Used to provide parsing limits
             if new_size >= XML_MAX_TEXT_LENGTH {
                 const MSG: &str = "buffer error: text too long\n";
                 unsafe {
@@ -231,16 +227,16 @@ impl XmlBuf {
             }
         }
 
-        /* Don't resize if we don't have to */
+        // Don't resize if we don't have to
         if new_size < self.content.len() {
             return Ok(());
         }
 
-        /* figure out new size */
+        // figure out new size
         let new_size = match self.scheme {
             XmlBufferAllocationScheme::XmlBufferAllocIo
             | XmlBufferAllocationScheme::XmlBufferAllocDoubleit => {
-                /*take care of empty case*/
+                // take care of empty case
                 let mut now = if self.content.len() == 0 {
                     new_size.saturating_add(10)
                 } else {
