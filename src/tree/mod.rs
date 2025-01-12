@@ -2693,12 +2693,9 @@ pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
                 && !matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
                 && !matches!((*cur).element_type(), XmlElementType::XmlXIncludeEnd)
                 && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
-                && ((*cur).content != addr_of_mut!((*cur).properties) as _)
+                && !(*cur).content.is_null()
             {
-                // DICT_FREE!(dict, (*cur).content)
-                if !(*cur).content.is_null() {
-                    xml_free((*cur).content as _);
-                }
+                xml_free((*cur).content as _);
             }
             if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
@@ -2807,12 +2804,9 @@ pub unsafe fn xml_free_node(cur: XmlNodePtr) {
         }
     } else if !(*cur).content.is_null()
         && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
-        && ((*cur).content != addr_of_mut!((*cur).properties) as _)
+        && !(*cur).content.is_null()
     {
-        // DICT_FREE!(dict, (*cur).content)
-        if !(*cur).content.is_null() {
-            xml_free((*cur).content as _);
-        }
+        xml_free((*cur).content as _);
     }
 
     // When a node is a text node or a comment, it uses a global static

@@ -8,7 +8,7 @@ use std::{
 use crate::{
     libxml::{
         entities::{XmlEntity, XmlEntityPtr},
-        xmlstring::{xml_strlen, xml_strncat, xml_strncat_new, XmlChar},
+        xmlstring::{xml_strlen, xml_strncat, XmlChar},
     },
     uri::build_uri,
 };
@@ -289,13 +289,7 @@ pub trait NodeCommon {
             | XmlElementType::XmlNotationNode => {
                 let mut node = self.as_node().unwrap();
                 if !content.is_null() {
-                    if node.as_ref().content == &raw mut node.as_mut().properties as _ {
-                        node.as_mut().content =
-                            xml_strncat_new(node.as_ref().content, content, len);
-                        node.as_mut().properties = null_mut();
-                    } else {
-                        node.as_mut().content = xml_strncat(node.as_ref().content, content, len);
-                    }
+                    node.as_mut().content = xml_strncat(node.as_ref().content, content, len);
                 }
             }
             XmlElementType::XmlDocumentNode

@@ -939,18 +939,14 @@ impl XmlDebugCtxt<'_> {
             XmlElementType::XmlTextNode => {
                 if self.check == 0 {
                     self.dump_spaces();
-                    let mut node = node.as_node().unwrap();
+                    let node = node.as_node().unwrap();
                     if node.as_ref().name == XML_STRING_TEXT_NOENC.as_ptr() as *const XmlChar {
                         write!(self.output, "TEXT no enc");
                     } else {
                         write!(self.output, "TEXT");
                     }
                     if self.options & DUMP_TEXT_TYPE != 0 {
-                        if node.as_ref().content
-                            == addr_of_mut!(node.as_mut().properties) as *mut XmlChar
-                        {
-                            writeln!(self.output, " compact");
-                        } else if xml_dict_owns(self.dict, node.as_ref().content) == 1 {
+                        if xml_dict_owns(self.dict, node.as_ref().content) == 1 {
                             writeln!(self.output, " interned");
                         } else {
                             writeln!(self.output);

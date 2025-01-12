@@ -1461,7 +1461,7 @@ impl XmlNode {
             | XmlElementType::XmlEntityNode
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode => {
-                if !self.content.is_null() && (self.content != &raw mut self.properties as _) {
+                if !self.content.is_null() {
                     xml_free(self.content as _);
                 }
                 if let Some(children) = self.children() {
@@ -1536,7 +1536,7 @@ impl XmlNode {
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode => {
-                if !self.content.is_null() && self.content != &raw mut self.properties as _ {
+                if !self.content.is_null() {
                     xml_free(self.content as _);
                 }
                 if let Some(children) = self.children() {

@@ -2786,10 +2786,7 @@ unsafe fn xml_sax2_text(ctxt: XmlParserCtxtPtr, ch: &str, typ: XmlElementType) {
             // reallocate a new buffer, move data, append ch. Here
             // We try to minimize realloc() uses and avoid copying
             // and recomputing length over and over.
-            if (*last_child).content == addr_of_mut!((*last_child).properties) as *mut XmlChar {
-                (*last_child).content = xml_strdup((*last_child).content);
-                (*last_child).properties = null_mut();
-            } else if (*ctxt).nodemem == (*ctxt).nodelen + 1
+            if (*ctxt).nodemem == (*ctxt).nodelen + 1
                 && xml_dict_owns((*ctxt).dict, (*last_child).content) != 0
             {
                 (*last_child).content = xml_strdup((*last_child).content);
