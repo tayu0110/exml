@@ -423,7 +423,7 @@ macro_rules! CUR_SCHAR {
     feature = "sax1",
     feature = "libxml_writer",
 ))]
-pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
+pub unsafe fn xml_validate_ncname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
@@ -437,9 +437,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) 
         return -1;
     }
 
-    /*
-     * First quick algorithm for ASCII range
-     */
+    // First quick algorithm for ASCII range
     if space != 0 {
         while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
@@ -471,9 +469,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) 
     // }
 
     // try_complex:
-    /*
-     * Second check for chars outside the ASCII range
-     */
+    // Second check for chars outside the ASCII range
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
@@ -517,7 +513,7 @@ pub unsafe extern "C" fn xml_validate_ncname(value: *const XmlChar, space: i32) 
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateQName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
+pub unsafe fn xml_validate_qname(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
@@ -530,9 +526,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -
     if value.is_null() {
         return -1;
     }
-    /*
-     * First quick algorithm for ASCII range
-     */
+    // First quick algorithm for ASCII range
     if space != 0 {
         while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
@@ -582,9 +576,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -
     }
 
     // try_complex:
-    /*
-     * Second check for chars outside the ASCII range
-     */
+    // Second check for chars outside the ASCII range
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
@@ -647,7 +639,7 @@ pub unsafe extern "C" fn xml_validate_qname(value: *const XmlChar, space: i32) -
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateName")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
+pub unsafe fn xml_validate_name(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
@@ -660,9 +652,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) ->
     if value.is_null() {
         return -1;
     }
-    /*
-     * First quick algorithm for ASCII range
-     */
+    // First quick algorithm for ASCII range
     if space != 0 {
         while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
@@ -697,9 +687,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) ->
     }
 
     // try_complex:
-    /*
-     * Second check for chars outside the ASCII range
-     */
+    // Second check for chars outside the ASCII range
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
@@ -743,7 +731,7 @@ pub unsafe extern "C" fn xml_validate_name(value: *const XmlChar, space: i32) ->
 /// and -1 in case of internal or API error.
 #[doc(alias = "xmlValidateNMToken")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
+pub unsafe fn xml_validate_nmtoken(value: *const XmlChar, space: i32) -> i32 {
     use crate::libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
         parser_internals::xml_is_letter,
@@ -756,9 +744,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32)
     if value.is_null() {
         return -1;
     }
-    /*
-     * First quick algorithm for ASCII range
-     */
+    // First quick algorithm for ASCII range
     if space != 0 {
         while xml_is_blank_char(*cur as u32) {
             cur = cur.add(1);
@@ -796,9 +782,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken(value: *const XmlChar, space: i32)
     }
 
     // try_complex:
-    /*
-     * Second check for chars outside the ASCII range
-     */
+    // Second check for chars outside the ASCII range
     cur = value;
     c = CUR_SCHAR!(cur, l);
     if space != 0 {
@@ -857,7 +841,7 @@ unsafe fn xml_tree_err_memory(extra: &str) {
 /// Returns the new string which must be freed by the caller if different from
 /// @memory and @ncname or NULL in case of error
 #[doc(alias = "xmlBuildQName")]
-pub unsafe extern "C" fn xml_build_qname(
+pub unsafe fn xml_build_qname(
     ncname: *const XmlChar,
     prefix: *const XmlChar,
     memory: *mut XmlChar,
@@ -893,7 +877,7 @@ pub unsafe extern "C" fn xml_build_qname(
 
 /// Parse an XML qualified name string
 ///
-/// ```ignore
+/// ```text
 /// [NS 5] QName ::= (Prefix ':')? LocalPart
 ///
 /// [NS 6] Prefix ::= NCName
@@ -905,10 +889,7 @@ pub unsafe extern "C" fn xml_build_qname(
 /// local part, and prefix is updated to get the Prefix. Both the return value
 /// and the prefix must be freed by the caller.
 #[doc(alias = "xmlSplitQName2")]
-pub unsafe extern "C" fn xml_split_qname2(
-    name: *const XmlChar,
-    prefix: *mut *mut XmlChar,
-) -> *mut XmlChar {
+pub unsafe fn xml_split_qname2(name: *const XmlChar, prefix: *mut *mut XmlChar) -> *mut XmlChar {
     let mut len: i32 = 0;
 
     if prefix.is_null() {
@@ -919,15 +900,13 @@ pub unsafe extern "C" fn xml_split_qname2(
         return null_mut();
     }
 
-    /* nasty but valid */
+    // nasty but valid
     if *name.add(0) == b':' {
         return null_mut();
     }
 
-    /*
-     * we are not trying to validate but just to cut, and yes it will
-     * work even if this is as set of UTF-8 encoded chars
-     */
+    // we are not trying to validate but just to cut, and yes it will
+    // work even if this is as set of UTF-8 encoded chars
     while *name.add(len as usize) != 0 && *name.add(len as usize) != b':' {
         len += 1;
     }
@@ -960,7 +939,7 @@ pub unsafe extern "C" fn xml_split_qname2(
 /// with the length in byte of the prefix and return a pointer
 /// to the start of the name without the prefix
 #[doc(alias = "xmlSplitQName3")]
-pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const XmlChar {
+pub unsafe fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -> *const XmlChar {
     let mut l: i32 = 0;
 
     if name.is_null() {
@@ -970,15 +949,13 @@ pub unsafe extern "C" fn xml_split_qname3(name: *const XmlChar, len: *mut i32) -
         return null_mut();
     }
 
-    /* nasty but valid */
+    // nasty but valid
     if *name.add(0) == b':' {
         return null_mut();
     }
 
-    /*
-     * we are not trying to validate but just to cut, and yes it will
-     * work even if this is as set of UTF-8 encoded chars
-     */
+    // we are not trying to validate but just to cut, and yes it will
+    // work even if this is as set of UTF-8 encoded chars
     while *name.add(l as usize) != 0 && *name.add(l as usize) != b':' {
         l += 1;
     }
@@ -1065,7 +1042,7 @@ pub unsafe fn xml_free_dtd(cur: XmlDtdPtr) {
 
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlFreeDoc")]
-pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
+pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
     let mut ext_subset: XmlDtdPtr;
     let mut dict: XmlDictPtr = null_mut();
 
@@ -1083,9 +1060,7 @@ pub unsafe extern "C" fn xml_free_doc(cur: XmlDocPtr) {
         xml_deregister_node_default_value(cur as _);
     }
 
-    /*
-     * Do this before freeing the children list to avoid ID lookups
-     */
+    // Do this before freeing the children list to avoid ID lookups
     if !(*cur).ids.is_null() {
         xml_free_id_table((*cur).ids as _);
     }
@@ -1199,7 +1174,7 @@ unsafe fn xml_new_prop_internal(
 
 /// Free a property and all its siblings, all the children are freed too.
 #[doc(alias = "xmlFreePropList")]
-pub unsafe extern "C" fn xml_free_prop_list(mut cur: XmlAttrPtr) {
+pub unsafe fn xml_free_prop_list(mut cur: XmlAttrPtr) {
     let mut next: XmlAttrPtr;
     if cur.is_null() {
         return;
@@ -1213,7 +1188,7 @@ pub unsafe extern "C" fn xml_free_prop_list(mut cur: XmlAttrPtr) {
 
 /// Free one attribute, all the content is freed too
 #[doc(alias = "xmlFreeProp")]
-pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
+pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     let mut dict: XmlDictPtr = null_mut();
     if cur.is_null() {
         return;
@@ -1229,7 +1204,7 @@ pub unsafe extern "C" fn xml_free_prop(cur: XmlAttrPtr) {
         xml_deregister_node_default_value(cur as _);
     }
 
-    /* Check for ID removal -> leading to invalid references ! */
+    // Check for ID removal -> leading to invalid references !
     if !(*cur).doc.is_null() && matches!((*cur).atype, Some(XmlAttributeType::XmlAttributeID)) {
         xml_remove_id((*cur).doc, cur);
     }
@@ -1571,7 +1546,7 @@ pub(crate) unsafe fn xml_static_copy_node_list(
             ret = q;
             p = q;
         } else if p != q {
-            /* the test is required if xmlStaticCopyNode coalesced 2 text nodes */
+            // the test is required if xmlStaticCopyNode coalesced 2 text nodes
             (*p).next = NodePtr::from_ptr(q);
             (*q).prev = NodePtr::from_ptr(p);
             p = q;
@@ -1664,7 +1639,7 @@ unsafe fn xml_copy_prop_internal(
         (*ret).last = None;
         let mut tmp = (*ret).children;
         while let Some(now) = tmp {
-            /* (*tmp).parent = ret; */
+            // (*tmp).parent = ret;
             if now.next.is_none() {
                 (*ret).last = Some(now);
             }
@@ -1974,7 +1949,7 @@ pub unsafe fn xml_new_doc_node_eat_name(
             UPDATE_LAST_CHILD_AND_PARENT!(cur)
         }
     } else {
-        /* if name don't come from the doc dictionary free it here */
+        // if name don't come from the doc dictionary free it here
         if !name.is_null()
             && (doc.is_null() || (*doc).dict.is_null() || xml_dict_owns((*doc).dict, name) == 0)
         {
@@ -1990,14 +1965,12 @@ pub unsafe fn xml_new_doc_node_eat_name(
 ///
 /// Returns a pointer to the new node object. Uses xml_strdup() to make copy of @name.
 #[doc(alias = "xmlNewNode")]
-pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> XmlNodePtr {
     if name.is_null() {
         return null_mut();
     }
 
-    /*
-     * Allocate a new node and fill the fields.
-     */
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building node");
@@ -2025,18 +1998,16 @@ pub unsafe extern "C" fn xml_new_node(ns: XmlNsPtr, name: *const XmlChar) -> Xml
 /// new node's name. Use xmlNewNode() if a copy of @name string is
 /// is needed as new node's name.
 #[doc(alias = "xmlNewNodeEatName")]
-pub unsafe extern "C" fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar) -> XmlNodePtr {
+pub unsafe fn xml_new_node_eat_name(ns: XmlNsPtr, name: *mut XmlChar) -> XmlNodePtr {
     if name.is_null() {
         return null_mut();
     }
 
-    /*
-     * Allocate a new node and fill the fields.
-     */
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building node");
-        /* we can't check here that name comes from the doc dictionary */
+        // we can't check here that name comes from the doc dictionary
         return null_mut();
     }
     std::ptr::write(&mut *cur, XmlNode::default());
@@ -2127,10 +2098,7 @@ pub unsafe fn xml_new_child(
 /// Creation of a new text node within a document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocText")]
-pub unsafe extern "C" fn xml_new_doc_text(
-    doc: *const XmlDoc,
-    content: *const XmlChar,
-) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_text(doc: *const XmlDoc, content: *const XmlChar) -> XmlNodePtr {
     let cur: XmlNodePtr = xml_new_text(content);
     if !cur.is_null() {
         (*cur).doc = doc as _;
@@ -2144,10 +2112,8 @@ pub unsafe extern "C" fn xml_new_doc_text(
 ///
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewText")]
-pub unsafe extern "C" fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_text(content: *const XmlChar) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building text");
@@ -2212,7 +2178,7 @@ pub unsafe fn xml_new_pi(name: &str, content: Option<&str>) -> XmlNodePtr {
 /// text node pertain to a given document.
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocTextLen")]
-pub unsafe extern "C" fn xml_new_doc_text_len(
+pub unsafe fn xml_new_doc_text_len(
     doc: XmlDocPtr,
     content: *const XmlChar,
     len: i32,
@@ -2229,10 +2195,8 @@ pub unsafe extern "C" fn xml_new_doc_text_len(
 /// Creation of a new text node with an extra parameter for the content's length
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewTextLen")]
-pub unsafe extern "C" fn xml_new_text_len(content: *const XmlChar, len: i32) -> XmlNodePtr {
-    /*
-     * Allocate a new node and fill the fields.
-     */
+pub unsafe fn xml_new_text_len(content: *const XmlChar, len: i32) -> XmlNodePtr {
+    // Allocate a new node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
         xml_tree_err_memory("building text");
@@ -2397,7 +2361,7 @@ pub unsafe fn xml_new_reference(doc: *const XmlDoc, name: &str) -> XmlNodePtr {
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNode")]
-pub unsafe extern "C" fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNodePtr {
+pub unsafe fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node(node, null_mut(), null_mut(), extended);
     ret
 }
@@ -2406,11 +2370,7 @@ pub unsafe extern "C" fn xml_copy_node(node: XmlNodePtr, extended: i32) -> XmlNo
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlDocCopyNode")]
-pub unsafe extern "C" fn xml_doc_copy_node(
-    node: XmlNodePtr,
-    doc: XmlDocPtr,
-    extended: i32,
-) -> XmlNodePtr {
+pub unsafe fn xml_doc_copy_node(node: XmlNodePtr, doc: XmlDocPtr, extended: i32) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node(node, doc, null_mut(), extended);
     ret
 }
@@ -2419,7 +2379,7 @@ pub unsafe extern "C" fn xml_doc_copy_node(
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlDocCopyNodeList")]
-pub unsafe extern "C" fn xml_doc_copy_node_list(doc: XmlDocPtr, node: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_doc_copy_node_list(doc: XmlDocPtr, node: XmlNodePtr) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node_list(node, doc, null_mut());
     ret
 }
@@ -2429,7 +2389,7 @@ pub unsafe extern "C" fn xml_doc_copy_node_list(doc: XmlDocPtr, node: XmlNodePtr
 ///
 /// Returns: a new #XmlNodePtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNodeList")]
-pub unsafe extern "C" fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_copy_node_list(node: XmlNodePtr) -> XmlNodePtr {
     let ret: XmlNodePtr = xml_static_copy_node_list(node, null_mut(), null_mut());
     ret
 }
@@ -2534,7 +2494,7 @@ pub unsafe fn xml_new_doc_raw_node(
 /// Returns a pointer to the new node object.
 #[doc(alias = "xmlNewDocFragment")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
+pub unsafe fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
     // Allocate a new DocumentFragment node and fill the fields.
     let cur: XmlNodePtr = xml_malloc(size_of::<XmlNode>()) as _;
     if cur.is_null() {
@@ -2563,7 +2523,7 @@ pub unsafe extern "C" fn xml_new_doc_fragment(doc: XmlDocPtr) -> XmlNodePtr {
 /// Returns the @old node
 #[doc(alias = "xmlReplaceNode")]
 #[cfg(any(feature = "libxml_tree", feature = "libxml_writer"))]
-pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> XmlNodePtr {
     if old == cur {
         return null_mut();
     }
@@ -2624,7 +2584,7 @@ pub unsafe extern "C" fn xml_replace_node(old: XmlNodePtr, cur: XmlNodePtr) -> X
 /// Merge two text nodes into one
 /// Returns the first text node augmented
 #[doc(alias = "xmlTextMerge")]
-pub unsafe extern "C" fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -> XmlNodePtr {
+pub unsafe fn xml_text_merge(first: XmlNodePtr, second: XmlNodePtr) -> XmlNodePtr {
     if first.is_null() {
         return second;
     }
@@ -2662,7 +2622,7 @@ pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
     {
         return -1;
     }
-    /* need to check if content is currently in the dictionary */
+    // need to check if content is currently in the dictionary
     if (*node).content == addr_of_mut!((*node).properties) as _
         || (!(*node).doc.is_null()
             && !(*(*node).doc).dict.is_null()
@@ -2682,7 +2642,7 @@ pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
 /// Free a node and all its siblings, this is a recursive behaviour, all
 /// the children are freed too.
 #[doc(alias = "xmlFreeNodeList")]
-pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
+pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
     let mut parent: XmlNodePtr;
     let mut dict: XmlDictPtr = null_mut();
     let mut depth: usize = 0;
@@ -2776,14 +2736,14 @@ pub unsafe extern "C" fn xml_free_node_list(mut cur: XmlNodePtr) {
 /// Free a node, this is a recursive behaviour, all the children are freed too.
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlFreeNode")]
-pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
+pub unsafe fn xml_free_node(cur: XmlNodePtr) {
     let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
         return;
     }
 
-    /* use xmlFreeDtd for DTD nodes */
+    // use xmlFreeDtd for DTD nodes
     if matches!((*cur).element_type(), XmlElementType::XmlDTDNode) {
         xml_free_dtd(cur as _);
         return;
@@ -2840,11 +2800,9 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
         DICT_FREE!(dict, (*cur).content)
     }
 
-    /*
-     * When a node is a text node or a comment, it uses a global static
-     * variable for the name of the node.
-     * Otherwise the node name might come from the document's dictionary
-     */
+    // When a node is a text node or a comment, it uses a global static
+    // variable for the name of the node.
+    // Otherwise the node name might come from the document's dictionary
     if !(*cur).name.is_null()
         && !matches!((*cur).element_type(), XmlElementType::XmlTextNode)
         && !matches!((*cur).element_type(), XmlElementType::XmlCommentNode)
@@ -2855,7 +2813,7 @@ pub unsafe extern "C" fn xml_free_node(cur: XmlNodePtr) {
     xml_free(cur as _);
 }
 
-unsafe extern "C" fn copy_string_for_new_dict_if_needed(
+unsafe fn copy_string_for_new_dict_if_needed(
     old_dict: XmlDictPtr,
     new_dict: XmlDictPtr,
     old_value: *const XmlChar,
@@ -2924,7 +2882,7 @@ unsafe fn xml_ns_in_scope(
 ///
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespace")]
-pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
+pub unsafe fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
     if cur.is_null() {
         return null_mut();
     }
@@ -2939,7 +2897,7 @@ pub unsafe extern "C" fn xml_copy_namespace(cur: XmlNsPtr) -> XmlNsPtr {
 ///
 /// Returns: a new #xmlNsPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyNamespaceList")]
-pub unsafe extern "C" fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr {
+pub unsafe fn xml_copy_namespace_list(mut cur: XmlNsPtr) -> XmlNsPtr {
     let mut ret: XmlNsPtr = null_mut();
     let mut p: XmlNsPtr = null_mut();
     let mut q: XmlNsPtr;
@@ -3026,7 +2984,7 @@ pub fn set_compress_mode(mode: i32) {
 ///
 /// Returns the xmlDOMWrapCtxtPtr or null_mut() in case of an internal error.
 #[doc(alias = "xmlDOMWrapNewCtxt")]
-pub unsafe extern "C" fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
+pub unsafe fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
     let ret: XmlDOMWrapCtxtPtr = xml_malloc(size_of::<XmlDOMWrapCtxt>()) as _;
     if ret.is_null() {
         xml_tree_err_memory("allocating DOM-wrapper context");
@@ -3038,7 +2996,7 @@ pub unsafe extern "C" fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
 
 /// Frees the ns-map
 #[doc(alias = "xmlDOMWrapNsMapFree")]
-unsafe extern "C" fn xml_dom_wrap_ns_map_free(nsmap: XmlNsMapPtr) {
+unsafe fn xml_dom_wrap_ns_map_free(nsmap: XmlNsMapPtr) {
     let mut cur: XmlNsMapItemPtr;
     let mut tmp: XmlNsMapItemPtr;
 
@@ -3062,16 +3020,14 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_free(nsmap: XmlNsMapPtr) {
 
 /// Frees the DOM-wrapper context.
 #[doc(alias = "xmlDOMWrapFreeCtxt")]
-pub unsafe extern "C" fn xml_dom_wrap_free_ctxt(ctxt: XmlDOMWrapCtxtPtr) {
+pub unsafe fn xml_dom_wrap_free_ctxt(ctxt: XmlDOMWrapCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
     if !(*ctxt).namespace_map.is_null() {
         xml_dom_wrap_ns_map_free((*ctxt).namespace_map as _);
     }
-    /*
-     * TODO: Store the namespace map in the context.
-     */
+    // TODO: Store the namespace map in the context.
     xml_free(ctxt as _);
 }
 
@@ -3167,7 +3123,7 @@ const XML_TREE_NSMAP_CUSTOM: i32 = -4;
 
 /// Adds an ns-mapping item.
 #[doc(alias = "xmlDOMWrapNsMapAddItem")]
-unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
+unsafe fn xml_dom_wrap_ns_map_add_item(
     nsmap: *mut XmlNsMapPtr,
     position: i32,
     old_ns: XmlNsPtr,
@@ -3186,9 +3142,7 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
     map = *nsmap;
 
     if map.is_null() {
-        /*
-        	* Create the ns-map.
-        	*/
+        // Create the ns-map.
         map = xml_malloc(size_of::<XmlNsMap>()) as _;
         if map.is_null() {
             xml_tree_err_memory("allocating namespace map");
@@ -3199,16 +3153,12 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
     }
 
     if !(*map).pool.is_null() {
-        /*
-        	* Reuse an item from the pool.
-        	*/
+        // Reuse an item from the pool.
         ret = (*map).pool;
         (*map).pool = (*ret).next;
         memset(ret as _, 0, size_of::<XmlNsMapItem>());
     } else {
-        /*
-        	* Create a new item.
-        	*/
+        // Create a new item.
         ret = xml_malloc(size_of::<XmlNsMapItem>()) as _;
         if ret.is_null() {
             xml_tree_err_memory("allocating namespace map item");
@@ -3218,22 +3168,16 @@ unsafe extern "C" fn xml_dom_wrap_ns_map_add_item(
     }
 
     if (*map).first.is_null() {
-        /*
-        	* First ever.
-        	*/
+        // First ever.
         (*map).first = ret;
         (*map).last = ret;
     } else if position == -1 {
-        /*
-        	* Append.
-        	*/
+        // Append.
         (*ret).prev = (*map).last;
         (*(*map).last).next = ret;
         (*map).last = ret;
     } else if position == 0 {
-        /*
-        	* Set on first position.
-        	*/
+        // Set on first position.
         (*(*map).first).prev = ret;
         (*ret).next = (*map).first;
         (*map).first = ret;
@@ -3304,7 +3248,7 @@ unsafe fn xml_dom_wrap_ns_norm_gather_in_scope_ns(map: *mut XmlNsMapPtr, node: X
 ///
 /// Returns 0 on success, -1 on internal errors.
 #[doc(alias = "xmlDOMWrapNSNormAddNsMapItem2")]
-unsafe extern "C" fn xml_dom_wrap_ns_norm_add_ns_map_item2(
+unsafe fn xml_dom_wrap_ns_norm_add_ns_map_item2(
     list: *mut *mut XmlNsPtr,
     size: *mut i32,
     number: *mut i32,
@@ -3375,7 +3319,7 @@ unsafe fn xml_dom_wrap_store_ns(
             ns = (*ns).next;
         }
     }
-    /* Create. */
+    // Create.
     if !ns.is_null() {
         (*ns).next = xml_new_ns(null_mut(), ns_name, prefix);
         return (*ns).next;
@@ -3413,7 +3357,7 @@ unsafe fn xml_tree_nslist_lookup_by_prefix(ns_list: XmlNsPtr, prefix: *const Xml
 ///
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlSearchNsByPrefixStrict")]
-unsafe extern "C" fn xml_search_ns_by_prefix_strict(
+unsafe fn xml_search_ns_by_prefix_strict(
     doc: XmlDocPtr,
     node: XmlNodePtr,
     prefix: *const XmlChar,
@@ -3687,7 +3631,7 @@ unsafe fn xml_dom_wrap_ns_norm_acquire_normalized_ns(
 ///
 /// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
 #[doc(alias = "xmlDOMWrapReconcileNamespaces")]
-pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
+pub unsafe fn xml_dom_wrap_reconcile_namespaces(
     _ctxt: XmlDOMWrapCtxtPtr,
     elem: XmlNodePtr,
     options: i32,
@@ -3701,7 +3645,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
     let mut cur_elem: XmlNodePtr = null_mut();
     let mut ns_map: XmlNsMapPtr = null_mut();
     let mut mi: XmlNsMapItemPtr;
-    /* @ancestorsOnly should be set by an option flag. */
+    // @ancestorsOnly should be set by an option flag.
     let ancestors_only: i32 = 0;
     let opt_remove_redundant_ns: i32 =
         if options & XmlDomreconcileNsoptions::XmlDomReconnsRemoveredund as i32 != 0 {
@@ -4055,7 +3999,7 @@ pub unsafe extern "C" fn xml_dom_wrap_reconcile_namespaces(
 ///
 /// Returns 0 if succeeded, -1 otherwise and on API/internal errors.
 #[doc(alias = "xmlDOMWrapAdoptBranch")]
-unsafe extern "C" fn xml_dom_wrap_adopt_branch(
+unsafe fn xml_dom_wrap_adopt_branch(
     ctxt: XmlDOMWrapCtxtPtr,
     source_doc: XmlDocPtr,
     node: XmlNodePtr,
@@ -4070,32 +4014,26 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
     let mut mi: XmlNsMapItemPtr;
     let mut ns: XmlNsPtr = null_mut();
     let mut depth: i32 = -1;
-    /* gather @parent's ns-decls. */
+    // gather @parent's ns-decls.
     let mut parnsdone: i32;
-    /* @ancestorsOnly should be set per option. */
+    // @ancestorsOnly should be set per option.
     let ancestors_only: i32 = 0;
 
-    /*
-     * Optimize string adoption for equal or none dicts.
-     */
+    // Optimize string adoption for equal or none dicts.
     let adopt_str = if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
         0
     } else {
         1
     };
 
-    /*
-     * Get the ns-map from the context if available.
-     */
+    // Get the ns-map from the context if available.
     if !ctxt.is_null() {
         ns_map = (*ctxt).namespace_map as _;
     }
-    /*
-     * Disable search for ns-decls in the parent-axis of the
-     * destination element, if:
-     * 1) there's no destination parent
-     * 2) custom ns-reference handling is used
-     */
+    // Disable search for ns-decls in the parent-axis of the
+    // destination element, if:
+    // 1) there's no destination parent
+    // 2) custom ns-reference handling is used
     if dest_parent.is_null() || (!ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some()) {
         parnsdone = 1;
     } else {
@@ -4112,16 +4050,12 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
             'main: while !cur.is_null() {
                 let mut leave_node = false;
 
-                /*
-                 * Paranoid source-doc sanity check.
-                 */
+                // Paranoid source-doc sanity check.
                 if (*cur).doc != source_doc {
-                    /*
-                     * We'll assume XIncluded nodes if the doc differs.
-                     * TODO: Do we need to reconciliate XIncluded nodes?
-                     * This here skips XIncluded nodes and tries to handle
-                     * broken sequences.
-                     */
+                    // We'll assume XIncluded nodes if the doc differs.
+                    // TODO: Do we need to reconciliate XIncluded nodes?
+                    // This here skips XIncluded nodes and tries to handle
+                    // broken sequences.
                     if (*cur).next.is_some() {
                         let mut next = (*cur).next;
                         while let Some(now) = next.filter(|now| {
@@ -4146,9 +4080,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                     (*cur).doc = dest_doc;
                     match (*cur).element_type() {
                         XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
-                            /*
-                             * TODO
-                             */
+                            // TODO
                             return -1;
                         }
                         ty @ XmlElementType::XmlElementNode
@@ -4156,21 +4088,17 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                             if matches!(ty, XmlElementType::XmlElementNode) {
                                 cur_elem = cur;
                                 depth += 1;
-                                /*
-                                 * Namespace declarations.
-                                 * - (*ns).href and (*ns).prefix are never in the dict, so
-                                 *   we need not move the values over to the destination dict.
-                                 * - Note that for custom handling of ns-references,
-                                 *   the ns-decls need not be stored in the ns-map,
-                                 *   since they won't be referenced by (*node).ns.
-                                 */
+                                // Namespace declarations.
+                                // - (*ns).href and (*ns).prefix are never in the dict, so
+                                //   we need not move the values over to the destination dict.
+                                // - Note that for custom handling of ns-references,
+                                //   the ns-decls need not be stored in the ns-map,
+                                //   since they won't be referenced by (*node).ns.
                                 if !(*cur).ns_def.is_null()
                                     && (ctxt.is_null() || (*ctxt).get_ns_for_node_func.is_none())
                                 {
                                     if parnsdone == 0 {
-                                        /*
-                                         * Gather @parent's in-scope ns-decls.
-                                         */
+                                        // Gather @parent's in-scope ns-decls.
                                         if xml_dom_wrap_ns_norm_gather_in_scope_ns(
                                             addr_of_mut!(ns_map),
                                             dest_parent,
@@ -4228,14 +4156,10 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
                                     }
                                     parnsdone = 1;
                                 }
-                                /*
-                                 * Adopt ns-references.
-                                 */
+                                // Adopt ns-references.
                                 let mut ns_end = false;
                                 if XML_NSMAP_NOTEMPTY!(ns_map) {
-                                    /*
-                                     * Search for a mapping.
-                                     */
+                                    // Search for a mapping.
                                     XML_NSMAP_FOREACH!(ns_map, mi, {
                                         if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
                                             (*cur).ns = (*mi).new_ns;
@@ -4457,7 +4381,7 @@ unsafe extern "C" fn xml_dom_wrap_adopt_branch(
 ///
 /// Returns 1 if a ns-decl was found, 0 if not and -1 on API and internal errors.
 #[doc(alias = "xmlSearchNsByNamespaceStrict")]
-unsafe extern "C" fn xml_search_ns_by_namespace_strict(
+unsafe fn xml_search_ns_by_namespace_strict(
     doc: XmlDocPtr,
     node: XmlNodePtr,
     ns_name: *const XmlChar,
@@ -4704,7 +4628,7 @@ unsafe fn xml_dom_wrap_adopt_attr(
 ///         2 if a node of not yet supported type was given and
 ///         -1 on API/internal errors.
 #[doc(alias = "xmlDOMWrapAdoptNode")]
-pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
+pub unsafe fn xml_dom_wrap_adopt_node(
     ctxt: XmlDOMWrapCtxtPtr,
     mut source_doc: XmlDocPtr,
     node: XmlNodePtr,
@@ -4719,13 +4643,9 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
     {
         return -1;
     }
-    /*
-     * Check (*node).doc sanity.
-     */
+    // Check (*node).doc sanity.
     if !(*node).doc.is_null() && !source_doc.is_null() && (*node).doc != source_doc {
-        /*
-        	* Might be an XIncluded node.
-        	*/
+        // Might be an XIncluded node.
         return -1;
     }
     if source_doc.is_null() {
@@ -4743,7 +4663,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
         | XmlElementType::XmlPINode
         | XmlElementType::XmlCommentNode => {}
         XmlElementType::XmlDocumentFragNode => {
-            /* TODO: Support document-fragment-nodes. */
+            // TODO: Support document-fragment-nodes.
             return 2;
         }
         _ => {
@@ -4819,7 +4739,7 @@ pub unsafe extern "C" fn xml_dom_wrap_adopt_node(
 /// Returns 0 on success, 1 if the node is not supported,
 ///         -1 on API and internal errors.
 #[doc(alias = "xmlDOMWrapRemoveNode")]
-pub unsafe extern "C" fn xml_dom_wrap_remove_node(
+pub unsafe fn xml_dom_wrap_remove_node(
     ctxt: XmlDOMWrapCtxtPtr,
     doc: XmlDocPtr,
     mut node: XmlNodePtr,
@@ -4834,7 +4754,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
         return -1;
     }
 
-    /* TODO: 0 or -1 ? */
+    // TODO: 0 or -1 ?
     if (*node).parent().is_none() {
         return 0;
     }
@@ -4854,9 +4774,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
         }
     }
     (*node).unlink();
-    /*
-     * Save out-of-scope ns-references in (*doc).oldNs.
-     */
+    // Save out-of-scope ns-references in (*doc).oldNs.
     'main: loop {
         match (*node).element_type() {
             ty @ XmlElementType::XmlElementNode | ty @ XmlElementType::XmlAttributeNode => {
@@ -4885,9 +4803,7 @@ pub unsafe extern "C" fn xml_dom_wrap_remove_node(
                 }
 
                 if !(*node).ns.is_null() {
-                    /*
-                     * Find a mapping.
-                     */
+                    // Find a mapping.
                     if !list.is_null() {
                         for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
                             if (*node).ns == *list.add(j) {
@@ -5077,7 +4993,8 @@ macro_rules! DICT_CONST_COPY {
 ///         1 if a node of unsupported (or not yet supported) type was given,
 ///         -1 on API/internal errors.
 #[doc(alias = "xmlDOMWrapCloneNode")]
-pub unsafe extern "C" fn xml_dom_wrap_clone_node(
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn xml_dom_wrap_clone_node(
     ctxt: XmlDOMWrapCtxtPtr,
     mut source_doc: XmlDocPtr,
     node: XmlNodePtr,
@@ -5094,14 +5011,12 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
     let mut mi: XmlNsMapItemPtr;
     let mut ns: XmlNsPtr = null_mut();
     let mut depth: i32 = -1;
-    /* let adoptStr: i32 = 1; */
-    /* gather @parent's ns-decls. */
+    // let adoptStr: i32 = 1;
+    // gather @parent's ns-decls.
     let mut parnsdone: i32 = 0;
-    /*
-     * @ancestorsOnly:
-     * TODO: @ancestorsOnly should be set per option.
-     *
-     */
+    // @ancestorsOnly:
+    // TODO: @ancestorsOnly should be set per option.
+    //
     let ancestors_only: i32 = 0;
     let mut result_clone: XmlNodePtr = null_mut();
     let mut clone: XmlNodePtr;
@@ -5109,24 +5024,18 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
     let mut prev_clone: XmlNodePtr = null_mut();
     let mut clone_ns: XmlNsPtr;
     let mut clone_ns_def_slot: *mut XmlNsPtr;
-    /* The destination dict */
+    // The destination dict
 
     if node.is_null() || res_node.is_null() || dest_doc.is_null() {
         return -1;
     }
-    /*
-     * TODO: Initially we support only element-nodes.
-     */
+    // TODO: Initially we support only element-nodes.
     if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
         return 1;
     }
-    /*
-     * Check (*node).doc sanity.
-     */
+    // Check (*node).doc sanity.
     if !(*node).doc.is_null() && !source_doc.is_null() && (*node).doc != source_doc {
-        /*
-        	* Might be an XIncluded node.
-        	*/
+        // Might be an XIncluded node.
         return -1;
     }
     if source_doc.is_null() {
@@ -5137,9 +5046,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
     }
 
     let dict: XmlDictPtr = (*dest_doc).dict;
-    /*
-     * Reuse the namespace map of the context.
-     */
+    // Reuse the namespace map of the context.
     if !ctxt.is_null() {
         ns_map = (*ctxt).namespace_map as _;
     }
@@ -5155,21 +5062,15 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
         'internal_error: {
             'main: while !cur.is_null() {
                 if (*cur).doc != source_doc {
-                    /*
-                     * We'll assume XIncluded nodes if the doc differs.
-                     * TODO: Do we need to reconciliate XIncluded nodes?
-                     * TODO: This here returns -1 in this case.
-                     */
+                    // We'll assume XIncluded nodes if the doc differs.
+                    // TODO: Do we need to reconciliate XIncluded nodes?
+                    // TODO: This here returns -1 in this case.
                     break 'internal_error;
                 }
-                /*
-                 * Create a new node.
-                 */
+                // Create a new node.
                 match (*cur).element_type() {
                     XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd => {
-                        /*
-                         * TODO: What to do with XInclude?
-                         */
+                        // TODO: What to do with XInclude?
                         break 'internal_error;
                     }
                     XmlElementType::XmlElementNode
@@ -5328,22 +5229,20 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                                 ns = (*ns).next;
                             }
                         }
-                        /* (*cur).ns will be processed further down. */
+                        // (*cur).ns will be processed further down.
                     }
                     XmlElementType::XmlAttributeNode => {
-                        /* IDs will be processed further down. */
-                        /* (*cur).ns will be processed further down. */
+                        // IDs will be processed further down.
+                        // (*cur).ns will be processed further down.
                     }
                     XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                        /*
-                         * Note that this will also cover the values of attributes.
-                         */
+                        // Note that this will also cover the values of attributes.
                         DICT_COPY!(dict, (*cur).content, (*clone).content);
                         // goto leave_node;
                         leave_node = true;
                     }
                     XmlElementType::XmlEntityNode => {
-                        /* TODO: What to do here? */
+                        // TODO: What to do here?
                         // goto leave_node;
                         leave_node = true;
                     }
@@ -5389,12 +5288,10 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                     if (*cur).ns.is_null() {
                         // goto end_ns_reference;
                     } else {
-                        /* handle_ns_reference: */
-                        /*
-                         ** The following will take care of references to ns-decls ********
-                         ** and is intended only for element- and attribute-nodes.
-                         **
-                         */
+                        // handle_ns_reference:
+                        // The following will take care of references to ns-decls
+                        // and is intended only for element- and attribute-nodes.
+                        //
                         if parnsdone == 0 {
                             if (!dest_parent.is_null() && ctxt.is_null())
                                 && (xml_dom_wrap_ns_norm_gather_in_scope_ns(
@@ -5406,19 +5303,13 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
                             }
                             parnsdone = 1;
                         }
-                        /*
-                         * Adopt ns-references.
-                         */
+                        // Adopt ns-references.
                         let mut end_ns_reference = false;
                         if XML_NSMAP_NOTEMPTY!(ns_map) {
-                            /*
-                             * Search for a mapping.
-                             */
+                            // Search for a mapping.
                             XML_NSMAP_FOREACH!(ns_map, mi, {
                                 if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
-                                    /*
-                                     * This is the nice case: a mapping was found.
-                                     */
+                                    // This is the nice case: a mapping was found.
                                     (*clone).ns = (*mi).new_ns;
                                     // goto end_ns_reference;
                                     end_ns_reference = true;
@@ -5601,14 +5492,10 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
         ret = -1;
     }
     // exit:
-    /*
-     * Cleanup.
-     */
+    // Cleanup.
     if !ns_map.is_null() {
         if !ctxt.is_null() && (*ctxt).namespace_map == ns_map as _ {
-            /*
-             * Just cleanup the map but don't free.
-             */
+            // Just cleanup the map but don't free.
             if !(*ns_map).first.is_null() {
                 if !(*ns_map).pool.is_null() {
                     (*(*ns_map).last).next = (*ns_map).pool;
@@ -5620,10 +5507,7 @@ pub unsafe extern "C" fn xml_dom_wrap_clone_node(
             xml_dom_wrap_ns_map_free(ns_map);
         }
     }
-    /*
-     * TODO: Should we try a cleanup of the cloned node in case of a
-     * fatal error?
-     */
+    // TODO: Should we try a cleanup of the cloned node in case of a fatal error?
     *res_node = result_clone;
     ret
 }
