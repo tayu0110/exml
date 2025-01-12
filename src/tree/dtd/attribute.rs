@@ -18,15 +18,23 @@
 //
 // daniel@veillard.com
 
-use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut};
+use std::{
+    borrow::Cow,
+    ffi::CStr,
+    os::raw::c_void,
+    ptr::{drop_in_place, null_mut},
+};
 
 use crate::{
-    libxml::xmlstring::XmlChar,
+    dict::xml_dict_owns,
+    libxml::{globals::xml_free, xmlstring::XmlChar},
     tree::{
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElementType,
-        XmlEnumerationPtr, XmlNode,
+        XmlNode,
     },
 };
+
+use super::XmlEnumeration;
 
 /// An Attribute declaration in a DTD.
 pub type XmlAttributePtr = *mut XmlAttribute;
@@ -47,7 +55,7 @@ pub struct XmlAttribute {
     pub(crate) atype: XmlAttributeType,  /* The attribute type */
     pub(crate) def: XmlAttributeDefault, /* the default */
     pub(crate) default_value: *const XmlChar, /* or the default value */
-    pub(crate) tree: XmlEnumerationPtr,  /* or the enumeration tree if any */
+    pub(crate) tree: Option<Box<XmlEnumeration>>, /* or the enumeration tree if any */
     pub(crate) prefix: Option<String>,   /* the namespace prefix if any */
     pub(crate) elem: Option<String>,     /* Element holding the attribute */
 }
@@ -68,7 +76,7 @@ impl Default for XmlAttribute {
             atype: XmlAttributeType::XmlAttributeCDATA,
             def: XmlAttributeDefault::XmlAttributeNone,
             default_value: null_mut(),
-            tree: null_mut(),
+            tree: None,
             prefix: None,
             elem: None,
         }
@@ -119,4 +127,39 @@ impl NodeCommon for XmlAttribute {
     fn set_parent(&mut self, parent: Option<NodePtr>) {
         self.parent = parent.map_or(null_mut(), |p| p.as_ptr()) as *mut XmlDtd;
     }
+}
+
+/// Deallocate the memory used by an attribute definition
+#[doc(alias = "xmlFreeAttribute")]
+pub(crate) unsafe fn xml_free_attribute(attr: XmlAttributePtr) {
+    if attr.is_null() {
+        return;
+    }
+    let dict = if !(*attr).doc.is_null() {
+        (*(*attr).doc).dict
+    } else {
+        null_mut()
+    };
+    (*attr).unlink();
+    if !dict.is_null() {
+        (*attr).elem = None;
+        if !(*attr).name.is_null() && xml_dict_owns(dict, (*attr).name) == 0 {
+            xml_free((*attr).name as _);
+        }
+        (*attr).prefix = None;
+        if !(*attr).default_value.is_null() && xml_dict_owns(dict, (*attr).default_value) == 0 {
+            xml_free((*attr).default_value as _);
+        }
+    } else {
+        (*attr).elem = None;
+        if !(*attr).name.is_null() {
+            xml_free((*attr).name as _);
+        }
+        if !(*attr).default_value.is_null() {
+            xml_free((*attr).default_value as _);
+        }
+        (*attr).prefix = None;
+    }
+    drop_in_place(attr);
+    xml_free(attr as _);
 }

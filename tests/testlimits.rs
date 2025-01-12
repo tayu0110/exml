@@ -37,7 +37,7 @@ use exml::{
     },
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration,
     },
 };
 use libc::{memcpy, strlen, strncmp};
@@ -752,7 +752,7 @@ fn attribute_decl_callback(
     _typ: XmlAttributeType,
     _def: XmlAttributeDefault,
     _default_value: Option<&str>,
-    _tree: XmlEnumerationPtr,
+    _tree: Option<Box<XmlEnumeration>>,
 ) {
     CALLBACKS.with(|c| c.fetch_add(1, Ordering::Relaxed));
 }

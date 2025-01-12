@@ -56,8 +56,8 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDOMWrapCtxtPtr,
         XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr,
-        XmlNotationPtr, XmlNs, XmlNsPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlNode, XmlNodePtr, XmlNotationPtr,
+        XmlNs, XmlNsPtr,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -1262,11 +1262,6 @@ pub(crate) unsafe fn desret_xml_element_content_ptr(val: XmlElementContentPtr) {
         xml_free_element_content(val);
     }
 }
-
-pub(crate) fn gen_xml_enumeration_ptr(_no: i32, _nr: i32) -> XmlEnumerationPtr {
-    null_mut()
-}
-pub(crate) fn des_xml_enumeration_ptr(_no: i32, _val: XmlEnumerationPtr, _nr: i32) {}
 
 unsafe fn get_api_root() -> XmlNodePtr {
     if (API_ROOT.get().is_null())

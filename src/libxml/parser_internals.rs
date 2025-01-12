@@ -34,11 +34,6 @@ use std::{
 
 use libc::{memcpy, INT_MAX};
 
-use crate::parser::{
-    parse_char_ref, parse_comment, parse_name, parse_nmtoken, parse_pi, parse_text_decl,
-    xml_create_memory_parser_ctxt, xml_free_input_stream, xml_free_parser_ctxt,
-    xml_new_entity_input_stream,
-};
 use crate::{
     encoding::{detect_encoding, XmlCharEncoding},
     error::XmlParserErrors,
@@ -64,8 +59,8 @@ use crate::{
         },
         sax2::xml_sax2_get_entity,
         valid::{
-            xml_create_enumeration, xml_free_doc_element_content, xml_free_enumeration,
-            xml_new_doc_element_content, xml_validate_element, xml_validate_root,
+            xml_free_doc_element_content, xml_new_doc_element_content, xml_validate_element,
+            xml_validate_root,
         },
         xmlstring::{xml_str_equal, xml_strchr, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
@@ -80,8 +75,16 @@ use crate::{
         xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon, NodePtr, XmlAttributeDefault,
         XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
         XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEnumerationPtr, XmlNode, XmlNodePtr, XML_XML_NAMESPACE,
+        XmlEnumeration, XmlNode, XmlNodePtr, XML_XML_NAMESPACE,
     },
+};
+use crate::{
+    parser::{
+        parse_char_ref, parse_comment, parse_name, parse_nmtoken, parse_pi, parse_text_decl,
+        xml_create_memory_parser_ctxt, xml_free_input_stream, xml_free_parser_ctxt,
+        xml_new_entity_input_stream,
+    },
+    tree::xml_create_enumeration,
 };
 
 use super::entities::{
@@ -1014,15 +1017,14 @@ pub(crate) unsafe fn xml_parse_default_decl(
 ///
 /// Returns: the notation attribute tree built while parsing
 #[doc(alias = "xmlParseNotationType")]
-pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnumerationPtr {
-    let mut ret: XmlEnumerationPtr = null_mut();
-    let mut last: XmlEnumerationPtr = null_mut();
-    let mut cur: XmlEnumerationPtr;
-    let mut tmp: XmlEnumerationPtr;
+pub(crate) unsafe fn xml_parse_notation_type(
+    ctxt: XmlParserCtxtPtr,
+) -> Option<Box<XmlEnumeration>> {
+    let mut ret = None::<Box<XmlEnumeration>>;
 
     if (*ctxt).current_byte() != b'(' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotStarted, None);
-        return null_mut();
+        return None;
     }
     while {
         (*ctxt).skip_char();
@@ -1033,12 +1035,11 @@ pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnume
                 XmlParserErrors::XmlErrNameRequired,
                 "Name expected in NOTATION declaration\n",
             );
-            xml_free_enumeration(ret);
-            return null_mut();
+            return None;
         };
-        tmp = ret;
-        while !tmp.is_null() {
-            if Some(name.as_str()) == (*tmp).name.as_deref() {
+        let mut tmp = ret.as_deref();
+        while let Some(now) = tmp {
+            if Some(name.as_str()) == now.name.as_deref() {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
@@ -1047,30 +1048,25 @@ pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnume
                 );
                 break;
             }
-            tmp = (*tmp).next;
+            tmp = now.next.as_deref();
         }
-        if tmp.is_null() {
-            cur = xml_create_enumeration(Some(&name));
-            if cur.is_null() {
-                xml_free_enumeration(ret);
-                return null_mut();
-            }
-            if last.is_null() {
-                ret = cur;
-                last = cur;
+        if tmp.is_none() {
+            let cur = xml_create_enumeration(Some(&name));
+            if let Some(mut ret) = ret.as_deref_mut() {
+                while ret.next.is_some() {
+                    ret = ret.next.as_deref_mut().unwrap();
+                }
+                ret.next = Some(cur);
             } else {
-                (*last).next = cur;
-                last = cur;
+                ret = Some(cur);
             }
         }
         (*ctxt).skip_blanks();
-
         (*ctxt).current_byte() == b'|'
     } {}
     if (*ctxt).current_byte() != b')' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrNotationNotFinished, None);
-        xml_free_enumeration(ret);
-        return null_mut();
+        return None;
     }
     (*ctxt).skip_char();
     ret
@@ -1085,15 +1081,14 @@ pub(crate) unsafe fn xml_parse_notation_type(ctxt: XmlParserCtxtPtr) -> XmlEnume
 ///
 /// Returns: the enumeration attribute tree built while parsing
 #[doc(alias = "xmlParseEnumerationType")]
-pub(crate) unsafe fn xml_parse_enumeration_type(ctxt: XmlParserCtxtPtr) -> XmlEnumerationPtr {
-    let mut ret: XmlEnumerationPtr = null_mut();
-    let mut last: XmlEnumerationPtr = null_mut();
-    let mut cur: XmlEnumerationPtr;
-    let mut tmp: XmlEnumerationPtr;
+pub(crate) unsafe fn xml_parse_enumeration_type(
+    ctxt: XmlParserCtxtPtr,
+) -> Option<Box<XmlEnumeration>> {
+    let mut ret = None::<Box<XmlEnumeration>>;
 
     if (*ctxt).current_byte() != b'(' {
         xml_fatal_err(ctxt, XmlParserErrors::XmlErrAttlistNotStarted, None);
-        return null_mut();
+        return None;
     }
     while {
         (*ctxt).skip_char();
@@ -1102,9 +1097,9 @@ pub(crate) unsafe fn xml_parse_enumeration_type(ctxt: XmlParserCtxtPtr) -> XmlEn
             xml_fatal_err(ctxt, XmlParserErrors::XmlErrNmtokenRequired, None);
             return ret;
         };
-        tmp = ret;
-        while !tmp.is_null() {
-            if Some(name.as_str()) == (*tmp).name.as_deref() {
+        let mut tmp = ret.as_deref();
+        while let Some(now) = tmp {
+            if Some(name.as_str()) == now.name.as_deref() {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
@@ -1113,24 +1108,20 @@ pub(crate) unsafe fn xml_parse_enumeration_type(ctxt: XmlParserCtxtPtr) -> XmlEn
                 );
                 break;
             }
-            tmp = (*tmp).next;
+            tmp = now.next.as_deref();
         }
-        if tmp.is_null() {
-            cur = xml_create_enumeration(Some(&name));
-            if cur.is_null() {
-                xml_free_enumeration(ret);
-                return null_mut();
-            }
-            if last.is_null() {
-                ret = cur;
-                last = cur;
+        if tmp.is_none() {
+            let cur = xml_create_enumeration(Some(&name));
+            if let Some(mut ret) = ret.as_deref_mut() {
+                while ret.next.is_some() {
+                    ret = ret.next.as_deref_mut().unwrap();
+                }
+                ret.next = Some(cur);
             } else {
-                (*last).next = cur;
-                last = cur;
+                ret = Some(cur);
             }
         }
         (*ctxt).skip_blanks();
-
         (*ctxt).current_byte() == b'|'
     } {}
     if (*ctxt).current_byte() != b')' {
@@ -1151,7 +1142,7 @@ pub(crate) unsafe fn xml_parse_enumeration_type(ctxt: XmlParserCtxtPtr) -> XmlEn
 #[doc(alias = "xmlParseEnumeratedType")]
 pub(crate) unsafe fn xml_parse_enumerated_type(
     ctxt: XmlParserCtxtPtr,
-    tree: *mut XmlEnumerationPtr,
+    tree: &mut Option<Box<XmlEnumeration>>,
 ) -> Option<XmlAttributeType> {
     if (*ctxt).content_bytes().starts_with(b"NOTATION") {
         (*ctxt).advance(8);
@@ -1164,13 +1155,13 @@ pub(crate) unsafe fn xml_parse_enumerated_type(
             return None;
         }
         *tree = xml_parse_notation_type(ctxt);
-        if (*tree).is_null() {
+        if tree.is_none() {
             return None;
         }
         return Some(XmlAttributeType::XmlAttributeNotation);
     }
     *tree = xml_parse_enumeration_type(ctxt);
-    if (*tree).is_null() {
+    if tree.is_none() {
         return None;
     }
     Some(XmlAttributeType::XmlAttributeEnumeration)
@@ -1216,7 +1207,7 @@ pub(crate) unsafe fn xml_parse_enumerated_type(
 #[doc(alias = "xmlParseAttributeType")]
 pub(crate) unsafe fn xml_parse_attribute_type(
     ctxt: XmlParserCtxtPtr,
-    tree: *mut XmlEnumerationPtr,
+    tree: &mut Option<Box<XmlEnumeration>>,
 ) -> Option<XmlAttributeType> {
     if (*ctxt).content_bytes().starts_with(b"CDATA") {
         (*ctxt).advance(5);

@@ -53,7 +53,7 @@ use crate::{
         xml_text_concat, xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
-        XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlEnumeration, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -76,7 +76,7 @@ use super::{
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     valid::{
         xml_add_attribute_decl, xml_add_element_decl, xml_add_id, xml_add_notation_decl,
-        xml_add_ref, xml_free_enumeration, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
+        xml_add_ref, xml_get_dtd_qelement_desc, xml_is_id, xml_is_ref,
         xml_valid_ctxt_normalize_attribute_value, xml_valid_normalize_attribute_value,
         xml_validate_dtd_final, xml_validate_element_decl, xml_validate_notation_decl,
         xml_validate_one_attribute, xml_validate_one_namespace, xml_validate_root,
@@ -765,7 +765,7 @@ pub unsafe fn xml_sax2_attribute_decl(
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
     default_value: Option<&str>,
-    tree: XmlEnumerationPtr,
+    tree: Option<Box<XmlEnumeration>>,
 ) {
     let attr: XmlAttributePtr;
 
@@ -825,7 +825,6 @@ pub unsafe fn xml_sax2_attribute_decl(
             "SAX.xmlSAX2AttributeDecl({}) called while not in subset\n",
             name
         );
-        xml_free_enumeration(tree);
         return;
     }
     #[cfg(feature = "libxml_valid")]

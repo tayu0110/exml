@@ -67,8 +67,8 @@ use exml::{
             XmlSchematronValidCtxtPtr, XmlSchematronValidOptions,
         },
         valid::{
-            xml_free_enumeration, xml_free_valid_ctxt, xml_new_valid_ctxt,
-            xml_valid_get_valid_elements, xml_validate_document, xml_validate_dtd,
+            xml_free_valid_ctxt, xml_new_valid_ctxt, xml_valid_get_valid_elements,
+            xml_validate_document, xml_validate_dtd,
         },
         xinclude::xml_xinclude_process_flags,
         xmlmemory::{
@@ -100,7 +100,7 @@ use exml::{
     tree::{
         xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node, NodeCommon,
         XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
+        XmlElementTypeVal, XmlEnumeration, XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };
@@ -1452,7 +1452,7 @@ unsafe fn attribute_decl_debug(
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
     default_value: Option<&str>,
-    tree: XmlEnumerationPtr,
+    _tree: Option<Box<XmlEnumeration>>,
 ) {
     CALLBACKS.fetch_add(1, Ordering::Relaxed);
     if CMD_ARGS.noout {
@@ -1469,7 +1469,6 @@ unsafe fn attribute_decl_debug(
             typ as i32, def as i32
         );
     }
-    xml_free_enumeration(tree);
 }
 
 /// An element definition has been parsed

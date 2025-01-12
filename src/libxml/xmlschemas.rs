@@ -104,7 +104,7 @@ use crate::{
             XML_SCHEMAS_TYPE_WHITESPACE_COLLAPSE, XML_SCHEMAS_TYPE_WHITESPACE_PRESERVE,
             XML_SCHEMAS_TYPE_WHITESPACE_REPLACE,
         },
-        valid::{xml_add_id, xml_free_enumeration},
+        valid::xml_add_id,
         xmlautomata::{
             xml_automata_compile, xml_automata_get_init_state, xml_automata_new_all_trans,
             xml_automata_new_count_trans2, xml_automata_new_counted_trans,
@@ -146,7 +146,7 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlIDPtr, XmlNodePtr, XmlNsPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlIDPtr, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
     uri::build_uri,
@@ -30269,7 +30269,7 @@ unsafe fn attribute_decl_split(
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
     default_value: Option<&str>,
-    tree: XmlEnumerationPtr,
+    tree: Option<Box<XmlEnumeration>>,
 ) {
     let ctx = ctx.unwrap();
     let lock = ctx.lock();
@@ -30289,11 +30289,7 @@ unsafe fn attribute_decl_split(
                 default_value,
                 tree,
             );
-        } else {
-            xml_free_enumeration(tree);
         }
-    } else {
-        xml_free_enumeration(tree);
     }
 }
 

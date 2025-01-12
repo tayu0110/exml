@@ -38,7 +38,7 @@ use crate::{
     tree::{
         xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttr, XmlAttribute,
         XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        XmlElementType, XmlElementTypeVal, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
@@ -607,22 +607,22 @@ impl XmlDebugCtxt<'_> {
                     write!(self.output, " NOTATION ");
                 }
             }
-            if !attr.tree.is_null() {
-                let mut cur: XmlEnumerationPtr = attr.tree;
-
+            if let Some(mut cur) = attr.tree.as_deref() {
+                let mut remain = true;
                 for indx in 0..5 {
-                    let name = (*cur).name.as_deref().unwrap();
+                    let name = cur.name.as_deref().unwrap();
                     if indx != 0 {
                         write!(self.output, "|{name}");
                     } else {
                         write!(self.output, " ({name}");
                     }
-                    cur = (*cur).next;
-                    if cur.is_null() {
+                    let Some(next) = cur.next.as_deref() else {
+                        remain = false;
                         break;
-                    }
+                    };
+                    cur = next;
                 }
-                if cur.is_null() {
+                if !remain {
                     write!(self.output, ")");
                 } else {
                     write!(self.output, "...)");

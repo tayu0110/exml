@@ -105,8 +105,8 @@ use crate::{
         sax2::{xml_sax2_entity_decl, xml_sax2_get_entity},
         uri::{xml_free_uri, xml_parse_uri},
         valid::{
-            xml_free_doc_element_content, xml_free_enumeration, xml_is_mixed_element,
-            xml_new_doc_element_content, xml_validate_root,
+            xml_free_doc_element_content, xml_is_mixed_element, xml_new_doc_element_content,
+            xml_validate_root,
         },
         xmlmemory::{xml_cleanup_memory_internal, xml_init_memory_internal},
         xmlschemastypes::xml_schema_cleanup_types,
@@ -127,7 +127,7 @@ use crate::{
         xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr,
         XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
         XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNode, XmlNodePtr, XmlNsPtr,
+        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr,
         XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
@@ -348,7 +348,7 @@ pub type AttributeDeclSAXFunc = unsafe fn(
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
     default_value: Option<&str>,
-    tree: XmlEnumerationPtr,
+    tree: Option<Box<XmlEnumeration>>,
 );
 
 /// An element definition has been parsed.
@@ -8239,7 +8239,6 @@ pub(crate) unsafe fn xml_parse_entity_decl(ctxt: XmlParserCtxtPtr) {
 pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
     let elem_name: *const XmlChar;
     let mut attr_name: *const XmlChar;
-    let mut tree: XmlEnumerationPtr;
 
     if (*ctxt).current_byte() != b'<' || (*ctxt).nth_byte(1) != b'!' {
         return;
@@ -8275,7 +8274,6 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
             let mut default_value: *mut XmlChar = null_mut();
 
             (*ctxt).grow();
-            tree = null_mut();
             attr_name = xml_parse_name(ctxt);
             if attr_name.is_null() {
                 xml_fatal_err_msg(
@@ -8295,7 +8293,8 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
                 break;
             }
 
-            let Some(typ) = xml_parse_attribute_type(ctxt, addr_of_mut!(tree)) else {
+            let mut tree = None;
+            let Some(typ) = xml_parse_attribute_type(ctxt, &mut tree) else {
                 break;
             };
 
@@ -8306,9 +8305,6 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
                     XmlParserErrors::XmlErrSpaceRequired,
                     "Space required after the attribute typ\n",
                 );
-                if !tree.is_null() {
-                    xml_free_enumeration(tree);
-                }
                 break;
             }
 
@@ -8326,9 +8322,6 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
                 );
                 if !default_value.is_null() {
                     xml_free(default_value as _);
-                }
-                if !tree.is_null() {
-                    xml_free_enumeration(tree);
                 }
                 break;
             }
@@ -8351,8 +8344,6 @@ pub(crate) unsafe fn xml_parse_attribute_list_decl(ctxt: XmlParserCtxtPtr) {
                         .as_deref(),
                     tree,
                 );
-            } else if !tree.is_null() {
-                xml_free_enumeration(tree);
             }
 
             if (*ctxt).sax2 != 0

@@ -50,7 +50,6 @@ use exml::{
         },
         pattern::{XmlPatternPtr, XmlStreamCtxtPtr},
         relaxng::XmlRelaxNGPtr,
-        valid::xml_free_enumeration,
         xinclude::xml_xinclude_process_flags,
         xmlmemory::{
             xml_mem_free, xml_mem_malloc, xml_mem_realloc, xml_mem_setup, xml_mem_used,
@@ -69,7 +68,7 @@ use exml::{
     relaxng::xml_relaxng_init_types,
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumerationPtr, XmlNodePtr,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,
@@ -766,7 +765,7 @@ unsafe fn attribute_decl_debug(
     typ: XmlAttributeType,
     def: XmlAttributeDefault,
     default_value: Option<&str>,
-    tree: XmlEnumerationPtr,
+    _tree: Option<Box<XmlEnumeration>>,
 ) {
     increment_callbacks_counter();
     if let Some(default_value) = default_value {
@@ -782,7 +781,6 @@ unsafe fn attribute_decl_debug(
             def as i32,
         );
     }
-    xml_free_enumeration(tree);
 }
 
 /// An element definition has been parsed
