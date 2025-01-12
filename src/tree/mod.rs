@@ -29,6 +29,7 @@ mod dom_wrapper;
 mod dtd;
 #[cfg(feature = "libxml_output")]
 mod dump;
+mod generic;
 mod id;
 mod namespace;
 mod node;
@@ -70,6 +71,7 @@ pub use attribute::*;
 pub use document::*;
 pub use dom_wrapper::*;
 pub use dtd::*;
+pub use generic::*;
 pub use id::*;
 pub use namespace::*;
 pub use node::*;
