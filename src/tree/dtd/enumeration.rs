@@ -44,7 +44,7 @@ impl Clone for XmlEnumeration {
 
 /// create and initialize an enumeration attribute node.
 ///
-/// Returns the xmlEnumerationPtr just created or null_mut() in case of error.
+/// Return a boxed `XmlEnumeration` whose name is `name`.
 #[doc(alias = "xmlCreateEnumeration")]
 pub fn xml_create_enumeration(name: &str) -> Box<XmlEnumeration> {
     Box::new(XmlEnumeration {

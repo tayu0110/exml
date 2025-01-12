@@ -112,12 +112,12 @@ pub struct XmlValidState {
 /// Callback called when a validity error is found. This is a message
 /// oriented function similar to an *printf function.
 #[doc(alias = "xmlValidityErrorFunc")]
-pub type XmlValidityErrorFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 /// Callback called when a validity warning is found. This is a message
 /// oriented function similar to an *printf function.
 #[doc(alias = "xmlValidityWarningFunc")]
-pub type XmlValidityWarningFunc = unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 pub type XmlValidCtxtPtr = *mut XmlValidCtxt;
 /// An xmlValidCtxt is used for error reporting when validating.
@@ -321,7 +321,7 @@ unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
 
 /// Deallocate the memory used by an notation definition
 #[doc(alias = "xmlFreeNotation")]
-unsafe extern "C" fn xml_free_notation(nota: XmlNotationPtr) {
+unsafe fn xml_free_notation(nota: XmlNotationPtr) {
     if nota.is_null() {
         return;
     }
@@ -425,9 +425,7 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
 /// Returns the new xmlNotationTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyNotationTable")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_copy_notation_table(
-    table: XmlNotationTablePtr,
-) -> XmlNotationTablePtr {
+pub unsafe fn xml_copy_notation_table(table: XmlNotationTablePtr) -> XmlNotationTablePtr {
     xml_hash_copy(table, Some(xml_copy_notation)) as XmlNotationTablePtr
 }
 
@@ -439,14 +437,14 @@ extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const Xml
 
 /// Deallocate the memory used by an entities hash table.
 #[doc(alias = "xmlFreeNotationTable")]
-pub unsafe extern "C" fn xml_free_notation_table(table: XmlNotationTablePtr) {
+pub unsafe fn xml_free_notation_table(table: XmlNotationTablePtr) {
     xml_hash_free(table, Some(xml_free_notation_table_entry));
 }
 
 /// This will dump the content the notation declaration as an XML DTD definition
 #[doc(alias = "xmlDumpNotationDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotationPtr) {
+pub unsafe fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotationPtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_write_quoted_string};
 
     if buf.is_null() || nota.is_null() {
@@ -488,7 +486,7 @@ extern "C" fn xml_dump_notation_decl_scan(
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlDumpNotationTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
+pub unsafe fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
     if buf.is_null() || table.is_null() {
         return;
     }
@@ -586,7 +584,7 @@ pub unsafe fn xml_new_doc_element_content(
 ///
 /// Returns the new xmlElementContentPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyDocElementContent")]
-pub unsafe extern "C" fn xml_copy_doc_element_content(
+pub unsafe fn xml_copy_doc_element_content(
     doc: XmlDocPtr,
     mut cur: XmlElementContentPtr,
 ) -> XmlElementContentPtr {
@@ -676,10 +674,7 @@ pub unsafe extern "C" fn xml_copy_doc_element_content(
 
 /// Free an element content structure. The whole subtree is removed.
 #[doc(alias = "xmlFreeDocElementContent")]
-pub unsafe extern "C" fn xml_free_doc_element_content(
-    doc: XmlDocPtr,
-    mut cur: XmlElementContentPtr,
-) {
+pub unsafe fn xml_free_doc_element_content(doc: XmlDocPtr, mut cur: XmlElementContentPtr) {
     let mut dict: XmlDictPtr = null_mut();
     let mut depth: usize = 0;
 
@@ -753,7 +748,7 @@ pub unsafe extern "C" fn xml_free_doc_element_content(
 /// This will dump the content of the element content definition
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElementContent")]
-pub unsafe extern "C" fn xml_snprintf_element_content(
+pub unsafe fn xml_snprintf_element_content(
     buf: *mut c_char,
     size: i32,
     content: XmlElementContentPtr,
@@ -886,7 +881,7 @@ pub unsafe extern "C" fn xml_snprintf_element_content(
 #[doc(alias = "xmlSprintfElementContent")]
 #[deprecated = "unsafe, use xmlSnprintfElementContent"]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_sprintf_element_content(
+pub unsafe fn xml_sprintf_element_content(
     _buf: *mut c_char,
     _content: XmlElementContentPtr,
     _englob: i32,
@@ -895,7 +890,7 @@ pub unsafe extern "C" fn xml_sprintf_element_content(
 
 /// Deallocate the memory used by an element definition
 #[doc(alias = "xmlFreeElement")]
-unsafe extern "C" fn xml_free_element(elem: XmlElementPtr) {
+unsafe fn xml_free_element(elem: XmlElementPtr) {
     if elem.is_null() {
         return;
     }
@@ -1211,7 +1206,7 @@ extern "C" fn xml_copy_element(payload: *mut c_void, _name: *const XmlChar) -> *
 /// Returns the new xmlElementTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyElementTable")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe extern "C" fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
+pub unsafe fn xml_copy_element_table(table: XmlElementTablePtr) -> XmlElementTablePtr {
     xml_hash_copy(table, Some(xml_copy_element)) as XmlElementTablePtr
 }
 
@@ -1223,7 +1218,7 @@ extern "C" fn xml_free_element_table_entry(elem: *mut c_void, _name: *const XmlC
 
 /// Deallocate the memory used by an element hash table.
 #[doc(alias = "xmlFreeElementTable")]
-pub unsafe extern "C" fn xml_free_element_table(table: XmlElementTablePtr) {
+pub unsafe fn xml_free_element_table(table: XmlElementTablePtr) {
     xml_hash_free(table, Some(xml_free_element_table_entry));
 }
 
@@ -1244,7 +1239,7 @@ extern "C" fn xml_dump_element_decl_scan(
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElementTablePtr) {
+pub unsafe fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElementTablePtr) {
     if buf.is_null() || table.is_null() {
         return;
     }
@@ -1254,7 +1249,7 @@ pub unsafe extern "C" fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElemen
 /// Dump the occurrence operator of an element.
 #[doc(alias = "xmlDumpElementOccur")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementContentPtr) {
+unsafe fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementContentPtr) {
     use crate::buf::libxml_api::xml_buf_ccat;
 
     match (*cur).ocur {
@@ -1274,7 +1269,7 @@ unsafe extern "C" fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementConte
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementContent")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr) {
+unsafe fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
 
     let mut cur: XmlElementContentPtr;
@@ -1369,7 +1364,7 @@ unsafe extern "C" fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElemen
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlDumpElementDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
+pub unsafe fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
     use std::ffi::CString;
 
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
@@ -1934,11 +1929,7 @@ unsafe fn xml_get_dtd_element_desc2(
 /// Returns the number of ID attributes found.
 #[doc(alias = "xmlScanIDAttributeDecl")]
 #[cfg(feature = "libxml_valid")]
-unsafe extern "C" fn xml_scan_id_attribute_decl(
-    ctxt: XmlValidCtxtPtr,
-    elem: XmlElementPtr,
-    err: i32,
-) -> i32 {
+unsafe fn xml_scan_id_attribute_decl(ctxt: XmlValidCtxtPtr, elem: XmlElementPtr, err: i32) -> i32 {
     let mut cur: XmlAttributePtr;
     let mut ret: i32 = 0;
 
@@ -2287,7 +2278,7 @@ extern "C" fn xml_dump_attribute_decl_scan(
 /// This will dump the content of the attribute table as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttributeTablePtr) {
+pub unsafe fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttributeTablePtr) {
     if buf.is_null() || table.is_null() {
         return;
     }
@@ -2297,7 +2288,7 @@ pub unsafe extern "C" fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttr
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
+pub unsafe fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
     use crate::{
         buf::libxml_api::{xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string},
         tree::xml_dump_enumeration,
@@ -2392,7 +2383,7 @@ pub unsafe extern "C" fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttrib
     xml_buf_ccat(buf, c">\n".as_ptr() as _);
 }
 
-unsafe extern "C" fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
+unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
     if ctxt.is_null() {
         return 0;
     }
@@ -2422,7 +2413,7 @@ macro_rules! DICT_FREE {
 
 /// Deallocate the memory used by an id definition
 #[doc(alias = "xmlFreeID")]
-unsafe extern "C" fn xml_free_id(id: XmlIDPtr) {
+unsafe fn xml_free_id(id: XmlIDPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
     if id.is_null() {
@@ -2530,7 +2521,7 @@ extern "C" fn xml_free_id_table_entry(id: *mut c_void, _name: *const XmlChar) {
 
 /// Deallocate the memory used by an ID hash table.
 #[doc(alias = "xmlFreeIDTable")]
-pub unsafe extern "C" fn xml_free_id_table(table: XmlIDTablePtr) {
+pub unsafe fn xml_free_id_table(table: XmlIDTablePtr) {
     xml_hash_free(table, Some(xml_free_id_table_entry));
 }
 
@@ -2657,7 +2648,7 @@ pub unsafe fn xml_is_id(doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAttrPtr) -> i
 
 /// Normalize a string in-place.
 #[doc(alias = "xmlValidNormalizeString")]
-unsafe extern "C" fn xml_valid_normalize_string(str: *mut XmlChar) {
+unsafe fn xml_valid_normalize_string(str: *mut XmlChar) {
     let mut dst: *mut XmlChar;
     let mut src: *const XmlChar;
 
@@ -2692,7 +2683,7 @@ unsafe extern "C" fn xml_valid_normalize_string(str: *mut XmlChar) {
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveID")]
-pub unsafe extern "C" fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
+pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     if doc.is_null() {
         return -1;
     }
@@ -2863,7 +2854,7 @@ extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *const XmlCh
 
 /// Deallocate the memory used by an Ref hash table.
 #[doc(alias = "xmlFreeRefTable")]
-pub(crate) unsafe extern "C" fn xml_free_ref_table(table: XmlRefTablePtr) {
+pub(crate) unsafe fn xml_free_ref_table(table: XmlRefTablePtr) {
     xml_hash_free(table, Some(xml_free_ref_table_entry));
 }
 
@@ -2872,11 +2863,7 @@ pub(crate) unsafe extern "C" fn xml_free_ref_table(table: XmlRefTablePtr) {
 ///
 /// Returns 0 or 1 depending on the lookup result
 #[doc(alias = "xmlIsRef")]
-pub(crate) unsafe extern "C" fn xml_is_ref(
-    mut doc: XmlDocPtr,
-    elem: XmlNodePtr,
-    attr: XmlAttrPtr,
-) -> i32 {
+pub(crate) unsafe fn xml_is_ref(mut doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlAttrPtr) -> i32 {
     if attr.is_null() {
         return 0;
     }
@@ -2890,7 +2877,7 @@ pub(crate) unsafe extern "C" fn xml_is_ref(
     if (*doc).int_subset.is_null() && (*doc).ext_subset.is_null() {
         return 0;
     } else if matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) {
-        /* TODO @@@ */
+        // TODO @@@
         return 0;
     } else {
         let mut attr_decl: XmlAttributePtr;
@@ -2949,7 +2936,7 @@ extern "C" fn xml_walk_remove_ref(data: *const c_void, user: *mut c_void) -> i32
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveRef")]
-pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
+pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     let mut target: XmlRemoveMemo = unsafe { zeroed() };
 
     if doc.is_null() {
@@ -3009,7 +2996,7 @@ pub(crate) unsafe extern "C" fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr)
 ///
 /// Returns null_mut() if not found, otherwise node set for the ID.
 #[doc(alias = "xmlGetRefs")]
-pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar) -> XmlListPtr {
+pub(crate) unsafe fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar) -> XmlListPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -3031,7 +3018,7 @@ pub(crate) unsafe extern "C" fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar)
 /// Returns null_mut() if not, otherwise the new validation context structure
 #[doc(alias = "xmlNewValidCtxt")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
+pub unsafe fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
     let ret: XmlValidCtxtPtr = xml_malloc(size_of::<XmlValidCtxt>()) as _;
     if ret.is_null() {
         xml_verr_memory(null_mut(), Some("malloc failed"));
@@ -3046,7 +3033,7 @@ pub unsafe extern "C" fn xml_new_valid_ctxt() -> XmlValidCtxtPtr {
 /// Free a validation context structure.
 #[doc(alias = "xmlFreeValidCtxt")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
+pub unsafe fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
     if cur.is_null() {
         return;
     }
@@ -3068,7 +3055,7 @@ pub unsafe extern "C" fn xml_free_valid_ctxt(cur: XmlValidCtxtPtr) {
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateRoot")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_validate_root(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let ret: i32;
 
     if doc.is_null() {
@@ -3154,7 +3141,7 @@ macro_rules! CHECK_DTD {
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateElementDecl")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_element_decl(
+pub unsafe fn xml_validate_element_decl(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlElementPtr,
@@ -3175,7 +3162,7 @@ pub unsafe extern "C" fn xml_validate_element_decl(
     // #endif
     // #endif
 
-    /* No Duplicate Types */
+    // No Duplicate Types
     if matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeMixed) {
         let mut cur: XmlElementContentPtr;
         let mut next: XmlElementContentPtr;
@@ -3333,11 +3320,11 @@ pub unsafe extern "C" fn xml_validate_element_decl(
         );
         ret = 0;
     }
-    /* One ID per Element Type
-     * already done when registering the attribute
-    if (xmlScanIDAttributeDecl(ctxt, elem) > 1) {
-        ret = 0;
-    } */
+    // One ID per Element Type
+    // already done when registering the attribute
+    // if (xmlScanIDAttributeDecl(ctxt, elem) > 1) {
+    //     ret = 0;
+    // }
     ret
 }
 
@@ -3776,7 +3763,7 @@ pub unsafe fn xml_validate_attribute_value(typ: XmlAttributeType, value: *const 
 /// Returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNotationDecl")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_notation_decl(
+pub unsafe fn xml_validate_notation_decl(
     _ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
     _nota: XmlNotationPtr,
@@ -3795,11 +3782,7 @@ pub unsafe extern "C" fn xml_validate_notation_decl(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDtd")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_dtd(
-    ctxt: XmlValidCtxtPtr,
-    doc: XmlDocPtr,
-    dtd: XmlDtdPtr,
-) -> i32 {
+pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDtdPtr) -> i32 {
     let mut ret: i32;
 
     if dtd.is_null() {
@@ -4149,7 +4132,7 @@ extern "C" fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCt
 /// Returns 1 if valid or 0 if invalid and -1 if not well-formed
 #[doc(alias = "xmlValidateDtdFinal")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_validate_dtd_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     let mut dtd: XmlDtdPtr;
 
     if doc.is_null() || ctxt.is_null() {
@@ -4282,11 +4265,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateElement")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_element(
-    ctxt: XmlValidCtxtPtr,
-    doc: XmlDocPtr,
-    root: XmlNodePtr,
-) -> i32 {
+pub unsafe fn xml_validate_element(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, root: XmlNodePtr) -> i32 {
     let mut elem: XmlNodePtr;
     let mut attr: XmlAttrPtr;
     let mut ns: XmlNsPtr;
@@ -4550,12 +4529,7 @@ macro_rules! DEBUG_VALID_MSG {
 /// This will dump the list of elements to the buffer
 /// Intended just for the debug routine
 #[doc(alias = "xmlSnprintfElements")]
-unsafe extern "C" fn xml_snprintf_elements(
-    buf: *mut c_char,
-    size: i32,
-    node: XmlNodePtr,
-    glob: i32,
-) {
+unsafe fn xml_snprintf_elements(buf: *mut c_char, size: i32, node: XmlNodePtr, glob: i32) {
     let mut cur: XmlNodePtr;
     let mut len: i32;
 
@@ -4652,7 +4626,7 @@ const ROLLBACK_PARENT: usize = 1;
 /// the content model is not determinist.
 #[doc(alias = "xmlValidateElementType")]
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
+unsafe fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
     let mut ret: i32 = -1;
     let mut determinist: i32 = 1;
 
@@ -4681,24 +4655,18 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
         return -2;
     }
 
-    /*
-     * We arrive here when more states need to be examined
-     */
+    // We arrive here when more states need to be examined
     //  cont:
     'cont: loop {
-        /*
-         * We just recovered from a rollback generated by a possible
-         * epsilon transition, go directly to the analysis phase
-         */
+        // We just recovered from a rollback generated by a possible
+        // epsilon transition, go directly to the analysis phase
         if (*(*ctxt).vstate).state == ROLLBACK_PARENT as u8 {
             DEBUG_VALID_MSG!(c"restored parent branch".as_ptr());
             ret = 1;
             // goto analyze;
         } else {
-            /*
-             * we may have to save a backup state here. This is the equivalent
-             * of handling epsilon transition in NFAs.
-             */
+            // we may have to save a backup state here. This is the equivalent
+            // of handling epsilon transition in NFAs.
             if !(*(*ctxt).vstate).cont.is_null()
                 && ((*(*(*ctxt).vstate).cont).parent.is_null()
                     || (*(*(*ctxt).vstate).cont).parent == 1 as XmlElementContentPtr
@@ -4729,9 +4697,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                 }
             }
 
-            /*
-             * Check first if the content matches
-             */
+            // Check first if the content matches
             match (*(*(*ctxt).vstate).cont).typ {
                 XmlElementContentType::XmlElementContentPCDATA => {
                     if (*(*ctxt).vstate).node.is_null() {
@@ -4741,10 +4707,8 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                     } else {
                         if matches!((*(*(*ctxt).vstate).node).typ, XmlElementType::XmlTextNode) {
                             DEBUG_VALID_MSG!(c"pcdata found, skip to next".as_ptr());
-                            /*
-                             * go to next element in the content model
-                             * skipping ignorable elems
-                             */
+                            // go to next element in the content model
+                            // skipping ignorable elems
                             loop {
                                 (*(*ctxt).vstate).node = (*(*(*ctxt).vstate).node).next;
                                 (*(*ctxt).vstate).node =
@@ -4817,10 +4781,8 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                         }
                         if ret == 1 {
                             DEBUG_VALID_MSG!(c"element found, skip to next".as_ptr());
-                            /*
-                             * go to next element in the content model
-                             * skipping ignorable elems
-                             */
+                            // go to next element in the content model
+                            // skipping ignorable elems
                             loop {
                                 (*(*ctxt).vstate).node = (*(*(*ctxt).vstate).node).next;
                                 (*(*ctxt).vstate).node =
@@ -4857,9 +4819,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                     }
                 }
                 XmlElementContentType::XmlElementContentOr => {
-                    /*
-                     * Small optimization.
-                     */
+                    // Small optimization.
                     if matches!(
                         (*(*(*(*ctxt).vstate).cont).c1).typ,
                         XmlElementContentType::XmlElementContentElement
@@ -4900,9 +4860,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                         }
                     }
 
-                    /*
-                     * save the second branch 'or' branch
-                     */
+                    // save the second branch 'or' branch
                     DEBUG_VALID_MSG!(c"saving 'or' branch".as_ptr());
                     if vstate_vpush(
                         ctxt,
@@ -4921,9 +4879,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                     continue 'cont;
                 }
                 XmlElementContentType::XmlElementContentSeq => {
-                    /*
-                     * Small optimization.
-                     */
+                    // Small optimization.
                     if matches!(
                         (*(*(*(*ctxt).vstate).cont).c1).typ,
                         XmlElementContentType::XmlElementContentElement
@@ -4976,9 +4932,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                 }
             }
 
-            /*
-             * At this point handle going up in the tree
-             */
+            // At this point handle going up in the tree
             if ret == -1 {
                 DEBUG_VALID_MSG!(c"error found returning".as_ptr());
                 return ret;
@@ -4986,10 +4940,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
         }
         // analyze:
         while !(*(*ctxt).vstate).cont.is_null() {
-            /*
-             * First do the analysis depending on the occurrence model at
-             * this level.
-             */
+            // First do the analysis depending on the occurrence model at this level.
             if ret == 0 {
                 let cur: XmlNodePtr;
                 match (*(*(*ctxt).vstate).cont).ocur {
@@ -5071,7 +5022,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
                                 // break;
                             } else {
                                 DEBUG_VALID_MSG!(c"Mult branch succeeded, continuing".as_ptr());
-                                /* (*(*ctxt).vstate).occurs |= 1 << (*(*ctxt).vstate).depth; */
+                                // (*(*ctxt).vstate).occurs |= 1 << (*(*ctxt).vstate).depth;
                                 // goto cont;
                                 continue 'cont;
                             }
@@ -5081,9 +5032,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
             }
             (*(*ctxt).vstate).state = 0;
 
-            /*
-             * Then act accordingly at the parent level
-             */
+            // Then act accordingly at the parent level
             (*(*ctxt).vstate).occurs &= (1 << (*(*ctxt).vstate).depth) - 1;
             if ((*(*(*ctxt).vstate).cont).parent.is_null())
                 || ((*(*(*ctxt).vstate).cont).parent == 1 as XmlElementContentPtr)
@@ -5166,7 +5115,7 @@ unsafe extern "C" fn xmlValidateElementType(ctxt: XmlValidCtxtPtr) -> i32 {
 ///
 /// returns 1 if valid or 0 if not and -1 in case of error
 #[doc(alias = "xmlValidateElementContent")]
-unsafe extern "C" fn xml_validate_element_content(
+unsafe fn xml_validate_element_content(
     ctxt: XmlValidCtxtPtr,
     child: XmlNodePtr,
     elem_decl: XmlElementPtr,
@@ -5193,7 +5142,7 @@ unsafe extern "C" fn xml_validate_element_content(
 
     #[cfg(feature = "libxml_regexp")]
     {
-        /* Build the regexp associated to the content model */
+        // Build the regexp associated to the content model
         if (*elem_decl).cont_model.is_null() {
             ret = xml_valid_build_content_model(ctxt, elem_decl);
         }
@@ -5234,7 +5183,7 @@ unsafe extern "C" fn xml_validate_element_content(
                                 }
                             }
                             XmlElementType::XmlCDATASectionNode => {
-                                /* TODO */
+                                // TODO
                                 ret = 0;
                                 break 'fail;
                             }
@@ -5290,9 +5239,7 @@ unsafe extern "C" fn xml_validate_element_content(
     'done: {
         #[cfg(not(feature = "libxml_regexp"))]
         {
-            /*
-             * Allocate the stack
-             */
+            // Allocate the stack
             (*ctxt).vstateMax = 8;
             (*ctxt).vstateTab =
                 xml_malloc((*ctxt).vstateMax as usize * size_of_val(&*(*ctxt).vstateTab.add(0)))
@@ -5301,9 +5248,7 @@ unsafe extern "C" fn xml_validate_element_content(
                 xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
                 return -1;
             }
-            /*
-             * The first entry in the stack is reserved to the current state
-             */
+            // The first entry in the stack is reserved to the current state
             (*ctxt).nodeMax = 0;
             (*ctxt).nodeNr = 0;
             (*ctxt).nodeTab = null_mut();
@@ -5329,20 +5274,16 @@ unsafe extern "C" fn xml_validate_element_content(
                     null_mut(),
                 );
             } else if ret == -2 {
-                /*
-                 * An entities reference appeared at this level.
-                 * Build a minimal representation of this node content
-                 * sufficient to run the validation process on it
-                 */
+                // An entities reference appeared at this level.
+                // Build a minimal representation of this node content
+                // sufficient to run the validation process on it
                 DEBUG_VALID_MSG!(c"Found an entity reference, linearizing".as_ptr());
                 cur = child;
                 while !cur.is_null() {
                     match (*cur).element_type() {
                         XmlElementType::XmlEntityRefNode => {
-                            /*
-                             * Push the current node to be able to roll back
-                             * and process within the entity
-                             */
+                            // Push the current node to be able to roll back
+                            // and process within the entity
                             if !(*cur).children.is_null() && !(*(*cur).children).children.is_null()
                             {
                                 node_vpush(ctxt, cur);
@@ -5358,10 +5299,8 @@ unsafe extern "C" fn xml_validate_element_content(
                             {
                                 // break;
                             } else {
-                                /*
-                                 * Allocate a new node and minimally fills in
-                                 * what's required
-                                 */
+                                // Allocate a new node and minimally fills in
+                                // what's required
                                 tmp = xml_malloc(size_of::<XmlNode>()) as XmlNodePtr;
                                 if tmp.is_null() {
                                     xml_verr_memory(ctxt as _, c"malloc failed".as_ptr() as _);
@@ -5382,19 +5321,14 @@ unsafe extern "C" fn xml_validate_element_content(
                                     last = tmp;
                                 }
                                 if matches!((*cur).typ, XmlElementType::XmlCDATASectionNode) {
-                                    /*
-                                     * E59 spaces in CDATA does not match the
-                                     * nonterminal S
-                                     */
+                                    // E59 spaces in CDATA does not match the nonterminal S
                                     (*tmp).content = xml_strdup(c"CDATA".as_ptr() as _);
                                 }
                             }
                         }
                         _ => {}
                     }
-                    /*
-                     * Switch to next element
-                     */
+                    // Switch to next element
                     cur = (*cur).next;
                     while cur.is_null() {
                         cur = node_vpop(ctxt);
@@ -5405,9 +5339,7 @@ unsafe extern "C" fn xml_validate_element_content(
                     }
                 }
 
-                /*
-                 * Relaunch the validation
-                 */
+                // Relaunch the validation
                 (*ctxt).vstate = (*ctxt).vstateTab.add(0);
                 (*ctxt).vstateNr = 1;
                 (*(*ctxt).vstate).cont = cont;
@@ -5502,9 +5434,7 @@ unsafe extern "C" fn xml_validate_element_content(
     #[cfg(not(feature = "libxml_regexp"))]
     {
         // done:
-        /*
-         * Deallocate the copy if done, and free up the validation stack
-         */
+        // Deallocate the copy if done, and free up the validation stack
         while !repl.is_null() {
             tmp = (*repl).next;
             xml_free(repl as _);
@@ -5537,7 +5467,7 @@ unsafe extern "C" fn xml_validate_element_content(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateOneElement")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_one_element(
+pub unsafe fn xml_validate_one_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -5691,7 +5621,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
     // If vstateNr is not zero that means continuous validation is
     // activated, do not try to check the content model at that level.
     if (*ctxt).vstate_nr == 0 {
-        /* Check that the element content matches the definition */
+        // Check that the element content matches the definition
         match (*elem_decl).etype {
             XmlElementTypeVal::XmlElementTypeUndefined => {
                 let name = (*elem).name().unwrap();
@@ -6107,7 +6037,7 @@ pub unsafe extern "C" fn xml_validate_one_element(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateOneAttribute")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_one_attribute(
+pub unsafe fn xml_validate_one_attribute(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -6202,7 +6132,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         }
     }
 
-    /* Validity Constraint: Attribute Value Type */
+    // Validity Constraint: Attribute Value Type
     if attr_decl.is_null() {
         let attr_name = (*attr).name().unwrap();
         let elem_name = (*elem).name().unwrap();
@@ -6236,7 +6166,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         ret = 0;
     }
 
-    /* Validity constraint: Fixed Attribute Default */
+    // Validity constraint: Fixed Attribute Default
     if matches!((*attr_decl).def, XmlAttributeDefault::XmlAttributeFixed)
         && !xml_str_equal(value, (*attr_decl).default_value)
     {
@@ -6258,7 +6188,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         ret = 0;
     }
 
-    /* Validity Constraint: ID uniqueness */
+    // Validity Constraint: ID uniqueness
     if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeID)
         && xml_add_id(ctxt, doc, value, attr).is_null()
     {
@@ -6273,12 +6203,12 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
         ret = 0;
     }
 
-    /* Validity Constraint: Notation Attributes */
+    // Validity Constraint: Notation Attributes
     if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeNotation) {
         let mut tree = (*attr_decl).tree.as_deref();
         let mut nota: XmlNotationPtr;
 
-        /* First check that the given NOTATION was declared */
+        // First check that the given NOTATION was declared
         nota = xml_get_dtd_notation_desc((*doc).int_subset, value);
         if nota.is_null() {
             nota = xml_get_dtd_notation_desc((*doc).ext_subset, value);
@@ -6411,7 +6341,7 @@ pub unsafe fn xml_validate_one_namespace(
     ns: XmlNsPtr,
     value: *const XmlChar,
 ) -> i32 {
-    /* let elemDecl: xmlElementPtr; */
+    // let elemDecl: xmlElementPtr;
     let mut attr_decl: XmlAttributePtr = null_mut();
     let mut ret: i32 = 1;
 
@@ -6798,11 +6728,7 @@ pub struct XmlValidateMemo {
 }
 
 #[doc(alias = "xmlValidateRef")]
-unsafe extern "C" fn xml_validate_ref(
-    refe: XmlRefPtr,
-    ctxt: XmlValidCtxtPtr,
-    name: *const XmlChar,
-) {
+unsafe fn xml_validate_ref(refe: XmlRefPtr, ctxt: XmlValidCtxtPtr, name: *const XmlChar) {
     if refe.is_null() {
         return;
     }
@@ -6954,7 +6880,7 @@ extern "C" fn xml_validate_check_ref_callback(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateDocumentFinal")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
+pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i32 {
     if ctxt.is_null() {
         return 0;
     }
@@ -6967,7 +6893,7 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
         return 0;
     }
 
-    /* trick to get correct line id report */
+    // trick to get correct line id report
     let save: u32 = (*ctxt).flags;
     (*ctxt).flags &= !XML_VCTXT_USE_PCTXT as u32;
 
@@ -6989,7 +6915,7 @@ pub unsafe extern "C" fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc:
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNotationUse")]
 #[cfg(any(feature = "libxml_valid", feature = "schema"))]
-pub unsafe extern "C" fn xml_validate_notation_use(
+pub unsafe fn xml_validate_notation_use(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     notation_name: *const XmlChar,
@@ -7025,7 +6951,7 @@ pub unsafe extern "C" fn xml_validate_notation_use(
 ///
 /// returns 0 if no, 1 if yes, and -1 if no element description is available
 #[doc(alias = "xmlIsMixedElement")]
-pub unsafe extern "C" fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlChar) -> i32 {
+pub unsafe fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlChar) -> i32 {
     let mut elem_decl: XmlElementPtr;
 
     if doc.is_null() || (*doc).int_subset.is_null() {
@@ -7047,10 +6973,8 @@ pub unsafe extern "C" fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlCh
             0
         }
         XmlElementTypeVal::XmlElementTypeEmpty
-        /*
-         * return 1 for EMPTY since we want VC error to pop up
-         * on <empty>     </empty> for example
-         */
+        // return 1 for EMPTY since we want VC error to pop up
+        // on <empty>     </empty> for example
         | XmlElementTypeVal::XmlElementTypeAny
         | XmlElementTypeVal::XmlElementTypeMixed => {
             1
@@ -7062,10 +6986,7 @@ pub unsafe extern "C" fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlCh
 ///
 /// returns the xmlNotationPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdNotationDesc")]
-pub unsafe extern "C" fn xml_get_dtd_notation_desc(
-    dtd: XmlDtdPtr,
-    name: *const XmlChar,
-) -> XmlNotationPtr {
+pub unsafe fn xml_get_dtd_notation_desc(dtd: XmlDtdPtr, name: *const XmlChar) -> XmlNotationPtr {
     if dtd.is_null() {
         return null_mut();
     }
@@ -7109,10 +7030,7 @@ pub unsafe fn xml_get_dtd_qelement_desc(
 ///
 /// returns the xmlElementPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdElementDesc")]
-pub unsafe extern "C" fn xml_get_dtd_element_desc(
-    dtd: XmlDtdPtr,
-    mut name: *const XmlChar,
-) -> XmlElementPtr {
+pub unsafe fn xml_get_dtd_element_desc(dtd: XmlDtdPtr, mut name: *const XmlChar) -> XmlElementPtr {
     let mut prefix: *mut XmlChar = null_mut();
 
     if dtd.is_null() || name.is_null() {
@@ -7142,7 +7060,7 @@ pub unsafe extern "C" fn xml_get_dtd_element_desc(
 /// Returns the number of element in the list, or -1 in case of error.
 #[doc(alias = "xmlValidGetPotentialChildren")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_valid_get_potential_children(
+pub unsafe fn xml_valid_get_potential_children(
     ctree: *mut XmlElementContent,
     names: *mut *const XmlChar,
     len: *mut i32,
@@ -7208,7 +7126,7 @@ fn xml_no_validity_err(_ctx: Option<GenericErrorContext>, _msg: &str) {}
 /// receiving array and retry.
 #[doc(alias = "xmlValidGetValidElements")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_valid_get_valid_elements(
+pub unsafe fn xml_valid_get_valid_elements(
     prev: *mut XmlNode,
     next: *mut XmlNode,
     names: *mut *const XmlChar,
@@ -7333,7 +7251,7 @@ pub unsafe extern "C" fn xml_valid_get_valid_elements(
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNameValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_name_value(value: *const XmlChar) -> i32 {
+pub unsafe fn xml_validate_name_value(value: *const XmlChar) -> i32 {
     xml_validate_name_value_internal(null_mut(), value)
 }
 
@@ -7342,7 +7260,7 @@ pub unsafe extern "C" fn xml_validate_name_value(value: *const XmlChar) -> i32 {
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNamesValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_names_value(value: *const XmlChar) -> i32 {
+pub unsafe fn xml_validate_names_value(value: *const XmlChar) -> i32 {
     xml_validate_names_value_internal(null_mut(), value)
 }
 
@@ -7353,7 +7271,7 @@ pub unsafe extern "C" fn xml_validate_names_value(value: *const XmlChar) -> i32 
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokenValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_nmtoken_value(value: *const XmlChar) -> i32 {
+pub unsafe fn xml_validate_nmtoken_value(value: *const XmlChar) -> i32 {
     xml_validate_nmtoken_value_internal(null_mut(), value)
 }
 
@@ -7364,7 +7282,7 @@ pub unsafe extern "C" fn xml_validate_nmtoken_value(value: *const XmlChar) -> i3
 /// returns 1 if valid or 0 otherwise
 #[doc(alias = "xmlValidateNmtokensValue")]
 #[cfg(feature = "libxml_valid")]
-pub unsafe extern "C" fn xml_validate_nmtokens_value(value: *const XmlChar) -> i32 {
+pub unsafe fn xml_validate_nmtokens_value(value: *const XmlChar) -> i32 {
     xml_validate_nmtokens_value_internal(null_mut(), value)
 }
 
@@ -7586,7 +7504,7 @@ pub unsafe fn xml_valid_build_content_model(ctxt: XmlValidCtxtPtr, elem: XmlElem
     if !matches!((*elem).etype, XmlElementTypeVal::XmlElementTypeElement) {
         return 1;
     }
-    /* TODO: should we rebuild in this case ? */
+    // TODO: should we rebuild in this case ?
     if !(*elem).cont_model.is_null() {
         if xml_regexp_is_determinist((*elem).cont_model) == 0 {
             (*ctxt).valid = 0;
@@ -7796,7 +7714,7 @@ unsafe fn vstate_vpush(ctxt: XmlValidCtxtPtr, elem_decl: XmlElementPtr, node: Xm
 const MAX_RECURSE: usize = 25000;
 
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe extern "C" fn vstate_vpush(
+unsafe fn vstate_vpush(
     ctxt: XmlValidCtxtPtr,
     cont: XmlElementContentPtr,
     node: XmlNodePtr,
@@ -7834,9 +7752,7 @@ unsafe extern "C" fn vstate_vpush(
         (*ctxt).vstateTab = tmp;
         (*ctxt).vstate = (*ctxt).vstateTab.add(0);
     }
-    /*
-     * Don't push on the stack a state already here
-     */
+    // Don't push on the stack a state already here
     if i >= 0
         && (*(*ctxt).vstateTab.add(i as usize)).cont == cont
         && (*(*ctxt).vstateTab.add(i as usize)).node == node
@@ -7862,7 +7778,7 @@ unsafe extern "C" fn vstate_vpush(
 /// returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushElement")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe extern "C" fn xml_validate_push_element(
+pub unsafe fn xml_validate_push_element(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     elem: XmlNodePtr,
@@ -7979,14 +7895,14 @@ pub unsafe extern "C" fn xml_validate_push_element(
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePushCData")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe extern "C" fn xml_validate_push_cdata(
+pub unsafe fn xml_validate_push_cdata(
     ctxt: XmlValidCtxtPtr,
     data: *const XmlChar,
     len: i32,
 ) -> i32 {
     let mut ret: i32 = 1;
 
-    /* printf("CDATA %s %d\n", data, len); */
+    // printf("CDATA %s %d\n", data, len);
     if ctxt.is_null() {
         return 0;
     }
@@ -7997,9 +7913,7 @@ pub unsafe extern "C" fn xml_validate_push_cdata(
         let state: XmlValidStatePtr = (*ctxt).vstate;
         let elem_decl: XmlElementPtr;
 
-        /*
-         * Check the new element against the content model of the new elem.
-         */
+        // Check the new element against the content model of the new elem.
         if !(*state).elem_decl.is_null() {
             elem_decl = (*state).elem_decl;
 
@@ -8054,7 +7968,7 @@ pub unsafe extern "C" fn xml_validate_push_cdata(
 }
 
 #[cfg(feature = "libxml_regexp")]
-unsafe extern "C" fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
+unsafe fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
     if (*ctxt).vstate_nr < 1 {
         return -1;
     }
@@ -8077,7 +7991,7 @@ unsafe extern "C" fn vstate_vpop(ctxt: XmlValidCtxtPtr) -> i32 {
 }
 
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe extern "C" fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
+unsafe fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
     if (*ctxt).vstateNr <= 1 {
         return -1;
     }
@@ -8096,7 +8010,7 @@ unsafe extern "C" fn vstateVPop(ctxt: XmlValidCtxtPtr) -> i32 {
 /// Returns 1 if no validation problem was found or 0 otherwise
 #[doc(alias = "xmlValidatePopElement")]
 #[cfg(all(feature = "libxml_valid", feature = "libxml_regexp"))]
-pub unsafe extern "C" fn xml_validate_pop_element(
+pub unsafe fn xml_validate_pop_element(
     ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
     _elem: XmlNodePtr,
@@ -8107,14 +8021,12 @@ pub unsafe extern "C" fn xml_validate_pop_element(
     if ctxt.is_null() {
         return 0;
     }
-    /* printf("PopElem %s\n", qname); */
+    // printf("PopElem %s\n", qname);
     if (*ctxt).vstate_nr > 0 && !(*ctxt).vstate.is_null() {
         let state: XmlValidStatePtr = (*ctxt).vstate;
         let elem_decl: XmlElementPtr;
 
-        /*
-         * Check the new element against the content model of the new elem.
-         */
+        // Check the new element against the content model of the new elem.
         if !(*state).elem_decl.is_null() {
             elem_decl = (*state).elem_decl;
 
@@ -8153,10 +8065,10 @@ pub unsafe extern "C" fn xml_validate_pop_element(
 /// Returns the first element to consider for validation of the content model
 #[doc(alias = "xmlValidateSkipIgnorable")]
 #[cfg(not(feature = "libxml_regexp"))]
-unsafe extern "C" fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
+unsafe fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodePtr {
     while !child.is_null() {
         match (*child).typ {
-            /* These things are ignored (skipped) during validation.  */
+            // These things are ignored (skipped) during validation.
             XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlXIncludeStart
@@ -8170,7 +8082,7 @@ unsafe extern "C" fn xmlValidateSkipIgnorable(mut child: XmlNodePtr) -> XmlNodeP
                     return child;
                 }
             }
-            /* keep current node */
+            // keep current node
             _ => {
                 return child;
             }
