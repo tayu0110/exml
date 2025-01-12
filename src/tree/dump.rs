@@ -77,10 +77,8 @@ impl XmlDoc {
         *doc_txt_ptr = null_mut();
         *doc_txt_len = 0;
 
-        /*
-         *  Validate the encoding value, if provided.
-         *  This logic is copied from xmlSaveFileEnc.
-         */
+        // Validate the encoding value, if provided.
+        // This logic is copied from xmlSaveFileEnc.
         let encoding = txt_encoding.map_or_else(
             || self.encoding.as_ref().map(|e| e.to_owned()),
             |e| Some(e.to_owned()),

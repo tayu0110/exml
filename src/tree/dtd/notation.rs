@@ -23,7 +23,7 @@ use std::io::Write;
 
 /// A DTD Notation definition.
 #[repr(C)]
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct XmlNotation {
     // Notation name
     name: String,

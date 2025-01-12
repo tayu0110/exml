@@ -41,7 +41,7 @@ use crate::{
     },
     hash::XmlHashTableRef,
     libxml::{
-        dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
+        dict::{xml_dict_owns, XmlDictPtr},
         globals::{xml_free, xml_malloc},
         hash::{xml_hash_create, xml_hash_scan, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
@@ -97,28 +97,48 @@ pub type XmlEntityPtr = *mut XmlEntity;
 #[repr(C)]
 #[derive(Default)]
 pub struct XmlEntity {
-    pub(crate) _private: AtomicPtr<c_void>,  /* application data */
-    pub(crate) typ: XmlElementType,          /* XML_ENTITY_DECL, must be second ! */
-    pub(crate) name: AtomicPtr<XmlChar>,     /* Entity name */
-    pub(crate) children: AtomicPtr<XmlNode>, /* First child link */
-    pub(crate) last: AtomicPtr<XmlNode>,     /* Last child link */
-    pub(crate) parent: AtomicPtr<XmlDtd>,    /* -> DTD */
-    pub(crate) next: AtomicPtr<XmlNode>,     /* next sibling link  */
-    pub(crate) prev: AtomicPtr<XmlNode>,     /* previous sibling link  */
-    pub(crate) doc: AtomicPtr<XmlDoc>,       /* the containing document */
+    // application data
+    pub(crate) _private: AtomicPtr<c_void>,
+    // XML_ENTITY_DECL, must be second !
+    pub(crate) typ: XmlElementType,
+    // Entity name
+    pub(crate) name: AtomicPtr<XmlChar>,
+    // First child link
+    pub(crate) children: AtomicPtr<XmlNode>,
+    // Last child link
+    pub(crate) last: AtomicPtr<XmlNode>,
+    // -> DTD
+    pub(crate) parent: AtomicPtr<XmlDtd>,
+    // next sibling link
+    pub(crate) next: AtomicPtr<XmlNode>,
+    // previous sibling link
+    pub(crate) prev: AtomicPtr<XmlNode>,
+    // the containing document
+    pub(crate) doc: AtomicPtr<XmlDoc>,
 
-    pub(crate) orig: AtomicPtr<XmlChar>, /* content without ref substitution */
-    pub(crate) content: AtomicPtr<XmlChar>, /* content or ndata if unparsed */
-    pub(crate) length: i32,              /* the content length */
-    pub(crate) etype: XmlEntityType,     /* The entity type */
-    pub(crate) external_id: AtomicPtr<XmlChar>, /* External identifier for PUBLIC */
-    pub(crate) system_id: AtomicPtr<XmlChar>, /* URI for a SYSTEM or PUBLIC Entity */
+    // content without ref substitution
+    pub(crate) orig: AtomicPtr<XmlChar>,
+    // content or ndata if unparsed
+    pub(crate) content: AtomicPtr<XmlChar>,
+    // the content length
+    pub(crate) length: i32,
+    // The entity type
+    pub(crate) etype: XmlEntityType,
+    // External identifier for PUBLIC
+    pub(crate) external_id: AtomicPtr<XmlChar>,
+    // URI for a SYSTEM or PUBLIC Entity
+    pub(crate) system_id: AtomicPtr<XmlChar>,
 
-    pub(crate) nexte: AtomicPtr<XmlEntity>, /* unused */
-    pub(crate) uri: AtomicPtr<XmlChar>,     /* the full URI as computed */
-    pub(crate) owner: i32,                  /* does the entity own the childrens */
-    pub(crate) flags: i32,                  /* various flags */
-    pub expanded_size: u64,                 /* expanded size */
+    // unused
+    pub(crate) nexte: AtomicPtr<XmlEntity>,
+    // the full URI as computed
+    pub(crate) uri: AtomicPtr<XmlChar>,
+    // does the entity own the childrens
+    pub(crate) owner: i32,
+    // various flags
+    pub(crate) flags: i32,
+    // expanded size
+    pub expanded_size: u64,
 }
 
 impl NodeCommon for XmlEntity {
@@ -190,7 +210,7 @@ unsafe fn xml_entities_err_memory(extra: &str) {
 /// internal routine doing the entity node structures allocations
 #[doc(alias = "xmlCreateEntity")]
 unsafe fn xml_create_entity(
-    dict: XmlDictPtr,
+    _dict: XmlDictPtr,
     name: &str,
     typ: XmlEntityType,
     external_id: Option<&str>,
@@ -208,30 +228,14 @@ unsafe fn xml_create_entity(
     // fill the structure.
     let name = CString::new(name).unwrap();
     (*ret).etype = typ;
-    if dict.is_null() {
-        (*ret).name = AtomicPtr::new(xml_strdup(name.as_ptr() as *const u8) as _);
-        if let Some(external_id) = external_id {
-            let external_id = CString::new(external_id).unwrap();
-            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
-        }
-        if let Some(system_id) = system_id {
-            let system_id = CString::new(system_id).unwrap();
-            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
-        }
-    } else {
-        (*ret).name = AtomicPtr::new(xml_dict_lookup(dict, name.as_ptr() as *const u8, -1) as _);
-        if let Some(external_id) = external_id {
-            let external_id = CString::new(external_id).unwrap();
-            (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
-        } else {
-            (*ret).external_id = AtomicPtr::new(null_mut());
-        }
-        if let Some(system_id) = system_id {
-            let system_id = CString::new(system_id).unwrap();
-            (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
-        } else {
-            (*ret).system_id = AtomicPtr::new(null_mut());
-        }
+    (*ret).name = AtomicPtr::new(xml_strdup(name.as_ptr() as *const u8) as _);
+    if let Some(external_id) = external_id {
+        let external_id = CString::new(external_id).unwrap();
+        (*ret).external_id = AtomicPtr::new(xml_strdup(external_id.as_ptr() as *const u8) as _);
+    }
+    if let Some(system_id) = system_id {
+        let system_id = CString::new(system_id).unwrap();
+        (*ret).system_id = AtomicPtr::new(xml_strdup(system_id.as_ptr() as *const u8) as _);
     }
     if let Some(content) = content {
         (*ret).length = content.len() as i32;
@@ -241,8 +245,8 @@ unsafe fn xml_create_entity(
         (*ret).length = 0;
         (*ret).content = AtomicPtr::new(null_mut());
     }
-    (*ret).uri = AtomicPtr::new(null_mut()); /* to be computed by the layer knowing
-                                             the defining entity */
+    // to be computed by the layer knowing the defining entity
+    (*ret).uri = AtomicPtr::new(null_mut());
     (*ret).orig = AtomicPtr::new(null_mut());
     (*ret).owner = 0;
 
@@ -321,7 +325,7 @@ macro_rules! xml_entities_warn {
 
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
-unsafe extern "C" fn xml_free_entity(entity: XmlEntityPtr) {
+unsafe fn xml_free_entity(entity: XmlEntityPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
     if entity.is_null() {
@@ -794,7 +798,7 @@ macro_rules! grow_buffer_reentrant {
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesInternal")]
-pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
+pub(crate) unsafe fn xml_encode_entities_internal(
     doc: XmlDocPtr,
     input: *const XmlChar,
     attr: i32,
@@ -812,9 +816,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
         html = matches!((*doc).typ, XmlElementType::XmlHTMLDocumentNode) as i32;
     }
 
-    /*
-     * allocate an translation buffer.
-     */
+    // allocate an translation buffer.
     buffer_size = 1000;
     buffer = xml_malloc(buffer_size) as *mut XmlChar;
     if buffer.is_null() {
@@ -831,15 +833,11 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                 out = buffer.add(indx);
             }
 
-            /*
-             * By default one have to encode at least '<', '>', '"' and '&' !
-             */
+            // By default one have to encode at least '<', '>', '"' and '&' !
             if *cur == b'<' {
                 let end: *const XmlChar;
 
-                /*
-                 * Special handling of server side include in HTML attributes
-                 */
+                // Special handling of server side include in HTML attributes
                 if html != 0
                     && attr != 0
                     && *cur.add(1) == b'!'
@@ -889,10 +887,8 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                 *out = b';';
                 out = out.add(1);
             } else if *cur == b'&' {
-                /*
-                 * Special handling of &{...} construct from HTML 4, see
-                 * http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
-                 */
+                // Special handling of &{...} construct from HTML 4, see
+                // http://www.w3.org/TR/html401/appendix/notes.html#h-B.7.1
                 if html != 0
                     && attr != 0
                     && *cur.add(1) == b'{'
@@ -928,38 +924,32 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                 || *cur == b'\t'
                 || (html != 0 && *cur == b'\r')
             {
-                /*
-                 * default case, just copy !
-                 */
+                // default case, just copy !
                 *out = *cur;
                 out = out.add(1);
             } else if *cur >= 0x80 {
                 if (!doc.is_null() && (*doc).encoding.is_some()) || html != 0 {
-                    /*
-                    * Bjørn Reese <br@sseusa.com> provided the patch
-                       XmlChar xc;
-                       xc = (*cur & 0x3F) << 6;
-                       if (*cur.add(1) != 0) {
-                       xc += *(++cur) & 0x3F;
-                       *out++ = xc;
-                       } else
-                    */
+                    // Bjørn Reese <br@sseusa.com> provided the patch
+                    // XmlChar xc;
+                    // xc = (*cur & 0x3F) << 6;
+                    // if (*cur.add(1) != 0) {
+                    //     xc += *(++cur) & 0x3F;
+                    //     *out++ = xc;
+                    // } else
                     *out = *cur;
                     out = out.add(1);
                 } else {
-                    /*
-                     * We assume we have UTF-8 input.
-                     * It must match either:
-                     *   110xxxxx 10xxxxxx
-                     *   1110xxxx 10xxxxxx 10xxxxxx
-                     *   11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-                     * That is:
-                     *   *cur.add(0) is 11xxxxxx
-                     *   *cur.add(1) is 10xxxxxx
-                     *   *cur.add(2) is 10xxxxxx if *cur.add(0) is 111xxxxx
-                     *   *cur.add(3) is 10xxxxxx if *cur.add(0) is 1111xxxx
-                     *   *cur.add(0) is not 11111xxx
-                     */
+                    // We assume we have UTF-8 input.
+                    // It must match either:
+                    //   110xxxxx 10xxxxxx
+                    //   1110xxxx 10xxxxxx 10xxxxxx
+                    //   11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+                    // That is:
+                    //   *cur.add(0) is 11xxxxxx
+                    //   *cur.add(1) is 10xxxxxx
+                    //   *cur.add(2) is 10xxxxxx if *cur.add(0) is 111xxxxx
+                    //   *cur.add(3) is 10xxxxxx if *cur.add(0) is 1111xxxx
+                    //   *cur.add(0) is not 11111xxx
                     let mut buf: [c_char; 11] = [0; 11];
                     let mut ptr: *mut c_char;
                     let mut val: i32 = 0;
@@ -1039,9 +1029,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
                         cur = cur.add(1);
                         continue;
                     }
-                    /*
-                     * We could do multiple things here. Just save as a c_char ref
-                     */
+                    // We could do multiple things here. Just save as a c_char ref
                     snprintf(
                         buf.as_mut_ptr() as _,
                         buf.len(),
@@ -1095,10 +1083,7 @@ pub(crate) unsafe extern "C" fn xml_encode_entities_internal(
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeEntitiesReentrant")]
-pub unsafe extern "C" fn xml_encode_entities_reentrant(
-    doc: XmlDocPtr,
-    input: *const XmlChar,
-) -> *mut XmlChar {
+pub unsafe fn xml_encode_entities_reentrant(doc: XmlDocPtr, input: *const XmlChar) -> *mut XmlChar {
     xml_encode_entities_internal(doc, input, 0)
 }
 
@@ -1107,10 +1092,7 @@ pub unsafe extern "C" fn xml_encode_entities_reentrant(
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeSpecialChars")]
-pub unsafe extern "C" fn xml_encode_special_chars(
-    _doc: *const XmlDoc,
-    input: *const XmlChar,
-) -> *mut XmlChar {
+pub unsafe fn xml_encode_special_chars(_doc: *const XmlDoc, input: *const XmlChar) -> *mut XmlChar {
     let mut cur: *const XmlChar = input;
     let mut buffer: *mut XmlChar;
     let mut out: *mut XmlChar;
@@ -1119,9 +1101,7 @@ pub unsafe extern "C" fn xml_encode_special_chars(
         return null_mut();
     }
 
-    /*
-     * allocate an translation buffer.
-     */
+    // allocate an translation buffer.
     buffer_size = 1000;
     buffer = xml_malloc(buffer_size) as *mut XmlChar;
     if buffer.is_null() {
@@ -1138,9 +1118,7 @@ pub unsafe extern "C" fn xml_encode_special_chars(
                 out = buffer.add(indx as usize);
             }
 
-            /*
-             * By default one have to encode at least '<', '>', '"' and '&' !
-             */
+            // By default one have to encode at least '<', '>', '"' and '&' !
             if *cur == b'<' {
                 *out = b'&';
                 out = out.add(1);
@@ -1195,10 +1173,8 @@ pub unsafe extern "C" fn xml_encode_special_chars(
                 *out = b';';
                 out = out.add(1);
             } else {
-                /*
-                 * Works because on UTF-8, all extended sequences cannot
-                 * result in bytes in the ASCII range.
-                 */
+                // Works because on UTF-8, all extended sequences cannot
+                // result in bytes in the ASCII range.
                 *out = *cur;
                 out = out.add(1);
             }
@@ -1219,7 +1195,7 @@ pub unsafe extern "C" fn xml_encode_special_chars(
 ///
 /// Returns the xmlEntitiesTablePtr just created or NULL in case of error.
 #[doc(alias = "xmlCreateEntitiesTable")]
-pub unsafe extern "C" fn xml_create_entities_table() -> XmlEntitiesTablePtr {
+pub unsafe fn xml_create_entities_table() -> XmlEntitiesTablePtr {
     xml_hash_create(0) as XmlEntitiesTablePtr
 }
 
@@ -1307,7 +1283,7 @@ extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _nam
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntitiesTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr) {
+pub unsafe fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr) {
     xml_hash_scan(table, Some(xml_dump_entity_decl_scan), buf as _);
 }
 
@@ -1315,7 +1291,7 @@ pub unsafe extern "C" fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntit
 /// treatment required by %
 #[doc(alias = "xmlDumpEntityContent")]
 #[cfg(feature = "libxml_output")]
-unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
+unsafe fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
     if !xml_strchr(content, b'%').is_null() {
         let mut base: *const XmlChar;
         let mut cur: *const XmlChar;
@@ -1354,7 +1330,7 @@ unsafe extern "C" fn xml_dump_entity_content(buf: XmlBufPtr, content: *const Xml
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe extern "C" fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
+pub unsafe fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
     if buf.is_null() || ent.is_null() {
         return;
     }
@@ -1456,7 +1432,7 @@ pub(crate) const XML_ENT_CONTAINS_LT: usize = 1 << 4;
 ///
 /// Returns A newly allocated string with the substitution done.
 #[doc(alias = "xmlEncodeAttributeEntities")]
-pub(crate) unsafe extern "C" fn xml_encode_attribute_entities(
+pub(crate) unsafe fn xml_encode_attribute_entities(
     doc: XmlDocPtr,
     input: *const XmlChar,
 ) -> *mut XmlChar {
