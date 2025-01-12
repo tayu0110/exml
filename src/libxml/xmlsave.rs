@@ -47,20 +47,17 @@ use crate::{
         },
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
-        valid::{
-            xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table,
-            XmlNotationTablePtr,
-        },
+        valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
         xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
         is_xhtml, xml_buf_add, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr, XmlBufPtr,
         XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlNodePtr,
-        XmlNsPtr, XML_LOCAL_NAMESPACE,
+        XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
-use super::chvalid::xml_is_char;
+use super::{chvalid::xml_is_char, hash::XmlHashTable};
 
 const MAX_INDENT: usize = 60;
 
@@ -299,7 +296,7 @@ pub(crate) unsafe extern "C" fn xml_ns_dump_output(
 
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlBufDumpNotationTable")]
-unsafe extern "C" fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
+unsafe fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: &XmlHashTable<'_, XmlNotation>) {
     xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
     xml_dump_notation_table(buf, table);
 }
@@ -750,7 +747,7 @@ pub(crate) unsafe extern "C" fn xml_node_dump_output_internal(
 
 /// Dump the XML document DTD, if any.
 #[doc(alias = "xmlDtdDumpOutput")]
-unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
+unsafe fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     let mut cur: XmlNodePtr;
 
     if dtd.is_null() {
@@ -786,24 +783,24 @@ unsafe extern "C" fn xml_dtd_dump_output(ctxt: XmlSaveCtxtPtr, dtd: XmlDtdPtr) {
     if (*dtd).entities.is_none()
         && (*dtd).elements.is_null()
         && (*dtd).attributes.is_none()
-        && (*dtd).notations.is_null()
+        && (*dtd).notations.is_none()
         && (*dtd).pentities.is_none()
     {
         (*ctxt).buf.borrow_mut().write_bytes(b">");
         return;
     }
     (*ctxt).buf.borrow_mut().write_bytes(b" [\n");
-    /*
-     * Dump the notations first they are not in the DTD children list
-     * Do this only on a standalone DTD or on the internal subset though.
-     */
-    if !(*dtd).notations.is_null() && ((*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd) {
-        let buf = (*ctxt)
-            .buf
-            .borrow()
-            .buffer
-            .map_or(null_mut(), |buf| buf.as_ptr());
-        xml_buf_dump_notation_table(buf, (*dtd).notations as _);
+    // Dump the notations first they are not in the DTD children list
+    // Do this only on a standalone DTD or on the internal subset though.
+    if (*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd {
+        if let Some(table) = (*dtd).notations.as_deref() {
+            let buf = (*ctxt)
+                .buf
+                .borrow()
+                .buffer
+                .map_or(null_mut(), |buf| buf.as_ptr());
+            xml_buf_dump_notation_table(buf, table);
+        }
     }
     let format: i32 = (*ctxt).format;
     let level: i32 = (*ctxt).level;
@@ -896,9 +893,7 @@ unsafe extern "C" fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: 
         xml_attr_serialize_content(&mut buf, name);
         buf.write_bytes(b"\"");
     }
-    /*
-     * C.7.
-     */
+    // C.7.
     if !lang.is_null() && xml_lang.is_null() {
         buf.write_bytes(b" xml:lang=\"");
         xml_attr_serialize_content(&mut buf, lang);
@@ -917,7 +912,7 @@ const XHTML_NS_NAME: &str = "http://www.w3.org/1999/xhtml";
 /// Returns 1 if the node is an empty node, 0 if not and -1 in case of error
 #[doc(alias = "xhtmlIsEmpty")]
 #[cfg(feature = "html")]
-unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
+unsafe fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
     if node.is_null() {
         return -1;
     }
@@ -1008,7 +1003,7 @@ unsafe extern "C" fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
 /// Dump an XHTML node, recursive behaviour, children are printed too.
 #[doc(alias = "xhtmlNodeDumpOutput")]
 #[cfg(feature = "html")]
-pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
+pub(crate) unsafe fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNodePtr) {
     use crate::{libxml::parser_internals::XML_STRING_TEXT, tree::XmlNode};
 
     let format: i32 = (*ctxt).format;
@@ -1375,7 +1370,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
             }
 
             cur = parent;
-            /* (*cur).parent was validated when descending. */
+            // (*cur).parent was validated when descending.
             parent = (*cur).parent().map_or(null_mut(), |p| p.as_ptr());
 
             if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
@@ -1415,7 +1410,7 @@ pub(crate) unsafe extern "C" fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut
     }
 }
 
-unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> i32 {
+unsafe fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> i32 {
     let mut buf = (*ctxt).buf.borrow_mut();
     buf.flush();
     let _ = buf.encoder.take();
@@ -1427,10 +1422,7 @@ unsafe extern "C" fn xml_save_clear_encoding(ctxt: XmlSaveCtxtPtr) -> i32 {
 
 /// Dump an XML document.
 #[doc(alias = "xmlDocContentDumpOutput")]
-pub(crate) unsafe extern "C" fn xml_doc_content_dump_output(
-    ctxt: XmlSaveCtxtPtr,
-    cur: XmlDocPtr,
-) -> i32 {
+pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlDocPtr) -> i32 {
     #[cfg(feature = "html")]
     let dtd: XmlDtdPtr;
     #[cfg(feature = "html")]

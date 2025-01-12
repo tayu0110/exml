@@ -335,89 +335,46 @@ unsafe fn xml_free_notation(nota: XmlNotationPtr) {
 ///
 /// Returns null_mut() if not, otherwise the entity
 #[doc(alias = "xmlAddNotationDecl")]
-pub unsafe fn xml_add_notation_decl(
-    ctxt: XmlValidCtxtPtr,
+pub unsafe fn xml_add_notation_decl<'a>(
+    _ctxt: XmlValidCtxtPtr,
     dtd: XmlDtdPtr,
     name: &str,
     public_id: Option<&str>,
     system_id: Option<&str>,
-) -> XmlNotationPtr {
-    let mut table: XmlNotationTablePtr;
-
+) -> Option<&'a XmlNotation> {
     if dtd.is_null() {
-        return null_mut();
+        return None;
     }
     if public_id.is_none() && system_id.is_none() {
-        return null_mut();
+        return None;
     }
 
     // Create the Notation table if needed.
-    table = (*dtd).notations as XmlNotationTablePtr;
-    if table.is_null() {
-        (*dtd).notations = xml_hash_create(0) as _;
-        table = (*dtd).notations as _;
-    }
-    if table.is_null() {
-        xml_verr_memory(ctxt, Some("xmlAddNotationDecl: Table creation failed!\n"));
-        return null_mut();
-    }
+    let table = (*dtd)
+        .notations
+        .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
-    let ret: XmlNotationPtr = xml_malloc(size_of::<XmlNotation>()) as XmlNotationPtr;
-    if ret.is_null() {
-        xml_verr_memory(ctxt as _, Some("malloc failed"));
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlNotation>());
-    std::ptr::write(&mut *ret, XmlNotation::default());
-
-    // fill the structure.
-    (*ret).name = Some(name.to_owned());
-    if let Some(system_id) = system_id {
-        (*ret).system_id = Some(system_id.to_owned());
-    }
-    if let Some(public_id) = public_id {
-        (*ret).public_id = Some(public_id.to_owned());
-    }
+    let ret = XmlNotation {
+        name: Some(name.to_owned()),
+        system_id: system_id.map(|s| s.to_owned()),
+        public_id: public_id.map(|p| p.to_owned()),
+    };
 
     // Validity Check:
     // Check the DTD for previous declarations of the ATTLIST
-    let name = CString::new(name).unwrap();
-    if xml_hash_add_entry(table, name.as_ptr() as *const u8, ret as _) != 0 {
+    if table.add_entry(name, ret).is_err() {
         #[cfg(feature = "libxml_valid")]
         {
             xml_err_valid!(
                 null_mut(),
                 XmlParserErrors::XmlDTDNotationRedefined,
                 "xmlAddNotationDecl: {} already defined\n",
-                (*ret).name.as_deref().unwrap()
+                name
             );
         }
-        xml_free_notation(ret);
-        return null_mut();
+        return None;
     }
-    ret
-}
-
-/// Build a copy of a notation.
-///
-/// Returns the new xmlNotationPtr or null_mut() in case of error.
-#[doc(alias = "xmlCopyNotation")]
-#[cfg(feature = "libxml_tree")]
-extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> *mut c_void {
-    let nota: XmlNotationPtr = payload as XmlNotationPtr;
-
-    unsafe {
-        let cur: XmlNotationPtr = xml_malloc(size_of::<XmlNotation>()) as XmlNotationPtr;
-        if cur.is_null() {
-            xml_verr_memory(null_mut(), Some("malloc failed"));
-            return null_mut();
-        }
-        std::ptr::write(&mut *cur, XmlNotation::default());
-        (*cur).name = (*nota).name.clone();
-        (*cur).public_id = (*nota).public_id.clone();
-        (*cur).system_id = (*nota).system_id.clone();
-        cur as _
-    }
+    table.lookup(name)
 }
 
 /// Build a copy of a notation table.
@@ -425,8 +382,10 @@ extern "C" fn xml_copy_notation(payload: *mut c_void, _name: *const XmlChar) -> 
 /// Returns the new xmlNotationTablePtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyNotationTable")]
 #[cfg(feature = "libxml_tree")]
-pub unsafe fn xml_copy_notation_table(table: XmlNotationTablePtr) -> XmlNotationTablePtr {
-    xml_hash_copy(table, Some(xml_copy_notation)) as XmlNotationTablePtr
+pub unsafe fn xml_copy_notation_table<'a>(
+    table: &XmlHashTable<'a, XmlNotation>,
+) -> XmlHashTable<'a, XmlNotation> {
+    table.clone_with(|data, _| data.clone())
 }
 
 extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const XmlChar) {
@@ -444,53 +403,42 @@ pub unsafe fn xml_free_notation_table(table: XmlNotationTablePtr) {
 /// This will dump the content the notation declaration as an XML DTD definition
 #[doc(alias = "xmlDumpNotationDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_notation_decl(buf: XmlBufPtr, nota: XmlNotationPtr) {
+pub unsafe fn xml_dump_notation_decl(buf: XmlBufPtr, nota: &XmlNotation) {
     use crate::buf::libxml_api::{xml_buf_cat, xml_buf_write_quoted_string};
 
-    if buf.is_null() || nota.is_null() {
+    if buf.is_null() {
         return;
     }
     xml_buf_cat(buf, c"<!NOTATION ".as_ptr() as _);
-    let name = CString::new((*nota).name.as_deref().unwrap()).unwrap();
+    let name = CString::new(nota.name.as_deref().unwrap()).unwrap();
     xml_buf_cat(buf, name.as_ptr() as *const u8);
-    if let Some(public_id) = (*nota).public_id.as_deref() {
+    if let Some(public_id) = nota.public_id.as_deref() {
         let public_id = CString::new(public_id).unwrap();
         xml_buf_cat(buf, c" PUBLIC ".as_ptr() as _);
         xml_buf_write_quoted_string(buf, public_id.as_ptr() as *const u8);
-        if let Some(system_id) = (*nota).system_id.as_deref() {
+        if let Some(system_id) = nota.system_id.as_deref() {
             let system_id = CString::new(system_id).unwrap();
             xml_buf_cat(buf, c" ".as_ptr() as _);
             xml_buf_write_quoted_string(buf, system_id.as_ptr() as *const u8);
         }
     } else {
-        let system_id = CString::new((*nota).system_id.as_deref().unwrap()).unwrap();
+        let system_id = CString::new(nota.system_id.as_deref().unwrap()).unwrap();
         xml_buf_cat(buf, c" SYSTEM ".as_ptr() as _);
         xml_buf_write_quoted_string(buf, system_id.as_ptr() as *const u8);
     }
     xml_buf_cat(buf, c" >\n".as_ptr() as _);
 }
 
-/// This is called with the hash scan function, and just reverses args
-#[doc(alias = "xmlDumpNotationDeclScan")]
-#[cfg(feature = "libxml_output")]
-extern "C" fn xml_dump_notation_decl_scan(
-    nota: *mut c_void,
-    buf: *mut c_void,
-    _name: *const XmlChar,
-) {
-    unsafe {
-        xml_dump_notation_decl(buf as XmlBufPtr, nota as XmlNotationPtr);
-    }
-}
-
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlDumpNotationTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_notation_table(buf: XmlBufPtr, table: XmlNotationTablePtr) {
-    if buf.is_null() || table.is_null() {
+pub unsafe fn xml_dump_notation_table(buf: XmlBufPtr, table: &XmlHashTable<'_, XmlNotation>) {
+    if buf.is_null() {
         return;
     }
-    xml_hash_scan(table, Some(xml_dump_notation_decl_scan), buf as _);
+    table.scan(|notation, _, _, _| {
+        xml_dump_notation_decl(buf, notation);
+    });
 }
 
 /// Allocate an element content structure.
@@ -3766,11 +3714,9 @@ pub unsafe fn xml_validate_attribute_value(typ: XmlAttributeType, value: *const 
 pub unsafe fn xml_validate_notation_decl(
     _ctxt: XmlValidCtxtPtr,
     _doc: XmlDocPtr,
-    _nota: XmlNotationPtr,
+    _nota: Option<&XmlNotation>,
 ) -> i32 {
-    let ret: i32 = 1;
-
-    ret
+    1
 }
 
 /// Try to validate the document against the dtd instance
@@ -3955,16 +3901,13 @@ unsafe fn xml_validate_attribute_value2(
             xml_free(dup as _);
         }
         XmlAttributeType::XmlAttributeNotation => {
-            let mut nota: XmlNotationPtr;
-            let cvalue = CString::new(value).unwrap();
-            let cvalue = cvalue.as_ptr() as *const u8;
+            let nota = xml_get_dtd_notation_desc((*doc).int_subset, value).or_else(|| {
+                (!(*doc).ext_subset.is_null())
+                    .then(|| xml_get_dtd_notation_desc((*doc).ext_subset, value))
+                    .flatten()
+            });
 
-            nota = xml_get_dtd_notation_desc((*doc).int_subset, cvalue);
-            if nota.is_null() && !(*doc).ext_subset.is_null() {
-                nota = xml_get_dtd_notation_desc((*doc).ext_subset, cvalue);
-            }
-
-            if nota.is_null() {
+            if nota.is_none() {
                 let name = CStr::from_ptr(name as *const i8).to_string_lossy();
                 xml_err_valid_node(
                     ctxt,
@@ -4111,7 +4054,9 @@ extern "C" fn xml_validate_notation_callback(cur: XmlEntityPtr, ctxt: XmlValidCt
                 let ret: i32 = xml_validate_notation_use(
                     ctxt,
                     (*cur).doc.load(Ordering::Relaxed) as _,
-                    notation,
+                    CStr::from_ptr(notation as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
                 );
                 if ret != 1 {
                     (*ctxt).valid = 0;
@@ -6206,16 +6151,13 @@ pub unsafe fn xml_validate_one_attribute(
     // Validity Constraint: Notation Attributes
     if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeNotation) {
         let mut tree = (*attr_decl).tree.as_deref();
-        let mut nota: XmlNotationPtr;
+        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
 
         // First check that the given NOTATION was declared
-        nota = xml_get_dtd_notation_desc((*doc).int_subset, value);
-        if nota.is_null() {
-            nota = xml_get_dtd_notation_desc((*doc).ext_subset, value);
-        }
+        let nota = xml_get_dtd_notation_desc((*doc).int_subset, &value)
+            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset, &value));
 
-        if nota.is_null() {
-            let value = CStr::from_ptr(value as *const i8).to_string_lossy();
+        if nota.is_none() {
             let attr_name = (*attr).name().unwrap();
             let elem_name = (*elem).name().unwrap();
             xml_err_valid_node(
@@ -6232,13 +6174,12 @@ pub unsafe fn xml_validate_one_attribute(
 
         // Second, verify that it's among the list
         while let Some(now) = tree {
-            if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
+            if now.name == value {
                 break;
             }
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let value = CStr::from_ptr(value as *const i8).to_string_lossy();
             let attr_name = (*attr).name().unwrap();
             let elem_name = (*elem).name().unwrap();
             xml_err_valid_node(
@@ -6542,17 +6483,14 @@ pub unsafe fn xml_validate_one_namespace(
     // Validity Constraint: Notation Attributes
     if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeNotation) {
         let mut tree = (*attr_decl).tree.as_deref();
-        let mut nota: XmlNotationPtr;
+        let value = CStr::from_ptr(value as *const i8).to_string_lossy();
 
         // First check that the given NOTATION was declared
-        nota = xml_get_dtd_notation_desc((*doc).int_subset, value);
-        if nota.is_null() {
-            nota = xml_get_dtd_notation_desc((*doc).ext_subset, value);
-        }
+        let nota = xml_get_dtd_notation_desc((*doc).int_subset, &value)
+            .or_else(|| xml_get_dtd_notation_desc((*doc).ext_subset, &value));
 
-        if nota.is_null() {
+        if nota.is_none() {
             if let Some(prefix) = (*ns).prefix() {
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 let elem_name = (*elem).name().unwrap();
                 xml_err_valid_node(
                     ctxt,
@@ -6564,7 +6502,6 @@ pub unsafe fn xml_validate_one_namespace(
                     Some(&elem_name),
                 );
             } else {
-                let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                 let elem_name = (*elem).name().unwrap();
                 xml_err_valid_node(
                     ctxt,
@@ -6581,13 +6518,12 @@ pub unsafe fn xml_validate_one_namespace(
 
         // Second, verify that it's among the list
         while let Some(now) = tree {
-            if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
+            if now.name == value {
                 break;
             }
             tree = now.next.as_deref();
         }
         if tree.is_none() {
-            let value = CStr::from_ptr(value as *const i8).to_string_lossy();
             let elem_name = (*elem).name().unwrap();
             if let Some(prefix) = (*ns).prefix() {
                 xml_err_valid_node(
@@ -6918,26 +6854,25 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
 pub unsafe fn xml_validate_notation_use(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    notation_name: *const XmlChar,
+    notation_name: &str,
 ) -> i32 {
-    let mut nota_decl: XmlNotationPtr;
-    if doc.is_null() || (*doc).int_subset.is_null() || notation_name.is_null() {
+    if doc.is_null() || (*doc).int_subset.is_null() {
         return -1;
     }
 
-    nota_decl = xml_get_dtd_notation_desc((*doc).int_subset, notation_name);
-    if nota_decl.is_null() && !(*doc).ext_subset.is_null() {
-        nota_decl = xml_get_dtd_notation_desc((*doc).ext_subset, notation_name);
-    }
+    let nota_decl = xml_get_dtd_notation_desc((*doc).int_subset, notation_name).or_else(|| {
+        (!(*doc).ext_subset.is_null())
+            .then(|| xml_get_dtd_notation_desc((*doc).ext_subset, notation_name))
+            .flatten()
+    });
 
-    if nota_decl.is_null() && !ctxt.is_null() {
-        let notation_name = CStr::from_ptr(notation_name as *const i8).to_string_lossy();
+    if nota_decl.is_none() && !ctxt.is_null() {
         xml_err_valid_node(
             ctxt,
             doc as XmlNodePtr,
             XmlParserErrors::XmlDTDUnknownNotation,
             format!("NOTATION {notation_name} is not declared\n").as_str(),
-            Some(&notation_name),
+            Some(notation_name),
             None,
             None,
         );
@@ -6986,16 +6921,11 @@ pub unsafe fn xml_is_mixed_element(doc: XmlDocPtr, name: *const XmlChar) -> i32 
 ///
 /// returns the xmlNotationPtr if found or null_mut()
 #[doc(alias = "xmlGetDtdNotationDesc")]
-pub unsafe fn xml_get_dtd_notation_desc(dtd: XmlDtdPtr, name: *const XmlChar) -> XmlNotationPtr {
+pub unsafe fn xml_get_dtd_notation_desc<'a>(dtd: XmlDtdPtr, name: &str) -> Option<&'a XmlNotation> {
     if dtd.is_null() {
-        return null_mut();
+        return None;
     }
-    if (*dtd).notations.is_null() {
-        return null_mut();
-    }
-    let table: XmlNotationTablePtr = (*dtd).notations as XmlNotationTablePtr;
-
-    xml_hash_lookup(table, name) as _
+    (*dtd).notations.as_deref()?.lookup(name)
 }
 
 /// Search the DTD for the description of this element
@@ -8297,74 +8227,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_dump_notation_decl() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_nota in 0..GEN_NB_XML_NOTATION_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let nota = gen_xml_notation_ptr(n_nota, 1);
-
-                    xml_dump_notation_decl(buf, nota);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_notation_ptr(n_nota, nota, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpNotationDecl",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDumpNotationDecl()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_nota);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_dump_notation_table() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_table in 0..GEN_NB_XML_NOTATION_TABLE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let table = gen_xml_notation_table_ptr(n_table, 1);
-
-                    xml_dump_notation_table(buf, table);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_notation_table_ptr(n_table, table, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpNotationTable",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDumpNotationTable()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_table);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_get_dtd_element_desc() {
         unsafe {
             let mut leaks = 0;
@@ -9222,86 +9084,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlValidateNmtokensValue()"
                     );
                     eprintln!(" {}", n_value);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_notation_decl() {
-        #[cfg(feature = "libxml_valid")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_nota in 0..GEN_NB_XML_NOTATION_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let nota = gen_xml_notation_ptr(n_nota, 2);
-
-                        let ret_val = xml_validate_notation_decl(ctxt, doc, nota);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_notation_ptr(n_nota, nota, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateNotationDecl",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateNotationDecl()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_nota);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_validate_notation_use() {
-        #[cfg(any(feature = "libxml_valid", feature = "schema"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_ctxt in 0..GEN_NB_XML_VALID_CTXT_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_notation_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let ctxt = gen_xml_valid_ctxt_ptr(n_ctxt, 0);
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let notation_name = gen_const_xml_char_ptr(n_notation_name, 2);
-
-                        let ret_val = xml_validate_notation_use(ctxt, doc, notation_name);
-                        desret_int(ret_val);
-                        des_xml_valid_ctxt_ptr(n_ctxt, ctxt, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_const_xml_char_ptr(n_notation_name, notation_name, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlValidateNotationUse",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlValidateNotationUse()"
-                            );
-                            eprint!(" {}", n_ctxt);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_notation_name);
-                        }
-                    }
                 }
             }
         }

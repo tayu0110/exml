@@ -53,7 +53,7 @@ use crate::{
         xml_text_concat, xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
         XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
-        XmlEnumeration, XmlNode, XmlNodePtr, XmlNotationPtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
 };
@@ -914,8 +914,6 @@ pub unsafe fn xml_sax2_notation_decl(
     public_id: Option<&str>,
     system_id: Option<&str>,
 ) {
-    let nota: XmlNotationPtr;
-
     if ctx.is_none() {
         return;
     }
@@ -928,7 +926,7 @@ pub unsafe fn xml_sax2_notation_decl(
         return;
     }
 
-    if public_id.is_none() && system_id.is_none() {
+    let nota = if public_id.is_none() && system_id.is_none() {
         xml_fatal_err_msg!(
             ctxt,
             XmlParserErrors::XmlErrNotationProcessing,
@@ -937,21 +935,21 @@ pub unsafe fn xml_sax2_notation_decl(
         );
         return;
     } else if (*ctxt).in_subset == 1 {
-        nota = xml_add_notation_decl(
+        xml_add_notation_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).int_subset,
             name,
             public_id,
             system_id,
-        );
+        )
     } else if (*ctxt).in_subset == 2 {
-        nota = xml_add_notation_decl(
+        xml_add_notation_decl(
             addr_of_mut!((*ctxt).vctxt) as _,
             (*(*ctxt).my_doc).ext_subset,
             name,
             public_id,
             system_id,
-        );
+        )
     } else {
         xml_fatal_err_msg!(
             ctxt,
@@ -960,10 +958,10 @@ pub unsafe fn xml_sax2_notation_decl(
             name
         );
         return;
-    }
+    };
     #[cfg(feature = "libxml_valid")]
     {
-        if nota.is_null() {
+        if nota.is_none() {
             (*ctxt).valid = 0;
         }
         if (*ctxt).validate != 0
@@ -1938,7 +1936,7 @@ pub unsafe fn xml_sax2_start_element(
     if (*ctxt).validate != 0
         && (*(*ctxt).my_doc).ext_subset.is_null()
         && ((*(*ctxt).my_doc).int_subset.is_null()
-            || ((*(*(*ctxt).my_doc).int_subset).notations.is_null()
+            || ((*(*(*ctxt).my_doc).int_subset).notations.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
                 && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))
@@ -2133,7 +2131,7 @@ pub unsafe fn xml_sax2_start_element_ns(
     if (*ctxt).validate != 0
         && (*(*ctxt).my_doc).ext_subset.is_null()
         && ((*(*ctxt).my_doc).int_subset.is_null()
-            || ((*(*(*ctxt).my_doc).int_subset).notations.is_null()
+            || ((*(*(*ctxt).my_doc).int_subset).notations.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).elements.is_null()
                 && (*(*(*ctxt).my_doc).int_subset).attributes.is_none()
                 && (*(*(*ctxt).my_doc).int_subset).entities.is_none()))

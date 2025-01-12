@@ -2975,7 +2975,13 @@ unsafe fn xml_schema_val_atomic_type(
                                     ret = 3;
                                 }
                                 if ret == 0 {
-                                    ret = xml_validate_notation_use(null_mut(), (*node).doc, value);
+                                    ret = xml_validate_notation_use(
+                                        null_mut(),
+                                        (*node).doc,
+                                        CStr::from_ptr(value as *const i8)
+                                            .to_string_lossy()
+                                            .as_ref(),
+                                    );
                                     if ret == 1 {
                                         ret = 0;
                                     } else {

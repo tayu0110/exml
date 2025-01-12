@@ -38,7 +38,7 @@ use std::{
     borrow::Cow,
     ffi::{c_char, CStr, CString},
     mem::size_of,
-    ptr::{addr_of_mut, null_mut},
+    ptr::{addr_of_mut, drop_in_place, null_mut},
     sync::atomic::{AtomicBool, AtomicI32, Ordering},
 };
 
@@ -58,8 +58,7 @@ use crate::{
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::{
             xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_id_table,
-            xml_free_notation_table, xml_free_ref_table, xml_is_id, xml_remove_id,
-            XmlElementTablePtr, XmlNotationTablePtr,
+            xml_free_ref_table, xml_is_id, xml_remove_id, XmlElementTablePtr,
         },
         xmlstring::{
             xml_str_equal, xml_strdup, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
@@ -1007,7 +1006,7 @@ macro_rules! DICT_FREE {
 
 /// Free a DTD structure.
 #[doc(alias = "xmlFreeDtd")]
-pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
+pub unsafe fn xml_free_dtd(cur: XmlDtdPtr) {
     let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
@@ -1024,10 +1023,8 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     }
 
     if let Some(children) = (*cur).children() {
-        /*
-         * Cleanup all nodes which are not part of the specific lists
-         * of notations, elements, attributes and entities.
-         */
+        // Cleanup all nodes which are not part of the specific lists
+        // of notations, elements, attributes and entities.
         let mut c = Some(children);
         while let Some(mut now) = c {
             let next = now.next;
@@ -1047,10 +1044,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
     DICT_FREE!(dict, (*cur).name);
     (*cur).system_id = None;
     (*cur).external_id = None;
-    /* TODO !!! */
-    if !(*cur).notations.is_null() {
-        xml_free_notation_table((*cur).notations as XmlNotationTablePtr);
-    }
+    // TODO !!!
 
     if !(*cur).elements.is_null() {
         xml_free_element_table((*cur).elements as XmlElementTablePtr);
@@ -1065,6 +1059,7 @@ pub unsafe extern "C" fn xml_free_dtd(cur: XmlDtdPtr) {
         xml_free_entities_table(pentities);
     }
 
+    drop_in_place(cur);
     xml_free(cur as _);
 }
 
@@ -1767,8 +1762,9 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
     if let Some(entities) = (*dtd).entities {
         (*ret).entities = xml_copy_entities_table(entities);
     }
-    if !(*dtd).notations.is_null() {
-        (*ret).notations = xml_copy_notation_table((*dtd).notations as XmlNotationTablePtr) as _;
+    if let Some(table) = (*dtd).notations.as_deref() {
+        let new = xml_copy_notation_table(table);
+        (*ret).notations = Some(Box::new(new));
     }
     if !(*dtd).elements.is_null() {
         (*ret).elements = xml_copy_element_table((*dtd).elements as XmlElementTablePtr) as _;
@@ -1845,7 +1841,7 @@ pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
 /// Returns: a new #xmlDocPtr, or null_mut() in case of error.
 #[doc(alias = "xmlCopyDoc")]
 #[cfg(any(feature = "libxml_tree", feature = "schema"))]
-pub unsafe extern "C" fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocPtr {
+pub unsafe fn xml_copy_doc(doc: XmlDocPtr, recursive: i32) -> XmlDocPtr {
     use crate::libxml::globals::xml_mem_strdup;
 
     if doc.is_null() {

@@ -38,7 +38,7 @@ use libc::memset;
 pub use notation::*;
 
 use crate::{
-    hash::XmlHashTableRef,
+    hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
         entities::XmlEntityPtr,
         globals::{xml_free, xml_malloc, xml_register_node_default_value},
@@ -68,8 +68,8 @@ pub struct XmlDtd {
     pub(crate) doc: *mut XmlDoc,          /* the containing document */
 
     // End of common part
-    pub(crate) notations: *mut c_void, /* Hash table for notations if any */
-    pub(crate) elements: *mut c_void,  /* Hash table for elements if any */
+    pub(crate) notations: Option<Box<XmlHashTable<'static, XmlNotation>>>, /* Hash table for notations if any */
+    pub(crate) elements: *mut c_void, /* Hash table for elements if any */
     pub(crate) attributes: Option<XmlHashTableRef<'static, XmlAttributePtr>>, /* Hash table for attributes if any */
     pub(crate) entities: Option<XmlHashTableRef<'static, XmlEntityPtr>>, /* Hash table for entities if any */
     pub(crate) external_id: Option<String>, /* External identifier for PUBLIC DTD */
@@ -158,7 +158,7 @@ impl Default for XmlDtd {
             next: None,
             prev: None,
             doc: null_mut(),
-            notations: null_mut(),
+            notations: None,
             elements: null_mut(),
             attributes: None,
             entities: None,
