@@ -49,8 +49,8 @@ use super::{
 pub type XmlDOMWrapAcquireNsFunction = unsafe fn(
     ctxt: XmlDOMWrapCtxtPtr,
     node: XmlNodePtr,
-    nsName: *const XmlChar,
-    nsPrefix: *const XmlChar,
+    ns_name: *const XmlChar,
+    ns_prefix: *const XmlChar,
 ) -> XmlNsPtr;
 
 /// Context for DOM wrapper-operations.
