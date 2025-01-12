@@ -25,7 +25,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use libc::{memset, snprintf};
+use libc::snprintf;
 
 use crate::libxml::{
     entities::{xml_get_doc_entity, XmlEntityPtr},
@@ -68,6 +68,17 @@ pub struct XmlDOMWrapCtxt {
     pub(super) get_ns_for_node_func: Option<XmlDOMWrapAcquireNsFunction>,
 }
 
+impl Default for XmlDOMWrapCtxt {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: 0,
+            namespace_map: null_mut(),
+            get_ns_for_node_func: None,
+        }
+    }
+}
+
 pub type XmlNsMapItemPtr = *mut XmlNsMapItem;
 #[repr(C)]
 pub struct XmlNsMapItem {
@@ -85,12 +96,35 @@ pub struct XmlNsMapItem {
     depth: i32,
 }
 
+impl Default for XmlNsMapItem {
+    fn default() -> Self {
+        Self {
+            next: null_mut(),
+            prev: null_mut(),
+            old_ns: null_mut(),
+            new_ns: null_mut(),
+            shadow_depth: 0,
+            depth: 0,
+        }
+    }
+}
+
 pub type XmlNsMapPtr = *mut XmlNsMap;
 #[repr(C)]
 pub struct XmlNsMap {
     first: XmlNsMapItemPtr,
     last: XmlNsMapItemPtr,
     pool: XmlNsMapItemPtr,
+}
+
+impl Default for XmlNsMap {
+    fn default() -> Self {
+        Self {
+            first: null_mut(),
+            last: null_mut(),
+            pool: null_mut(),
+        }
+    }
 }
 
 /// Allocates and initializes a new DOM-wrapper context.
@@ -103,7 +137,7 @@ pub unsafe fn xml_dom_wrap_new_ctxt() -> XmlDOMWrapCtxtPtr {
         xml_tree_err_memory("allocating DOM-wrapper context");
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlDOMWrapCtxt>());
+    std::ptr::write(&mut *ret, XmlDOMWrapCtxt::default());
     ret
 }
 
@@ -218,7 +252,7 @@ unsafe fn xml_dom_wrap_ns_map_add_item(
             xml_tree_err_memory("allocating namespace map");
             return null_mut();
         }
-        memset(map as _, 0, size_of::<XmlNsMap>());
+        std::ptr::write(&mut *map, XmlNsMap::default());
         *nsmap = map;
     }
 
@@ -226,7 +260,7 @@ unsafe fn xml_dom_wrap_ns_map_add_item(
         // Reuse an item from the pool.
         ret = (*map).pool;
         (*map).pool = (*ret).next;
-        memset(ret as _, 0, size_of::<XmlNsMapItem>());
+        std::ptr::write(&mut *ret, XmlNsMapItem::default());
     } else {
         // Create a new item.
         ret = xml_malloc(size_of::<XmlNsMapItem>()) as _;
@@ -234,7 +268,7 @@ unsafe fn xml_dom_wrap_ns_map_add_item(
             xml_tree_err_memory("allocating namespace map item");
             return null_mut();
         }
-        memset(ret as _, 0, size_of::<XmlNsMapItem>());
+        std::ptr::write(&mut *ret, XmlNsMapItem::default());
     }
 
     if (*map).first.is_null() {
@@ -1891,7 +1925,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                             xml_tree_err_memory("xmlDOMWrapCloneNode(): allocating an attr-node");
                             break 'internal_error;
                         }
-                        memset(clone as _, 0, size_of::<XmlAttr>());
+                        std::ptr::write(&mut *(clone as *mut XmlAttr), XmlAttr::default());
                         // Set hierarchical links.
                         // TODO: Change this to add to the end of attributes.
                         if !result_clone.is_null() {
@@ -1965,7 +1999,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                                     );
                                     return -1;
                                 }
-                                memset(clone_ns as _, 0, size_of::<XmlNs>());
+                                std::ptr::write(&mut *clone_ns, XmlNs::default());
                                 (*clone_ns).typ = XML_LOCAL_NAMESPACE;
 
                                 if !(*ns).href.is_null() {

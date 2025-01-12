@@ -87,6 +87,25 @@ impl XmlAttr {
     }
 }
 
+impl Default for XmlAttr {
+    fn default() -> Self {
+        Self {
+            _private: null_mut(),
+            typ: XmlElementType::default(),
+            name: null_mut(),
+            children: None,
+            last: None,
+            parent: None,
+            next: null_mut(),
+            prev: null_mut(),
+            doc: null_mut(),
+            ns: null_mut(),
+            atype: None,
+            psvi: null_mut(),
+        }
+    }
+}
+
 impl NodeCommon for XmlAttr {
     fn document(&self) -> *mut XmlDoc {
         self.doc
