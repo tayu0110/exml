@@ -1039,7 +1039,7 @@ pub(crate) unsafe fn xml_parse_notation_type(
         };
         let mut tmp = ret.as_deref();
         while let Some(now) = tmp {
-            if Some(name.as_str()) == now.name.as_deref() {
+            if name == now.name {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
@@ -1051,7 +1051,7 @@ pub(crate) unsafe fn xml_parse_notation_type(
             tmp = now.next.as_deref();
         }
         if tmp.is_none() {
-            let cur = xml_create_enumeration(Some(&name));
+            let cur = xml_create_enumeration(&name);
             if let Some(mut ret) = ret.as_deref_mut() {
                 while ret.next.is_some() {
                     ret = ret.next.as_deref_mut().unwrap();
@@ -1099,7 +1099,7 @@ pub(crate) unsafe fn xml_parse_enumeration_type(
         };
         let mut tmp = ret.as_deref();
         while let Some(now) = tmp {
-            if Some(name.as_str()) == now.name.as_deref() {
+            if name.as_str() == now.name {
                 xml_validity_error!(
                     ctxt,
                     XmlParserErrors::XmlDTDDupToken,
@@ -1111,7 +1111,7 @@ pub(crate) unsafe fn xml_parse_enumeration_type(
             tmp = now.next.as_deref();
         }
         if tmp.is_none() {
-            let cur = xml_create_enumeration(Some(&name));
+            let cur = xml_create_enumeration(&name);
             if let Some(mut ret) = ret.as_deref_mut() {
                 while ret.next.is_some() {
                     ret = ret.next.as_deref_mut().unwrap();

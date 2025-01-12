@@ -26,8 +26,10 @@ use std::io::Write;
 #[repr(C)]
 #[derive(Debug, Default)]
 pub struct XmlEnumeration {
-    pub(crate) next: Option<Box<XmlEnumeration>>, /* next one */
-    pub(crate) name: Option<String>,              /* Enumeration name */
+    // next one
+    pub(crate) next: Option<Box<XmlEnumeration>>,
+    // Enumeration name
+    pub(crate) name: String,
 }
 
 impl Clone for XmlEnumeration {
@@ -44,9 +46,9 @@ impl Clone for XmlEnumeration {
 ///
 /// Returns the xmlEnumerationPtr just created or null_mut() in case of error.
 #[doc(alias = "xmlCreateEnumeration")]
-pub fn xml_create_enumeration(name: Option<&str>) -> Box<XmlEnumeration> {
+pub fn xml_create_enumeration(name: &str) -> Box<XmlEnumeration> {
     Box::new(XmlEnumeration {
-        name: name.map(|n| n.to_owned()),
+        name: name.to_owned(),
         next: None,
     })
 }
@@ -58,7 +60,7 @@ pub fn xml_create_enumeration(name: Option<&str>) -> Box<XmlEnumeration> {
 #[doc(alias = "xmlDumpEnumeration")]
 #[cfg(feature = "libxml_output")]
 pub(crate) fn xml_dump_enumeration<'a>(out: &mut (impl Write + 'a), cur: &XmlEnumeration) {
-    write!(out, "{}", cur.name.as_deref().unwrap()).ok();
+    write!(out, "{}", cur.name).ok();
     if let Some(next) = cur.next.as_deref() {
         write!(out, " | ").ok();
         xml_dump_enumeration(out, next);

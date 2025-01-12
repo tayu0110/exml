@@ -3713,10 +3713,7 @@ pub unsafe fn xml_validate_attribute_decl(
     if !(*attr).default_value.is_null() && (*attr).tree.is_some() {
         let mut tree = (*attr).tree.as_deref();
         while let Some(now) = tree {
-            if now.name.as_deref()
-                == Some(CStr::from_ptr((*attr).default_value as *const i8).to_string_lossy())
-                    .as_deref()
-            {
+            if now.name == CStr::from_ptr((*attr).default_value as *const i8).to_string_lossy() {
                 break;
             }
             tree = now.next.as_deref();
@@ -4045,7 +4042,7 @@ extern "C" fn xml_validate_attribute_callback(cur: XmlAttributePtr, ctxt: XmlVal
                             (*ctxt).doc,
                             (*cur).name,
                             (*cur).atype,
-                            now.name.as_deref().unwrap(),
+                            &now.name,
                         );
                         if ret == 0 && (*ctxt).valid == 1 {
                             (*ctxt).valid = 0;
@@ -6305,9 +6302,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
 
         // Second, verify that it's among the list
         while let Some(now) = tree {
-            if now.name.as_deref()
-                == Some(CStr::from_ptr(value as *const i8).to_string_lossy()).as_deref()
-            {
+            if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
                 break;
             }
             tree = now.next.as_deref();
@@ -6336,9 +6331,7 @@ pub unsafe extern "C" fn xml_validate_one_attribute(
     ) {
         let mut tree = (*attr_decl).tree.as_deref();
         while let Some(now) = tree {
-            if now.name.as_deref()
-                == Some(CStr::from_ptr(value as *const i8).to_string_lossy()).as_deref()
-            {
+            if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
                 break;
             }
             tree = now.next.as_deref();
@@ -6658,9 +6651,7 @@ pub unsafe fn xml_validate_one_namespace(
 
         // Second, verify that it's among the list
         while let Some(now) = tree {
-            if now.name.as_deref()
-                == Some(CStr::from_ptr(value as *const i8).to_string_lossy()).as_deref()
-            {
+            if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
                 break;
             }
             tree = now.next.as_deref();
@@ -6700,9 +6691,7 @@ pub unsafe fn xml_validate_one_namespace(
     ) {
         let mut tree = (*attr_decl).tree.as_deref();
         while let Some(now) = tree {
-            if now.name.as_deref()
-                == Some(CStr::from_ptr(value as *const i8).to_string_lossy()).as_deref()
-            {
+            if now.name == CStr::from_ptr(value as *const i8).to_string_lossy() {
                 break;
             }
             tree = now.next.as_deref();

@@ -610,11 +610,10 @@ impl XmlDebugCtxt<'_> {
             if let Some(mut cur) = attr.tree.as_deref() {
                 let mut remain = true;
                 for indx in 0..5 {
-                    let name = cur.name.as_deref().unwrap();
                     if indx != 0 {
-                        write!(self.output, "|{name}");
+                        write!(self.output, "|{}", cur.name);
                     } else {
-                        write!(self.output, " ({name}");
+                        write!(self.output, " ({}", cur.name);
                     }
                     let Some(next) = cur.next.as_deref() else {
                         remain = false;
