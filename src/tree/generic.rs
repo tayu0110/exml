@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     ffi::CStr,
+    ops::{Deref, DerefMut},
     ptr::{null, null_mut, NonNull},
     sync::atomic::Ordering,
 };
@@ -672,5 +673,68 @@ pub trait NodeCommon {
         }
         self.set_next(None);
         self.set_prev(None);
+    }
+}
+
+pub(crate) struct XmlGenericNodePtr(NonNull<dyn NodeCommon>);
+
+impl XmlGenericNodePtr {
+    /// Allocate new memory and create new `XmlGenericNodePtr` from an owned xml node.
+    ///
+    /// This method leaks allocated memory.  
+    /// Users can use `free` method for deallocating memory.
+    pub(crate) fn new<T: NodeCommon + 'static>(node: T) -> Option<Self> {
+        let boxed: Box<dyn NodeCommon> = Box::new(node);
+        NonNull::new(Box::leak(boxed)).map(Self)
+    }
+
+    /// Deallocate memory.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn free(self) {
+        let _ = *Box::from_raw(self.0.as_ptr());
+    }
+
+    /// Acquire the ownership of the inner value.  
+    /// As a result, `self` will be invalid. `self` must not be used after performs this method.
+    ///
+    /// # Safety
+    /// This method should be called only once.  
+    /// If called more than twice, the behavior is undefined.
+    pub(crate) unsafe fn into_inner(self) -> Box<dyn NodeCommon> {
+        Box::from_raw(self.0.as_ptr())
+    }
+}
+
+impl Clone for XmlGenericNodePtr {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl Copy for XmlGenericNodePtr {}
+
+impl Deref for XmlGenericNodePtr {
+    type Target = dyn NodeCommon;
+    fn deref(&self) -> &Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `XmlGenericNodePtr`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_ref() }
+    }
+}
+
+impl DerefMut for XmlGenericNodePtr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // # Safety
+        // I don't implement the pointer casting and addition/subtraction methods
+        // and don't expose the inner `NonNull` for `XmlGenericNodePtr`.
+        // Therefore, as long as the constructor is correctly implemented,
+        // the pointer dereference is valid.
+        unsafe { self.0.as_mut() }
     }
 }
