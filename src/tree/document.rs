@@ -23,7 +23,6 @@ use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::
 use libc::memset;
 
 use crate::{
-    dict::XmlDict,
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     libxml::{
@@ -76,7 +75,9 @@ pub struct XmlDoc {
     pub(crate) url: Option<String>,     /* The URI for that document */
     pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,
                                         actually an xmlCharEncoding */
-    pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
+    // `dict` confuses me very much about the lifetime of the string...
+    // I believe it is incompatible with the lifetime of Rust objects, so I removed it.
+    // pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
     pub(crate) psvi: *mut c_void, /* for type/PSVI information */
     pub(crate) parse_flags: i32,  /* set of xmlParserOption used to parse the
                                   document */
@@ -809,7 +810,6 @@ impl Default for XmlDoc {
             refs: null_mut(),
             url: None,
             charset: XmlCharEncoding::None,
-            dict: null_mut(),
             psvi: null_mut(),
             parse_flags: 0,
             properties: 0,

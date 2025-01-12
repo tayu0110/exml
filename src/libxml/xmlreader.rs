@@ -4357,9 +4357,6 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         xml_free_ns_list((*cur).old_ns);
     }
     (*cur).url = None;
-    if !(*cur).dict.is_null() {
-        xml_dict_free((*cur).dict);
-    }
 
     xml_free(cur as _);
 }

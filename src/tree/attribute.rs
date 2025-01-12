@@ -22,12 +22,9 @@ use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::
 
 use libc::memset;
 
-use crate::{
-    dict::xml_dict_lookup,
-    libxml::{
-        globals::{xml_free, xml_malloc, xml_register_node_default_value},
-        xmlstring::{xml_strdup, XmlChar},
-    },
+use crate::libxml::{
+    globals::{xml_free, xml_malloc, xml_register_node_default_value},
+    xmlstring::{xml_strdup, XmlChar},
 };
 
 use super::{
@@ -161,12 +158,7 @@ pub unsafe fn xml_new_doc_prop(
     }
     memset(cur as _, 0, size_of::<XmlAttr>());
     (*cur).typ = XmlElementType::XmlAttributeNode;
-
-    if !doc.is_null() && !(*doc).dict.is_null() {
-        (*cur).name = xml_dict_lookup((*doc).dict, name, -1);
-    } else {
-        (*cur).name = xml_strdup(name);
-    }
+    (*cur).name = xml_strdup(name);
     (*cur).doc = doc;
     if !value.is_null() {
         (*cur).children = (!doc.is_null())

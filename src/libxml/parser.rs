@@ -82,10 +82,7 @@ use crate::{
         xml_parser_get_directory, XmlParserInputBuffer,
     },
     libxml::{
-        dict::{
-            __xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup,
-            xml_dict_reference,
-        },
+        dict::{__xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup},
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
@@ -2108,14 +2105,7 @@ pub unsafe fn xml_parse_in_node_context(
     // Use input doc's dict if present, else assure XML_PARSE_NODICT is set.
     // We need a dictionary for xmlDetectSAX2, so if there's no doc dict
     // we must wait until the last moment to free the original one.
-    if !(*doc).dict.is_null() {
-        if !(*ctxt).dict.is_null() {
-            xml_dict_free((*ctxt).dict);
-        }
-        (*ctxt).dict = (*doc).dict;
-    } else {
-        options |= XmlParserOption::XmlParseNoDict as i32;
-    }
+    options |= XmlParserOption::XmlParseNoDict as i32;
 
     if let Some(encoding) = (*doc).encoding.as_deref() {
         (*ctxt).encoding = Some(encoding.to_owned());
@@ -2223,9 +2213,6 @@ pub unsafe fn xml_parse_in_node_context(
         *lst = null_mut();
     }
 
-    if !(*doc).dict.is_null() {
-        (*ctxt).dict = null_mut();
-    }
     xml_free_parser_ctxt(ctxt);
 
     ret
@@ -2290,17 +2277,7 @@ pub unsafe fn xml_parse_balanced_chunk_memory_recover(
         return -1;
     }
     (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-    if !doc.is_null() && !(*doc).dict.is_null() {
-        xml_dict_free((*ctxt).dict);
-        (*ctxt).dict = (*doc).dict;
-        xml_dict_reference((*ctxt).dict);
-        (*ctxt).str_xml = Some(Cow::Borrowed("xml"));
-        (*ctxt).str_xmlns = Some(Cow::Borrowed("xmlns"));
-        (*ctxt).str_xml_ns = Some(Cow::Borrowed(XML_XML_NAMESPACE.to_str().unwrap()));
-        (*ctxt).dict_names = 1;
-    } else {
-        (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
-    }
+    (*ctxt).ctxt_use_options_internal(XmlParserOption::XmlParseNoDict as i32, None);
     // doc.is_null() is only supported for historic reasons
     if !doc.is_null() {
         (*new_doc).int_subset = (*doc).int_subset;
@@ -2457,10 +2434,6 @@ pub(crate) unsafe fn xml_parse_external_entity_private(
     if !doc.is_null() {
         (*new_doc).int_subset = (*doc).int_subset;
         (*new_doc).ext_subset = (*doc).ext_subset;
-        if !(*doc).dict.is_null() {
-            (*new_doc).dict = (*doc).dict;
-            xml_dict_reference((*new_doc).dict);
-        }
         if (*doc).url.is_some() {
             (*new_doc).url = (*doc).url.clone();
         }

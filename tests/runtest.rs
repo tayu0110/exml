@@ -4098,7 +4098,7 @@ unsafe fn pattern_test(
 
                     patternc = xml_patterncompile(
                         str.as_ptr(),
-                        (*doc).dict,
+                        null_mut(),
                         0,
                         Some(namespaces[..=j].to_vec()),
                     );

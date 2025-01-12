@@ -50,7 +50,6 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
-        dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
@@ -480,20 +479,20 @@ pub unsafe fn xml_new_doc_element_content(
 /// Returns the new xmlElementContentPtr or null_mut() in case of error.
 #[doc(alias = "xmlCopyDocElementContent")]
 pub unsafe fn xml_copy_doc_element_content(
-    doc: XmlDocPtr,
+    _doc: XmlDocPtr,
     mut cur: XmlElementContentPtr,
 ) -> XmlElementContentPtr {
     let mut prev: XmlElementContentPtr;
     let mut tmp: XmlElementContentPtr;
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
         return null_mut();
     }
 
-    if !doc.is_null() {
-        dict = (*doc).dict;
-    }
+    // if !doc.is_null() {
+    //     dict = (*doc).dict;
+    // }
 
     let ret: XmlElementContentPtr =
         xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
@@ -505,22 +504,14 @@ pub unsafe fn xml_copy_doc_element_content(
     (*ret).typ = (*cur).typ;
     (*ret).ocur = (*cur).ocur;
     if !(*cur).name.is_null() {
-        if !dict.is_null() {
-            (*ret).name = xml_dict_lookup(dict, (*cur).name, -1);
-        } else {
-            (*ret).name = xml_strdup((*cur).name);
-        }
+        (*ret).name = xml_strdup((*cur).name);
     }
 
     if !(*cur).prefix.is_null() {
-        if !dict.is_null() {
-            (*ret).prefix = xml_dict_lookup(dict, (*cur).prefix, -1);
-        } else {
-            (*ret).prefix = xml_strdup((*cur).prefix);
-        }
+        (*ret).prefix = xml_strdup((*cur).prefix);
     }
     if !(*cur).c1.is_null() {
-        (*ret).c1 = xml_copy_doc_element_content(doc, (*cur).c1);
+        (*ret).c1 = xml_copy_doc_element_content(_doc, (*cur).c1);
     }
     if !(*ret).c1.is_null() {
         (*(*ret).c1).parent = ret;
@@ -540,22 +531,14 @@ pub unsafe fn xml_copy_doc_element_content(
             (*prev).c2 = tmp;
             (*tmp).parent = prev;
             if !(*cur).name.is_null() {
-                if !dict.is_null() {
-                    (*tmp).name = xml_dict_lookup(dict, (*cur).name, -1);
-                } else {
-                    (*tmp).name = xml_strdup((*cur).name);
-                }
+                (*tmp).name = xml_strdup((*cur).name);
             }
 
             if !(*cur).prefix.is_null() {
-                if !dict.is_null() {
-                    (*tmp).prefix = xml_dict_lookup(dict, (*cur).prefix, -1);
-                } else {
-                    (*tmp).prefix = xml_strdup((*cur).prefix);
-                }
+                (*tmp).prefix = xml_strdup((*cur).prefix);
             }
             if !(*cur).c1.is_null() {
-                (*tmp).c1 = xml_copy_doc_element_content(doc, (*cur).c1);
+                (*tmp).c1 = xml_copy_doc_element_content(_doc, (*cur).c1);
             }
             if !(*tmp).c1.is_null() {
                 (*(*tmp).c1).parent = tmp;
@@ -569,16 +552,16 @@ pub unsafe fn xml_copy_doc_element_content(
 
 /// Free an element content structure. The whole subtree is removed.
 #[doc(alias = "xmlFreeDocElementContent")]
-pub unsafe fn xml_free_doc_element_content(doc: XmlDocPtr, mut cur: XmlElementContentPtr) {
-    let mut dict: XmlDictPtr = null_mut();
+pub unsafe fn xml_free_doc_element_content(_doc: XmlDocPtr, mut cur: XmlElementContentPtr) {
+    // let mut dict: XmlDictPtr = null_mut();
     let mut depth: usize = 0;
 
     if cur.is_null() {
         return;
     }
-    if !doc.is_null() {
-        dict = (*doc).dict;
-    }
+    // if !doc.is_null() {
+    //     dict = (*doc).dict;
+    // }
 
     loop {
         while !(*cur).c1.is_null() || !(*cur).c2.is_null() {
@@ -604,20 +587,11 @@ pub unsafe fn xml_free_doc_element_content(doc: XmlDocPtr, mut cur: XmlElementCo
                                                                //     return;
                                                                // }
         }
-        if !dict.is_null() {
-            if !(*cur).name.is_null() && xml_dict_owns(dict, (*cur).name) == 0 {
-                xml_free((*cur).name as _);
-            }
-            if !(*cur).prefix.is_null() && xml_dict_owns(dict, (*cur).prefix) == 0 {
-                xml_free((*cur).prefix as _);
-            }
-        } else {
-            if !(*cur).name.is_null() {
-                xml_free((*cur).name as _);
-            }
-            if !(*cur).prefix.is_null() {
-                xml_free((*cur).prefix as _);
-            }
+        if !(*cur).name.is_null() {
+            xml_free((*cur).name as _);
+        }
+        if !(*cur).prefix.is_null() {
+            xml_free((*cur).prefix as _);
         }
         let parent: XmlElementContentPtr = (*cur).parent;
         if depth == 0 || parent.is_null() {
@@ -1875,14 +1849,14 @@ pub unsafe fn xml_add_attribute_decl(
     tree: Option<Box<XmlEnumeration>>,
 ) -> XmlAttributePtr {
     let mut ret: XmlAttributePtr;
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if dtd.is_null() {
         return null_mut();
     }
-    if !(*dtd).doc.is_null() {
-        dict = (*(*dtd).doc).dict;
-    }
+    // if !(*dtd).doc.is_null() {
+    //     dict = (*(*dtd).doc).dict;
+    // }
 
     #[cfg(feature = "libxml_valid")]
     {
@@ -1975,42 +1949,17 @@ pub unsafe fn xml_add_attribute_decl(
     // doc must be set before possible error causes call
     // to xmlFreeAttribute (because it's used to check on dict use)
     (*ret).doc = (*dtd).doc;
-    if !dict.is_null() {
-        let name = CString::new(name).unwrap();
-        (*ret).name = xml_dict_lookup(dict, name.as_ptr() as *const u8, -1);
-        let ns = ns.map(|ns| CString::new(ns).unwrap());
-        let prefix = xml_dict_lookup(
-            dict,
-            ns.as_deref().map_or(null(), |ns| ns.as_ptr() as *const u8),
-            -1,
-        );
-        (*ret).prefix = (!prefix.is_null()).then(|| {
-            CStr::from_ptr(prefix as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-        let elem = CString::new(elem).unwrap();
-        let elem = xml_dict_lookup(dict, elem.as_ptr() as *const u8, -1);
-        (*ret).elem = (!elem.is_null()).then(|| {
-            CStr::from_ptr(elem as *const i8)
-                .to_string_lossy()
-                .into_owned()
-        });
-    } else {
+    {
         let name = CString::new(name).unwrap();
         (*ret).name = xml_strdup(name.as_ptr() as *const u8);
-        (*ret).prefix = ns.map(|ns| ns.to_owned());
-        (*ret).elem = Some(elem.to_owned());
     }
+    (*ret).prefix = ns.map(|ns| ns.to_owned());
+    (*ret).elem = Some(elem.to_owned());
     (*ret).def = def;
     (*ret).tree = tree;
     if let Some(default_value) = default_value {
         let default_value = CString::new(default_value).unwrap();
-        if !dict.is_null() {
-            (*ret).default_value = xml_dict_lookup(dict, default_value.as_ptr() as *const u8, -1);
-        } else {
-            (*ret).default_value = xml_strdup(default_value.as_ptr() as *const u8);
-        }
+        (*ret).default_value = xml_strdup(default_value.as_ptr() as *const u8);
     }
 
     // Validity Check:
@@ -2309,21 +2258,27 @@ macro_rules! DICT_FREE {
 /// Deallocate the memory used by an id definition
 #[doc(alias = "xmlFreeID")]
 unsafe fn xml_free_id(id: XmlIDPtr) {
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if id.is_null() {
         return;
     }
 
-    if !(*id).doc.is_null() {
-        dict = (*(*id).doc).dict;
-    }
+    // if !(*id).doc.is_null() {
+    //     dict = (*(*id).doc).dict;
+    // }
 
     if !(*id).value.is_null() {
-        DICT_FREE!((*id).value, dict);
+        // DICT_FREE!((*id).value, dict);
+        if !(*id).value.is_null() {
+            xml_free((*id).value as _);
+        }
     }
     if !(*id).name.is_null() {
-        DICT_FREE!((*id).name, dict);
+        // DICT_FREE!((*id).name, dict);
+        if !(*id).name.is_null() {
+            xml_free((*id).name as _);
+        }
     }
     xml_free(id as _);
 }
@@ -2372,11 +2327,7 @@ pub unsafe fn xml_add_id(
     (*ret).doc = doc;
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        if !(*doc).dict.is_null() {
-            (*ret).name = xml_dict_lookup((*doc).dict, (*attr).name, -1);
-        } else {
-            (*ret).name = xml_strdup((*attr).name);
-        }
+        (*ret).name = xml_strdup((*attr).name);
         (*ret).attr = null_mut();
     } else {
         (*ret).attr = attr;

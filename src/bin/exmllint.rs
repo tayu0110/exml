@@ -2317,7 +2317,7 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             PATTERNC.store(
                 xml_patterncompile(
                     cpattern.as_ptr() as *const u8,
-                    (*doc).dict,
+                    null_mut(),
                     0,
                     Some(namespaces[..=i].to_vec()),
                 ),

@@ -10927,9 +10927,6 @@ unsafe fn html_do_read(
     let ret: HtmlDocPtr = (*ctxt).my_doc;
     (*ctxt).my_doc = null_mut();
     if reuse == 0 {
-        if (*ctxt).dict_names != 0 && !ret.is_null() && (*ret).dict == (*ctxt).dict {
-            (*ctxt).dict = null_mut();
-        }
         xml_free_parser_ctxt(ctxt);
     }
     ret

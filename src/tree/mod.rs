@@ -47,10 +47,11 @@ use libc::{memcpy, memset, snprintf, strlen};
 
 pub(crate) use crate::buf::libxml_api::*;
 use crate::{
+    dict::XmlDict,
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     libxml::{
         chvalid::xml_is_blank_char,
-        dict::{xml_dict_free, xml_dict_lookup, xml_dict_owns, XmlDictPtr},
+        dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         entities::{xml_free_entities_table, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
@@ -61,9 +62,7 @@ use crate::{
             xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_id_table,
             xml_free_ref_table, xml_is_id, xml_remove_id, XmlElementTablePtr,
         },
-        xmlstring::{
-            xml_str_equal, xml_strdup, xml_strncat, xml_strncat_new, xml_strndup, XmlChar,
-        },
+        xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
 };
 
@@ -986,14 +985,14 @@ macro_rules! DICT_FREE {
 /// Free a DTD structure.
 #[doc(alias = "xmlFreeDtd")]
 pub unsafe fn xml_free_dtd(cur: XmlDtdPtr) {
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
         return;
     }
-    if !(*cur).doc.is_null() {
-        dict = (*(*cur).doc).dict;
-    }
+    // if !(*cur).doc.is_null() {
+    //     dict = (*(*cur).doc).dict;
+    // }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
@@ -1020,7 +1019,10 @@ pub unsafe fn xml_free_dtd(cur: XmlDtdPtr) {
             c = next;
         }
     }
-    DICT_FREE!(dict, (*cur).name);
+    // DICT_FREE!(dict, (*cur).name);
+    if !(*cur).name.is_null() {
+        xml_free((*cur).name as _);
+    }
     (*cur).system_id = None;
     (*cur).external_id = None;
     // TODO !!!
@@ -1046,15 +1048,15 @@ pub unsafe fn xml_free_dtd(cur: XmlDtdPtr) {
 #[doc(alias = "xmlFreeDoc")]
 pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
     let mut ext_subset: XmlDtdPtr;
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
         return;
     }
 
-    if !cur.is_null() {
-        dict = (*cur).dict;
-    }
+    // if !cur.is_null() {
+    //     dict = (*cur).dict;
+    // }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
@@ -1095,13 +1097,16 @@ pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
     }
 
     (*cur).version = None;
-    DICT_FREE!(dict, (*cur).name);
+    // DICT_FREE!(dict, (*cur).name);
+    if !(*cur).name.is_null() {
+        xml_free((*cur).name as _);
+    }
     (*cur).encoding = None;
     (*cur).url = None;
     xml_free(cur as _);
-    if !dict.is_null() {
-        xml_dict_free(dict);
-    }
+    // if !dict.is_null() {
+    //     xml_dict_free(dict);
+    // }
 }
 
 unsafe fn xml_new_prop_internal(
@@ -1191,14 +1196,14 @@ pub unsafe fn xml_free_prop_list(mut cur: XmlAttrPtr) {
 /// Free one attribute, all the content is freed too
 #[doc(alias = "xmlFreeProp")]
 pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
     if cur.is_null() {
         return;
     }
 
-    if !(*cur).doc.is_null() {
-        dict = (*(*cur).doc).dict;
-    }
+    // if !(*cur).doc.is_null() {
+    //     dict = (*(*cur).doc).dict;
+    // }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
     // && xmlDeregisterNodeDefaultValue.is_some()
@@ -1213,7 +1218,10 @@ pub unsafe fn xml_free_prop(cur: XmlAttrPtr) {
     if let Some(children) = (*cur).children() {
         xml_free_node_list(children.as_ptr());
     }
-    DICT_FREE!(dict, (*cur).name);
+    // DICT_FREE!(dict, (*cur).name);
+    if !(*cur).name.is_null() {
+        xml_free((*cur).name as _);
+    }
     xml_free(cur as _);
 }
 
@@ -1341,11 +1349,7 @@ pub(crate) unsafe fn xml_static_copy_node(
     } else if (*node).name == XML_STRING_COMMENT.as_ptr() as _ {
         (*ret).name = XML_STRING_COMMENT.as_ptr() as _;
     } else if !(*node).name.is_null() {
-        if !doc.is_null() && !(*doc).dict.is_null() {
-            (*ret).name = xml_dict_lookup((*doc).dict, (*node).name, -1);
-        } else {
-            (*ret).name = xml_strdup((*node).name);
-        }
+        (*ret).name = xml_strdup((*node).name);
     }
     if !matches!((*node).element_type(), XmlElementType::XmlElementNode)
         && !(*node).content.is_null()
@@ -1953,7 +1957,7 @@ pub unsafe fn xml_new_doc_node_eat_name(
     } else {
         // if name don't come from the doc dictionary free it here
         if !name.is_null()
-            && (doc.is_null() || (*doc).dict.is_null() || xml_dict_owns((*doc).dict, name) == 0)
+        // && (doc.is_null() || (*doc).dict.is_null() || xml_dict_owns((*doc).dict, name) == 0)
         {
             xml_free(name as _);
         }
@@ -2625,15 +2629,7 @@ pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
         return -1;
     }
     // need to check if content is currently in the dictionary
-    if (*node).content == addr_of_mut!((*node).properties) as _
-        || (!(*node).doc.is_null()
-            && !(*(*node).doc).dict.is_null()
-            && xml_dict_owns((*(*node).doc).dict, (*node).content) != 0)
-    {
-        (*node).content = xml_strncat_new((*node).content, content.as_ptr(), content.len() as i32);
-    } else {
-        (*node).content = xml_strncat((*node).content, content.as_ptr(), content.len() as i32);
-    }
+    (*node).content = xml_strncat((*node).content, content.as_ptr(), content.len() as i32);
     (*node).properties = null_mut();
     if (*node).content.is_null() {
         return -1;
@@ -2646,7 +2642,7 @@ pub unsafe fn xml_text_concat(node: XmlNodePtr, content: &str) -> i32 {
 #[doc(alias = "xmlFreeNodeList")]
 pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
     let mut parent: XmlNodePtr;
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
     let mut depth: usize = 0;
 
     if cur.is_null() {
@@ -2656,9 +2652,9 @@ pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
         xml_free_ns_list(cur as _);
         return;
     }
-    if !(*cur).doc.is_null() {
-        dict = (*(*cur).doc).dict;
-    }
+    // if !(*cur).doc.is_null() {
+    //     dict = (*(*cur).doc).dict;
+    // }
     loop {
         while let Some(children) = (*cur).children().filter(|_| {
             !matches!(
@@ -2699,7 +2695,10 @@ pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
                 && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
                 && ((*cur).content != addr_of_mut!((*cur).properties) as _)
             {
-                DICT_FREE!(dict, (*cur).content)
+                // DICT_FREE!(dict, (*cur).content)
+                if !(*cur).content.is_null() {
+                    xml_free((*cur).content as _);
+                }
             }
             if (matches!((*cur).element_type(), XmlElementType::XmlElementNode)
                 || matches!((*cur).element_type(), XmlElementType::XmlXIncludeStart)
@@ -2717,7 +2716,10 @@ pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
                 && !matches!((*cur).element_type(), XmlElementType::XmlTextNode)
                 && !matches!((*cur).element_type(), XmlElementType::XmlCommentNode)
             {
-                DICT_FREE!(dict, (*cur).name)
+                // DICT_FREE!(dict, (*cur).name)
+                if !(*cur).name.is_null() {
+                    xml_free((*cur).name as _);
+                }
             }
             xml_free(cur as _);
         }
@@ -2739,7 +2741,7 @@ pub unsafe fn xml_free_node_list(mut cur: XmlNodePtr) {
 /// This doesn't unlink the child from the list, use xmlUnlinkNode() first.
 #[doc(alias = "xmlFreeNode")]
 pub unsafe fn xml_free_node(cur: XmlNodePtr) {
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
         return;
@@ -2765,15 +2767,23 @@ pub unsafe fn xml_free_node(cur: XmlNodePtr) {
         xml_deregister_node_default_value(cur as _);
     }
 
-    if !(*cur).doc.is_null() {
-        dict = (*(*cur).doc).dict;
-    }
+    // if !(*cur).doc.is_null() {
+    //     dict = (*(*cur).doc).dict;
+    // }
 
     if matches!((*cur).element_type(), XmlElementType::XmlEntityDecl) {
         let ent: XmlEntityPtr = cur as _;
-        DICT_FREE!(dict, (*ent).system_id.load(Ordering::Relaxed));
+        // DICT_FREE!(dict, (*ent).system_id.load(Ordering::Relaxed));
+        let system_id = (*ent).system_id.load(Ordering::Relaxed);
+        if !system_id.is_null() {
+            xml_free(system_id as _);
+        }
         (*ent).system_id.store(null_mut(), Ordering::Relaxed);
-        DICT_FREE!(dict, (*ent).external_id.load(Ordering::Relaxed));
+        // DICT_FREE!(dict, (*ent).external_id.load(Ordering::Relaxed));
+        let external_id = (*ent).external_id.load(Ordering::Relaxed);
+        if !external_id.is_null() {
+            xml_free(external_id as _);
+        }
         (*ent).external_id.store(null_mut(), Ordering::Relaxed);
     }
     if let Some(children) = (*cur)
@@ -2799,7 +2809,10 @@ pub unsafe fn xml_free_node(cur: XmlNodePtr) {
         && !matches!((*cur).element_type(), XmlElementType::XmlEntityRefNode)
         && ((*cur).content != addr_of_mut!((*cur).properties) as _)
     {
-        DICT_FREE!(dict, (*cur).content)
+        // DICT_FREE!(dict, (*cur).content)
+        if !(*cur).content.is_null() {
+            xml_free((*cur).content as _);
+        }
     }
 
     // When a node is a text node or a comment, it uses a global static
@@ -2809,7 +2822,10 @@ pub unsafe fn xml_free_node(cur: XmlNodePtr) {
         && !matches!((*cur).element_type(), XmlElementType::XmlTextNode)
         && !matches!((*cur).element_type(), XmlElementType::XmlCommentNode)
     {
-        DICT_FREE!(dict, (*cur).name)
+        // DICT_FREE!(dict, (*cur).name)
+        if !(*cur).name.is_null() {
+            xml_free((*cur).name as _);
+        }
     }
 
     xml_free(cur as _);
@@ -3078,23 +3094,23 @@ macro_rules! XML_NSMAP_POP {
 // XML_TREE_ADOPT_STR: If we have a dest-dict, put @str in the dict;
 // otherwise copy it, when it was in the source-dict.
 macro_rules! XML_TREE_ADOPT_STR {
-    ($str:expr, $adoptStr:expr, $sourceDoc:expr, $destDoc:expr) => {
-        if $adoptStr != 0 && !$str.is_null() {
-            if !(*$destDoc).dict.is_null() {
-                let old: *const XmlChar = $str;
-                $str = xml_dict_lookup((*$destDoc).dict, $str, -1);
-                if $sourceDoc.is_null()
-                    || (*$sourceDoc).dict.is_null()
-                    || xml_dict_owns((*$sourceDoc).dict, old) == 0
-                {
-                    xml_free(old as _);
-                }
-            } else if !$sourceDoc.is_null()
-                && !(*$sourceDoc).dict.is_null()
-                && xml_dict_owns((*$sourceDoc).dict, $str) != 0
-            {
-                $str = xml_strdup($str);
-            }
+    ($str:expr, $adopt_str:expr, $source_doc:expr, $dest_doc:expr) => {
+        if $adopt_str != 0 && !$str.is_null() {
+            // if !(*$dest_doc).dict.is_null() {
+            //     let old: *const XmlChar = $str;
+            //     $str = xml_dict_lookup((*$dest_doc).dict, $str, -1);
+            //     if $source_doc.is_null()
+            //         || (*$source_doc).dict.is_null()
+            //         || xml_dict_owns((*$source_doc).dict, old) == 0
+            //     {
+            //         xml_free(old as _);
+            //     }
+            // } else if !$source_doc.is_null()
+            //     && !(*$source_doc).dict.is_null()
+            //     && xml_dict_owns((*$source_doc).dict, $str) != 0
+            // {
+            //     $str = xml_strdup($str);
+            // }
         }
     };
 }
@@ -3102,19 +3118,19 @@ macro_rules! XML_TREE_ADOPT_STR {
 // XML_TREE_ADOPT_STR_2: If @str was in the source-dict, then
 // put it in dest-dict or copy it.
 macro_rules! XML_TREE_ADOPT_STR_2 {
-    ($str:expr, $adoptStr:expr, $sourceDoc:expr, $destDoc:expr, $cur:expr) => {
-        if $adoptStr != 0
-            && !$str.is_null()
-            && !$sourceDoc.is_null()
-            && !(*$sourceDoc).dict.is_null()
-            && xml_dict_owns((*$sourceDoc).dict, (*$cur).content) != 0
-        {
-            if !(*$destDoc).dict.is_null() {
-                (*$cur).content = xml_dict_lookup((*$destDoc).dict, (*$cur).content, -1) as _;
-            } else {
-                (*$cur).content = xml_strdup((*$cur).content);
-            }
-        }
+    ($str:expr, $adopt_str:expr, $source_doc:expr, $dest_doc:expr, $cur:expr) => {
+        // if $adopt_str != 0
+        //     && !$str.is_null()
+        //     && !$source_doc.is_null()
+        //     && !(*$source_doc).dict.is_null()
+        //     && xml_dict_owns((*$source_doc).dict, (*$cur).content) != 0
+        // {
+        //     if !(*$dest_doc).dict.is_null() {
+        //         (*$cur).content = xml_dict_lookup((*$dest_doc).dict, (*$cur).content, -1) as _;
+        //     } else {
+        //         (*$cur).content = xml_strdup((*$cur).content);
+        //     }
+        // }
     };
 }
 
@@ -4022,11 +4038,12 @@ unsafe fn xml_dom_wrap_adopt_branch(
     let ancestors_only: i32 = 0;
 
     // Optimize string adoption for equal or none dicts.
-    let adopt_str = if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
-        0
-    } else {
-        1
-    };
+    // let adopt_str = if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
+    //     0
+    // } else {
+    //     1
+    // };
+    let adopt_str = 0;
 
     // Get the ns-map from the context if available.
     if !ctxt.is_null() {
@@ -4494,7 +4511,7 @@ unsafe fn xml_search_ns_by_namespace_strict(
 #[doc(alias = "xmlDOMWrapAdoptAttr")]
 unsafe fn xml_dom_wrap_adopt_attr(
     ctxt: XmlDOMWrapCtxtPtr,
-    source_doc: XmlDocPtr,
+    _source_doc: XmlDocPtr,
     attr: XmlAttrPtr,
     dest_doc: XmlDocPtr,
     dest_parent: XmlNodePtr,
@@ -4694,13 +4711,14 @@ pub unsafe fn xml_dom_wrap_adopt_node(
         );
     } else {
         let cur: XmlNodePtr = node;
-        let mut adopt_str: i32 = 1;
+        // let mut adopt_str: i32 = 1;
+        let adopt_str = 0;
 
         (*cur).doc = dest_doc;
         // Optimize string adoption.
-        if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
-            adopt_str = 0;
-        }
+        // if !source_doc.is_null() && (*source_doc).dict == (*dest_doc).dict {
+        //     adopt_str = 0;
+        // }
         match (*node).element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                 XML_TREE_ADOPT_STR_2!((*node).content, adopt_str, source_doc, dest_doc, cur);
@@ -5047,7 +5065,9 @@ pub unsafe fn xml_dom_wrap_clone_node(
         return -1;
     }
 
-    let dict: XmlDictPtr = (*dest_doc).dict;
+    // let dict: XmlDictPtr = (*dest_doc).dict;
+    let dict = null_mut::<XmlDict>();
+
     // Reuse the namespace map of the context.
     if !ctxt.is_null() {
         ns_map = (*ctxt).namespace_map as _;

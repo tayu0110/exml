@@ -26,7 +26,6 @@ use std::{
 };
 
 use crate::{
-    dict::xml_dict_owns,
     libxml::{globals::xml_free, xmlstring::XmlChar},
     tree::{
         NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDtd, XmlElementType,
@@ -135,31 +134,15 @@ pub(crate) unsafe fn xml_free_attribute(attr: XmlAttributePtr) {
     if attr.is_null() {
         return;
     }
-    let dict = if !(*attr).doc.is_null() {
-        (*(*attr).doc).dict
-    } else {
-        null_mut()
-    };
     (*attr).unlink();
-    if !dict.is_null() {
-        (*attr).elem = None;
-        if !(*attr).name.is_null() && xml_dict_owns(dict, (*attr).name) == 0 {
-            xml_free((*attr).name as _);
-        }
-        (*attr).prefix = None;
-        if !(*attr).default_value.is_null() && xml_dict_owns(dict, (*attr).default_value) == 0 {
-            xml_free((*attr).default_value as _);
-        }
-    } else {
-        (*attr).elem = None;
-        if !(*attr).name.is_null() {
-            xml_free((*attr).name as _);
-        }
-        if !(*attr).default_value.is_null() {
-            xml_free((*attr).default_value as _);
-        }
-        (*attr).prefix = None;
+    (*attr).elem = None;
+    if !(*attr).name.is_null() {
+        xml_free((*attr).name as _);
     }
+    if !(*attr).default_value.is_null() {
+        xml_free((*attr).default_value as _);
+    }
+    (*attr).prefix = None;
     drop_in_place(attr);
     xml_free(attr as _);
 }

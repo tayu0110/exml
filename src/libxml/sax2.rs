@@ -59,7 +59,7 @@ use crate::{
 };
 
 use super::{
-    dict::{xml_dict_owns, xml_dict_reference},
+    dict::xml_dict_owns,
     entities::{
         xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
         xml_get_predefined_entity, XmlEntityType,
@@ -1134,10 +1134,6 @@ pub unsafe fn xml_sax2_start_document(ctx: Option<GenericErrorContext>) {
         } else {
             xml_sax2_err_memory(ctxt, "xmlSAX2StartDocument");
             return;
-        }
-        if (*ctxt).dict_names != 0 && !doc.is_null() {
-            (*doc).dict = (*ctxt).dict;
-            xml_dict_reference((*doc).dict);
         }
     }
     if !(*ctxt).my_doc.is_null() && (*(*ctxt).my_doc).url.is_none() && !(*ctxt).input.is_null() {

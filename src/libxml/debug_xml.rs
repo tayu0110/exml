@@ -232,16 +232,9 @@ impl XmlDebugCtxt<'_> {
         if node.document().is_null() {
             xml_debug_err!(self, XmlParserErrors::XmlCheckNoDoc, "Node has no doc\n",);
         } else {
-            let dict = (*doc).dict;
-            if dict.is_null() && self.nodict == 0 {
-                self.nodict = 1;
-            }
+            self.nodict = 1;
             if self.doc.is_null() {
                 self.doc = doc;
-            }
-
-            if self.dict.is_null() {
-                self.dict = dict;
             }
         }
         if node

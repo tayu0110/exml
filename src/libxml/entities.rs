@@ -41,7 +41,7 @@ use crate::{
     },
     hash::XmlHashTableRef,
     libxml::{
-        dict::{xml_dict_owns, XmlDictPtr},
+        dict::XmlDictPtr,
         globals::{xml_free, xml_malloc},
         hash::{xml_hash_create, xml_hash_scan, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
@@ -272,12 +272,13 @@ pub unsafe fn xml_new_entity(
     if !doc.is_null() && !(*doc).int_subset.is_null() {
         return xml_add_doc_entity(doc, name, typ, external_id, system_id, content);
     }
-    let dict = if !doc.is_null() {
-        (*doc).dict
-    } else {
-        null_mut()
-    };
-    let ret: XmlEntityPtr = xml_create_entity(dict, name, typ, external_id, system_id, content);
+    // let dict = if !doc.is_null() {
+    //     (*doc).dict
+    // } else {
+    //     null_mut()
+    // };
+    let ret: XmlEntityPtr =
+        xml_create_entity(null_mut(), name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }
@@ -326,15 +327,15 @@ macro_rules! xml_entities_warn {
 /// clean-up an entity record.
 #[doc(alias = "xmlFreeEntity")]
 unsafe fn xml_free_entity(entity: XmlEntityPtr) {
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
 
     if entity.is_null() {
         return;
     }
 
-    if !(*entity).doc.load(Ordering::Relaxed).is_null() {
-        dict = (*(*entity).doc.load(Ordering::Relaxed)).dict as _;
-    }
+    // if !(*entity).doc.load(Ordering::Relaxed).is_null() {
+    //     dict = (*(*entity).doc.load(Ordering::Relaxed)).dict as _;
+    // }
 
     if !(*entity).children.load(Ordering::Relaxed).is_null()
         && (*entity).owner == 1
@@ -345,7 +346,7 @@ unsafe fn xml_free_entity(entity: XmlEntityPtr) {
         (*entity).children.store(null_mut(), Ordering::Relaxed);
     }
     if !(*entity).name.load(Ordering::Relaxed).is_null()
-        && (dict.is_null() || xml_dict_owns(dict, (*entity).name.load(Ordering::Relaxed)) == 0)
+    // && (dict.is_null() || xml_dict_owns(dict, (*entity).name.load(Ordering::Relaxed)) == 0)
     {
         xml_free((*entity).name.load(Ordering::Relaxed) as _);
         (*entity).name.store(null_mut(), Ordering::Relaxed);
@@ -383,16 +384,16 @@ unsafe fn xml_add_entity(
     system_id: Option<&str>,
     content: Option<&str>,
 ) -> XmlEntityPtr {
-    let mut dict: XmlDictPtr = null_mut();
+    // let mut dict: XmlDictPtr = null_mut();
     let mut table = None;
     let predef: XmlEntityPtr;
 
     if dtd.is_null() {
         return null_mut();
     }
-    if !(*dtd).doc.is_null() {
-        dict = (*(*dtd).doc).dict;
-    }
+    // if !(*dtd).doc.is_null() {
+    //     dict = (*(*dtd).doc).dict;
+    // }
 
     match typ {
         XmlEntityType::XmlInternalGeneralEntity
@@ -457,7 +458,8 @@ unsafe fn xml_add_entity(
     let Some(mut table) = table else {
         return null_mut();
     };
-    let ret: XmlEntityPtr = xml_create_entity(dict, name, typ, external_id, system_id, content);
+    let ret: XmlEntityPtr =
+        xml_create_entity(null_mut(), name, typ, external_id, system_id, content);
     if ret.is_null() {
         return null_mut();
     }

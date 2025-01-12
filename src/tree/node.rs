@@ -30,7 +30,6 @@ use std::{
 use libc::memset;
 
 use crate::{
-    dict::xml_dict_owns,
     libxml::{
         entities::{
             xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_get_doc_entity,
@@ -1090,10 +1089,7 @@ impl XmlNode {
     #[doc(alias = "xmlNodeSetName")]
     #[cfg(feature = "libxml_tree")]
     pub unsafe fn set_name(&mut self, name: &str) {
-        use crate::{
-            dict::{xml_dict_lookup, xml_dict_owns},
-            libxml::{globals::xml_free, xmlstring::xml_strdup},
-        };
+        use crate::libxml::{globals::xml_free, xmlstring::xml_strdup};
 
         match self.element_type() {
             XmlElementType::XmlTextNode
@@ -1120,25 +1116,12 @@ impl XmlNode {
             | XmlElementType::XmlEntityDecl => {}
             _ => unreachable!(),
         }
-        let doc = self.document();
-        let dict = if !doc.is_null() {
-            (*doc).dict
-        } else {
-            null_mut()
-        };
         let mut freeme: *const XmlChar = null_mut();
         let name = CString::new(name).unwrap();
-        if !dict.is_null() {
-            if !self.name.is_null() && xml_dict_owns(dict, self.name) == 0 {
-                freeme = self.name;
-            }
-            self.name = xml_dict_lookup(dict, name.as_ptr() as *const u8, -1);
-        } else {
-            if !self.name.is_null() {
-                freeme = self.name;
-            }
-            self.name = xml_strdup(name.as_ptr() as *const u8);
+        if !self.name.is_null() {
+            freeme = self.name;
         }
+        self.name = xml_strdup(name.as_ptr() as *const u8);
 
         if !freeme.is_null() {
             xml_free(freeme as _);
@@ -1478,12 +1461,7 @@ impl XmlNode {
             | XmlElementType::XmlEntityNode
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode => {
-                if !self.content.is_null()
-                    && (self.content != &raw mut self.properties as _)
-                    && !(!self.document().is_null()
-                        && !(*self.document()).dict.is_null()
-                        && xml_dict_owns((*self.document()).dict, self.content) != 0)
-                {
+                if !self.content.is_null() && (self.content != &raw mut self.properties as _) {
                     xml_free(self.content as _);
                 }
                 if let Some(children) = self.children() {
@@ -1558,11 +1536,7 @@ impl XmlNode {
             | XmlElementType::XmlPINode
             | XmlElementType::XmlCommentNode
             | XmlElementType::XmlNotationNode => {
-                if (!self.content.is_null() && self.content != &raw mut self.properties as _)
-                    && (!(!self.document().is_null()
-                        && !(*self.document()).dict.is_null()
-                        && xml_dict_owns((*self.document()).dict, self.content) != 0))
-                {
+                if !self.content.is_null() && self.content != &raw mut self.properties as _ {
                     xml_free(self.content as _);
                 }
                 if let Some(children) = self.children() {
@@ -1600,16 +1574,8 @@ impl XmlNode {
             return;
         }
         if self.document() != doc {
-            let old_tree_dict = if !self.document().is_null() {
-                (*self.document()).dict
-            } else {
-                null_mut()
-            };
-            let new_dict = if !doc.is_null() {
-                (*doc).dict
-            } else {
-                null_mut()
-            };
+            let old_tree_dict = null_mut();
+            let new_dict = null_mut();
 
             if matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 prop = self.properties;
@@ -1619,11 +1585,7 @@ impl XmlNode {
                     }
 
                     if (*prop).document() != doc {
-                        let old_prop_dict = if !(*prop).doc.is_null() {
-                            (*(*prop).document()).dict
-                        } else {
-                            null_mut()
-                        };
+                        let old_prop_dict = null_mut();
                         (*prop).name = copy_string_for_new_dict_if_needed(
                             old_prop_dict,
                             new_dict,
@@ -1640,8 +1602,7 @@ impl XmlNode {
                     //       The underlying problem is that xmlRemoveID is only called
                     //       if a node is destroyed, not if it's unlinked.
                     // if (xmlIsID(doc, tree, prop)) {
-                    //     XmlChar *idVal = xmlNodeListGetString(doc, (*prop).children,
-                    //                                           1);
+                    //     XmlChar *idVal = xmlNodeListGetString(doc, (*prop).children, 1);
                     //     xmlAddID(null_mut(), doc, idVal, prop);
                     // }
 

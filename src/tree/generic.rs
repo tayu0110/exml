@@ -6,7 +6,6 @@ use std::{
 };
 
 use crate::{
-    dict::xml_dict_owns,
     libxml::{
         entities::{XmlEntity, XmlEntityPtr},
         xmlstring::{xml_strlen, xml_strncat, xml_strncat_new, XmlChar},
@@ -290,14 +289,7 @@ pub trait NodeCommon {
             | XmlElementType::XmlNotationNode => {
                 let mut node = self.as_node().unwrap();
                 if !content.is_null() {
-                    if node.as_ref().content == &raw mut node.as_mut().properties as _
-                        || (!node.as_ref().document().is_null()
-                            && !(*node.as_ref().document()).dict.is_null()
-                            && xml_dict_owns(
-                                (*node.as_ref().document()).dict,
-                                node.as_ref().content,
-                            ) != 0)
-                    {
+                    if node.as_ref().content == &raw mut node.as_mut().properties as _ {
                         node.as_mut().content =
                             xml_strncat_new(node.as_ref().content, content, len);
                         node.as_mut().properties = null_mut();

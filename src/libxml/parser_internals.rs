@@ -45,7 +45,7 @@ use crate::{
             xml_is_base_char, xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit,
             xml_is_extender, xml_is_ideographic,
         },
-        dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference},
+        dict::{xml_dict_free, xml_dict_lookup},
         entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
@@ -1949,8 +1949,6 @@ unsafe fn xml_parse_balanced_chunk_memory_internal(
             return XmlParserErrors::XmlErrInternalError;
         }
         (*new_doc).properties = XmlDocProperties::XmlDocInternal as i32;
-        (*new_doc).dict = (*ctxt).dict;
-        xml_dict_reference((*new_doc).dict);
         (*ctxt).my_doc = new_doc;
     } else {
         (*ctxt).my_doc = (*oldctxt).my_doc;

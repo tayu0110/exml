@@ -41,7 +41,6 @@ use crate::{
     error::__xml_raise_error,
     io::xml_parser_get_directory,
     libxml::{
-        dict::{xml_dict_free, xml_dict_reference},
         entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser::{
@@ -599,13 +598,13 @@ unsafe fn xml_xinclude_parse_file(ctxt: XmlXincludeCtxtPtr, mut url: &str) -> Xm
 
     // try to ensure that new documents included are actually
     // built with the same dictionary as the including document.
-    if !(*ctxt).doc.is_null() && !(*(*ctxt).doc).dict.is_null() {
-        if !(*pctxt).dict.is_null() {
-            xml_dict_free((*pctxt).dict);
-        }
-        (*pctxt).dict = (*(*ctxt).doc).dict;
-        xml_dict_reference((*pctxt).dict);
-    }
+    // if !(*ctxt).doc.is_null() && !(*(*ctxt).doc).dict.is_null() {
+    //     if !(*pctxt).dict.is_null() {
+    //         xml_dict_free((*pctxt).dict);
+    //     }
+    //     (*pctxt).dict = (*(*ctxt).doc).dict;
+    //     xml_dict_reference((*pctxt).dict);
+    // }
 
     xml_ctxt_use_options(
         pctxt,
