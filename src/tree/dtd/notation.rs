@@ -19,7 +19,6 @@
 // daniel@veillard.com
 
 /// A DTD Notation definition.
-pub type XmlNotationPtr = *mut XmlNotation;
 #[repr(C)]
 #[derive(Clone, Default)]
 pub struct XmlNotation {

@@ -75,7 +75,7 @@ use crate::{
         XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
         XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
         XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlID, XmlIDPtr, XmlNode,
-        XmlNodePtr, XmlNotation, XmlNotationPtr, XmlNsPtr, XmlRef, XmlRefPtr,
+        XmlNodePtr, XmlNotation, XmlNsPtr, XmlRef, XmlRefPtr,
     },
 };
 
@@ -319,18 +319,6 @@ unsafe fn xml_verr_memory(ctxt: XmlValidCtxtPtr, extra: Option<&str>) {
     }
 }
 
-/// Deallocate the memory used by an notation definition
-#[doc(alias = "xmlFreeNotation")]
-unsafe fn xml_free_notation(nota: XmlNotationPtr) {
-    if nota.is_null() {
-        return;
-    }
-    (*nota).name = None;
-    (*nota).public_id = None;
-    (*nota).system_id = None;
-    xml_free(nota as _);
-}
-
 /// Register a new notation declaration
 ///
 /// Returns null_mut() if not, otherwise the entity
@@ -386,18 +374,6 @@ pub unsafe fn xml_copy_notation_table<'a>(
     table: &XmlHashTable<'a, XmlNotation>,
 ) -> XmlHashTable<'a, XmlNotation> {
     table.clone_with(|data, _| data.clone())
-}
-
-extern "C" fn xml_free_notation_table_entry(nota: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        xml_free_notation(nota as XmlNotationPtr);
-    }
-}
-
-/// Deallocate the memory used by an entities hash table.
-#[doc(alias = "xmlFreeNotationTable")]
-pub unsafe fn xml_free_notation_table(table: XmlNotationTablePtr) {
-    xml_hash_free(table, Some(xml_free_notation_table_entry));
 }
 
 /// This will dump the content the notation declaration as an XML DTD definition

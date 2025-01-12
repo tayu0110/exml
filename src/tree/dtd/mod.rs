@@ -84,7 +84,7 @@ impl XmlDtd {
     /// Returns A pointer to the entity structure or null_mut() if not found.
     #[doc(alias = "xmlGetEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
-    pub(super) unsafe fn get_entity(&self, name: &str) -> XmlEntityPtr {
+    pub(super) fn get_entity(&self, name: &str) -> XmlEntityPtr {
         if let Some(table) = self.entities {
             return table.lookup(name).map_or(null_mut(), |p| *p);
         }
@@ -97,7 +97,7 @@ impl XmlDtd {
     /// Returns A pointer to the entity structure or NULL if not found.
     #[doc(alias = "xmlGetParameterEntityFromDtd")]
     #[cfg(feature = "libxml_tree")]
-    pub(super) unsafe fn get_parameter_entity(&self, name: &str) -> XmlEntityPtr {
+    pub(super) fn get_parameter_entity(&self, name: &str) -> XmlEntityPtr {
         if let Some(table) = self.pentities {
             return table.lookup(name).map_or(null_mut(), |p| *p);
         }

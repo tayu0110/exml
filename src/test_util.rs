@@ -56,8 +56,7 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDOMWrapCtxtPtr,
         XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlNode, XmlNodePtr, XmlNotationPtr,
-        XmlNs, XmlNsPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,
@@ -732,12 +731,6 @@ pub(crate) fn gen_xml_element_table_ptr(_no: i32, _nr: i32) -> XmlElementTablePt
 }
 
 pub(crate) fn des_xml_element_table_ptr(_no: i32, _val: XmlElementTablePtr, _nr: i32) {}
-
-pub(crate) fn gen_xml_notation_ptr(_no: i32, _nr: i32) -> XmlNotationPtr {
-    null_mut()
-}
-
-pub(crate) fn des_xml_notation_ptr(_no: i32, _val: XmlNotationPtr, _nr: i32) {}
 
 pub(crate) fn gen_xml_notation_table_ptr(_no: i32, _nr: i32) -> XmlNotationTablePtr {
     null_mut()
