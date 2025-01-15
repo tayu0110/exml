@@ -40,7 +40,6 @@ pub use notation::*;
 use crate::{
     hash::{XmlHashTable, XmlHashTableRef},
     libxml::{
-        entities::XmlEntityPtr,
         globals::{xml_free, xml_malloc, xml_register_node_default_value},
         xmlstring::{xml_strdup, XmlChar},
     },
@@ -48,8 +47,8 @@ use crate::{
 };
 
 use super::{
-    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
-    __XML_REGISTER_CALLBACKS,
+    xml_tree_err_memory, NodeCommon, NodePtr, XmlDoc, XmlDocPtr, XmlElementType, XmlEntityPtr,
+    XmlNode, __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML DTD, as defined by <!DOCTYPE ... There is actually one for

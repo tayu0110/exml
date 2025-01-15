@@ -29,6 +29,7 @@ mod dom_wrapper;
 mod dtd;
 #[cfg(feature = "libxml_output")]
 mod dump;
+mod entities;
 mod generic;
 mod id;
 mod namespace;
@@ -51,7 +52,6 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-        entities::{xml_free_entities_table, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
             xml_register_node_default_value,
@@ -69,6 +69,7 @@ pub use attribute::*;
 pub use document::*;
 pub use dom_wrapper::*;
 pub use dtd::*;
+pub use entities::*;
 pub use generic::*;
 pub use id::*;
 pub use namespace::*;
@@ -1691,12 +1692,9 @@ pub unsafe fn xml_copy_prop_list(target: XmlNodePtr, mut cur: XmlAttrPtr) -> Xml
 #[doc(alias = "xmlCopyDtd")]
 #[cfg(feature = "libxml_tree")]
 pub unsafe fn xml_copy_dtd(dtd: XmlDtdPtr) -> XmlDtdPtr {
-    use crate::libxml::{
-        entities::xml_copy_entities_table,
-        valid::{
-            xml_copy_attribute_table, xml_copy_element_table, xml_copy_notation_table,
-            xml_get_dtd_qelement_desc,
-        },
+    use crate::libxml::valid::{
+        xml_copy_attribute_table, xml_copy_element_table, xml_copy_notation_table,
+        xml_get_dtd_qelement_desc,
     };
 
     let mut p: XmlNodePtr = null_mut();

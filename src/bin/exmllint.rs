@@ -40,7 +40,6 @@ use exml::{
     libxml::{
         c14n::{xml_c14n_doc_dump_memory, XmlC14NMode},
         debug_xml::{xml_debug_dump_document, xml_debug_dump_entities, xml_shell},
-        entities::{xml_encode_entities_reentrant, XmlEntityPtr, XmlEntityType},
         globals::{xml_deregister_node_default, xml_free, xml_register_node_default},
         htmlparser::{
             html_create_push_parser_ctxt, html_ctxt_use_options, html_free_parser_ctxt,
@@ -98,9 +97,10 @@ use exml::{
         xml_relaxng_new_valid_ctxt,
     },
     tree::{
-        xml_copy_doc, xml_free_doc, xml_free_dtd, xml_new_doc, xml_new_doc_node, NodeCommon,
-        XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
-        XmlElementTypeVal, XmlEnumeration, XmlNodePtr,
+        xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
+        xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
+        XmlElementContentPtr, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration,
+        XmlNodePtr,
     },
     xpath::{xml_xpath_order_doc_elems, XmlXPathObjectPtr},
 };

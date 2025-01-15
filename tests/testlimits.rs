@@ -19,7 +19,6 @@ use exml::{
     },
     io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
-        entities::{XmlEntityPtr, XmlEntityType},
         parser::{
             xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
             XmlSAXHandler, XmlSAXLocatorPtr, XML_SAX2_MAGIC,
@@ -37,7 +36,8 @@ use exml::{
     },
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlEnumeration,
     },
 };
 use libc::{memcpy, strlen, strncmp};

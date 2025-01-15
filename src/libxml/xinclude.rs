@@ -41,7 +41,6 @@ use crate::{
     error::__xml_raise_error,
     io::xml_parser_get_directory,
     libxml::{
-        entities::{xml_add_doc_entity, xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser::{
             xml_ctxt_use_options, xml_init_parser, xml_load_external_entity, xml_parse_document,
@@ -54,9 +53,10 @@ use crate::{
     },
     parser::{xml_free_input_stream, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserInputPtr},
     tree::{
-        xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_new_doc_node, xml_new_doc_text, xml_static_copy_node, xml_static_copy_node_list,
-        NodeCommon, NodePtr, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_add_doc_entity, xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node,
+        xml_free_node_list, xml_get_doc_entity, xml_new_doc_node, xml_new_doc_text,
+        xml_static_copy_node, xml_static_copy_node_list, NodeCommon, NodePtr, XmlDocPtr, XmlDtdPtr,
+        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNodePtr, XML_XML_NAMESPACE,
     },
     uri::{build_uri, escape_url, XmlURI},
     xpath::{

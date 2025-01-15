@@ -58,13 +58,13 @@ use crate::{
     io::{XmlParserInputBuffer, __xml_loader_err, xml_check_http_input, xml_parser_get_directory},
     libxml::{
         chvalid::xml_is_blank_char,
-        entities::{XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc},
         parser::{xml_load_external_entity, XmlParserInputDeallocate},
         parser_internals::{INPUT_CHUNK, LINE_LEN},
         xmlstring::xml_strlen,
     },
     parser::xml_err_internal,
+    tree::{XmlEntityPtr, XmlEntityType},
     uri::canonic_path,
 };
 

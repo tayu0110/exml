@@ -34,7 +34,6 @@ use crate::{
     error::{__xml_raise_error, parser_error, parser_warning, XmlParserErrors},
     globals::{GenericErrorContext, StructuredError},
     libxml::{
-        entities::XmlEntityPtr,
         htmltree::html_new_doc_no_dtd,
         parser::{XmlParserInputState, XmlSAXLocatorPtr},
         valid::{
@@ -47,12 +46,14 @@ use crate::{
         XmlParserInputPtr,
     },
     tree::{
-        xml_build_qname, xml_create_int_subset, xml_free_dtd, xml_free_node, xml_new_cdata_block,
-        xml_new_char_ref, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi,
-        xml_new_doc_text, xml_new_dtd, xml_new_ns, xml_new_ns_prop, xml_new_reference,
-        xml_text_concat, xml_validate_ncname, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
-        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
-        XmlDtdPtr, XmlElementContentPtr, XmlElementPtr, XmlElementType, XmlElementTypeVal,
+        xml_add_doc_entity, xml_add_dtd_entity, xml_build_qname, xml_create_int_subset,
+        xml_free_dtd, xml_free_node, xml_get_doc_entity, xml_get_parameter_entity,
+        xml_get_predefined_entity, xml_new_cdata_block, xml_new_char_ref, xml_new_doc,
+        xml_new_doc_comment, xml_new_doc_node, xml_new_doc_pi, xml_new_doc_text, xml_new_dtd,
+        xml_new_ns, xml_new_ns_prop, xml_new_reference, xml_text_concat, xml_validate_ncname,
+        NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr,
+        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
         XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
     uri::{build_uri, canonic_path, path_to_uri},
@@ -60,10 +61,6 @@ use crate::{
 
 use super::{
     dict::xml_dict_owns,
-    entities::{
-        xml_add_doc_entity, xml_add_dtd_entity, xml_get_doc_entity, xml_get_parameter_entity,
-        xml_get_predefined_entity, XmlEntityType,
-    },
     globals::{xml_free, xml_malloc, xml_realloc, xml_register_node_default_value},
     parser::{
         xml_load_external_entity, XmlParserOption, XmlSAXHandler, XML_COMPLETE_ATTRS,

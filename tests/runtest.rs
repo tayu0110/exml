@@ -36,7 +36,6 @@ use exml::{
         XmlInputCallback,
     },
     libxml::{
-        entities::{XmlEntityPtr, XmlEntityType},
         globals::{set_xml_free, set_xml_malloc, set_xml_mem_strdup, set_xml_realloc, xml_free},
         htmlparser::{
             html_ctxt_read_file, html_free_parser_ctxt, html_new_sax_parser_ctxt, html_read_file,
@@ -68,7 +67,8 @@ use exml::{
     relaxng::xml_relaxng_init_types,
     tree::{
         xml_free_doc, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr,
-        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlNodePtr,
+        XmlElementContentPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlEnumeration, XmlNodePtr,
     },
     uri::{build_uri, normalize_uri_path, XmlURI},
     xpath::XmlXPathObjectPtr,

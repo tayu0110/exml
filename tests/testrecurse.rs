@@ -23,7 +23,6 @@ use exml::{
     },
     io::{register_input_callbacks, xml_no_net_external_entity_loader, XmlInputCallback},
     libxml::{
-        entities::{xml_get_doc_entity, XmlEntityPtr},
         parser::{
             xml_cleanup_parser, xml_init_parser, xml_set_external_entity_loader, XmlParserOption,
         },
@@ -37,7 +36,7 @@ use exml::{
         xml_ctxt_read_file, xml_free_parser_ctxt, xml_new_parser_ctxt, XmlParserCtxtPtr,
         XmlParserInputPtr,
     },
-    tree::{xml_free_doc, NodeCommon, XmlDocPtr, XmlElementType},
+    tree::{xml_free_doc, xml_get_doc_entity, NodeCommon, XmlDocPtr, XmlElementType, XmlEntityPtr},
 };
 use libc::{free, glob, glob_t, globfree, memcpy, snprintf, strdup, strlen, strncpy, GLOB_DOOFFS};
 

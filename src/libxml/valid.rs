@@ -50,7 +50,6 @@ use crate::{
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
-        entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup,
@@ -71,12 +70,13 @@ use crate::{
     },
     parser::{split_qname2, XmlParserCtxtPtr},
     tree::{
-        xml_build_qname, xml_free_attribute, xml_free_node, xml_new_doc_node, xml_split_qname2,
-        xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute, XmlAttributeDefault,
-        XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElement,
-        XmlElementContent, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlID, XmlIDPtr, XmlNode,
-        XmlNodePtr, XmlNotation, XmlNsPtr, XmlRef, XmlRefPtr,
+        xml_build_qname, xml_free_attribute, xml_free_node, xml_get_doc_entity, xml_new_doc_node,
+        xml_split_qname2, xml_split_qname3, NodeCommon, NodePtr, XmlAttrPtr, XmlAttribute,
+        XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
+        XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
+        XmlEntityType, XmlEnumeration, XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNsPtr,
+        XmlRef, XmlRefPtr,
     },
 };
 

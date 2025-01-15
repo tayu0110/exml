@@ -83,7 +83,6 @@ use crate::{
     },
     libxml::{
         dict::{__xml_initialize_dict, xml_cleanup_dict_internal, xml_dict_free, xml_dict_lookup},
-        entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{
             xml_cleanup_globals_internal, xml_default_sax_locator, xml_free,
             xml_init_globals_internal, xml_malloc_atomic, xml_realloc,
@@ -120,12 +119,13 @@ use crate::{
         XmlParserNodeInfo,
     },
     tree::{
-        xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list, xml_new_doc,
-        xml_new_doc_comment, xml_new_doc_node, xml_new_dtd, NodeCommon, NodePtr,
-        XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme, XmlDocProperties,
-        XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType,
-        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        xml_buf_use, xml_build_qname, xml_free_doc, xml_free_node, xml_free_node_list,
+        xml_get_predefined_entity, xml_new_doc, xml_new_doc_comment, xml_new_doc_node, xml_new_dtd,
+        NodeCommon, NodePtr, XmlAttributeDefault, XmlAttributeType, XmlBufferAllocationScheme,
+        XmlDocProperties, XmlDocPtr, XmlDtdPtr, XmlElementContentOccur, XmlElementContentPtr,
+        XmlElementContentType, XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType,
+        XmlEnumeration, XmlNode, XmlNodePtr, XmlNsPtr, XML_ENT_CHECKED, XML_ENT_CHECKED_LT,
+        XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
     uri::{canonic_path, XmlURI},
     xpath::xml_init_xpath_internal,
@@ -133,9 +133,6 @@ use crate::{
 
 use super::{
     chvalid::{xml_is_blank_char, xml_is_char, xml_is_pubid_char},
-    entities::{
-        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
-    },
     threads::{
         __xml_global_init_mutex_lock, __xml_global_init_mutex_unlock, xml_cleanup_threads_internal,
         xml_init_threads_internal,

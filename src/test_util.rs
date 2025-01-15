@@ -18,7 +18,6 @@ use crate::{
     io::XmlOutputBuffer,
     libxml::{
         debug_xml::XmlShellCtxtPtr,
-        entities::{XmlEntitiesTablePtr, XmlEntityPtr},
         globals::xml_free,
         htmlparser::{
             html_free_parser_ctxt, HtmlDocPtr, HtmlElemDesc, HtmlEntityDesc, HtmlNodePtr,
@@ -56,7 +55,8 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc, xml_new_dtd, xml_new_pi, NodeCommon, XmlAttr,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDOMWrapCtxtPtr,
         XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElementContentPtr, XmlElementContentType,
-        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntitiesTablePtr, XmlEntityPtr,
+        XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
     xpath::{
         XmlNodeSet, XmlXPathCompExprPtr, XmlXPathContextPtr, XmlXPathObjectPtr,

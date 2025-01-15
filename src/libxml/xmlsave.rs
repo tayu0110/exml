@@ -40,7 +40,6 @@ use crate::{
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::XmlOutputBuffer,
     libxml::{
-        entities::{xml_dump_entity_decl, XmlEntityPtr},
         globals::{xml_free, xml_malloc},
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
@@ -51,9 +50,9 @@ use crate::{
         xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
-        is_xhtml, xml_buf_add, xml_buf_cat, NodeCommon, NodePtr, XmlAttrPtr, XmlAttributePtr,
-        XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType,
-        XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_buf_add, xml_buf_cat, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttrPtr,
+        XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr,
+        XmlElementType, XmlEntityPtr, XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 

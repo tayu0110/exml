@@ -39,8 +39,9 @@ use crate::{
         XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
         __xml_simple_oom_error,
     },
-    hash::XmlHashTableRef,
+    hash::{CVoidWrapper, XmlHashTableRef},
     libxml::{
+        chvalid::xml_is_char,
         dict::XmlDictPtr,
         globals::{xml_free, xml_malloc},
         hash::{xml_hash_create, xml_hash_scan, XmlHashTable},
@@ -51,8 +52,6 @@ use crate::{
         XmlElementType, XmlNode,
     },
 };
-
-use super::{chvalid::xml_is_char, hash::CVoidWrapper};
 
 /// The different valid entity types.
 #[repr(C)]

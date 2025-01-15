@@ -28,7 +28,6 @@ use std::{
 use libc::snprintf;
 
 use crate::libxml::{
-    entities::{xml_get_doc_entity, XmlEntityPtr},
     globals::{xml_free, xml_malloc, xml_realloc},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::{xml_add_id, xml_is_id, xml_remove_id},
@@ -36,10 +35,10 @@ use crate::libxml::{
 };
 
 use super::{
-    xml_free_ns, xml_new_ns, xml_search_ns_by_namespace_strict, xml_search_ns_by_prefix_strict,
-    xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix, NodeCommon, NodePtr, XmlAttr,
-    XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs,
-    XmlNsPtr, XML_LOCAL_NAMESPACE,
+    xml_free_ns, xml_get_doc_entity, xml_new_ns, xml_search_ns_by_namespace_strict,
+    xml_search_ns_by_prefix_strict, xml_tree_err_memory, xml_tree_nslist_lookup_by_prefix,
+    NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType,
+    XmlEntityPtr, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_LOCAL_NAMESPACE,
 };
 
 /// A function called to acquire namespaces (xmlNs) from the wrapper.

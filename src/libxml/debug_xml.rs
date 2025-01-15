@@ -34,17 +34,17 @@ use crate::xpath::{XmlXPathContextPtr, XmlXPathObjectPtr, XmlXPathObjectType};
 use crate::{
     error::{XmlParserErrors, __xml_raise_error},
     generic_error,
-    libxml::{chvalid::xml_is_blank_char, entities::XmlEntityPtr},
+    libxml::chvalid::xml_is_blank_char,
     tree::{
-        xml_free_node_list, xml_validate_name, NodeCommon, NodePtr, XmlAttr, XmlAttribute,
-        XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr, XmlElement,
-        XmlElementType, XmlElementTypeVal, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+        xml_free_node_list, xml_get_doc_entity, xml_validate_name, NodeCommon, NodePtr, XmlAttr,
+        XmlAttribute, XmlAttributeDefault, XmlAttributeType, XmlDoc, XmlDocPtr, XmlDtd, XmlDtdPtr,
+        XmlElement, XmlElementType, XmlElementTypeVal, XmlEntity, XmlEntityPtr, XmlEntityType,
+        XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
     },
 };
 
 use super::{
     dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
-    entities::{xml_get_doc_entity, XmlEntity, XmlEntityType},
     parser::{xml_parse_in_node_context, XmlParserOption},
     parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
     valid::xml_snprintf_element_content,

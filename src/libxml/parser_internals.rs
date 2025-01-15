@@ -46,7 +46,6 @@ use crate::{
             xml_is_extender, xml_is_ideographic,
         },
         dict::{xml_dict_free, xml_dict_lookup},
-        entities::{xml_get_predefined_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser::{
             xml_parse_att_value_internal, xml_parse_cdsect, xml_parse_char_data_internal,
@@ -72,10 +71,12 @@ use crate::{
     },
     tree::{
         xml_create_int_subset, xml_doc_copy_node, xml_free_doc, xml_free_node, xml_free_node_list,
-        xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon, NodePtr, XmlAttributeDefault,
-        XmlAttributeType, XmlDocProperties, XmlDocPtr, XmlElementContentOccur,
-        XmlElementContentPtr, XmlElementContentType, XmlElementType, XmlElementTypeVal,
-        XmlEnumeration, XmlNode, XmlNodePtr, XML_XML_NAMESPACE,
+        xml_get_predefined_entity, xml_new_doc, xml_new_doc_node, xml_split_qname3, NodeCommon,
+        NodePtr, XmlAttributeDefault, XmlAttributeType, XmlDocProperties, XmlDocPtr,
+        XmlElementContentOccur, XmlElementContentPtr, XmlElementContentType, XmlElementType,
+        XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNode, XmlNodePtr,
+        XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING,
+        XML_ENT_PARSED, XML_XML_NAMESPACE,
     },
 };
 use crate::{
@@ -87,9 +88,6 @@ use crate::{
     tree::xml_create_enumeration,
 };
 
-use super::entities::{
-    XML_ENT_CHECKED, XML_ENT_CHECKED_LT, XML_ENT_CONTAINS_LT, XML_ENT_EXPANDING, XML_ENT_PARSED,
-};
 use super::hash::XmlHashTable;
 
 macro_rules! VALID_CTXT {

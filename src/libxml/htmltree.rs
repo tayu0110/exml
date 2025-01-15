@@ -1000,14 +1000,13 @@ pub unsafe fn html_node_dump_format_output(
 
     use crate::{
         libxml::{
-            entities::xml_encode_entities_reentrant,
             globals::xml_free,
             htmlparser::html_tag_lookup,
             parser::xml_init_parser,
             parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
             xmlsave::xml_ns_list_dump_output,
         },
-        tree::NodePtr,
+        tree::{xml_encode_entities_reentrant, NodePtr},
     };
 
     let mut parent: XmlNodePtr;

@@ -44,7 +44,6 @@ use crate::{
     globals::GenericErrorContext,
     io::XmlOutputBuffer,
     libxml::{
-        entities::xml_encode_special_chars,
         globals::{xml_free, xml_malloc},
         htmltree::html_new_doc_no_dtd,
         list::{
@@ -60,7 +59,7 @@ use crate::{
         xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
     },
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
-    tree::{xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
+    tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };
 

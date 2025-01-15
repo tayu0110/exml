@@ -32,7 +32,6 @@ use libc::{memcpy, memmove, memset, snprintf, sscanf};
 use crate::{
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_oom_error},
     libxml::{
-        entities::{xml_get_doc_entity, XmlEntityPtr, XmlEntityType},
         globals::{xml_free, xml_malloc, xml_malloc_atomic},
         hash::{
             xml_hash_add_entry2, xml_hash_create, xml_hash_free, xml_hash_lookup2, XmlHashTable,
@@ -62,9 +61,9 @@ use crate::{
         },
     },
     tree::{
-        xml_split_qname2, xml_validate_name, xml_validate_ncname, xml_validate_nmtoken,
-        xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType, XmlElementType, XmlIDPtr,
-        XmlNodePtr, XmlNsPtr,
+        xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
+        xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType,
+        XmlElementType, XmlEntityPtr, XmlEntityType, XmlIDPtr, XmlNodePtr, XmlNsPtr,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };

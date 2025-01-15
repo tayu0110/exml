@@ -7,17 +7,14 @@ use std::{
 };
 
 use crate::{
-    libxml::{
-        entities::{XmlEntity, XmlEntityPtr},
-        xmlstring::{xml_strlen, xml_strncat, XmlChar},
-    },
+    libxml::xmlstring::{xml_strlen, xml_strncat, XmlChar},
     uri::build_uri,
 };
 
 use super::{
     xml_free_node, xml_free_prop, xml_new_doc_text_len, xml_text_merge, NodePtr, XmlAttr,
-    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlNode, XmlNodePtr, XmlNs,
-    XML_XML_NAMESPACE,
+    XmlAttribute, XmlDoc, XmlDtd, XmlElement, XmlElementType, XmlEntity, XmlEntityPtr, XmlNode,
+    XmlNodePtr, XmlNs, XML_XML_NAMESPACE,
 };
 
 pub trait NodeCommon {

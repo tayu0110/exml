@@ -47,7 +47,6 @@ use crate::{
     libxml::{
         chvalid::xml_is_blank_char,
         dict::{xml_dict_create, xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDictPtr},
-        entities::XmlEntityPtr,
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_create, xml_hash_free,
@@ -146,13 +145,11 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEnumeration, XmlIDPtr, XmlNodePtr, XmlNsPtr,
-        XML_XML_NAMESPACE,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlIDPtr,
+        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
-
-use super::entities::XmlEntityType;
 
 /// This error codes are obsolete; not used any more.
 #[repr(C)]

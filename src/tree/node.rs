@@ -31,10 +31,6 @@ use libc::memset;
 
 use crate::{
     libxml::{
-        entities::{
-            xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_get_doc_entity,
-            XmlEntityPtr,
-        },
         globals::{xml_free, xml_malloc},
         valid::xml_remove_id,
         xmlstring::{xml_str_equal, xml_strcat, xml_strdup, xml_strncat, XmlChar},
@@ -44,10 +40,11 @@ use crate::{
 
 use super::{
     copy_string_for_new_dict_if_needed, xml_buf_cat, xml_buf_create, xml_buf_create_size,
-    xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_free_node, xml_free_prop,
+    xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_encode_attribute_entities,
+    xml_encode_entities_reentrant, xml_free_node, xml_free_prop, xml_get_doc_entity,
     xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon, XmlAttr, XmlAttrPtr,
     XmlAttributeType, XmlBufPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlElementType,
-    XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    XmlEntityPtr, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 /// A node in an XML tree.
@@ -1023,7 +1020,7 @@ impl XmlNode {
     #[doc(alias = "xmlNodeListGetRawString")]
     #[cfg(feature = "libxml_tree")]
     pub unsafe fn get_raw_string(&self, doc: *const XmlDoc, in_line: i32) -> Option<String> {
-        use crate::libxml::entities::xml_encode_special_chars;
+        use super::xml_encode_special_chars;
 
         let mut node: *const XmlNode = self;
         let mut ret: *mut XmlChar = null_mut();

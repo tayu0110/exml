@@ -31,7 +31,6 @@ use crate::{
     libxml::{
         catalog::XmlCatalogEntry,
         chvalid::{xml_is_blank_char, xml_is_char},
-        entities::{XmlEntityType, XML_ENT_EXPANDING, XML_ENT_PARSED},
         globals::{xml_free, xml_malloc},
         parser::{
             xml_init_parser, xml_load_external_entity, xml_parse_document, xml_parser_entity_check,
@@ -49,7 +48,10 @@ use crate::{
         valid::XmlValidCtxt,
     },
     parser::{__xml_err_encoding, xml_err_encoding_int, xml_err_internal, xml_fatal_err_msg_int},
-    tree::{xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlNodePtr, XML_XML_NAMESPACE},
+    tree::{
+        xml_free_doc, XmlAttrPtr, XmlAttributeType, XmlDocPtr, XmlEntityType, XmlNodePtr,
+        XML_ENT_EXPANDING, XML_ENT_PARSED, XML_XML_NAMESPACE,
+    },
     uri::build_uri,
 };
 

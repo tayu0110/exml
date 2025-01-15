@@ -26,9 +26,6 @@ use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
     libxml::{
-        entities::{
-            xml_get_doc_entity, XmlEntityPtr, XmlEntityType, XML_ENT_EXPANDING, XML_ENT_PARSED,
-        },
         globals::{xml_free, xml_malloc, xml_register_node_default_value},
         parser_internals::xml_copy_char_multi_byte,
         xmlstring::{xml_strdup, xml_strndup, XmlChar},
@@ -37,9 +34,10 @@ use crate::{
 
 use super::{
     xml_buf_add, xml_buf_cat, xml_buf_create_size, xml_buf_detach, xml_buf_free, xml_buf_is_empty,
-    xml_buf_set_allocation_scheme, xml_free_node_list, xml_new_doc_text, xml_new_reference,
-    xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr, XmlBufferAllocationScheme,
-    XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr,
+    xml_buf_set_allocation_scheme, xml_free_node_list, xml_get_doc_entity, xml_new_doc_text,
+    xml_new_reference, xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr,
+    XmlBufferAllocationScheme, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityPtr,
+    XmlEntityType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
