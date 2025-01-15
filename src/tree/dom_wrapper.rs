@@ -670,112 +670,104 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
         'internal_error: {
             'main: while {
                 match (*cur).element_type() {
-                    ty @ XmlElementType::XmlElementNode | ty @ XmlElementType::XmlAttributeNode => {
-                        if matches!(ty, XmlElementType::XmlElementNode) {
-                            adoptns = 1;
-                            cur_elem = cur;
-                            depth += 1;
-                            // Namespace declarations.
-                            if !(*cur).ns_def.is_null() {
-                                prevns = null_mut();
-                                ns = (*cur).ns_def;
-                                'b: while !ns.is_null() {
-                                    if parnsdone == 0 {
-                                        if let Some(parent) = (*elem)
-                                            .parent()
-                                            .filter(|p| p.doc != p.as_ptr() as *mut XmlDoc)
+                    XmlElementType::XmlElementNode => {
+                        adoptns = 1;
+                        cur_elem = cur;
+                        depth += 1;
+                        // Namespace declarations.
+                        if !(*cur).ns_def.is_null() {
+                            prevns = null_mut();
+                            ns = (*cur).ns_def;
+                            'b: while !ns.is_null() {
+                                if parnsdone == 0 {
+                                    if let Some(parent) = (*elem)
+                                        .parent()
+                                        .filter(|p| p.doc != p.as_ptr() as *mut XmlDoc)
+                                    {
+                                        // Gather ancestor in-scope ns-decls.
+                                        if xml_dom_wrap_ns_norm_gather_in_scope_ns(
+                                            &raw mut ns_map,
+                                            parent.as_ptr(),
+                                        ) == -1
                                         {
-                                            // Gather ancestor in-scope ns-decls.
-                                            if xml_dom_wrap_ns_norm_gather_in_scope_ns(
-                                                &raw mut ns_map,
-                                                parent.as_ptr(),
+                                            break 'internal_error;
+                                        }
+                                    }
+                                    parnsdone = 1;
+                                }
+
+                                // Lookup the ns ancestor-axis for equal ns-decls in scope.
+                                if opt_remove_redundant_ns != 0 && XML_NSMAP_NOTEMPTY!(ns_map) {
+                                    XML_NSMAP_FOREACH!(ns_map, mi, {
+                                        if (*mi).depth >= XML_TREE_NSMAP_PARENT
+                                            && (*mi).shadow_depth == -1
+                                            && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                            && (*ns).href() == (*(*mi).new_ns).href()
+                                        {
+                                            // A redundant ns-decl was found.
+                                            // Add it to the list of redundant ns-decls.
+                                            if xml_dom_wrap_ns_norm_add_ns_map_item2(
+                                                &raw mut list_redund,
+                                                &raw mut size_redund,
+                                                &raw mut nb_redund,
+                                                ns,
+                                                (*mi).new_ns,
                                             ) == -1
                                             {
                                                 break 'internal_error;
                                             }
+                                            // Remove the ns-decl from the element-node.
+                                            if !prevns.is_null() {
+                                                (*prevns).next = (*ns).next;
+                                            } else {
+                                                (*cur).ns_def = (*ns).next;
+                                            }
+                                            // goto next_ns_decl;
+                                            ns = (*ns).next;
+                                            continue 'b;
                                         }
-                                        parnsdone = 1;
-                                    }
+                                    });
+                                }
 
-                                    // Lookup the ns ancestor-axis for equal ns-decls in scope.
-                                    if opt_remove_redundant_ns != 0 && XML_NSMAP_NOTEMPTY!(ns_map) {
-                                        XML_NSMAP_FOREACH!(ns_map, mi, {
-                                            if (*mi).depth >= XML_TREE_NSMAP_PARENT
-                                                && (*mi).shadow_depth == -1
-                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
-                                                && (*ns).href() == (*(*mi).new_ns).href()
-                                            {
-                                                // A redundant ns-decl was found.
-                                                // Add it to the list of redundant ns-decls.
-                                                if xml_dom_wrap_ns_norm_add_ns_map_item2(
-                                                    &raw mut list_redund,
-                                                    &raw mut size_redund,
-                                                    &raw mut nb_redund,
-                                                    ns,
-                                                    (*mi).new_ns,
-                                                ) == -1
-                                                {
-                                                    break 'internal_error;
-                                                }
-                                                // Remove the ns-decl from the element-node.
-                                                if !prevns.is_null() {
-                                                    (*prevns).next = (*ns).next;
-                                                } else {
-                                                    (*cur).ns_def = (*ns).next;
-                                                }
-                                                // goto next_ns_decl;
-                                                ns = (*ns).next;
-                                                continue 'b;
-                                            }
-                                        });
-                                    }
-
-                                    // Skip ns-references handling if the referenced
-                                    // ns-decl is declared on the same element.
-                                    if !(*cur).ns.is_null() && adoptns != 0 && (*cur).ns == ns {
-                                        adoptns = 0;
-                                    }
-                                    // Does it shadow any ns-decl?
-                                    if XML_NSMAP_NOTEMPTY!(ns_map) {
-                                        XML_NSMAP_FOREACH!(ns_map, mi, {
-                                            if (*mi).depth >= XML_TREE_NSMAP_PARENT
-                                                && (*mi).shadow_depth == -1
-                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
-                                            {
-                                                (*mi).shadow_depth = depth;
-                                            }
-                                        });
-                                    }
-                                    // Push mapping.
-                                    if xml_dom_wrap_ns_map_add_item(
-                                        &raw mut ns_map,
-                                        -1,
-                                        ns,
-                                        ns,
-                                        depth,
-                                    )
+                                // Skip ns-references handling if the referenced
+                                // ns-decl is declared on the same element.
+                                if !(*cur).ns.is_null() && adoptns != 0 && (*cur).ns == ns {
+                                    adoptns = 0;
+                                }
+                                // Does it shadow any ns-decl?
+                                if XML_NSMAP_NOTEMPTY!(ns_map) {
+                                    XML_NSMAP_FOREACH!(ns_map, mi, {
+                                        if (*mi).depth >= XML_TREE_NSMAP_PARENT
+                                            && (*mi).shadow_depth == -1
+                                            && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                        {
+                                            (*mi).shadow_depth = depth;
+                                        }
+                                    });
+                                }
+                                // Push mapping.
+                                if xml_dom_wrap_ns_map_add_item(&raw mut ns_map, -1, ns, ns, depth)
                                     .is_null()
-                                    {
-                                        break 'internal_error;
-                                    }
-
-                                    prevns = ns;
-                                    // next_ns_decl:
-                                    ns = (*ns).next;
-                                }
-                            }
-                            if adoptns == 0 {
-                                // goto ns_end;
-                                if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
-                                    && !(*cur).properties.is_null()
                                 {
-                                    // Process attributes.
-                                    cur = (*cur).properties as _;
-                                    if cur.is_null() {
-                                        break 'main;
-                                    }
-                                    continue 'main;
+                                    break 'internal_error;
                                 }
+
+                                prevns = ns;
+                                // next_ns_decl:
+                                ns = (*ns).next;
+                            }
+                        }
+                        if adoptns == 0 {
+                            // goto ns_end;
+                            if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                                && !(*cur).properties.is_null()
+                            {
+                                // Process attributes.
+                                cur = (*cur).properties as _;
+                                if cur.is_null() {
+                                    break 'main;
+                                }
+                                continue 'main;
                             }
                         }
 
@@ -794,6 +786,83 @@ pub unsafe fn xml_dom_wrap_reconcile_namespaces(
                             }
                         }
 
+                        if parnsdone == 0 {
+                            if (*elem)
+                                .parent()
+                                .filter(|p| {
+                                    p.doc != p.as_ptr() as *mut XmlDoc
+                                        && xml_dom_wrap_ns_norm_gather_in_scope_ns(
+                                            &raw mut ns_map,
+                                            p.as_ptr(),
+                                        ) == -1
+                                })
+                                .is_some()
+                            {
+                                break 'internal_error;
+                            }
+                            parnsdone = 1;
+                        }
+                        // Adjust the reference if this was a redundant ns-decl.
+                        if !list_redund.is_null() {
+                            for (_, j) in (0..nb_redund).zip((0..).step_by(2)) {
+                                if (*cur).ns == *list_redund.add(j) {
+                                    (*cur).ns = *list_redund.add(j + 1);
+                                    break;
+                                }
+                            }
+                        }
+                        // Adopt ns-references.
+                        if XML_NSMAP_NOTEMPTY!(ns_map) {
+                            // Search for a mapping.
+                            XML_NSMAP_FOREACH!(ns_map, mi, {
+                                if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                    (*cur).ns = (*mi).new_ns;
+                                    // goto ns_end;
+                                    if matches!(
+                                        (*cur).element_type(),
+                                        XmlElementType::XmlElementNode
+                                    ) && !(*cur).properties.is_null()
+                                    {
+                                        // Process attributes.
+                                        cur = (*cur).properties as _;
+                                        if cur.is_null() {
+                                            break 'main;
+                                        }
+                                        continue 'main;
+                                    }
+                                }
+                            });
+                        }
+                        // Acquire a normalized ns-decl and add it to the map.
+                        if xml_dom_wrap_ns_norm_acquire_normalized_ns(
+                            doc,
+                            cur_elem,
+                            (*cur).ns,
+                            &raw mut ns,
+                            &raw mut ns_map,
+                            depth,
+                            ancestors_only,
+                            matches!((*cur).element_type(), XmlElementType::XmlAttributeNode)
+                                as i32,
+                        ) == -1
+                        {
+                            break 'internal_error;
+                        }
+                        (*cur).ns = ns;
+
+                        // ns_end:
+                        if matches!((*cur).element_type(), XmlElementType::XmlElementNode)
+                            && !(*cur).properties.is_null()
+                        {
+                            // Process attributes.
+                            cur = (*cur).properties as _;
+                            if cur.is_null() {
+                                break 'main;
+                            }
+                            continue 'main;
+                        }
+                    }
+                    XmlElementType::XmlAttributeNode => {
                         if parnsdone == 0 {
                             if (*elem)
                                 .parent()
@@ -1075,59 +1144,56 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // TODO
                             return -1;
                         }
-                        ty @ XmlElementType::XmlElementNode
-                        | ty @ XmlElementType::XmlAttributeNode => {
-                            if matches!(ty, XmlElementType::XmlElementNode) {
-                                cur_elem = cur;
-                                depth += 1;
-                                // Namespace declarations.
-                                // - (*ns).href and (*ns).prefix are never in the dict, so
-                                //   we need not move the values over to the destination dict.
-                                // - Note that for custom handling of ns-references,
-                                //   the ns-decls need not be stored in the ns-map,
-                                //   since they won't be referenced by (*node).ns.
-                                if !(*cur).ns_def.is_null()
-                                    && (ctxt.is_null() || (*ctxt).get_ns_for_node_func.is_none())
-                                {
-                                    if parnsdone == 0 {
-                                        // Gather @parent's in-scope ns-decls.
-                                        if xml_dom_wrap_ns_norm_gather_in_scope_ns(
-                                            &raw mut ns_map,
-                                            dest_parent,
-                                        ) == -1
-                                        {
-                                            break 'internal_error;
-                                        }
+                        XmlElementType::XmlElementNode => {
+                            cur_elem = cur;
+                            depth += 1;
+                            // Namespace declarations.
+                            // - (*ns).href and (*ns).prefix are never in the dict, so
+                            //   we need not move the values over to the destination dict.
+                            // - Note that for custom handling of ns-references,
+                            //   the ns-decls need not be stored in the ns-map,
+                            //   since they won't be referenced by (*node).ns.
+                            if !(*cur).ns_def.is_null()
+                                && (ctxt.is_null() || (*ctxt).get_ns_for_node_func.is_none())
+                            {
+                                if parnsdone == 0 {
+                                    // Gather @parent's in-scope ns-decls.
+                                    if xml_dom_wrap_ns_norm_gather_in_scope_ns(
+                                        &raw mut ns_map,
+                                        dest_parent,
+                                    ) == -1
+                                    {
+                                        break 'internal_error;
+                                    }
 
-                                        parnsdone = 1;
+                                    parnsdone = 1;
+                                }
+                                ns = (*cur).ns_def;
+                                while !ns.is_null() {
+                                    // Does it shadow any ns-decl?
+                                    if XML_NSMAP_NOTEMPTY!(ns_map) {
+                                        XML_NSMAP_FOREACH!(ns_map, mi, {
+                                            if (*mi).depth >= XML_TREE_NSMAP_PARENT
+                                                && (*mi).shadow_depth == -1
+                                                && (*ns).prefix() == (*(*mi).new_ns).prefix()
+                                            {
+                                                (*mi).shadow_depth = depth;
+                                            }
+                                        });
                                     }
-                                    ns = (*cur).ns_def;
-                                    while !ns.is_null() {
-                                        // Does it shadow any ns-decl?
-                                        if XML_NSMAP_NOTEMPTY!(ns_map) {
-                                            XML_NSMAP_FOREACH!(ns_map, mi, {
-                                                if (*mi).depth >= XML_TREE_NSMAP_PARENT
-                                                    && (*mi).shadow_depth == -1
-                                                    && (*ns).prefix() == (*(*mi).new_ns).prefix()
-                                                {
-                                                    (*mi).shadow_depth = depth;
-                                                }
-                                            });
-                                        }
-                                        // Push mapping.
-                                        if xml_dom_wrap_ns_map_add_item(
-                                            &raw mut ns_map,
-                                            -1,
-                                            ns,
-                                            ns,
-                                            depth,
-                                        )
-                                        .is_null()
-                                        {
-                                            break 'internal_error;
-                                        }
-                                        ns = (*ns).next;
+                                    // Push mapping.
+                                    if xml_dom_wrap_ns_map_add_item(
+                                        &raw mut ns_map,
+                                        -1,
+                                        ns,
+                                        ns,
+                                        depth,
+                                    )
+                                    .is_null()
+                                    {
+                                        break 'internal_error;
                                     }
+                                    ns = (*ns).next;
                                 }
                             }
                             /* No namespace, no fun. */
@@ -1213,29 +1279,111 @@ unsafe fn xml_dom_wrap_adopt_branch(
                             // ns_end:
                             // Further node properties.
                             // TODO: Is this all?
-                            if matches!((*cur).element_type(), XmlElementType::XmlElementNode) {
-                                (*cur).psvi = null_mut();
-                                (*cur).line = 0;
-                                (*cur).extra = 0;
-                                // Walk attributes.
-                                if !(*cur).properties.is_null() {
-                                    // Process first attribute node.
-                                    cur = (*cur).properties as _;
-                                    continue;
-                                }
-                            } else {
-                                // Attributes.
-                                if !source_doc.is_null()
-                                    && matches!(
-                                        (*cur).as_attribute_node().unwrap().as_ref().atype,
-                                        Some(XmlAttributeType::XmlAttributeID)
-                                    )
-                                {
-                                    xml_remove_id(source_doc, cur as _);
-                                }
-                                (*cur).as_attribute_node().unwrap().as_mut().atype = None;
-                                (*cur).as_attribute_node().unwrap().as_mut().psvi = null_mut();
+                            (*cur).psvi = null_mut();
+                            (*cur).line = 0;
+                            (*cur).extra = 0;
+                            // Walk attributes.
+                            if !(*cur).properties.is_null() {
+                                // Process first attribute node.
+                                cur = (*cur).properties as _;
+                                continue;
                             }
+                        }
+                        XmlElementType::XmlAttributeNode => {
+                            /* No namespace, no fun. */
+                            if (*cur).ns.is_null() {
+                                // goto ns_end;
+                            } else {
+                                if parnsdone == 0 {
+                                    if xml_dom_wrap_ns_norm_gather_in_scope_ns(
+                                        &raw mut ns_map,
+                                        dest_parent,
+                                    ) == -1
+                                    {
+                                        break 'internal_error;
+                                    }
+                                    parnsdone = 1;
+                                }
+                                // Adopt ns-references.
+                                let mut ns_end = false;
+                                if XML_NSMAP_NOTEMPTY!(ns_map) {
+                                    // Search for a mapping.
+                                    XML_NSMAP_FOREACH!(ns_map, mi, {
+                                        if (*mi).shadow_depth == -1 && ((*cur).ns == (*mi).old_ns) {
+                                            (*cur).ns = (*mi).new_ns;
+                                            // goto ns_end;
+                                            ns_end = true;
+                                            break;
+                                        }
+                                    });
+                                }
+
+                                if !ns_end {
+                                    // No matching namespace in scope. We need a new one.
+                                    if !ctxt.is_null() && (*ctxt).get_ns_for_node_func.is_some() {
+                                        // User-defined behaviour.
+                                        ns = ((*ctxt).get_ns_for_node_func.unwrap())(
+                                            ctxt,
+                                            cur,
+                                            (*(*cur).ns).href,
+                                            (*(*cur).ns).prefix,
+                                        );
+                                        // Insert mapping if ns is available; it's the users fault
+                                        // if not.
+                                        if xml_dom_wrap_ns_map_add_item(
+                                            &raw mut ns_map,
+                                            -1,
+                                            (*cur).ns,
+                                            ns,
+                                            XML_TREE_NSMAP_CUSTOM,
+                                        )
+                                        .is_null()
+                                        {
+                                            break 'internal_error;
+                                        }
+                                        (*cur).ns = ns;
+                                    } else {
+                                        // Acquire a normalized ns-decl and add it to the map.
+                                        if xml_dom_wrap_ns_norm_acquire_normalized_ns(
+                                            dest_doc,
+                                            // ns-decls on curElem or on (*destDoc).oldNs
+                                            if !dest_parent.is_null() {
+                                                cur_elem
+                                            } else {
+                                                null_mut()
+                                            },
+                                            (*cur).ns,
+                                            &raw mut ns,
+                                            &raw mut ns_map,
+                                            depth,
+                                            ancestors_only,
+                                            // ns-decls must be prefixed for attributes.
+                                            matches!(
+                                                (*cur).element_type(),
+                                                XmlElementType::XmlAttributeNode
+                                            ) as i32,
+                                        ) == -1
+                                        {
+                                            break 'internal_error;
+                                        }
+                                        (*cur).ns = ns;
+                                    }
+                                }
+                            }
+                            // ns_end:
+                            // Further node properties.
+                            // TODO: Is this all?
+                            // Attributes.
+                            if !source_doc.is_null()
+                                && matches!(
+                                    (*cur).as_attribute_node().unwrap().as_ref().atype,
+                                    Some(XmlAttributeType::XmlAttributeID)
+                                )
+                            {
+                                xml_remove_id(source_doc, cur as _);
+                            }
+                            (*cur).as_attribute_node().unwrap().as_mut().atype = None;
+                            (*cur).as_attribute_node().unwrap().as_mut().psvi = null_mut();
                         }
                         XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
                             // goto leave_node;
@@ -1628,10 +1776,8 @@ pub unsafe fn xml_dom_wrap_remove_node(
     // Save out-of-scope ns-references in (*doc).oldNs.
     'main: loop {
         match (*node).element_type() {
-            ty @ XmlElementType::XmlElementNode | ty @ XmlElementType::XmlAttributeNode => {
-                if matches!(ty, XmlElementType::XmlElementNode)
-                    && (ctxt.is_null() && !(*node).ns_def.is_null())
-                {
+            XmlElementType::XmlElementNode => {
+                if ctxt.is_null() && !(*node).ns_def.is_null() {
                     ns = (*node).ns_def;
                     while {
                         if xml_dom_wrap_ns_norm_add_ns_map_item2(
@@ -1653,6 +1799,86 @@ pub unsafe fn xml_dom_wrap_remove_node(
                     } {}
                 }
 
+                if !(*node).ns.is_null() {
+                    // Find a mapping.
+                    if !list.is_null() {
+                        for (_, j) in (0..nb_list).zip((0..).step_by(2)) {
+                            if (*node).ns == *list.add(j) {
+                                (*node).ns = *list.add(j + 1);
+                                // goto next_node;
+                                if let Some(children) = (*node).children().filter(|_| {
+                                    matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                                }) {
+                                    node = children.as_ptr();
+                                    continue 'main;
+                                }
+                                // next_sibling:
+                                'next_sibling: loop {
+                                    if node.is_null() {
+                                        break;
+                                    }
+                                    if let Some(next) = (*node).next {
+                                        node = next.as_ptr();
+                                    } else {
+                                        node = (*node).parent().map_or(null_mut(), |p| p.as_ptr());
+                                        // goto next_sibling;
+                                        continue 'next_sibling;
+                                    }
+
+                                    if node.is_null() {
+                                        break 'main;
+                                    }
+
+                                    continue 'main;
+                                }
+                            }
+                        }
+                    }
+                    ns = null_mut();
+                    if !ctxt.is_null() {
+                        // User defined.
+                    } else {
+                        // Add to doc's oldNs.
+                        ns = xml_dom_wrap_store_ns(
+                            doc,
+                            (*(*node).ns).href,
+                            (*(*node).ns).prefix().as_deref(),
+                        );
+                        if ns.is_null() {
+                            // goto internal_error;
+                            if !list.is_null() {
+                                xml_free(list as _);
+                            }
+                            return -1;
+                        }
+                    }
+                    if !ns.is_null() {
+                        // Add mapping.
+                        if xml_dom_wrap_ns_norm_add_ns_map_item2(
+                            &raw mut list,
+                            &raw mut size_list,
+                            &raw mut nb_list,
+                            (*node).ns,
+                            ns,
+                        ) == -1
+                        {
+                            // goto internal_error;
+                            if !list.is_null() {
+                                xml_free(list as _);
+                            }
+                            return -1;
+                        }
+                    }
+                    (*node).ns = ns;
+                }
+                if matches!((*node).element_type(), XmlElementType::XmlElementNode)
+                    && !(*node).properties.is_null()
+                {
+                    node = (*node).properties as _;
+                    continue;
+                }
+            }
+            XmlElementType::XmlAttributeNode => {
                 if !(*node).ns.is_null() {
                     // Find a mapping.
                     if !list.is_null() {
