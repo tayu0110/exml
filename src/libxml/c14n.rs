@@ -375,7 +375,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| self.print_namespaces_walker(*data) != 0);
+        list.walk(|data| self.print_namespaces(&**data) != 0);
 
         // Cleanup
         0
@@ -1083,7 +1083,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| self.print_namespaces_walker(*data) != 0);
+        list.walk(|data| self.print_namespaces(&**data) != 0);
 
         // Cleanup
         0
@@ -1289,11 +1289,6 @@ impl<T> XmlC14NCtx<'_, T> {
         }
         self.buf.borrow_mut().write_str("\"");
         true
-    }
-
-    #[doc(alias = "xmlC14NPrintNamespacesWalker")]
-    unsafe fn print_namespaces_walker(&mut self, ns: *const XmlNs) -> i32 {
-        self.print_namespaces(&*ns)
     }
 }
 
