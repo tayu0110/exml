@@ -50,12 +50,10 @@ const XML_STREAM_STEP_ATTR: usize = 8;
 const XML_STREAM_STEP_NODE: usize = 16;
 const XML_STREAM_STEP_IN_SET: usize = 32;
 
-/*
-* NOTE: Those private flags (XML_STREAM_xxx) are used
-*   in xmlStreamCtxt->flag. They extend the public
-*   XmlPatternFlags, so be careful not to interfere with the
-*   reserved values for XmlPatternFlags.
-*/
+// NOTE: Those private flags (XML_STREAM_xxx) are used
+//   in xmlStreamCtxt->flag. They extend the public
+//   XmlPatternFlags, so be careful not to interfere with the
+//   reserved values for XmlPatternFlags.
 const XML_STREAM_FINAL_IS_ANY_NODE: usize = 1 << 14;
 const XML_STREAM_FROM_ROOT: usize = 1 << 15;
 const XML_STREAM_DESC: usize = 1 << 16;
@@ -135,13 +133,13 @@ pub enum XmlPatternFlags {
 
 /// Free up the memory allocated by @comp
 #[doc(alias = "xmlFreePattern")]
-pub unsafe extern "C" fn xml_free_pattern(comp: XmlPatternPtr) {
+pub unsafe fn xml_free_pattern(comp: XmlPatternPtr) {
     xml_free_pattern_list(comp);
 }
 
 /// Free the compiled pattern for streaming
 #[doc(alias = "xmlFreeStreamComp")]
-unsafe extern "C" fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
+unsafe fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
     if !comp.is_null() {
         if !(*comp).steps.is_null() {
             xml_free((*comp).steps as _);
@@ -153,7 +151,7 @@ unsafe extern "C" fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
     }
 }
 
-unsafe extern "C" fn xml_free_pattern_internal(comp: XmlPatternPtr) {
+unsafe fn xml_free_pattern_internal(comp: XmlPatternPtr) {
     let mut op: XmlStepOpPtr;
 
     if comp.is_null() {
@@ -189,7 +187,7 @@ unsafe extern "C" fn xml_free_pattern_internal(comp: XmlPatternPtr) {
 
 /// Free up the memory allocated by all the elements of @comp
 #[doc(alias = "xmlFreePatternList")]
-pub unsafe extern "C" fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
+pub unsafe fn xml_free_pattern_list(mut comp: XmlPatternPtr) {
     let mut cur: XmlPatternPtr;
 
     while !comp.is_null() {
@@ -254,7 +252,7 @@ unsafe fn xml_new_pat_parser_context(
 
 /// Free up the memory allocated by @ctxt
 #[doc(alias = "xmlFreePatParserContext")]
-unsafe extern "C" fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
+unsafe fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -267,11 +265,9 @@ unsafe extern "C" fn xml_free_pat_parser_context(ctxt: XmlPatParserContextPtr) {
 ///
 /// Returns the newly allocated xmlPatternPtr or NULL in case of error
 #[doc(alias = "xmlNewPattern")]
-unsafe extern "C" fn xml_new_pattern() -> XmlPatternPtr {
+unsafe fn xml_new_pattern() -> XmlPatternPtr {
     let cur: XmlPatternPtr = xml_malloc(size_of::<XmlPattern>()) as XmlPatternPtr;
     if cur.is_null() {
-        // ERROR(NULL, NULL, NULL,
-        // 	"xmlNewPattern : malloc failed\n");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlPattern>());
@@ -279,8 +275,6 @@ unsafe extern "C" fn xml_new_pattern() -> XmlPatternPtr {
     (*cur).steps = xml_malloc((*cur).max_step as usize * size_of::<XmlStepOp>()) as XmlStepOpPtr;
     if (*cur).steps.is_null() {
         xml_free(cur as _);
-        // ERROR(NULL, NULL, NULL,
-        // 	"xmlNewPattern : malloc failed\n");
         return null_mut();
     }
     cur
@@ -327,7 +321,7 @@ const PAT_FROM_CUR: usize = 1 << 9;
 ///
 /// Returns -1 in case of failure, 0 otherwise.
 #[doc(alias = "xmlPatternAdd")]
-unsafe extern "C" fn xml_pattern_add(
+unsafe fn xml_pattern_add(
     _ctxt: XmlPatParserContextPtr,
     comp: XmlPatternPtr,
     op: XmlPatOp,
@@ -340,8 +334,6 @@ unsafe extern "C" fn xml_pattern_add(
             (*comp).max_step as usize * 2 * size_of::<XmlStepOp>(),
         ) as XmlStepOpPtr;
         if temp.is_null() {
-            // ERROR(ctxt, NULL, NULL,
-            // 	     "xmlPatternAdd: realloc failed\n");
             return -1;
         }
         (*comp).steps = temp;
@@ -403,7 +395,7 @@ macro_rules! CUR_PTR {
 ///
 /// Returns the Name parsed or NULL
 #[doc(alias = "xmlPatScanNCName")]
-unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
+unsafe fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
     let mut cur: *const XmlChar;
     let mut val: i32;
     let mut len: i32 = 0;
@@ -437,15 +429,17 @@ unsafe extern "C" fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut X
     ret
 }
 
-/// `[4] NameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender`
+/// ```text
+/// [4] NameChar ::= Letter | Digit | '.' | '-' | '_' | CombiningChar | Extender
 ///
-/// `[5] Name ::= (Letter | '_' | ':') (NameChar)*`
+/// [5] Name ::= (Letter | '_' | ':') (NameChar)*
 ///
-/// `[6] Names ::= Name (S Name)*`
+/// [6] Names ::= Name (S Name)*
+/// ```
 ///
 /// Returns the Name parsed or NULL
 #[doc(alias = "xmlPatScanName")]
-unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
+unsafe fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
     let mut cur: *const XmlChar;
     let mut val: i32;
     let mut len: i32 = 0;
@@ -481,7 +475,7 @@ unsafe extern "C" fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut Xml
 
 /// Compile an attribute test.
 #[doc(alias = "xmlCompileAttributeTest")]
-unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
+unsafe fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
     let mut token: *mut XmlChar = null_mut();
     let mut url: *mut XmlChar = null_mut();
 
@@ -493,8 +487,6 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                 PUSH!(ctxt, XmlPatOp::XmlOpAttr, null_mut(), null_mut(), 'error);
                 NEXT!(ctxt);
             } else {
-                // ERROR(NULL, NULL, NULL,
-                // "xmlCompileAttributeTest : Name expected\n");
                 (*ctxt).error = 1;
             }
             return;
@@ -505,7 +497,6 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
             NEXT!(ctxt);
 
             if xml_is_blank_char(CUR!(ctxt) as u32) {
-                // ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                 XML_PAT_FREE_STRING!(ctxt, prefix);
                 (*ctxt).error = 1;
                 break 'error;
@@ -528,9 +519,6 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                     }
                 }
                 if !found {
-                    // ERROR5(NULL, NULL, NULL,
-                    //     "xmlCompileAttributeTest : no namespace bound to prefix %s\n",
-                    //     prefix);
                     XML_PAT_FREE_STRING!(ctxt, prefix);
                     (*ctxt).error = 1;
                     break 'error;
@@ -542,8 +530,6 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                     NEXT!(ctxt);
                     PUSH!(ctxt, XmlPatOp::XmlOpAttr, null_mut(), url, 'error);
                 } else {
-                    // ERROR(NULL, NULL, NULL,
-                    //     "xmlCompileAttributeTest : Name expected\n");
                     (*ctxt).error = 1;
                     break 'error;
                 }
@@ -567,10 +553,12 @@ unsafe extern "C" fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
 /// Compile the Step Pattern and generates a precompiled
 /// form suitable for fast matching.
 ///
-/// `[3]    Step    ::=    '.' | NameTest`
-/// `[4]    NameTest    ::=    QName | '*' | NCName ':' '*'`
+/// ```text
+/// [3]    Step    ::=    '.' | NameTest
+/// [4]    NameTest    ::=    QName | '*' | NCName ':' '*'
+/// ```
 #[doc(alias = "xmlCompileStepPattern")]
-unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
+unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     let mut token: *mut XmlChar = null_mut();
     let mut name: *mut XmlChar = null_mut();
     let mut url: *mut XmlChar = null_mut();
@@ -587,8 +575,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
         if CUR!(ctxt) == b'@' {
             // Attribute test.
             if XML_STREAM_XS_IDC_SEL!((*ctxt).comp) {
-                //  ERROR5(NULL, NULL, NULL,
-                //  "Unexpected attribute axis in '%s'.\n", (*ctxt).base);
                 (*ctxt).error = 1;
                 return;
             }
@@ -606,8 +592,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                 PUSH!(ctxt, XmlPatOp::XmlOpAll, null_mut(), null_mut(), 'error);
                 return;
             } else {
-                //  ERROR(NULL, NULL, NULL,
-                //      "xmlCompileStepPattern : Name expected\n");
                 (*ctxt).error = 1;
                 return;
             }
@@ -622,7 +606,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                 let prefix: *mut XmlChar = name;
 
                 if has_blanks != 0 || xml_is_blank_char(CUR!(ctxt) as u32) {
-                    //  ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                     (*ctxt).error = 1;
                     break 'error;
                 }
@@ -644,9 +627,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                         }
                     }
                     if !found {
-                        //  ERROR5(NULL, NULL, NULL,
-                        //  "xmlCompileStepPattern : no namespace bound to prefix %s\n",
-                        //  prefix);
                         (*ctxt).error = 1;
                         break 'error;
                     }
@@ -658,8 +638,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                         NEXT!(ctxt);
                         PUSH!(ctxt, XmlPatOp::XmlOpNs, url, null_mut(), 'error);
                     } else {
-                        //  ERROR(NULL, NULL, NULL,
-                        //      "xmlCompileStepPattern : Name expected\n");
                         (*ctxt).error = 1;
                         break 'error;
                     }
@@ -677,8 +655,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                             PUSH!(ctxt, XmlPatOp::XmlOpAll, null_mut(), null_mut(), 'error);
                             return;
                         } else {
-                            //  ERROR(NULL, NULL, NULL,
-                            //      "xmlCompileStepPattern : QName expected\n");
                             (*ctxt).error = 1;
                             break 'error;
                         }
@@ -688,7 +664,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
 
                         NEXT!(ctxt);
                         if xml_is_blank_char(CUR!(ctxt) as u32) {
-                            //  ERROR5(NULL, NULL, NULL, "Invalid QName.\n", NULL);
                             (*ctxt).error = 1;
                             break 'error;
                         }
@@ -710,9 +685,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                                 }
                             }
                             if !found {
-                                //  ERROR5(NULL, NULL, NULL,
-                                //  "xmlCompileStepPattern : no namespace bound "
-                                //  "to prefix %s\n", prefix);
                                 (*ctxt).error = 1;
                                 break 'error;
                             }
@@ -724,8 +696,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                                 NEXT!(ctxt);
                                 PUSH!(ctxt, XmlPatOp::XmlOpNs, url, null_mut(), 'error);
                             } else {
-                                //  ERROR(NULL, NULL, NULL,
-                                //  "xmlCompileStepPattern : Name expected\n");
                                 (*ctxt).error = 1;
                                 break 'error;
                             }
@@ -739,8 +709,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     XML_PAT_FREE_STRING!(ctxt, name);
                     name = null_mut();
                     if XML_STREAM_XS_IDC_SEL!((*ctxt).comp) {
-                        //  ERROR5(NULL, NULL, NULL,
-                        //  "Unexpected attribute axis in '%s'.\n", (*ctxt).base);
                         (*ctxt).error = 1;
                         break 'error;
                     }
@@ -750,8 +718,6 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     }
                     return;
                 } else {
-                    //  ERROR5(NULL, NULL, NULL,
-                    //      "The 'element' or 'attribute' axis is expected.\n", NULL);
                     (*ctxt).error = 1;
                     break 'error;
                 }
@@ -785,48 +751,37 @@ unsafe extern "C" fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
 ///
 /// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
 #[doc(alias = "xmlCompileIDCXPathPath")]
-unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
+unsafe fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     'error_unfinished: {
         'error: {
             if CUR!(ctxt) == b'/' {
-                // ERROR5(NULL, NULL, NULL,
-                //     "Unexpected selection of the document root in '%s'.\n",
-                //     (*ctxt).base);
                 break 'error;
             }
             (*(*ctxt).comp).flags |= PAT_FROM_CUR as i32;
 
             if CUR!(ctxt) == b'.' {
-                /* "." - "self::node()" */
+                // "." - "self::node()"
                 NEXT!(ctxt);
                 SKIP_BLANKS!(ctxt);
                 if CUR!(ctxt) == 0 {
-                    /*
-                     * Selection of the context node.
-                     */
+                    // Selection of the context node.
                     PUSH!(ctxt, XmlPatOp::XmlOpElem, null_mut(), null_mut(), 'error);
                     return;
                 }
                 if CUR!(ctxt) != b'/' {
-                    /* TODO: A more meaningful error message. */
-                    // ERROR5(NULL, NULL, NULL,
-                    // "Unexpected token after '.' in '%s'.\n", (*ctxt).base);
+                    // TODO: A more meaningful error message.
                     break 'error;
                 }
-                /* "./" - "self::node()/" */
+                // "./" - "self::node()/"
                 NEXT!(ctxt);
                 SKIP_BLANKS!(ctxt);
                 if CUR!(ctxt) == b'/' {
                     if xml_is_blank_char(PEEKPREV!(ctxt, 1) as u32) {
-                        /*
-                         * Disallow "./ /"
-                         */
-                        // ERROR5(NULL, NULL, NULL,
-                        //     "Unexpected '/' token in '%s'.\n", (*ctxt).base);
+                        // Disallow "./ /"
                         break 'error;
                     }
-                    /* ".//" - "self:node()/descendant-or-self::node()/" */
+                    // ".//" - "self:node()/descendant-or-self::node()/"
                     PUSH!(ctxt, XmlPatOp::XmlOpAncestor, null_mut(), null_mut(), 'error);
                     NEXT!(ctxt);
                     SKIP_BLANKS!(ctxt);
@@ -835,9 +790,7 @@ unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
                     break 'error_unfinished;
                 }
             }
-            /*
-             * Process steps.
-             */
+            // Process steps.
             'b: while {
                 xml_compile_step_pattern(ctxt);
                 if (*ctxt).error != 0 {
@@ -851,12 +804,7 @@ unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
                 NEXT!(ctxt);
                 SKIP_BLANKS!(ctxt);
                 if CUR!(ctxt) == b'/' {
-                    /*
-                     * Disallow subsequent '//'.
-                     */
-                    // ERROR5(NULL, NULL, NULL,
-                    // "Unexpected subsequent '//' in '%s'.\n",
-                    // (*ctxt).base);
+                    // Disallow subsequent '//'.
                     break 'error;
                 }
                 if CUR!(ctxt) == 0 {
@@ -867,8 +815,6 @@ unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
             } {}
 
             if CUR!(ctxt) != 0 {
-                // ERROR5(NULL, NULL, NULL,
-                //     "Failed to compile expression '%s'.\n", (*ctxt).base);
                 (*ctxt).error = 1;
             }
             return;
@@ -880,9 +826,6 @@ unsafe extern "C" fn xml_compile_idc_xpath_path(ctxt: XmlPatParserContextPtr) {
 
     // error_unfinished:
     (*ctxt).error = 1;
-    //     // ERROR5(NULL, NULL, NULL,
-    // 	// "Unfinished expression '%s'.\n", (*ctxt).base);
-    //     return;
 }
 
 const XML_PATTERN_NOTPATTERN: i32 = XmlPatternFlags::XmlPatternXpath as i32
@@ -900,7 +843,7 @@ macro_rules! NXT {
 ///
 /// `[5]    Path    ::=    ('.//')? ( Step '/' )* ( Step | '@' NameTest )`
 #[doc(alias = "xmlCompilePathPattern")]
-unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
+unsafe fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
     SKIP_BLANKS!(ctxt);
     if CUR!(ctxt) == b'/' {
         (*(*ctxt).comp).flags |= PAT_FROM_ROOT as i32;
@@ -918,11 +861,9 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
             NEXT!(ctxt);
             NEXT!(ctxt);
             NEXT!(ctxt);
-            /* Check for incompleteness. */
+            // Check for incompleteness.
             SKIP_BLANKS!(ctxt);
             if CUR!(ctxt) == 0 {
-                // ERROR5(NULL, NULL, NULL,
-                //    "Incomplete expression '%s'.\n", (*ctxt).base);
                 (*ctxt).error = 1;
                 break 'error;
             }
@@ -931,7 +872,7 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
             NEXT!(ctxt);
             xml_compile_attribute_test(ctxt);
             SKIP_BLANKS!(ctxt);
-            /* TODO: check for incompleteness */
+            // TODO: check for incompleteness
             if CUR!(ctxt) != 0 {
                 xml_compile_step_pattern(ctxt);
                 if (*ctxt).error != 0 {
@@ -942,11 +883,9 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
             if CUR!(ctxt) == b'/' {
                 PUSH!(ctxt, XmlPatOp::XmlOpRoot, null_mut(), null_mut(), 'error);
                 NEXT!(ctxt);
-                /* Check for incompleteness. */
+                // Check for incompleteness.
                 SKIP_BLANKS!(ctxt);
                 if CUR!(ctxt) == 0 {
-                    // ERROR5(NULL, NULL, NULL,
-                    //     "Incomplete expression '%s'.\n", (*ctxt).base);
                     (*ctxt).error = 1;
                     break 'error;
                 }
@@ -971,8 +910,6 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
                     NEXT!(ctxt);
                     SKIP_BLANKS!(ctxt);
                     if CUR!(ctxt) == 0 {
-                        // ERROR5(NULL, NULL, NULL,
-                        // "Incomplete expression '%s'.\n", (*ctxt).base);
                         (*ctxt).error = 1;
                         break 'error;
                     }
@@ -984,8 +921,6 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
             }
         }
         if CUR!(ctxt) != 0 {
-            // ERROR5(NULL, NULL, NULL,
-            //        "Failed to compile pattern %s\n", (*ctxt).base);
             (*ctxt).error = 1;
         }
     }
@@ -997,23 +932,19 @@ unsafe extern "C" fn xml_compile_path_pattern(ctxt: XmlPatParserContextPtr) {
 ///
 /// Returns the new structure or NULL in case of error.
 #[doc(alias = "xmlNewStreamComp")]
-unsafe extern "C" fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
+unsafe fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
     if size < 4 {
         size = 4;
     }
 
     let cur: XmlStreamCompPtr = xml_malloc(size_of::<XmlStreamComp>()) as XmlStreamCompPtr;
     if cur.is_null() {
-        // ERROR(NULL, NULL, NULL,
-        // 	"xmlNewStreamComp: malloc failed\n");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlStreamComp>());
     (*cur).steps = xml_malloc(size as usize * size_of::<XmlStreamStep>()) as XmlStreamStepPtr;
     if (*cur).steps.is_null() {
         xml_free(cur as _);
-        // ERROR(NULL, NULL, NULL,
-        //       "xmlNewStreamComp: malloc failed\n");
         return null_mut();
     }
     (*cur).nb_step = 0;
@@ -1025,7 +956,7 @@ unsafe extern "C" fn xml_new_stream_comp(mut size: i32) -> XmlStreamCompPtr {
 ///
 /// Returns -1 in case of error or the step index if successful
 #[doc(alias = "xmlStreamCompAddStep")]
-unsafe extern "C" fn xml_stream_comp_add_step(
+unsafe fn xml_stream_comp_add_step(
     comp: XmlStreamCompPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -1040,8 +971,6 @@ unsafe extern "C" fn xml_stream_comp_add_step(
             (*comp).max_step as usize * 2 * size_of::<XmlStreamStep>(),
         ) as XmlStreamStepPtr;
         if cur.is_null() {
-            // ERROR(NULL, NULL, NULL,
-            //   "xmlNewStreamComp: malloc failed\n");
             return -1;
         }
         (*comp).steps = cur;
@@ -1060,7 +989,7 @@ unsafe extern "C" fn xml_stream_comp_add_step(
 ///
 /// Returns -1 in case of failure and 0 in case of success.
 #[doc(alias = "xmlStreamCompile")]
-unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
+unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
     let stream: XmlStreamCompPtr;
     let mut s: i32 = 0;
     let mut root: i32 = 0;
@@ -1071,9 +1000,7 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
     if comp.is_null() || (*comp).steps.is_null() {
         return -1;
     }
-    /*
-     * special case for .
-     */
+    // special case for .
     if (*comp).nb_step == 1
         && matches!((*(*comp).steps.add(0)).op, XmlPatOp::XmlOpElem)
         && (*(*comp).steps.add(0)).value.is_null()
@@ -1083,7 +1010,7 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
         if stream.is_null() {
             return -1;
         }
-        /* Note that the stream will have no steps in this case. */
+        // Note that the stream will have no steps in this case.
         (*stream).flags |= XML_STREAM_FINAL_IS_ANY_NODE as i32;
         (*comp).stream = stream;
         return 0;
@@ -1144,19 +1071,15 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                 }
                 XmlPatOp::XmlOpElem => 'to_break: {
                     if step.value.is_null() && step.value2.is_null() {
-                        /*
-                         * We have a "." or "self::node()" here.
-                         * Eliminate redundant self::node() tests like in "/./."
-                         * or "//./"
-                         * The only case we won't eliminate is "//.", i.e. if
-                         * self::node() is the last node test and we had
-                         * continuation somewhere beforehand.
-                         */
+                        // We have a "." or "self::node()" here.
+                        // Eliminate redundant self::node() tests like in "/./."
+                        // or "//./"
+                        // The only case we won't eliminate is "//.", i.e. if
+                        // self::node() is the last node test and we had
+                        // continuation somewhere beforehand.
                         if (*comp).nb_step == i + 1 && flags & XML_STREAM_STEP_DESC as i32 != 0 {
-                            /*
-                             * Mark the special case where the expression resolves
-                             * to any type of node.
-                             */
+                            // Mark the special case where the expression resolves
+                            // to any type of node.
                             if (*comp).nb_step == i + 1 {
                                 (*stream).flags |= XML_STREAM_FINAL_IS_ANY_NODE as i32;
                             }
@@ -1172,12 +1095,10 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                                 break 'error;
                             }
                             flags = 0;
-                            /*
-                             * If there was a previous step, mark it to be added to
-                             * the result node-set; this is needed since only
-                             * the last step will be marked as "is_final" and only
-                             * "is_final" nodes are added to the resulting set.
-                             */
+                            // If there was a previous step, mark it to be added to
+                            // the result node-set; this is needed since only
+                            // the last step will be marked as "is_final" and only
+                            // "is_final" nodes are added to the resulting set.
                             if prevs != -1 {
                                 (*(*stream).steps.add(prevs as usize)).flags |=
                                     XML_STREAM_STEP_IN_SET as i32;
@@ -1185,11 +1106,11 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                             }
                             break 'to_break;
                         } else {
-                            /* Just skip this one. */
+                            // Just skip this one.
                             continue 'main;
                         }
                     }
-                    /* An element node. */
+                    // An element node.
                     s = xml_stream_comp_add_step(
                         stream,
                         step.value,
@@ -1204,7 +1125,7 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                     flags = 0;
                 }
                 XmlPatOp::XmlOpChild => {
-                    /* An element node child. */
+                    // An element node child.
                     s = xml_stream_comp_add_step(
                         stream,
                         step.value,
@@ -1234,14 +1155,12 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
                 }
                 XmlPatOp::XmlOpParent => {}
                 XmlPatOp::XmlOpAncestor => {
-                    /* Skip redundant continuations. */
+                    // Skip redundant continuations.
                     if flags & XML_STREAM_STEP_DESC as i32 != 0 {
                         // break;
                     } else {
                         flags |= XML_STREAM_STEP_DESC as i32;
-                        /*
-                         * Mark the expression as having "//".
-                         */
+                        // Mark the expression as having "//".
                         if (*stream).flags & XML_STREAM_DESC as i32 == 0 {
                             (*stream).flags |= XML_STREAM_DESC as i32;
                         }
@@ -1250,11 +1169,9 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
             }
         }
         if root == 0 && (*comp).flags & XML_PATTERN_NOTPATTERN == 0 {
-            /*
-             * If this should behave like a real pattern, we will mark
-             * the first step as having "//", to be reentrant on every
-             * tree level.
-             */
+            // If this should behave like a real pattern, we will mark
+            // the first step as having "//", to be reentrant on every
+            // tree level.
             if (*stream).flags & XML_STREAM_DESC as i32 == 0 {
                 (*stream).flags |= XML_STREAM_DESC as i32;
             }
@@ -1284,13 +1201,11 @@ unsafe extern "C" fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
 ///
 /// Returns 0 in case of success and -1 in case of error.
 #[doc(alias = "xmlReversePattern")]
-unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
+unsafe fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
     let mut i: i32;
     let mut j: i32;
 
-    /*
-     * remove the leading // for //a or .//a
-     */
+    // remove the leading // for //a or .//a
     if (*comp).nb_step > 0 && matches!((*(*comp).steps.add(0)).op, XmlPatOp::XmlOpAncestor) {
         for (i, j) in (0..).zip(1..(*comp).nb_step) {
             (*(*comp).steps.add(i as usize)).value = (*(*comp).steps.add(j as usize)).value;
@@ -1305,7 +1220,6 @@ unsafe extern "C" fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
             (*comp).max_step as usize * 2 * size_of::<XmlStepOp>(),
         ) as XmlStepOpPtr;
         if temp.is_null() {
-            // ERROR(ctxt, NULL, NULL, "xmlReversePattern: realloc failed\n");
             return -1;
         }
         (*comp).steps = temp;
@@ -1471,11 +1385,7 @@ pub struct XmlStepStates {
     states: XmlStepStatePtr,
 }
 
-unsafe extern "C" fn xml_pat_push_state(
-    states: *mut XmlStepStates,
-    step: i32,
-    node: XmlNodePtr,
-) -> i32 {
+unsafe fn xml_pat_push_state(states: *mut XmlStepStates, step: i32, node: XmlNodePtr) -> i32 {
     if (*states).states.is_null() || (*states).maxstates <= 0 {
         (*states).maxstates = 4;
         (*states).nbstates = 0;
@@ -1501,14 +1411,15 @@ unsafe extern "C" fn xml_pat_push_state(
 ///
 /// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
 #[doc(alias = "xmlPatMatch")]
-unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
+unsafe fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) -> i32 {
     let mut i: i32;
     let mut step: XmlStepOpPtr;
     let mut states: XmlStepStates = XmlStepStates {
         nbstates: 0,
         maxstates: 0,
         states: null_mut(),
-    }; /* // may require backtrack */
+    };
+    // // may require backtrack
 
     if comp.is_null() || node.is_null() {
         return -1;
@@ -1557,7 +1468,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                     break 'rollback;
                                 }
 
-                                /* Namespace test */
+                                // Namespace test
                                 if (*node).ns.is_null() {
                                     if !(*step).value2.is_null() {
                                         break 'rollback;
@@ -1722,10 +1633,8 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
                                 if node.is_null() {
                                     break 'rollback;
                                 }
-                                /*
-                                 * prepare a potential rollback from here
-                                 * for ancestors of that node.
-                                 */
+                                // prepare a potential rollback from here
+                                // for ancestors of that node.
                                 if matches!((*step).op, XmlPatOp::XmlOpAncestor) {
                                     xml_pat_push_state(addr_of_mut!(states), i, node);
                                 } else {
@@ -1789,7 +1698,7 @@ unsafe extern "C" fn xml_pat_match(comp: XmlPatternPtr, mut node: XmlNodePtr) ->
 ///
 /// Returns 1 if it matches, 0 if it doesn't and -1 in case of failure
 #[doc(alias = "xmlPatternMatch")]
-pub unsafe extern "C" fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNodePtr) -> i32 {
+pub unsafe fn xml_pattern_match(mut comp: XmlPatternPtr, node: XmlNodePtr) -> i32 {
     let mut ret: i32 = 0;
 
     if comp.is_null() || node.is_null() {
@@ -1824,7 +1733,7 @@ pub struct XmlStreamCtxt {
 ///
 /// Returns 1 if streamable, 0 if not and -1 in case of error.
 #[doc(alias = "xmlPatternStreamable")]
-pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> i32 {
+pub unsafe fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> i32 {
     if comp.is_null() {
         return -1;
     }
@@ -1841,7 +1750,7 @@ pub unsafe extern "C" fn xml_pattern_streamable(mut comp: XmlPatternPtr) -> i32 
 ///
 /// Returns -2 if no limit (using //), otherwise the depth, and -1 in case of error
 #[doc(alias = "xmlPatternMaxDepth")]
-pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
+pub unsafe fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
     let mut ret: i32 = 0;
 
     if comp.is_null() {
@@ -1869,7 +1778,7 @@ pub unsafe extern "C" fn xml_pattern_max_depth(mut comp: XmlPatternPtr) -> i32 {
 ///
 /// Returns -1 in case of error otherwise the depth,
 #[doc(alias = "xmlPatternMinDepth")]
-pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
+pub unsafe fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
     let mut ret: i32 = 12345678;
     if comp.is_null() {
         return -1;
@@ -1893,7 +1802,7 @@ pub unsafe extern "C" fn xml_pattern_min_depth(mut comp: XmlPatternPtr) -> i32 {
 ///
 /// Returns 1 if true, 0 if false and -1 in case of error
 #[doc(alias = "xmlPatternFromRoot")]
-pub unsafe extern "C" fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> i32 {
+pub unsafe fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> i32 {
     if comp.is_null() {
         return -1;
     }
@@ -1913,18 +1822,15 @@ pub unsafe extern "C" fn xml_pattern_from_root(mut comp: XmlPatternPtr) -> i32 {
 ///
 /// Returns the new structure or NULL in case of error.
 #[doc(alias = "xmlNewStreamCtxt")]
-unsafe extern "C" fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamCtxtPtr {
+unsafe fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamCtxtPtr {
     let cur: XmlStreamCtxtPtr = xml_malloc(size_of::<XmlStreamCtxt>()) as XmlStreamCtxtPtr;
     if cur.is_null() {
-        // ERROR(NULL, NULL, NULL,
-        // 	"xmlNewStreamCtxt: malloc failed\n");
         return null_mut();
     }
     memset(cur as _, 0, size_of::<XmlStreamCtxt>());
     (*cur).states = xml_malloc(4 * 2 * size_of::<i32>()) as *mut i32;
     if (*cur).states.is_null() {
         xml_free(cur as _);
-        // ERROR(NULL, NULL, NULL, "xmlNewStreamCtxt: malloc failed\n");
         return null_mut();
     }
     (*cur).nb_state = 0;
@@ -1940,7 +1846,7 @@ unsafe extern "C" fn xml_new_stream_ctxt(stream: XmlStreamCompPtr) -> XmlStreamC
 ///
 /// Returns a pointer to the context or NULL in case of failure
 #[doc(alias = "xmlPatternGetStreamCtxt")]
-pub unsafe extern "C" fn xml_pattern_get_stream_ctxt(mut comp: XmlPatternPtr) -> XmlStreamCtxtPtr {
+pub unsafe fn xml_pattern_get_stream_ctxt(mut comp: XmlPatternPtr) -> XmlStreamCtxtPtr {
     let mut ret: XmlStreamCtxtPtr = null_mut();
     let mut cur: XmlStreamCtxtPtr;
 
@@ -1977,7 +1883,7 @@ pub unsafe extern "C" fn xml_pattern_get_stream_ctxt(mut comp: XmlPatternPtr) ->
 
 /// Free the stream context
 #[doc(alias = "xmlFreeStreamCtxt")]
-pub unsafe extern "C" fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
+pub unsafe fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
     let mut next: XmlStreamCtxtPtr;
 
     while !stream.is_null() {
@@ -1994,11 +1900,7 @@ pub unsafe extern "C" fn xml_free_stream_ctxt(mut stream: XmlStreamCtxtPtr) {
 ///
 /// Returns -1 in case of error or the state index if successful
 #[doc(alias = "xmlStreamCtxtAddState")]
-unsafe extern "C" fn xml_stream_ctxt_add_state(
-    comp: XmlStreamCtxtPtr,
-    idx: i32,
-    level: i32,
-) -> i32 {
+unsafe fn xml_stream_ctxt_add_state(comp: XmlStreamCtxtPtr, idx: i32, level: i32) -> i32 {
     for i in 0..(*comp).nb_state {
         if *(*comp).states.add(2 * i as usize) < 0 {
             *(*comp).states.add(2 * i as usize) = idx;
@@ -2012,7 +1914,6 @@ unsafe extern "C" fn xml_stream_ctxt_add_state(
             (*comp).max_state as usize * 4 * size_of::<i32>(),
         ) as *mut i32;
         if cur.is_null() {
-            // ERROR(NULL, NULL, NULL, "xmlNewStreamCtxt: malloc failed\n");
             return -1;
         }
         (*comp).states = cur;
@@ -2032,7 +1933,7 @@ unsafe extern "C" fn xml_stream_ctxt_add_state(
 ///
 /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
 #[doc(alias = "xmlStreamPushInternal")]
-unsafe extern "C" fn xml_stream_push_internal(
+unsafe fn xml_stream_push_internal(
     mut stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -2060,25 +1961,22 @@ unsafe extern "C" fn xml_stream_push_internal(
 
             if node_type == XmlElementType::XmlElementNode as i32 && name.is_null() && ns.is_null()
             {
-                /* We have a document node here (or a reset). */
+                // We have a document node here (or a reset).
                 (*stream).nb_state = 0;
                 (*stream).level = 0;
                 (*stream).block_level = -1;
                 if (*comp).flags & XML_STREAM_FROM_ROOT as i32 != 0 {
                     if (*comp).nb_step == 0 {
-                        /* TODO: We have a "/." here? */
+                        // TODO: We have a "/." here?
                         ret = 1;
                     } else if (*comp).nb_step == 1
                         && (*(*comp).steps.add(0)).node_type == XML_STREAM_ANY_NODE as i32
                         && (*(*comp).steps.add(0)).flags & XML_STREAM_STEP_DESC as i32 != 0
                     {
-                        /*
-                         * In the case of "//." the document node will is_match
-                         * as well.
-                         */
+                        // In the case of "//." the document node will is_match as well.
                         ret = 1;
                     } else if (*(*comp).steps.add(0)).flags & XML_STREAM_STEP_ROOT as i32 != 0 {
-                        /* TODO: Do we need this ? */
+                        // TODO: Do we need this ?
                         tmp = xml_stream_ctxt_add_state(stream, 0, 0);
                         if tmp < 0 {
                             err += 1;
@@ -2086,26 +1984,20 @@ unsafe extern "C" fn xml_stream_push_internal(
                     }
                 }
                 stream = (*stream).next;
-                continue 'stream; /* while */
+                continue 'stream;
             }
 
-            /*
-             * Fast check for ".".
-             */
+            // Fast check for ".".
             if (*comp).nb_step == 0 {
-                /*
-                 * / and . are handled at the XPath node set creation
-                 * level by checking min depth
-                 */
+                // / and . are handled at the XPath node set creation
+                // level by checking min depth
                 if (*stream).flags & XmlPatternFlags::XmlPatternXpath as i32 != 0 {
                     stream = (*stream).next;
                     continue 'stream; /* while */
                 }
-                /*
-                 * For non-pattern like evaluation like XML Schema IDCs
-                 * or traditional XPath expressions, this will is_match if
-                 * we are at the first level only, otherwise on every level.
-                 */
+                // For non-pattern like evaluation like XML Schema IDCs
+                // or traditional XPath expressions, this will is_match if
+                // we are at the first level only, otherwise on every level.
                 if node_type != XmlElementType::XmlAttributeNode as i32
                     && ((*stream).flags & XML_PATTERN_NOTPATTERN == 0 || (*stream).level == 0)
                 {
@@ -2115,9 +2007,7 @@ unsafe extern "C" fn xml_stream_push_internal(
                 break 'stream_next;
             }
             if (*stream).block_level != -1 {
-                /*
-                 * Skip blocked expressions.
-                 */
+                // Skip blocked expressions.
                 (*stream).level += 1;
                 break 'stream_next;
             }
@@ -2126,31 +2016,23 @@ unsafe extern "C" fn xml_stream_push_internal(
                 && node_type != XmlElementType::XmlAttributeNode as i32
                 && (*comp).flags & XML_STREAM_FINAL_IS_ANY_NODE as i32 == 0
             {
-                /*
-                 * No need to process nodes of other types if we don't
-                 * resolve to those types.
-                 * TODO: Do we need to block the context here?
-                 */
+                // No need to process nodes of other types if we don't
+                // resolve to those types.
+                // TODO: Do we need to block the context here?
                 (*stream).level += 1;
                 break 'stream_next;
             }
 
-            /*
-             * Check evolution of existing states
-             */
+            // Check evolution of existing states
             i = 0;
             m = (*stream).nb_state;
             while i < m {
                 'next_state: {
                     if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
-                        /*
-                         * If there is no "//", then only the last
-                         * added state is of interest.
-                         */
+                        // If there is no "//", then only the last
+                        // added state is of interest.
                         step_nr = *(*stream).states.add(2 * ((*stream).nb_state - 1) as usize);
-                        /*
-                         * TODO: Security check, should not happen, remove it.
-                         */
+                        // TODO: Security check, should not happen, remove it.
                         if *(*stream)
                             .states
                             .add((2 * ((*stream).nb_state - 1) as usize) + 1)
@@ -2159,44 +2041,37 @@ unsafe extern "C" fn xml_stream_push_internal(
                             return -1;
                         }
                         // desc = 0;
-                        /* loop-stopper */
+                        // loop-stopper
                         i = m;
                     } else {
-                        /*
-                         * If there are "//", then we need to process every "//"
-                         * occurring in the states, plus any other state for this
-                         * level.
-                         */
+                        // If there are "//", then we need to process every "//"
+                        // occurring in the states, plus any other state for this level.
                         step_nr = *(*stream).states.add(2 * i as usize);
 
-                        /* TODO: should not happen anymore: dead states */
+                        // TODO: should not happen anymore: dead states
                         if step_nr < 0 {
                             break 'next_state;
                         }
 
                         tmp = *(*stream).states.add((2 * i) as usize + 1);
 
-                        /* skip new states just added */
+                        // skip new states just added
                         if tmp > (*stream).level {
                             break 'next_state;
                         }
 
-                        /* skip states at ancestor levels, except if "//" */
+                        // skip states at ancestor levels, except if "//"
                         desc = (*(*comp).steps.add(step_nr as usize)).flags
                             & XML_STREAM_STEP_DESC as i32;
                         if tmp < (*stream).level && desc == 0 {
                             break 'next_state;
                         }
                     }
-                    /*
-                     * Check for correct node-type.
-                     */
+                    // Check for correct node-type.
                     step = *(*comp).steps.add(step_nr as usize);
                     if step.node_type != node_type {
                         if step.node_type == XmlElementType::XmlAttributeNode as i32 {
-                            /*
-                             * Block this expression for deeper evaluation.
-                             */
+                            // Block this expression for deeper evaluation.
                             if (*comp).flags & XML_STREAM_DESC as i32 == 0 {
                                 (*stream).block_level = (*stream).level + 1;
                             }
@@ -2205,17 +2080,13 @@ unsafe extern "C" fn xml_stream_push_internal(
                             break 'next_state;
                         }
                     }
-                    /*
-                     * Compare local/namespace-name.
-                     */
+                    // Compare local/namespace-name.
                     is_match = 0;
                     if step.node_type == XML_STREAM_ANY_NODE as i32 {
                         is_match = 1;
                     } else if step.name.is_null() {
                         if step.ns.is_null() {
-                            /*
-                             * This lets through all elements/attributes.
-                             */
+                            // This lets through all elements/attributes.
                             is_match = 1;
                         } else if !ns.is_null() {
                             is_match = xml_str_equal(step.ns, ns) as i32;
@@ -2252,21 +2123,17 @@ unsafe extern "C" fn xml_stream_push_internal(
                             xml_stream_ctxt_add_state(stream, step_nr + 1, (*stream).level + 1);
                         }
                         if ret != 1 && step.flags & XML_STREAM_STEP_IN_SET as i32 != 0 {
-                            /*
-                             * Check if we have a special case like "foo/bar//.", where
-                             * "foo" is selected as well.
-                             */
+                            // Check if we have a special case like "foo/bar//.", where
+                            // "foo" is selected as well.
                             ret = 1;
                         }
                     }
                     if (*comp).flags & XML_STREAM_DESC as i32 == 0
                         && (is_match == 0 || is_final != 0)
                     {
-                        /*
-                         * Mark this expression as blocked for any evaluation at
-                         * deeper levels. Note that this includes "/foo"
-                         * expressions if the *pattern* behaviour is used.
-                         */
+                        // Mark this expression as blocked for any evaluation at
+                        // deeper levels. Note that this includes "/foo"
+                        // expressions if the *pattern* behaviour is used.
                         (*stream).block_level = (*stream).level + 1;
                     }
                 }
@@ -2276,11 +2143,9 @@ unsafe extern "C" fn xml_stream_push_internal(
 
             (*stream).level += 1;
 
-            /*
-             * Re/enter the expression.
-             * Don't reenter if it's an absolute expression like "/foo",
-             *   except "//foo".
-             */
+            // Re/enter the expression.
+            // Don't reenter if it's an absolute expression like "/foo",
+            //   except "//foo".
             step = *(*comp).steps.add(0);
             if step.flags & XML_STREAM_STEP_ROOT as i32 != 0 {
                 break 'stream_next;
@@ -2289,32 +2154,24 @@ unsafe extern "C" fn xml_stream_push_internal(
             desc = step.flags & XML_STREAM_STEP_DESC as i32;
             'compare: {
                 if (*stream).flags & XML_PATTERN_NOTPATTERN != 0 {
-                    /*
-                     * Re/enter the expression if it is a "descendant" one,
-                     * or if we are at the 1st level of evaluation.
-                     */
+                    // Re/enter the expression if it is a "descendant" one,
+                    // or if we are at the 1st level of evaluation.
                     if (*stream).level == 1 {
                         if XML_STREAM_XS_IDC!(stream) {
-                            /*
-                             * XS-IDC: The missing "self::node()" will always
-                             * is_match the first given node.
-                             */
+                            // XS-IDC: The missing "self::node()" will always
+                            // is_match the first given node.
                             break 'stream_next;
                         } else {
                             break 'compare;
                         }
                     }
-                    /*
-                     * A "//" is always reentrant.
-                     */
+                    // A "//" is always reentrant.
                     if desc != 0 {
                         break 'compare;
                     }
-                    /*
-                     * XS-IDC: Process the 2nd level, since the missing
-                     * "self::node()" is responsible for the 2nd level being
-                     * the real start level.
-                     */
+                    // XS-IDC: Process the 2nd level, since the missing
+                    // "self::node()" is responsible for the 2nd level being
+                    // the real start level.
                     if (*stream).level == 2 && XML_STREAM_XS_IDC!(stream) {
                         break 'compare;
                     }
@@ -2323,26 +2180,20 @@ unsafe extern "C" fn xml_stream_push_internal(
             }
 
             // compare:
-            /*
-             * Check expected node-type.
-             */
+            // Check expected node-type.
             if step.node_type != node_type
                 && (node_type == XmlElementType::XmlAttributeNode as i32
                     || step.node_type != XML_STREAM_ANY_NODE as i32)
             {
                 break 'stream_next;
             }
-            /*
-             * Compare local/namespace-name.
-             */
+            // Compare local/namespace-name.
             is_match = 0;
             if step.node_type == XML_STREAM_ANY_NODE as i32 {
                 is_match = 1;
             } else if step.name.is_null() {
                 if step.ns.is_null() {
-                    /*
-                     * This lets through all elements/attributes.
-                     */
+                    // This lets through all elements/attributes.
                     is_match = 1;
                 } else if !ns.is_null() {
                     is_match = xml_str_equal(step.ns, ns) as i32;
@@ -2363,18 +2214,14 @@ unsafe extern "C" fn xml_stream_push_internal(
                     xml_stream_ctxt_add_state(stream, 1, (*stream).level);
                 }
                 if ret != 1 && step.flags & XML_STREAM_STEP_IN_SET as i32 != 0 {
-                    /*
-                     * Check if we have a special case like "foo//.", where
-                     * "foo" is selected as well.
-                     */
+                    // Check if we have a special case like "foo//.", where
+                    // "foo" is selected as well.
                     ret = 1;
                 }
             }
             if (*comp).flags & XML_STREAM_DESC as i32 == 0 && (is_match == 0 || is_final != 0) {
-                /*
-                 * Mark this expression as blocked for any evaluation at
-                 * deeper levels.
-                 */
+                // Mark this expression as blocked for any evaluation at
+                // deeper levels.
                 (*stream).block_level = (*stream).level;
             }
         }
@@ -2400,7 +2247,7 @@ unsafe extern "C" fn xml_stream_push_internal(
 ///
 /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
 #[doc(alias = "xmlStreamPushNode")]
-pub unsafe extern "C" fn xml_stream_push_node(
+pub unsafe fn xml_stream_push_node(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -2418,7 +2265,7 @@ pub unsafe extern "C" fn xml_stream_push_node(
 ///
 /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
 #[doc(alias = "xmlStreamPush")]
-pub unsafe extern "C" fn xml_stream_push(
+pub unsafe fn xml_stream_push(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -2435,7 +2282,7 @@ pub unsafe extern "C" fn xml_stream_push(
 ///
 /// Returns: -1 in case of error, 1 if the current state in the stream is a is_match and 0 otherwise.
 #[doc(alias = "xmlStreamPushAttr")]
-pub unsafe extern "C" fn xml_stream_push_attr(
+pub unsafe fn xml_stream_push_attr(
     stream: XmlStreamCtxtPtr,
     name: *const XmlChar,
     ns: *const XmlChar,
@@ -2447,33 +2294,27 @@ pub unsafe extern "C" fn xml_stream_push_attr(
 ///
 /// Returns: -1 in case of error, 0 otherwise.
 #[doc(alias = "xmlStreamPop")]
-pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
+pub unsafe fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
     let mut lev: i32;
 
     if stream.is_null() {
         return -1;
     }
     while !stream.is_null() {
-        /*
-        	* Reset block-level.
-        	*/
+        // Reset block-level.
         if (*stream).block_level == (*stream).level {
             (*stream).block_level = -1;
         }
 
-        /*
-         *  (*stream).level can be zero when XML_FINAL_IS_ANY_NODE is set
-         *  (see the thread at
-         *  http://mail.gnome.org/archives/xslt/2008-July/msg00027.html)
-         */
+        //  (*stream).level can be zero when XML_FINAL_IS_ANY_NODE is set
+        //  (see the thread at
+        //  http://mail.gnome.org/archives/xslt/2008-July/msg00027.html)
         if (*stream).level != 0 {
             (*stream).level -= 1;
         }
-        /*
-         * Check evolution of existing states
-         */
+        // Check evolution of existing states
         for i in (0..(*stream).nb_state).rev() {
-            /* discard obsoleted states */
+            // discard obsoleted states
             lev = *(*stream).states.add((2 * i) as usize + 1);
             if lev > (*stream).level {
                 (*stream).nb_state -= 1;
@@ -2495,7 +2336,7 @@ pub unsafe extern "C" fn xml_stream_pop(mut stream: XmlStreamCtxtPtr) -> i32 {
 /// Returns 1 in case of need of nodes of the above described types,
 /// 0 otherwise. -1 on API errors.
 #[doc(alias = "xmlStreamWantsAnyNode")]
-pub unsafe extern "C" fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr) -> i32 {
+pub unsafe fn xml_stream_wants_any_node(mut stream: XmlStreamCtxtPtr) -> i32 {
     if stream.is_null() {
         return -1;
     }
