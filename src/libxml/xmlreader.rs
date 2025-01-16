@@ -62,10 +62,7 @@ use crate::{
             xml_relaxng_validate_push_cdata, XmlRelaxNGPtr,
         },
         sax2::xml_sax_version,
-        valid::{
-            xml_free_ref_table, xml_validate_pop_element, xml_validate_push_cdata,
-            xml_validate_push_element, XmlRefTablePtr,
-        },
+        valid::{xml_validate_pop_element, xml_validate_push_cdata, xml_validate_push_element},
         xinclude::{
             xml_xinclude_new_context, xml_xinclude_process_node, xml_xinclude_set_flags,
             xml_xinclude_set_streaming_mode, XmlXincludeCtxtPtr,
@@ -4295,7 +4292,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
-    use crate::tree::NodeCommon;
+    use crate::{list::xml_list_delete, tree::NodeCommon};
 
     let mut ext_subset: XmlDtdPtr;
 
@@ -4312,10 +4309,9 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
 
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
-    if !(*cur).refs.is_null() {
-        xml_free_ref_table((*cur).refs as XmlRefTablePtr);
+    if let Some(mut refs) = (*cur).refs.take() {
+        refs.clear_with(|list, _| xml_list_delete(list));
     }
-    (*cur).refs = null_mut();
     ext_subset = (*cur).ext_subset;
     let int_subset: XmlDtdPtr = (*cur).int_subset;
     if int_subset == ext_subset {

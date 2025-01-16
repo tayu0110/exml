@@ -57,11 +57,12 @@ use crate::{
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::{
-            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_ref_table,
-            xml_is_id, xml_remove_id, XmlElementTablePtr,
+            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_is_id, xml_remove_id,
+            XmlElementTablePtr,
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
+    list::xml_list_delete,
 };
 
 pub use attribute::*;
@@ -1017,10 +1018,9 @@ pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
 
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
-    if !(*cur).refs.is_null() {
-        xml_free_ref_table((*cur).refs as _);
+    if let Some(mut refs) = (*cur).refs.take() {
+        refs.clear_with(|list, _| xml_list_delete(list));
     }
-    (*cur).refs = null_mut();
     ext_subset = (*cur).ext_subset;
     let int_subset: XmlDtdPtr = (*cur).int_subset;
     if int_subset == ext_subset {

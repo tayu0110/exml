@@ -31,6 +31,7 @@ use crate::{
         parser_internals::xml_copy_char_multi_byte,
         xmlstring::{xml_strdup, xml_strndup, XmlChar},
     },
+    list::XmlListPtr,
 };
 
 use super::{
@@ -58,30 +59,33 @@ pub struct XmlDoc {
 
     /* End of common part */
     pub(crate) compression: i32, /* level of zlib compression */
-    pub(crate) standalone: i32,  /* standalone document (no external refs)
-                                  1 if standalone="yes"
-                                  0 if standalone="no"
-                                 -1 if there is no XML declaration
-                                 -2 if there is an XML declaration, but no
-                                 standalone attribute was specified */
+    // standalone document (no external refs)
+    //   1 if standalone="yes"
+    //   0 if standalone="no"
+    //  -1 if there is no XML declaration
+    //  -2 if there is an XML declaration, but no
+    //  standalone attribute was specified
+    pub(crate) standalone: i32,
     pub int_subset: *mut XmlDtd,        /* the document internal subset */
     pub(crate) ext_subset: *mut XmlDtd, /* the document external subset */
     pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
     pub(crate) version: Option<String>, /* the XML version string */
     pub(crate) encoding: Option<String>, /* external initial encoding, if any */
-    pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>, /* Hash table for ID attributes if any */
-    pub(crate) refs: *mut c_void, /* Hash table for IDREFs attributes if any */
-    pub(crate) url: Option<String>, /* The URI for that document */
-    pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,
-                                  actually an xmlCharEncoding */
+    // Hash table for ID attributes if any
+    pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>,
+    pub(crate) refs: Option<Box<XmlHashTable<'static, XmlListPtr>>>, /* Hash table for IDREFs attributes if any */
+    pub(crate) url: Option<String>,                                  /* The URI for that document */
+    // Internal flag for charset handling, actually an xmlCharEncoding
+    pub(crate) charset: XmlCharEncoding,
     // `dict` confuses me very much about the lifetime of the string...
     // I believe it is incompatible with the lifetime of Rust objects, so I removed it.
     // pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
     pub(crate) psvi: *mut c_void, /* for type/PSVI information */
-    pub(crate) parse_flags: i32,  /* set of xmlParserOption used to parse the
-                                  document */
-    pub properties: i32, /* set of xmlDocProperties for this document
-                         set at the end of parsing */
+    // set of xmlParserOption used to parse the document
+    pub(crate) parse_flags: i32,
+    // set of xmlDocProperties for this document
+    // set at the end of parsing
+    pub properties: i32,
 }
 
 impl XmlDoc {
@@ -806,7 +810,7 @@ impl Default for XmlDoc {
             version: None,
             encoding: None,
             ids: None,
-            refs: null_mut(),
+            refs: None,
             url: None,
             charset: XmlCharEncoding::None,
             psvi: null_mut(),
