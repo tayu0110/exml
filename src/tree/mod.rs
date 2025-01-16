@@ -51,7 +51,6 @@ use crate::{
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     libxml::{
         chvalid::xml_is_blank_char,
-        dict::{xml_dict_lookup, xml_dict_owns, XmlDictPtr},
         globals::{
             xml_deregister_node_default_value, xml_free, xml_malloc, xml_malloc_atomic,
             xml_register_node_default_value,
@@ -2795,26 +2794,6 @@ pub unsafe fn xml_free_node(cur: XmlNodePtr) {
     }
 
     xml_free(cur as _);
-}
-
-unsafe fn copy_string_for_new_dict_if_needed(
-    old_dict: XmlDictPtr,
-    new_dict: XmlDictPtr,
-    old_value: *const XmlChar,
-) -> *const XmlChar {
-    let mut new_value: *const XmlChar = old_value;
-    if !old_value.is_null() {
-        let old_dict_owns_old_value: i32 =
-            (!old_dict.is_null() && xml_dict_owns(old_dict, old_value) == 1) as i32;
-        if old_dict_owns_old_value != 0 {
-            if !new_dict.is_null() {
-                new_value = xml_dict_lookup(new_dict, old_value, -1);
-            } else {
-                new_value = xml_strdup(old_value);
-            }
-        }
-    }
-    new_value
 }
 
 /// Verify that the given namespace held on @ancestor is still in scope on node.

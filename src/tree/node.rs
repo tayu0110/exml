@@ -39,12 +39,12 @@ use crate::{
 };
 
 use super::{
-    copy_string_for_new_dict_if_needed, xml_buf_cat, xml_buf_create, xml_buf_create_size,
-    xml_buf_detach, xml_buf_free, xml_buf_set_allocation_scheme, xml_encode_attribute_entities,
-    xml_encode_entities_reentrant, xml_free_node, xml_free_prop, xml_get_doc_entity,
-    xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon, XmlAttr, XmlAttrPtr,
-    XmlAttributeType, XmlBufPtr, XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlElementType,
-    XmlEntityPtr, XmlNs, XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free,
+    xml_buf_set_allocation_scheme, xml_encode_attribute_entities, xml_encode_entities_reentrant,
+    xml_free_node, xml_free_prop, xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope,
+    xml_tree_err_memory, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlBufPtr,
+    XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlNs, XmlNsPtr,
+    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 /// A node in an XML tree.
@@ -1571,9 +1571,6 @@ impl XmlNode {
             return;
         }
         if self.document() != doc {
-            let old_tree_dict = null_mut();
-            let new_dict = null_mut();
-
             if matches!(self.element_type(), XmlElementType::XmlElementNode) {
                 prop = self.properties;
                 while !prop.is_null() {
@@ -1582,12 +1579,6 @@ impl XmlNode {
                     }
 
                     if (*prop).document() != doc {
-                        let old_prop_dict = null_mut();
-                        (*prop).name = copy_string_for_new_dict_if_needed(
-                            old_prop_dict,
-                            new_dict,
-                            (*prop).name,
-                        );
                         (*prop).set_document(doc);
                     }
                     if let Some(mut children) = (*prop).children() {
@@ -1614,10 +1605,7 @@ impl XmlNode {
                 children.set_doc_all_sibling(doc);
             }
 
-            self.name = copy_string_for_new_dict_if_needed(old_tree_dict, new_dict, self.name);
-            self.content =
-                copy_string_for_new_dict_if_needed(old_tree_dict, null_mut(), self.content) as _;
-            /* FIXME: self.ns should be updated as in xmlStaticCopyNode(). */
+            // FIXME: self.ns should be updated as in xmlStaticCopyNode().
             self.set_document(doc);
         }
     }
