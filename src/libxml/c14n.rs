@@ -53,10 +53,7 @@ use crate::{
 
 use super::{
     globals::{xml_free, xml_malloc_atomic, xml_realloc},
-    list::{
-        xml_list_create, xml_list_delete, xml_list_insert, xml_list_search, xml_list_walk,
-        XmlListPtr,
-    },
+    list::{xml_list_create, xml_list_delete, xml_list_insert, xml_list_walk, XmlList, XmlListPtr},
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, XmlChar},
 };
@@ -421,12 +418,16 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Create a sorted list to store element attributes
-        let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_attrs_compare));
-        if list.is_null() {
-            xml_c14n_err_internal("creating attributes list");
-            return -1;
-        }
-
+        let mut list = XmlList::<*mut XmlAttr>::new(
+            None,
+            Rc::new(
+                |&attr1, &attr2| match xml_c14n_attrs_compare(attr1 as _, attr2 as _) {
+                    ..0 => std::cmp::Ordering::Less,
+                    0 => std::cmp::Ordering::Equal,
+                    1.. => std::cmp::Ordering::Greater,
+                },
+            ),
+        );
         match self.mode {
             XmlC14NMode::XmlC14N1_0 => {
                 // The processing of an element node E MUST be modified slightly when an XPath node-set is
@@ -444,7 +445,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 while !attr.is_null() {
                     // check that attribute is visible
                     if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                        xml_list_insert(list, attr as _);
+                        list.insert_lower_bound(attr);
                     }
                     attr = (*attr).next;
                 }
@@ -462,10 +463,8 @@ impl<T> XmlC14NCtx<'_, T> {
                     while !tmp.is_null() {
                         attr = (*tmp).properties;
                         while !attr.is_null() {
-                            if xml_c14n_is_xml_attr(attr)
-                                && xml_list_search(list, attr as _).is_null()
-                            {
-                                xml_list_insert(list, attr as _);
+                            if xml_c14n_is_xml_attr(attr) && list.search(&attr).is_none() {
+                                list.insert_lower_bound(attr);
                             }
                             attr = (*attr).next;
                         }
@@ -482,7 +481,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 while !attr.is_null() {
                     /* check that attribute is visible */
                     if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                        xml_list_insert(list, attr as _);
+                        list.insert_lower_bound(attr);
                     }
                     attr = (*attr).next;
                 }
@@ -527,7 +526,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if !parent_visible || !xml_c14n_is_xml_attr(attr) {
                         // check that attribute is visible
                         if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
-                            xml_list_insert(list, attr as _);
+                            list.insert_lower_bound(attr);
                         }
                     } else {
                         let mut matched: i32 = 0;
@@ -561,7 +560,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         if matched == 0
                             && self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur))
                         {
-                            xml_list_insert(list, attr as _);
+                            list.insert_lower_bound(attr);
                         }
                     }
 
@@ -580,7 +579,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         );
                     }
                     if !xml_lang_attr.is_null() {
-                        xml_list_insert(list, xml_lang_attr as _);
+                        list.insert_lower_bound(xml_lang_attr);
                     }
                     if xml_space_attr.is_null() {
                         xml_space_attr = self.find_hidden_parent_attr(
@@ -590,7 +589,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         );
                     }
                     if !xml_space_attr.is_null() {
-                        xml_list_insert(list, xml_space_attr as _);
+                        list.insert_lower_bound(xml_space_attr);
                     }
 
                     // base uri attribute - fix up
@@ -605,7 +604,7 @@ impl<T> XmlC14NCtx<'_, T> {
                     if !xml_base_attr.is_null() {
                         xml_base_attr = self.fixup_base_attr(&*xml_base_attr);
                         if !xml_base_attr.is_null() {
-                            xml_list_insert(list, xml_base_attr as _);
+                            list.insert_lower_bound(xml_base_attr);
 
                             // note that we MUST delete returned attr node ourselves!
                             (*xml_base_attr).next = attrs_to_delete;
@@ -617,15 +616,12 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        xml_list_walk(
-            list,
-            Some(xml_c14n_print_attrs::<T>),
-            self as *const XmlC14NCtx<T> as _,
-        );
+        list.walk(|data| {
+            xml_c14n_print_attrs::<T>(*data as _, self as *mut XmlC14NCtx<T> as _) != 0
+        });
 
         // Cleanup
         xml_free_prop_list(attrs_to_delete);
-        xml_list_delete(list);
         0
     }
 
