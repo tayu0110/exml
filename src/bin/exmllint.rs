@@ -744,7 +744,7 @@ static CMD_ARGS: LazyLock<CmdArgs> = LazyLock::new(|| {
             unsafe {
                 let pattern = CString::new(p).unwrap();
                 PATTERNC.store(
-                    xml_patterncompile(p.as_ptr() as _, null_mut(), 0, None),
+                    xml_patterncompile(p.as_ptr() as _, 0, None),
                     Ordering::Relaxed,
                 );
                 if PATTERNC.load(Ordering::Relaxed).is_null() {
@@ -2317,7 +2317,6 @@ unsafe fn walk_doc(doc: XmlDocPtr) {
             PATTERNC.store(
                 xml_patterncompile(
                     cpattern.as_ptr() as *const u8,
-                    null_mut(),
                     0,
                     Some(namespaces[..=i].to_vec()),
                 ),

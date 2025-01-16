@@ -10109,14 +10109,12 @@ unsafe extern "C" fn xml_schema_check_cselector_xpath(
         if is_field != 0 {
             (*selector).xpath_comp = xml_patterncompile(
                 (*selector).xpath,
-                null_mut(),
                 XmlPatternFlags::XmlPatternXsfield as i32,
                 ns_array,
             ) as _;
         } else {
             (*selector).xpath_comp = xml_patterncompile(
                 (*selector).xpath,
-                null_mut(),
                 XmlPatternFlags::XmlPatternXssel as i32,
                 ns_array,
             ) as _;

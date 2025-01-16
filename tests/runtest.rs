@@ -4096,12 +4096,7 @@ unsafe fn pattern_test(
                         ns = (*ns).next;
                     }
 
-                    patternc = xml_patterncompile(
-                        str.as_ptr(),
-                        null_mut(),
-                        0,
-                        Some(namespaces[..=j].to_vec()),
-                    );
+                    patternc = xml_patterncompile(str.as_ptr(), 0, Some(namespaces[..=j].to_vec()));
                     if patternc.is_null() {
                         let str = CStr::from_ptr(str.as_ptr() as *const i8).to_string_lossy();
                         test_error_handler(

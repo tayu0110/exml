@@ -2797,8 +2797,7 @@ impl XmlTextReader {
         use super::globals::xml_realloc;
 
         let pattern = CString::new(pattern).unwrap();
-        let comp: XmlPatternPtr =
-            xml_patterncompile(pattern.as_ptr() as *const u8, self.dict, 0, namespaces);
+        let comp: XmlPatternPtr = xml_patterncompile(pattern.as_ptr() as *const u8, 0, namespaces);
         if comp.is_null() {
             return -1;
         }

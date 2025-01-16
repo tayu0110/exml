@@ -35,7 +35,6 @@ use libc::memset;
 use crate::{
     libxml::{
         chvalid::{xml_is_blank_char, xml_is_combining, xml_is_digit, xml_is_extender},
-        dict::{xml_dict_free, xml_dict_lookup, xml_dict_reference, XmlDict, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_realloc},
         parser_internals::{xml_is_letter, xml_string_current_char},
         xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
@@ -94,7 +93,6 @@ pub struct XmlStreamStep {
 pub type XmlStreamCompPtr = *mut XmlStreamComp;
 #[repr(C)]
 pub struct XmlStreamComp {
-    dict: *mut XmlDict,      /* the dictionary if any */
     nb_step: i32,            /* number of steps in the automata */
     max_step: i32,           /* allocated number of steps */
     steps: XmlStreamStepPtr, /* the array of steps */
@@ -107,7 +105,6 @@ pub type XmlPatternPtr = *mut XmlPattern;
 #[repr(C)]
 pub struct XmlPattern {
     data: *mut c_void,       /* the associated template */
-    dict: XmlDictPtr,        /* the optional dictionary */
     next: *mut XmlPattern,   /* next pattern if | is used */
     pattern: *const XmlChar, /* the pattern */
     flags: i32,              /* flags */
@@ -144,9 +141,6 @@ unsafe fn xml_free_stream_comp(comp: XmlStreamCompPtr) {
         if !(*comp).steps.is_null() {
             xml_free((*comp).steps as _);
         }
-        if !(*comp).dict.is_null() {
-            xml_dict_free((*comp).dict);
-        }
         xml_free(comp as _);
     }
 }
@@ -164,21 +158,16 @@ unsafe fn xml_free_pattern_internal(comp: XmlPatternPtr) {
         xml_free((*comp).pattern as _);
     }
     if !(*comp).steps.is_null() {
-        if (*comp).dict.is_null() {
-            for i in 0..(*comp).nb_step {
-                op = (*comp).steps.add(i as usize);
-                if !(*op).value.is_null() {
-                    xml_free((*op).value as _);
-                }
-                if !(*op).value2.is_null() {
-                    xml_free((*op).value2 as _);
-                }
+        for i in 0..(*comp).nb_step {
+            op = (*comp).steps.add(i as usize);
+            if !(*op).value.is_null() {
+                xml_free((*op).value as _);
+            }
+            if !(*op).value2.is_null() {
+                xml_free((*op).value2 as _);
             }
         }
         xml_free((*comp).steps as _);
-    }
-    if !(*comp).dict.is_null() {
-        xml_dict_free((*comp).dict);
     }
 
     memset(comp as _, -1, size_of::<XmlPattern>());
@@ -204,7 +193,6 @@ pub struct XmlPatParserContext {
     cur: *const XmlChar,  /* the current char being parsed */
     base: *const XmlChar, /* the full expression */
     error: i32,           /* error code */
-    dict: XmlDictPtr,     /* the dictionary if any */
     comp: XmlPatternPtr,  /* the result */
     elem: XmlNodePtr,     /* the current node if any */
     namespaces: Option<Vec<(*const u8, *const u8)>>, /* the namespaces definitions */
@@ -216,7 +204,6 @@ impl Default for XmlPatParserContext {
             cur: null(),
             base: null(),
             error: 0,
-            dict: null_mut(),
             comp: null_mut(),
             elem: null_mut(),
             namespaces: None,
@@ -230,7 +217,6 @@ impl Default for XmlPatParserContext {
 #[doc(alias = "xmlNewPatParserContext")]
 unsafe fn xml_new_pat_parser_context(
     pattern: *const XmlChar,
-    dict: XmlDictPtr,
     namespaces: Option<Vec<(*const u8, *const u8)>>,
 ) -> XmlPatParserContextPtr {
     if pattern.is_null() {
@@ -243,7 +229,6 @@ unsafe fn xml_new_pat_parser_context(
         return null_mut();
     }
     std::ptr::write(&mut *cur, XmlPatParserContext::default());
-    (*cur).dict = dict;
     (*cur).cur = pattern;
     (*cur).base = pattern;
     (*cur).namespaces = namespaces;
@@ -369,19 +354,13 @@ macro_rules! XML_STREAM_XS_IDC_SEL {
 
 macro_rules! XML_PAT_FREE_STRING {
     ($c:expr, $r:expr) => {
-        if (*(*$c).comp).dict.is_null() {
-            xml_free($r as _);
-        }
+        xml_free($r as _)
     };
 }
 
 macro_rules! XML_PAT_COPY_NSNAME {
     ($c:expr, $r:expr, $nsname:expr) => {
-        if !(*(*$c).comp).dict.is_null() {
-            $r = xml_dict_lookup((*(*$c).comp).dict, $nsname, -1) as *mut XmlChar;
-        } else {
-            $r = xml_strdup($nsname);
-        }
+        $r = xml_strdup($nsname);
     };
 }
 
@@ -420,11 +399,7 @@ unsafe fn xml_pat_scan_ncname(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
         cur = cur.add(len as usize);
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
     }
-    let ret = if !(*ctxt).dict.is_null() {
-        xml_dict_lookup((*ctxt).dict, q, cur.offset_from(q) as _) as *mut XmlChar
-    } else {
-        xml_strndup(q, cur.offset_from(q) as _)
-    };
+    let ret = xml_strndup(q, cur.offset_from(q) as _);
     CUR_PTR!(ctxt) = cur;
     ret
 }
@@ -464,11 +439,7 @@ unsafe fn xml_pat_scan_name(ctxt: XmlPatParserContextPtr) -> *mut XmlChar {
         cur = cur.add(len as usize);
         val = xml_string_current_char(null_mut(), cur, addr_of_mut!(len));
     }
-    let ret = if !(*ctxt).dict.is_null() {
-        xml_dict_lookup((*ctxt).dict, q, cur.offset_from(q) as _) as *mut XmlChar
-    } else {
-        xml_strndup(q, cur.offset_from(q) as _)
-    };
+    let ret = xml_strndup(q, cur.offset_from(q) as _);
     CUR_PTR!(ctxt) = cur;
     ret
 }
@@ -1020,10 +991,6 @@ unsafe fn xml_stream_compile(comp: XmlPatternPtr) -> i32 {
     if stream.is_null() {
         return -1;
     }
-    if !(*comp).dict.is_null() {
-        (*stream).dict = (*comp).dict;
-        xml_dict_reference((*stream).dict);
-    }
 
     if (*comp).flags & PAT_FROM_ROOT as i32 != 0 {
         (*stream).flags |= XML_STREAM_FROM_ROOT as i32;
@@ -1255,7 +1222,6 @@ unsafe fn xml_reverse_pattern(comp: XmlPatternPtr) -> i32 {
 #[doc(alias = "xmlPatterncompile")]
 pub unsafe fn xml_patterncompile(
     pattern: *const XmlChar,
-    dict: *mut XmlDict,
     flags: i32,
     namespaces: Option<Vec<(*const u8, *const u8)>>,
 ) -> XmlPatternPtr {
@@ -1281,11 +1247,11 @@ pub unsafe fn xml_patterncompile(
                 or = or.add(1);
             }
             if *or == 0 {
-                ctxt = xml_new_pat_parser_context(start, dict, namespaces.clone());
+                ctxt = xml_new_pat_parser_context(start, namespaces.clone());
             } else {
                 tmp = xml_strndup(start, or.offset_from(start) as _);
                 if !tmp.is_null() {
-                    ctxt = xml_new_pat_parser_context(tmp, dict, namespaces.clone());
+                    ctxt = xml_new_pat_parser_context(tmp, namespaces.clone());
                 }
                 or = or.add(1);
             }
@@ -1297,10 +1263,6 @@ pub unsafe fn xml_patterncompile(
                 break 'error;
             }
             // Assign string dict.
-            if !dict.is_null() {
-                (*cur).dict = dict;
-                xml_dict_reference(dict);
-            }
             if ret.is_null() {
                 ret = cur;
             } else {

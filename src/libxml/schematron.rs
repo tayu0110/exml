@@ -599,7 +599,6 @@ unsafe extern "C" fn xml_schematron_add_rule(
     // Try first to compile the pattern
     let pattern: XmlPatternPtr = xml_patterncompile(
         context,
-        (*ctxt).dict,
         XmlPatternFlags::XmlPatternXpath as i32,
         (*ctxt).namespaces.clone(),
     );

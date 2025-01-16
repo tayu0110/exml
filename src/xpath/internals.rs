@@ -1940,12 +1940,7 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
             }
         }
 
-        stream = xml_patterncompile(
-            str,
-            dict,
-            XmlPatternFlags::XmlPatternXpath as i32,
-            namespaces,
-        );
+        stream = xml_patterncompile(str, XmlPatternFlags::XmlPatternXpath as i32, namespaces);
         if !stream.is_null() && xml_pattern_streamable(stream) == 1 {
             comp = xml_xpath_new_comp_expr();
             if comp.is_null() {
