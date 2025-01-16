@@ -421,7 +421,7 @@ impl<T> XmlC14NCtx<'_, T> {
         let mut list = XmlList::<*mut XmlAttr>::new(
             None,
             Rc::new(
-                |&attr1, &attr2| match xml_c14n_attrs_compare(attr1 as _, attr2 as _) {
+                |&attr1, &attr2| match xml_c14n_attrs_compare(attr1, attr2) {
                     ..0 => std::cmp::Ordering::Less,
                     0 => std::cmp::Ordering::Equal,
                     1.. => std::cmp::Ordering::Greater,
@@ -1694,10 +1694,7 @@ extern "C" fn xml_c14n_print_namespaces_walker<T>(ns: *const c_void, ctx: *mut c
 ///
 /// Returns -1 if attr1 < attr2, 0 if attr1 == attr2 or 1 if attr1 > attr2.
 #[doc(alias = "xmlC14NAttrsCompare")]
-extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void) -> i32 {
-    let attr1: XmlAttrPtr = data1 as _;
-    let attr2: XmlAttrPtr = data2 as _;
-
+unsafe fn xml_c14n_attrs_compare(attr1: XmlAttrPtr, attr2: XmlAttrPtr) -> i32 {
     // Simple cases
     if attr1 == attr2 {
         return 0;
@@ -1709,33 +1706,31 @@ extern "C" fn xml_c14n_attrs_compare(data1: *const c_void, data2: *const c_void)
         return 1;
     }
 
-    unsafe {
-        if (*attr1).ns == (*attr2).ns {
-            return xml_strcmp((*attr1).name, (*attr2).name);
-        }
-
-        // Attributes in the default namespace are first
-        // because the default namespace is not applied to
-        // unqualified attributes
-        if (*attr1).ns.is_null() {
-            return -1;
-        }
-        if (*attr2).ns.is_null() {
-            return 1;
-        }
-        if (*(*attr1).ns).prefix().is_none() {
-            return -1;
-        }
-        if (*(*attr2).ns).prefix().is_none() {
-            return 1;
-        }
-
-        let mut ret: i32 = xml_strcmp((*(*attr1).ns).href, (*(*attr2).ns).href);
-        if ret == 0 {
-            ret = xml_strcmp((*attr1).name, (*attr2).name);
-        }
-        ret
+    if (*attr1).ns == (*attr2).ns {
+        return xml_strcmp((*attr1).name, (*attr2).name);
     }
+
+    // Attributes in the default namespace are first
+    // because the default namespace is not applied to
+    // unqualified attributes
+    if (*attr1).ns.is_null() {
+        return -1;
+    }
+    if (*attr2).ns.is_null() {
+        return 1;
+    }
+    if (*(*attr1).ns).prefix().is_none() {
+        return -1;
+    }
+    if (*(*attr2).ns).prefix().is_none() {
+        return 1;
+    }
+
+    let mut ret: i32 = xml_strcmp((*(*attr1).ns).href, (*(*attr2).ns).href);
+    if ret == 0 {
+        ret = xml_strcmp((*attr1).name, (*attr2).name);
+    }
+    ret
 }
 
 /// Checks whether `attr` is a default "xml:" namespace with `href="http://www.w3.org/XML/1998/namespace"`.  
