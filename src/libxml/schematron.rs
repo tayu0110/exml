@@ -70,13 +70,11 @@ pub enum XmlSchematronValidOptions {
 
 /// Signature of an error callback from a Schematron validation
 #[doc(alias = "xmlSchematronValidityErrorFunc")]
-pub type XmlSchematronValidityErrorFunc =
-    unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlSchematronValidityErrorFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 /// Signature of a warning callback from a Schematron validation
 #[doc(alias = "xmlSchematronValidityWarningFunc")]
-pub type XmlSchematronValidityWarningFunc =
-    unsafe extern "C" fn(ctx: *mut c_void, msg: *const c_char);
+pub type XmlSchematronValidityWarningFunc = unsafe fn(ctx: *mut c_void, msg: *const c_char);
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -292,9 +290,7 @@ unsafe fn xml_schematron_perr_memory(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchematronNewParserCtxt")]
-pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
-    url: *const c_char,
-) -> XmlSchematronParserCtxtPtr {
+pub unsafe fn xml_schematron_new_parser_ctxt(url: *const c_char) -> XmlSchematronParserCtxtPtr {
     if url.is_null() {
         return null_mut();
     }
@@ -329,7 +325,7 @@ pub unsafe extern "C" fn xml_schematron_new_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchematronNewMemParserCtxt")]
-pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
+pub unsafe fn xml_schematron_new_mem_parser_ctxt(
     buffer: *const c_char,
     size: i32,
 ) -> XmlSchematronParserCtxtPtr {
@@ -365,9 +361,7 @@ pub unsafe extern "C" fn xml_schematron_new_mem_parser_ctxt(
 ///
 /// Returns the parser context or NULL in case of error
 #[doc(alias = "xmlSchematronNewDocParserCtxt")]
-pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
-    doc: XmlDocPtr,
-) -> XmlSchematronParserCtxtPtr {
+pub unsafe fn xml_schematron_new_doc_parser_ctxt(doc: XmlDocPtr) -> XmlSchematronParserCtxtPtr {
     if doc.is_null() {
         return null_mut();
     }
@@ -381,7 +375,7 @@ pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
     memset(ret as _, 0, size_of::<XmlSchematronParserCtxt>());
     (*ret).doc = doc;
     (*ret).dict = xml_dict_create();
-    /* The application has responsibility for the document */
+    // The application has responsibility for the document
     (*ret).preserve = 1;
     (*ret).xctxt = xml_xpath_new_context(doc);
     if (*ret).xctxt.is_null() {
@@ -399,7 +393,7 @@ pub unsafe extern "C" fn xml_schematron_new_doc_parser_ctxt(
 
 /// Free the resources associated to the schema parser context
 #[doc(alias = "xmlSchematronFreeParserCtxt")]
-pub unsafe extern "C" fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) {
+pub unsafe fn xml_schematron_free_parser_ctxt(ctxt: XmlSchematronParserCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -515,9 +509,7 @@ macro_rules! xml_schematron_perr {
 ///
 /// Returns the newly allocated structure or NULL in case or error
 #[doc(alias = "xmlSchematronNewSchematron")]
-unsafe extern "C" fn xml_schematron_new_schematron(
-    ctxt: XmlSchematronParserCtxtPtr,
-) -> XmlSchematronPtr {
+unsafe fn xml_schematron_new_schematron(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchematronPtr {
     let ret: XmlSchematronPtr = xml_malloc(size_of::<XmlSchematron>()) as XmlSchematronPtr;
     if ret.is_null() {
         xml_schematron_perr_memory(ctxt, "allocating schema", null_mut());
@@ -532,7 +524,7 @@ unsafe extern "C" fn xml_schematron_new_schematron(
 
 /// Add a namespace definition in the context
 #[doc(alias = "xmlSchematronAddNamespace")]
-unsafe extern "C" fn xml_schematron_add_namespace(
+unsafe fn xml_schematron_add_namespace(
     ctxt: XmlSchematronParserCtxtPtr,
     prefix: *const XmlChar,
     ns: *const XmlChar,
@@ -548,7 +540,7 @@ unsafe extern "C" fn xml_schematron_add_namespace(
 ///
 /// Returns the new pointer or NULL in case of error
 #[doc(alias = "xmlSchematronAddPattern")]
-unsafe extern "C" fn xml_schematron_add_pattern(
+unsafe fn xml_schematron_add_pattern(
     ctxt: XmlSchematronParserCtxtPtr,
     schema: XmlSchematronPtr,
     node: XmlNodePtr,
@@ -584,7 +576,7 @@ unsafe extern "C" fn xml_schematron_add_pattern(
 ///
 /// Returns the new pointer or NULL in case of error
 #[doc(alias = "xmlSchematronAddRule")]
-unsafe extern "C" fn xml_schematron_add_rule(
+unsafe fn xml_schematron_add_rule(
     ctxt: XmlSchematronParserCtxtPtr,
     schema: XmlSchematronPtr,
     pat: XmlSchematronPatternPtr,
@@ -652,10 +644,7 @@ unsafe extern "C" fn xml_schematron_add_rule(
 
 /// Format the message content of the assert or report test
 #[doc(alias = "xmlSchematronParseTestReportMsg")]
-unsafe extern "C" fn xml_schematron_parse_test_report_msg(
-    ctxt: XmlSchematronParserCtxtPtr,
-    con: XmlNodePtr,
-) {
+unsafe fn xml_schematron_parse_test_report_msg(ctxt: XmlSchematronParserCtxtPtr, con: XmlNodePtr) {
     let mut comp: XmlXPathCompExprPtr;
 
     let mut child = (*con).children().map_or(null_mut(), |c| c.as_ptr());
@@ -699,7 +688,7 @@ unsafe extern "C" fn xml_schematron_parse_test_report_msg(
 ///
 /// Returns the new pointer or NULL in case of error
 #[doc(alias = "xmlSchematronAddTest")]
-unsafe extern "C" fn xml_schematron_add_test(
+unsafe fn xml_schematron_add_test(
     ctxt: XmlSchematronParserCtxtPtr,
     typ: XmlSchematronTestType,
     rule: XmlSchematronRulePtr,
@@ -753,7 +742,7 @@ unsafe extern "C" fn xml_schematron_add_test(
 
 /// Parse a rule element
 #[doc(alias = "xmlSchematronParseRule")]
-unsafe extern "C" fn xml_schematron_parse_rule(
+unsafe fn xml_schematron_parse_rule(
     ctxt: XmlSchematronParserCtxtPtr,
     pattern: XmlSchematronPatternPtr,
     rule: XmlNodePtr,
@@ -974,10 +963,7 @@ unsafe extern "C" fn xml_schematron_parse_rule(
 
 /// Parse a pattern element
 #[doc(alias = "xmlSchematronParsePattern")]
-unsafe extern "C" fn xml_schematron_parse_pattern(
-    ctxt: XmlSchematronParserCtxtPtr,
-    pat: XmlNodePtr,
-) {
+unsafe fn xml_schematron_parse_pattern(ctxt: XmlSchematronParserCtxtPtr, pat: XmlNodePtr) {
     let mut nb_rules: i32 = 0;
 
     if ctxt.is_null() || pat.is_null() {
@@ -1199,7 +1185,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
                 );
             // goto exit;
             } else {
-                /* the original document must be kept for reporting */
+                // the original document must be kept for reporting
                 (*ret).doc = doc;
                 if preserve != 0 {
                     (*ret).preserve = 1;
@@ -1226,7 +1212,7 @@ pub unsafe fn xml_schematron_parse(ctxt: XmlSchematronParserCtxtPtr) -> XmlSchem
 
 /// Free a list of tests.
 #[doc(alias = "xmlSchematronFreeTests")]
-unsafe extern "C" fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) {
+unsafe fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) {
     let mut next: XmlSchematronTestPtr;
 
     while !tests.is_null() {
@@ -1247,7 +1233,7 @@ unsafe extern "C" fn xml_schematron_free_tests(mut tests: XmlSchematronTestPtr) 
 
 /// Free a list of let variables.
 #[doc(alias = "xmlSchematronFreeLets")]
-unsafe extern "C" fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
+unsafe fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
     let mut next: XmlSchematronLetPtr;
 
     while !lets.is_null() {
@@ -1265,7 +1251,7 @@ unsafe extern "C" fn xml_schematron_free_lets(mut lets: XmlSchematronLetPtr) {
 
 /// Free a list of rules.
 #[doc(alias = "xmlSchematronFreeRules")]
-unsafe extern "C" fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) {
+unsafe fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) {
     let mut next: XmlSchematronRulePtr;
 
     while !rules.is_null() {
@@ -1292,7 +1278,7 @@ unsafe extern "C" fn xml_schematron_free_rules(mut rules: XmlSchematronRulePtr) 
 
 /// Free a list of patterns.
 #[doc(alias = "xmlSchematronFreePatterns")]
-unsafe extern "C" fn xml_schematron_free_patterns(mut patterns: XmlSchematronPatternPtr) {
+unsafe fn xml_schematron_free_patterns(mut patterns: XmlSchematronPatternPtr) {
     let mut next: XmlSchematronPatternPtr;
 
     while !patterns.is_null() {
@@ -1307,7 +1293,7 @@ unsafe extern "C" fn xml_schematron_free_patterns(mut patterns: XmlSchematronPat
 
 /// Deallocate a Schematron structure.
 #[doc(alias = "xmlSchematronFree")]
-pub unsafe extern "C" fn xml_schematron_free(schema: XmlSchematronPtr) {
+pub unsafe fn xml_schematron_free(schema: XmlSchematronPtr) {
     if schema.is_null() {
         return;
     }
@@ -1358,7 +1344,7 @@ unsafe fn xml_schematron_verr_memory(
 ///
 /// Returns the validation context or NULL in case of error
 #[doc(alias = "xmlSchematronNewValidCtxt")]
-pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
+pub unsafe fn xml_schematron_new_valid_ctxt(
     schema: XmlSchematronPtr,
     options: i32,
 ) -> XmlSchematronValidCtxtPtr {
@@ -1395,7 +1381,7 @@ pub unsafe extern "C" fn xml_schematron_new_valid_ctxt(
 
 /// Free the resources associated to the schema validation context
 #[doc(alias = "xmlSchematronFreeValidCtxt")]
-pub unsafe extern "C" fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
+pub unsafe fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValidCtxtPtr) {
     if ctxt.is_null() {
         return;
     }
@@ -1412,7 +1398,7 @@ pub unsafe extern "C" fn xml_schematron_free_valid_ctxt(ctxt: XmlSchematronValid
 ///
 /// Returns -1 in case of errors, otherwise 0
 #[doc(alias = "xmlSchematronRegisterVariables")]
-unsafe extern "C" fn xml_schematron_register_variables(
+unsafe fn xml_schematron_register_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
     instance: XmlDocPtr,
@@ -1437,7 +1423,7 @@ unsafe extern "C" fn xml_schematron_register_variables(
     0
 }
 
-unsafe extern "C" fn xml_schematron_get_node(
+unsafe fn xml_schematron_get_node(
     ctxt: XmlSchematronValidCtxtPtr,
     cur: XmlNodePtr,
     xpath: *const XmlChar,
@@ -1471,7 +1457,7 @@ unsafe extern "C" fn xml_schematron_get_node(
 ///
 /// Returns a report string or NULL in case of error. The string needs to be deallocated by the caller
 #[doc(alias = "xmlSchematronFormatReport")]
-unsafe extern "C" fn xml_schematron_format_report(
+unsafe fn xml_schematron_format_report(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlNodePtr,
     cur: XmlNodePtr,
@@ -1545,7 +1531,6 @@ unsafe extern "C" fn xml_schematron_format_report(
                 XmlXPathObjectType::XPathNumber => {
                     let size: i32 = snprintf(null_mut(), 0, c"%0g".as_ptr() as _, (*eval).floatval);
                     let buf: *mut XmlChar = malloc(size as usize) as _;
-                    /* xmlStrPrintf(buf, size, c"%0g".as_ptr() as _, (*eval).floatval); // doesn't work */
                     sprintf(buf as _, c"%0g".as_ptr() as _, (*eval).floatval);
                     ret = xml_strcat(ret, buf);
                     xml_free(buf as _);
@@ -1574,9 +1559,7 @@ unsafe extern "C" fn xml_schematron_format_report(
             continue;
         }
 
-        /*
-         * remove superfluous \n
-         */
+        // remove superfluous \n
         if !ret.is_null() {
             let mut len: i32 = xml_strlen(ret) as _;
             let mut c: XmlChar;
@@ -1604,18 +1587,18 @@ unsafe extern "C" fn xml_schematron_format_report(
 
 /// Output part of the report to whatever channel the user selected
 #[doc(alias = "xmlSchematronReportOutput")]
-unsafe extern "C" fn xml_schematron_report_output(
+unsafe fn xml_schematron_report_output(
     _ctxt: XmlSchematronValidCtxtPtr,
     _cur: XmlNodePtr,
     msg: *const c_char,
 ) {
-    /* TODO */
+    // TODO
     eprintln!("{}", CStr::from_ptr(msg).to_string_lossy());
 }
 
 /// Called from the validation engine when an assert or report test have been done.
 #[doc(alias = "xmlSchematronReportSuccess")]
-unsafe extern "C" fn xml_schematron_report_success(
+unsafe fn xml_schematron_report_success(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
     cur: XmlNodePtr,
@@ -1625,7 +1608,7 @@ unsafe extern "C" fn xml_schematron_report_success(
     if ctxt.is_null() || cur.is_null() || test.is_null() {
         return;
     }
-    /* if quiet and not SVRL report only failures */
+    // if quiet and not SVRL report only failures
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
         && (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 == 0
         && (*test).typ == XmlSchematronTestType::XmlSchematronReport
@@ -1722,7 +1705,7 @@ unsafe extern "C" fn xml_schematron_report_success(
 ///
 /// Returns 1 in case of success, 0 if error and -1 in case of internal error
 #[doc(alias = "xmlSchematronRunTest")]
-unsafe extern "C" fn xml_schematron_run_test(
+unsafe fn xml_schematron_run_test(
     ctxt: XmlSchematronValidCtxtPtr,
     test: XmlSchematronTestPtr,
     instance: XmlDocPtr,
@@ -1784,7 +1767,7 @@ unsafe extern "C" fn xml_schematron_run_test(
 ///
 /// Returns -1 in case of errors, otherwise 0
 #[doc(alias = "xmlSchematronUnregisterVariables")]
-unsafe extern "C" fn xml_schematron_unregister_variables(
+unsafe fn xml_schematron_unregister_variables(
     ctxt: XmlXPathContextPtr,
     mut letr: XmlSchematronLetPtr,
 ) -> i32 {
@@ -1798,7 +1781,7 @@ unsafe extern "C" fn xml_schematron_unregister_variables(
     0
 }
 
-unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr {
+unsafe fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr {
     if let Some(children) = (*cur).children() {
         // Do not descend on entities declarations
         if children.element_type() != XmlElementType::XmlEntityDecl {
@@ -1841,7 +1824,7 @@ unsafe extern "C" fn xml_schematron_next_node(mut cur: XmlNodePtr) -> XmlNodePtr
 
 /// Called from the validation engine when starting to check a pattern
 #[doc(alias = "xmlSchematronReportPattern")]
-unsafe extern "C" fn xml_schematron_report_pattern(
+unsafe fn xml_schematron_report_pattern(
     ctxt: XmlSchematronValidCtxtPtr,
     pattern: XmlSchematronPatternPtr,
 ) {
@@ -1850,8 +1833,8 @@ unsafe extern "C" fn xml_schematron_report_pattern(
     }
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
         || (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutError as i32 != 0
-    /* Error gives pattern name as part of error */
     {
+        // Error gives pattern name as part of error
         return;
     }
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutXml as i32 != 0 {
@@ -1876,7 +1859,7 @@ unsafe extern "C" fn xml_schematron_report_pattern(
 ///
 /// Returns 0 in case of success, -1 in case of internal error and an error count otherwise.
 #[doc(alias = "xmlSchematronValidateDoc")]
-pub unsafe extern "C" fn xml_schematron_validate_doc(
+pub unsafe fn xml_schematron_validate_doc(
     ctxt: XmlSchematronValidCtxtPtr,
     instance: XmlDocPtr,
 ) -> i32 {
@@ -1902,10 +1885,8 @@ pub unsafe extern "C" fn xml_schematron_validate_doc(
     if (*ctxt).flags & XmlSchematronValidOptions::XmlSchematronOutQuiet as i32 != 0
         || (*ctxt).flags == 0
     {
-        /*
-         * we are just trying to assert the validity of the document,
-         * speed primes over the output, run in a single pass
-         */
+        // we are just trying to assert the validity of the document,
+        // speed primes over the output, run in a single pass
         cur = root;
         while !cur.is_null() {
             rule = (*(*ctxt).schema).rules;
@@ -1940,20 +1921,16 @@ pub unsafe extern "C" fn xml_schematron_validate_doc(
             cur = xml_schematron_next_node(cur);
         }
     } else {
-        /*
-         * Process all contexts one at a time
-         */
+        // Process all contexts one at a time
         pattern = (*(*ctxt).schema).patterns;
 
         while !pattern.is_null() {
             xml_schematron_report_pattern(ctxt, pattern);
 
-            /*
-             * TODO convert the pattern rule to a direct XPath and
-             * compute directly instead of using the pattern matching
-             * over the full document...
-             * Check the exact semantic
-             */
+            // TODO convert the pattern rule to a direct XPath and
+            // compute directly instead of using the pattern matching
+            // over the full document...
+            // Check the exact semantic
             cur = root;
             while !cur.is_null() {
                 rule = (*pattern).rules;
@@ -1990,42 +1967,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_schematron_new_doc_parser_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schematron_new_mem_parser_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schematron_new_parser_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schematron_new_valid_ctxt() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schematron_parse() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_schematron_set_valid_structured_errors() {
-
-        /* missing type support */
-    }
 
     #[test]
     fn test_xml_schematron_validate_doc() {
