@@ -352,18 +352,6 @@ macro_rules! XML_STREAM_XS_IDC_SEL {
     };
 }
 
-macro_rules! XML_PAT_FREE_STRING {
-    ($c:expr, $r:expr) => {
-        xml_free($r as _)
-    };
-}
-
-macro_rules! XML_PAT_COPY_NSNAME {
-    ($c:expr, $r:expr, $nsname:expr) => {
-        $r = xml_strdup($nsname);
-    };
-}
-
 macro_rules! CUR_PTR {
     ($ctxt:expr) => {
         (*$ctxt).cur
@@ -468,7 +456,7 @@ unsafe fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
             NEXT!(ctxt);
 
             if xml_is_blank_char(CUR!(ctxt) as u32) {
-                XML_PAT_FREE_STRING!(ctxt, prefix);
+                xml_free(prefix as _);
                 (*ctxt).error = 1;
                 break 'error;
             }
@@ -479,23 +467,23 @@ unsafe fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
                 && *prefix.add(2) == b'l'
                 && *prefix.add(3) == 0
             {
-                XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
+                url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
             } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
                 let mut found = false;
                 for &(href, pref) in namespaces {
                     if xml_str_equal(pref, prefix) {
-                        XML_PAT_COPY_NSNAME!(ctxt, url, href);
+                        url = xml_strdup(href);
                         found = true;
                         break;
                     }
                 }
                 if !found {
-                    XML_PAT_FREE_STRING!(ctxt, prefix);
+                    xml_free(prefix as _);
                     (*ctxt).error = 1;
                     break 'error;
                 }
             }
-            XML_PAT_FREE_STRING!(ctxt, prefix);
+            xml_free(prefix as _);
             if token.is_null() {
                 if CUR!(ctxt) == b'*' {
                     NEXT!(ctxt);
@@ -514,10 +502,10 @@ unsafe fn xml_compile_attribute_test(ctxt: XmlPatParserContextPtr) {
     }
     // error:
     if !url.is_null() {
-        XML_PAT_FREE_STRING!(ctxt, url)
+        xml_free(url as _)
     }
     if !token.is_null() {
-        XML_PAT_FREE_STRING!(ctxt, token);
+        xml_free(token as _);
     }
 }
 
@@ -587,12 +575,12 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                     && *prefix.add(2) == b'l'
                     && *prefix.add(3) == 0
                 {
-                    XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
+                    url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                 } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
                     let mut found = false;
                     for &(href, pref) in namespaces {
                         if xml_str_equal(pref, prefix) {
-                            XML_PAT_COPY_NSNAME!(ctxt, url, href);
+                            url = xml_strdup(href);
                             found = true;
                             break;
                         }
@@ -602,7 +590,7 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                         break 'error;
                     }
                 }
-                XML_PAT_FREE_STRING!(ctxt, prefix);
+                xml_free(prefix as _);
                 name = null_mut();
                 if token.is_null() {
                     if CUR!(ctxt) == b'*' {
@@ -618,7 +606,7 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
             } else {
                 NEXT!(ctxt);
                 if xml_str_equal(name, c"child".as_ptr() as _) {
-                    XML_PAT_FREE_STRING!(ctxt, name);
+                    xml_free(name as _);
                     name = xml_pat_scan_name(ctxt);
                     if name.is_null() {
                         if CUR!(ctxt) == b'*' {
@@ -645,12 +633,12 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                             && *prefix.add(2) == b'l'
                             && *prefix.add(3) == 0
                         {
-                            XML_PAT_COPY_NSNAME!(ctxt, url, XML_XML_NAMESPACE.as_ptr() as _);
+                            url = xml_strdup(XML_XML_NAMESPACE.as_ptr() as _);
                         } else if let Some(namespaces) = (*ctxt).namespaces.as_deref() {
                             let mut found = false;
                             for &(href, pref) in namespaces {
                                 if xml_str_equal(pref, prefix) {
-                                    XML_PAT_COPY_NSNAME!(ctxt, url, href);
+                                    url = xml_strdup(href);
                                     found = true;
                                     break;
                                 }
@@ -660,7 +648,7 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                                 break 'error;
                             }
                         }
-                        XML_PAT_FREE_STRING!(ctxt, prefix);
+                        xml_free(prefix as _);
                         name = null_mut();
                         if token.is_null() {
                             if CUR!(ctxt) == b'*' {
@@ -677,7 +665,7 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
                         PUSH!(ctxt, XmlPatOp::XmlOpChild, name, null_mut(), 'error);
                     }
                 } else if xml_str_equal(name, c"attribute".as_ptr() as _) {
-                    XML_PAT_FREE_STRING!(ctxt, name);
+                    xml_free(name as _);
                     name = null_mut();
                     if XML_STREAM_XS_IDC_SEL!((*ctxt).comp) {
                         (*ctxt).error = 1;
@@ -707,13 +695,13 @@ unsafe fn xml_compile_step_pattern(ctxt: XmlPatParserContextPtr) {
     }
     //  error:
     if !url.is_null() {
-        XML_PAT_FREE_STRING!(ctxt, url)
+        xml_free(url as _)
     }
     if !token.is_null() {
-        XML_PAT_FREE_STRING!(ctxt, token)
+        xml_free(token as _)
     }
     if !name.is_null() {
-        XML_PAT_FREE_STRING!(ctxt, name)
+        xml_free(name as _)
     }
 }
 

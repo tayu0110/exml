@@ -51,7 +51,6 @@ use crate::{
         chvalid::{
             xml_is_blank_char, xml_is_char, xml_is_combining, xml_is_digit, xml_is_extender,
         },
-        dict::{xml_dict_lookup, xml_dict_reference, XmlDictPtr},
         globals::{xml_free, xml_malloc, xml_malloc_atomic, xml_realloc},
         parser_internals::{xml_copy_char, xml_is_letter, XML_MAX_NAMELEN, XML_MAX_NAME_LENGTH},
         pattern::{
@@ -1676,10 +1675,6 @@ pub unsafe extern "C" fn xml_xpath_new_parser_context(
         xml_free(ret as _);
         return null_mut();
     }
-    if !ctxt.is_null() && !(*ctxt).dict.is_null() {
-        (*(*ret).comp).dict = (*ctxt).dict;
-        xml_dict_reference((*(*ret).comp).dict);
-    }
 
     ret
 }
@@ -1906,7 +1901,6 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
     // be compiled to a stream lookup
     let stream: XmlPatternPtr;
     let comp: XmlXPathCompExprPtr;
-    let mut dict: XmlDictPtr = null_mut();
 
     if xml_strchr(str, b'[').is_null()
         && xml_strchr(str, b'(').is_null()
@@ -1930,7 +1924,6 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
 
         let mut namespaces = None;
         if !ctxt.is_null() {
-            dict = (*ctxt).dict;
             if let Some(table) = (*ctxt).namespaces.as_deref().filter(|t| !t.is_empty()) {
                 let namespaces =
                     namespaces.get_or_insert_with(|| vec![(null(), null()); table.len()]);
@@ -1949,10 +1942,6 @@ pub unsafe extern "C" fn xml_xpath_try_stream_compile(
                 return null_mut();
             }
             (*comp).stream = stream;
-            (*comp).dict = dict;
-            if !(*comp).dict.is_null() {
-                xml_dict_reference((*comp).dict);
-            }
             return comp;
         }
         xml_free_pattern(stream);
@@ -2056,30 +2045,8 @@ unsafe extern "C" fn xml_xpath_comp_expr_add(
     (*(*comp).steps.add((*comp).nb_step as usize)).value = value;
     (*(*comp).steps.add((*comp).nb_step as usize)).value2 = value2;
     (*(*comp).steps.add((*comp).nb_step as usize)).value3 = value3;
-    if !(*comp).dict.is_null()
-        && matches!(
-            op,
-            XmlXPathOp::XpathOpFunction | XmlXPathOp::XpathOpVariable | XmlXPathOp::XpathOpCollect
-        )
-    {
-        if !value4.is_null() {
-            (*(*comp).steps.add((*comp).nb_step as usize)).value4 =
-                xml_dict_lookup((*comp).dict, value4 as _, -1) as _;
-            xml_free(value4 as _);
-        } else {
-            (*(*comp).steps.add((*comp).nb_step as usize)).value4 = null_mut();
-        }
-        if !value5.is_null() {
-            (*(*comp).steps.add((*comp).nb_step as usize)).value5 =
-                xml_dict_lookup((*comp).dict, value5 as _, -1) as _;
-            xml_free(value5 as _);
-        } else {
-            (*(*comp).steps.add((*comp).nb_step as usize)).value5 = null_mut();
-        }
-    } else {
-        (*(*comp).steps.add((*comp).nb_step as usize)).value4 = value4;
-        (*(*comp).steps.add((*comp).nb_step as usize)).value5 = value5;
-    }
+    (*(*comp).steps.add((*comp).nb_step as usize)).value4 = value4;
+    (*(*comp).steps.add((*comp).nb_step as usize)).value5 = value5;
     (*(*comp).steps.add((*comp).nb_step as usize)).cache = None;
     let res = (*comp).nb_step;
     (*comp).nb_step += 1;

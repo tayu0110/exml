@@ -58,7 +58,6 @@ use crate::{
     globals::{GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
     libxml::{
-        dict::{xml_dict_free, XmlDictPtr},
         globals::{xml_free, xml_malloc},
         parser::xml_init_parser,
         pattern::{xml_free_pattern_list, XmlPatternPtr},
@@ -295,9 +294,6 @@ pub struct XmlXPathContext {
     pub(crate) last_error: XmlError,                   /* the last error */
     pub(crate) debug_node: XmlNodePtr,                 /* the source node XSLT */
 
-    // dictionary
-    pub(crate) dict: XmlDictPtr, /* dictionary if any */
-
     pub(crate) flags: i32, /* flags to control compilation */
 
     // Cache for reusal of XPath objects
@@ -347,7 +343,6 @@ impl Default for XmlXPathContext {
             error: None,
             last_error: XmlError::default(),
             debug_node: null_mut(),
-            dict: null_mut(),
             flags: 0,
             cache: null_mut(),
             op_limit: 0,
@@ -411,7 +406,6 @@ pub struct XmlXPathCompExpr {
     pub(crate) steps: *mut XmlXPathStepOp, /* ops for computation of this expression */
     pub(crate) last: i32,     /* index of last step in expression */
     pub(crate) expr: *mut XmlChar, /* the expression being computed */
-    pub(crate) dict: XmlDictPtr, /* the dictionary to use if any */
     #[cfg(feature = "libxml_pattern")]
     pub(crate) stream: XmlPatternPtr,
 }
@@ -1470,7 +1464,7 @@ pub unsafe extern "C" fn xml_xpath_compiled_eval(
 /// -1 in API and internal errors.
 #[doc(alias = "xmlXPathCompiledEvalToBoolean")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_compiled_eval_to_boolean(
+pub unsafe fn xml_xpath_compiled_eval_to_boolean(
     comp: XmlXPathCompExprPtr,
     ctxt: XmlXPathContextPtr,
 ) -> i32 {
@@ -1480,34 +1474,24 @@ pub unsafe extern "C" fn xml_xpath_compiled_eval_to_boolean(
 /// Free up the memory allocated by @comp
 #[doc(alias = "xmlXPathFreeCompExpr")]
 #[cfg(feature = "xpath")]
-pub unsafe extern "C" fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
+pub unsafe fn xml_xpath_free_comp_expr(comp: XmlXPathCompExprPtr) {
     let mut op: XmlXPathStepOpPtr;
 
     if comp.is_null() {
         return;
     }
-    if (*comp).dict.is_null() {
-        for i in 0..(*comp).nb_step {
-            op = (*comp).steps.add(i as usize);
-            if !(*op).value4.is_null() {
-                if matches!((*op).op, XmlXPathOp::XpathOpValue) {
-                    xml_xpath_free_object((*op).value4 as _);
-                } else {
-                    xml_free((*op).value4 as _);
-                }
-            }
-            if !(*op).value5.is_null() {
-                xml_free((*op).value5 as _);
-            }
-        }
-    } else {
-        for i in 0..(*comp).nb_step {
-            op = (*comp).steps.add(i as usize);
-            if !(*op).value4.is_null() && matches!((*op).op, XmlXPathOp::XpathOpValue) {
+    for i in 0..(*comp).nb_step {
+        op = (*comp).steps.add(i as usize);
+        if !(*op).value4.is_null() {
+            if matches!((*op).op, XmlXPathOp::XpathOpValue) {
                 xml_xpath_free_object((*op).value4 as _);
+            } else {
+                xml_free((*op).value4 as _);
             }
         }
-        xml_dict_free((*comp).dict);
+        if !(*op).value5.is_null() {
+            xml_free((*op).value5 as _);
+        }
     }
     if !(*comp).steps.is_null() {
         xml_free((*comp).steps as _);
