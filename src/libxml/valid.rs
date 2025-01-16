@@ -484,15 +484,10 @@ pub unsafe fn xml_copy_doc_element_content(
 ) -> XmlElementContentPtr {
     let mut prev: XmlElementContentPtr;
     let mut tmp: XmlElementContentPtr;
-    // let mut dict: XmlDictPtr = null_mut();
 
     if cur.is_null() {
         return null_mut();
     }
-
-    // if !doc.is_null() {
-    //     dict = (*doc).dict;
-    // }
 
     let ret: XmlElementContentPtr =
         xml_malloc(size_of::<XmlElementContent>()) as XmlElementContentPtr;
@@ -553,15 +548,11 @@ pub unsafe fn xml_copy_doc_element_content(
 /// Free an element content structure. The whole subtree is removed.
 #[doc(alias = "xmlFreeDocElementContent")]
 pub unsafe fn xml_free_doc_element_content(_doc: XmlDocPtr, mut cur: XmlElementContentPtr) {
-    // let mut dict: XmlDictPtr = null_mut();
     let mut depth: usize = 0;
 
     if cur.is_null() {
         return;
     }
-    // if !doc.is_null() {
-    //     dict = (*doc).dict;
-    // }
 
     loop {
         while !(*cur).c1.is_null() || !(*cur).c2.is_null() {
@@ -1849,14 +1840,10 @@ pub unsafe fn xml_add_attribute_decl(
     tree: Option<Box<XmlEnumeration>>,
 ) -> XmlAttributePtr {
     let mut ret: XmlAttributePtr;
-    // let mut dict: XmlDictPtr = null_mut();
 
     if dtd.is_null() {
         return null_mut();
     }
-    // if !(*dtd).doc.is_null() {
-    //     dict = (*(*dtd).doc).dict;
-    // }
 
     #[cfg(feature = "libxml_valid")]
     {
@@ -2245,40 +2232,18 @@ unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
     matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
 }
 
-/// Free a string if it is not owned by the "dict" dictionary in the current scope
-macro_rules! DICT_FREE {
-    ($str:expr, $dict:expr) => {
-        if !$str.is_null() && ($dict.is_null() || xml_dict_owns($dict, $str as *const XmlChar) == 0)
-        {
-            xml_free($str as _);
-        }
-    };
-}
-
 /// Deallocate the memory used by an id definition
 #[doc(alias = "xmlFreeID")]
 unsafe fn xml_free_id(id: XmlIDPtr) {
-    // let mut dict: XmlDictPtr = null_mut();
-
     if id.is_null() {
         return;
     }
 
-    // if !(*id).doc.is_null() {
-    //     dict = (*(*id).doc).dict;
-    // }
-
     if !(*id).value.is_null() {
-        // DICT_FREE!((*id).value, dict);
-        if !(*id).value.is_null() {
-            xml_free((*id).value as _);
-        }
+        xml_free((*id).value as _);
     }
     if !(*id).name.is_null() {
-        // DICT_FREE!((*id).name, dict);
-        if !(*id).name.is_null() {
-            xml_free((*id).name as _);
-        }
+        xml_free((*id).name as _);
     }
     xml_free(id as _);
 }
