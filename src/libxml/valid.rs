@@ -2239,9 +2239,6 @@ pub(crate) unsafe fn xml_free_id(id: XmlIDPtr) {
         return;
     }
 
-    if !(*id).name.is_null() {
-        xml_free((*id).name as _);
-    }
     drop_in_place(id);
     xml_free(id as _);
 }
@@ -2282,11 +2279,11 @@ pub unsafe fn xml_add_id(
     (*ret).doc = doc;
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        (*ret).name = xml_strdup((*attr).name);
+        std::ptr::write(&mut (*ret).name, (*attr).name().map(|n| n.into_owned()));
         (*ret).attr = null_mut();
     } else {
         (*ret).attr = attr;
-        (*ret).name = null_mut();
+        std::ptr::write(&mut (*ret).name, None);
     }
     (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
