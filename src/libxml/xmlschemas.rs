@@ -5835,7 +5835,14 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: XmlAt
                     xml_free(value as _);
                     value = strip;
                 }
-                let res: XmlIDPtr = xml_add_id(null_mut(), (*attr).doc, value, attr);
+                let res: XmlIDPtr = xml_add_id(
+                    null_mut(),
+                    (*attr).doc,
+                    CStr::from_ptr(value as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                    attr,
+                );
                 if res.is_null() {
                     ret = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
                     let value = CStr::from_ptr(value as *const i8).to_string_lossy();

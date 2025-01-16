@@ -2801,10 +2801,24 @@ unsafe fn xml_schema_val_atomic_type(
 
                                         let strip: *mut XmlChar = xml_schema_strip(value);
                                         if !strip.is_null() {
-                                            res = xml_add_id(null_mut(), (*node).doc, strip, attr);
+                                            res = xml_add_id(
+                                                null_mut(),
+                                                (*node).doc,
+                                                CStr::from_ptr(strip as *const i8)
+                                                    .to_string_lossy()
+                                                    .as_ref(),
+                                                attr,
+                                            );
                                             xml_free(strip as _);
                                         } else {
-                                            res = xml_add_id(null_mut(), (*node).doc, value, attr);
+                                            res = xml_add_id(
+                                                null_mut(),
+                                                (*node).doc,
+                                                CStr::from_ptr(value as *const i8)
+                                                    .to_string_lossy()
+                                                    .as_ref(),
+                                                attr,
+                                            );
                                         }
                                         if res.is_null() {
                                             ret = 2;

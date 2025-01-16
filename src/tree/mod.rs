@@ -1114,7 +1114,14 @@ unsafe fn xml_new_prop_internal(
     }
 
     if !value.is_null() && !node.is_null() && (xml_is_id((*node).doc, node, cur) == 1) {
-        xml_add_id(null_mut(), (*node).doc, value, cur);
+        xml_add_id(
+            null_mut(),
+            (*node).doc,
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            cur,
+        );
     }
 
     if __XML_REGISTER_CALLBACKS.load(Ordering::Relaxed) != 0
@@ -1605,8 +1612,7 @@ unsafe fn xml_copy_prop_internal(
     {
         let children = (*cur).children;
         if let Some(id) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
-            let id = CString::new(id).unwrap();
-            xml_add_id(null_mut(), (*target).doc, id.as_ptr() as *const u8, ret);
+            xml_add_id(null_mut(), (*target).doc, &id, ret);
         }
     }
     ret

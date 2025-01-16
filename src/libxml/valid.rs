@@ -24,7 +24,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
     sync::atomic::Ordering,
 };
 
@@ -2239,12 +2239,10 @@ pub(crate) unsafe fn xml_free_id(id: XmlIDPtr) {
         return;
     }
 
-    if !(*id).value.is_null() {
-        xml_free((*id).value as _);
-    }
     if !(*id).name.is_null() {
         xml_free((*id).name as _);
     }
+    drop_in_place(id);
     xml_free(id as _);
 }
 
@@ -2255,13 +2253,13 @@ pub(crate) unsafe fn xml_free_id(id: XmlIDPtr) {
 pub unsafe fn xml_add_id(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    value: *const XmlChar,
+    value: &str,
     attr: XmlAttrPtr,
 ) -> XmlIDPtr {
     if doc.is_null() {
         return null_mut();
     }
-    if value.is_null() || *value.add(0) == 0 {
+    if value.is_empty() {
         return null_mut();
     }
     if attr.is_null() {
@@ -2280,7 +2278,7 @@ pub unsafe fn xml_add_id(
     }
 
     // fill the structure.
-    (*ret).value = xml_strdup(value);
+    std::ptr::write(&mut (*ret).value, value.to_owned());
     (*ret).doc = doc;
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
@@ -2292,25 +2290,16 @@ pub unsafe fn xml_add_id(
     }
     (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
-    if table
-        .add_entry(
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-            ret,
-        )
-        .is_err()
-    {
+    if table.add_entry(value, ret).is_err() {
         // The id is already defined in this DTD.
         #[cfg(feature = "libxml_valid")]
         if !ctxt.is_null() {
-            let value = CStr::from_ptr(value as *const i8).to_string_lossy();
             xml_err_valid_node(
                 ctxt,
                 (*attr).parent.map_or(null_mut(), |p| p.as_ptr()),
                 XmlParserErrors::XmlDTDIDRedefined,
                 format!("ID {value} already defined\n").as_str(),
-                Some(&value),
+                Some(value),
                 None,
                 None,
             );
@@ -5985,7 +5974,15 @@ pub unsafe fn xml_validate_one_attribute(
 
     // Validity Constraint: ID uniqueness
     if matches!((*attr_decl).atype, XmlAttributeType::XmlAttributeID)
-        && xml_add_id(ctxt, doc, value, attr).is_null()
+        && xml_add_id(
+            ctxt,
+            doc,
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            attr,
+        )
+        .is_null()
     {
         ret = 0;
     }

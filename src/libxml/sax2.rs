@@ -1734,14 +1734,18 @@ unsafe fn xml_sax2_attribute_internal(
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
-                content,
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 ret,
             );
         } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
-                content,
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 ret,
             );
         } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
@@ -2655,14 +2659,18 @@ unsafe fn xml_sax2_attribute_ns(
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
-                content,
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 ret,
             );
         } else if xml_is_id((*ctxt).my_doc, (*ctxt).node, ret) != 0 {
             xml_add_id(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
-                content,
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 ret,
             );
         } else if xml_is_ref((*ctxt).my_doc, (*ctxt).node, ret) != 0 {

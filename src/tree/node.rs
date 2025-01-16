@@ -1239,13 +1239,7 @@ impl XmlNode {
                 }
             }
             if matches!((*prop).atype, Some(XmlAttributeType::XmlAttributeID)) {
-                let value = value.map(|v| CString::new(v).unwrap());
-                xml_add_id(
-                    null_mut(),
-                    self.document(),
-                    value.as_deref().map_or(null(), |v| v.as_ptr() as *const u8),
-                    prop,
-                );
+                xml_add_id(null_mut(), self.document(), value.unwrap(), prop);
             }
             return prop;
         }

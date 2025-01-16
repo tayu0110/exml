@@ -18,12 +18,7 @@
 //
 // daniel@veillard.com
 
-use std::{
-    ffi::{CStr, CString},
-    os::raw::c_void,
-    ptr::null_mut,
-    sync::atomic::Ordering,
-};
+use std::{ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
 
 use libc::snprintf;
 
@@ -2423,15 +2418,7 @@ pub unsafe fn xml_dom_wrap_clone_node(
                     {
                         let children = (*cur).children();
                         if let Some(id_val) = children.and_then(|c| c.get_string((*cur).doc, 1)) {
-                            let id_val = CString::new(id_val).unwrap();
-                            if xml_add_id(
-                                null_mut(),
-                                dest_doc,
-                                id_val.as_ptr() as *const u8,
-                                cur as _,
-                            )
-                            .is_null()
-                            {
+                            if xml_add_id(null_mut(), dest_doc, &id_val, cur as _).is_null() {
                                 // TODO: error message.
                                 break 'internal_error;
                             }
