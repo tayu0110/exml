@@ -193,11 +193,6 @@ pub type XmlElementTablePtr = *mut XmlElementTable;
 pub type XmlAttributeTable = XmlHashTable<'static, CVoidWrapper>;
 pub type XmlAttributeTablePtr = *mut XmlAttributeTable;
 
-// ALL IDs attributes are stored in a table.
-// There is one table per document.
-pub type XmlIDTable = XmlHashTable<'static, CVoidWrapper>;
-pub type XmlIDTablePtr = *mut XmlIDTable;
-
 // ALL Refs attributes are stored in a table.
 // There is one table per document.
 pub type XmlRefTable = XmlHashTable<'static, CVoidWrapper>;
