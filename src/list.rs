@@ -106,7 +106,7 @@ impl<T> XmlList<T> {
     /// ```rust
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.insert_lower_bound(1u32);
     /// list.insert_lower_bound(2u32);
     ///
@@ -132,15 +132,26 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// If `deallocator` is `None`, `drop` is used by default.  
     /// If `comparator` is `None`, `T::cmp` is used by default.
-    pub fn new(deallocator: Option<Deallocator<T>>, comparator: Option<Comparator<T>>) -> Self {
+    pub fn without_comparator(deallocator: Option<Deallocator<T>>) -> Self {
         let mut default = Self::default();
         if let Some(deallocator) = deallocator {
             default.deallocator = deallocator;
         }
-        if let Some(comparator) = comparator {
-            default.comparator = comparator;
-        }
         default
+    }
+}
+
+impl<T: 'static> XmlList<T> {
+    /// Create new `XmlList`.
+    ///
+    /// If `deallocator` is `None`, `drop` is used by default.  
+    pub fn new(deallocator: Option<Deallocator<T>>, comparator: Comparator<T>) -> Self {
+        Self {
+            head: None,
+            tail: None,
+            deallocator: deallocator.unwrap_or(Rc::new(drop)),
+            comparator,
+        }
     }
 
     /// Return a `link` satisfies `!self.comparator(&link.data, &data).is_lt()`.  
@@ -183,7 +194,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.push_last((0u32, 0u32));
     /// list.push_last((1, 0));
     /// list.push_last((1, 2));
@@ -244,7 +255,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.push_last((0u32, 0u32));
     /// list.push_last((1, 0));
     /// list.push_last((1, 2));
@@ -280,7 +291,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.insert_lower_bound((0u32, 0u32));
     /// list.insert_lower_bound((1, 0));
     /// list.insert_lower_bound((1, 2));
@@ -333,7 +344,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.insert_upper_bound((0u32, 0u32));
     /// list.insert_upper_bound((1, 0));
     /// list.insert_upper_bound((1, 2));
@@ -400,7 +411,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.push_last((0u32, 0u32));
     /// list.push_last((1, 0));
     /// list.push_last((1, 2));
@@ -431,7 +442,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.push_last((0u32, 0u32));
     /// list.push_last((1, 0));
     /// list.push_last((1, 2));
@@ -462,7 +473,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// // ignore second element when comparing
     /// let comparator = |l: &(u32, u32), r: &(u32, u32)| l.0.cmp(&r.0);
-    /// let mut list = XmlList::new(None, Some(Rc::new(comparator)));
+    /// let mut list = XmlList::new(None, Rc::new(comparator));
     /// list.push_last((0u32, 0u32));
     /// list.push_last((1, 0));
     /// list.push_last((1, 2));
@@ -527,7 +538,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(1);
     /// list.push_last(1);
@@ -550,7 +561,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(1);
     /// list.push_last(1);
@@ -576,7 +587,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_first(0u32);
     /// list.push_first(2);
     /// list.push_first(1);
@@ -609,7 +620,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(2);
     /// list.push_last(1);
@@ -639,7 +650,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(2);
     /// list.push_last(1);
@@ -717,7 +728,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(2);
     /// list.push_last(1);
@@ -803,7 +814,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(1);
     /// list.push_last(2);
@@ -836,7 +847,7 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(1);
     /// list.push_last(2);
@@ -873,12 +884,12 @@ impl<T: Ord + 'static> XmlList<T> {
     ///
     /// use exml::list::XmlList;
     ///
-    /// let mut list = XmlList::new(None, None);
+    /// let mut list = XmlList::without_comparator(None);
     /// list.push_last(0u32);
     /// list.push_last(2);
     /// list.push_last(4);
     ///
-    /// let mut list2 = XmlList::new(None, None);
+    /// let mut list2 = XmlList::without_comparator(None);
     /// list.push_last(1u32);
     /// list.push_last(3);
     /// list.push_last(4);
@@ -1048,7 +1059,11 @@ pub mod libxml_api {
             let f = move |l: &*mut c_void, r: &*mut c_void| -> Ordering { c(*l, *r).cmp(&0) };
             make_comparator(f)
         });
-        let list = XmlList::new(deallocator, comparator);
+        let list = if let Some(comparator) = comparator {
+            XmlList::new(deallocator, comparator)
+        } else {
+            XmlList::without_comparator(deallocator)
+        };
         XmlListRef::from_list(list).map_or(null_mut(), |r| r.0.as_ptr())
     }
 
