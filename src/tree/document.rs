@@ -69,7 +69,7 @@ pub struct XmlDoc {
     pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
     pub(crate) version: Option<String>, /* the XML version string */
     pub(crate) encoding: Option<String>, /* external initial encoding, if any */
-    pub(crate) ids: Option<Box<XmlHashTable<'static, *mut XmlID>>>, /* Hash table for ID attributes if any */
+    pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>, /* Hash table for ID attributes if any */
     pub(crate) refs: *mut c_void, /* Hash table for IDREFs attributes if any */
     pub(crate) url: Option<String>, /* The URI for that document */
     pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,

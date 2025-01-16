@@ -57,8 +57,8 @@ use crate::{
         },
         parser_internals::{XML_STRING_COMMENT, XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
         valid::{
-            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_id,
-            xml_free_ref_table, xml_is_id, xml_remove_id, XmlElementTablePtr,
+            xml_add_id, xml_free_attribute_table, xml_free_element_table, xml_free_ref_table,
+            xml_is_id, xml_remove_id, XmlElementTablePtr,
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
@@ -1016,9 +1016,7 @@ pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
     }
 
     // Do this before freeing the children list to avoid ID lookups
-    if let Some(mut ids) = (*cur).ids.take() {
-        ids.clear_with(|data, _| xml_free_id(data));
-    }
+    (*cur).ids.take();
     if !(*cur).refs.is_null() {
         xml_free_ref_table((*cur).refs as _);
     }

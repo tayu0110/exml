@@ -145,8 +145,8 @@ use crate::{
         xml_free_doc, xml_free_node, xml_new_doc_text, xml_new_ns, xml_new_ns_prop, xml_new_prop,
         xml_split_qname2, xml_split_qname3, xml_validate_ncname, xml_validate_qname, NodeCommon,
         XmlAttrPtr, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlElementContentPtr,
-        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlIDPtr,
-        XmlNodePtr, XmlNsPtr, XML_XML_NAMESPACE,
+        XmlElementType, XmlElementTypeVal, XmlEntityPtr, XmlEntityType, XmlEnumeration, XmlNodePtr,
+        XmlNsPtr, XML_XML_NAMESPACE,
     },
     uri::build_uri,
 };
@@ -5835,7 +5835,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: XmlAt
                     xml_free(value as _);
                     value = strip;
                 }
-                let res: XmlIDPtr = xml_add_id(
+                let res = xml_add_id(
                     null_mut(),
                     (*attr).doc,
                     CStr::from_ptr(value as *const i8)
@@ -5843,7 +5843,7 @@ unsafe fn xml_schema_pval_attr_node_id(ctxt: XmlSchemaParserCtxtPtr, attr: XmlAt
                         .as_ref(),
                     attr,
                 );
-                if res.is_null() {
+                if res.is_none() {
                     ret = XmlParserErrors::XmlSchemapS4sAttrInvalidValue as i32;
                     let value = CStr::from_ptr(value as *const i8).to_string_lossy();
                     xml_schema_psimple_type_err(

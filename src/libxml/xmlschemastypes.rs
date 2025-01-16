@@ -63,7 +63,7 @@ use crate::{
     tree::{
         xml_get_doc_entity, xml_split_qname2, xml_validate_name, xml_validate_ncname,
         xml_validate_nmtoken, xml_validate_qname, NodeCommon, XmlAttrPtr, XmlAttributeType,
-        XmlElementType, XmlEntityPtr, XmlEntityType, XmlIDPtr, XmlNodePtr, XmlNsPtr,
+        XmlElementType, XmlEntityPtr, XmlEntityType, XmlNodePtr, XmlNsPtr,
     },
     xpath::{xml_xpath_is_nan, XML_XPATH_NAN, XML_XPATH_NINF, XML_XPATH_PINF},
 };
@@ -2797,11 +2797,9 @@ unsafe fn xml_schema_val_atomic_type(
                                         (*attr).atype,
                                         Some(XmlAttributeType::XmlAttributeID)
                                     ) {
-                                        let res: XmlIDPtr;
-
                                         let strip: *mut XmlChar = xml_schema_strip(value);
-                                        if !strip.is_null() {
-                                            res = xml_add_id(
+                                        let res = if !strip.is_null() {
+                                            let res = xml_add_id(
                                                 null_mut(),
                                                 (*node).doc,
                                                 CStr::from_ptr(strip as *const i8)
@@ -2810,17 +2808,18 @@ unsafe fn xml_schema_val_atomic_type(
                                                 attr,
                                             );
                                             xml_free(strip as _);
+                                            res
                                         } else {
-                                            res = xml_add_id(
+                                            xml_add_id(
                                                 null_mut(),
                                                 (*node).doc,
                                                 CStr::from_ptr(value as *const i8)
                                                     .to_string_lossy()
                                                     .as_ref(),
                                                 attr,
-                                            );
-                                        }
-                                        if res.is_null() {
+                                            )
+                                        };
+                                        if res.is_none() {
                                             ret = 2;
                                         } else {
                                             (*attr).atype = Some(XmlAttributeType::XmlAttributeID);

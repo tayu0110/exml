@@ -24,7 +24,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut, NonNull},
     sync::atomic::Ordering,
 };
 
@@ -75,8 +75,8 @@ use crate::{
         XmlAttributeDefault, XmlAttributePtr, XmlAttributeType, XmlDocProperties, XmlDocPtr,
         XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
         XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
-        XmlEntityType, XmlEnumeration, XmlID, XmlIDPtr, XmlNode, XmlNodePtr, XmlNotation, XmlNsPtr,
-        XmlRef, XmlRefPtr,
+        XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNodePtr, XmlNotation, XmlNsPtr, XmlRef,
+        XmlRefPtr,
     },
 };
 
@@ -2232,35 +2232,24 @@ unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
     matches!((*pctxt).parse_mode, XmlParserMode::XmlParseReader) as i32
 }
 
-/// Deallocate the memory used by an id definition
-#[doc(alias = "xmlFreeID")]
-pub(crate) unsafe fn xml_free_id(id: XmlIDPtr) {
-    if id.is_null() {
-        return;
-    }
-
-    drop_in_place(id);
-    xml_free(id as _);
-}
-
 /// Register a new id declaration
 ///
 /// Returns null_mut() if not, otherwise the new xmlIDPtr
 #[doc(alias = "xmlAddID")]
-pub unsafe fn xml_add_id(
+pub unsafe fn xml_add_id<'a>(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     value: &str,
     attr: XmlAttrPtr,
-) -> XmlIDPtr {
+) -> Option<&'a XmlID> {
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
     if value.is_empty() {
-        return null_mut();
+        return None;
     }
     if attr.is_null() {
-        return null_mut();
+        return None;
     }
 
     // Create the ID table if needed.
@@ -2268,24 +2257,18 @@ pub unsafe fn xml_add_id(
         .ids
         .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
-    let ret: XmlIDPtr = xml_malloc(size_of::<XmlID>()) as XmlIDPtr;
-    if ret.is_null() {
-        xml_verr_memory(ctxt as _, Some("malloc failed"));
-        return null_mut();
-    }
-
-    // fill the structure.
-    std::ptr::write(&mut (*ret).value, value.to_owned());
-    (*ret).doc = doc;
+    let mut ret = Box::new(XmlID::default());
+    ret.value = value.to_owned();
+    ret.doc = doc;
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        std::ptr::write(&mut (*ret).name, (*attr).name().map(|n| n.into_owned()));
-        (*ret).attr = null_mut();
+        ret.name = (*attr).name().map(|n| n.into_owned());
+        ret.attr = null_mut();
     } else {
-        (*ret).attr = attr;
-        std::ptr::write(&mut (*ret).name, None);
+        ret.attr = attr;
+        ret.name = None;
     }
-    (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
     if table.add_entry(value, ret).is_err() {
         // The id is already defined in this DTD.
@@ -2301,13 +2284,12 @@ pub unsafe fn xml_add_id(
                 None,
             );
         }
-        xml_free_id(ret);
-        return null_mut();
+        return None;
     }
     if !attr.is_null() {
         (*attr).atype = Some(XmlAttributeType::XmlAttributeID);
     }
-    ret
+    table.lookup(value).map(|res| &**res)
 }
 
 /// Search the attribute declaring the given ID
@@ -2325,13 +2307,13 @@ pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<d
     }
 
     let table = (*doc).ids.as_deref()?;
-    let &id_ptr = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())?;
-    if (*id_ptr).attr.is_null() {
+    let id_ptr = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())?;
+    if id_ptr.attr.is_null() {
         // We are operating on a stream, return a well known reference
         // since the attribute node doesn't exist anymore
         return NonNull::new(doc as *mut dyn NodeCommon);
     }
-    NonNull::new((*id_ptr).attr as *mut dyn NodeCommon)
+    NonNull::new(id_ptr.attr as *mut dyn NodeCommon)
 }
 
 /// Determine whether an attribute is of type ID. In case we have DTD(s)
@@ -2480,21 +2462,19 @@ pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     let id = xml_strdup(id.as_ptr() as *const u8);
     xml_valid_normalize_string(id);
 
-    let Some(&id_ptr) = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())
+    let Some(id_ptr) = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())
     else {
         xml_free(id as _);
         return -1;
     };
-    if (*id_ptr).attr != attr {
+    if id_ptr.attr != attr {
         xml_free(id as _);
         return -1;
     }
 
     table.remove_entry(
         CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
-        |data, _| {
-            xml_free_id(data);
-        },
+        |_, _| {},
     );
     xml_free(id as _);
     (*attr).atype = None;
@@ -3585,9 +3565,7 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDt
         (*doc).int_subset = old_int;
         return ret;
     }
-    if let Some(mut ids) = (*doc).ids.take() {
-        ids.clear_with(|data, _| xml_free_id(data));
-    }
+    (*doc).ids.take();
     if !(*doc).refs.is_null() {
         xml_free_ref_table((*doc).refs as _);
         (*doc).refs = null_mut();
@@ -4023,9 +4001,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
         }
     }
 
-    if let Some(mut ids) = (*doc).ids.take() {
-        ids.clear_with(|data, _| xml_free_id(data));
-    }
+    (*doc).ids.take();
     if !(*doc).refs.is_null() {
         xml_free_ref_table((*doc).refs as _);
         (*doc).refs = null_mut();
@@ -5979,7 +5955,7 @@ pub unsafe fn xml_validate_one_attribute(
                 .as_ref(),
             attr,
         )
-        .is_null()
+        .is_none()
     {
         ret = 0;
     }

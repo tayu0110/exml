@@ -18,20 +18,34 @@
 //
 // daniel@veillard.com
 
+use std::ptr::null_mut;
+
 use crate::libxml::xmlstring::XmlChar;
 
 use super::{XmlAttrPtr, XmlDoc};
 
 /// An XML ID instance.
-pub type XmlIDPtr = *mut XmlID;
 #[repr(C)]
 pub struct XmlID {
-    pub(crate) next: *mut XmlID,     /* next ID */
-    pub(crate) value: String,        /* The ID name */
-    pub(crate) attr: XmlAttrPtr,     /* The attribute holding it */
-    pub(crate) name: Option<String>, /* The attribute if attr is not available */
-    pub(crate) lineno: i32,          /* The line number if attr is not available */
-    pub(crate) doc: *mut XmlDoc,     /* The document holding the ID */
+    pub(crate) next: Option<Box<XmlID>>, /* next ID */
+    pub(crate) value: String,            /* The ID name */
+    pub(crate) attr: XmlAttrPtr,         /* The attribute holding it */
+    pub(crate) name: Option<String>,     /* The attribute if attr is not available */
+    pub(crate) lineno: i32,              /* The line number if attr is not available */
+    pub(crate) doc: *mut XmlDoc,         /* The document holding the ID */
+}
+
+impl Default for XmlID {
+    fn default() -> Self {
+        Self {
+            next: None,
+            value: "".to_owned(),
+            attr: null_mut(),
+            name: None,
+            lineno: 0,
+            doc: null_mut(),
+        }
+    }
 }
 
 /// An XML IDREF instance.
