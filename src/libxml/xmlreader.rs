@@ -4985,7 +4985,7 @@ pub unsafe fn xml_text_reader_relaxng_set_schema(
 /// Returns 0 in case the Schema validation could be (de)activated and -1 in case of error.
 #[doc(alias = "xmlTextReaderLocator")]
 #[cfg(all(feature = "libxml_reader", feature = "schema"))]
-unsafe extern "C" fn xml_text_reader_locator(
+unsafe fn xml_text_reader_locator(
     ctx: *mut c_void,
     file: *mut Option<String>,
     line: *mut u64,
