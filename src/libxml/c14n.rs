@@ -53,7 +53,7 @@ use crate::{
 
 use super::{
     globals::{xml_free, xml_malloc_atomic, xml_realloc},
-    list::{xml_list_create, xml_list_delete, xml_list_insert, xml_list_walk, XmlList, XmlListPtr},
+    list::XmlList,
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, XmlChar},
 };
@@ -327,11 +327,14 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Create a sorted list to store element namespaces
-        let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_ns_compare));
-        if list.is_null() {
-            xml_c14n_err_internal("creating namespaces list (c14n)");
-            return -1;
-        }
+        let mut list = XmlList::new(
+            None,
+            Rc::new(|ns1, ns2| match xml_c14n_ns_compare(*ns1, *ns2) {
+                ..0 => std::cmp::Ordering::Less,
+                0 => std::cmp::Ordering::Equal,
+                1.. => std::cmp::Ordering::Greater,
+            }),
+        );
 
         // check all namespaces
         let mut n = cur as *mut XmlNode;
@@ -350,7 +353,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         (*self.ns_rendered).add(ns, cur);
                     }
                     if !already_rendered {
-                        xml_list_insert(list, ns as _);
+                        list.insert_lower_bound(ns);
                     }
                     if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
@@ -373,14 +376,11 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        xml_list_walk(
-            list,
-            Some(xml_c14n_print_namespaces_walker::<T>),
-            self as *const XmlC14NCtx<'_, T> as _,
-        );
+        list.walk(|data| {
+            xml_c14n_print_namespaces_walker::<T>(*data, self as *const XmlC14NCtx<'_, T> as _) != 0
+        });
 
         // Cleanup
-        xml_list_delete(list);
         0
     }
 
@@ -972,11 +972,14 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // Create a sorted list to store element namespaces
-        let list: XmlListPtr = xml_list_create(None, Some(xml_c14n_ns_compare));
-        if list.is_null() {
-            xml_c14n_err_internal("creating namespaces list (exc c14n)");
-            return -1;
-        }
+        let mut list = XmlList::new(
+            None,
+            Rc::new(|ns1, ns2| match xml_c14n_ns_compare(*ns1, *ns2) {
+                ..0 => std::cmp::Ordering::Less,
+                0 => std::cmp::Ordering::Equal,
+                1.. => std::cmp::Ordering::Greater,
+            }),
+        );
 
         // process inclusive namespaces:
         // All namespace nodes appearing on inclusive ns list are
@@ -1002,7 +1005,7 @@ impl<T> XmlC14NCtx<'_, T> {
                         (*self.ns_rendered).add(ns, cur as *const XmlNode as _);
                     }
                     if !already_rendered {
-                        xml_list_insert(list, ns as _);
+                        list.insert_lower_bound(ns);
                     }
                     if (*ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                         has_empty_ns = true;
@@ -1023,7 +1026,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 && self.is_visible((!ns.is_null()).then(|| &*ns as _), Some(cur))
                 && self.exc_c14n_visible_ns_stack_find(&self.ns_rendered, Some(&*ns)) == 0
             {
-                xml_list_insert(list, ns as _);
+                list.insert_lower_bound(ns);
             }
             if visible {
                 // TODO: replace `cur` to `Rc<XmlNode>`
@@ -1049,7 +1052,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // TODO: replace `cur` to `Rc<XmlNode>`
                 (*self.ns_rendered).add((*attr).ns, cur as *const XmlNode as _);
                 if already_rendered == 0 && visible {
-                    xml_list_insert(list, (*attr).ns as _);
+                    list.insert_lower_bound((*attr).ns);
                 }
                 if (*(*attr).ns).prefix().map_or(0, |pre| pre.len()) == 0 {
                     has_empty_ns = true;
@@ -1083,14 +1086,11 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        xml_list_walk(
-            list,
-            Some(xml_c14n_print_namespaces_walker::<T>),
-            self as *const XmlC14NCtx<'_, T> as _,
-        );
+        list.walk(|data| {
+            xml_c14n_print_namespaces_walker::<T>(*data, self as *const XmlC14NCtx<'_, T> as _) != 0
+        });
 
         // Cleanup
-        xml_list_delete(list);
         0
     }
 
@@ -1670,9 +1670,7 @@ unsafe fn xml_c14n_err_relative_namespace(ns_uri: &str) {
 ///
 /// Returns -1 if ns1 < ns2, 0 if ns1 == ns2 or 1 if ns1 > ns2.
 #[doc(alias = "xmlC14NNsCompare")]
-extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) -> i32 {
-    let ns1: XmlNsPtr = data1 as _;
-    let ns2: XmlNsPtr = data2 as _;
+unsafe fn xml_c14n_ns_compare(ns1: XmlNsPtr, ns2: XmlNsPtr) -> i32 {
     if ns1 == ns2 {
         return 0;
     }
@@ -1683,7 +1681,7 @@ extern "C" fn xml_c14n_ns_compare(data1: *const c_void, data2: *const c_void) ->
         return 1;
     }
 
-    unsafe { xml_strcmp((*ns1).prefix, (*ns2).prefix) }
+    xml_strcmp((*ns1).prefix, (*ns2).prefix)
 }
 
 /// Check whether `ns` is a default 'xml:' namespace with `href="http://www.w3.org/XML/1998/namespace"`.  
@@ -1723,12 +1721,12 @@ unsafe fn xml_c14n_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar)
 const XML_NAMESPACES_DEFAULT: usize = 16;
 
 #[doc(alias = "xmlC14NPrintNamespacesWalker")]
-extern "C" fn xml_c14n_print_namespaces_walker<T>(ns: *const c_void, ctx: *mut c_void) -> i32 {
+unsafe fn xml_c14n_print_namespaces_walker<T>(ns: *const XmlNs, ctx: *mut c_void) -> i32 {
     if ctx.is_null() {
         0
     } else {
         let ctxt = ctx as *mut XmlC14NCtx<'_, T>;
-        unsafe { (*ctxt).print_namespaces(&(*(ns as *const XmlNs))) }
+        (*ctxt).print_namespaces(&*ns)
     }
 }
 
