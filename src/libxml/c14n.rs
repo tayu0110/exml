@@ -479,7 +479,7 @@ impl<T> XmlC14NCtx<'_, T> {
                 // Add all visible attributes from current node.
                 let mut attr = cur.properties;
                 while !attr.is_null() {
-                    /* check that attribute is visible */
+                    // check that attribute is visible
                     if self.is_visible((!attr.is_null()).then(|| &*attr as _), Some(cur)) {
                         list.insert_lower_bound(attr);
                     }
@@ -616,9 +616,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| {
-            xml_c14n_print_attrs::<T>(*data as _, self as *mut XmlC14NCtx<T> as _) != 0
-        });
+        list.walk(|data| self.print_attrs(*data));
 
         // Cleanup
         xml_free_prop_list(attrs_to_delete);
@@ -1252,6 +1250,50 @@ impl<T> XmlC14NCtx<'_, T> {
 
         // done
         attr
+    }
+
+    /// Prints out canonical attribute urrent node to the
+    /// buffer from C14N context as follows
+    ///
+    /// Canonical XML v 1.0 (<http://www.w3.org/TR/xml-c14n>)
+    ///
+    /// Returns 1 on success or 0 on fail.
+    #[doc(alias = "xmlC14NPrintAttrs")]
+    unsafe fn print_attrs(&mut self, attr: XmlAttrPtr) -> bool {
+        let buffer: *mut XmlChar;
+
+        if attr.is_null() {
+            xml_c14n_err_param("writing attributes");
+            return false;
+        }
+
+        self.buf.borrow_mut().write_str(" ");
+        if !(*attr).ns.is_null() {
+            if let Some(prefix) = (*(*attr).ns).prefix().filter(|pre| !pre.is_empty()) {
+                self.buf.borrow_mut().write_str(&prefix);
+                self.buf.borrow_mut().write_str(":");
+            }
+        }
+
+        self.buf.borrow_mut().write_str(&(*attr).name().unwrap());
+        self.buf.borrow_mut().write_str("=\"");
+
+        // todo: should we log an error if value==NULL ?
+        if let Some(value) = (*attr).children().and_then(|c| c.get_string(self.doc, 1)) {
+            let value = CString::new(value).unwrap();
+            buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
+            if !buffer.is_null() {
+                self.buf
+                    .borrow_mut()
+                    .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
+                xml_free(buffer as _);
+            } else {
+                xml_c14n_err_internal("normalizing attributes axis");
+                return false;
+            }
+        }
+        self.buf.borrow_mut().write_str("\"");
+        true
     }
 }
 
@@ -1899,55 +1941,6 @@ unsafe fn xml_c11n_normalize_string(
 #[doc(alias = "xmlC11NNormalizeAttr")]
 unsafe fn xml_c11n_normalize_attr(a: *const u8) -> *mut XmlChar {
     xml_c11n_normalize_string(a, XmlC14NNormalizationMode::XmlC14NNormalizeAttr)
-}
-
-/// Prints out canonical attribute urrent node to the
-/// buffer from C14N context as follows
-///
-/// Canonical XML v 1.0 (<http://www.w3.org/TR/xml-c14n>)
-///
-/// Returns 1 on success or 0 on fail.
-#[doc(alias = "xmlC14NPrintAttrs")]
-extern "C" fn xml_c14n_print_attrs<T>(data: *const c_void, user: *mut c_void) -> i32 {
-    let attr: XmlAttrPtr = data as _;
-    let ctx: XmlC14NCtxPtr<T> = user as _;
-    let buffer: *mut XmlChar;
-
-    unsafe {
-        if attr.is_null() || ctx.is_null() {
-            xml_c14n_err_param("writing attributes");
-            return 0;
-        }
-
-        (*ctx).buf.borrow_mut().write_str(" ");
-        if !(*attr).ns.is_null() {
-            if let Some(prefix) = (*(*attr).ns).prefix().filter(|pre| !pre.is_empty()) {
-                (*ctx).buf.borrow_mut().write_str(&prefix);
-                (*ctx).buf.borrow_mut().write_str(":");
-            }
-        }
-
-        (*ctx).buf.borrow_mut().write_str(&(*attr).name().unwrap());
-        (*ctx).buf.borrow_mut().write_str("=\"");
-
-        // todo: should we log an error if value==NULL ?
-        if let Some(value) = (*attr).children().and_then(|c| c.get_string((*ctx).doc, 1)) {
-            let value = CString::new(value).unwrap();
-            buffer = xml_c11n_normalize_attr(value.as_ptr() as *const u8);
-            if !buffer.is_null() {
-                (*ctx)
-                    .buf
-                    .borrow_mut()
-                    .write_str(CStr::from_ptr(buffer as _).to_string_lossy().as_ref());
-                xml_free(buffer as _);
-            } else {
-                xml_c14n_err_internal("normalizing attributes axis");
-                return 0;
-            }
-        }
-        (*ctx).buf.borrow_mut().write_str("\"");
-        1
-    }
 }
 
 unsafe fn xml_c11n_normalize_text(a: *const u8) -> *mut XmlChar {
