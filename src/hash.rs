@@ -1200,6 +1200,72 @@ impl<'a, T> XmlHashTable<'a, T> {
         assert_eq!(self.num_elems, num_elems);
     }
 
+    /// Apply callback `f` to all entries of the table.
+    ///
+    /// # Note
+    /// In original libxml2, xmlHashScan/ScanFull allows to modify the table inner callback,
+    /// but it is obviously not safe.  
+    /// Therefore, this method allow callback to modify the table.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use exml::hash::XmlHashTable;
+    ///
+    /// let mut table = XmlHashTable::new();
+    /// table.add_entry("foo", 1u32);
+    /// table.add_entry2("hoge", Some("fuga"), 2);
+    /// table.add_entry3("foo", Some("bar"), Some("piyo"), 3);
+    ///
+    /// let mut entries = vec![];
+    /// table.scan_mut(|data, _, _, _| *data *= 2);
+    /// table.scan(|data, s1, s2, s3| entries.push(
+    ///     (
+    ///         *data,
+    ///         s1.map_or("".to_owned(), |s| s.clone().into()),
+    ///         s2.map_or("".to_owned(), |s| s.clone().into()),
+    ///         s3.map_or("".to_owned(), |s| s.clone().into()),
+    ///     )
+    /// ));
+    /// entries.sort();
+    /// assert_eq!(
+    ///     entries,
+    ///     vec![
+    ///         (2u32, "foo".to_owned(), "".to_owned(), "".to_owned()),
+    ///         (4u32, "hoge".to_owned(), "fuga".to_owned(), "".to_owned()),
+    ///         (6u32, "foo".to_owned(), "bar".to_owned(), "piyo".to_owned()),
+    ///     ],
+    /// )
+    /// ```
+    pub fn scan_mut(
+        &mut self,
+        mut f: impl FnMut(&mut T, Option<&Cow<'_, str>>, Option<&Cow<'_, str>>, Option<&Cow<'_, str>>),
+    ) {
+        let num_elems = self.num_elems;
+        for mut entry in &mut self.table {
+            if entry.payload.is_none() {
+                continue;
+            }
+
+            loop {
+                f(
+                    entry.payload.as_mut().unwrap(),
+                    entry.name.as_ref(),
+                    entry.name2.as_ref(),
+                    entry.name3.as_ref(),
+                );
+
+                let Some(next) = entry.next.as_mut() else {
+                    break;
+                };
+                entry = next.deref_mut();
+            }
+        }
+        // In original libxml2, some entries may be removed by callback,
+        // but this method does not allowed such operations.
+        // Therefore, we should check that such operations have not been applied.
+        assert_eq!(self.num_elems, num_elems);
+    }
+
     pub fn drain(&'a mut self) -> Drain<'a, T> {
         Drain::new(self)
     }

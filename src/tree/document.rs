@@ -66,15 +66,22 @@ pub struct XmlDoc {
     //  -2 if there is an XML declaration, but no
     //  standalone attribute was specified
     pub(crate) standalone: i32,
-    pub int_subset: *mut XmlDtd,        /* the document internal subset */
-    pub(crate) ext_subset: *mut XmlDtd, /* the document external subset */
-    pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
-    pub(crate) version: Option<String>, /* the XML version string */
-    pub(crate) encoding: Option<String>, /* external initial encoding, if any */
+    // the document internal subset
+    pub int_subset: *mut XmlDtd,
+    // the document external subset
+    pub(crate) ext_subset: *mut XmlDtd,
+    // Global namespace, the old way
+    pub(crate) old_ns: *mut XmlNs,
+    // the XML version string
+    pub(crate) version: Option<String>,
+    // external initial encoding, if any
+    pub(crate) encoding: Option<String>,
     // Hash table for ID attributes if any
     pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>,
-    pub(crate) refs: Option<Box<XmlHashTable<'static, XmlListPtr>>>, /* Hash table for IDREFs attributes if any */
-    pub(crate) url: Option<String>,                                  /* The URI for that document */
+    // Hash table for IDREFs attributes if any
+    pub(crate) refs: Option<Box<XmlHashTable<'static, XmlListPtr>>>,
+    // The URI for that document
+    pub(crate) url: Option<String>,
     // Internal flag for charset handling, actually an xmlCharEncoding
     pub(crate) charset: XmlCharEncoding,
     // `dict` confuses me very much about the lifetime of the string...
