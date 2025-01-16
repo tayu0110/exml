@@ -34,7 +34,6 @@ use std::{
     any::type_name,
     cell::RefCell,
     ffi::{c_char, CStr, CString},
-    os::raw::c_void,
     ptr::{drop_in_place, null_mut},
     rc::Rc,
 };
@@ -376,9 +375,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| {
-            xml_c14n_print_namespaces_walker::<T>(*data, self as *const XmlC14NCtx<'_, T> as _) != 0
-        });
+        list.walk(|data| self.print_namespaces_walker(*data) != 0);
 
         // Cleanup
         0
@@ -1086,9 +1083,7 @@ impl<T> XmlC14NCtx<'_, T> {
         }
 
         // print out all elements from list
-        list.walk(|data| {
-            xml_c14n_print_namespaces_walker::<T>(*data, self as *const XmlC14NCtx<'_, T> as _) != 0
-        });
+        list.walk(|data| self.print_namespaces_walker(*data) != 0);
 
         // Cleanup
         0
@@ -1294,6 +1289,11 @@ impl<T> XmlC14NCtx<'_, T> {
         }
         self.buf.borrow_mut().write_str("\"");
         true
+    }
+
+    #[doc(alias = "xmlC14NPrintNamespacesWalker")]
+    unsafe fn print_namespaces_walker(&mut self, ns: *const XmlNs) -> i32 {
+        self.print_namespaces(&*ns)
     }
 }
 
@@ -1719,16 +1719,6 @@ unsafe fn xml_c14n_str_equal(mut str1: *const XmlChar, mut str2: *const XmlChar)
 }
 
 const XML_NAMESPACES_DEFAULT: usize = 16;
-
-#[doc(alias = "xmlC14NPrintNamespacesWalker")]
-unsafe fn xml_c14n_print_namespaces_walker<T>(ns: *const XmlNs, ctx: *mut c_void) -> i32 {
-    if ctx.is_null() {
-        0
-    } else {
-        let ctxt = ctx as *mut XmlC14NCtx<'_, T>;
-        (*ctxt).print_namespaces(&*ns)
-    }
-}
 
 /// Prints the given attribute to the output buffer from C14N context.
 ///
