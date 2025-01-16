@@ -63,8 +63,8 @@ use crate::{
         },
         sax2::xml_sax_version,
         valid::{
-            xml_free_id_table, xml_free_ref_table, xml_validate_pop_element,
-            xml_validate_push_cdata, xml_validate_push_element, XmlIDTablePtr, XmlRefTablePtr,
+            xml_free_ref_table, xml_validate_pop_element, xml_validate_push_cdata,
+            xml_validate_push_element, XmlRefTablePtr,
         },
         xinclude::{
             xml_xinclude_new_context, xml_xinclude_process_node, xml_xinclude_set_flags,
@@ -4294,8 +4294,8 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
 /// Free up all the structures used by a document, tree included.
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
-    use crate::tree::NodeCommon;
+unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
+    use crate::{libxml::valid::xml_free_id, tree::NodeCommon};
 
     let mut ext_subset: XmlDtdPtr;
 
@@ -4310,13 +4310,10 @@ unsafe extern "C" fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: X
         xml_deregister_node_default_value(cur as _);
     }
 
-    /*
-     * Do this before freeing the children list to avoid ID lookups
-     */
-    if !(*cur).ids.is_null() {
-        xml_free_id_table((*cur).ids as XmlIDTablePtr);
+    // Do this before freeing the children list to avoid ID lookups
+    if let Some(mut ids) = (*cur).ids.take() {
+        ids.clear_with(|data, _| xml_free_id(data));
     }
-    (*cur).ids = null_mut();
     if !(*cur).refs.is_null() {
         xml_free_ref_table((*cur).refs as XmlRefTablePtr);
     }

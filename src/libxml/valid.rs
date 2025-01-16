@@ -53,8 +53,8 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry, xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup,
-            xml_hash_lookup2, xml_hash_remove_entry, xml_hash_remove_entry2, xml_hash_scan,
-            xml_hash_update_entry, XmlHashTable,
+            xml_hash_lookup2, xml_hash_remove_entry2, xml_hash_scan, xml_hash_update_entry,
+            XmlHashTable,
         },
         list::{
             xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
@@ -2234,7 +2234,7 @@ unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
 
 /// Deallocate the memory used by an id definition
 #[doc(alias = "xmlFreeID")]
-unsafe fn xml_free_id(id: XmlIDPtr) {
+pub(crate) unsafe fn xml_free_id(id: XmlIDPtr) {
     if id.is_null() {
         return;
     }
@@ -2258,8 +2258,6 @@ pub unsafe fn xml_add_id(
     value: *const XmlChar,
     attr: XmlAttrPtr,
 ) -> XmlIDPtr {
-    let mut table: XmlIDTablePtr;
-
     if doc.is_null() {
         return null_mut();
     }
@@ -2271,15 +2269,9 @@ pub unsafe fn xml_add_id(
     }
 
     // Create the ID table if needed.
-    table = (*doc).ids as XmlIDTablePtr;
-    if table.is_null() {
-        (*doc).ids = xml_hash_create(0) as _;
-        table = (*doc).ids as _;
-    }
-    if table.is_null() {
-        xml_verr_memory(ctxt, Some("xmlAddID: Table creation failed!\n"));
-        return null_mut();
-    }
+    let table = (*doc)
+        .ids
+        .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
 
     let ret: XmlIDPtr = xml_malloc(size_of::<XmlID>()) as XmlIDPtr;
     if ret.is_null() {
@@ -2300,7 +2292,15 @@ pub unsafe fn xml_add_id(
     }
     (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
-    if xml_hash_add_entry(table, value, ret as _) < 0 {
+    if table
+        .add_entry(
+            CStr::from_ptr(value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+            ret,
+        )
+        .is_err()
+    {
         // The id is already defined in this DTD.
         #[cfg(feature = "libxml_valid")]
         if !ctxt.is_null() {
@@ -2324,18 +2324,6 @@ pub unsafe fn xml_add_id(
     ret
 }
 
-extern "C" fn xml_free_id_table_entry(id: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        xml_free_id(id as XmlIDPtr);
-    }
-}
-
-/// Deallocate the memory used by an ID hash table.
-#[doc(alias = "xmlFreeIDTable")]
-pub unsafe fn xml_free_id_table(table: XmlIDTablePtr) {
-    xml_hash_free(table, Some(xml_free_id_table_entry));
-}
-
 /// Search the attribute declaring the given ID
 ///
 /// Returns null_mut() if not found,
@@ -2350,15 +2338,8 @@ pub unsafe fn xml_get_id(doc: XmlDocPtr, id: *const XmlChar) -> Option<NonNull<d
         return None;
     }
 
-    let table: XmlIDTablePtr = (*doc).ids as XmlIDTablePtr;
-    if table.is_null() {
-        return None;
-    }
-
-    let id_ptr: XmlIDPtr = xml_hash_lookup(table, id) as _;
-    if id_ptr.is_null() {
-        return None;
-    }
+    let table = (*doc).ids.as_deref()?;
+    let &id_ptr = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())?;
     if (*id_ptr).attr.is_null() {
         // We are operating on a stream, return a well known reference
         // since the attribute node doesn't exist anymore
@@ -2502,10 +2483,9 @@ pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
         return -1;
     }
 
-    let table: XmlIDTablePtr = (*doc).ids as XmlIDTablePtr;
-    if table.is_null() {
+    let Some(table) = (*doc).ids.as_deref_mut() else {
         return -1;
-    }
+    };
 
     let Some(id) = (*attr).children.and_then(|c| c.get_string(doc, 1)) else {
         return -1;
@@ -2514,13 +2494,22 @@ pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     let id = xml_strdup(id.as_ptr() as *const u8);
     xml_valid_normalize_string(id);
 
-    let id_ptr: XmlIDPtr = xml_hash_lookup(table, id) as _;
-    if id_ptr.is_null() || (*id_ptr).attr != attr {
+    let Some(&id_ptr) = table.lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())
+    else {
+        xml_free(id as _);
+        return -1;
+    };
+    if (*id_ptr).attr != attr {
         xml_free(id as _);
         return -1;
     }
 
-    xml_hash_remove_entry(table, id, Some(xml_free_id_table_entry));
+    table.remove_entry(
+        CStr::from_ptr(id as *const i8).to_string_lossy().as_ref(),
+        |data, _| {
+            xml_free_id(data);
+        },
+    );
     xml_free(id as _);
     (*attr).atype = None;
     0
@@ -3610,9 +3599,8 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDt
         (*doc).int_subset = old_int;
         return ret;
     }
-    if !(*doc).ids.is_null() {
-        xml_free_id_table((*doc).ids as _);
-        (*doc).ids = null_mut();
+    if let Some(mut ids) = (*doc).ids.take() {
+        ids.clear_with(|data, _| xml_free_id(data));
     }
     if !(*doc).refs.is_null() {
         xml_free_ref_table((*doc).refs as _);
@@ -4049,9 +4037,8 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
         }
     }
 
-    if !(*doc).ids.is_null() {
-        xml_free_id_table((*doc).ids as _);
-        (*doc).ids = null_mut();
+    if let Some(mut ids) = (*doc).ids.take() {
+        ids.clear_with(|data, _| xml_free_id(data));
     }
     if !(*doc).refs.is_null() {
         xml_free_ref_table((*doc).refs as _);

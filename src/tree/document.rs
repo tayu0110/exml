@@ -25,6 +25,7 @@ use libc::memset;
 use crate::{
     encoding::XmlCharEncoding,
     error::XmlParserErrors,
+    hash::XmlHashTable,
     libxml::{
         globals::{xml_free, xml_malloc, xml_register_node_default_value},
         parser_internals::xml_copy_char_multi_byte,
@@ -37,7 +38,7 @@ use super::{
     xml_buf_set_allocation_scheme, xml_free_node_list, xml_get_doc_entity, xml_new_doc_text,
     xml_new_reference, xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr,
     XmlBufferAllocationScheme, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityPtr,
-    XmlEntityType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_ENT_EXPANDING, XML_ENT_PARSED,
+    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_ENT_EXPANDING, XML_ENT_PARSED,
     XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -68,11 +69,11 @@ pub struct XmlDoc {
     pub(crate) old_ns: *mut XmlNs,      /* Global namespace, the old way */
     pub(crate) version: Option<String>, /* the XML version string */
     pub(crate) encoding: Option<String>, /* external initial encoding, if any */
-    pub(crate) ids: *mut c_void,        /* Hash table for ID attributes if any */
-    pub(crate) refs: *mut c_void,       /* Hash table for IDREFs attributes if any */
-    pub(crate) url: Option<String>,     /* The URI for that document */
+    pub(crate) ids: Option<Box<XmlHashTable<'static, *mut XmlID>>>, /* Hash table for ID attributes if any */
+    pub(crate) refs: *mut c_void, /* Hash table for IDREFs attributes if any */
+    pub(crate) url: Option<String>, /* The URI for that document */
     pub(crate) charset: XmlCharEncoding, /* Internal flag for charset handling,
-                                        actually an xmlCharEncoding */
+                                  actually an xmlCharEncoding */
     // `dict` confuses me very much about the lifetime of the string...
     // I believe it is incompatible with the lifetime of Rust objects, so I removed it.
     // pub dict: *mut XmlDict,       /* dict used to allocate names or NULL */
@@ -804,7 +805,7 @@ impl Default for XmlDoc {
             old_ns: null_mut(),
             version: None,
             encoding: None,
-            ids: null_mut(),
+            ids: None,
             refs: null_mut(),
             url: None,
             charset: XmlCharEncoding::None,
