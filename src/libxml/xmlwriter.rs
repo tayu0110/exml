@@ -112,6 +112,89 @@ pub struct XmlTextWriter<'a> {
     doc: XmlDocPtr,
 }
 
+impl XmlTextWriter<'_> {
+    /// Start a new xml document
+    ///
+    /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
+    #[doc(alias = "xmlTextWriterStartDocument")]
+    pub unsafe fn start_document(
+        &mut self,
+        version: Option<&str>,
+        encoding: Option<&str>,
+        standalone: Option<&str>,
+    ) -> io::Result<usize> {
+        if self.nodes.front().is_some() {
+            xml_writer_err_msg(
+                self,
+                XmlParserErrors::XmlErrInternalError,
+                "xmlTextWriterStartDocument : not allowed in this context!\n",
+            );
+            return Err(io::Error::other(
+                "xmlTextWriterStartDocument : not allowed in this context!",
+            ));
+        }
+
+        let encoder = if let Some(encoding) = encoding {
+            let Some(encoder) = find_encoding_handler(encoding) else {
+                xml_writer_err_msg(
+                    self,
+                    XmlParserErrors::XmlErrUnsupportedEncoding,
+                    "xmlTextWriterStartDocument : unsupported encoding\n",
+                );
+                return Err(io::Error::other(
+                    "xmlTextWriterStartDocument : unsupported encoding",
+                ));
+            };
+            Some(encoder)
+        } else {
+            None
+        };
+
+        self.out.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
+        if self.out.encoder.is_some() {
+            if self.out.conv.is_none() {
+                self.out.conv = XmlBufRef::with_capacity(4000);
+            }
+            self.out.encode(true);
+            if !self.doc.is_null() && (*self.doc).encoding.is_none() {
+                let encoder = self.out.encoder.as_ref().unwrap().borrow();
+                (*self.doc).encoding = Some(encoder.name().to_owned());
+            }
+        } else {
+            self.out.conv = None;
+        }
+
+        let mut sum = self.out.write_str("<?xml version=")?;
+        sum += self.out.write_bytes(&[self.qchar])?;
+        sum += self.out.write_str(version.unwrap_or("1.0"))?;
+        sum += self.out.write_bytes(&[self.qchar])?;
+        if self.out.encoder.is_some() {
+            sum += self.out.write_str(" encoding=")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            let name = self
+                .out
+                .encoder
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .name()
+                .to_owned();
+            sum += self.out.write_str(&name)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        if let Some(standalone) = standalone {
+            sum += self.out.write_str(" standalone=")?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+            sum += self.out.write_str(standalone)?;
+            sum += self.out.write_bytes(&[self.qchar])?;
+        }
+
+        sum += self.out.write_str("?>\n")?;
+        Ok(sum)
+    }
+}
+
 impl Default for XmlTextWriter<'_> {
     fn default() -> Self {
         Self {
@@ -645,102 +728,6 @@ pub unsafe fn xml_free_text_writer(writer: XmlTextWriterPtr) {
     }
     drop_in_place(writer);
     xml_free(writer as _);
-}
-
-/// Start a new xml document
-///
-/// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
-#[doc(alias = "xmlTextWriterStartDocument")]
-pub unsafe fn xml_text_writer_start_document(
-    writer: XmlTextWriterPtr,
-    version: *const c_char,
-    encoding: *const c_char,
-    standalone: *const c_char,
-) -> io::Result<usize> {
-    if writer.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrInternalError,
-            "xmlTextWriterStartDocument : invalid writer!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartDocument : invalid writer!",
-        ));
-    }
-
-    if (*writer).nodes.front().is_some() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrInternalError,
-            "xmlTextWriterStartDocument : not allowed in this context!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartDocument : not allowed in this context!",
-        ));
-    }
-
-    let encoder = if let Some(Ok(encoding)) =
-        (!encoding.is_null()).then(|| CStr::from_ptr(encoding).to_str())
-    {
-        let Some(encoder) = find_encoding_handler(encoding) else {
-            xml_writer_err_msg(
-                writer,
-                XmlParserErrors::XmlErrUnsupportedEncoding,
-                "xmlTextWriterStartDocument : unsupported encoding\n",
-            );
-            return Err(io::Error::other(
-                "xmlTextWriterStartDocument : unsupported encoding",
-            ));
-        };
-        Some(encoder)
-    } else {
-        None
-    };
-
-    (*writer).out.encoder = encoder.map(|e| Rc::new(RefCell::new(e)));
-    if (*writer).out.encoder.is_some() {
-        if (*writer).out.conv.is_none() {
-            (*writer).out.conv = XmlBufRef::with_capacity(4000);
-        }
-        (*writer).out.encode(true);
-        if !(*writer).doc.is_null() && (*(*writer).doc).encoding.is_none() {
-            let encoder = (*writer).out.encoder.as_ref().unwrap().borrow();
-            (*(*writer).doc).encoding = Some(encoder.name().to_owned());
-        }
-    } else {
-        (*writer).out.conv = None;
-    }
-
-    let mut sum = (*writer).out.write_str("<?xml version=")?;
-    sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
-    if !version.is_null() {
-        sum += (*writer)
-            .out
-            .write_str(CStr::from_ptr(version).to_string_lossy().as_ref())?;
-    } else {
-        sum += (*writer).out.write_str("1.0")?;
-    }
-    sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
-    if (*writer).out.encoder.is_some() {
-        sum += (*writer).out.write_str(" encoding=")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
-        sum += (*writer)
-            .out
-            .write_str((*writer).out.encoder.as_ref().unwrap().borrow().name())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
-    }
-
-    if !standalone.is_null() {
-        sum += (*writer).out.write_str(" standalone=")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
-        sum += (*writer)
-            .out
-            .write_str(CStr::from_ptr(standalone).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
-    }
-
-    sum += (*writer).out.write_str("?>\n")?;
-    Ok(sum)
 }
 
 /// End an xml document. All open elements are closed, and
@@ -3366,50 +3353,6 @@ mod tests {
                             eprint!(" {}", n_writer);
                             eprint!(" {}", n_pe);
                             eprintln!(" {}", n_name);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_start_document() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_version in 0..GEN_NB_CONST_CHAR_PTR {
-                    for n_encoding in 0..GEN_NB_CONST_CHAR_PTR {
-                        for n_standalone in 0..GEN_NB_CONST_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                            let version = gen_const_char_ptr(n_version, 1);
-                            let encoding = gen_const_char_ptr(n_encoding, 2);
-                            let standalone = gen_const_char_ptr(n_standalone, 3);
-
-                            xml_text_writer_start_document(writer, version, encoding, standalone);
-                            des_xml_text_writer_ptr(n_writer, writer, 0);
-                            des_const_char_ptr(n_version, version, 1);
-                            des_const_char_ptr(n_encoding, encoding, 2);
-                            des_const_char_ptr(n_standalone, standalone, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlTextWriterStartDocument",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlTextWriterStartDocument()"
-                                );
-                                eprint!(" {}", n_writer);
-                                eprint!(" {}", n_version);
-                                eprint!(" {}", n_encoding);
-                                eprintln!(" {}", n_standalone);
-                            }
                         }
                     }
                 }
