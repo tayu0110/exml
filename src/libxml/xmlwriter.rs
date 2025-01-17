@@ -106,7 +106,7 @@ pub struct XmlTextWriter<'a> {
     indent: i32,         /* enable indent */
     doindent: i32,       /* internal indent flag */
     ichar: *mut XmlChar, /* indent character */
-    qchar: c_char,       /* character used for quoting attribute values */
+    qchar: u8,           /* character used for quoting attribute values */
     ctxt: XmlParserCtxtPtr,
     no_doc_free: i32,
     doc: XmlDocPtr,
@@ -122,7 +122,7 @@ impl Default for XmlTextWriter<'_> {
             indent: 0,
             doindent: 0,
             ichar: null_mut(),
-            qchar: 0,
+            qchar: b'"',
             ctxt: null_mut(),
             no_doc_free: 0,
             doc: null_mut(),
@@ -221,7 +221,7 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
 
     (*ret).out = out;
     (*ret).ichar = xml_strdup(c" ".as_ptr() as _);
-    (*ret).qchar = b'"' as _;
+    (*ret).qchar = b'"';
 
     if (*ret).ichar.is_null() {
         drop_in_place(ret);
@@ -712,7 +712,7 @@ pub unsafe fn xml_text_writer_start_document(
     }
 
     let mut sum = (*writer).out.write_str("<?xml version=")?;
-    sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+    sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     if !version.is_null() {
         sum += (*writer)
             .out
@@ -720,23 +720,23 @@ pub unsafe fn xml_text_writer_start_document(
     } else {
         sum += (*writer).out.write_str("1.0")?;
     }
-    sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+    sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     if (*writer).out.encoder.is_some() {
         sum += (*writer).out.write_str(" encoding=")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str((*writer).out.encoder.as_ref().unwrap().borrow().name())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     if !standalone.is_null() {
         sum += (*writer).out.write_str(" standalone=")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(standalone).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     sum += (*writer).out.write_str("?>\n")?;
@@ -1204,52 +1204,39 @@ unsafe fn xml_text_writer_handle_state_dependencies(
     writer: XmlTextWriterPtr,
     p: &mut Rc<XmlTextWriterStackEntry>,
 ) -> io::Result<usize> {
-    let mut extra: [c_char; 3] = [0; 3];
-
     if writer.is_null() {
         return Err(io::Error::other("Writer is NULL"));
     }
 
     let mut sum = 0;
-    extra[0] = b'\0' as _;
-    extra[1] = b'\0' as _;
-    extra[2] = b'\0' as _;
     match p.state.get() {
         XmlTextWriterState::XmlTextwriterName => {
             // Output namespace declarations
             sum += xml_text_writer_output_nsdecl(writer)?;
-            extra[0] = b'>' as _;
+            sum += (*writer).out.write_str(">")?;
             p.state.set(XmlTextWriterState::XmlTextwriterText);
         }
         XmlTextWriterState::XmlTextwriterPI => {
-            extra[0] = b' ' as _;
+            sum += (*writer).out.write_str(" ")?;
             p.state.set(XmlTextWriterState::XmlTextwriterPIText);
         }
         XmlTextWriterState::XmlTextwriterDTD => {
-            extra[0] = b' ' as _;
-            extra[1] = b'[' as _;
+            sum += (*writer).out.write_str(" [")?;
             p.state.set(XmlTextWriterState::XmlTextwriterDTDText);
         }
         XmlTextWriterState::XmlTextwriterDTDElem => {
-            extra[0] = b' ' as _;
+            sum += (*writer).out.write_str(" ")?;
             p.state.set(XmlTextWriterState::XmlTextwriterDTDElemText);
         }
         XmlTextWriterState::XmlTextwriterDTDAttl => {
-            extra[0] = b' ' as _;
+            sum += (*writer).out.write_str(" ")?;
             p.state.set(XmlTextWriterState::XmlTextwriterDTDAttlText);
         }
         XmlTextWriterState::XmlTextwriterDTDEnty | XmlTextWriterState::XmlTextwriterDTDPEnt => {
-            extra[0] = b' ' as _;
-            extra[1] = (*writer).qchar;
+            sum += (*writer).out.write_bytes(&[b' ', (*writer).qchar])?;
             p.state.set(XmlTextWriterState::XmlTextwriterDTDEntyText);
         }
         _ => {}
-    }
-
-    if extra[0] != b'\0' as i8 {
-        sum += (*writer)
-            .out
-            .write_str(CStr::from_ptr(extra.as_ptr()).to_string_lossy().as_ref())?;
     }
 
     Ok(sum)
@@ -1553,7 +1540,7 @@ pub unsafe fn xml_text_writer_start_attribute(
             sum += (*writer).out.write_str(" ")?;
             sum += (*writer).out.write_str(name)?;
             sum += (*writer).out.write_str("=")?;
-            sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+            sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
             lk.state.set(XmlTextWriterState::XmlTextwriterAttribute);
         }
         _ => {
@@ -1641,7 +1628,7 @@ pub unsafe fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr) -> io::Res
         XmlTextWriterState::XmlTextwriterAttribute => {
             lk.state.set(XmlTextWriterState::XmlTextwriterName);
 
-            sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+            sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         }
         _ => {
             return Err(io::Error::other("Not attribute"));
@@ -1960,11 +1947,11 @@ pub unsafe fn xml_text_writer_start_dtd(
         }
 
         sum += (*writer).out.write_str("PUBLIC ")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     if !sysid.is_null() {
@@ -1981,11 +1968,11 @@ pub unsafe fn xml_text_writer_start_dtd(
             sum += (*writer).out.write_bytes(b" ")?;
         }
 
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     Ok(sum)
@@ -2332,7 +2319,7 @@ pub unsafe fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr) -> io::Re
         | ty @ XmlTextWriterState::XmlTextwriterDTDEnty
         | ty @ XmlTextWriterState::XmlTextwriterDTDPEnt => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterDTDEntyText) {
-                sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+                sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
             }
             sum += (*writer).out.write_str(">")?;
         }
@@ -2452,11 +2439,11 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
         }
 
         sum += (*writer).out.write_str(" PUBLIC ")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     if !sysid.is_null() {
@@ -2464,11 +2451,11 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
             sum += (*writer).out.write_str(" SYSTEM")?;
         }
         sum += (*writer).out.write_str(" ")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     if !ndataid.is_null() {
@@ -2551,11 +2538,11 @@ pub unsafe fn xml_text_writer_write_dtd_notation(
 
     if !pubid.is_null() {
         sum += (*writer).out.write_str(" PUBLIC ")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     if !sysid.is_null() {
@@ -2563,11 +2550,11 @@ pub unsafe fn xml_text_writer_write_dtd_notation(
             sum += (*writer).out.write_str(" SYSTEM")?;
         }
         sum += (*writer).out.write_str(" ")?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
         sum += (*writer)
             .out
             .write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref())?;
-        sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
+        sum += (*writer).out.write_bytes(&[(*writer).qchar])?;
     }
 
     sum += (*writer).out.write_str(">")?;
