@@ -49,7 +49,7 @@ use crate::{
             XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlstring::{xml_strcasecmp, xml_strdup, XmlChar},
+        xmlstring::{xml_strdup, XmlChar},
     },
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
@@ -874,12 +874,12 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartPI")]
-    pub unsafe fn start_pi(&mut self, target: *const XmlChar) -> io::Result<usize> {
-        if target.is_null() || *target == b'\0' {
+    pub unsafe fn start_pi(&mut self, target: &str) -> io::Result<usize> {
+        if target.is_empty() {
             return Err(io::Error::other("Writer or target is NULL"));
         }
 
-        if xml_strcasecmp(target, c"xml".as_ptr() as _) == 0 {
+        if target.eq_ignore_ascii_case("xml") {
             xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
                         "xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!\n");
             return Err(io::Error::other(
@@ -918,19 +918,13 @@ impl XmlTextWriter<'_> {
         }
 
         let p = XmlTextWriterStackEntry {
-            name: Some(
-                CStr::from_ptr(target as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            ),
+            name: Some(target.to_owned()),
             state: Cell::new(XmlTextWriterState::XmlTextwriterPI),
         };
         self.nodes.push_front(p.into());
 
         sum += self.out.write_str("<?")?;
-        sum += self
-            .out
-            .write_str(CStr::from_ptr(target as _).to_string_lossy().as_ref())?;
+        sum += self.out.write_str(target)?;
         Ok(sum)
     }
 
@@ -938,11 +932,7 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWritePI")]
-    pub unsafe fn write_pi(
-        &mut self,
-        target: *const XmlChar,
-        content: Option<&str>,
-    ) -> io::Result<usize> {
+    pub unsafe fn write_pi(&mut self, target: &str, content: Option<&str>) -> io::Result<usize> {
         let mut sum = self.start_pi(target)?;
         if let Some(content) = content {
             sum += self.write_string(content)?;
