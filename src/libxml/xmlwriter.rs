@@ -25,12 +25,13 @@
 // alfred@mickautsch.de
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
+    collections::VecDeque,
     ffi::{c_char, CStr},
     io::{self, Write},
-    mem::{size_of, zeroed},
+    mem::size_of,
     os::raw::c_void,
-    ptr::{addr_of_mut, null_mut},
+    ptr::{drop_in_place, null_mut},
     rc::Rc,
     slice::from_raw_parts,
 };
@@ -46,11 +47,6 @@ use crate::{
     libxml::{
         globals::{xml_free, xml_malloc},
         htmltree::html_new_doc_no_dtd,
-        list::{
-            xml_link_get_data, xml_list_create, xml_list_delete, xml_list_empty, xml_list_front,
-            xml_list_pop_front, xml_list_push_front, xml_list_search, xml_list_size, XmlLinkPtr,
-            XmlListPtr,
-        },
         parser::{
             xml_create_push_parser_ctxt, xml_parse_chunk, XmlParserInputState, XmlSAXHandler,
             XML_DEFAULT_VERSION,
@@ -63,7 +59,7 @@ use crate::{
     uri::canonic_path,
 };
 
-use super::xmlsave::xml_buf_attr_serialize_txt_content;
+use super::{list::XmlList, xmlsave::xml_buf_attr_serialize_txt_content};
 
 // Types are kept private
 #[repr(C)]
@@ -90,23 +86,23 @@ enum XmlTextWriterState {
 
 #[repr(C)]
 struct XmlTextWriterStackEntry {
-    name: *mut XmlChar,
-    state: XmlTextWriterState,
+    name: Option<String>,
+    state: Cell<XmlTextWriterState>,
 }
 
 #[repr(C)]
 struct XmlTextWriterNsStackEntry {
     prefix: *mut XmlChar,
     uri: *mut XmlChar,
-    elem: XmlLinkPtr,
+    elem: Option<Rc<XmlTextWriterStackEntry>>,
 }
 
 pub type XmlTextWriterPtr<'a> = *mut XmlTextWriter<'a>;
 #[repr(C)]
 pub struct XmlTextWriter<'a> {
-    out: XmlOutputBuffer<'a>, /* output buffer */
-    nodes: XmlListPtr,        /* element name stack */
-    nsstack: XmlListPtr,      /* name spaces stack */
+    out: XmlOutputBuffer<'a>,                     /* output buffer */
+    nodes: VecDeque<Rc<XmlTextWriterStackEntry>>, /* element name stack */
+    nsstack: XmlList<XmlTextWriterNsStackEntry>,  /* name spaces stack */
     level: i32,
     indent: i32,         /* enable indent */
     doindent: i32,       /* internal indent flag */
@@ -121,8 +117,8 @@ impl Default for XmlTextWriter<'_> {
     fn default() -> Self {
         Self {
             out: XmlOutputBuffer::default(),
-            nodes: null_mut(),
-            nsstack: null_mut(),
+            nodes: VecDeque::new(),
+            nsstack: XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)),
             level: 0,
             indent: 0,
             doindent: 0,
@@ -133,45 +129,6 @@ impl Default for XmlTextWriter<'_> {
             doc: null_mut(),
         }
     }
-}
-
-/// Free callback for the xmlList.
-#[doc(alias = "xmlFreeTextWriterStackEntry")]
-extern "C" fn xml_free_text_writer_stack_entry(data: *mut c_void) {
-    let p: *mut XmlTextWriterStackEntry = data as _;
-    if p.is_null() {
-        return;
-    }
-
-    unsafe {
-        if !(*p).name.is_null() {
-            xml_free((*p).name as _);
-        }
-        xml_free(p as _);
-    }
-}
-
-/// Compare callback for the xmlList.
-///
-/// Returns -1, 0, 1
-#[doc(alias = "xmlCmpTextWriterStackEntry")]
-extern "C" fn xml_cmp_text_writer_stack_entry(data0: *const c_void, data1: *const c_void) -> i32 {
-    if data0 == data1 {
-        return 0;
-    }
-
-    if data0.is_null() {
-        return -1;
-    }
-
-    if data1.is_null() {
-        return 1;
-    }
-
-    let p0: *mut XmlTextWriterStackEntry = data0 as _;
-    let p1: *mut XmlTextWriterStackEntry = data1 as _;
-
-    unsafe { xml_strcmp((*p0).name, (*p1).name) }
 }
 
 /// Free callback for the xmlList.
@@ -192,42 +149,6 @@ extern "C" fn xml_free_text_writer_ns_stack_entry(data: *mut c_void) {
 
         xml_free(p as _);
     }
-}
-
-/// Compare callback for the xmlList.
-///
-/// Returns -1, 0, 1
-#[doc(alias = "xmlCmpTextWriterNsStackEntry")]
-extern "C" fn xml_cmp_text_writer_ns_stack_entry(
-    data0: *const c_void,
-    data1: *const c_void,
-) -> i32 {
-    let mut rc: i32;
-
-    if data0 == data1 {
-        return 0;
-    }
-
-    if data0.is_null() {
-        return -1;
-    }
-
-    if data1.is_null() {
-        return 1;
-    }
-
-    let p0: *mut XmlTextWriterNsStackEntry = data0 as *mut XmlTextWriterNsStackEntry;
-    let p1: *mut XmlTextWriterNsStackEntry = data1 as *mut XmlTextWriterNsStackEntry;
-
-    unsafe {
-        rc = xml_strcmp((*p0).prefix, (*p1).prefix);
-
-        if rc != 0 || (*p0).elem != (*p1).elem {
-            rc = -1;
-        }
-    }
-
-    rc
 }
 
 /// Handle a writer error
@@ -295,42 +216,50 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
     memset(ret as _, 0, size_of::<XmlTextWriter>());
     std::ptr::write(&mut *ret, XmlTextWriter::default());
 
-    (*ret).nodes = xml_list_create(
-        Some(xml_free_text_writer_stack_entry),
-        Some(xml_cmp_text_writer_stack_entry),
-    );
-    if (*ret).nodes.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlNewTextWriter : out of memory!\n",
-        );
-        xml_free(ret as _);
-        return null_mut();
-    }
+    (*ret).nsstack = XmlList::new(
+        Some(Rc::new(|data| {
+            if !data.prefix.is_null() {
+                xml_free(data.prefix as _);
+            }
+            if !data.uri.is_null() {
+                xml_free(data.uri as _);
+            }
+        })),
+        Rc::new(|d1, d2| {
+            let mut rc: i32;
 
-    (*ret).nsstack = xml_list_create(
-        Some(xml_free_text_writer_ns_stack_entry),
-        Some(xml_cmp_text_writer_ns_stack_entry),
+            if std::ptr::eq(d1, d2) {
+                return std::cmp::Ordering::Equal;
+            }
+
+            rc = xml_strcmp(d1.prefix, d2.prefix);
+
+            if rc != 0 {
+                rc = -1;
+            }
+            match (d1.elem.as_ref(), d2.elem.as_ref()) {
+                (Some(d1), Some(d2)) => {
+                    if !Rc::ptr_eq(d1, d2) {
+                        rc = -1;
+                    }
+                }
+                (None, None) => {}
+                _ => rc = -1,
+            }
+            match rc {
+                ..0 => std::cmp::Ordering::Less,
+                0 => std::cmp::Ordering::Equal,
+                1.. => std::cmp::Ordering::Greater,
+            }
+        }),
     );
-    if (*ret).nsstack.is_null() {
-        xml_writer_err_msg(
-            null_mut(),
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlNewTextWriter : out of memory!\n",
-        );
-        xml_list_delete((*ret).nodes);
-        xml_free(ret as _);
-        return null_mut();
-    }
 
     (*ret).out = out;
     (*ret).ichar = xml_strdup(c" ".as_ptr() as _);
     (*ret).qchar = b'"' as _;
 
     if (*ret).ichar.is_null() {
-        xml_list_delete((*ret).nodes);
-        xml_list_delete((*ret).nsstack);
+        drop_in_place(ret);
         xml_free(ret as _);
         xml_writer_err_msg(
             null_mut(),
@@ -410,7 +339,7 @@ macro_rules! xml_writer_err_msg_int {
 ///
 /// Returns -1, 0, 1
 #[doc(alias = "xmlTextWriterWriteDocCallback")]
-unsafe extern "C" fn xml_text_writer_write_doc_callback(
+unsafe fn xml_text_writer_write_doc_callback(
     context: *mut c_void,
     str: *const c_char,
     len: i32,
@@ -435,7 +364,7 @@ unsafe extern "C" fn xml_text_writer_write_doc_callback(
 ///
 /// Returns -1, 0, 1
 #[doc(alias = "xmlTextWriterCloseDocCallback")]
-unsafe extern "C" fn xml_text_writer_close_doc_callback(context: *mut c_void) -> i32 {
+unsafe fn xml_text_writer_close_doc_callback(context: *mut c_void) -> i32 {
     let ctxt: XmlParserCtxtPtr = context as XmlParserCtxtPtr;
     let rc: i32;
 
@@ -491,7 +420,7 @@ impl Drop for TextWriterPushContext {
 ///
 /// Returns the new xmlTextWriterPtr or NULL in case of error
 #[doc(alias = "xmlNewTextWriterPushParser")]
-pub unsafe extern "C" fn xml_new_text_writer_push_parser(
+pub unsafe fn xml_new_text_writer_push_parser(
     ctxt: XmlParserCtxtPtr,
     _compression: i32,
 ) -> XmlTextWriterPtr<'static> {
@@ -734,14 +663,6 @@ pub unsafe fn xml_free_text_writer(writer: XmlTextWriterPtr) {
     (*writer).out.flush();
     (*writer).out = XmlOutputBuffer::default();
 
-    if !(*writer).nodes.is_null() {
-        xml_list_delete((*writer).nodes);
-    }
-
-    if !(*writer).nsstack.is_null() {
-        xml_list_delete((*writer).nsstack);
-    }
-
     if !(*writer).ctxt.is_null() {
         if !(*(*writer).ctxt).my_doc.is_null() && (*writer).no_doc_free == 0 {
             xml_free_doc((*(*writer).ctxt).my_doc);
@@ -757,6 +678,7 @@ pub unsafe fn xml_free_text_writer(writer: XmlTextWriterPtr) {
     if !(*writer).ichar.is_null() {
         xml_free((*writer).ichar as _);
     }
+    drop_in_place(writer);
     xml_free(writer as _);
 }
 
@@ -781,8 +703,7 @@ pub unsafe fn xml_text_writer_start_document(
         ));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() && !xml_link_get_data(lk).is_null() {
+    if (*writer).nodes.front().is_some() {
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
@@ -863,9 +784,6 @@ pub unsafe fn xml_text_writer_start_document(
 /// Returns the bytes written or -1 in case of error
 #[doc(alias = "xmlTextWriterEndDocument")]
 pub unsafe fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> io::Result<usize> {
-    let mut lk: XmlLinkPtr;
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() {
         xml_writer_err_msg(
             writer,
@@ -878,15 +796,8 @@ pub unsafe fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> io::Resu
     }
 
     let mut sum = 0;
-    while {
-        lk = xml_list_front((*writer).nodes);
-        !lk.is_null()
-    } {
-        p = xml_link_get_data(lk) as _;
-        if p.is_null() {
-            break;
-        }
-        match (*p).state {
+    while let Some(lk) = (*writer).nodes.front() {
+        match lk.state.get() {
             XmlTextWriterState::XmlTextwriterName
             | XmlTextWriterState::XmlTextwriterAttribute
             | XmlTextWriterState::XmlTextwriterText => {
@@ -928,36 +839,20 @@ pub unsafe fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> io::Resu
 /// Output the current namespace declarations.
 #[doc(alias = "xmlTextWriterOutputNSDecl")]
 unsafe fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> io::Result<usize> {
-    let mut lk: XmlLinkPtr;
-    let mut np: *mut XmlTextWriterNsStackEntry;
-
     let mut sum = 0;
-    while xml_list_empty((*writer).nsstack) == 0 {
-        let mut namespace_uri: *mut XmlChar = null_mut();
-        let mut prefix: *mut XmlChar = null_mut();
+    while let Some(lk) = (*writer).nsstack.pop_first() {
+        let namespace_uri = xml_strdup(lk.uri);
+        let prefix = xml_strdup(lk.prefix);
 
-        lk = xml_list_front((*writer).nsstack);
-        np = xml_link_get_data(lk) as *mut XmlTextWriterNsStackEntry;
+        let count = xml_text_writer_write_attribute(writer, prefix, namespace_uri);
+        xml_free(namespace_uri as _);
+        xml_free(prefix as _);
 
-        if !np.is_null() {
-            namespace_uri = xml_strdup((*np).uri);
-            prefix = xml_strdup((*np).prefix);
+        if count.is_err() {
+            (*writer).nsstack.clear();
+            return count;
         }
-
-        xml_list_pop_front((*writer).nsstack);
-
-        if !np.is_null() {
-            let count = xml_text_writer_write_attribute(writer, prefix, namespace_uri);
-            xml_free(namespace_uri as _);
-            xml_free(prefix as _);
-
-            if count.is_err() {
-                xml_list_delete((*writer).nsstack);
-                (*writer).nsstack = null_mut();
-                return count;
-            }
-            sum += count.unwrap();
-        }
+        sum += count.unwrap();
     }
     Ok(sum)
 }
@@ -967,7 +862,7 @@ unsafe fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> io::Result<
 /// Returns -1 on error or the number of strings written.
 #[doc(alias = "xmlTextWriterWriteIndent")]
 unsafe fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> io::Result<usize> {
-    let lksize = xml_list_size((*writer).nodes);
+    let lksize = (*writer).nodes.len();
     if lksize < 1 {
         return Err(io::Error::other("List is empty"));
     }
@@ -979,7 +874,7 @@ unsafe fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> io::Result<u
         )?;
     }
 
-    Ok(lksize as usize - 1)
+    Ok(lksize - 1)
 }
 
 /// Start an xml comment.
@@ -987,8 +882,6 @@ unsafe fn xml_text_writer_write_indent(writer: XmlTextWriterPtr) -> io::Result<u
 /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
 #[doc(alias = "xmlTextWriterStartComment")]
 pub unsafe fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> io::Result<usize> {
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() {
         xml_writer_err_msg(
             writer,
@@ -1001,44 +894,31 @@ pub unsafe fn xml_text_writer_start_comment(writer: XmlTextWriterPtr) -> io::Res
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            match (*p).state {
-                XmlTextWriterState::XmlTextwriterText | XmlTextWriterState::XmlTextwriterNone => {}
-                XmlTextWriterState::XmlTextwriterName => {
-                    // Output namespace declarations
-                    sum += xml_text_writer_output_nsdecl(writer)?;
-                    sum += (*writer).out.write_str(">")?;
-                    if (*writer).indent != 0 {
-                        sum += (*writer).out.write_str("\n")?;
-                    }
-                    (*p).state = XmlTextWriterState::XmlTextwriterText;
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterText | XmlTextWriterState::XmlTextwriterNone => {}
+            XmlTextWriterState::XmlTextwriterName => {
+                // Output namespace declarations
+                sum += xml_text_writer_output_nsdecl(writer)?;
+                sum += (*writer).out.write_str(">")?;
+                if (*writer).indent != 0 {
+                    sum += (*writer).out.write_str("\n")?;
                 }
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
+                lk.state.set(XmlTextWriterState::XmlTextwriterText);
+            }
+            _ => {
+                return Err(io::Error::other("Invalid state"));
             }
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartElement : out of memory!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartElement : out of memory!",
-        ));
-    }
-
-    (*p).name = null_mut();
-    (*p).state = XmlTextWriterState::XmlTextwriterComment;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    (*writer).nodes.push_front(
+        XmlTextWriterStackEntry {
+            name: None,
+            state: Cell::new(XmlTextWriterState::XmlTextwriterComment),
+        }
+        .into(),
+    );
 
     if (*writer).indent != 0 {
         sum += xml_text_writer_write_indent(writer)?;
@@ -1064,8 +944,7 @@ pub unsafe fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> io::Resul
         ));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
@@ -1074,15 +953,10 @@ pub unsafe fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> io::Resul
         return Err(io::Error::other(
             "xmlTextWriterEndComment : not allowed in this context!",
         ));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("XmlTextWriterStackEntry is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterComment => {
             sum += (*writer).out.write_str("-->")?;
         }
@@ -1095,7 +969,7 @@ pub unsafe fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> io::Resul
         sum += (*writer).out.write_str("\n")?;
     }
 
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -1121,69 +995,45 @@ pub unsafe fn xml_text_writer_start_element(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
 ) -> io::Result<usize> {
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() || name.is_null() || (*name == b'\0') {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            match (*p).state {
-                XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
-                    return Err(io::Error::other("Not start element"));
-                }
-                XmlTextWriterState::XmlTextwriterNone => {}
-                ty @ XmlTextWriterState::XmlTextwriterAttribute
-                | ty @ XmlTextWriterState::XmlTextwriterName => {
-                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        sum += xml_text_writer_end_attribute(writer)?;
-                    }
-
-                    // Output namespace declarations
-                    sum += xml_text_writer_output_nsdecl(writer)?;
-                    sum += (*writer).out.write_str(">")?;
-                    if (*writer).indent != 0 {
-                        // count =
-                        (*writer).out.write_str("\n");
-                    }
-                    (*p).state = XmlTextWriterState::XmlTextwriterText;
-                }
-                _ => {}
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
+                return Err(io::Error::other("Not start element"));
             }
+            XmlTextWriterState::XmlTextwriterNone => {}
+            ty @ XmlTextWriterState::XmlTextwriterAttribute
+            | ty @ XmlTextWriterState::XmlTextwriterName => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                    sum += xml_text_writer_end_attribute(writer)?;
+                }
+
+                // Output namespace declarations
+                sum += xml_text_writer_output_nsdecl(writer)?;
+                sum += (*writer).out.write_str(">")?;
+                if (*writer).indent != 0 {
+                    // count =
+                    (*writer).out.write_str("\n");
+                }
+                lk.state.set(XmlTextWriterState::XmlTextwriterText);
+            }
+            _ => {}
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartElement : out of memory!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartElement : out of memory!",
-        ));
-    }
-
-    (*p).name = xml_strdup(name);
-    if (*p).name.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartElement : out of memory!\n",
-        );
-        xml_free(p as _);
-        return Err(io::Error::other(
-            "xmlTextWriterStartElement : out of memory!",
-        ));
-    }
-    (*p).state = XmlTextWriterState::XmlTextwriterName;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    let p = XmlTextWriterStackEntry {
+        name: Some(
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        state: Cell::new(XmlTextWriterState::XmlTextwriterName),
+    };
+    (*writer).nodes.push_front(p.into());
 
     if (*writer).indent != 0 {
         sum += xml_text_writer_write_indent(writer)?;
@@ -1192,7 +1042,7 @@ pub unsafe fn xml_text_writer_start_element(
     sum += (*writer).out.write_str("<")?;
     sum += (*writer)
         .out
-        .write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref())?;
+        .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
     Ok(sum)
 }
 
@@ -1225,41 +1075,18 @@ pub unsafe fn xml_text_writer_start_element_ns(
     sum += count?;
 
     if !namespace_uri.is_null() {
-        let p: *mut XmlTextWriterNsStackEntry =
-            xml_malloc(size_of::<XmlTextWriterNsStackEntry>()) as *mut XmlTextWriterNsStackEntry;
-        if p.is_null() {
-            xml_writer_err_msg(
-                writer,
-                XmlParserErrors::XmlErrNoMemory,
-                "xmlTextWriterStartElementNS : out of memory!\n",
-            );
-            return Err(io::Error::other(
-                "xmlTextWriterStartElementNS : out of memory!",
-            ));
-        }
-
         buf = xml_strdup(c"xmlns".as_ptr() as _);
         if !prefix.is_null() {
             buf = xml_strcat(buf, c":".as_ptr() as _);
             buf = xml_strcat(buf, prefix);
         }
 
-        (*p).prefix = buf;
-        (*p).uri = xml_strdup(namespace_uri);
-        if (*p).uri.is_null() {
-            xml_writer_err_msg(
-                writer,
-                XmlParserErrors::XmlErrNoMemory,
-                "xmlTextWriterStartElementNS : out of memory!\n",
-            );
-            xml_free(p as _);
-            return Err(io::Error::other(
-                "xmlTextWriterStartElementNS : out of memory!",
-            ));
-        }
-        (*p).elem = xml_list_front((*writer).nodes);
-
-        xml_list_push_front((*writer).nsstack, p as _);
+        let p = XmlTextWriterNsStackEntry {
+            prefix: buf,
+            uri: xml_strdup(namespace_uri),
+            elem: (*writer).nodes.front().cloned(),
+        };
+        (*writer).nsstack.push_first(p);
     }
 
     Ok(sum)
@@ -1274,29 +1101,19 @@ pub unsafe fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> io::Resul
         return Err(io::Error::other("Writer is invalid"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
-        xml_list_delete((*writer).nsstack);
-        (*writer).nsstack = null_mut();
+    let Some(lk) = (*writer).nodes.front() else {
+        (*writer).nsstack.clear();
         return Err(io::Error::other("Nodes link is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        xml_list_delete((*writer).nsstack);
-        (*writer).nsstack = null_mut();
-        return Err(io::Error::other("XmlTextWriterStackEntry is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         ty @ XmlTextWriterState::XmlTextwriterAttribute
         | ty @ XmlTextWriterState::XmlTextwriterName => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
                 let count = xml_text_writer_end_attribute(writer);
                 if count.is_err() {
-                    xml_list_delete((*writer).nsstack);
-                    (*writer).nsstack = null_mut();
+                    (*writer).nsstack.clear();
                     return count;
                 }
                 sum += count.unwrap();
@@ -1319,9 +1136,7 @@ pub unsafe fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> io::Resul
                 (*writer).doindent = 1;
             }
             sum += (*writer).out.write_str("</")?;
-            sum += (*writer)
-                .out
-                .write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref())?;
+            sum += (*writer).out.write_str(lk.name.as_deref().unwrap())?;
             sum += (*writer).out.write_str(">")?;
         }
         _ => {
@@ -1333,7 +1148,7 @@ pub unsafe fn xml_text_writer_end_element(writer: XmlTextWriterPtr) -> io::Resul
         sum += (*writer).out.write_str("\n")?;
     }
 
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -1346,18 +1161,12 @@ pub unsafe fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> io::
         return Err(io::Error::other("Writer is invalid"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         return Err(io::Error::other("Nodes link is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("XmlTextWriterStackEntry is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         ty @ XmlTextWriterState::XmlTextwriterAttribute
         | ty @ XmlTextWriterState::XmlTextwriterName
         | ty @ XmlTextWriterState::XmlTextwriterText => {
@@ -1384,9 +1193,7 @@ pub unsafe fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> io::
                 (*writer).doindent = 1;
             }
             sum += (*writer).out.write_str("</")?;
-            sum += (*writer)
-                .out
-                .write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref())?;
+            sum += (*writer).out.write_str(lk.name.as_deref().unwrap())?;
             sum += (*writer).out.write_str(">")?;
         }
         _ => {
@@ -1398,7 +1205,7 @@ pub unsafe fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> io::
         sum += (*writer).out.write_str("\n")?;
     }
 
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -1447,7 +1254,7 @@ pub unsafe fn xml_text_writer_write_element_ns(
 #[doc(alias = "xmlTextWriterHandleStateDependencies")]
 unsafe fn xml_text_writer_handle_state_dependencies(
     writer: XmlTextWriterPtr,
-    p: *mut XmlTextWriterStackEntry,
+    p: &mut Rc<XmlTextWriterStackEntry>,
 ) -> io::Result<usize> {
     let mut extra: [c_char; 3] = [0; 3];
 
@@ -1455,46 +1262,40 @@ unsafe fn xml_text_writer_handle_state_dependencies(
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    if p.is_null() {
-        return Ok(0);
-    }
-
     let mut sum = 0;
     extra[0] = b'\0' as _;
     extra[1] = b'\0' as _;
     extra[2] = b'\0' as _;
-    if !p.is_null() {
-        match (*p).state {
-            XmlTextWriterState::XmlTextwriterName => {
-                // Output namespace declarations
-                sum += xml_text_writer_output_nsdecl(writer)?;
-                extra[0] = b'>' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterText;
-            }
-            XmlTextWriterState::XmlTextwriterPI => {
-                extra[0] = b' ' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterPIText;
-            }
-            XmlTextWriterState::XmlTextwriterDTD => {
-                extra[0] = b' ' as _;
-                extra[1] = b'[' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
-            }
-            XmlTextWriterState::XmlTextwriterDTDElem => {
-                extra[0] = b' ' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDElemText;
-            }
-            XmlTextWriterState::XmlTextwriterDTDAttl => {
-                extra[0] = b' ' as _;
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDAttlText;
-            }
-            XmlTextWriterState::XmlTextwriterDTDEnty | XmlTextWriterState::XmlTextwriterDTDPEnt => {
-                extra[0] = b' ' as _;
-                extra[1] = (*writer).qchar;
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDEntyText;
-            }
-            _ => {}
+    match p.state.get() {
+        XmlTextWriterState::XmlTextwriterName => {
+            // Output namespace declarations
+            sum += xml_text_writer_output_nsdecl(writer)?;
+            extra[0] = b'>' as _;
+            p.state.set(XmlTextWriterState::XmlTextwriterText);
         }
+        XmlTextWriterState::XmlTextwriterPI => {
+            extra[0] = b' ' as _;
+            p.state.set(XmlTextWriterState::XmlTextwriterPIText);
+        }
+        XmlTextWriterState::XmlTextwriterDTD => {
+            extra[0] = b' ' as _;
+            extra[1] = b'[' as _;
+            p.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+        }
+        XmlTextWriterState::XmlTextwriterDTDElem => {
+            extra[0] = b' ' as _;
+            p.state.set(XmlTextWriterState::XmlTextwriterDTDElemText);
+        }
+        XmlTextWriterState::XmlTextwriterDTDAttl => {
+            extra[0] = b' ' as _;
+            p.state.set(XmlTextWriterState::XmlTextwriterDTDAttlText);
+        }
+        XmlTextWriterState::XmlTextwriterDTDEnty | XmlTextWriterState::XmlTextwriterDTDPEnt => {
+            extra[0] = b' ' as _;
+            extra[1] = (*writer).qchar;
+            p.state.set(XmlTextWriterState::XmlTextwriterDTDEntyText);
+        }
+        _ => {}
     }
 
     if extra[0] != b'\0' as i8 {
@@ -1516,8 +1317,6 @@ pub unsafe fn xml_text_writer_write_raw_len(
     content: *const XmlChar,
     len: i32,
 ) -> io::Result<usize> {
-    let p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() {
         xml_writer_err_msg(
             writer,
@@ -1541,10 +1340,8 @@ pub unsafe fn xml_text_writer_write_raw_len(
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        sum += xml_text_writer_handle_state_dependencies(writer, p)?;
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        sum += xml_text_writer_handle_state_dependencies(writer, lk)?;
     }
 
     if (*writer).indent != 0 {
@@ -1579,7 +1376,6 @@ pub unsafe fn xml_text_writer_write_string(
     writer: XmlTextWriterPtr,
     content: *const XmlChar,
 ) -> io::Result<usize> {
-    let p: *mut XmlTextWriterStackEntry;
     let mut buf: *mut XmlChar;
 
     if writer.is_null() || content.is_null() {
@@ -1588,25 +1384,21 @@ pub unsafe fn xml_text_writer_write_string(
 
     let mut sum = 0;
     buf = content as _;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            match (*p).state {
-                XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
-                    buf = xml_encode_special_chars(null_mut(), content);
-                }
-                XmlTextWriterState::XmlTextwriterAttribute => {
-                    buf = null_mut();
-                    xml_buf_attr_serialize_txt_content(
-                        (*writer).out.buffer.map_or(null_mut(), |buf| buf.as_ptr()),
-                        (*writer).doc,
-                        null_mut(),
-                        content,
-                    );
-                }
-                _ => {}
+    if let Some(lk) = (*writer).nodes.front() {
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
+                buf = xml_encode_special_chars(null_mut(), content);
             }
+            XmlTextWriterState::XmlTextwriterAttribute => {
+                buf = null_mut();
+                xml_buf_attr_serialize_txt_content(
+                    (*writer).out.buffer.map_or(null_mut(), |buf| buf.as_ptr()),
+                    (*writer).doc,
+                    null_mut(),
+                    content,
+                );
+            }
+            _ => {}
         }
     }
 
@@ -1712,19 +1504,13 @@ pub unsafe fn xml_text_writer_write_base64(
     start: i32,
     len: i32,
 ) -> io::Result<usize> {
-    let p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() || data.is_null() || start < 0 || len < 0 {
         return Err(io::Error::other("Writer or content is invalid"));
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            sum += xml_text_writer_handle_state_dependencies(writer, p)?;
-        }
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        sum += xml_text_writer_handle_state_dependencies(writer, lk)?;
     }
 
     if (*writer).indent != 0 {
@@ -1775,19 +1561,13 @@ pub unsafe fn xml_text_writer_write_bin_hex(
     start: i32,
     len: i32,
 ) -> io::Result<usize> {
-    let p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() || data.is_null() || start < 0 || len < 0 {
         return Err(io::Error::other("Writer or content is invalid"));
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            sum += xml_text_writer_handle_state_dependencies(writer, p)?;
-        }
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        sum += xml_text_writer_handle_state_dependencies(writer, lk)?;
     }
 
     if (*writer).indent != 0 {
@@ -1810,18 +1590,12 @@ pub unsafe fn xml_text_writer_start_attribute(
         return Err(io::Error::other("Writer or name is invalid"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front_mut() else {
         return Err(io::Error::other("Node link is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("XmlTextWriterStackEntry is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         ty @ XmlTextWriterState::XmlTextwriterAttribute
         | ty @ XmlTextWriterState::XmlTextwriterName => {
             if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
@@ -1834,7 +1608,7 @@ pub unsafe fn xml_text_writer_start_attribute(
                 .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
             sum += (*writer).out.write_str("=")?;
             sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
-            (*p).state = XmlTextWriterState::XmlTextwriterAttribute;
+            lk.state.set(XmlTextWriterState::XmlTextwriterAttribute);
         }
         _ => {
             return Err(io::Error::other("State is invalid"));
@@ -1855,32 +1629,28 @@ pub unsafe fn xml_text_writer_start_attribute_ns(
     namespace_uri: *const XmlChar,
 ) -> io::Result<usize> {
     let mut buf: *mut XmlChar;
-    let p: *mut XmlTextWriterNsStackEntry;
 
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return Err(io::Error::other("Writer or name is invalid"));
     }
 
-    /* Handle namespace first in case of error */
+    // Handle namespace first in case of error
     if !namespace_uri.is_null() {
-        let mut nsentry: XmlTextWriterNsStackEntry = unsafe { zeroed() };
-
         buf = xml_strdup(c"xmlns".as_ptr() as _);
         if !prefix.is_null() {
             buf = xml_strcat(buf, c":".as_ptr() as _);
             buf = xml_strcat(buf, prefix);
         }
 
-        nsentry.prefix = buf;
-        nsentry.uri = namespace_uri as _;
-        nsentry.elem = xml_list_front((*writer).nodes);
+        let nsentry = XmlTextWriterNsStackEntry {
+            prefix: buf,
+            uri: namespace_uri as _,
+            elem: (*writer).nodes.front().cloned(),
+        };
 
-        let curns: *mut XmlTextWriterNsStackEntry =
-            xml_list_search((*writer).nsstack, addr_of_mut!(nsentry) as _)
-                as *mut XmlTextWriterNsStackEntry;
-        if !curns.is_null() {
+        if let Some(curns) = (*writer).nsstack.search(&nsentry) {
             xml_free(buf as _);
-            if xml_strcmp((*curns).uri, namespace_uri) == 0 {
+            if xml_strcmp(curns.uri, namespace_uri) == 0 {
                 // Namespace already defined on element skip
                 buf = null_mut();
             } else {
@@ -1889,37 +1659,14 @@ pub unsafe fn xml_text_writer_start_attribute_ns(
             }
         }
 
-        /* Do not add namespace decl to list - it is already there */
+        // Do not add namespace decl to list - it is already there
         if !buf.is_null() {
-            p = xml_malloc(size_of::<XmlTextWriterNsStackEntry>())
-                as *mut XmlTextWriterNsStackEntry;
-            if p.is_null() {
-                xml_writer_err_msg(
-                    writer,
-                    XmlParserErrors::XmlErrNoMemory,
-                    "xmlTextWriterStartAttributeNS : out of memory!\n",
-                );
-                return Err(io::Error::other(
-                    "xmlTextWriterStartAttributeNS : out of memory!",
-                ));
-            }
-
-            (*p).prefix = buf;
-            (*p).uri = xml_strdup(namespace_uri);
-            if (*p).uri.is_null() {
-                xml_writer_err_msg(
-                    writer,
-                    XmlParserErrors::XmlErrNoMemory,
-                    "xmlTextWriterStartAttributeNS : out of memory!\n",
-                );
-                xml_free(p as _);
-                return Err(io::Error::other(
-                    "xmlTextWriterStartAttributeNS : out of memory!",
-                ));
-            }
-            (*p).elem = xml_list_front((*writer).nodes);
-
-            xml_list_push_front((*writer).nsstack, p as _);
+            let p = XmlTextWriterNsStackEntry {
+                prefix: buf,
+                uri: xml_strdup(namespace_uri),
+                elem: (*writer).nodes.front().cloned(),
+            };
+            (*writer).nsstack.push_first(p);
         }
     }
 
@@ -1944,20 +1691,14 @@ pub unsafe fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr) -> io::Res
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front_mut() else {
         return Err(io::Error::other("List is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("Link data is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterAttribute => {
-            (*p).state = XmlTextWriterState::XmlTextwriterName;
+            lk.state.set(XmlTextWriterState::XmlTextwriterName);
 
             sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
         }
@@ -2015,8 +1756,6 @@ pub unsafe fn xml_text_writer_start_pi(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
 ) -> io::Result<usize> {
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() || target.is_null() || *target == b'\0' {
         return Err(io::Error::other("Writer or target is NULL"));
     }
@@ -2030,67 +1769,49 @@ pub unsafe fn xml_text_writer_start_pi(
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            match (*p).state {
-                ty @ XmlTextWriterState::XmlTextwriterAttribute
-                | ty @ XmlTextWriterState::XmlTextwriterName => {
-                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        sum += xml_text_writer_end_attribute(writer)?;
-                    }
-                    // Output namespace declarations
-                    sum += xml_text_writer_output_nsdecl(writer)?;
-                    sum += (*writer).out.write_str(">")?;
-                    (*p).state = XmlTextWriterState::XmlTextwriterText;
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        match lk.state.get() {
+            ty @ XmlTextWriterState::XmlTextwriterAttribute
+            | ty @ XmlTextWriterState::XmlTextwriterName => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                    sum += xml_text_writer_end_attribute(writer)?;
                 }
-                XmlTextWriterState::XmlTextwriterNone
-                | XmlTextWriterState::XmlTextwriterText
-                | XmlTextWriterState::XmlTextwriterDTD => {}
-                XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
-                    xml_writer_err_msg(
-                        writer,
-                        XmlParserErrors::XmlErrInternalError,
-                        "xmlTextWriterStartPI : nested PI!\n",
-                    );
-                    return Err(io::Error::other("xmlTextWriterStartPI : nested PI!"));
-                }
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
+                // Output namespace declarations
+                sum += xml_text_writer_output_nsdecl(writer)?;
+                sum += (*writer).out.write_str(">")?;
+                lk.state.set(XmlTextWriterState::XmlTextwriterText);
+            }
+            XmlTextWriterState::XmlTextwriterNone
+            | XmlTextWriterState::XmlTextwriterText
+            | XmlTextWriterState::XmlTextwriterDTD => {}
+            XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
+                xml_writer_err_msg(
+                    writer,
+                    XmlParserErrors::XmlErrInternalError,
+                    "xmlTextWriterStartPI : nested PI!\n",
+                );
+                return Err(io::Error::other("xmlTextWriterStartPI : nested PI!"));
+            }
+            _ => {
+                return Err(io::Error::other("Invalid state"));
             }
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartPI : out of memory!\n",
-        );
-        return Err(io::Error::other("xmlTextWriterStartPI : out of memory!"));
-    }
-
-    (*p).name = xml_strdup(target);
-    if (*p).name.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartPI : out of memory!\n",
-        );
-        xml_free(p as _);
-        return Err(io::Error::other("xmlTextWriterStartPI : out of memory!"));
-    }
-    (*p).state = XmlTextWriterState::XmlTextwriterPI;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    let p = XmlTextWriterStackEntry {
+        name: Some(
+            CStr::from_ptr(target as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        state: Cell::new(XmlTextWriterState::XmlTextwriterPI),
+    };
+    (*writer).nodes.push_front(p.into());
 
     sum += (*writer).out.write_str("<?")?;
     sum += (*writer)
         .out
-        .write_str(CStr::from_ptr((*p).name as _).to_string_lossy().as_ref())?;
+        .write_str(CStr::from_ptr(target as _).to_string_lossy().as_ref())?;
     Ok(sum)
 }
 
@@ -2103,18 +1824,12 @@ pub unsafe fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> io::Result<usi
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         return Ok(0);
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Ok(0);
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterPI | XmlTextWriterState::XmlTextwriterPIText => {
             sum += (*writer).out.write_str("?>")?;
         }
@@ -2127,7 +1842,7 @@ pub unsafe fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> io::Result<usi
         sum += (*writer).out.write_str("\n")?;
     }
 
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -2154,64 +1869,51 @@ pub unsafe fn xml_text_writer_write_pi(
 /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
 #[doc(alias = "xmlTextWriterStartCDATA")]
 pub unsafe fn xml_text_writer_start_cdata(writer: XmlTextWriterPtr) -> io::Result<usize> {
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() {
         return Err(io::Error::other("Writer is NULL"));
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            match (*p).state {
-                XmlTextWriterState::XmlTextwriterNone
-                | XmlTextWriterState::XmlTextwriterText
-                | XmlTextWriterState::XmlTextwriterPI
-                | XmlTextWriterState::XmlTextwriterPIText => {}
-                ty @ XmlTextWriterState::XmlTextwriterAttribute
-                | ty @ XmlTextWriterState::XmlTextwriterName => {
-                    if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
-                        sum += xml_text_writer_end_attribute(writer)?;
-                    }
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterNone
+            | XmlTextWriterState::XmlTextwriterText
+            | XmlTextWriterState::XmlTextwriterPI
+            | XmlTextWriterState::XmlTextwriterPIText => {}
+            ty @ XmlTextWriterState::XmlTextwriterAttribute
+            | ty @ XmlTextWriterState::XmlTextwriterName => {
+                if matches!(ty, XmlTextWriterState::XmlTextwriterAttribute) {
+                    sum += xml_text_writer_end_attribute(writer)?;
+                }
 
-                    // Output namespace declarations
-                    sum += xml_text_writer_output_nsdecl(writer)?;
-                    sum += (*writer).out.write_str(">")?;
-                    (*p).state = XmlTextWriterState::XmlTextwriterText;
-                }
-                XmlTextWriterState::XmlTextwriterCDATA => {
-                    xml_writer_err_msg(
-                        writer,
-                        XmlParserErrors::XmlErrInternalError,
-                        "xmlTextWriterStartCDATA : CDATA not allowed in this context!\n",
-                    );
-                    return Err(io::Error::other(
-                        "xmlTextWriterStartCDATA : CDATA not allowed in this context!",
-                    ));
-                }
-                _ => {
-                    return Err(io::Error::other("Invalid State"));
-                }
+                // Output namespace declarations
+                sum += xml_text_writer_output_nsdecl(writer)?;
+                sum += (*writer).out.write_str(">")?;
+                lk.state.set(XmlTextWriterState::XmlTextwriterText);
+            }
+            XmlTextWriterState::XmlTextwriterCDATA => {
+                xml_writer_err_msg(
+                    writer,
+                    XmlParserErrors::XmlErrInternalError,
+                    "xmlTextWriterStartCDATA : CDATA not allowed in this context!\n",
+                );
+                return Err(io::Error::other(
+                    "xmlTextWriterStartCDATA : CDATA not allowed in this context!",
+                ));
+            }
+            _ => {
+                return Err(io::Error::other("Invalid State"));
             }
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartCDATA : out of memory!\n",
-        );
-        return Err(io::Error::other("xmlTextWriterStartCDATA : out of memory!"));
-    }
-
-    (*p).name = null_mut();
-    (*p).state = XmlTextWriterState::XmlTextwriterCDATA;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    (*writer).nodes.push_front(
+        XmlTextWriterStackEntry {
+            name: None,
+            state: Cell::new(XmlTextWriterState::XmlTextwriterCDATA),
+        }
+        .into(),
+    );
 
     sum += (*writer).out.write_str("<![CDATA[")?;
     Ok(sum)
@@ -2226,18 +1928,12 @@ pub unsafe fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> io::Result<
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("Link data is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterCDATA => {
             sum += (*writer).out.write_str("]]>")?;
         }
@@ -2246,7 +1942,7 @@ pub unsafe fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> io::Result<
         }
     }
 
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -2281,8 +1977,7 @@ pub unsafe fn xml_text_writer_start_dtd(
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() && !xml_link_get_data(lk).is_null() {
+    if (*writer).nodes.front().is_some() {
         xml_writer_err_msg(
             writer,
             XmlParserErrors::XmlErrInternalError,
@@ -2293,30 +1988,15 @@ pub unsafe fn xml_text_writer_start_dtd(
         ));
     }
 
-    let p: *mut XmlTextWriterStackEntry =
-        xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTD : out of memory!\n",
-        );
-        return Err(io::Error::other("xmlTextWriterStartDTD : out of memory!"));
-    }
-
-    (*p).name = xml_strdup(name);
-    if (*p).name.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTD : out of memory!\n",
-        );
-        xml_free(p as _);
-        return Err(io::Error::other("xmlTextWriterStartDTD : out of memory!"));
-    }
-    (*p).state = XmlTextWriterState::XmlTextwriterDTD;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    let p = XmlTextWriterStackEntry {
+        name: Some(
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        state: Cell::new(XmlTextWriterState::XmlTextwriterDTD),
+    };
+    (*writer).nodes.push_front(p.into());
 
     let mut sum = (*writer).out.write_str("<!DOCTYPE ")?;
     sum += (*writer)
@@ -2378,26 +2058,13 @@ pub unsafe fn xml_text_writer_start_dtd(
 /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
 #[doc(alias = "xmlTextWriterEndDTD")]
 pub unsafe fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> io::Result<usize> {
-    let mut do_loop: i32;
-    let mut lk: XmlLinkPtr;
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() {
         return Err(io::Error::other("Writer is NULL"));
     }
 
     let mut sum = 0;
-    do_loop = 1;
-    while do_loop != 0 {
-        lk = xml_list_front((*writer).nodes);
-        if lk.is_null() {
-            break;
-        }
-        p = xml_link_get_data(lk) as _;
-        if p.is_null() {
-            break;
-        }
-        match (*p).state {
+    while let Some(lk) = (*writer).nodes.front() {
+        match lk.state.get() {
             ty @ XmlTextWriterState::XmlTextwriterDTDText
             | ty @ XmlTextWriterState::XmlTextwriterDTD => {
                 if matches!(ty, XmlTextWriterState::XmlTextwriterDTDText) {
@@ -2409,7 +2076,7 @@ pub unsafe fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> io::Result<us
                     sum += (*writer).out.write_str("\n")?;
                 }
 
-                xml_list_pop_front((*writer).nodes);
+                (*writer).nodes.pop_front();
             }
             XmlTextWriterState::XmlTextwriterDTDElem
             | XmlTextWriterState::XmlTextwriterDTDElemText => {
@@ -2428,8 +2095,7 @@ pub unsafe fn xml_text_writer_end_dtd(writer: XmlTextWriterPtr) -> io::Result<us
                 sum += xml_text_writer_end_comment(writer)?;
             }
             _ => {
-                do_loop = 0;
-                continue;
+                break;
             }
         }
     }
@@ -2468,56 +2134,34 @@ pub unsafe fn xml_text_writer_start_dtdelement(
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front_mut() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    let mut p = xml_link_get_data(lk) as *mut XmlTextWriterStackEntry;
-    if !p.is_null() {
-        match (*p).state {
-            XmlTextWriterState::XmlTextwriterDTD => {
-                sum += (*writer).out.write_str(" [")?;
-                if (*writer).indent != 0 {
-                    sum += (*writer).out.write_str("\n")?;
-                }
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
+    match lk.state.get() {
+        XmlTextWriterState::XmlTextwriterDTD => {
+            sum += (*writer).out.write_str(" [")?;
+            if (*writer).indent != 0 {
+                sum += (*writer).out.write_str("\n")?;
             }
-            XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
-            _ => {
-                return Err(io::Error::other("Invalid state"));
-            }
+            lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+        }
+        XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
+        _ => {
+            return Err(io::Error::other("Invalid state"));
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTDElement : out of memory!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartDTDElement : out of memory!",
-        ));
-    }
-
-    (*p).name = xml_strdup(name);
-    if (*p).name.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTDElement : out of memory!\n",
-        );
-        xml_free(p as _);
-        return Err(io::Error::other(
-            "xmlTextWriterStartDTDElement : out of memory!",
-        ));
-    }
-    (*p).state = XmlTextWriterState::XmlTextwriterDTDElem;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    let p = XmlTextWriterStackEntry {
+        name: Some(
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        state: Cell::new(XmlTextWriterState::XmlTextwriterDTDElem),
+    };
+    (*writer).nodes.push_front(p.into());
 
     if (*writer).indent != 0 {
         sum += xml_text_writer_write_indent(writer)?;
@@ -2539,18 +2183,12 @@ pub unsafe fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr) -> io::Re
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("List data is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterDTDElem | XmlTextWriterState::XmlTextwriterDTDElemText => {
             sum += (*writer).out.write_str(">")?;
         }
@@ -2563,7 +2201,7 @@ pub unsafe fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr) -> io::Re
         sum += (*writer).out.write_str("\n")?;
     }
 
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -2594,62 +2232,38 @@ pub unsafe fn xml_text_writer_start_dtdattlist(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
 ) -> io::Result<usize> {
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front_mut() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    p = xml_link_get_data(lk) as _;
-    if !p.is_null() {
-        match (*p).state {
-            XmlTextWriterState::XmlTextwriterDTD => {
-                sum += (*writer).out.write_str(" [")?;
-                if (*writer).indent != 0 {
-                    sum += (*writer).out.write_str("\n")?;
-                }
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
+    match lk.state.get() {
+        XmlTextWriterState::XmlTextwriterDTD => {
+            sum += (*writer).out.write_str(" [")?;
+            if (*writer).indent != 0 {
+                sum += (*writer).out.write_str("\n")?;
             }
-            XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
-            _ => {
-                return Err(io::Error::other("Invalid state"));
-            }
+            lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+        }
+        XmlTextWriterState::XmlTextwriterDTDText | XmlTextWriterState::XmlTextwriterNone => {}
+        _ => {
+            return Err(io::Error::other("Invalid state"));
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTDAttlist : out of memory!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartDTDAttlist : out of memory!",
-        ));
-    }
-
-    (*p).name = xml_strdup(name);
-    if (*p).name.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTDAttlist : out of memory!\n",
-        );
-        xml_free(p as _);
-        return Err(io::Error::other(
-            "xmlTextWriterStartDTDAttlist : out of memory!",
-        ));
-    }
-    (*p).state = XmlTextWriterState::XmlTextwriterDTDAttl;
-
-    xml_list_push_front((*writer).nodes, p as _);
+    let p = XmlTextWriterStackEntry {
+        name: Some(
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        state: Cell::new(XmlTextWriterState::XmlTextwriterDTDAttl),
+    };
+    (*writer).nodes.push_front(p.into());
 
     if (*writer).indent != 0 {
         sum += xml_text_writer_write_indent(writer)?;
@@ -2671,18 +2285,12 @@ pub unsafe fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPtr) -> io::R
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("List data is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterDTDAttl | XmlTextWriterState::XmlTextwriterDTDAttlText => {
             sum += (*writer).out.write_str(">")?;
         }
@@ -2694,8 +2302,7 @@ pub unsafe fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPtr) -> io::R
     if (*writer).indent != 0 {
         sum += (*writer).out.write_str("\n")?;
     }
-
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -2727,66 +2334,41 @@ pub unsafe fn xml_text_writer_start_dtd_entity(
     pe: i32,
     name: *const XmlChar,
 ) -> io::Result<usize> {
-    let mut p: *mut XmlTextWriterStackEntry;
-
     if writer.is_null() || name.is_null() || *name == b'\0' {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
     let mut sum = 0;
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if !lk.is_null() {
-        p = xml_link_get_data(lk) as _;
-        if !p.is_null() {
-            match (*p).state {
-                XmlTextWriterState::XmlTextwriterDTD => {
-                    sum += (*writer).out.write_str(" [")?;
-                    if (*writer).indent != 0 {
-                        sum += (*writer).out.write_str("\n")?;
-                    }
-                    (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
+    if let Some(lk) = (*writer).nodes.front_mut() {
+        match lk.state.get() {
+            XmlTextWriterState::XmlTextwriterDTD => {
+                sum += (*writer).out.write_str(" [")?;
+                if (*writer).indent != 0 {
+                    sum += (*writer).out.write_str("\n")?;
                 }
-                _ty @ XmlTextWriterState::XmlTextwriterDTDText
-                | _ty @ XmlTextWriterState::XmlTextwriterNone => {}
-                _ => {
-                    return Err(io::Error::other("Invalid state"));
-                }
+                lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+            }
+            _ty @ XmlTextWriterState::XmlTextwriterDTDText
+            | _ty @ XmlTextWriterState::XmlTextwriterNone => {}
+            _ => {
+                return Err(io::Error::other("Invalid state"));
             }
         }
     }
 
-    p = xml_malloc(size_of::<XmlTextWriterStackEntry>()) as *mut XmlTextWriterStackEntry;
-    if p.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTDElement : out of memory!\n",
-        );
-        return Err(io::Error::other(
-            "xmlTextWriterStartDTDElement : out of memory!",
-        ));
-    }
-
-    (*p).name = xml_strdup(name);
-    if (*p).name.is_null() {
-        xml_writer_err_msg(
-            writer,
-            XmlParserErrors::XmlErrNoMemory,
-            "xmlTextWriterStartDTDElement : out of memory!\n",
-        );
-        xml_free(p as _);
-        return Err(io::Error::other(
-            "xmlTextWriterStartDTDElement : out of memory!",
-        ));
-    }
-
-    if pe != 0 {
-        (*p).state = XmlTextWriterState::XmlTextwriterDTDPEnt;
-    } else {
-        (*p).state = XmlTextWriterState::XmlTextwriterDTDEnty;
-    }
-
-    xml_list_push_front((*writer).nodes, p as _);
+    let p = XmlTextWriterStackEntry {
+        name: Some(
+            CStr::from_ptr(name as *const i8)
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        state: if pe != 0 {
+            Cell::new(XmlTextWriterState::XmlTextwriterDTDPEnt)
+        } else {
+            Cell::new(XmlTextWriterState::XmlTextwriterDTDEnty)
+        },
+    };
+    (*writer).nodes.push_front(p.into());
 
     if (*writer).indent != 0 {
         sum += xml_text_writer_write_indent(writer)?;
@@ -2810,18 +2392,12 @@ pub unsafe fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr) -> io::Re
         return Err(io::Error::other("Writer is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
-
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("List data is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    match (*p).state {
+    match lk.state.get() {
         ty @ XmlTextWriterState::XmlTextwriterDTDEntyText
         | ty @ XmlTextWriterState::XmlTextwriterDTDEnty
         | ty @ XmlTextWriterState::XmlTextwriterDTDPEnt => {
@@ -2838,8 +2414,7 @@ pub unsafe fn xml_text_writer_end_dtd_entity(writer: XmlTextWriterPtr) -> io::Re
     if (*writer).indent != 0 {
         sum += (*writer).out.write_str("\n")?;
     }
-
-    xml_list_pop_front((*writer).nodes);
+    (*writer).nodes.pop_front();
     Ok(sum)
 }
 
@@ -2909,21 +2484,15 @@ pub unsafe fn xml_text_writer_write_dtd_external_entity_contents(
         ));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front() else {
         xml_writer_err_msg(writer, XmlParserErrors::XmlErrInternalError,
                         "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!\n");
         return Err(io::Error::other(
             "xmlTextWriterWriteDTDExternalEntityContents: you must call xmlTextWriterStartDTDEntity before the call to this function!",
         ));
-    }
+    };
 
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if p.is_null() {
-        return Err(io::Error::other("Link data is NULL"));
-    }
-
-    match (*p).state {
+    match lk.state.get() {
         XmlTextWriterState::XmlTextwriterDTDEnty => {}
         XmlTextWriterState::XmlTextwriterDTDPEnt => {
             if !ndataid.is_null() {
@@ -3022,26 +2591,22 @@ pub unsafe fn xml_text_writer_write_dtd_notation(
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
-    let lk: XmlLinkPtr = xml_list_front((*writer).nodes);
-    if lk.is_null() {
+    let Some(lk) = (*writer).nodes.front_mut() else {
         return Err(io::Error::other("Node list is NULL"));
-    }
+    };
 
     let mut sum = 0;
-    let p: *mut XmlTextWriterStackEntry = xml_link_get_data(lk) as _;
-    if !p.is_null() {
-        match (*p).state {
-            XmlTextWriterState::XmlTextwriterDTD => {
-                sum += (*writer).out.write_str(" [")?;
-                if (*writer).indent != 0 {
-                    sum += (*writer).out.write_str("\n")?;
-                }
-                (*p).state = XmlTextWriterState::XmlTextwriterDTDText;
+    match lk.state.get() {
+        XmlTextWriterState::XmlTextwriterDTD => {
+            sum += (*writer).out.write_str(" [")?;
+            if (*writer).indent != 0 {
+                sum += (*writer).out.write_str("\n")?;
             }
-            XmlTextWriterState::XmlTextwriterDTDText => {}
-            _ => {
-                return Err(io::Error::other("Invalid state"));
-            }
+            lk.state.set(XmlTextWriterState::XmlTextwriterDTDText);
+        }
+        XmlTextWriterState::XmlTextwriterDTDText => {}
+        _ => {
+            return Err(io::Error::other("Invalid state"));
         }
     }
 
@@ -3083,7 +2648,7 @@ pub unsafe fn xml_text_writer_write_dtd_notation(
 ///
 /// Returns -1 on error or 0 otherwise.
 #[doc(alias = "xmlTextWriterSetIndent")]
-pub unsafe extern "C" fn xml_text_writer_set_indent(writer: XmlTextWriterPtr, indent: i32) -> i32 {
+pub unsafe fn xml_text_writer_set_indent(writer: XmlTextWriterPtr, indent: i32) -> i32 {
     if writer.is_null() || indent < 0 {
         return -1;
     }
@@ -3098,7 +2663,7 @@ pub unsafe extern "C" fn xml_text_writer_set_indent(writer: XmlTextWriterPtr, in
 ///
 /// Returns -1 on error or 0 otherwise.
 #[doc(alias = "xmlTextWriterSetIndentString")]
-pub unsafe extern "C" fn xml_text_writer_set_indent_string(
+pub unsafe fn xml_text_writer_set_indent_string(
     writer: XmlTextWriterPtr,
     str: *const XmlChar,
 ) -> i32 {
@@ -3122,10 +2687,7 @@ pub unsafe extern "C" fn xml_text_writer_set_indent_string(
 ///
 /// Returns -1 on error or 0 otherwise.
 #[doc(alias = "xmlTextWriterSetQuoteChar")]
-pub unsafe extern "C" fn xml_text_writer_set_quote_char(
-    writer: XmlTextWriterPtr,
-    quotechar: XmlChar,
-) -> i32 {
+pub unsafe fn xml_text_writer_set_quote_char(writer: XmlTextWriterPtr, quotechar: XmlChar) -> i32 {
     if writer.is_null() || (quotechar != b'\'' && quotechar != b'"') {
         return -1;
     }
@@ -3139,7 +2701,7 @@ pub unsafe extern "C" fn xml_text_writer_set_quote_char(
 ///
 /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
 #[doc(alias = "xmlTextWriterFlush")]
-pub unsafe extern "C" fn xml_text_writer_flush(writer: XmlTextWriterPtr) -> i32 {
+pub unsafe fn xml_text_writer_flush(writer: XmlTextWriterPtr) -> i32 {
     if writer.is_null() {
         return -1;
     }
