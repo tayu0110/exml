@@ -1264,11 +1264,11 @@ impl XmlTextWriter<'_> {
                 }
                 XmlTextWriterState::XmlTextwriterDTDElem
                 | XmlTextWriterState::XmlTextwriterDTDElemText => {
-                    sum += self.end_dtdelement()?;
+                    sum += self.end_dtd_element()?;
                 }
                 XmlTextWriterState::XmlTextwriterDTDAttl
                 | XmlTextWriterState::XmlTextwriterDTDAttlText => {
-                    sum += self.end_dtdattlist()?;
+                    sum += self.end_dtd_attlist()?;
                 }
                 XmlTextWriterState::XmlTextwriterDTDEnty
                 | XmlTextWriterState::XmlTextwriterDTDPEnt
@@ -1291,8 +1291,8 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTDElement")]
-    pub unsafe fn start_dtdelement(&mut self, name: *const XmlChar) -> io::Result<usize> {
-        if name.is_null() || *name == b'\0' {
+    pub unsafe fn start_dtd_element(&mut self, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
             return Err(io::Error::other("Writer or name is NULL"));
         }
 
@@ -1316,11 +1316,7 @@ impl XmlTextWriter<'_> {
         }
 
         let p = XmlTextWriterStackEntry {
-            name: Some(
-                CStr::from_ptr(name as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            ),
+            name: Some(name.to_owned()),
             state: Cell::new(XmlTextWriterState::XmlTextwriterDTDElem),
         };
         self.nodes.push_front(p.into());
@@ -1330,9 +1326,7 @@ impl XmlTextWriter<'_> {
         }
 
         sum += self.out.write_str("<!ELEMENT ")?;
-        sum += self
-            .out
-            .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+        sum += self.out.write_str(name)?;
         Ok(sum)
     }
 
@@ -1340,14 +1334,10 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDElement")]
-    pub unsafe fn write_dtdelement(
-        &mut self,
-        name: *const XmlChar,
-        content: &str,
-    ) -> io::Result<usize> {
-        let mut sum = self.start_dtdelement(name)?;
+    pub unsafe fn write_dtd_element(&mut self, name: &str, content: &str) -> io::Result<usize> {
+        let mut sum = self.start_dtd_element(name)?;
         sum += self.write_string(content)?;
-        sum += self.end_dtdelement()?;
+        sum += self.end_dtd_element()?;
         Ok(sum)
     }
 
@@ -1355,7 +1345,7 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDTDElement")]
-    pub unsafe fn end_dtdelement(&mut self) -> io::Result<usize> {
+    pub unsafe fn end_dtd_element(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Err(io::Error::other("Node list is NULL"));
         };
@@ -1383,8 +1373,8 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTDAttlist")]
-    pub unsafe fn start_dtdattlist(&mut self, name: *const XmlChar) -> io::Result<usize> {
-        if name.is_null() || *name == b'\0' {
+    pub unsafe fn start_dtd_attlist(&mut self, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
             return Err(io::Error::other("Writer or name is NULL"));
         }
 
@@ -1408,11 +1398,7 @@ impl XmlTextWriter<'_> {
         }
 
         let p = XmlTextWriterStackEntry {
-            name: Some(
-                CStr::from_ptr(name as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            ),
+            name: Some(name.to_owned()),
             state: Cell::new(XmlTextWriterState::XmlTextwriterDTDAttl),
         };
         self.nodes.push_front(p.into());
@@ -1422,9 +1408,7 @@ impl XmlTextWriter<'_> {
         }
 
         sum += self.out.write_str("<!ATTLIST ")?;
-        sum += self
-            .out
-            .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+        sum += self.out.write_str(name)?;
         Ok(sum)
     }
 
@@ -1432,14 +1416,10 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteDTDAttlist")]
-    pub unsafe fn write_dtd_attlist(
-        &mut self,
-        name: *const XmlChar,
-        content: &str,
-    ) -> io::Result<usize> {
-        let mut sum = self.start_dtdattlist(name)?;
+    pub unsafe fn write_dtd_attlist(&mut self, name: &str, content: &str) -> io::Result<usize> {
+        let mut sum = self.start_dtd_attlist(name)?;
         sum += self.write_string(content)?;
-        sum += self.end_dtdattlist()?;
+        sum += self.end_dtd_attlist()?;
         Ok(sum)
     }
 
@@ -1447,7 +1427,7 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterEndDTDAttlist")]
-    pub unsafe fn end_dtdattlist(&mut self) -> io::Result<usize> {
+    pub unsafe fn end_dtd_attlist(&mut self) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             return Err(io::Error::other("Node list is NULL"));
         };
@@ -1474,8 +1454,8 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterStartDTDEntity")]
-    pub unsafe fn start_dtd_entity(&mut self, pe: i32, name: *const XmlChar) -> io::Result<usize> {
-        if name.is_null() || *name == b'\0' {
+    pub unsafe fn start_dtd_entity(&mut self, pe: i32, name: &str) -> io::Result<usize> {
+        if name.is_empty() {
             return Err(io::Error::other("Writer or name is NULL"));
         }
 
@@ -1498,11 +1478,7 @@ impl XmlTextWriter<'_> {
         }
 
         let p = XmlTextWriterStackEntry {
-            name: Some(
-                CStr::from_ptr(name as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            ),
+            name: Some(name.to_owned()),
             state: if pe != 0 {
                 Cell::new(XmlTextWriterState::XmlTextwriterDTDPEnt)
             } else {
@@ -1518,9 +1494,7 @@ impl XmlTextWriter<'_> {
         if pe != 0 {
             sum += self.out.write_str("% ")?;
         }
-        sum += self
-            .out
-            .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+        sum += self.out.write_str(name)?;
         Ok(sum)
     }
 
@@ -1531,20 +1505,20 @@ impl XmlTextWriter<'_> {
     pub unsafe fn write_dtd_entity(
         &mut self,
         pe: i32,
-        name: *const XmlChar,
-        pubid: *const XmlChar,
-        sysid: *const XmlChar,
-        ndataid: *const XmlChar,
+        name: &str,
+        pubid: Option<&str>,
+        sysid: Option<&str>,
+        ndataid: Option<&str>,
         content: Option<&str>,
     ) -> io::Result<usize> {
-        if content.is_none() && pubid.is_null() && sysid.is_null() {
+        if content.is_none() && pubid.is_none() && sysid.is_none() {
             return Err(io::Error::other("Content, PublicID and SystemID are NULL"));
         }
-        if pe != 0 && !ndataid.is_null() {
+        if pe != 0 && ndataid.is_some() {
             return Err(io::Error::other("This is PE, but NDATAID is not NULL"));
         }
 
-        if pubid.is_null() && sysid.is_null() {
+        if pubid.is_none() && sysid.is_none() {
             return self.write_dtd_internal_entity(pe, name, content.unwrap());
         }
 
@@ -1558,10 +1532,10 @@ impl XmlTextWriter<'_> {
     pub unsafe fn write_dtd_internal_entity(
         &mut self,
         pe: i32,
-        name: *const XmlChar,
+        name: &str,
         content: &str,
     ) -> io::Result<usize> {
-        if name.is_null() || *name == b'\0' {
+        if name.is_empty() {
             return Err(io::Error::other("Writer or name is NULL"));
         }
 
@@ -1578,16 +1552,16 @@ impl XmlTextWriter<'_> {
     pub unsafe fn write_dtd_external_entity(
         &mut self,
         pe: i32,
-        name: *const XmlChar,
-        pubid: *const XmlChar,
-        sysid: *const XmlChar,
-        ndataid: *const XmlChar,
+        name: &str,
+        pubid: Option<&str>,
+        sysid: Option<&str>,
+        ndataid: Option<&str>,
     ) -> io::Result<usize> {
-        if pubid.is_null() && sysid.is_null() {
+        if pubid.is_none() && sysid.is_none() {
             return Err(io::Error::other("Both ExternalID and PublicID is NULL"));
         }
-        if pe != 0 && !ndataid.is_null() {
-            return Err(io::Error::other("This is PE, but NDATAID is NULL"));
+        if pe != 0 && ndataid.is_some() {
+            return Err(io::Error::other("This is PE, but NDATAID is not NULL"));
         }
 
         let mut sum = self.start_dtd_entity(pe, name)?;
@@ -1602,9 +1576,9 @@ impl XmlTextWriter<'_> {
     #[doc(alias = "xmlTextWriterWriteDTDExternalEntityContents")]
     pub unsafe fn write_dtd_external_entity_contents(
         &mut self,
-        pubid: *const XmlChar,
-        sysid: *const XmlChar,
-        ndataid: *const XmlChar,
+        pubid: Option<&str>,
+        sysid: Option<&str>,
+        ndataid: Option<&str>,
     ) -> io::Result<usize> {
         let Some(lk) = self.nodes.front() else {
             xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
@@ -1617,7 +1591,7 @@ impl XmlTextWriter<'_> {
         match lk.state.get() {
             XmlTextWriterState::XmlTextwriterDTDEnty => {}
             XmlTextWriterState::XmlTextwriterDTDPEnt => {
-                if !ndataid.is_null() {
+                if ndataid.is_some() {
                     xml_writer_err_msg(self, XmlParserErrors::XmlErrInternalError,
                                 "xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!\n");
                     return Err(io::Error::other("xmlTextWriterWriteDTDExternalEntityContents: notation not allowed with parameter entities!"));
@@ -1631,8 +1605,8 @@ impl XmlTextWriter<'_> {
         }
 
         let mut sum = 0;
-        if !pubid.is_null() {
-            if sysid.is_null() {
+        if let Some(pubid) = pubid {
+            if sysid.is_none() {
                 xml_writer_err_msg(
                     self,
                     XmlParserErrors::XmlErrInternalError,
@@ -1645,29 +1619,23 @@ impl XmlTextWriter<'_> {
 
             sum += self.out.write_str(" PUBLIC ")?;
             sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(pubid)?;
             sum += self.out.write_bytes(&[self.qchar])?;
         }
 
-        if !sysid.is_null() {
-            if pubid.is_null() {
+        if let Some(sysid) = sysid {
+            if pubid.is_none() {
                 sum += self.out.write_str(" SYSTEM")?;
             }
             sum += self.out.write_str(" ")?;
             sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(sysid)?;
             sum += self.out.write_bytes(&[self.qchar])?;
         }
 
-        if !ndataid.is_null() {
+        if let Some(ndataid) = ndataid {
             sum += self.out.write_str(" NDATA ")?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(ndataid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(ndataid)?;
         }
         Ok(sum)
     }
@@ -1709,11 +1677,11 @@ impl XmlTextWriter<'_> {
     #[doc(alias = "xmlTextWriterWriteDTDNotation")]
     pub unsafe fn write_dtd_notation(
         &mut self,
-        name: *const XmlChar,
-        pubid: *const XmlChar,
-        sysid: *const XmlChar,
+        name: &str,
+        pubid: Option<&str>,
+        sysid: Option<&str>,
     ) -> io::Result<usize> {
-        if name.is_null() || *name == b'\0' {
+        if name.is_empty() {
             return Err(io::Error::other("Writer or name is NULL"));
         }
 
@@ -1741,28 +1709,22 @@ impl XmlTextWriter<'_> {
         }
 
         sum += self.out.write_str("<!NOTATION ")?;
-        sum += self
-            .out
-            .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+        sum += self.out.write_str(name)?;
 
-        if !pubid.is_null() {
+        if let Some(pubid) = pubid {
             sum += self.out.write_str(" PUBLIC ")?;
             sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(pubid)?;
             sum += self.out.write_bytes(&[self.qchar])?;
         }
 
-        if !sysid.is_null() {
-            if pubid.is_null() {
+        if let Some(sysid) = sysid {
+            if pubid.is_none() {
                 sum += self.out.write_str(" SYSTEM")?;
             }
             sum += self.out.write_str(" ")?;
             sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(sysid)?;
             sum += self.out.write_bytes(&[self.qchar])?;
         }
 
