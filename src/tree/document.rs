@@ -18,7 +18,10 @@
 //
 // daniel@veillard.com
 
-use std::{borrow::Cow, ffi::CStr, os::raw::c_void, ptr::null_mut, sync::atomic::Ordering};
+use std::{
+    borrow::Cow, collections::HashMap, ffi::CStr, os::raw::c_void, ptr::null_mut,
+    sync::atomic::Ordering,
+};
 
 use libc::memset;
 
@@ -79,7 +82,7 @@ pub struct XmlDoc {
     // Hash table for ID attributes if any
     pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>,
     // Hash table for IDREFs attributes if any
-    pub(crate) refs: Option<Box<XmlHashTable<'static, XmlListPtr>>>,
+    pub(crate) refs: Option<HashMap<String, XmlListPtr>>,
     // The URI for that document
     pub(crate) url: Option<String>,
     // Internal flag for charset handling, actually an xmlCharEncoding

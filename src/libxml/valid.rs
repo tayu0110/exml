@@ -21,6 +21,7 @@
 #[cfg(feature = "libxml_output")]
 use std::io::Write;
 use std::{
+    collections::HashMap,
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
@@ -2515,9 +2516,7 @@ pub(crate) unsafe fn xml_add_ref(
     }
 
     // Create the Ref table if needed.
-    let table = (*doc)
-        .refs
-        .get_or_insert_with(|| Box::new(XmlHashTable::with_capacity(0)));
+    let table = (*doc).refs.get_or_insert_with(HashMap::new);
 
     let ret: XmlRefPtr = xml_malloc(size_of::<XmlRef>()) as XmlRefPtr;
     if ret.is_null() {
@@ -2544,7 +2543,7 @@ pub(crate) unsafe fn xml_add_ref(
     // Add the owning node to the NodeList
     // Return the ref
 
-    let mut ref_list = *table.lookup(value).unwrap_or(&null_mut());
+    let mut ref_list = *table.get(value).unwrap_or(&null_mut());
     'failed: {
         if ref_list.is_null() {
             ref_list = xml_list_create(Some(xml_free_ref), Some(xml_dummy_compare));
@@ -2556,7 +2555,7 @@ pub(crate) unsafe fn xml_add_ref(
                 );
                 break 'failed;
             }
-            if table.add_entry(value, ref_list).is_err() {
+            if table.insert(value.to_owned(), ref_list).is_some() {
                 xml_list_delete(ref_list);
                 xml_err_valid!(
                     null_mut(),
@@ -2691,7 +2690,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
         return -1;
     }
 
-    let Some(table) = (*doc).refs.as_deref_mut() else {
+    let Some(table) = (*doc).refs.as_mut() else {
         return -1;
     };
 
@@ -2699,7 +2698,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
         return -1;
     };
 
-    let Some(&ref_list) = table.lookup(&id) else {
+    let Some(&ref_list) = table.get(&id) else {
         return -1;
     };
 
@@ -2724,7 +2723,9 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
 
     // If the list is empty then remove the list entry in the hash
     if xml_list_empty(ref_list) != 0 {
-        table.update_entry(&id, null_mut(), |data, _| xml_list_delete(data));
+        if let Some(data) = table.remove(&id) {
+            xml_list_delete(data);
+        }
     }
     0
 }
@@ -2733,21 +2734,15 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
 ///
 /// Returns null_mut() if not found, otherwise node set for the ID.
 #[doc(alias = "xmlGetRefs")]
-pub(crate) unsafe fn xml_get_refs(doc: XmlDocPtr, id: *const XmlChar) -> XmlListPtr {
+pub(crate) unsafe fn xml_get_refs(doc: XmlDocPtr, id: &str) -> XmlListPtr {
     if doc.is_null() {
         return null_mut();
     }
 
-    if id.is_null() {
-        return null_mut();
-    }
-
-    let Some(table) = (*doc).refs.as_deref() else {
+    let Some(table) = (*doc).refs.as_ref() else {
         return null_mut();
     };
-    *table
-        .lookup(CStr::from_ptr(id as *const i8).to_string_lossy().as_ref())
-        .unwrap_or(&null_mut())
+    *table.get(id).unwrap_or(&null_mut())
 }
 
 /// Allocate a validation context structure.
@@ -3538,7 +3533,9 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDt
     }
     (*doc).ids.take();
     if let Some(mut refs) = (*doc).refs.take() {
-        refs.clear_with(|list, _| xml_list_delete(list));
+        for (_, list) in refs.drain() {
+            xml_list_delete(list);
+        }
     }
     let root: XmlNodePtr = (*doc).get_root_element();
     ret = xml_validate_element(ctxt, doc, root);
@@ -3973,7 +3970,9 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
 
     (*doc).ids.take();
     if let Some(mut refs) = (*doc).refs.take() {
-        refs.clear_with(|list, _| xml_list_delete(list));
+        for (_, list) in refs.drain() {
+            xml_list_delete(list);
+        }
     }
     ret = xml_validate_dtd_final(ctxt, doc);
     if xml_validate_root(ctxt, doc) == 0 {
@@ -6612,15 +6611,15 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
     // Check all the IDREF/IDREFS attributes definition for validity
     (*ctxt).doc = doc;
     (*ctxt).valid = 1;
-    if let Some(table) = (*doc).refs.as_deref() {
-        table.scan(|&ref_list, name, _, _| {
+    if let Some(table) = (*doc).refs.as_ref() {
+        for (name, &ref_list) in table.iter() {
             if !ref_list.is_null() {
                 let mut memo: XmlValidateMemo = unsafe { zeroed() };
 
                 if ref_list.is_null() {
-                    return;
+                    continue;
                 }
-                let name = CString::new(name.unwrap().as_ref()).unwrap();
+                let name = CString::new(name.as_str()).unwrap();
                 memo.ctxt = ctxt;
                 memo.name = name.as_ptr() as *const u8;
 
@@ -6630,7 +6629,7 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
                     addr_of_mut!(memo) as _,
                 );
             }
-        });
+        }
     }
 
     (*ctxt).flags = save;

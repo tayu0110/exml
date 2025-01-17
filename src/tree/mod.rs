@@ -1019,7 +1019,9 @@ pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
     if let Some(mut refs) = (*cur).refs.take() {
-        refs.clear_with(|list, _| xml_list_delete(list));
+        for (_, list) in refs.drain() {
+            xml_list_delete(list);
+        }
     }
     ext_subset = (*cur).ext_subset;
     let int_subset: XmlDtdPtr = (*cur).int_subset;
