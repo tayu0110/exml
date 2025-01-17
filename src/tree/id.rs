@@ -52,9 +52,21 @@ impl Default for XmlID {
 pub type XmlRefPtr = *mut XmlRef;
 #[repr(C)]
 pub struct XmlRef {
-    pub(crate) next: *mut XmlRef,     /* next Ref */
-    pub(crate) value: *const XmlChar, /* The Ref name */
-    pub(crate) attr: XmlAttrPtr,      /* The attribute holding it */
-    pub(crate) name: *const XmlChar,  /* The attribute if attr is not available */
-    pub(crate) lineno: i32,           /* The line number if attr is not available */
+    pub(crate) next: *mut XmlRef,    /* next Ref */
+    pub(crate) value: String,        /* The Ref name */
+    pub(crate) attr: XmlAttrPtr,     /* The attribute holding it */
+    pub(crate) name: *const XmlChar, /* The attribute if attr is not available */
+    pub(crate) lineno: i32,          /* The line number if attr is not available */
+}
+
+impl Default for XmlRef {
+    fn default() -> Self {
+        Self {
+            next: null_mut(),
+            value: "".to_owned(),
+            attr: null_mut(),
+            name: null_mut(),
+            lineno: 0,
+        }
+    }
 }

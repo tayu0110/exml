@@ -24,7 +24,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, null, null_mut, NonNull},
+    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
     sync::atomic::Ordering,
 };
 
@@ -2483,12 +2483,10 @@ extern "C" fn xml_free_ref(data: *mut c_void) {
         return;
     }
     unsafe {
-        if !(*refe).value.is_null() {
-            xml_free((*refe).value as _);
-        }
         if !(*refe).name.is_null() {
             xml_free((*refe).name as _);
         }
+        drop_in_place(refe);
         xml_free(refe as _);
     }
 }
@@ -2506,13 +2504,10 @@ extern "C" fn xml_dummy_compare(_data0: *const c_void, _data1: *const c_void) ->
 pub(crate) unsafe fn xml_add_ref(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
-    value: *const XmlChar,
+    value: &str,
     attr: XmlAttrPtr,
 ) -> XmlRefPtr {
     if doc.is_null() {
-        return null_mut();
-    }
-    if value.is_null() {
         return null_mut();
     }
     if attr.is_null() {
@@ -2529,9 +2524,10 @@ pub(crate) unsafe fn xml_add_ref(
         xml_verr_memory(ctxt as _, Some("malloc failed"));
         return null_mut();
     }
+    std::ptr::write(&mut *ret, XmlRef::default());
 
     // fill the structure.
-    (*ret).value = xml_strdup(value);
+    (*ret).value = value.to_owned();
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
         (*ret).name = xml_strdup((*attr).name);
@@ -2548,13 +2544,7 @@ pub(crate) unsafe fn xml_add_ref(
     // Add the owning node to the NodeList
     // Return the ref
 
-    let mut ref_list = *table
-        .lookup(
-            CStr::from_ptr(value as *const i8)
-                .to_string_lossy()
-                .as_ref(),
-        )
-        .unwrap_or(&null_mut());
+    let mut ref_list = *table.lookup(value).unwrap_or(&null_mut());
     'failed: {
         if ref_list.is_null() {
             ref_list = xml_list_create(Some(xml_free_ref), Some(xml_dummy_compare));
@@ -2566,15 +2556,7 @@ pub(crate) unsafe fn xml_add_ref(
                 );
                 break 'failed;
             }
-            if table
-                .add_entry(
-                    CStr::from_ptr(value as *const i8)
-                        .to_string_lossy()
-                        .as_ref(),
-                    ref_list,
-                )
-                .is_err()
-            {
+            if table.add_entry(value, ref_list).is_err() {
                 xml_list_delete(ref_list);
                 xml_err_valid!(
                     null_mut(),
@@ -2596,12 +2578,10 @@ pub(crate) unsafe fn xml_add_ref(
     }
     // failed:
     if !ret.is_null() {
-        if !(*ret).value.is_null() {
-            xml_free((*ret).value as _);
-        }
         if !(*ret).name.is_null() {
             xml_free((*ret).name as _);
         }
+        drop_in_place(ret);
         xml_free(ret as _);
     }
     null_mut()
@@ -5952,7 +5932,15 @@ pub unsafe fn xml_validate_one_attribute(
     if matches!(
         (*attr_decl).atype,
         XmlAttributeType::XmlAttributeIDREF | XmlAttributeType::XmlAttributeIDREFS
-    ) && xml_add_ref(ctxt, doc, value, attr).is_null()
+    ) && xml_add_ref(
+        ctxt,
+        doc,
+        CStr::from_ptr(value as *const i8)
+            .to_string_lossy()
+            .as_ref(),
+        attr,
+    )
+    .is_null()
     {
         ret = 0;
     }

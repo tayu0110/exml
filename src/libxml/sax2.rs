@@ -1752,7 +1752,9 @@ unsafe fn xml_sax2_attribute_internal(
             xml_add_ref(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
-                content,
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 ret,
             );
         }
@@ -2677,7 +2679,9 @@ unsafe fn xml_sax2_attribute_ns(
             xml_add_ref(
                 addr_of_mut!((*ctxt).vctxt) as _,
                 (*ctxt).my_doc,
-                content,
+                CStr::from_ptr(content as *const i8)
+                    .to_string_lossy()
+                    .as_ref(),
                 ret,
             );
         }
