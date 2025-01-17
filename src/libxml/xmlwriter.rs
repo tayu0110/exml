@@ -33,7 +33,6 @@ use std::{
     os::raw::c_void,
     ptr::{drop_in_place, null_mut},
     rc::Rc,
-    slice::from_raw_parts,
 };
 
 use crate::{
@@ -50,7 +49,7 @@ use crate::{
             XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlstring::{xml_strcasecmp, xml_strdup, xml_strlen, XmlChar},
+        xmlstring::{xml_strcasecmp, xml_strdup, XmlChar},
     },
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
@@ -218,18 +217,8 @@ impl XmlTextWriter<'_> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteRawLen")]
-    pub unsafe fn write_raw_len(&mut self, content: *const XmlChar, len: i32) -> io::Result<usize> {
-        if content.is_null() || len < 0 {
-            xml_writer_err_msg(
-                self,
-                XmlParserErrors::XmlErrInternalError,
-                "xmlTextWriterWriteRawLen : invalid content!\n",
-            );
-            return Err(io::Error::other(
-                "xmlTextWriterWriteRawLen : invalid content!",
-            ));
-        }
-
+    #[doc(alias = "xmlTextWriterWriteRaw")]
+    pub unsafe fn write_bytes(&mut self, content: &[u8]) -> io::Result<usize> {
         let mut sum = 0;
         if let Some(lk) = self.nodes.front().cloned() {
             sum += self.handle_state_dependencies(lk)?;
@@ -239,21 +228,8 @@ impl XmlTextWriter<'_> {
             self.doindent = 0;
         }
 
-        if !content.is_null() {
-            sum += self
-                .out
-                .write_bytes(from_raw_parts(content as _, len as usize))?;
-        }
-
+        sum += self.out.write_bytes(content)?;
         Ok(sum)
-    }
-
-    /// Write a raw xml text.
-    ///
-    /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
-    #[doc(alias = "xmlTextWriterWriteRaw")]
-    pub unsafe fn write_raw(&mut self, content: *const XmlChar) -> io::Result<usize> {
-        self.write_raw_len(content, xml_strlen(content))
     }
 
     /// Write an xml text.
@@ -283,7 +259,7 @@ impl XmlTextWriter<'_> {
         }
 
         if !buf.is_null() {
-            let count = self.write_raw(buf);
+            let count = self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes());
             if buf != content {
                 // buf was allocated by us, so free it
                 xml_free(buf as _);
