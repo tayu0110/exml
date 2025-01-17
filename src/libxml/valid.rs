@@ -25,7 +25,7 @@ use std::{
     ffi::{c_char, CStr, CString},
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
-    ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
+    ptr::{addr_of_mut, null, null_mut, NonNull},
     rc::Rc,
     sync::atomic::Ordering,
 };
@@ -73,7 +73,6 @@ use crate::{
         XmlDtdPtr, XmlElement, XmlElementContent, XmlElementContentOccur, XmlElementContentPtr,
         XmlElementContentType, XmlElementPtr, XmlElementType, XmlElementTypeVal, XmlEntityPtr,
         XmlEntityType, XmlEnumeration, XmlID, XmlNode, XmlNodePtr, XmlNotation, XmlNsPtr, XmlRef,
-        XmlRefPtr,
     },
 };
 
@@ -2474,66 +2473,43 @@ pub unsafe fn xml_remove_id(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     0
 }
 
-/// Deallocate the memory used by a ref definition
-#[doc(alias = "xmlFreeRef")]
-extern "C" fn xml_free_ref(data: *mut c_void) {
-    let refe: XmlRefPtr = data as XmlRefPtr;
-    if refe.is_null() {
-        return;
-    }
-    unsafe {
-        if !(*refe).name.is_null() {
-            xml_free((*refe).name as _);
-        }
-        drop_in_place(refe);
-        xml_free(refe as _);
-    }
-}
-
-/// Do nothing, return 0. Used to create unordered lists.
-#[doc(alias = "xmlDummyCompare")]
-extern "C" fn xml_dummy_compare(_data0: *const c_void, _data1: *const c_void) -> i32 {
-    0
-}
-
 /// Register a new ref declaration
 ///
-/// Returns null_mut() if not, otherwise the new xmlRefPtr
+/// Returns `None` if not, otherwise `Some(())`
+///
+/// # Note
+/// This function in original libxml2 returns new `xmlRefPtr`.  
+/// However, this function cannot returns `Option<&XmlRef>`.
 #[doc(alias = "xmlAddRef")]
 pub(crate) unsafe fn xml_add_ref(
     ctxt: XmlValidCtxtPtr,
     doc: XmlDocPtr,
     value: &str,
     attr: XmlAttrPtr,
-) -> XmlRefPtr {
+) -> Option<()> {
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
     if attr.is_null() {
-        return null_mut();
+        return None;
     }
 
     // Create the Ref table if needed.
     let table = (*doc).refs.get_or_insert_with(HashMap::new);
-
-    let ret: XmlRefPtr = xml_malloc(size_of::<XmlRef>()) as XmlRefPtr;
-    if ret.is_null() {
-        xml_verr_memory(ctxt as _, Some("malloc failed"));
-        return null_mut();
-    }
-    std::ptr::write(&mut *ret, XmlRef::default());
-
+    let mut ret = XmlRef {
+        value: value.to_owned(),
+        ..Default::default()
+    };
     // fill the structure.
-    (*ret).value = value.to_owned();
     if xml_is_streaming(ctxt) != 0 {
         // Operating in streaming mode, attr is gonna disappear
-        (*ret).name = xml_strdup((*attr).name);
-        (*ret).attr = null_mut();
+        ret.name = (*attr).name().map(|n| n.into_owned());
+        ret.attr = null_mut();
     } else {
-        (*ret).name = null_mut();
-        (*ret).attr = attr;
+        ret.name = None;
+        ret.attr = attr;
     }
-    (*ret).lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
+    ret.lineno = (*attr).parent.map_or(-1, |p| p.get_line_no() as i32);
 
     // To add a reference :-
     // References are maintained as a list of references,
@@ -2541,18 +2517,11 @@ pub(crate) unsafe fn xml_add_ref(
     // Add the owning node to the NodeList
     // Return the ref
 
-    let ref_list = table.entry(value.to_owned()).or_insert_with(|| {
-        XmlList::new(
-            Some(Rc::new(|data| xml_free_ref(data as _))),
-            Rc::new(|d1, d2| match xml_dummy_compare(*d1 as _, *d2 as _) {
-                ..0 => std::cmp::Ordering::Less,
-                0 => std::cmp::Ordering::Equal,
-                1.. => std::cmp::Ordering::Greater,
-            }),
-        )
-    });
-    ref_list.insert_upper_bound(ret);
-    ret
+    let ref_list = table
+        .entry(value.to_owned())
+        .or_insert_with(|| XmlList::new(None, Rc::new(|_, _| std::cmp::Ordering::Equal)));
+    ref_list.insert_upper_bound(Box::new(ret));
+    Some(())
 }
 
 /// Determine whether an attribute is of type Ref. In case we have DTD(s)
@@ -2640,21 +2609,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     // will have enough data to be able to remove the entry.
 
     // Remove the supplied attr from our list
-    let mut target = null_mut();
-    ref_list.walk(|&refe| {
-        let attr0 = (*refe).attr;
-        let attr1 = attr;
-
-        if attr0 == attr1 {
-            // Matched: remove and terminate walk
-            target = refe;
-            return false;
-        }
-        true
-    });
-    if !target.is_null() {
-        ref_list.remove_first(&target);
-    }
+    ref_list.remove_first_by(|refe| refe.attr == attr);
 
     // If the list is empty then remove the list entry in the hash
     if ref_list.is_empty() {
@@ -2667,7 +2622,10 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
 ///
 /// Returns `None` if not found, otherwise node set for the ID.
 #[doc(alias = "xmlGetRefs")]
-pub(crate) unsafe fn xml_get_refs<'a>(doc: XmlDocPtr, id: &str) -> Option<&'a XmlList<XmlRefPtr>> {
+pub(crate) unsafe fn xml_get_refs<'a>(
+    doc: XmlDocPtr,
+    id: &str,
+) -> Option<&'a XmlList<Box<XmlRef>>> {
     if doc.is_null() {
         return None;
     }
@@ -5861,7 +5819,7 @@ pub unsafe fn xml_validate_one_attribute(
             .as_ref(),
         attr,
     )
-    .is_null()
+    .is_none()
     {
         ret = 0;
     }
@@ -6376,14 +6334,11 @@ pub unsafe fn xml_validate_one_namespace(
 }
 
 #[doc(alias = "xmlValidateRef")]
-unsafe fn xml_validate_ref(refe: XmlRefPtr, ctxt: XmlValidCtxtPtr, name: *const XmlChar) {
-    if refe.is_null() {
+unsafe fn xml_validate_ref(refe: &XmlRef, ctxt: XmlValidCtxtPtr, name: *const XmlChar) {
+    if refe.attr.is_null() && refe.name.is_none() {
         return;
     }
-    if (*refe).attr.is_null() && (*refe).name.is_null() {
-        return;
-    }
-    let attr: XmlAttrPtr = (*refe).attr;
+    let attr: XmlAttrPtr = refe.attr;
     if attr.is_null() {
         let mut str: *mut XmlChar;
         let mut cur: *mut XmlChar;
@@ -6408,8 +6363,8 @@ unsafe fn xml_validate_ref(refe: XmlRefPtr, ctxt: XmlValidCtxtPtr, name: *const 
                     null_mut(),
                     XmlParserErrors::XmlDTDUnknownID,
                     "attribute {} line {} references an unknown ID \"{}\"\n",
-                    CStr::from_ptr((*refe).name as *const i8).to_string_lossy(),
-                    (*refe).lineno,
+                    refe.name.as_deref().unwrap(),
+                    refe.lineno,
                     CStr::from_ptr(str as *const i8).to_string_lossy()
                 );
                 (*ctxt).valid = 0;
@@ -6521,8 +6476,8 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
         for (name, ref_list) in table.iter() {
             let name = CString::new(name.as_str()).unwrap();
 
-            ref_list.walk(|&data| {
-                xml_validate_ref(data, ctxt, name.as_ptr() as *const u8);
+            ref_list.walk(|data| {
+                xml_validate_ref(data.as_ref(), ctxt, name.as_ptr() as *const u8);
                 true
             });
         }

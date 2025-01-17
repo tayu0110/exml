@@ -179,6 +179,17 @@ impl<T: 'static> XmlList<T> {
         (self.comparator)(&link.data, data).is_eq().then_some(link)
     }
 
+    fn link_search_by(&self, mut pred: impl FnMut(&T) -> bool) -> Option<XmlLinkRef<T>> {
+        let mut link = self.head;
+        while let Some(now) = link {
+            if pred(&now.data) {
+                return Some(now);
+            }
+            link = now.next;
+        }
+        None
+    }
+
     /// Return the first data that `self.comparator` determines to be equal to `data`.
     ///
     /// If such element is not found, return `None`.
@@ -425,6 +436,13 @@ impl<T: 'static> XmlList<T> {
     /// ```
     pub fn remove_first(&mut self, data: &T) -> Option<T> {
         let link = self.link_search(data)?;
+        Some(self.remove_link(link))
+    }
+
+    /// Remove the first element determined that `pred` is `true` of the list
+    /// and return its data.
+    pub fn remove_first_by(&mut self, pred: impl FnMut(&T) -> bool) -> Option<T> {
+        let link = self.link_search_by(pred)?;
         Some(self.remove_link(link))
     }
 

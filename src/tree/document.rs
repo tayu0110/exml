@@ -42,7 +42,7 @@ use super::{
     xml_buf_set_allocation_scheme, xml_free_node_list, xml_get_doc_entity, xml_new_doc_text,
     xml_new_reference, xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr,
     XmlBufferAllocationScheme, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityPtr,
-    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRefPtr, XML_ENT_EXPANDING,
+    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRef, XML_ENT_EXPANDING,
     XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
@@ -82,7 +82,7 @@ pub struct XmlDoc {
     // Hash table for ID attributes if any
     pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>,
     // Hash table for IDREFs attributes if any
-    pub(crate) refs: Option<HashMap<String, XmlList<XmlRefPtr>>>,
+    pub(crate) refs: Option<HashMap<String, XmlList<Box<XmlRef>>>>,
     // The URI for that document
     pub(crate) url: Option<String>,
     // Internal flag for charset handling, actually an xmlCharEncoding

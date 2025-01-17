@@ -20,8 +20,6 @@
 
 use std::ptr::null_mut;
 
-use crate::libxml::xmlstring::XmlChar;
-
 use super::{XmlAttrPtr, XmlDoc};
 
 /// An XML ID instance.
@@ -52,20 +50,20 @@ impl Default for XmlID {
 pub type XmlRefPtr = *mut XmlRef;
 #[repr(C)]
 pub struct XmlRef {
-    pub(crate) next: *mut XmlRef,    /* next Ref */
-    pub(crate) value: String,        /* The Ref name */
-    pub(crate) attr: XmlAttrPtr,     /* The attribute holding it */
-    pub(crate) name: *const XmlChar, /* The attribute if attr is not available */
-    pub(crate) lineno: i32,          /* The line number if attr is not available */
+    pub(crate) next: Option<Box<XmlRef>>, /* next Ref */
+    pub(crate) value: String,             /* The Ref name */
+    pub(crate) attr: XmlAttrPtr,          /* The attribute holding it */
+    pub(crate) name: Option<String>,      /* The attribute if attr is not available */
+    pub(crate) lineno: i32,               /* The line number if attr is not available */
 }
 
 impl Default for XmlRef {
     fn default() -> Self {
         Self {
-            next: null_mut(),
+            next: None,
             value: "".to_owned(),
             attr: null_mut(),
-            name: null_mut(),
+            name: None,
             lineno: 0,
         }
     }
