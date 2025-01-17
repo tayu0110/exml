@@ -1146,11 +1146,11 @@ impl XmlTextWriter<'_> {
     #[doc(alias = "xmlTextWriterStartDTD")]
     pub unsafe fn start_dtd(
         &mut self,
-        name: *const XmlChar,
-        pubid: *const XmlChar,
-        sysid: *const XmlChar,
+        name: &str,
+        pubid: Option<&str>,
+        sysid: Option<&str>,
     ) -> io::Result<usize> {
-        if name.is_null() || *name == b'\0' {
+        if name.is_empty() {
             return Err(io::Error::other("Writer or name is NULL"));
         }
 
@@ -1166,22 +1166,16 @@ impl XmlTextWriter<'_> {
         }
 
         let p = XmlTextWriterStackEntry {
-            name: Some(
-                CStr::from_ptr(name as *const i8)
-                    .to_string_lossy()
-                    .into_owned(),
-            ),
+            name: Some(name.to_owned()),
             state: Cell::new(XmlTextWriterState::XmlTextwriterDTD),
         };
         self.nodes.push_front(p.into());
 
         let mut sum = self.out.write_str("<!DOCTYPE ")?;
-        sum += self
-            .out
-            .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+        sum += self.out.write_str(name)?;
 
-        if !pubid.is_null() {
-            if sysid.is_null() {
+        if let Some(pubid) = pubid {
+            if sysid.is_none() {
                 xml_writer_err_msg(
                     self,
                     XmlParserErrors::XmlErrInternalError,
@@ -1190,7 +1184,7 @@ impl XmlTextWriter<'_> {
                 return Err(io::Error::other(
                     "xmlTextWriterStartDTD : system identifier needed!",
                 ));
-            }
+            };
 
             if self.indent != 0 {
                 sum += self.out.write_bytes(b"\n")?;
@@ -1200,30 +1194,28 @@ impl XmlTextWriter<'_> {
 
             sum += self.out.write_str("PUBLIC ")?;
             sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(pubid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(pubid)?;
             sum += self.out.write_bytes(&[self.qchar])?;
         }
 
-        if !sysid.is_null() {
-            if pubid.is_null() {
+        if let Some(sysid) = sysid {
+            if pubid.is_some() {
+                if self.indent != 0 {
+                    sum += self.out.write_str("\n       ")?;
+                } else {
+                    sum += self.out.write_bytes(b" ")?;
+                }
+            } else {
                 if self.indent != 0 {
                     sum += self.out.write_bytes(b"\n")?;
                 } else {
                     sum += self.out.write_bytes(b" ")?;
                 }
                 sum += self.out.write_str("SYSTEM ")?;
-            } else if self.indent != 0 {
-                sum += self.out.write_str("\n       ")?;
-            } else {
-                sum += self.out.write_bytes(b" ")?;
             }
 
             sum += self.out.write_bytes(&[self.qchar])?;
-            sum += self
-                .out
-                .write_str(CStr::from_ptr(sysid as _).to_string_lossy().as_ref())?;
+            sum += self.out.write_str(sysid)?;
             sum += self.out.write_bytes(&[self.qchar])?;
         }
 
@@ -1236,9 +1228,9 @@ impl XmlTextWriter<'_> {
     #[doc(alias = "xmlTextWriterWriteDTD")]
     pub unsafe fn write_dtd(
         &mut self,
-        name: *const XmlChar,
-        pubid: *const XmlChar,
-        sysid: *const XmlChar,
+        name: &str,
+        pubid: Option<&str>,
+        sysid: Option<&str>,
         subset: Option<&str>,
     ) -> io::Result<usize> {
         let mut sum = self.start_dtd(name, pubid, sysid)?;
