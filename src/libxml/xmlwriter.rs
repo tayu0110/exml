@@ -36,8 +36,6 @@ use std::{
     slice::from_raw_parts,
 };
 
-use libc::memset;
-
 use crate::{
     buf::XmlBufRef,
     encoding::find_encoding_handler,
@@ -52,14 +50,14 @@ use crate::{
             XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlstring::{xml_strcasecmp, xml_strcat, xml_strcmp, xml_strdup, xml_strlen, XmlChar},
+        xmlstring::{xml_strcasecmp, xml_strdup, xml_strlen, XmlChar},
     },
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };
 
-use super::{list::XmlList, xmlsave::xml_buf_attr_serialize_txt_content};
+use super::{list::XmlList, xmlsave::xml_buf_attr_serialize_txt_content, xmlstring::xml_strndup};
 
 // Types are kept private
 #[repr(C)]
@@ -92,8 +90,8 @@ struct XmlTextWriterStackEntry {
 
 #[repr(C)]
 struct XmlTextWriterNsStackEntry {
-    prefix: *mut XmlChar,
-    uri: *mut XmlChar,
+    prefix: String,
+    uri: String,
     elem: Option<Rc<XmlTextWriterStackEntry>>,
 }
 
@@ -128,26 +126,6 @@ impl Default for XmlTextWriter<'_> {
             no_doc_free: 0,
             doc: null_mut(),
         }
-    }
-}
-
-/// Free callback for the xmlList.
-#[doc(alias = "xmlFreeTextWriterNsStackEntry")]
-extern "C" fn xml_free_text_writer_ns_stack_entry(data: *mut c_void) {
-    let p: *mut XmlTextWriterNsStackEntry = data as *mut XmlTextWriterNsStackEntry;
-    if p.is_null() {
-        return;
-    }
-
-    unsafe {
-        if !(*p).prefix.is_null() {
-            xml_free((*p).prefix as _);
-        }
-        if !(*p).uri.is_null() {
-            xml_free((*p).uri as _);
-        }
-
-        xml_free(p as _);
     }
 }
 
@@ -213,44 +191,30 @@ pub unsafe fn xml_new_text_writer(out: XmlOutputBuffer) -> XmlTextWriterPtr {
         );
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlTextWriter>());
     std::ptr::write(&mut *ret, XmlTextWriter::default());
 
     (*ret).nsstack = XmlList::new(
-        Some(Rc::new(|data| {
-            if !data.prefix.is_null() {
-                xml_free(data.prefix as _);
-            }
-            if !data.uri.is_null() {
-                xml_free(data.uri as _);
-            }
-        })),
+        None,
         Rc::new(|d1, d2| {
-            let mut rc: i32;
-
             if std::ptr::eq(d1, d2) {
                 return std::cmp::Ordering::Equal;
             }
 
-            rc = xml_strcmp(d1.prefix, d2.prefix);
+            let mut rc = d1.prefix.cmp(&d2.prefix);
 
-            if rc != 0 {
-                rc = -1;
+            if !rc.is_eq() {
+                rc = std::cmp::Ordering::Less;
             }
             match (d1.elem.as_ref(), d2.elem.as_ref()) {
                 (Some(d1), Some(d2)) => {
                     if !Rc::ptr_eq(d1, d2) {
-                        rc = -1;
+                        rc = std::cmp::Ordering::Less;
                     }
                 }
                 (None, None) => {}
-                _ => rc = -1,
+                _ => rc = std::cmp::Ordering::Less,
             }
-            match rc {
-                ..0 => std::cmp::Ordering::Less,
-                0 => std::cmp::Ordering::Equal,
-                1.. => std::cmp::Ordering::Greater,
-            }
+            rc
         }),
     );
 
@@ -841,12 +805,7 @@ pub unsafe fn xml_text_writer_end_document(writer: XmlTextWriterPtr) -> io::Resu
 unsafe fn xml_text_writer_output_nsdecl(writer: XmlTextWriterPtr) -> io::Result<usize> {
     let mut sum = 0;
     while let Some(lk) = (*writer).nsstack.pop_first() {
-        let namespace_uri = xml_strdup(lk.uri);
-        let prefix = xml_strdup(lk.prefix);
-
-        let count = xml_text_writer_write_attribute(writer, prefix, namespace_uri);
-        xml_free(namespace_uri as _);
-        xml_free(prefix as _);
+        let count = xml_text_writer_write_attribute(writer, &lk.prefix, &lk.uri);
 
         if count.is_err() {
             (*writer).nsstack.clear();
@@ -979,7 +938,7 @@ pub unsafe fn xml_text_writer_end_comment(writer: XmlTextWriterPtr) -> io::Resul
 #[doc(alias = "xmlTextWriterWriteComment")]
 pub unsafe fn xml_text_writer_write_comment(
     writer: XmlTextWriterPtr,
-    content: *const XmlChar,
+    content: &str,
 ) -> io::Result<usize> {
     let mut sum = xml_text_writer_start_comment(writer)?;
     sum += xml_text_writer_write_string(writer, content)?;
@@ -993,9 +952,9 @@ pub unsafe fn xml_text_writer_write_comment(
 #[doc(alias = "xmlTextWriterStartElement")]
 pub unsafe fn xml_text_writer_start_element(
     writer: XmlTextWriterPtr,
-    name: *const XmlChar,
+    name: &str,
 ) -> io::Result<usize> {
-    if writer.is_null() || name.is_null() || (*name == b'\0') {
+    if writer.is_null() || name.is_empty() {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
@@ -1026,11 +985,7 @@ pub unsafe fn xml_text_writer_start_element(
     }
 
     let p = XmlTextWriterStackEntry {
-        name: Some(
-            CStr::from_ptr(name as *const i8)
-                .to_string_lossy()
-                .into_owned(),
-        ),
+        name: Some(name.to_owned()),
         state: Cell::new(XmlTextWriterState::XmlTextwriterName),
     };
     (*writer).nodes.push_front(p.into());
@@ -1040,9 +995,7 @@ pub unsafe fn xml_text_writer_start_element(
     }
 
     sum += (*writer).out.write_str("<")?;
-    sum += (*writer)
-        .out
-        .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+    sum += (*writer).out.write_str(name)?;
     Ok(sum)
 }
 
@@ -1052,38 +1005,33 @@ pub unsafe fn xml_text_writer_start_element(
 #[doc(alias = "xmlTextWriterStartElementNS")]
 pub unsafe fn xml_text_writer_start_element_ns(
     writer: XmlTextWriterPtr,
-    prefix: *const XmlChar,
-    name: *const XmlChar,
-    namespace_uri: *const XmlChar,
+    prefix: Option<&str>,
+    name: &str,
+    namespace_uri: Option<&str>,
 ) -> io::Result<usize> {
-    let mut buf: *mut XmlChar;
-
-    if writer.is_null() || name.is_null() || (*name == b'\0') {
+    if writer.is_null() || name.is_empty() {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
-    buf = null_mut();
-    if !prefix.is_null() {
-        buf = xml_strdup(prefix);
-        buf = xml_strcat(buf, c":".as_ptr() as _);
+    let mut buf = String::new();
+    if let Some(prefix) = prefix {
+        buf.push_str(prefix);
+        buf.push(':');
     }
-    buf = xml_strcat(buf, name);
+    buf.push_str(name);
 
-    let mut sum = 0;
-    let count = xml_text_writer_start_element(writer, buf);
-    xml_free(buf as _);
-    sum += count?;
+    let sum = xml_text_writer_start_element(writer, &buf)?;
 
-    if !namespace_uri.is_null() {
-        buf = xml_strdup(c"xmlns".as_ptr() as _);
-        if !prefix.is_null() {
-            buf = xml_strcat(buf, c":".as_ptr() as _);
-            buf = xml_strcat(buf, prefix);
+    if let Some(namespace_uri) = namespace_uri {
+        let mut buf = "xmlns".to_owned();
+        if let Some(prefix) = prefix {
+            buf.push(':');
+            buf.push_str(prefix);
         }
 
         let p = XmlTextWriterNsStackEntry {
             prefix: buf,
-            uri: xml_strdup(namespace_uri),
+            uri: namespace_uri.to_owned(),
             elem: (*writer).nodes.front().cloned(),
         };
         (*writer).nsstack.push_first(p);
@@ -1215,12 +1163,11 @@ pub unsafe fn xml_text_writer_full_end_element(writer: XmlTextWriterPtr) -> io::
 #[doc(alias = "xmlTextWriterWriteElement")]
 pub unsafe fn xml_text_writer_write_element(
     writer: XmlTextWriterPtr,
-    name: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    content: Option<&str>,
 ) -> io::Result<usize> {
-    let mut sum = 0;
-    sum += xml_text_writer_start_element(writer, name)?;
-    if !content.is_null() {
+    let mut sum = xml_text_writer_start_element(writer, name)?;
+    if let Some(content) = content {
         sum += xml_text_writer_write_string(writer, content)?;
     }
     sum += xml_text_writer_end_element(writer)?;
@@ -1233,12 +1180,12 @@ pub unsafe fn xml_text_writer_write_element(
 #[doc(alias = "xmlTextWriterWriteElementNS")]
 pub unsafe fn xml_text_writer_write_element_ns(
     writer: XmlTextWriterPtr,
-    prefix: *const XmlChar,
-    name: *const XmlChar,
-    namespace_uri: *const XmlChar,
-    content: *const XmlChar,
+    prefix: Option<&str>,
+    name: &str,
+    namespace_uri: Option<&str>,
+    content: &str,
 ) -> io::Result<usize> {
-    if writer.is_null() || name.is_null() || *name == b'\0' {
+    if writer.is_null() || name.is_empty() {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
@@ -1374,16 +1321,15 @@ pub unsafe fn xml_text_writer_write_raw(
 #[doc(alias = "xmlTextWriterWriteString")]
 pub unsafe fn xml_text_writer_write_string(
     writer: XmlTextWriterPtr,
-    content: *const XmlChar,
+    content: &str,
 ) -> io::Result<usize> {
-    let mut buf: *mut XmlChar;
-
-    if writer.is_null() || content.is_null() {
+    if writer.is_null() {
         return Err(io::Error::other("Writer of content is NULL"));
     }
 
     let mut sum = 0;
-    buf = content as _;
+    let content = xml_strndup(content.as_ptr(), content.len() as i32);
+    let mut buf = content;
     if let Some(lk) = (*writer).nodes.front() {
         match lk.state.get() {
             XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
@@ -1404,12 +1350,13 @@ pub unsafe fn xml_text_writer_write_string(
 
     if !buf.is_null() {
         let count = xml_text_writer_write_raw(writer, buf);
-        if buf != content as _ {
+        if buf != content {
             // buf was allocated by us, so free it
             xml_free(buf as _);
         }
         sum += count?;
     }
+    xml_free(content as _);
 
     Ok(sum)
 }
@@ -1584,9 +1531,9 @@ pub unsafe fn xml_text_writer_write_bin_hex(
 #[doc(alias = "xmlTextWriterStartAttribute")]
 pub unsafe fn xml_text_writer_start_attribute(
     writer: XmlTextWriterPtr,
-    name: *const XmlChar,
+    name: &str,
 ) -> io::Result<usize> {
-    if writer.is_null() || name.is_null() || *name == b'\0' {
+    if writer.is_null() || name.is_empty() {
         return Err(io::Error::other("Writer or name is invalid"));
     }
 
@@ -1603,9 +1550,7 @@ pub unsafe fn xml_text_writer_start_attribute(
             }
 
             sum += (*writer).out.write_str(" ")?;
-            sum += (*writer)
-                .out
-                .write_str(CStr::from_ptr(name as _).to_string_lossy().as_ref())?;
+            sum += (*writer).out.write_str(name)?;
             sum += (*writer).out.write_str("=")?;
             sum += (*writer).out.write_bytes(&[(*writer).qchar as u8])?;
             lk.state.set(XmlTextWriterState::XmlTextwriterAttribute);
@@ -1624,35 +1569,32 @@ pub unsafe fn xml_text_writer_start_attribute(
 #[doc(alias = "xmlTextWriterStartAttributeNS")]
 pub unsafe fn xml_text_writer_start_attribute_ns(
     writer: XmlTextWriterPtr,
-    prefix: *const XmlChar,
-    name: *const XmlChar,
-    namespace_uri: *const XmlChar,
+    prefix: Option<&str>,
+    name: &str,
+    namespace_uri: Option<&str>,
 ) -> io::Result<usize> {
-    let mut buf: *mut XmlChar;
-
-    if writer.is_null() || name.is_null() || *name == b'\0' {
+    if writer.is_null() || name.is_empty() {
         return Err(io::Error::other("Writer or name is invalid"));
     }
 
     // Handle namespace first in case of error
-    if !namespace_uri.is_null() {
-        buf = xml_strdup(c"xmlns".as_ptr() as _);
-        if !prefix.is_null() {
-            buf = xml_strcat(buf, c":".as_ptr() as _);
-            buf = xml_strcat(buf, prefix);
+    if let Some(namespace_uri) = namespace_uri {
+        let mut buf = "xmlns".to_owned();
+        if let Some(prefix) = prefix {
+            buf.push(':');
+            buf.push_str(prefix);
         }
 
         let nsentry = XmlTextWriterNsStackEntry {
-            prefix: buf,
-            uri: namespace_uri as _,
+            prefix: buf.clone(),
+            uri: namespace_uri.to_owned(),
             elem: (*writer).nodes.front().cloned(),
         };
 
         if let Some(curns) = (*writer).nsstack.search(&nsentry) {
-            xml_free(buf as _);
-            if xml_strcmp(curns.uri, namespace_uri) == 0 {
+            if curns.uri == namespace_uri {
                 // Namespace already defined on element skip
-                buf = null_mut();
+                buf.clear();
             } else {
                 // Prefix mismatch so error out
                 return Err(io::Error::other("Prefix mismatch"));
@@ -1660,26 +1602,24 @@ pub unsafe fn xml_text_writer_start_attribute_ns(
         }
 
         // Do not add namespace decl to list - it is already there
-        if !buf.is_null() {
+        if !buf.is_empty() {
             let p = XmlTextWriterNsStackEntry {
                 prefix: buf,
-                uri: xml_strdup(namespace_uri),
+                uri: namespace_uri.to_owned(),
                 elem: (*writer).nodes.front().cloned(),
             };
             (*writer).nsstack.push_first(p);
         }
     }
 
-    buf = null_mut();
-    if !prefix.is_null() {
-        buf = xml_strdup(prefix);
-        buf = xml_strcat(buf, c":".as_ptr() as _);
+    let mut buf = String::new();
+    if let Some(prefix) = prefix {
+        buf.push_str(prefix);
+        buf.push(':');
     }
-    buf = xml_strcat(buf, name);
+    buf.push_str(name);
 
-    let count = xml_text_writer_start_attribute(writer, buf);
-    xml_free(buf as _);
-    count
+    xml_text_writer_start_attribute(writer, &buf)
 }
 
 /// End the current xml element.
@@ -1716,8 +1656,8 @@ pub unsafe fn xml_text_writer_end_attribute(writer: XmlTextWriterPtr) -> io::Res
 #[doc(alias = "xmlTextWriterWriteAttribute")]
 pub unsafe fn xml_text_writer_write_attribute(
     writer: XmlTextWriterPtr,
-    name: *const XmlChar,
-    content: *const XmlChar,
+    name: &str,
+    content: &str,
 ) -> io::Result<usize> {
     let mut sum = 0;
     sum += xml_text_writer_start_attribute(writer, name)?;
@@ -1732,17 +1672,16 @@ pub unsafe fn xml_text_writer_write_attribute(
 #[doc(alias = "xmlTextWriterWriteAttributeNS")]
 pub unsafe fn xml_text_writer_write_attribute_ns(
     writer: XmlTextWriterPtr,
-    prefix: *const XmlChar,
-    name: *const XmlChar,
-    namespace_uri: *const XmlChar,
-    content: *const XmlChar,
+    prefix: Option<&str>,
+    name: &str,
+    namespace_uri: Option<&str>,
+    content: &str,
 ) -> io::Result<usize> {
-    if writer.is_null() || name.is_null() || *name == b'\0' {
+    if writer.is_null() || name.is_empty() {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
-    let mut sum = 0;
-    sum += xml_text_writer_start_attribute_ns(writer, prefix, name, namespace_uri)?;
+    let mut sum = xml_text_writer_start_attribute_ns(writer, prefix, name, namespace_uri)?;
     sum += xml_text_writer_write_string(writer, content)?;
     sum += xml_text_writer_end_attribute(writer)?;
     Ok(sum)
@@ -1853,11 +1792,10 @@ pub unsafe fn xml_text_writer_end_pi(writer: XmlTextWriterPtr) -> io::Result<usi
 pub unsafe fn xml_text_writer_write_pi(
     writer: XmlTextWriterPtr,
     target: *const XmlChar,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> io::Result<usize> {
-    let mut sum = 0;
-    sum += xml_text_writer_start_pi(writer, target)?;
-    if !content.is_null() {
+    let mut sum = xml_text_writer_start_pi(writer, target)?;
+    if let Some(content) = content {
         sum += xml_text_writer_write_string(writer, content)?;
     }
     sum += xml_text_writer_end_pi(writer)?;
@@ -1952,11 +1890,10 @@ pub unsafe fn xml_text_writer_end_cdata(writer: XmlTextWriterPtr) -> io::Result<
 #[doc(alias = "xmlTextWriterWriteCDATA")]
 pub unsafe fn xml_text_writer_write_cdata(
     writer: XmlTextWriterPtr,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> io::Result<usize> {
-    let mut sum = 0;
-    sum += xml_text_writer_start_cdata(writer)?;
-    if !content.is_null() {
+    let mut sum = xml_text_writer_start_cdata(writer)?;
+    if let Some(content) = content {
         sum += xml_text_writer_write_string(writer, content)?;
     }
     sum += xml_text_writer_end_cdata(writer)?;
@@ -2112,10 +2049,10 @@ pub unsafe fn xml_text_writer_write_dtd(
     name: *const XmlChar,
     pubid: *const XmlChar,
     sysid: *const XmlChar,
-    subset: *const XmlChar,
+    subset: Option<&str>,
 ) -> io::Result<usize> {
     let mut sum = xml_text_writer_start_dtd(writer, name, pubid, sysid)?;
-    if !subset.is_null() {
+    if let Some(subset) = subset {
         sum += xml_text_writer_write_string(writer, subset)?;
     }
     sum += xml_text_writer_end_dtd(writer)?;
@@ -2212,12 +2149,8 @@ pub unsafe fn xml_text_writer_end_dtdelement(writer: XmlTextWriterPtr) -> io::Re
 pub unsafe fn xml_text_writer_write_dtdelement(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
-    content: *const XmlChar,
+    content: &str,
 ) -> io::Result<usize> {
-    if content.is_null() {
-        return Err(io::Error::other("Content is NULL"));
-    }
-
     let mut sum = xml_text_writer_start_dtdelement(writer, name)?;
     sum += xml_text_writer_write_string(writer, content)?;
     sum += xml_text_writer_end_dtdelement(writer)?;
@@ -2313,12 +2246,8 @@ pub unsafe fn xml_text_writer_end_dtd_attlist(writer: XmlTextWriterPtr) -> io::R
 pub unsafe fn xml_text_writer_write_dtd_attlist(
     writer: XmlTextWriterPtr,
     name: *const XmlChar,
-    content: *const XmlChar,
+    content: &str,
 ) -> io::Result<usize> {
-    if content.is_null() {
-        return Err(io::Error::other("Content is NULL"));
-    }
-
     let mut sum = xml_text_writer_start_dtdattlist(writer, name)?;
     sum += xml_text_writer_write_string(writer, content)?;
     sum += xml_text_writer_end_dtd_attlist(writer)?;
@@ -2426,9 +2355,9 @@ pub unsafe fn xml_text_writer_write_dtd_internal_entity(
     writer: XmlTextWriterPtr,
     pe: i32,
     name: *const XmlChar,
-    content: *const XmlChar,
+    content: &str,
 ) -> io::Result<usize> {
-    if name.is_null() || *name == b'\0' || content.is_null() {
+    if name.is_null() || *name == b'\0' {
         return Err(io::Error::other("Writer or name is NULL"));
     }
 
@@ -2561,9 +2490,9 @@ pub unsafe fn xml_text_writer_write_dtd_entity(
     pubid: *const XmlChar,
     sysid: *const XmlChar,
     ndataid: *const XmlChar,
-    content: *const XmlChar,
+    content: Option<&str>,
 ) -> io::Result<usize> {
-    if content.is_null() && pubid.is_null() && sysid.is_null() {
+    if content.is_none() && pubid.is_null() && sysid.is_null() {
         return Err(io::Error::other("Content, PublicID and SystemID are NULL"));
     }
     if pe != 0 && !ndataid.is_null() {
@@ -2571,7 +2500,7 @@ pub unsafe fn xml_text_writer_write_dtd_entity(
     }
 
     if pubid.is_null() && sysid.is_null() {
-        return xml_text_writer_write_dtd_internal_entity(writer, pe, name, content);
+        return xml_text_writer_write_dtd_internal_entity(writer, pe, name, content.unwrap());
     }
 
     xml_text_writer_write_dtd_external_entity(writer, pe, name, pubid, sysid, ndataid)
@@ -3248,84 +3177,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_writer_start_attribute() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    xml_text_writer_start_attribute(writer, name);
-                    des_xml_text_writer_ptr(n_writer, writer, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextWriterStartAttribute",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlTextWriterStartAttribute()"
-                        );
-                        eprint!(" {}", n_writer);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_start_attribute_ns() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                            let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
-
-                            xml_text_writer_start_attribute_ns(writer, prefix, name, namespace_uri);
-                            des_xml_text_writer_ptr(n_writer, writer, 0);
-                            des_const_xml_char_ptr(n_prefix, prefix, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlTextWriterStartAttributeNS",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlTextWriterStartAttributeNS()"
-                                );
-                                eprint!(" {}", n_writer);
-                                eprint!(" {}", n_prefix);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_namespace_uri);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_writer_start_cdata() {
         #[cfg(feature = "libxml_writer")]
         unsafe {
@@ -3579,84 +3430,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_writer_start_element() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                    let name = gen_const_xml_char_ptr(n_name, 1);
-
-                    xml_text_writer_start_element(writer, name);
-                    des_xml_text_writer_ptr(n_writer, writer, 0);
-                    des_const_xml_char_ptr(n_name, name, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextWriterStartElement",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlTextWriterStartElement()"
-                        );
-                        eprint!(" {}", n_writer);
-                        eprintln!(" {}", n_name);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_start_element_ns() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                            let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
-
-                            xml_text_writer_start_element_ns(writer, prefix, name, namespace_uri);
-                            des_xml_text_writer_ptr(n_writer, writer, 0);
-                            des_const_xml_char_ptr(n_prefix, prefix, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!(
-                                    "Leak of {} blocks found in xmlTextWriterStartElementNS",
-                                    xml_mem_blocks() - mem_base
-                                );
-                                assert!(
-                                    leaks == 0,
-                                    "{leaks} Leaks are found in xmlTextWriterStartElementNS()"
-                                );
-                                eprint!(" {}", n_writer);
-                                eprint!(" {}", n_prefix);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_namespace_uri);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_writer_start_pi() {
         #[cfg(feature = "libxml_writer")]
         unsafe {
@@ -3684,97 +3457,6 @@ mod tests {
                         );
                         eprint!(" {}", n_writer);
                         eprintln!(" {}", n_target);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_attribute() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        xml_text_writer_write_attribute(writer, name, content);
-                        des_xml_text_writer_ptr(n_writer, writer, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextWriterWriteAttribute",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlTextWriterWriteAttribute()"
-                            );
-                            eprint!(" {}", n_writer);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_content);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_attribute_ns() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                                let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-                                let name = gen_const_xml_char_ptr(n_name, 2);
-                                let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
-                                let content = gen_const_xml_char_ptr(n_content, 4);
-
-                                xml_text_writer_write_attribute_ns(
-                                    writer,
-                                    prefix,
-                                    name,
-                                    namespace_uri,
-                                    content,
-                                );
-                                des_xml_text_writer_ptr(n_writer, writer, 0);
-                                des_const_xml_char_ptr(n_prefix, prefix, 1);
-                                des_const_xml_char_ptr(n_name, name, 2);
-                                des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
-                                des_const_xml_char_ptr(n_content, content, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlTextWriterWriteAttributeNS",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(leaks == 0, "{leaks} Leaks are found in xmlTextWriterWriteAttributeNS()");
-                                    eprint!(" {}", n_writer);
-                                    eprint!(" {}", n_prefix);
-                                    eprint!(" {}", n_name);
-                                    eprint!(" {}", n_namespace_uri);
-                                    eprintln!(" {}", n_content);
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -3882,256 +3564,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_writer_write_cdata() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    xml_text_writer_write_cdata(writer, content);
-                    des_xml_text_writer_ptr(n_writer, writer, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextWriterWriteCDATA",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlTextWriterWriteCDATA()"
-                        );
-                        eprint!(" {}", n_writer);
-                        eprintln!(" {}", n_content);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_comment() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    xml_text_writer_write_comment(writer, content);
-                    des_xml_text_writer_ptr(n_writer, writer, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextWriterWriteComment",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlTextWriterWriteComment()"
-                        );
-                        eprint!(" {}", n_writer);
-                        eprintln!(" {}", n_content);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_dtd() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_pubid in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_sysid in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_subset in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                                let name = gen_const_xml_char_ptr(n_name, 1);
-                                let pubid = gen_const_xml_char_ptr(n_pubid, 2);
-                                let sysid = gen_const_xml_char_ptr(n_sysid, 3);
-                                let subset = gen_const_xml_char_ptr(n_subset, 4);
-
-                                xml_text_writer_write_dtd(writer, name, pubid, sysid, subset);
-                                des_xml_text_writer_ptr(n_writer, writer, 0);
-                                des_const_xml_char_ptr(n_name, name, 1);
-                                des_const_xml_char_ptr(n_pubid, pubid, 2);
-                                des_const_xml_char_ptr(n_sysid, sysid, 3);
-                                des_const_xml_char_ptr(n_subset, subset, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlTextWriterWriteDTD",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlTextWriterWriteDTD()"
-                                    );
-                                    eprint!(" {}", n_writer);
-                                    eprint!(" {}", n_name);
-                                    eprint!(" {}", n_pubid);
-                                    eprint!(" {}", n_sysid);
-                                    eprintln!(" {}", n_subset);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_dtdattlist() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        xml_text_writer_write_dtd_attlist(writer, name, content);
-                        des_xml_text_writer_ptr(n_writer, writer, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextWriterWriteDTDAttlist",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlTextWriterWriteDTDAttlist()"
-                            );
-                            eprint!(" {}", n_writer);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_content);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_dtdelement() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        xml_text_writer_write_dtdelement(writer, name, content);
-                        des_xml_text_writer_ptr(n_writer, writer, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextWriterWriteDTDElement",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlTextWriterWriteDTDElement()"
-                            );
-                            eprint!(" {}", n_writer);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_content);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_dtdentity() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_pe in 0..GEN_NB_INT {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_pubid in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_sysid in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                for n_ndataid in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                        let mem_base = xml_mem_blocks();
-                                        let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                                        let pe = gen_int(n_pe, 1);
-                                        let name = gen_const_xml_char_ptr(n_name, 2);
-                                        let pubid = gen_const_xml_char_ptr(n_pubid, 3);
-                                        let sysid = gen_const_xml_char_ptr(n_sysid, 4);
-                                        let ndataid = gen_const_xml_char_ptr(n_ndataid, 5);
-                                        let content = gen_const_xml_char_ptr(n_content, 6);
-
-                                        xml_text_writer_write_dtd_entity(
-                                            writer, pe, name, pubid, sysid, ndataid, content,
-                                        );
-                                        des_xml_text_writer_ptr(n_writer, writer, 0);
-                                        des_int(n_pe, pe, 1);
-                                        des_const_xml_char_ptr(n_name, name, 2);
-                                        des_const_xml_char_ptr(n_pubid, pubid, 3);
-                                        des_const_xml_char_ptr(n_sysid, sysid, 4);
-                                        des_const_xml_char_ptr(n_ndataid, ndataid, 5);
-                                        des_const_xml_char_ptr(n_content, content, 6);
-                                        reset_last_error();
-                                        if mem_base != xml_mem_blocks() {
-                                            leaks += 1;
-                                            eprint!("Leak of {} blocks found in xmlTextWriterWriteDTDEntity", xml_mem_blocks() - mem_base);
-                                            assert!(leaks == 0, "{leaks} Leaks are found in xmlTextWriterWriteDTDEntity()");
-                                            eprint!(" {}", n_writer);
-                                            eprint!(" {}", n_pe);
-                                            eprint!(" {}", n_name);
-                                            eprint!(" {}", n_pubid);
-                                            eprint!(" {}", n_sysid);
-                                            eprint!(" {}", n_ndataid);
-                                            eprintln!(" {}", n_content);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_writer_write_dtdexternal_entity() {
         #[cfg(feature = "libxml_writer")]
         unsafe {
@@ -4222,44 +3654,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_text_writer_write_dtdinternal_entity() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_pe in 0..GEN_NB_INT {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            let mem_base = xml_mem_blocks();
-                            let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                            let pe = gen_int(n_pe, 1);
-                            let name = gen_const_xml_char_ptr(n_name, 2);
-                            let content = gen_const_xml_char_ptr(n_content, 3);
-
-                            xml_text_writer_write_dtd_internal_entity(writer, pe, name, content);
-                            des_xml_text_writer_ptr(n_writer, writer, 0);
-                            des_int(n_pe, pe, 1);
-                            des_const_xml_char_ptr(n_name, name, 2);
-                            des_const_xml_char_ptr(n_content, content, 3);
-                            reset_last_error();
-                            if mem_base != xml_mem_blocks() {
-                                leaks += 1;
-                                eprint!("Leak of {} blocks found in xmlTextWriterWriteDTDInternalEntity", xml_mem_blocks() - mem_base);
-                                assert!(leaks == 0, "{leaks} Leaks are found in xmlTextWriterWriteDTDInternalEntity()");
-                                eprint!(" {}", n_writer);
-                                eprint!(" {}", n_pe);
-                                eprint!(" {}", n_name);
-                                eprintln!(" {}", n_content);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_text_writer_write_dtdnotation() {
         #[cfg(feature = "libxml_writer")]
         unsafe {
@@ -4296,217 +3690,6 @@ mod tests {
                                 eprint!(" {}", n_pubid);
                                 eprintln!(" {}", n_sysid);
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_element() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                        let name = gen_const_xml_char_ptr(n_name, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        xml_text_writer_write_element(writer, name, content);
-                        des_xml_text_writer_ptr(n_writer, writer, 0);
-                        des_const_xml_char_ptr(n_name, name, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextWriterWriteElement",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlTextWriterWriteElement()"
-                            );
-                            eprint!(" {}", n_writer);
-                            eprint!(" {}", n_name);
-                            eprintln!(" {}", n_content);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_element_ns() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_prefix in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_name in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        for n_namespace_uri in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                            for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                                let mem_base = xml_mem_blocks();
-                                let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                                let prefix = gen_const_xml_char_ptr(n_prefix, 1);
-                                let name = gen_const_xml_char_ptr(n_name, 2);
-                                let namespace_uri = gen_const_xml_char_ptr(n_namespace_uri, 3);
-                                let content = gen_const_xml_char_ptr(n_content, 4);
-
-                                xml_text_writer_write_element_ns(
-                                    writer,
-                                    prefix,
-                                    name,
-                                    namespace_uri,
-                                    content,
-                                );
-                                des_xml_text_writer_ptr(n_writer, writer, 0);
-                                des_const_xml_char_ptr(n_prefix, prefix, 1);
-                                des_const_xml_char_ptr(n_name, name, 2);
-                                des_const_xml_char_ptr(n_namespace_uri, namespace_uri, 3);
-                                des_const_xml_char_ptr(n_content, content, 4);
-                                reset_last_error();
-                                if mem_base != xml_mem_blocks() {
-                                    leaks += 1;
-                                    eprint!(
-                                        "Leak of {} blocks found in xmlTextWriterWriteElementNS",
-                                        xml_mem_blocks() - mem_base
-                                    );
-                                    assert!(
-                                        leaks == 0,
-                                        "{leaks} Leaks are found in xmlTextWriterWriteElementNS()"
-                                    );
-                                    eprint!(" {}", n_writer);
-                                    eprint!(" {}", n_prefix);
-                                    eprint!(" {}", n_name);
-                                    eprint!(" {}", n_namespace_uri);
-                                    eprintln!(" {}", n_content);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_attribute() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_attribute_ns() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_cdata() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_comment() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_dtd() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_dtdattlist() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_dtdelement() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_dtdinternal_entity() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_element() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_element_ns() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_pi() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_raw() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_format_string() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_pi() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_target in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                        let target = gen_const_xml_char_ptr(n_target, 1);
-                        let content = gen_const_xml_char_ptr(n_content, 2);
-
-                        xml_text_writer_write_pi(writer, target, content);
-                        des_xml_text_writer_ptr(n_writer, writer, 0);
-                        des_const_xml_char_ptr(n_target, target, 1);
-                        des_const_xml_char_ptr(n_content, content, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in xmlTextWriterWritePI",
-                                xml_mem_blocks() - mem_base
-                            );
-                            assert!(
-                                leaks == 0,
-                                "{leaks} Leaks are found in xmlTextWriterWritePI()"
-                            );
-                            eprint!(" {}", n_writer);
-                            eprint!(" {}", n_target);
-                            eprintln!(" {}", n_content);
                         }
                     }
                 }
@@ -4588,117 +3771,5 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_string() {
-        #[cfg(feature = "libxml_writer")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_writer in 0..GEN_NB_XML_TEXT_WRITER_PTR {
-                for n_content in 0..GEN_NB_CONST_XML_CHAR_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let writer = gen_xml_text_writer_ptr(n_writer, 0);
-                    let content = gen_const_xml_char_ptr(n_content, 1);
-
-                    xml_text_writer_write_string(writer, content);
-                    des_xml_text_writer_ptr(n_writer, writer, 0);
-                    des_const_xml_char_ptr(n_content, content, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlTextWriterWriteString",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlTextWriterWriteString()"
-                        );
-                        eprint!(" {}", n_writer);
-                        eprintln!(" {}", n_content);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_attribute() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_attribute_ns() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_cdata() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_comment() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_dtd() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_dtdattlist() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_dtdelement() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_dtdinternal_entity() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_element() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_element_ns() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_pi() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_raw() {
-
-        /* missing type support */
-    }
-
-    #[test]
-    fn test_xml_text_writer_write_vformat_string() {
-
-        /* missing type support */
     }
 }
