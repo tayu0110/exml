@@ -52,12 +52,13 @@ use crate::{
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
         xmlstring::{xml_strcasecmp, xml_strdup, xml_strlen, XmlChar},
     },
+    list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
     tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };
 
-use super::{list::XmlList, xmlsave::xml_buf_attr_serialize_txt_content, xmlstring::xml_strndup};
+use super::{xmlsave::xml_buf_attr_serialize_txt_content, xmlstring::xml_strndup};
 
 // Types are kept private
 #[repr(C)]

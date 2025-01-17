@@ -42,6 +42,7 @@ use crate::{
     buf::libxml_api::xml_buf_write_quoted_string,
     error::{XmlParserErrors, __xml_raise_error},
     io::XmlOutputBuffer,
+    list::XmlList,
     tree::{
         xml_free_prop_list, xml_new_ns_prop, NodeCommon, XmlAttr, XmlAttrPtr, XmlDoc,
         XmlElementType, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_XML_NAMESPACE,
@@ -52,7 +53,6 @@ use crate::{
 
 use super::{
     globals::{xml_free, xml_malloc_atomic, xml_realloc},
-    list::XmlList,
     uri::{xml_free_uri, xml_parse_uri, XmlURIPtr},
     xmlstring::{xml_str_equal, xml_strcmp, xml_strlen, XmlChar},
 };

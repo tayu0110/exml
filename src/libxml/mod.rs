@@ -12,7 +12,6 @@ pub mod hash;
 pub mod htmlparser;
 #[cfg(feature = "html")]
 pub mod htmltree;
-pub mod list;
 #[cfg(feature = "ftp")]
 pub mod nanoftp;
 pub mod parser;

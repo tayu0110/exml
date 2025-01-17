@@ -65,6 +65,7 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strlen, xml_strndup, XmlChar},
     },
+    list::XmlList,
     parser::{split_qname2, XmlParserCtxtPtr},
     tree::{
         xml_build_qname, xml_free_attribute, xml_free_node, xml_get_doc_entity, xml_new_doc_node,
@@ -79,7 +80,6 @@ use crate::{
 use super::{
     chvalid::xml_is_blank_char,
     hash::{xml_hash_create, CVoidWrapper},
-    list::XmlList,
     parser_internals::XML_VCTXT_USE_PCTXT,
 };
 
