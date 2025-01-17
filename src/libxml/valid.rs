@@ -26,6 +26,7 @@ use std::{
     mem::{size_of, size_of_val, zeroed},
     os::raw::c_void,
     ptr::{addr_of_mut, drop_in_place, null, null_mut, NonNull},
+    rc::Rc,
     sync::atomic::Ordering,
 };
 
@@ -56,10 +57,6 @@ use crate::{
             xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup2,
             xml_hash_remove_entry2, xml_hash_scan, XmlHashTable,
         },
-        list::{
-            xml_list_append, xml_list_create, xml_list_delete, xml_list_empty,
-            xml_list_remove_first, xml_list_walk, XmlListPtr,
-        },
         parser::XmlParserMode,
         parser_internals::xml_string_current_char,
         xmlautomata::{
@@ -83,6 +80,7 @@ use crate::{
 use super::{
     chvalid::xml_is_blank_char,
     hash::{xml_hash_create, CVoidWrapper},
+    list::XmlList,
     parser_internals::XML_VCTXT_USE_PCTXT,
 };
 
@@ -2543,63 +2541,18 @@ pub(crate) unsafe fn xml_add_ref(
     // Add the owning node to the NodeList
     // Return the ref
 
-    let mut ref_list = *table.get(value).unwrap_or(&null_mut());
-    'failed: {
-        if ref_list.is_null() {
-            ref_list = xml_list_create(Some(xml_free_ref), Some(xml_dummy_compare));
-            if ref_list.is_null() {
-                xml_err_valid!(
-                    null_mut(),
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlAddRef: Reference list creation failed!\n"
-                );
-                break 'failed;
-            }
-            if table.insert(value.to_owned(), ref_list).is_some() {
-                xml_list_delete(ref_list);
-                xml_err_valid!(
-                    null_mut(),
-                    XmlParserErrors::XmlErrInternalError,
-                    "xmlAddRef: Reference list insertion failed!\n"
-                );
-                break 'failed;
-            }
-        }
-        if xml_list_append(ref_list, ret as _) != 0 {
-            xml_err_valid!(
-                null_mut(),
-                XmlParserErrors::XmlErrInternalError,
-                "xmlAddRef: Reference list insertion failed!\n"
-            );
-            break 'failed;
-        }
-        return ret;
-    }
-    // failed:
-    if !ret.is_null() {
-        if !(*ret).name.is_null() {
-            xml_free((*ret).name as _);
-        }
-        drop_in_place(ret);
-        xml_free(ret as _);
-    }
-    null_mut()
-}
-
-/// Deallocate the memory used by a list of references
-#[doc(alias = "xmlFreeRefTableEntry")]
-extern "C" fn xml_free_ref_table_entry(payload: *mut c_void, _name: *const XmlChar) {
-    let list_ref: XmlListPtr = payload as XmlListPtr;
-    if list_ref.is_null() {
-        return;
-    }
-    xml_list_delete(list_ref);
-}
-
-/// Deallocate the memory used by an Ref hash table.
-#[doc(alias = "xmlFreeRefTable")]
-pub(crate) unsafe fn xml_free_ref_table(table: XmlRefTablePtr) {
-    xml_hash_free(table, Some(xml_free_ref_table_entry));
+    let ref_list = table.entry(value.to_owned()).or_insert_with(|| {
+        XmlList::new(
+            Some(Rc::new(|data| xml_free_ref(data as _))),
+            Rc::new(|d1, d2| match xml_dummy_compare(*d1 as _, *d2 as _) {
+                ..0 => std::cmp::Ordering::Less,
+                0 => std::cmp::Ordering::Equal,
+                1.. => std::cmp::Ordering::Greater,
+            }),
+        )
+    });
+    ref_list.insert_upper_bound(ret);
+    ret
 }
 
 /// Determine whether an attribute is of type Ref. In case we have DTD(s)
@@ -2652,37 +2605,11 @@ pub(crate) unsafe fn xml_is_ref(mut doc: XmlDocPtr, elem: XmlNodePtr, attr: XmlA
     0
 }
 
-#[repr(C)]
-pub struct XmlRemoveMemo {
-    l: XmlListPtr,
-    ap: XmlAttrPtr,
-}
-pub type XmlRemoveMemoPtr = *mut XmlRemoveMemo;
-
-/// Returns 0 to abort the walk or 1 to continue
-#[doc(alias = "xmlWalkRemoveRef")]
-extern "C" fn xml_walk_remove_ref(data: *const c_void, user: *mut c_void) -> i32 {
-    unsafe {
-        let attr0: XmlAttrPtr = (*(data as XmlRefPtr)).attr;
-        let attr1: XmlAttrPtr = (*(user as XmlRemoveMemoPtr)).ap;
-        let ref_list: XmlListPtr = (*(user as XmlRemoveMemoPtr)).l;
-
-        if attr0 == attr1 {
-            /* Matched: remove and terminate walk */
-            xml_list_remove_first(ref_list, data as *mut c_void);
-            return 0;
-        }
-        1
-    }
-}
-
 /// Remove the given attribute from the Ref table maintained internally.
 ///
 /// Returns -1 if the lookup failed and 0 otherwise
 #[doc(alias = "xmlRemoveRef")]
 pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
-    let mut target: XmlRemoveMemo = unsafe { zeroed() };
-
     if doc.is_null() {
         return -1;
     }
@@ -2698,7 +2625,7 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
         return -1;
     };
 
-    let Some(&ref_list) = table.get(&id) else {
+    let Some(ref_list) = table.get_mut(&id) else {
         return -1;
     };
 
@@ -2711,38 +2638,41 @@ pub(crate) unsafe fn xml_remove_ref(doc: XmlDocPtr, attr: XmlAttrPtr) -> i32 {
     // The list is ordered by reference, so that means we don't have the
     // key. Passing the list and the reference to the walker means we
     // will have enough data to be able to remove the entry.
-    target.l = ref_list;
-    target.ap = attr;
 
     // Remove the supplied attr from our list
-    xml_list_walk(
-        ref_list,
-        Some(xml_walk_remove_ref),
-        addr_of_mut!(target) as _,
-    );
+    let mut target = null_mut();
+    ref_list.walk(|&refe| {
+        let attr0 = (*refe).attr;
+        let attr1 = attr;
+
+        if attr0 == attr1 {
+            // Matched: remove and terminate walk
+            target = refe;
+            return false;
+        }
+        true
+    });
+    if !target.is_null() {
+        ref_list.remove_first(&target);
+    }
 
     // If the list is empty then remove the list entry in the hash
-    if xml_list_empty(ref_list) != 0 {
-        if let Some(data) = table.remove(&id) {
-            xml_list_delete(data);
-        }
+    if ref_list.is_empty() {
+        table.remove(&id);
     }
     0
 }
 
 /// Find the set of references for the supplied ID.
 ///
-/// Returns null_mut() if not found, otherwise node set for the ID.
+/// Returns `None` if not found, otherwise node set for the ID.
 #[doc(alias = "xmlGetRefs")]
-pub(crate) unsafe fn xml_get_refs(doc: XmlDocPtr, id: &str) -> XmlListPtr {
+pub(crate) unsafe fn xml_get_refs<'a>(doc: XmlDocPtr, id: &str) -> Option<&'a XmlList<XmlRefPtr>> {
     if doc.is_null() {
-        return null_mut();
+        return None;
     }
 
-    let Some(table) = (*doc).refs.as_ref() else {
-        return null_mut();
-    };
-    *table.get(id).unwrap_or(&null_mut())
+    (*doc).refs.as_ref()?.get(id)
 }
 
 /// Allocate a validation context structure.
@@ -3532,11 +3462,7 @@ pub unsafe fn xml_validate_dtd(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr, dtd: XmlDt
         return ret;
     }
     (*doc).ids.take();
-    if let Some(mut refs) = (*doc).refs.take() {
-        for (_, list) in refs.drain() {
-            xml_list_delete(list);
-        }
-    }
+    (*doc).refs.take();
     let root: XmlNodePtr = (*doc).get_root_element();
     ret = xml_validate_element(ctxt, doc, root);
     ret &= xml_validate_document_final(ctxt, doc);
@@ -3969,11 +3895,7 @@ pub unsafe fn xml_validate_document(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr) -> i3
     }
 
     (*doc).ids.take();
-    if let Some(mut refs) = (*doc).refs.take() {
-        for (_, list) in refs.drain() {
-            xml_list_delete(list);
-        }
-    }
+    (*doc).refs.take();
     ret = xml_validate_dtd_final(ctxt, doc);
     if xml_validate_root(ctxt, doc) == 0 {
         return 0;
@@ -6453,12 +6375,6 @@ pub unsafe fn xml_validate_one_namespace(
     ret
 }
 
-pub type XmlValidateMemoPtr = *mut XmlValidateMemo;
-pub struct XmlValidateMemo {
-    ctxt: XmlValidCtxtPtr,
-    name: *const XmlChar,
-}
-
 #[doc(alias = "xmlValidateRef")]
 unsafe fn xml_validate_ref(refe: XmlRefPtr, ctxt: XmlValidCtxtPtr, name: *const XmlChar) {
     if refe.is_null() {
@@ -6569,16 +6485,6 @@ unsafe fn xml_validate_ref(refe: XmlRefPtr, ctxt: XmlValidCtxtPtr, name: *const 
     }
 }
 
-/// Returns 0 to abort the walk or 1 to continue
-#[doc(alias = "xmlWalkValidateList")]
-extern "C" fn xml_walk_validate_list(data: *const c_void, user: *mut c_void) -> i32 {
-    unsafe {
-        let memo: XmlValidateMemoPtr = user as XmlValidateMemoPtr;
-        xml_validate_ref(data as XmlRefPtr, (*memo).ctxt, (*memo).name);
-    }
-    1
-}
-
 /// Does the final step for the document validation once all the
 /// incremental validation steps have been completed
 ///
@@ -6612,23 +6518,13 @@ pub unsafe fn xml_validate_document_final(ctxt: XmlValidCtxtPtr, doc: XmlDocPtr)
     (*ctxt).doc = doc;
     (*ctxt).valid = 1;
     if let Some(table) = (*doc).refs.as_ref() {
-        for (name, &ref_list) in table.iter() {
-            if !ref_list.is_null() {
-                let mut memo: XmlValidateMemo = unsafe { zeroed() };
+        for (name, ref_list) in table.iter() {
+            let name = CString::new(name.as_str()).unwrap();
 
-                if ref_list.is_null() {
-                    continue;
-                }
-                let name = CString::new(name.as_str()).unwrap();
-                memo.ctxt = ctxt;
-                memo.name = name.as_ptr() as *const u8;
-
-                xml_list_walk(
-                    ref_list,
-                    Some(xml_walk_validate_list),
-                    addr_of_mut!(memo) as _,
-                );
-            }
+            ref_list.walk(|&data| {
+                xml_validate_ref(data, ctxt, name.as_ptr() as *const u8);
+                true
+            });
         }
     }
 

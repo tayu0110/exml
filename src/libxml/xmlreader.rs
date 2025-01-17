@@ -4292,7 +4292,7 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
 #[doc(alias = "xmlTextReaderFreeDoc")]
 #[cfg(feature = "libxml_reader")]
 unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
-    use crate::{list::xml_list_delete, tree::NodeCommon};
+    use crate::tree::NodeCommon;
 
     let mut ext_subset: XmlDtdPtr;
 
@@ -4309,11 +4309,7 @@ unsafe fn xml_text_reader_free_doc(reader: &mut XmlTextReader, cur: XmlDocPtr) {
 
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
-    if let Some(mut refs) = (*cur).refs.take() {
-        for (_, list) in refs.drain() {
-            xml_list_delete(list);
-        }
-    }
+    (*cur).refs.take();
     ext_subset = (*cur).ext_subset;
     let int_subset: XmlDtdPtr = (*cur).int_subset;
     if int_subset == ext_subset {

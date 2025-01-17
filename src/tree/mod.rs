@@ -62,7 +62,6 @@ use crate::{
         },
         xmlstring::{xml_str_equal, xml_strdup, xml_strncat, xml_strndup, XmlChar},
     },
-    list::xml_list_delete,
 };
 
 pub use attribute::*;
@@ -1018,11 +1017,7 @@ pub unsafe fn xml_free_doc(cur: XmlDocPtr) {
 
     // Do this before freeing the children list to avoid ID lookups
     (*cur).ids.take();
-    if let Some(mut refs) = (*cur).refs.take() {
-        for (_, list) in refs.drain() {
-            xml_list_delete(list);
-        }
-    }
+    (*cur).refs.take();
     ext_subset = (*cur).ext_subset;
     let int_subset: XmlDtdPtr = (*cur).int_subset;
     if int_subset == ext_subset {

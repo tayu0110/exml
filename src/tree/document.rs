@@ -34,7 +34,7 @@ use crate::{
         parser_internals::xml_copy_char_multi_byte,
         xmlstring::{xml_strdup, xml_strndup, XmlChar},
     },
-    list::XmlListPtr,
+    list::XmlList,
 };
 
 use super::{
@@ -42,8 +42,8 @@ use super::{
     xml_buf_set_allocation_scheme, xml_free_node_list, xml_get_doc_entity, xml_new_doc_text,
     xml_new_reference, xml_tree_err, xml_tree_err_memory, NodeCommon, NodePtr,
     XmlBufferAllocationScheme, XmlDocProperties, XmlDtd, XmlDtdPtr, XmlElementType, XmlEntityPtr,
-    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XML_ENT_EXPANDING, XML_ENT_PARSED,
-    XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
+    XmlEntityType, XmlID, XmlNode, XmlNodePtr, XmlNs, XmlNsPtr, XmlRefPtr, XML_ENT_EXPANDING,
+    XML_ENT_PARSED, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE, __XML_REGISTER_CALLBACKS,
 };
 
 /// An XML document.
@@ -82,7 +82,7 @@ pub struct XmlDoc {
     // Hash table for ID attributes if any
     pub(crate) ids: Option<Box<XmlHashTable<'static, Box<XmlID>>>>,
     // Hash table for IDREFs attributes if any
-    pub(crate) refs: Option<HashMap<String, XmlListPtr>>,
+    pub(crate) refs: Option<HashMap<String, XmlList<XmlRefPtr>>>,
     // The URI for that document
     pub(crate) url: Option<String>,
     // Internal flag for charset handling, actually an xmlCharEncoding
