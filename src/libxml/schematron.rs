@@ -29,7 +29,6 @@ use std::{
 use libc::{malloc, memset, snprintf, sprintf, FILE};
 
 use crate::{
-    buf::libxml_api::XmlBufPtr,
     error::{XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_oom_error},
     generic_error,
     globals::{GenericError, GenericErrorContext, StructuredError},
@@ -189,8 +188,8 @@ pub struct XmlSchematronValidCtxt {
     schema: XmlSchematronPtr,
     xctxt: XmlXPathContextPtr,
 
-    output_file: *mut FILE,   /* if using XML_SCHEMATRON_OUT_FILE */
-    output_buffer: XmlBufPtr, /* if using XML_SCHEMATRON_OUT_BUFFER */
+    output_file: *mut FILE, /* if using XML_SCHEMATRON_OUT_FILE */
+    output_buffer: Vec<u8>, /* if using XML_SCHEMATRON_OUT_BUFFER */
     #[cfg(feature = "libxml_output")]
     iowrite: Option<XmlOutputWriteCallback>, /* if using XML_SCHEMATRON_OUT_IO */
     #[cfg(feature = "libxml_output")]
@@ -202,6 +201,29 @@ pub struct XmlSchematronValidCtxt {
     error: Option<GenericError>,            /* the callback in case of errors */
     warning: Option<XmlSchematronValidityWarningFunc>, /* callback in case of warning */
     serror: Option<StructuredError>,        /* the structured function */
+}
+
+impl Default for XmlSchematronValidCtxt {
+    fn default() -> Self {
+        Self {
+            typ: 0,
+            flags: 0,
+            dict: null_mut(),
+            nberrors: 0,
+            err: 0,
+            schema: null_mut(),
+            xctxt: null_mut(),
+            output_file: null_mut(),
+            output_buffer: vec![],
+            iowrite: None,
+            ioclose: None,
+            ioctx: null_mut(),
+            user_data: None,
+            error: None,
+            warning: None,
+            serror: None,
+        }
+    }
 }
 
 pub type XmlSchematronParserCtxtPtr = *mut XmlSchematronParserCtxt;
@@ -1354,7 +1376,7 @@ pub unsafe fn xml_schematron_new_valid_ctxt(
         xml_schematron_verr_memory(null_mut(), "allocating validation context", null_mut());
         return null_mut();
     }
-    memset(ret as _, 0, size_of::<XmlSchematronValidCtxt>());
+    std::ptr::write(&mut *ret, XmlSchematronValidCtxt::default());
     (*ret).typ = XML_STRON_CTXT_VALIDATOR;
     (*ret).schema = schema;
     (*ret).xctxt = xml_xpath_new_context(null_mut());
