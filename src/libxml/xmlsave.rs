@@ -33,6 +33,8 @@ use std::{
 
 use libc::memset;
 
+#[cfg(feature = "html")]
+use crate::tree::XmlNode;
 use crate::{
     buf::{libxml_api::xml_buf_set_allocation_scheme, XmlBufRef},
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
@@ -912,95 +914,39 @@ const XHTML_NS_NAME: &str = "http://www.w3.org/1999/xhtml";
 
 /// Check if a node is an empty xhtml node
 ///
-/// Returns 1 if the node is an empty node, 0 if not and -1 in case of error
+/// Returns `true` if the node is an empty node, `false`.
 #[doc(alias = "xhtmlIsEmpty")]
 #[cfg(feature = "html")]
-unsafe fn xhtml_is_empty(node: XmlNodePtr) -> i32 {
-    if node.is_null() {
-        return -1;
+unsafe fn xhtml_is_empty(node: &XmlNode) -> bool {
+    if !matches!(node.element_type(), XmlElementType::XmlElementNode) {
+        return false;
     }
-    if !matches!((*node).element_type(), XmlElementType::XmlElementNode) {
-        return 0;
+    if !node.ns.is_null() && (*node.ns).href().as_deref() != Some(XHTML_NS_NAME) {
+        return false;
     }
-    {
-        let str2 = CString::new(XHTML_NS_NAME).unwrap();
-        if !(*node).ns.is_null() && !xml_str_equal((*(*node).ns).href, str2.as_ptr() as _) {
-            return 0;
-        }
+    if node.children().is_some() {
+        return false;
     }
-    if (*node).children().is_some() {
-        return 0;
-    }
-    match *(*node).name.add(0) {
-        b'a' => {
-            if xml_str_equal((*node).name, c"area".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
+    match *node.name.add(0) {
+        b'a' => node.name().as_deref() == Some("area"),
         b'b' => {
-            if xml_str_equal((*node).name, c"br".as_ptr() as _) {
-                return 1;
-            }
-            if xml_str_equal((*node).name, c"base".as_ptr() as _) {
-                return 1;
-            }
-            if xml_str_equal((*node).name, c"basefont".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
+            node.name().as_deref() == Some("br")
+                || node.name().as_deref() == Some("base")
+                || node.name().as_deref() == Some("basefont")
         }
-        b'c' => {
-            if xml_str_equal((*node).name, c"col".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
-        b'f' => {
-            if xml_str_equal((*node).name, c"frame".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
-        b'h' => {
-            if xml_str_equal((*node).name, c"hr".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
+        b'c' => node.name().as_deref() == Some("col"),
+        b'f' => node.name().as_deref() == Some("frame"),
+        b'h' => node.name().as_deref() == Some("hr"),
         b'i' => {
-            if xml_str_equal((*node).name, c"img".as_ptr() as _) {
-                return 1;
-            }
-            if xml_str_equal((*node).name, c"input".as_ptr() as _) {
-                return 1;
-            }
-            if xml_str_equal((*node).name, c"isindex".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
+            node.name().as_deref() == Some("img")
+                || node.name().as_deref() == Some("input")
+                || node.name().as_deref() == Some("isindex")
         }
-        b'l' => {
-            if xml_str_equal((*node).name, c"link".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
-        b'm' => {
-            if xml_str_equal((*node).name, c"meta".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
-        b'p' => {
-            if xml_str_equal((*node).name, c"param".as_ptr() as _) {
-                return 1;
-            }
-            return 0;
-        }
-        _ => {}
+        b'l' => node.name().as_deref() == Some("link"),
+        b'm' => node.name().as_deref() == Some("meta"),
+        b'p' => node.name().as_deref() == Some("param"),
+        _ => false,
     }
-    0
 }
 
 /// Dump an XHTML node, recursive behaviour, children are printed too.
@@ -1200,7 +1146,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlNo
                     cur = children.as_ptr();
                     continue;
                 } else if ((*cur).ns.is_null() || (*(*cur).ns).prefix().is_none())
-                    && (xhtml_is_empty(cur) == 1 && addmeta == 0)
+                    && (xhtml_is_empty(&*cur) && addmeta == 0)
                 {
                     // C.2. Empty Elements
                     (*ctxt).buf.borrow_mut().write_bytes(b" />");
