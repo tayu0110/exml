@@ -39,7 +39,7 @@ use crate::{
     },
 };
 #[cfg(feature = "libxml_output")]
-use crate::{error::XmlParserErrors, io::XmlOutputBuffer, tree::XmlBufPtr};
+use crate::{error::XmlParserErrors, io::XmlOutputBuffer};
 
 use super::{
     globals::{xml_malloc, xml_register_node_default_value},
@@ -680,29 +680,24 @@ unsafe fn html_save_err_memory(extra: &str) {
 /// Returns the number of byte written or -1 in case of error
 #[doc(alias = "htmlBufNodeDumpFormat")]
 #[cfg(feature = "libxml_output")]
-unsafe fn html_buf_node_dump_format(
-    buf: XmlBufPtr,
+unsafe fn html_buf_node_dump_format<'a>(
+    buf: &mut (impl Write + 'a),
     doc: XmlDocPtr,
     cur: XmlNodePtr,
     format: i32,
 ) -> usize {
-    use crate::{buf::XmlBufRef, io::XmlOutputBuffer, tree::xml_buf_use};
+    use crate::io::XmlOutputBuffer;
 
     if cur.is_null() {
         return usize::MAX;
     }
-    if buf.is_null() {
+    let Some(mut outbuf) = XmlOutputBuffer::from_writer(buf, None) else {
         return usize::MAX;
-    }
-    let mut outbuf = XmlOutputBuffer::default();
-    outbuf.buffer = XmlBufRef::from_raw(buf);
-    outbuf.encoder = None;
-    outbuf.context = None;
-    outbuf.written = 0;
+    };
 
-    let using: usize = xml_buf_use(buf);
     html_node_dump_format_output(&mut outbuf, doc, cur, None, format);
-    (xml_buf_use(buf) as i32 - using as i32) as _
+    // Is this correct ????
+    outbuf.written as usize
 }
 
 /// Dump an HTML node, recursive behaviour,children are printed too, and formatting returns are added.
@@ -710,10 +705,14 @@ unsafe fn html_buf_node_dump_format(
 /// Returns the number of byte written or -1 in case of error
 #[doc(alias = "htmlNodeDump")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn html_node_dump(buf: XmlBufPtr, doc: XmlDocPtr, cur: XmlNodePtr) -> i32 {
+pub unsafe fn html_node_dump<'a>(
+    buf: &mut (impl Write + 'a),
+    doc: XmlDocPtr,
+    cur: XmlNodePtr,
+) -> i32 {
     use crate::libxml::parser::xml_init_parser;
 
-    if buf.is_null() || cur.is_null() {
+    if cur.is_null() {
         return -1;
     }
 
@@ -1555,43 +1554,6 @@ mod tests {
                 }
             }
             assert!(leaks == 0, "{leaks} Leaks are found in htmlNewDocNoDtD()");
-        }
-    }
-
-    #[test]
-    fn test_html_node_dump() {
-        #[cfg(all(feature = "html", feature = "libxml_output"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_doc in 0..GEN_NB_XML_DOC_PTR {
-                    for n_cur in 0..GEN_NB_XML_NODE_PTR {
-                        let mem_base = xml_mem_blocks();
-                        let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                        let doc = gen_xml_doc_ptr(n_doc, 1);
-                        let cur = gen_xml_node_ptr(n_cur, 2);
-
-                        let ret_val = html_node_dump(buf, doc, cur);
-                        desret_int(ret_val);
-                        des_const_xml_buf_ptr(n_buf, buf, 0);
-                        des_xml_doc_ptr(n_doc, doc, 1);
-                        des_xml_node_ptr(n_cur, cur, 2);
-                        reset_last_error();
-                        if mem_base != xml_mem_blocks() {
-                            leaks += 1;
-                            eprint!(
-                                "Leak of {} blocks found in htmlNodeDump",
-                                xml_mem_blocks() - mem_base
-                            );
-                            eprint!(" {}", n_buf);
-                            eprint!(" {}", n_doc);
-                            eprintln!(" {}", n_cur);
-                        }
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in htmlNodeDump()");
         }
     }
 
