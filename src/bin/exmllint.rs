@@ -75,7 +75,7 @@ use exml::{
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
-        xmlsave::{xml_save_to_filename, xml_save_to_io, XmlSaveOption},
+        xmlsave::{XmlSaveCtxt, XmlSaveOption},
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
             xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parse,
@@ -3038,18 +3038,17 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
 
                 let encoding = CMD_ARGS.encode.as_deref();
                 let ctxt = if let Some(o) = CMD_ARGS.output.as_deref() {
-                    xml_save_to_filename(o, encoding, save_opts)
+                    XmlSaveCtxt::save_to_filename(o, encoding, save_opts)
                 } else {
-                    xml_save_to_io(stdout(), encoding, save_opts)
+                    XmlSaveCtxt::save_to_io(stdout(), encoding, save_opts)
                 };
 
-                if !ctxt.is_null() {
-                    if (*ctxt).save_doc(doc) < 0 {
+                if let Some(mut ctxt) = ctxt {
+                    if ctxt.save_doc(doc) < 0 {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
                         eprintln!("failed save to {o}");
                         PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
-                    (*ctxt).close();
                 } else {
                     PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                 }

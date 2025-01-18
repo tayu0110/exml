@@ -23,15 +23,12 @@ use std::{
     cell::RefCell,
     ffi::{CStr, CString},
     io::Write,
-    mem::size_of,
     os::raw::c_void,
     ptr::{null, null_mut},
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8_unchecked,
 };
-
-use libc::memset;
 
 #[cfg(feature = "html")]
 use crate::tree::XmlNode;
@@ -42,7 +39,6 @@ use crate::{
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::XmlOutputBuffer,
     libxml::{
-        globals::{xml_free, xml_malloc},
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
         },
@@ -98,6 +94,81 @@ pub struct XmlSaveCtxt<'a> {
 }
 
 impl<'a> XmlSaveCtxt<'a> {
+    /// Create a new saving context
+    ///
+    /// Returns the new structure or NULL in case of error
+    #[doc(alias = "xmlNewSaveCtxt")]
+    fn new(encoding: Option<&str>, mut options: i32) -> Option<Self> {
+        let mut ret = XmlSaveCtxt::default();
+        if let Some(enc) = encoding {
+            ret.handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
+            if ret.handler.is_none() {
+                unsafe {
+                    xml_save_err(
+                        XmlParserErrors::XmlSaveUnknownEncoding,
+                        null_mut(),
+                        encoding,
+                    );
+                }
+                return None;
+            }
+            ret.encoding = Some(enc.to_owned());
+            ret.escape = None;
+        }
+        ret.init();
+
+        // Use the options
+        // Re-check this option as it may already have been set
+        if ret.options & XmlSaveOption::XmlSaveNoEmpty as i32 != 0
+            && options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0
+        {
+            options |= XmlSaveOption::XmlSaveNoEmpty as i32;
+        }
+
+        ret.options = options;
+        if options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
+            ret.format = 1;
+        } else if options & XmlSaveOption::XmlSaveWsnonsig as i32 != 0 {
+            ret.format = 2;
+        }
+
+        Some(ret)
+    }
+
+    /// Create a document saving context serializing to a filename or possibly
+    /// to an URL (but this is less reliable) with the encoding and the options given.
+    ///
+    /// Returns a new serialization context or NULL in case of error.
+    #[doc(alias = "xmlSaveToFilename")]
+    pub fn save_to_filename<'b: 'a>(
+        filename: &'b str,
+        encoding: Option<&'b str>,
+        options: i32,
+    ) -> Option<Self> {
+        let compression: i32 = 0; /* TODO handle compression option */
+
+        let mut ret = Self::new(encoding, options)?;
+        let buf = XmlOutputBuffer::from_uri(filename, ret.handler.clone(), compression)?;
+        ret.buf = Rc::new(RefCell::new(buf));
+        Some(ret)
+    }
+
+    /// Create a document saving context serializing to a file descriptor
+    /// with the encoding and the options given
+    ///
+    /// Returns a new serialization context or NULL in case of error.
+    #[doc(alias = "xmlSaveToIO")]
+    pub fn save_to_io(
+        ioctx: impl Write + 'a,
+        encoding: Option<&'a str>,
+        options: i32,
+    ) -> Option<Self> {
+        let mut ret = Self::new(encoding, options)?;
+        let buf = XmlOutputBuffer::from_writer_with_wrapped_encoder(ioctx, ret.handler.clone())?;
+        ret.buf = Rc::new(RefCell::new(buf));
+        Some(ret)
+    }
+
     /// Initialize a saving context
     #[doc(alias = "xmlSaveCtxtInit")]
     pub(crate) fn init(&mut self) {
@@ -244,7 +315,7 @@ impl<'a> XmlSaveCtxt<'a> {
     ///
     /// Returns the number of byte written or -1 in case of error.
     #[doc(alias = "xmlSaveFlush")]
-    pub unsafe fn flush(&mut self) -> i32 {
+    pub fn flush(&mut self) -> i32 {
         self.buf.borrow_mut().flush()
     }
 
@@ -253,7 +324,7 @@ impl<'a> XmlSaveCtxt<'a> {
     ///
     /// Returns the number of byte written or -1 in case of error.
     #[doc(alias = "xmlSaveClose")]
-    pub unsafe fn close(&mut self) -> i32 {
+    pub fn close(&mut self) -> i32 {
         self.flush()
     }
 }
@@ -277,6 +348,12 @@ impl Default for XmlSaveCtxt<'_> {
             escape: None,
             escape_attr: None,
         }
+    }
+}
+
+impl Drop for XmlSaveCtxt<'_> {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
@@ -1623,114 +1700,6 @@ pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: &mut XmlSaveCtxt, cur: Xm
     }
     (*cur).encoding = oldenc;
     0
-}
-
-/// Free a saving context, destroying the output in any remaining buffer
-#[doc(alias = "xmlFreeSaveCtxt")]
-unsafe fn xml_free_save_ctxt(ctxt: XmlSaveCtxtPtr) {
-    if ctxt.is_null() {
-        return;
-    }
-    (*ctxt).encoding = None;
-    // does it work ???
-    (*ctxt).buf = Rc::new_uninit().assume_init();
-    xml_free(ctxt as _);
-}
-
-/// Create a new saving context
-///
-/// Returns the new structure or NULL in case of error
-#[doc(alias = "xmlNewSaveCtxt")]
-unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xml_malloc(size_of::<XmlSaveCtxt>()) as _;
-    if ret.is_null() {
-        xml_save_err_memory("creating saving context");
-        return null_mut();
-    }
-    memset(ret as _, 0, size_of::<XmlSaveCtxt>());
-    std::ptr::write(&mut *ret, XmlSaveCtxt::default());
-
-    if let Some(enc) = encoding {
-        (*ret).handler = find_encoding_handler(enc).map(|e| Rc::new(RefCell::new(e)));
-        if (*ret).handler.is_none() {
-            xml_save_err(
-                XmlParserErrors::XmlSaveUnknownEncoding,
-                null_mut(),
-                encoding,
-            );
-            xml_free_save_ctxt(ret);
-            return null_mut();
-        }
-        (*ret).encoding = Some(enc.to_owned());
-        (*ret).escape = None;
-    }
-    (*ret).init();
-
-    // Use the options
-
-    // Re-check this option as it may already have been set
-    if (*ret).options & XmlSaveOption::XmlSaveNoEmpty as i32 != 0
-        && options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0
-    {
-        options |= XmlSaveOption::XmlSaveNoEmpty as i32;
-    }
-
-    (*ret).options = options;
-    if options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-        (*ret).format = 1;
-    } else if options & XmlSaveOption::XmlSaveWsnonsig as i32 != 0 {
-        (*ret).format = 2;
-    }
-
-    ret
-}
-
-/// Create a document saving context serializing to a filename or possibly
-/// to an URL (but this is less reliable) with the encoding and the options given.
-///
-/// Returns a new serialization context or NULL in case of error.
-#[doc(alias = "xmlSaveToFilename")]
-pub unsafe fn xml_save_to_filename<'a, 'b: 'a>(
-    filename: &'b str,
-    encoding: Option<&'b str>,
-    options: i32,
-) -> XmlSaveCtxtPtr<'a> {
-    let compression: i32 = 0; /* TODO handle compression option */
-
-    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
-    if ret.is_null() {
-        return null_mut();
-    }
-    let Some(buf) = XmlOutputBuffer::from_uri(filename, (*ret).handler.clone(), compression) else {
-        xml_free_save_ctxt(ret);
-        return null_mut();
-    };
-    (*ret).buf = Rc::new(RefCell::new(buf));
-    ret
-}
-
-/// Create a document saving context serializing to a file descriptor
-/// with the encoding and the options given
-///
-/// Returns a new serialization context or NULL in case of error.
-#[doc(alias = "xmlSaveToIO")]
-pub unsafe fn xml_save_to_io<'a>(
-    ioctx: impl Write + 'a,
-    encoding: Option<&'a str>,
-    options: i32,
-) -> XmlSaveCtxtPtr {
-    let ret: XmlSaveCtxtPtr = xml_new_save_ctxt(encoding, options);
-    if ret.is_null() {
-        return null_mut();
-    }
-    let Some(buf) =
-        XmlOutputBuffer::from_writer_with_wrapped_encoder(ioctx, (*ret).handler.clone())
-    else {
-        xml_free_save_ctxt(ret);
-        return null_mut();
-    };
-    (*ret).buf = Rc::new(RefCell::new(buf));
-    ret
 }
 
 /// Dump an HTML node, recursive behaviour, children are printed too.

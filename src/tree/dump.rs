@@ -208,13 +208,14 @@ impl XmlDoc {
             level: 0,
             format: (format != 0) as i32,
             encoding,
+            handler: None,
             ..Default::default()
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&mut ctxt as _, self);
 
-        let mut buf = Rc::into_inner(ctxt.buf)
+        let mut buf = Rc::into_inner(ctxt.buf.clone())
             .expect("Internal Error")
             .into_inner();
 
@@ -274,6 +275,7 @@ impl XmlDoc {
             level: 0,
             format: (format != 0) as i32,
             encoding,
+            handler: None,
             ..Default::default()
         };
         ctxt.init();
@@ -281,7 +283,7 @@ impl XmlDoc {
 
         xml_doc_content_dump_output(&mut ctxt as _, self);
 
-        let mut buf = Rc::into_inner(ctxt.buf)
+        let mut buf = Rc::into_inner(ctxt.buf.clone())
             .expect("Internal Error")
             .into_inner();
         if buf.error.is_ok() {
@@ -347,12 +349,13 @@ impl XmlDoc {
             level: 0,
             format: (format != 0) as i32,
             encoding: encoding.map(|e| e.to_owned()),
+            handler: None,
             ..Default::default()
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&mut ctxt as _, self);
-        let mut buf = Rc::into_inner(ctxt.buf)
+        let mut buf = Rc::into_inner(ctxt.buf.clone())
             .expect("Internal Error")
             .into_inner();
         if buf.error.is_ok() {
@@ -380,12 +383,13 @@ impl XmlDoc {
             level: 0,
             format: 0,
             encoding: encoding.map(|e| e.to_owned()),
+            handler: None,
             ..Default::default()
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&mut ctxt as _, self);
-        let mut buf = Rc::into_inner(ctxt.buf)
+        let mut buf = Rc::into_inner(ctxt.buf.clone())
             .expect("Internal Error")
             .into_inner();
         if buf.error.is_ok() {
@@ -422,6 +426,7 @@ impl XmlNode {
             level,
             format: (format != 0) as i32,
             encoding: encoding.map(|e| e.to_owned()),
+            handler: None,
             ..Default::default()
         };
         ctxt.init();
