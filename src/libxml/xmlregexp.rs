@@ -39,7 +39,6 @@ use std::{
 use libc::{memcpy, memset, snprintf, strlen, INT_MAX};
 
 use crate::{
-    buf::libxml_api::{xml_buf_cat, xml_buf_ccat, XmlBufPtr},
     error::{XmlParserErrors, __xml_raise_error},
     libxml::{
         dict::{xml_dict_lookup, XmlDictPtr},
@@ -6844,21 +6843,28 @@ pub unsafe fn xml_exp_subsume(ctxt: XmlExpCtxtPtr, exp: XmlExpNodePtr, sub: XmlE
     0
 }
 
-unsafe fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: i32) {
+#[cfg(feature = "libxml_expr")]
+unsafe fn xml_exp_dump_int<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr, glob: i32) {
     let mut c: XmlExpNodePtr;
 
     if expr.is_null() {
         return;
     }
     if glob != 0 {
-        xml_buf_ccat(buf, c"(".as_ptr());
+        write!(buf, "(");
     }
     if (*expr).typ == XmlExpNodeType::XmlExpEmpty as u8 {
-        xml_buf_ccat(buf, c"empty".as_ptr());
+        write!(buf, "empty");
     } else if (*expr).typ == XmlExpNodeType::XmlExpForbid as u8 {
-        xml_buf_ccat(buf, c"forbidden".as_ptr());
+        write!(buf, "forbidden");
     } else if (*expr).typ == XmlExpNodeType::XmlExpAtom as u8 {
-        xml_buf_cat(buf, (*expr).field.f_str);
+        write!(
+            buf,
+            "{}",
+            CStr::from_ptr((*expr).field.f_str as *const i8)
+                .to_string_lossy()
+                .as_ref()
+        );
     } else if (*expr).typ == XmlExpNodeType::XmlExpSeq as u8 {
         c = (*expr).exp_left;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
@@ -6867,7 +6873,7 @@ unsafe fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: i32) {
         } else {
             xml_exp_dump_int(buf, c, 0);
         }
-        xml_buf_ccat(buf, c" , ".as_ptr());
+        write!(buf, " , ");
         c = (*expr).field.children.f_right;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
         {
@@ -6883,7 +6889,7 @@ unsafe fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: i32) {
         } else {
             xml_exp_dump_int(buf, c, 0);
         }
-        xml_buf_ccat(buf, c" | ".as_ptr());
+        write!(buf, " | ");
         c = (*expr).field.children.f_right;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
         {
@@ -6892,7 +6898,7 @@ unsafe fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: i32) {
             xml_exp_dump_int(buf, c, 0);
         }
     } else if (*expr).typ == XmlExpNodeType::XmlExpCount as u8 {
-        let mut rep: [c_char; 40] = [0; 40];
+        let mut rep: [i8; 40] = [0; 40];
 
         c = (*expr).exp_left;
         if (*c).typ == XmlExpNodeType::XmlExpSeq as u8 || (*c).typ == XmlExpNodeType::XmlExpOr as u8
@@ -6934,20 +6940,20 @@ unsafe fn xml_exp_dump_int(buf: XmlBufPtr, expr: XmlExpNodePtr, glob: i32) {
             );
         }
         rep[39] = 0;
-        xml_buf_ccat(buf, rep.as_ptr());
+        write!(buf, "{}", CStr::from_ptr(rep.as_ptr()).to_string_lossy());
     } else {
         eprintln!("Error in tree");
     }
     if glob != 0 {
-        xml_buf_ccat(buf, c")".as_ptr());
+        write!(buf, ")");
     }
 }
 
 /// Serialize the expression as compiled to the buffer
 #[doc(alias = "xmlExpDump")]
 #[cfg(feature = "libxml_expr")]
-pub unsafe fn xml_exp_dump(buf: XmlBufPtr, expr: XmlExpNodePtr) {
-    if buf.is_null() || expr.is_null() {
+pub unsafe fn xml_exp_dump<'a>(buf: &mut (impl Write + 'a), expr: XmlExpNodePtr) {
+    if expr.is_null() {
         return;
     }
     xml_exp_dump_int(buf, expr, 0);
@@ -7011,43 +7017,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_xml_exp_dump() {
-        #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_expr in 0..GEN_NB_XML_EXP_NODE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let expr = gen_xml_exp_node_ptr(n_expr, 1);
-
-                    xml_exp_dump(buf, expr);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_exp_node_ptr(n_expr, expr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlExpDump",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(leaks == 0, "{leaks} Leaks are found in xmlExpDump()");
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_expr);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_exp_exp_derive() {
-
-        /* missing type support */
     }
 
     #[test]
