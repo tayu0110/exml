@@ -49,7 +49,5 @@ pub mod xmlschemastypes;
 pub mod xmlstring;
 #[cfg(feature = "libxml_unicode")]
 pub mod xmlunicode;
-#[cfg(feature = "libxml_writer")]
-pub mod xmlwriter;
 #[cfg(feature = "xpointer")]
 pub mod xpointer;
