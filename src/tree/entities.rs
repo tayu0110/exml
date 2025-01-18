@@ -34,7 +34,6 @@ use std::{
 use libc::{size_t, snprintf, strchr};
 
 use crate::{
-    buf::libxml_api::{xml_buf_cat, XmlBufPtr},
     error::{
         XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
         __xml_simple_oom_error,
@@ -43,7 +42,7 @@ use crate::{
     libxml::{
         chvalid::xml_is_char,
         globals::{xml_free, xml_malloc},
-        hash::{xml_hash_create, xml_hash_scan, XmlHashTable},
+        hash::{xml_hash_create, XmlHashTable},
         xmlstring::{xml_strchr, xml_strdup, xml_strndup, xml_strstr, XmlChar},
     },
     tree::{
@@ -1251,23 +1250,14 @@ pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityP
     });
 }
 
-/// When using the hash table scan function, arguments need to be reversed
-#[doc(alias = "xmlDumpEntityDeclScan")]
-#[cfg(feature = "libxml_output")]
-extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _name: *const XmlChar) {
-    unsafe {
-        let mut out = vec![];
-        xml_dump_entity_decl(&mut out, ent as XmlEntityPtr);
-        out.push(0);
-        xml_buf_cat(buf as XmlBufPtr, out.as_ptr());
-    }
-}
-
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntitiesTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr) {
-    xml_hash_scan(table, Some(xml_dump_entity_decl_scan), buf as _);
+pub unsafe fn xml_dump_entities_table<'a>(buf: &mut (impl Write + 'a), table: XmlEntitiesTablePtr) {
+    let Some(table) = XmlHashTableRef::from_raw(table) else {
+        return;
+    };
+    table.scan(|data, _, _, _| xml_dump_entity_decl(buf, data.0 as XmlEntityPtr));
 }
 
 /// This will dump the quoted string value, taking care of the special
@@ -1511,40 +1501,6 @@ mod tests {
     use crate::{globals::reset_last_error, libxml::xmlmemory::xml_mem_blocks, test_util::*};
 
     use super::*;
-
-    #[test]
-    fn test_xml_dump_entities_table() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_table in 0..GEN_NB_XML_ENTITIES_TABLE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let table = gen_xml_entities_table_ptr(n_table, 1);
-
-                    xml_dump_entities_table(buf, table);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_entities_table_ptr(n_table, table, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpEntitiesTable",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_table);
-                    }
-                }
-            }
-            assert!(
-                leaks == 0,
-                "{leaks} Leaks are found in xmlDumpEntitiesTable()"
-            );
-        }
-    }
 
     #[test]
     fn test_xml_encode_entities_reentrant() {
