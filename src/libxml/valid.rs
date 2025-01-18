@@ -47,7 +47,6 @@ use crate::libxml::xmlstring::xml_strncmp;
 #[cfg(not(feature = "libxml_regexp"))]
 use crate::tree::xml_free_node_list;
 use crate::{
-    buf::libxml_api::XmlBufPtr,
     error::{XmlParserErrors, __xml_raise_error},
     globals::{GenericError, GenericErrorContext, StructuredError},
     hash::XmlHashTableRef,
@@ -55,7 +54,7 @@ use crate::{
         globals::{xml_free, xml_malloc, xml_realloc},
         hash::{
             xml_hash_add_entry2, xml_hash_copy, xml_hash_free, xml_hash_lookup2,
-            xml_hash_remove_entry2, xml_hash_scan, XmlHashTable,
+            xml_hash_remove_entry2, XmlHashTable,
         },
         parser::XmlParserMode,
         parser_internals::xml_string_current_char,
@@ -1074,33 +1073,17 @@ pub unsafe fn xml_free_element_table(table: XmlElementTablePtr) {
     xml_hash_free(table, Some(xml_free_element_table_entry));
 }
 
-/// This routine is used by the hash scan function.  
-/// It just reverses the arguments.
-#[doc(alias = "xmlDumpElementDeclScan")]
-#[cfg(feature = "libxml_output")]
-extern "C" fn xml_dump_element_decl_scan(
-    elem: *mut c_void,
-    buf: *mut c_void,
-    _name: *const XmlChar,
-) {
-    use crate::tree::xml_buf_cat;
-
-    unsafe {
-        let mut out = vec![];
-        xml_dump_element_decl(&mut out, elem as XmlElementPtr);
-        out.push(0);
-        xml_buf_cat(buf as XmlBufPtr, out.as_ptr());
-    }
-}
-
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElementTablePtr) {
-    if buf.is_null() || table.is_null() {
+pub unsafe fn xml_dump_element_table<'a>(buf: &mut (impl Write + 'a), table: XmlElementTablePtr) {
+    if table.is_null() {
         return;
     }
-    xml_hash_scan(table, Some(xml_dump_element_decl_scan), buf as _);
+    let Some(table) = XmlHashTableRef::from_raw(table) else {
+        return;
+    };
+    table.scan(|data, _, _, _| xml_dump_element_decl(buf, data.0 as XmlElementPtr));
 }
 
 /// Dump the occurrence operator of an element.
@@ -2064,31 +2047,20 @@ pub unsafe fn xml_free_attribute_table(mut table: XmlHashTable<'static, *mut Xml
     });
 }
 
-/// This is used with the hash scan function - just reverses arguments
-#[doc(alias = "xmlDumpAttributeDeclScan")]
-#[cfg(feature = "libxml_output")]
-extern "C" fn xml_dump_attribute_decl_scan(
-    attr: *mut c_void,
-    buf: *mut c_void,
-    _name: *const XmlChar,
-) {
-    use crate::tree::xml_buf_cat;
-
-    unsafe {
-        let mut out = vec![];
-        xml_dump_attribute_decl(&mut out, attr as XmlAttributePtr);
-        xml_buf_cat(buf as XmlBufPtr, out.as_ptr());
-    }
-}
-
 /// This will dump the content of the attribute table as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeTable")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttributeTablePtr) {
-    if buf.is_null() || table.is_null() {
+pub unsafe fn xml_dump_attribute_table<'a>(
+    buf: &mut (impl Write + 'a),
+    table: XmlAttributeTablePtr,
+) {
+    if table.is_null() {
         return;
     }
-    xml_hash_scan(table, Some(xml_dump_attribute_decl_scan), buf as _);
+    let Some(table) = XmlHashTableRef::from_raw(table) else {
+        return;
+    };
+    table.scan(|data, _, _, _| xml_dump_attribute_decl(buf, data.0 as XmlAttributePtr));
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
@@ -7667,74 +7639,6 @@ mod tests {
                         "{leaks} Leaks are found in xmlCopyElementContent()"
                     );
                     eprintln!(" {}", n_cur);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_dump_attribute_table() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_table in 0..GEN_NB_XML_ATTRIBUTE_TABLE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let table = gen_xml_attribute_table_ptr(n_table, 1);
-
-                    xml_dump_attribute_table(buf, table);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_attribute_table_ptr(n_table, table, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpAttributeTable",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDumpAttributeTable()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_table);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_dump_element_table() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_table in 0..GEN_NB_XML_ELEMENT_TABLE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let table = gen_xml_element_table_ptr(n_table, 1);
-
-                    xml_dump_element_table(buf, table);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_element_table_ptr(n_table, table, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpElementTable",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDumpElementTable()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_table);
-                    }
                 }
             }
         }
