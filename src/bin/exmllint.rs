@@ -75,9 +75,7 @@ use exml::{
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
-        xmlsave::{
-            xml_save_close, xml_save_doc, xml_save_to_filename, xml_save_to_io, XmlSaveOption,
-        },
+        xmlsave::{xml_save_to_filename, xml_save_to_io, XmlSaveOption},
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
             xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parse,
@@ -3046,12 +3044,12 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 };
 
                 if !ctxt.is_null() {
-                    if xml_save_doc(ctxt, doc) < 0 {
+                    if (*ctxt).save_doc(doc) < 0 {
                         let o = CMD_ARGS.output.as_deref().unwrap_or("-");
                         eprintln!("failed save to {o}");
                         PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                     }
-                    xml_save_close(ctxt);
+                    (*ctxt).close();
                 } else {
                     PROGRESULT.store(ERR_OUT, Ordering::Relaxed);
                 }

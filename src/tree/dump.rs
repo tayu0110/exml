@@ -109,7 +109,7 @@ impl XmlDoc {
         ctxt.encoding = encoding;
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&raw mut ctxt, self);
+        xml_doc_content_dump_output(&mut ctxt, self);
         out_buff.borrow_mut().flush();
         if let Some(conv) = out_buff.borrow().conv {
             *doc_txt_len = conv.len() as i32;
@@ -212,7 +212,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+        xml_doc_content_dump_output(&mut ctxt as _, self);
 
         let mut buf = Rc::into_inner(ctxt.buf)
             .expect("Internal Error")
@@ -279,7 +279,7 @@ impl XmlDoc {
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
-        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+        xml_doc_content_dump_output(&mut ctxt as _, self);
 
         let mut buf = Rc::into_inner(ctxt.buf)
             .expect("Internal Error")
@@ -351,7 +351,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+        xml_doc_content_dump_output(&mut ctxt as _, self);
         let mut buf = Rc::into_inner(ctxt.buf)
             .expect("Internal Error")
             .into_inner();
@@ -384,7 +384,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&raw mut ctxt as _, self);
+        xml_doc_content_dump_output(&mut ctxt as _, self);
         let mut buf = Rc::into_inner(ctxt.buf)
             .expect("Internal Error")
             .into_inner();
@@ -440,9 +440,9 @@ impl XmlNode {
             }
 
             if is_html {
-                xhtml_node_dump_output(&raw mut ctxt as _, self);
+                xhtml_node_dump_output(&mut ctxt, self);
             } else {
-                xml_node_dump_output_internal(&raw mut ctxt as _, self);
+                xml_node_dump_output_internal(&mut ctxt as _, self);
             }
         }
         #[cfg(not(feature = "html"))]
