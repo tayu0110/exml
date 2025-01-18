@@ -56,18 +56,18 @@ pub type XmlOutputMatchCallback = unsafe fn(filename: &str) -> i32;
 ///
 /// Returns an Output context or NULL in case or error
 #[doc(alias = "xmlOutputOpenCallback")]
-pub type XmlOutputOpenCallback = unsafe extern "C" fn(filename: *const i8) -> *mut c_void;
+pub type XmlOutputOpenCallback = unsafe fn(filename: *const i8) -> *mut c_void;
 /// Callback used in the I/O Output API to write to the resource
 ///
 /// Returns the number of bytes written or -1 in case of error
 #[doc(alias = "xmlOutputWriteCallback")]
 pub type XmlOutputWriteCallback =
-    unsafe extern "C" fn(context: *mut c_void, buffer: *const i8, len: i32) -> i32;
+    unsafe fn(context: *mut c_void, buffer: *const i8, len: i32) -> i32;
 /// Callback used in the I/O Output API to close the resource
 ///
 /// Returns 0 or -1 in case of error
 #[doc(alias = "xmlOutputCloseCallback")]
-pub type XmlOutputCloseCallback = unsafe extern "C" fn(context: *mut c_void) -> i32;
+pub type XmlOutputCloseCallback = unsafe fn(context: *mut c_void) -> i32;
 
 #[repr(C)]
 #[derive(Default)]
@@ -107,12 +107,10 @@ impl<'a> XmlOutputBuffer<'a> {
         let ret = loop {
             let mut written = out.avail();
 
-            /*
-             * First specific handling of the initialization call
-             */
+            // First specific handling of the initialization call
             if init {
                 let c_out = written;
-                /* TODO: Check return value. */
+                // TODO: Check return value.
                 let mut dst = vec![0; c_out];
                 return match encoder.encode("", &mut dst) {
                     Ok((_, write)) => {
@@ -131,9 +129,7 @@ impl<'a> XmlOutputBuffer<'a> {
                 };
             }
 
-            /*
-             * Conversion itself.
-             */
+            // Conversion itself.
             let mut toconv = bufin.len();
             if toconv == 0 {
                 return Ok(writtentot);
@@ -306,7 +302,8 @@ impl<'a> XmlOutputBuffer<'a> {
     /// Returns the number of chars immediately written, or -1 in case of error.
     #[doc(alias = "xmlOutputBufferWrite")]
     pub fn write_bytes(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut written = 0; /* number of c_char written to I/O so far */
+        // number of c_char written to I/O so far
+        let mut written = 0;
 
         if !self.error.is_ok() {
             return Err(io::Error::other("Buffer already has an error."));
@@ -595,6 +592,20 @@ impl<'a> XmlOutputBuffer<'a> {
     #[doc(alias = "xmlOutputBufferGetSize")]
     pub fn get_buffer_size(&self) -> usize {
         self.buffer.map_or(0, |buf| buf.len())
+    }
+}
+
+impl Write for XmlOutputBuffer<'_> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.write_bytes(buf).map(|_| buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.flush() < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
     }
 }
 

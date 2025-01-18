@@ -26,6 +26,8 @@ mod output;
 
 #[cfg(feature = "ftp")]
 use std::ffi::{c_char, c_void};
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     borrow::Cow,
     env::current_dir,
@@ -269,6 +271,30 @@ pub(crate) unsafe fn __xml_ioerr(
 #[doc(alias = "xmlIOErr")]
 unsafe fn xml_ioerr(code: XmlParserErrors, extra: Option<&str>) {
     __xml_ioerr(XmlErrorDomain::XmlFromIO, code, extra);
+}
+
+#[cfg(feature = "libxml_output")]
+pub(crate) fn write_quoted<'a>(out: &mut (impl Write + 'a), s: &str) -> std::io::Result<()> {
+    if s.contains('"') {
+        if s.contains('\'') {
+            // If `s` contains both single and double-quote, quote with double-quote
+            // and escape inner double-quotes
+            write!(out, "\"")?;
+            let mut split = s.split('"');
+            write!(out, "{}", split.next().unwrap())?;
+            for chunk in split {
+                write!(out, "&quot;{chunk}")?;
+            }
+            write!(out, "\"")?;
+        } else {
+            // If `s` contains only double-quote, quote with single-quote
+            write!(out, "'{s}'")?;
+        }
+    } else {
+        // If `s` does not contain double-quotes, quote with double-quote
+        write!(out, "\"{s}\"")?;
+    }
+    Ok(())
 }
 
 const MINLEN: usize = 4000;

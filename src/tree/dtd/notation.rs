@@ -47,28 +47,7 @@ impl XmlNotation {
 #[doc(alias = "xmlDumpNotationDecl")]
 #[cfg(feature = "libxml_output")]
 pub fn xml_dump_notation_decl<'a>(out: &mut (impl Write + 'a), nota: &XmlNotation) {
-    fn write_quoted<'a>(out: &mut (impl Write + 'a), s: &str) -> std::io::Result<()> {
-        if s.contains('"') {
-            if s.contains('\'') {
-                // If `s` contains both single and double-quote, quote with double-quote
-                // and escape inner double-quotes
-                write!(out, "\"")?;
-                let mut split = s.split('"');
-                write!(out, "{}", split.next().unwrap())?;
-                for chunk in split {
-                    write!(out, "&quot;{chunk}")?;
-                }
-                write!(out, "\"")?;
-            } else {
-                // If `s` contains only double-quote, quote with single-quote
-                write!(out, "'{s}'")?;
-            }
-        } else {
-            // If `s` does not contain double-quotes, quote with double-quote
-            write!(out, "\"{s}\"")?;
-        }
-        Ok(())
-    }
+    use crate::io::write_quoted;
 
     write!(out, "<!NOTATION {}", nota.name).ok();
     if let Some(public_id) = nota.public_id.as_deref() {

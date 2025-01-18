@@ -1083,8 +1083,13 @@ extern "C" fn xml_dump_element_decl_scan(
     buf: *mut c_void,
     _name: *const XmlChar,
 ) {
+    use crate::tree::xml_buf_cat;
+
     unsafe {
-        xml_dump_element_decl(buf as XmlBufPtr, elem as XmlElementPtr);
+        let mut out = vec![];
+        xml_dump_element_decl(&mut out, elem as XmlElementPtr);
+        out.push(0);
+        xml_buf_cat(buf as XmlBufPtr, out.as_ptr());
     }
 }
 
@@ -1101,19 +1106,17 @@ pub unsafe fn xml_dump_element_table(buf: XmlBufPtr, table: XmlElementTablePtr) 
 /// Dump the occurrence operator of an element.
 #[doc(alias = "xmlDumpElementOccur")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementContentPtr) {
-    use crate::buf::libxml_api::xml_buf_ccat;
-
+unsafe fn xml_dump_element_occur<'a>(buf: &mut (impl Write + 'a), cur: XmlElementContentPtr) {
     match (*cur).ocur {
         XmlElementContentOccur::XmlElementContentOnce => {}
         XmlElementContentOccur::XmlElementContentOpt => {
-            xml_buf_ccat(buf, c"?".as_ptr() as _);
+            write!(buf, "?");
         }
         XmlElementContentOccur::XmlElementContentMult => {
-            xml_buf_ccat(buf, c"*".as_ptr() as _);
+            write!(buf, "*");
         }
         XmlElementContentOccur::XmlElementContentPlus => {
-            xml_buf_ccat(buf, c"+".as_ptr() as _);
+            write!(buf, "+");
         }
     }
 }
@@ -1121,17 +1124,13 @@ unsafe fn xml_dump_element_occur(buf: XmlBufPtr, cur: XmlElementContentPtr) {
 /// This will dump the content of the element table as an XML DTD definition
 #[doc(alias = "xmlDumpElementContent")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr) {
-    use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
-
-    let mut cur: XmlElementContentPtr;
-
+unsafe fn xml_dump_element_content<'a>(buf: &mut (impl Write + 'a), content: XmlElementContentPtr) {
     if content.is_null() {
         return;
     }
 
-    xml_buf_ccat(buf, c"(".as_ptr() as _);
-    cur = content;
+    write!(buf, "(");
+    let mut cur = content;
 
     while {
         'to_continue: {
@@ -1141,14 +1140,25 @@ unsafe fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr
 
             match (*cur).typ {
                 XmlElementContentType::XmlElementContentPCDATA => {
-                    xml_buf_ccat(buf, c"#PCDATA".as_ptr() as _);
+                    write!(buf, "#PCDATA");
                 }
                 XmlElementContentType::XmlElementContentElement => {
                     if !(*cur).prefix.is_null() {
-                        xml_buf_cat(buf, (*cur).prefix);
-                        xml_buf_ccat(buf, c":".as_ptr() as _);
+                        write!(
+                            buf,
+                            "{}:",
+                            CStr::from_ptr((*cur).prefix as *const i8)
+                                .to_string_lossy()
+                                .as_ref()
+                        );
                     }
-                    xml_buf_cat(buf, (*cur).name);
+                    write!(
+                        buf,
+                        "{}",
+                        CStr::from_ptr((*cur).name as *const i8)
+                            .to_string_lossy()
+                            .as_ref(),
+                    );
                 }
                 XmlElementContentType::XmlElementContentSeq
                 | XmlElementContentType::XmlElementContentOr => {
@@ -1160,7 +1170,7 @@ unsafe fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr
                                 XmlElementContentOccur::XmlElementContentOnce
                             ))
                     {
-                        xml_buf_ccat(buf, c"(".as_ptr() as _);
+                        write!(buf, "(");
                     }
                     cur = (*cur).c1;
                     break 'to_continue;
@@ -1188,15 +1198,15 @@ unsafe fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr
                 ) && ((*cur).typ != (*parent).typ
                     || !matches!((*cur).ocur, XmlElementContentOccur::XmlElementContentOnce))
                 {
-                    xml_buf_ccat(buf, c")".as_ptr() as _);
+                    write!(buf, ")");
                 }
                 xml_dump_element_occur(buf, cur);
 
                 if cur == (*parent).c1 {
                     if (*parent).typ == XmlElementContentType::XmlElementContentSeq {
-                        xml_buf_ccat(buf, c" , ".as_ptr() as _);
+                        write!(buf, " , ");
                     } else if (*parent).typ == XmlElementContentType::XmlElementContentOr {
-                        xml_buf_ccat(buf, c" | ".as_ptr() as _);
+                        write!(buf, " | ");
                     }
 
                     cur = (*parent).c2;
@@ -1209,81 +1219,50 @@ unsafe fn xml_dump_element_content(buf: XmlBufPtr, content: XmlElementContentPtr
         cur != content
     } {}
 
-    xml_buf_ccat(buf, c")".as_ptr() as _);
+    write!(buf, ")");
     xml_dump_element_occur(buf, content);
 }
 
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlDumpElementDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
-    use std::ffi::CString;
-
-    use crate::buf::libxml_api::{xml_buf_cat, xml_buf_ccat};
-
-    if buf.is_null() || elem.is_null() {
+pub unsafe fn xml_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
+    if elem.is_null() {
         return;
     }
-    let name = (*elem)
-        .name
-        .as_ref()
-        .map(|n| CString::new(n.as_str()).unwrap());
+    let name = (*elem).name.as_deref().unwrap();
     match (*elem).etype {
         XmlElementTypeVal::XmlElementTypeEmpty => {
-            xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
+            write!(buf, "<!ELEMENT ");
             if let Some(prefix) = (*elem).prefix.as_deref() {
-                let prefix = CString::new(prefix).unwrap();
-                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
-                xml_buf_ccat(buf, c":".as_ptr() as _);
+                write!(buf, "{prefix}:");
             }
-            xml_buf_cat(
-                buf,
-                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-            );
-            xml_buf_ccat(buf, c" EMPTY>\n".as_ptr() as _);
+            writeln!(buf, "{} EMPTY>", name);
         }
         XmlElementTypeVal::XmlElementTypeAny => {
-            xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
+            write!(buf, "<!ELEMENT ");
             if let Some(prefix) = (*elem).prefix.as_deref() {
-                let prefix = CString::new(prefix).unwrap();
-                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
-                xml_buf_ccat(buf, c":".as_ptr() as _);
+                write!(buf, "{prefix}:");
             }
-            xml_buf_cat(
-                buf,
-                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-            );
-            xml_buf_ccat(buf, c" ANY>\n".as_ptr() as _);
+            writeln!(buf, "{} ANY>", name);
         }
         XmlElementTypeVal::XmlElementTypeMixed => {
-            xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
+            write!(buf, "<!ELEMENT ");
             if let Some(prefix) = (*elem).prefix.as_deref() {
-                let prefix = CString::new(prefix).unwrap();
-                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
-                xml_buf_ccat(buf, c":".as_ptr() as _);
+                write!(buf, "{prefix}:");
             }
-            xml_buf_cat(
-                buf,
-                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-            );
-            xml_buf_ccat(buf, c" ".as_ptr() as _);
+            write!(buf, "{} ", name);
             xml_dump_element_content(buf, (*elem).content);
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">",);
         }
         XmlElementTypeVal::XmlElementTypeElement => {
-            xml_buf_ccat(buf, c"<!ELEMENT ".as_ptr() as _);
+            write!(buf, "<!ELEMENT ");
             if let Some(prefix) = (*elem).prefix.as_deref() {
-                let prefix = CString::new(prefix).unwrap();
-                xml_buf_cat(buf, prefix.as_ptr() as *const u8);
-                xml_buf_ccat(buf, c":".as_ptr() as _);
+                write!(buf, "{prefix}:");
             }
-            xml_buf_cat(
-                buf,
-                name.as_ref().map_or(null(), |n| n.as_ptr() as *const u8),
-            );
-            xml_buf_ccat(buf, c" ".as_ptr() as _);
+            write!(buf, "{} ", name);
             xml_dump_element_content(buf, (*elem).content);
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">",);
         }
         _ => {
             xml_err_valid!(
@@ -2093,8 +2072,12 @@ extern "C" fn xml_dump_attribute_decl_scan(
     buf: *mut c_void,
     _name: *const XmlChar,
 ) {
+    use crate::tree::xml_buf_cat;
+
     unsafe {
-        xml_dump_attribute_decl(buf as XmlBufPtr, attr as XmlAttributePtr);
+        let mut out = vec![];
+        xml_dump_attribute_decl(&mut out, attr as XmlAttributePtr);
+        xml_buf_cat(buf as XmlBufPtr, out.as_ptr());
     }
 }
 
@@ -2111,99 +2094,56 @@ pub unsafe fn xml_dump_attribute_table(buf: XmlBufPtr, table: XmlAttributeTableP
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlDumpAttributeDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
-    use crate::{
-        buf::libxml_api::{xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string},
-        tree::xml_dump_enumeration,
-    };
+pub unsafe fn xml_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
+    use crate::{io::write_quoted, tree::xml_dump_enumeration};
 
-    if buf.is_null() || attr.is_null() {
+    if attr.is_null() {
         return;
     }
-    xml_buf_ccat(buf, c"<!ATTLIST ".as_ptr() as _);
-    let elem = (*attr).elem.as_deref().map(|e| CString::new(e).unwrap());
-    xml_buf_cat(
-        buf,
-        elem.as_ref().map_or(null(), |e| e.as_ptr() as *const u8),
-    );
-    xml_buf_ccat(buf, c" ".as_ptr() as _);
+    write!(buf, "<!ATTLIST ");
+    let elem = (*attr).elem.as_deref().unwrap();
+    write!(buf, "{elem}");
+    write!(buf, " ");
     if let Some(prefix) = (*attr).prefix.as_deref() {
-        let prefix = CString::new(prefix).unwrap();
-        xml_buf_cat(buf, prefix.as_ptr() as *const u8);
-        xml_buf_ccat(buf, c":".as_ptr() as _);
+        write!(buf, "{}:", prefix);
     }
-    xml_buf_cat(buf, (*attr).name);
+    write!(buf, "{}", (*attr).name().unwrap());
     match (*attr).atype {
-        XmlAttributeType::XmlAttributeCDATA => {
-            xml_buf_ccat(buf, c" CDATA".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeID => {
-            xml_buf_ccat(buf, c" ID".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeIDREF => {
-            xml_buf_ccat(buf, c" IDREF".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeIDREFS => {
-            xml_buf_ccat(buf, c" IDREFS".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeEntity => {
-            xml_buf_ccat(buf, c" ENTITY".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeEntities => {
-            xml_buf_ccat(buf, c" ENTITIES".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeNmtoken => {
-            xml_buf_ccat(buf, c" NMTOKEN".as_ptr() as _);
-        }
-        XmlAttributeType::XmlAttributeNmtokens => {
-            xml_buf_ccat(buf, c" NMTOKENS".as_ptr() as _);
-        }
+        XmlAttributeType::XmlAttributeCDATA => write!(buf, " CDATA").ok(),
+        XmlAttributeType::XmlAttributeID => write!(buf, " ID").ok(),
+        XmlAttributeType::XmlAttributeIDREF => write!(buf, " IDREF").ok(),
+        XmlAttributeType::XmlAttributeIDREFS => write!(buf, " IDREFS").ok(),
+        XmlAttributeType::XmlAttributeEntity => write!(buf, " ENTITY").ok(),
+        XmlAttributeType::XmlAttributeEntities => write!(buf, " ENTITIES").ok(),
+        XmlAttributeType::XmlAttributeNmtoken => write!(buf, " NMTOKEN").ok(),
+        XmlAttributeType::XmlAttributeNmtokens => write!(buf, " NMTOKENS").ok(),
         XmlAttributeType::XmlAttributeEnumeration => {
-            xml_buf_ccat(buf, c" (".as_ptr() as _);
-            let mut out = vec![];
-            xml_dump_enumeration(&mut out, (*attr).tree.as_deref().unwrap());
-            out.push(0);
-            xml_buf_cat(buf, out.as_ptr());
+            write!(buf, " (");
+            xml_dump_enumeration(buf, (*attr).tree.as_deref().unwrap());
+            Some(())
         }
         XmlAttributeType::XmlAttributeNotation => {
-            xml_buf_ccat(buf, c" NOTATION (".as_ptr() as _);
-            let mut out = vec![];
-            xml_dump_enumeration(&mut out, (*attr).tree.as_deref().unwrap());
-            out.push(0);
-            xml_buf_cat(buf, out.as_ptr());
-        } // _ => {
-          //     xml_err_valid!(
-          //         null_mut(),
-          //         XmlParserErrors::XmlErrInternalError,
-          //         c"Internal: ATTRIBUTE struct corrupted invalid type\n".as_ptr() as _,
-          //         null_mut(),
-          //     );
-          // }
-    }
+            write!(buf, " NOTATION (");
+            xml_dump_enumeration(buf, (*attr).tree.as_deref().unwrap());
+            Some(())
+        }
+    };
     match (*attr).def {
-        XmlAttributeDefault::XmlAttributeNone => {}
-        XmlAttributeDefault::XmlAttributeRequired => {
-            xml_buf_ccat(buf, c" #REQUIRED".as_ptr() as _);
-        }
-        XmlAttributeDefault::XmlAttributeImplied => {
-            xml_buf_ccat(buf, c" #IMPLIED".as_ptr() as _);
-        }
-        XmlAttributeDefault::XmlAttributeFixed => {
-            xml_buf_ccat(buf, c" #FIXED".as_ptr() as _);
-        } // _ => {
-          //     xml_err_valid!(
-          //         null_mut(),
-          //         XmlParserErrors::XmlErrInternalError,
-          //         c"Internal: ATTRIBUTE struct corrupted invalid def\n".as_ptr() as _,
-          //         null_mut(),
-          //     );
-          // }
-    }
+        XmlAttributeDefault::XmlAttributeNone => None,
+        XmlAttributeDefault::XmlAttributeRequired => write!(buf, " #REQUIRED").ok(),
+        XmlAttributeDefault::XmlAttributeImplied => write!(buf, " #IMPLIED").ok(),
+        XmlAttributeDefault::XmlAttributeFixed => write!(buf, " #FIXED").ok(),
+    };
     if !(*attr).default_value.is_null() {
-        xml_buf_ccat(buf, c" ".as_ptr() as _);
-        xml_buf_write_quoted_string(buf, (*attr).default_value);
+        write!(buf, " ");
+        write_quoted(
+            buf,
+            CStr::from_ptr((*attr).default_value as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        );
     }
-    xml_buf_ccat(buf, c">\n".as_ptr() as _);
+    writeln!(buf, ">");
 }
 
 unsafe fn xml_is_streaming(ctxt: XmlValidCtxtPtr) -> i32 {
@@ -7733,40 +7673,6 @@ mod tests {
     }
 
     #[test]
-    fn test_xml_dump_attribute_decl() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_attr in 0..GEN_NB_XML_ATTRIBUTE_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let attr = gen_xml_attribute_ptr(n_attr, 1);
-
-                    xml_dump_attribute_decl(buf, attr);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_attribute_ptr(n_attr, attr, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpAttributeDecl",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDumpAttributeDecl()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_attr);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_xml_dump_attribute_table() {
         #[cfg(feature = "libxml_output")]
         unsafe {
@@ -7794,40 +7700,6 @@ mod tests {
                         );
                         eprint!(" {}", n_buf);
                         eprintln!(" {}", n_table);
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_xml_dump_element_decl() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_elem in 0..GEN_NB_XML_ELEMENT_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let elem = gen_xml_element_ptr(n_elem, 1);
-
-                    xml_dump_element_decl(buf, elem);
-                    des_const_xml_buf_ptr(n_buf, buf as _, 0);
-                    des_xml_element_ptr(n_elem, elem, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpElementDecl",
-                            xml_mem_blocks() - mem_base
-                        );
-                        assert!(
-                            leaks == 0,
-                            "{leaks} Leaks are found in xmlDumpElementDecl()"
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_elem);
                     }
                 }
             }

@@ -33,7 +33,7 @@ use std::{
 #[cfg(feature = "html")]
 use crate::tree::XmlNode;
 use crate::{
-    buf::{libxml_api::xml_buf_set_allocation_scheme, XmlBufRef},
+    buf::XmlBufRef,
     encoding::{find_encoding_handler, XmlCharEncoding, XmlCharEncodingHandler},
     error::{XmlErrorDomain, XmlParserErrors, __xml_simple_error, __xml_simple_oom_error},
     globals::{get_indent_tree_output, GLOBAL_STATE},
@@ -48,9 +48,9 @@ use crate::{
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
     },
     tree::{
-        is_xhtml, xml_buf_cat, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
-        XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr,
-        XmlElementType, XmlEntityPtr, XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
+        is_xhtml, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr, XmlAttributePtr,
+        XmlDocPtr, XmlDtdPtr, XmlElementPtr, XmlElementType, XmlEntityPtr, XmlNodePtr, XmlNotation,
+        XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
 };
 
@@ -681,32 +681,28 @@ unsafe fn xml_ns_dump_output(
 
 /// This will dump the content of the notation table as an XML DTD definition
 #[doc(alias = "xmlBufDumpNotationTable")]
-unsafe fn xml_buf_dump_notation_table(buf: XmlBufPtr, table: &XmlHashTable<'_, XmlNotation>) {
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    let mut out = vec![];
-    xml_dump_notation_table(&mut out, table);
-    out.push(0);
-    xml_buf_cat(buf, out.as_ptr());
+unsafe fn xml_buf_dump_notation_table<'a>(
+    buf: &mut (impl Write + 'a),
+    table: &XmlHashTable<'_, XmlNotation>,
+) {
+    xml_dump_notation_table(buf, table);
 }
 
 /// This will dump the content of the element declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpElementDecl")]
-unsafe fn xml_buf_dump_element_decl(buf: XmlBufPtr, elem: XmlElementPtr) {
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+unsafe fn xml_buf_dump_element_decl<'a>(buf: &mut (impl Write + 'a), elem: XmlElementPtr) {
     xml_dump_element_decl(buf, elem);
 }
 
 /// This will dump the content of the attribute declaration as an XML DTD definition
 #[doc(alias = "xmlBufDumpAttributeDecl")]
-unsafe fn xml_buf_dump_attribute_decl(buf: XmlBufPtr, attr: XmlAttributePtr) {
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+unsafe fn xml_buf_dump_attribute_decl<'a>(buf: &mut (impl Write + 'a), attr: XmlAttributePtr) {
     xml_dump_attribute_decl(buf, attr);
 }
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlBufDumpEntityDecl")]
-unsafe fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+unsafe fn xml_buf_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
     xml_dump_entity_decl(buf, ent);
 }
 
@@ -811,31 +807,13 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl(
-                    ctxt.buf
-                        .borrow()
-                        .buffer
-                        .map_or(null_mut(), |buf| buf.as_ptr()),
-                    cur as _,
-                );
+                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
             }
             XmlElementType::XmlAttributeDecl => {
-                xml_buf_dump_attribute_decl(
-                    ctxt.buf
-                        .borrow()
-                        .buffer
-                        .map_or(null_mut(), |buf| buf.as_ptr()),
-                    cur as _,
-                );
+                xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
             }
             XmlElementType::XmlEntityDecl => {
-                xml_buf_dump_entity_decl(
-                    ctxt.buf
-                        .borrow()
-                        .buffer
-                        .map_or(null_mut(), |buf| buf.as_ptr()),
-                    cur as _,
-                );
+                xml_buf_dump_entity_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
             }
             XmlElementType::XmlElementNode => {
                 if cur != root && ctxt.format == 1 && get_indent_tree_output() != 0 {
@@ -1163,12 +1141,7 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
     // Do this only on a standalone DTD or on the internal subset though.
     if (*dtd).doc.is_null() || (*(*dtd).doc).int_subset == dtd {
         if let Some(table) = (*dtd).notations.as_deref() {
-            let buf = ctxt
-                .buf
-                .borrow()
-                .buffer
-                .map_or(null_mut(), |buf| buf.as_ptr());
-            xml_buf_dump_notation_table(buf, table);
+            xml_buf_dump_notation_table(&mut *ctxt.buf.borrow_mut(), table);
         }
     }
     let format: i32 = ctxt.format;
@@ -1356,31 +1329,13 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
             }
             XmlElementType::XmlElementDecl => {
-                xml_buf_dump_element_decl(
-                    ctxt.buf
-                        .borrow()
-                        .buffer
-                        .map_or(null_mut(), |buf| buf.as_ptr()),
-                    cur as _,
-                );
+                xml_buf_dump_element_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
             }
             XmlElementType::XmlAttributeDecl => {
-                xml_buf_dump_attribute_decl(
-                    ctxt.buf
-                        .borrow()
-                        .buffer
-                        .map_or(null_mut(), |buf| buf.as_ptr()),
-                    cur as _,
-                );
+                xml_buf_dump_attribute_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
             }
             XmlElementType::XmlEntityDecl => {
-                xml_buf_dump_entity_decl(
-                    ctxt.buf
-                        .borrow()
-                        .buffer
-                        .map_or(null_mut(), |buf| buf.as_ptr()),
-                    cur as _,
-                );
+                xml_buf_dump_entity_decl(&mut *ctxt.buf.borrow_mut(), cur as _);
             }
             XmlElementType::XmlElementNode => {
                 addmeta = 0;

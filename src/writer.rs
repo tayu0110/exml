@@ -450,9 +450,7 @@ impl<'a> XmlTextWriter<'a> {
                     xml_free(content as _);
                 }
                 XmlTextWriterState::XmlTextwriterAttribute => {
-                    let mut buf = vec![];
-                    attr_serialize_text_content(&mut buf, self.doc, None, content);
-                    self.out.write_bytes(&buf)?;
+                    attr_serialize_text_content(&mut self.out, self.doc, None, content);
                 }
                 _ => {
                     sum += self.write_bytes(content.as_bytes())?;

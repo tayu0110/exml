@@ -5302,7 +5302,7 @@ const TEST_DESCRIPTIONS: &[TestDesc] = &[
     },
 ];
 
-unsafe extern "C" fn launch_tests(tst: &TestDesc) -> i32 {
+unsafe fn launch_tests(tst: &TestDesc) -> i32 {
     let mut res: i32;
     let mut err: i32 = 0;
     let mut result;

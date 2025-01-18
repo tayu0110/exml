@@ -19,6 +19,8 @@
 //
 // daniel@veillard.com
 
+#[cfg(feature = "libxml_output")]
+use std::io::Write;
 use std::{
     any::type_name,
     borrow::Cow,
@@ -32,9 +34,7 @@ use std::{
 use libc::{size_t, snprintf, strchr};
 
 use crate::{
-    buf::libxml_api::{
-        xml_buf_add, xml_buf_cat, xml_buf_ccat, xml_buf_write_quoted_string, XmlBufPtr,
-    },
+    buf::libxml_api::{xml_buf_cat, XmlBufPtr},
     error::{
         XmlErrorDomain, XmlParserErrors, __xml_raise_error, __xml_simple_error,
         __xml_simple_oom_error,
@@ -1256,7 +1256,10 @@ pub unsafe fn xml_free_entities_table(table: XmlHashTableRef<'static, XmlEntityP
 #[cfg(feature = "libxml_output")]
 extern "C" fn xml_dump_entity_decl_scan(ent: *mut c_void, buf: *mut c_void, _name: *const XmlChar) {
     unsafe {
-        xml_dump_entity_decl(buf as XmlBufPtr, ent as XmlEntityPtr);
+        let mut out = vec![];
+        xml_dump_entity_decl(&mut out, ent as XmlEntityPtr);
+        out.push(0);
+        xml_buf_cat(buf as XmlBufPtr, out.as_ptr());
     }
 }
 
@@ -1271,27 +1274,39 @@ pub unsafe fn xml_dump_entities_table(buf: XmlBufPtr, table: XmlEntitiesTablePtr
 /// treatment required by %
 #[doc(alias = "xmlDumpEntityContent")]
 #[cfg(feature = "libxml_output")]
-unsafe fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
+unsafe fn xml_dump_entity_content<'a>(buf: &mut (impl Write + 'a), content: *const XmlChar) {
+    use std::{slice::from_raw_parts, str::from_utf8};
+
+    use crate::io::write_quoted;
+
     if !xml_strchr(content, b'%').is_null() {
         let mut base: *const XmlChar;
         let mut cur: *const XmlChar;
 
-        xml_buf_ccat(buf, c"\"".as_ptr() as _);
+        write!(buf, "\"");
         base = content;
         cur = content;
         while *cur != 0 {
             if *cur == b'"' {
                 if base != cur {
-                    xml_buf_add(buf, base, cur.offset_from(base) as _);
+                    write!(
+                        buf,
+                        "{}",
+                        from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+                    );
                 }
-                xml_buf_add(buf, c"&quot;".as_ptr() as _, 6);
+                write!(buf, "&quot;");
                 cur = cur.add(1);
                 base = cur;
             } else if *cur == b'%' {
                 if base != cur {
-                    xml_buf_add(buf, base, cur.offset_from(base) as _);
+                    write!(
+                        buf,
+                        "{}",
+                        from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+                    );
                 }
-                xml_buf_add(buf, c"&#x25;".as_ptr() as _, 6);
+                write!(buf, "&#x25;");
                 cur = cur.add(1);
                 base = cur;
             } else {
@@ -1299,94 +1314,166 @@ unsafe fn xml_dump_entity_content(buf: XmlBufPtr, content: *const XmlChar) {
             }
         }
         if base != cur {
-            xml_buf_add(buf, base, cur.offset_from(base) as _);
+            write!(
+                buf,
+                "{}",
+                from_utf8(from_raw_parts(base, cur.offset_from(base) as _)).unwrap()
+            );
         }
-        xml_buf_ccat(buf, c"\"".as_ptr() as _);
+        write!(buf, "\"");
     } else {
-        xml_buf_write_quoted_string(buf, content);
+        write_quoted(
+            buf,
+            CStr::from_ptr(content as *const i8)
+                .to_string_lossy()
+                .as_ref(),
+        );
     }
 }
 
 /// This will dump the content of the entity table as an XML DTD definition
 #[doc(alias = "xmlDumpEntityDecl")]
 #[cfg(feature = "libxml_output")]
-pub unsafe fn xml_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
-    if buf.is_null() || ent.is_null() {
+pub unsafe fn xml_dump_entity_decl<'a>(buf: &mut (impl Write + 'a), ent: XmlEntityPtr) {
+    use crate::io::write_quoted;
+
+    if ent.is_null() {
         return;
     }
+    let name = CStr::from_ptr((*ent).name.load(Ordering::Relaxed) as _).to_string_lossy();
     match (*ent).etype {
         XmlEntityType::XmlInternalGeneralEntity => {
-            xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
-            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
-            xml_buf_ccat(buf, c" ".as_ptr() as _);
+            write!(buf, "<!ENTITY {name} ");
             if !(*ent).orig.load(Ordering::Relaxed).is_null() {
-                xml_buf_write_quoted_string(buf, (*ent).orig.load(Ordering::Relaxed) as _);
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).orig.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             } else {
                 xml_dump_entity_content(buf, (*ent).content.load(Ordering::Relaxed) as _);
             }
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">");
         }
         XmlEntityType::XmlExternalGeneralParsedEntity => {
-            xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
-            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            write!(buf, "<!ENTITY {name}");
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-                xml_buf_ccat(buf, c" PUBLIC ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).external_id.load(Ordering::Relaxed) as _);
-                xml_buf_ccat(buf, c" ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                write!(buf, " PUBLIC ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
+                write!(buf, " ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             } else {
-                xml_buf_ccat(buf, c" SYSTEM ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                write!(buf, " SYSTEM ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">");
         }
         XmlEntityType::XmlExternalGeneralUnparsedEntity => {
-            xml_buf_ccat(buf, c"<!ENTITY ".as_ptr() as _);
-            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            write!(buf, "<!ENTITY {name}");
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-                xml_buf_ccat(buf, c" PUBLIC ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).external_id.load(Ordering::Relaxed) as _);
-                xml_buf_ccat(buf, c" ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                write!(buf, " PUBLIC ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
+                write!(buf, " ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             } else {
-                xml_buf_ccat(buf, c" SYSTEM ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                write!(buf, " SYSTEM ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
             if !(*ent).content.load(Ordering::Relaxed).is_null() {
                 /* Should be true ! */
-                xml_buf_ccat(buf, c" NDATA ".as_ptr() as _);
+                write!(buf, " NDATA ");
                 if !(*ent).orig.load(Ordering::Relaxed).is_null() {
-                    xml_buf_cat(buf, (*ent).orig.load(Ordering::Acquire) as _);
+                    write!(
+                        buf,
+                        "{}",
+                        CStr::from_ptr((*ent).orig.load(Ordering::Acquire) as _)
+                            .to_string_lossy()
+                            .as_ref()
+                    );
                 } else {
-                    xml_buf_cat(buf, (*ent).content.load(Ordering::Acquire) as _);
+                    write!(
+                        buf,
+                        "{}",
+                        CStr::from_ptr((*ent).content.load(Ordering::Acquire) as _)
+                            .to_string_lossy()
+                            .as_ref()
+                    );
                 }
             }
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">");
         }
         XmlEntityType::XmlInternalParameterEntity => {
-            xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
-            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
-            xml_buf_ccat(buf, c" ".as_ptr() as _);
+            write!(buf, "<!ENTITY % {name} ");
             if (*ent).orig.load(Ordering::Relaxed).is_null() {
                 xml_dump_entity_content(buf, (*ent).content.load(Ordering::Relaxed) as _);
             } else {
-                xml_buf_write_quoted_string(buf, (*ent).orig.load(Ordering::Relaxed) as _);
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).orig.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">");
         }
         XmlEntityType::XmlExternalParameterEntity => {
-            xml_buf_ccat(buf, c"<!ENTITY % ".as_ptr() as _);
-            xml_buf_cat(buf, (*ent).name.load(Ordering::Relaxed) as _);
+            write!(buf, "<!ENTITY % {name}");
             if !(*ent).external_id.load(Ordering::Relaxed).is_null() {
-                xml_buf_ccat(buf, c" PUBLIC ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).external_id.load(Ordering::Relaxed) as _);
-                xml_buf_ccat(buf, c" ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                write!(buf, " PUBLIC ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).external_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
+                write!(buf, " ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             } else {
-                xml_buf_ccat(buf, c" SYSTEM ".as_ptr() as _);
-                xml_buf_write_quoted_string(buf, (*ent).system_id.load(Ordering::Relaxed) as _);
+                write!(buf, " SYSTEM ");
+                write_quoted(
+                    buf,
+                    CStr::from_ptr((*ent).system_id.load(Ordering::Relaxed) as _)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
-            xml_buf_ccat(buf, c">\n".as_ptr() as _);
+            writeln!(buf, ">");
         }
         _ => {
             xml_entities_err(
@@ -1456,37 +1543,6 @@ mod tests {
                 leaks == 0,
                 "{leaks} Leaks are found in xmlDumpEntitiesTable()"
             );
-        }
-    }
-
-    #[test]
-    fn test_xml_dump_entity_decl() {
-        #[cfg(feature = "libxml_output")]
-        unsafe {
-            let mut leaks = 0;
-
-            for n_buf in 0..GEN_NB_XML_BUFFER_PTR {
-                for n_ent in 0..GEN_NB_XML_ENTITY_PTR {
-                    let mem_base = xml_mem_blocks();
-                    let buf = gen_const_xml_buf_ptr(n_buf, 0) as _;
-                    let ent = gen_xml_entity_ptr(n_ent, 1);
-
-                    xml_dump_entity_decl(buf, ent);
-                    des_const_xml_buf_ptr(n_buf, buf, 0);
-                    des_xml_entity_ptr(n_ent, ent, 1);
-                    reset_last_error();
-                    if mem_base != xml_mem_blocks() {
-                        leaks += 1;
-                        eprint!(
-                            "Leak of {} blocks found in xmlDumpEntityDecl",
-                            xml_mem_blocks() - mem_base
-                        );
-                        eprint!(" {}", n_buf);
-                        eprintln!(" {}", n_ent);
-                    }
-                }
-            }
-            assert!(leaks == 0, "{leaks} Leaks are found in xmlDumpEntityDecl()");
         }
     }
 
