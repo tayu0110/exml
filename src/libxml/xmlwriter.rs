@@ -360,7 +360,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns -1 on error or 0 otherwise.
     #[doc(alias = "xmlTextWriterSetIndent")]
-    pub unsafe fn set_indent(&mut self, indent: i32) -> i32 {
+    pub fn set_indent(&mut self, indent: i32) -> i32 {
         if indent < 0 {
             return -1;
         }
@@ -375,7 +375,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns -1 on error or 0 otherwise.
     #[doc(alias = "xmlTextWriterSetIndentString")]
-    pub unsafe fn set_indent_string(&mut self, indent: &str) -> i32 {
+    pub fn set_indent_string(&mut self, indent: &str) -> i32 {
         self.ichar = Cow::Owned(indent.to_owned());
         0
     }
@@ -384,7 +384,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns -1 on error or 0 otherwise.
     #[doc(alias = "xmlTextWriterSetQuoteChar")]
-    pub unsafe fn set_quote_char(&mut self, quotechar: u8) -> i32 {
+    pub fn set_quote_char(&mut self, quotechar: u8) -> i32 {
         if quotechar != b'\'' && quotechar != b'"' {
             return -1;
         }
@@ -398,7 +398,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterFlush")]
-    pub unsafe fn flush(&mut self) -> i32 {
+    pub fn flush(&mut self) -> i32 {
         self.out.flush()
     }
 
@@ -483,16 +483,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteBinHex")]
-    pub unsafe fn write_bin_hex(
-        &mut self,
-        data: *const c_char,
-        start: i32,
-        len: i32,
-    ) -> io::Result<usize> {
-        if data.is_null() || start < 0 || len < 0 {
-            return Err(io::Error::other("Writer or content is invalid"));
-        }
-
+    pub unsafe fn write_bin_hex(&mut self, data: &[u8]) -> io::Result<usize> {
         let mut sum = 0;
         if let Some(lk) = self.nodes.front().cloned() {
             sum += self.handle_state_dependencies(lk)?;
@@ -502,7 +493,7 @@ impl<'a> XmlTextWriter<'a> {
             self.doindent = 0;
         }
 
-        sum += xml_output_buffer_write_bin_hex(&mut self.out, len, data.add(start as usize) as _)?;
+        sum += xml_output_buffer_write_bin_hex(&mut self.out, data)?;
         Ok(sum)
     }
 
@@ -2241,23 +2232,25 @@ unsafe fn xml_output_buffer_write_base64(
 #[doc(alias = "xmlOutputBufferWriteBinHex")]
 unsafe fn xml_output_buffer_write_bin_hex(
     out: &mut XmlOutputBuffer,
-    len: i32,
-    data: *const u8,
+    data: &[u8],
 ) -> io::Result<usize> {
-    const HEX: [u8; 16] = [
-        b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D', b'E',
-        b'F',
-    ];
-    if data.is_null() || len < 0 {
-        return Err(io::Error::other("Data is invalid"));
-    }
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    const LUT: [u8; 512] = {
+        let mut lut = [0; 512];
+        let mut data = 0;
+        while data < u8::MAX as usize {
+            let (hi, lo) = (data >> 4, data & 0x0F);
+            lut[data * 2] = hi as u8;
+            lut[data * 2 + 1] = lo as u8;
+            data += 1;
+        }
+        lut
+    };
 
     let mut sum = 0;
-    for i in 0..len as usize {
-        let hi = *data.add(i) as usize >> 4;
-        sum += (*out).write_bytes(&HEX[hi..hi + 1])?;
-        let lo = *data.add(i) as usize & 0xF;
-        sum += (*out).write_bytes(&HEX[lo..lo + 1])?;
+    for &data in data {
+        let start = data as usize * 2;
+        sum += out.write_bytes(&LUT[start..start + 2])?;
     }
 
     Ok(sum)
