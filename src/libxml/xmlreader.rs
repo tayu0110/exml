@@ -37,9 +37,6 @@ use libc::memset;
 #[cfg(feature = "schema")]
 use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
 use crate::{
-    buf::libxml_api::{
-        xml_buf_cat, xml_buf_create, xml_buf_free, xml_buf_set_allocation_scheme, XmlBufPtr,
-    },
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
     },
@@ -78,10 +75,9 @@ use crate::{
     },
     parser::XmlParserCtxtPtr,
     tree::{
-        xml_buf_content, xml_buf_shrink, xml_buf_use, xml_copy_dtd, xml_doc_copy_node,
-        xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns, xml_free_ns_list, xml_new_doc_text,
-        XmlAttrPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementType, XmlNodePtr,
-        XmlNsPtr, __XML_REGISTER_CALLBACKS,
+        xml_copy_dtd, xml_doc_copy_node, xml_free_doc, xml_free_dtd, xml_free_node, xml_free_ns,
+        xml_free_ns_list, xml_new_doc_text, XmlAttrPtr, XmlDocPtr, XmlDtdPtr, XmlElementType,
+        XmlNodePtr, XmlNsPtr, __XML_REGISTER_CALLBACKS,
     },
 };
 
@@ -749,7 +745,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{buf::libxml_api::xml_buf_detach, tree::NodeCommon};
+        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
 
         let mut node: XmlNodePtr;
         let mut cur_node: XmlNodePtr;
@@ -758,32 +754,22 @@ impl XmlTextReader {
             return null_mut();
         }
         let doc: XmlDocPtr = (*self.node).doc;
-        let buff = xml_buf_create();
-        if buff.is_null() {
-            return null_mut();
-        }
-        xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
+        let mut buff = vec![];
         cur_node = (*self.node).children().map_or(null_mut(), |c| c.as_ptr());
         while !cur_node.is_null() {
             /* XXX: Why is the node copied? */
             node = xml_doc_copy_node(cur_node, doc, 1);
             /* XXX: Why do we need a second buffer? */
             let mut buff2 = vec![];
-            xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
             if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
                 xml_free_node(node);
-                xml_buf_free(buff);
                 return null_mut();
             }
-            buff2.push(0);
-            xml_buf_cat(buff, buff2.as_ptr());
+            buff.extend(buff2);
             xml_free_node(node);
             cur_node = (*cur_node).next.map_or(null_mut(), |n| n.as_ptr());
         }
-        let resbuf = xml_buf_detach(buff);
-
-        xml_buf_free(buff);
-        resbuf
+        xml_strndup(buff.as_ptr(), buff.len() as i32)
     }
 
     /// Reads the contents of the current node, including child nodes and markup.
@@ -1073,15 +1059,15 @@ impl XmlTextReader {
 
         let oldstate: XmlTextReaderState = self.state;
         self.state = XmlTextReaderState::None;
-        let inbuf: XmlBufPtr = self.input.as_ref().unwrap().buffer.unwrap().as_ptr();
+        let mut inbuf = self.input.as_ref().unwrap().buffer.unwrap();
 
         while self.state == XmlTextReaderState::None {
-            if xml_buf_use(inbuf) < self.cur as usize + CHUNK_SIZE {
+            if inbuf.len() < self.cur as usize + CHUNK_SIZE {
                 // Refill the buffer unless we are at the end of the stream
                 if self.mode != XmlTextReaderMode::XmlTextreaderModeEof {
                     val = self.input.as_mut().unwrap().read(4096);
                     if val == 0 && self.input.as_ref().unwrap().context.is_none() {
-                        if xml_buf_use(inbuf) == self.cur as _ {
+                        if inbuf.len() == self.cur as _ {
                             self.mode = XmlTextReaderMode::XmlTextreaderModeEof;
                             self.state = oldstate;
                         }
@@ -1102,10 +1088,10 @@ impl XmlTextReader {
             }
             // parse by block of CHUNK_SIZE bytes, various tests show that
             // it's the best tradeoff at least on a 1.2GH Duron
-            if xml_buf_use(inbuf) >= self.cur as usize + CHUNK_SIZE {
+            if inbuf.len() >= self.cur as usize + CHUNK_SIZE {
                 val = xml_parse_chunk(
                     self.ctxt,
-                    xml_buf_content(inbuf).add(self.cur as usize) as _,
+                    inbuf.as_ref().as_ptr().add(self.cur as usize) as _,
                     CHUNK_SIZE as _,
                     0,
                 );
@@ -1117,10 +1103,10 @@ impl XmlTextReader {
                     break;
                 }
             } else {
-                s = xml_buf_use(inbuf) as i32 - self.cur as i32;
+                s = inbuf.len() as i32 - self.cur as i32;
                 val = xml_parse_chunk(
                     self.ctxt,
-                    xml_buf_content(inbuf).add(self.cur as usize) as _,
+                    inbuf.as_ref().as_ptr().add(self.cur as usize) as _,
                     s,
                     0,
                 );
@@ -1135,9 +1121,9 @@ impl XmlTextReader {
         // Discard the consumed input when needed and possible
         if self.mode == XmlTextReaderMode::XmlTextreaderModeInteractive {
             if self.input.as_ref().unwrap().context.is_some()
-                && (self.cur >= 4096 && xml_buf_use(inbuf) - self.cur as usize <= CHUNK_SIZE)
+                && (self.cur >= 4096 && inbuf.len() - self.cur as usize <= CHUNK_SIZE)
             {
-                val = xml_buf_shrink(inbuf, self.cur as _) as _;
+                val = inbuf.trim_head(self.cur as _) as _;
                 if val >= 0 {
                     self.cur -= val as u32;
                 }
@@ -1147,14 +1133,14 @@ impl XmlTextReader {
         else if self.mode == XmlTextReaderMode::XmlTextreaderModeEof
             && self.state != XmlTextReaderState::Done
         {
-            s = (xml_buf_use(inbuf) - self.cur as usize) as i32;
+            s = (inbuf.len() - self.cur as usize) as i32;
             val = xml_parse_chunk(
                 self.ctxt,
-                xml_buf_content(inbuf).add(self.cur as usize) as _,
+                inbuf.as_ref().as_ptr().add(self.cur as usize) as _,
                 s,
                 1,
             );
-            self.cur = xml_buf_use(inbuf) as _;
+            self.cur = inbuf.len() as _;
             self.state = XmlTextReaderState::Done;
             if val != 0 {
                 if (*self.ctxt).well_formed != 0 {
@@ -3879,33 +3865,26 @@ unsafe extern "C" fn xml_text_reader_get_successor(mut cur: XmlNodePtr) -> XmlNo
 ///  Returns a string containing the content, or NULL in case of error.
 #[doc(alias = "xmlTextReaderCollectSiblings")]
 #[cfg(feature = "libxml_reader")]
-unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar {
-    use crate::tree::NodeCommon;
+unsafe fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *mut XmlChar {
+    use std::ffi::CStr;
+
+    use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
 
     if node.is_null() || (*node).element_type() == XmlElementType::XmlNamespaceDecl {
         return null_mut();
     }
 
-    // let buffer: XmlBufferPtr = xml_buffer_create();
-    let buffer = xml_buf_create();
-    if buffer.is_null() {
-        return null_mut();
-    }
-    // xml_buffer_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    xml_buf_set_allocation_scheme(buffer, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-
+    let mut buffer = vec![];
     while !node.is_null() {
         match (*node).element_type() {
             XmlElementType::XmlTextNode | XmlElementType::XmlCDATASectionNode => {
-                // xml_buffer_cat(buffer, (*node).content);
-                xml_buf_cat(buffer, (*node).content);
+                buffer.extend(CStr::from_ptr((*node).content as *const i8).to_bytes());
             }
             XmlElementType::XmlElementNode => {
                 let tmp: *mut XmlChar = xml_text_reader_collect_siblings(
                     (*node).children().map_or(null_mut(), |c| c.as_ptr()),
                 );
-                // xml_buffer_cat(buffer, tmp);
-                xml_buf_cat(buffer, tmp);
+                buffer.extend(CStr::from_ptr(tmp as *const i8).to_bytes());
                 xml_free(tmp as _);
             }
             _ => {}
@@ -3913,12 +3892,7 @@ unsafe extern "C" fn xml_text_reader_collect_siblings(mut node: XmlNodePtr) -> *
 
         node = (*node).next.map_or(null_mut(), |n| n.as_ptr());
     }
-    // let ret: *mut XmlChar = (*buffer).content;
-    // (*buffer).content = null_mut();
-    // xml_buffer_free(buffer);
-    let ret = xml_buf_content(buffer);
-    xml_buf_free(buffer);
-    ret
+    xml_strndup(buffer.as_ptr(), buffer.len() as i32)
 }
 
 /// Provides the number of attributes of the current node
