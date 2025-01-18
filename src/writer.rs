@@ -96,14 +96,21 @@ struct XmlTextWriterNsStackEntry {
 
 #[repr(C)]
 pub struct XmlTextWriter<'a> {
-    out: XmlOutputBuffer<'a>,                     /* output buffer */
-    nodes: VecDeque<Rc<XmlTextWriterStackEntry>>, /* element name stack */
-    nsstack: XmlList<XmlTextWriterNsStackEntry>,  /* name spaces stack */
+    // output buffer
+    out: XmlOutputBuffer<'a>,
+    // element name stack
+    nodes: VecDeque<Rc<XmlTextWriterStackEntry>>,
+    // name spaces stack
+    nsstack: XmlList<XmlTextWriterNsStackEntry>,
     level: i32,
-    indent: i32,              /* enable indent */
-    doindent: i32,            /* internal indent flag */
-    ichar: Cow<'static, str>, /* indent character */
-    qchar: u8,                /* character used for quoting attribute values */
+    // enable indent
+    indent: i32,
+    // internal indent flag
+    doindent: i32,
+    // indent character
+    ichar: Cow<'static, str>,
+    // character used for quoting attribute values
+    qchar: u8,
     ctxt: XmlParserCtxtPtr,
     no_doc_free: i32,
     doc: XmlDocPtr,
@@ -434,12 +441,11 @@ impl<'a> XmlTextWriter<'a> {
                     let content = xml_strndup(content.as_ptr(), content.len() as i32);
                     let buf = xml_encode_special_chars(null_mut(), content);
                     if !buf.is_null() {
-                        let count = self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes());
+                        sum += self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes())?;
                         if buf != content {
                             // buf was allocated by us, so free it
                             xml_free(buf as _);
                         }
-                        sum += count?;
                     }
                     xml_free(content as _);
                 }
