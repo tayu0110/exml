@@ -38,8 +38,7 @@ use libc::memset;
 use crate::relaxng::{xml_relaxng_new_parser_ctxt, XmlRelaxNGValidCtxtPtr};
 use crate::{
     buf::libxml_api::{
-        xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_empty, xml_buf_free,
-        xml_buf_set_allocation_scheme, XmlBufPtr,
+        xml_buf_cat, xml_buf_create, xml_buf_free, xml_buf_set_allocation_scheme, XmlBufPtr,
     },
     error::{
         parser_error, parser_validity_error, parser_validity_warning, parser_warning, XmlError,
@@ -252,7 +251,7 @@ pub struct XmlTextReader {
     // preserve the resulting document
     preserve: i32,
     // used to return const xmlChar *
-    buffer: XmlBufPtr,
+    buffer: String,
     // the context dictionary
     dict: XmlDictPtr,
 
@@ -2893,7 +2892,7 @@ impl Default for XmlTextReader {
             depth: 0,
             faketext: null_mut(),
             preserve: 0,
-            buffer: null_mut(),
+            buffer: "".to_owned(),
             dict: null_mut(),
             ent: null_mut(),
             ent_nr: 0,
@@ -3118,6 +3117,8 @@ pub unsafe fn xml_new_text_reader(
     input: XmlParserInputBuffer,
     uri: Option<&str>,
 ) -> XmlTextReaderPtr {
+    use std::ptr::drop_in_place;
+
     use crate::generic_error;
 
     let ret: XmlTextReaderPtr = xml_malloc(size_of::<XmlTextReader>()) as _;
@@ -3131,17 +3132,6 @@ pub unsafe fn xml_new_text_reader(
     (*ret).ent_max = 0;
     (*ret).ent_nr = 0;
     (*ret).input = Some(input);
-    (*ret).buffer = xml_buf_create_size(100);
-    if (*ret).buffer.is_null() {
-        xml_free(ret as _);
-        generic_error!("xmlNewTextReader : malloc failed\n");
-        return null_mut();
-    }
-    // no operation on a reader should require a huge buffer
-    xml_buf_set_allocation_scheme(
-        (*ret).buffer,
-        XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-    );
     let mut sax = XmlSAXHandler::default();
     xml_sax_version(&mut sax, 2);
     (*ret).start_element = sax.start_element;
@@ -3218,7 +3208,7 @@ pub unsafe fn xml_new_text_reader(
 
     if (*ret).ctxt.is_null() {
         generic_error!("xmlNewTextReader : malloc failed\n");
-        xml_buf_free((*ret).buffer);
+        drop_in_place(ret);
         xml_free(ret as _);
         return null_mut();
     }
@@ -3270,6 +3260,8 @@ pub unsafe fn xml_new_text_reader_filename(uri: &str) -> XmlTextReaderPtr {
 #[doc(alias = "xmlFreeTextReader")]
 #[cfg(feature = "libxml_reader")]
 pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
+    use std::ptr::drop_in_place;
+
     use crate::parser::xml_free_parser_ctxt;
     #[cfg(feature = "schema")]
     use crate::relaxng::xml_relaxng_free_valid_ctxt;
@@ -3330,15 +3322,13 @@ pub unsafe fn xml_free_text_reader(reader: XmlTextReaderPtr) {
             xml_free_parser_ctxt((*reader).ctxt);
         }
     }
-    if !(*reader).buffer.is_null() {
-        xml_buf_free((*reader).buffer);
-    }
     if !(*reader).ent_tab.is_null() {
         xml_free((*reader).ent_tab as _);
     }
     if !(*reader).dict.is_null() {
         xml_dict_free((*reader).dict);
     }
+    drop_in_place(reader);
     xml_free(reader as _);
 }
 
@@ -3386,18 +3376,8 @@ pub unsafe fn xml_text_reader_setup(
         (*reader).input = input;
         (*reader).allocs |= XML_TEXTREADER_INPUT;
     }
-    if (*reader).buffer.is_null() {
-        (*reader).buffer = xml_buf_create_size(100);
-    }
-    if (*reader).buffer.is_null() {
-        generic_error!("xmlTextReaderSetup : malloc failed\n");
-        return -1;
-    }
-    // no operation on a reader should require a huge buffer
-    xml_buf_set_allocation_scheme(
-        (*reader).buffer,
-        XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-    );
+    (*reader).buffer.clear();
+    (*reader).buffer.reserve(100);
     let mut sax = (*(*reader).ctxt).sax.take().unwrap_or_default();
     xml_sax_version(&mut sax, 2);
     (*reader).start_element = sax.start_element;
@@ -4214,8 +4194,8 @@ pub unsafe extern "C" fn xml_text_reader_const_string(
 /// The result will be deallocated on the next Read() operation.
 #[doc(alias = "xmlTextReaderConstValue")]
 #[cfg(feature = "libxml_reader")]
-pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
-    use crate::{generic_error, tree::NodeCommon};
+pub unsafe fn xml_text_reader_const_value(reader: &mut XmlTextReader) -> *const XmlChar {
+    use crate::tree::NodeCommon;
 
     if reader.node.is_null() {
         return null_mut();
@@ -4230,7 +4210,6 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
         XmlElementType::XmlNamespaceDecl => return (*(node as XmlNsPtr)).href,
         XmlElementType::XmlAttributeNode => {
             let attr: XmlAttrPtr = (*node).as_attribute_node().unwrap().as_ptr();
-            let mut ret: *const XmlChar;
 
             if let Some(children) = (*attr)
                 .children
@@ -4238,32 +4217,11 @@ pub unsafe extern "C" fn xml_text_reader_const_value(reader: &mut XmlTextReader)
             {
                 return children.content;
             } else {
-                if reader.buffer.is_null() {
-                    reader.buffer = xml_buf_create_size(100);
-                    if reader.buffer.is_null() {
-                        generic_error!("xmlTextReaderSetup : malloc failed\n");
-                        return null_mut();
-                    }
-                    xml_buf_set_allocation_scheme(
-                        reader.buffer,
-                        XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-                    );
-                } else {
-                    xml_buf_empty(reader.buffer);
-                }
-                (*node).get_content_to(reader.buffer);
-                ret = xml_buf_content(reader.buffer);
-                if ret.is_null() {
-                    /* error on the buffer best to reallocate */
-                    xml_buf_free(reader.buffer);
-                    reader.buffer = xml_buf_create_size(100);
-                    xml_buf_set_allocation_scheme(
-                        reader.buffer,
-                        XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-                    );
-                    ret = c"".as_ptr() as _;
-                }
-                return ret;
+                reader.buffer.clear();
+                (*node).get_content_to(&mut reader.buffer);
+                // temporary workaround for NULL terminated string
+                reader.buffer.push('\0');
+                return reader.buffer.as_ptr();
             }
         }
         XmlElementType::XmlTextNode

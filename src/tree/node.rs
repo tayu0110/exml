@@ -39,12 +39,10 @@ use crate::{
 };
 
 use super::{
-    xml_buf_cat, xml_buf_create, xml_buf_create_size, xml_buf_detach, xml_buf_free,
-    xml_buf_set_allocation_scheme, xml_encode_attribute_entities, xml_encode_entities_reentrant,
-    xml_free_node, xml_free_prop, xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope,
-    xml_tree_err_memory, NodeCommon, XmlAttr, XmlAttrPtr, XmlAttributeType, XmlBufPtr,
-    XmlBufferAllocationScheme, XmlDoc, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlNs, XmlNsPtr,
-    XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
+    xml_encode_attribute_entities, xml_encode_entities_reentrant, xml_free_node, xml_free_prop,
+    xml_get_doc_entity, xml_is_blank_char, xml_ns_in_scope, xml_tree_err_memory, NodeCommon,
+    XmlAttr, XmlAttrPtr, XmlAttributeType, XmlDoc, XmlDocPtr, XmlElementType, XmlEntityPtr, XmlNs,
+    XmlNsPtr, XML_CHECK_DTD, XML_LOCAL_NAMESPACE, XML_XML_NAMESPACE,
 };
 
 /// A node in an XML tree.
@@ -391,22 +389,9 @@ impl XmlNode {
     pub unsafe fn get_content(&self) -> Option<String> {
         match self.element_type() {
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
-                let buf = xml_buf_create_size(64);
-                if buf.is_null() {
-                    return None;
-                }
-                xml_buf_set_allocation_scheme(
-                    buf,
-                    XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-                );
-                self.get_content_to(buf);
-                let ret: *mut XmlChar = xml_buf_detach(buf);
-                xml_buf_free(buf);
-                let r = CStr::from_ptr(ret as *const i8)
-                    .to_string_lossy()
-                    .into_owned();
-                xml_free(ret as _);
-                Some(r)
+                let mut buf = String::with_capacity(64);
+                self.get_content_to(&mut buf);
+                Some(buf)
             }
             XmlElementType::XmlAttributeNode => {
                 (*(self as *const XmlNode as *const XmlAttr)).get_prop_node_value_internal()
@@ -428,26 +413,9 @@ impl XmlNode {
                     return None;
                 }
 
-                let buf = xml_buf_create();
-                if buf.is_null() {
-                    return None;
-                }
-                xml_buf_set_allocation_scheme(
-                    buf,
-                    XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-                );
-
-                self.get_content_to(buf);
-
-                let ret: *mut XmlChar = xml_buf_detach(buf);
-                xml_buf_free(buf);
-                let r = Some(
-                    CStr::from_ptr(ret as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-                xml_free(ret as _);
-                r
+                let mut buf = String::new();
+                self.get_content_to(&mut buf);
+                Some(buf)
             }
             XmlElementType::XmlEntityNode
             | XmlElementType::XmlDocumentTypeNode
@@ -456,26 +424,9 @@ impl XmlNode {
             | XmlElementType::XmlXIncludeStart
             | XmlElementType::XmlXIncludeEnd => None,
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                let buf = xml_buf_create();
-                if buf.is_null() {
-                    return None;
-                }
-                xml_buf_set_allocation_scheme(
-                    buf,
-                    XmlBufferAllocationScheme::XmlBufferAllocDoubleit,
-                );
-
-                self.get_content_to(buf);
-
-                let ret: *mut XmlChar = xml_buf_detach(buf);
-                xml_buf_free(buf);
-                let r = Some(
-                    CStr::from_ptr(ret as *const i8)
-                        .to_string_lossy()
-                        .into_owned(),
-                );
-                xml_free(ret as _);
-                r
+                let mut buf = String::new();
+                self.get_content_to(&mut buf);
+                Some(buf)
             }
             XmlElementType::XmlNamespaceDecl => {
                 let ns = self.as_namespace_decl_node().unwrap();
@@ -519,13 +470,14 @@ impl XmlNode {
     ///
     /// Returns 0 in case of success and -1 in case of error.
     #[doc(alias = "xmlBufGetNodeContent")]
-    pub unsafe fn get_content_to(&self, buf: XmlBufPtr) -> i32 {
-        if buf.is_null() {
-            return -1;
-        }
+    pub unsafe fn get_content_to(&self, buf: &mut String) -> i32 {
         match self.element_type() {
             XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
-                xml_buf_cat(buf, self.content);
+                buf.push_str(
+                    CStr::from_ptr(self.content as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
             XmlElementType::XmlDocumentFragNode | XmlElementType::XmlElementNode => {
                 let mut tmp: *const XmlNode = self;
@@ -534,7 +486,11 @@ impl XmlNode {
                     match (*tmp).element_type() {
                         XmlElementType::XmlCDATASectionNode | XmlElementType::XmlTextNode => {
                             if !(*tmp).content.is_null() {
-                                xml_buf_cat(buf, (*tmp).content);
+                                buf.push_str(
+                                    CStr::from_ptr((*tmp).content as *const i8)
+                                        .to_string_lossy()
+                                        .as_ref(),
+                                );
                             }
                         }
                         XmlElementType::XmlEntityRefNode => {
@@ -582,7 +538,11 @@ impl XmlNode {
 
                 while let Some(now) = tmp {
                     if matches!(now.element_type(), XmlElementType::XmlTextNode) {
-                        xml_buf_cat(buf, now.content);
+                        buf.push_str(
+                            CStr::from_ptr(now.content as *const i8)
+                                .to_string_lossy()
+                                .as_ref(),
+                        );
                     } else {
                         now.get_content_to(buf);
                     }
@@ -590,7 +550,11 @@ impl XmlNode {
                 }
             }
             XmlElementType::XmlCommentNode | XmlElementType::XmlPINode => {
-                xml_buf_cat(buf, self.content);
+                buf.push_str(
+                    CStr::from_ptr(self.content as *const i8)
+                        .to_string_lossy()
+                        .as_ref(),
+                );
             }
             XmlElementType::XmlEntityRefNode => {
                 // lookup entity declaration
@@ -631,7 +595,14 @@ impl XmlNode {
                 }
             }
             XmlElementType::XmlNamespaceDecl => {
-                xml_buf_cat(buf, self.as_namespace_decl_node().unwrap().as_ref().href);
+                buf.push_str(
+                    &self
+                        .as_namespace_decl_node()
+                        .unwrap()
+                        .as_ref()
+                        .href()
+                        .unwrap(),
+                );
             }
             XmlElementType::XmlElementDecl
             | XmlElementType::XmlAttributeDecl
