@@ -100,7 +100,7 @@ impl<'a> XmlSaveCtxt<'a> {
     #[doc(alias = "xmlSaveCtxtInit")]
     pub(crate) fn init(&mut self) {
         if self.encoding.is_none() && self.escape.is_none() {
-            self.escape = Some(xml_escape_entities);
+            self.escape = Some(escape_entities);
         }
         GLOBAL_STATE.with_borrow(|state| {
             let len = state.tree_indent_string.len();
@@ -119,6 +119,30 @@ impl<'a> XmlSaveCtxt<'a> {
                 self.options |= XmlSaveOption::XmlSaveNoEmpty as i32;
             }
         })
+    }
+
+    unsafe fn switch_encoding(&mut self, encoding: &str) -> i32 {
+        let mut buf = self.buf.borrow_mut();
+
+        if buf.encoder.is_none() && buf.conv.is_none() {
+            buf.encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
+            if buf.encoder.is_none() {
+                xml_save_err(
+                    XmlParserErrors::XmlSaveUnknownEncoding,
+                    null_mut(),
+                    Some(encoding),
+                );
+                return -1;
+            }
+            buf.conv = XmlBufRef::new();
+            if buf.conv.is_none() {
+                xml_save_err_memory("creating encoding buffer");
+                return -1;
+            }
+            // initialize the state, e.g. if outputting a BOM
+            buf.encode(true);
+        }
+        0
     }
 
     /// Write out formatting for non-significant whitespace output.
@@ -183,7 +207,7 @@ pub(crate) unsafe fn xml_save_err_memory(extra: &str) {
 /// # Panics
 /// - If c is NULL character, `out.len() >= 5` must be satisfied.
 /// - Otherwise, `out.len() >= 5 + (c as u32).ilog2() / 4` must be satisfied.
-pub(crate) fn xml_serialize_hex_char_ref(out: &mut [u8], mut val: u32) -> &[u8] {
+pub(crate) fn serialize_hex_charref(out: &mut [u8], mut val: u32) -> &[u8] {
     out[..3].copy_from_slice(b"&#x");
     // corner case... if val == 0, ilog2 will panic.
     if val == 0 {
@@ -212,7 +236,7 @@ pub(crate) fn xml_serialize_hex_char_ref(out: &mut [u8], mut val: u32) -> &[u8] 
 /// if the return value is positive, else unpredictable.
 /// The value of @outlen after return is the number of octets consumed.
 #[doc(alias = "xmlEscapeEntities")]
-fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
+fn escape_entities(src: &str, dst: &mut String) -> i32 {
     let mut out = [0; 13];
     for c in src.chars() {
         match c {
@@ -221,7 +245,7 @@ fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
             '&' => dst.push_str("&amp;"),
             c @ ('\n' | '\t' | '\u{20}'..'\u{80}') => dst.push(c),
             c => {
-                let out = xml_serialize_hex_char_ref(&mut out, c as u32);
+                let out = serialize_hex_charref(&mut out, c as u32);
                 // # Safety
                 // character reference includes only '&', '#', 'x', ';' and ascii hex digits,
                 // so `from_utf8_unchecked` won't fail.
@@ -230,30 +254,6 @@ fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
                 }
             }
         }
-    }
-    0
-}
-
-unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i32 {
-    let mut buf = ctxt.buf.borrow_mut();
-
-    if buf.encoder.is_none() && buf.conv.is_none() {
-        buf.encoder = find_encoding_handler(encoding).map(|e| Rc::new(RefCell::new(e)));
-        if buf.encoder.is_none() {
-            xml_save_err(
-                XmlParserErrors::XmlSaveUnknownEncoding,
-                null_mut(),
-                Some(encoding),
-            );
-            return -1;
-        }
-        buf.conv = XmlBufRef::new();
-        if buf.conv.is_none() {
-            xml_save_err_memory("creating encoding buffer");
-            return -1;
-        }
-        // initialize the state, e.g. if outputting a BOM
-        buf.encode(true);
     }
     0
 }
@@ -1472,7 +1472,7 @@ pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlD
                 && oldctxtenc.is_none()
                 && (*ctxt).buf.borrow().encoder.is_none()
                 && (*ctxt).buf.borrow().conv.is_none())
-                && xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0
+                && (*ctxt).switch_encoding(encoding.as_deref().unwrap()) < 0
             {
                 (*cur).encoding = oldenc;
                 return -1;
@@ -1525,16 +1525,16 @@ pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlD
                 // we need to match to this encoding but just for this
                 // document since we output the XMLDecl the conversion
                 // must be done to not generate not well formed documents.
-                if xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0 {
+                if (*ctxt).switch_encoding(encoding.as_deref().unwrap()) < 0 {
                     (*cur).encoding = oldenc;
                     return -1;
                 }
                 switched_encoding = 1;
             }
-            if (*ctxt).escape == Some(xml_escape_entities) {
+            if (*ctxt).escape == Some(escape_entities) {
                 (*ctxt).escape = None;
             }
-            if (*ctxt).escape_attr == Some(xml_escape_entities) {
+            if (*ctxt).escape_attr == Some(escape_entities) {
                 (*ctxt).escape_attr = None;
             }
         }
@@ -1783,7 +1783,7 @@ unsafe fn html_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, cur: XmlNodePtr) 
         && (*ctxt).buf.borrow().encoder.is_none()
         && (*ctxt).buf.borrow().conv.is_none()
     {
-        if xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0 {
+        if (*ctxt).switch_encoding(encoding.as_deref().unwrap()) < 0 {
             (*doc).encoding = oldenc;
             return -1;
         }
@@ -1937,10 +1937,7 @@ pub(crate) unsafe fn attr_serialize_text_content(
             }
             if cur.as_bytes()[0] < 0xC0 {
                 xml_save_err(XmlParserErrors::XmlSaveNotUTF8 as _, attr as _, None);
-                buf.write_all(xml_serialize_hex_char_ref(
-                    &mut tmp,
-                    cur.as_bytes()[0] as u32,
-                ));
+                buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
                 cur = &cur[1..];
                 base = cur;
                 continue;
@@ -1948,16 +1945,13 @@ pub(crate) unsafe fn attr_serialize_text_content(
             let val = cur.chars().next().unwrap();
             if val.len_utf8() == 1 || !xml_is_char(val as u32) {
                 xml_save_err(XmlParserErrors::XmlSaveCharInvalid as _, attr as _, None);
-                buf.write_all(xml_serialize_hex_char_ref(
-                    &mut tmp,
-                    cur.as_bytes()[0] as u32,
-                ));
+                buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
                 cur = &cur[1..];
                 base = cur;
                 continue;
             }
             // We could do multiple things here. Just save as a c_char ref
-            buf.write_all(xml_serialize_hex_char_ref(&mut tmp, val as u32));
+            buf.write_all(serialize_hex_charref(&mut tmp, val as u32));
             cur = &cur[val.len_utf8()..];
             base = cur;
         } else {
