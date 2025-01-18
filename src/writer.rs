@@ -451,7 +451,7 @@ impl<'a> XmlTextWriter<'a> {
                 }
                 XmlTextWriterState::XmlTextwriterAttribute => {
                     let mut buf = vec![];
-                    attr_serialize_text_content(&mut buf, self.doc, null_mut(), content);
+                    attr_serialize_text_content(&mut buf, self.doc, None, content);
                     self.out.write_bytes(&buf)?;
                 }
                 _ => {

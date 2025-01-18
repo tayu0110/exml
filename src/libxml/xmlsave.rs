@@ -48,7 +48,7 @@ use crate::{
         xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
-        is_xhtml, xml_buf_cat, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttrPtr,
+        is_xhtml, xml_buf_cat, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
         XmlAttributePtr, XmlBufPtr, XmlBufferAllocationScheme, XmlDocPtr, XmlDtdPtr, XmlElementPtr,
         XmlElementType, XmlEntityPtr, XmlNodePtr, XmlNotation, XmlNsPtr, XML_LOCAL_NAMESPACE,
     },
@@ -513,16 +513,16 @@ unsafe fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlNsPtr) 
 
 /// Serialize the attribute in the buffer
 #[doc(alias = "xmlAttrSerializeContent")]
-unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr) {
-    let mut children = (*attr).children;
+unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: &XmlAttr) {
+    let mut children = attr.children;
     while let Some(now) = children {
         match now.element_type() {
             XmlElementType::XmlTextNode => {
                 let mut out = vec![];
                 attr_serialize_text_content(
                     &mut out,
-                    (*attr).doc,
-                    attr,
+                    attr.doc,
+                    Some(attr),
                     CStr::from_ptr(now.content as *const i8)
                         .to_string_lossy()
                         .as_ref(),
@@ -544,24 +544,21 @@ unsafe fn xml_attr_serialize_content(buf: &mut XmlOutputBuffer, attr: XmlAttrPtr
 
 /// Dump an XML attribute
 #[doc(alias = "xmlAttrDumpOutput")]
-unsafe fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
-    if cur.is_null() {
-        return;
-    }
-    if (*ctxt).format == 2 {
-        (*ctxt).write_ws_non_sig(2);
+unsafe fn xml_attr_dump_output(ctxt: &mut XmlSaveCtxt, cur: &XmlAttr) {
+    if ctxt.format == 2 {
+        ctxt.write_ws_non_sig(2);
     } else {
-        (*ctxt).buf.borrow_mut().write_bytes(b" ");
+        ctxt.buf.borrow_mut().write_bytes(b" ");
     }
-    let mut buf = (*ctxt).buf.borrow_mut();
-    if !(*cur).ns.is_null() {
-        if let Some(prefix) = (*(*cur).ns).prefix() {
+    let mut buf = ctxt.buf.borrow_mut();
+    if !cur.ns.is_null() {
+        if let Some(prefix) = (*cur.ns).prefix() {
             buf.write_str(&prefix);
             buf.write_bytes(b":");
         }
     }
 
-    buf.write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
+    buf.write_str(&cur.name().unwrap());
     buf.write_bytes(b"=\"");
     xml_attr_serialize_content(&mut buf, cur);
     buf.write_bytes(b"\"");
@@ -663,7 +660,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                     }
                     attr = (*cur).properties;
                     while !attr.is_null() {
-                        xml_attr_dump_output(ctxt, attr);
+                        xml_attr_dump_output(ctxt, &*attr);
                         attr = (*attr).next;
                     }
 
@@ -844,7 +841,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                xml_attr_dump_output(ctxt, cur as _);
+                xml_attr_dump_output(ctxt, &*(cur as *const XmlAttr));
             }
             XmlElementType::XmlNamespaceDecl => {
                 xml_ns_dump_output_ctxt(ctxt, cur as _);
@@ -990,7 +987,7 @@ unsafe fn xml_ns_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
 /// Dump a list of XML attributes
 #[doc(alias = "xhtmlAttrListDumpOutput")]
 #[cfg(feature = "html")]
-unsafe fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr) {
+unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlAttrPtr) {
     use crate::tree::{xml_free_node, xml_new_doc_text, XmlNode};
 
     use super::htmltree::html_is_boolean_attr;
@@ -1031,10 +1028,10 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr)
                 children.set_parent(NodePtr::from_ptr(cur as *mut XmlNode));
             }
         }
-        xml_attr_dump_output(ctxt, cur);
+        xml_attr_dump_output(ctxt, &*cur);
         cur = (*cur).next;
     }
-    let mut buf = (*ctxt).buf.borrow_mut();
+    let mut buf = ctxt.buf.borrow_mut();
     // C.8
     if (!name.is_null() && id.is_null())
         && parent
@@ -1053,17 +1050,17 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: XmlSaveCtxtPtr, mut cur: XmlAttrPtr)
             .is_some()
     {
         buf.write_bytes(b" id=\"");
-        xml_attr_serialize_content(&mut buf, name);
+        xml_attr_serialize_content(&mut buf, &*name);
         buf.write_bytes(b"\"");
     }
     // C.7.
     if !lang.is_null() && xml_lang.is_null() {
         buf.write_bytes(b" xml:lang=\"");
-        xml_attr_serialize_content(&mut buf, lang);
+        xml_attr_serialize_content(&mut buf, &*lang);
         buf.write_bytes(b"\"");
     } else if !xml_lang.is_null() && lang.is_null() {
         buf.write_bytes(b" lang=\"");
-        xml_attr_serialize_content(&mut buf, xml_lang);
+        xml_attr_serialize_content(&mut buf, &*xml_lang);
         buf.write_bytes(b"\"");
     }
 }
@@ -1449,7 +1446,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 }
             }
             XmlElementType::XmlAttributeNode => {
-                xml_attr_dump_output(ctxt, cur as _);
+                xml_attr_dump_output(ctxt, &*(cur as *const XmlAttr));
             }
             _ => {}
         }
@@ -1765,10 +1762,10 @@ unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr
 
 /// Serialize text attribute values to an xmlBufPtr
 #[doc(alias = "xmlBufAttrSerializeTxtContent")]
-pub(crate) unsafe fn attr_serialize_text_content(
-    buf: &mut impl Write,
+pub(crate) unsafe fn attr_serialize_text_content<'a>(
+    buf: &mut (impl Write + 'a),
     doc: XmlDocPtr,
-    attr: XmlAttrPtr,
+    attr: Option<&XmlAttr>,
     string: &str,
 ) {
     let mut base = string;
@@ -1805,7 +1802,11 @@ pub(crate) unsafe fn attr_serialize_text_content(
                 write!(buf, "{}", &base[..base.len() - cur.len()]);
             }
             if cur.as_bytes()[0] < 0xC0 {
-                xml_save_err(XmlParserErrors::XmlSaveNotUTF8 as _, attr as _, None);
+                xml_save_err(
+                    XmlParserErrors::XmlSaveNotUTF8 as _,
+                    attr.map_or(null_mut(), |attr| attr as *const XmlAttr as _),
+                    None,
+                );
                 buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
                 cur = &cur[1..];
                 base = cur;
@@ -1813,7 +1814,11 @@ pub(crate) unsafe fn attr_serialize_text_content(
             }
             let val = cur.chars().next().unwrap();
             if val.len_utf8() == 1 || !xml_is_char(val as u32) {
-                xml_save_err(XmlParserErrors::XmlSaveCharInvalid as _, attr as _, None);
+                xml_save_err(
+                    XmlParserErrors::XmlSaveCharInvalid as _,
+                    attr.map_or(null_mut(), |attr| attr as *const XmlAttr as _),
+                    None,
+                );
                 buf.write_all(serialize_hex_charref(&mut tmp, cur.as_bytes()[0] as u32));
                 cur = &cur[1..];
                 base = cur;

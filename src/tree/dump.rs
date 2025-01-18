@@ -215,9 +215,9 @@ impl XmlDoc {
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&mut ctxt as _, self);
 
-        let mut buf = Rc::into_inner(ctxt.buf.clone())
-            .expect("Internal Error")
-            .into_inner();
+        let buf = ctxt.buf.clone();
+        drop(ctxt);
+        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
 
         if buf.error.is_ok() {
             buf.flush();
@@ -283,9 +283,9 @@ impl XmlDoc {
 
         xml_doc_content_dump_output(&mut ctxt as _, self);
 
-        let mut buf = Rc::into_inner(ctxt.buf.clone())
-            .expect("Internal Error")
-            .into_inner();
+        let buf = ctxt.buf.clone();
+        drop(ctxt);
+        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
         if buf.error.is_ok() {
             buf.flush();
             buf.written
@@ -355,9 +355,9 @@ impl XmlDoc {
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&mut ctxt as _, self);
-        let mut buf = Rc::into_inner(ctxt.buf.clone())
-            .expect("Internal Error")
-            .into_inner();
+        let buf = ctxt.buf.clone();
+        drop(ctxt);
+        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
         if buf.error.is_ok() {
             buf.flush();
             buf.written
@@ -389,9 +389,9 @@ impl XmlDoc {
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&mut ctxt as _, self);
-        let mut buf = Rc::into_inner(ctxt.buf.clone())
-            .expect("Internal Error")
-            .into_inner();
+        let buf = ctxt.buf.clone();
+        drop(ctxt);
+        let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
         if buf.error.is_ok() {
             buf.flush();
             buf.written
