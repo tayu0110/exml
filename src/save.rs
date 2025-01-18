@@ -24,7 +24,7 @@ use std::{
     ffi::{CStr, CString},
     io::Write,
     os::raw::c_void,
-    ptr::{null, null_mut},
+    ptr::null_mut,
     rc::Rc,
     slice::from_raw_parts,
     str::from_utf8_unchecked,
@@ -46,7 +46,6 @@ use crate::{
         parser::xml_init_parser,
         parser_internals::XML_STRING_TEXT_NOENC,
         valid::{xml_dump_attribute_decl, xml_dump_element_decl, xml_dump_notation_table},
-        xmlstring::{xml_str_equal, XmlChar},
     },
     tree::{
         is_xhtml, xml_buf_cat, xml_dump_entity_decl, NodeCommon, NodePtr, XmlAttr, XmlAttrPtr,
@@ -79,7 +78,7 @@ pub struct XmlSaveCtxt<'a> {
     pub(crate) _private: *mut c_void,
     pub(crate) typ: i32,
     pub(crate) fd: i32,
-    pub(crate) filename: *const XmlChar,
+    pub(crate) filename: Option<String>,
     pub(crate) encoding: Option<String>,
     pub(crate) handler: Option<Rc<RefCell<XmlCharEncodingHandler>>>,
     pub(crate) buf: Rc<RefCell<XmlOutputBuffer<'a>>>,
@@ -532,7 +531,7 @@ impl Default for XmlSaveCtxt<'_> {
             _private: null_mut(),
             typ: 0,
             fd: 0,
-            filename: null(),
+            filename: None,
             encoding: None,
             handler: None,
             buf: Rc::new(RefCell::new(XmlOutputBuffer::default())),
@@ -783,8 +782,8 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
     let mut unformatted_node: XmlNodePtr = null_mut();
     let mut parent: XmlNodePtr;
     let mut attr: XmlAttrPtr;
-    let mut start: *mut XmlChar;
-    let mut end: *mut XmlChar;
+    let mut start: *mut u8;
+    let mut end: *mut u8;
 
     if cur.is_null() {
         return;
@@ -1213,11 +1212,11 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlAttrPt
 
     let parent = (*cur).parent;
     while !cur.is_null() {
-        if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"id".as_ptr() as _) {
+        if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("id") {
             id = cur;
-        } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"name".as_ptr() as _) {
+        } else if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("name") {
             name = cur;
-        } else if (*cur).ns.is_null() && xml_str_equal((*cur).name, c"lang".as_ptr() as _) {
+        } else if (*cur).ns.is_null() && (*cur).name().as_deref() == Some("lang") {
             lang = cur;
         } else if !(*cur).ns.is_null()
             && (*cur).name().as_deref() == Some("lang")
@@ -1247,15 +1246,15 @@ unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlAttrPt
         && parent
             .filter(|p| {
                 !p.name.is_null()
-                    && (xml_str_equal(p.name, c"a".as_ptr() as _)
-                        || xml_str_equal(p.name, c"p".as_ptr() as _)
-                        || xml_str_equal(p.name, c"div".as_ptr() as _)
-                        || xml_str_equal(p.name, c"img".as_ptr() as _)
-                        || xml_str_equal(p.name, c"map".as_ptr() as _)
-                        || xml_str_equal(p.name, c"applet".as_ptr() as _)
-                        || xml_str_equal(p.name, c"form".as_ptr() as _)
-                        || xml_str_equal(p.name, c"frame".as_ptr() as _)
-                        || xml_str_equal(p.name, c"iframe".as_ptr() as _))
+                    && (p.name().as_deref() == Some("a")
+                        || p.name().as_deref() == Some("p")
+                        || p.name().as_deref() == Some("div")
+                        || p.name().as_deref() == Some("img")
+                        || p.name().as_deref() == Some("map")
+                        || p.name().as_deref() == Some("applet")
+                        || p.name().as_deref() == Some("form")
+                        || p.name().as_deref() == Some("frame")
+                        || p.name().as_deref() == Some("iframe"))
             })
             .is_some()
     {
@@ -1325,8 +1324,8 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
     let mut tmp: XmlNodePtr;
     let mut unformatted_node: XmlNodePtr = null_mut();
     let mut parent: XmlNodePtr;
-    let mut start: *mut XmlChar;
-    let mut end: *mut XmlChar;
+    let mut start: *mut u8;
+    let mut end: *mut u8;
 
     if cur.is_null() {
         return;
@@ -1417,7 +1416,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
                 if !(*cur).ns_def.is_null() {
                     xml_ns_list_dump_output_ctxt(ctxt, (*cur).ns_def);
                 }
-                if xml_str_equal((*cur).name, c"html".as_ptr() as _)
+                if (*cur).name().as_deref() == Some("html")
                     && (*cur).ns.is_null()
                     && (*cur).ns_def.is_null()
                 {
@@ -1433,12 +1432,12 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 
                 if !parent.is_null()
                     && ((*parent).parent() == NodePtr::from_ptr((*cur).doc as *mut XmlNode))
-                    && xml_str_equal((*cur).name, c"head".as_ptr() as _)
-                    && xml_str_equal((*parent).name, c"html".as_ptr() as _)
+                    && (*cur).name().as_deref() == Some("head")
+                    && (*parent).name().as_deref() == Some("html")
                 {
                     tmp = (*cur).children().map_or(null_mut(), |c| c.as_ptr());
                     while !tmp.is_null() {
-                        if xml_str_equal((*tmp).name, c"meta".as_ptr() as _) {
+                        if (*tmp).name().as_deref() == Some("meta") {
                             if let Some(httpequiv) = (*tmp).get_prop("http-equiv") {
                                 if httpequiv.eq_ignore_ascii_case("Content-Type") {
                                     break;

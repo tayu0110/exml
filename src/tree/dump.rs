@@ -209,6 +209,7 @@ impl XmlDoc {
             format: (format != 0) as i32,
             encoding,
             handler: None,
+            filename: None,
             ..Default::default()
         };
         ctxt.init();
@@ -276,6 +277,7 @@ impl XmlDoc {
             format: (format != 0) as i32,
             encoding,
             handler: None,
+            filename: None,
             ..Default::default()
         };
         ctxt.init();
@@ -350,6 +352,7 @@ impl XmlDoc {
             format: (format != 0) as i32,
             encoding: encoding.map(|e| e.to_owned()),
             handler: None,
+            filename: None,
             ..Default::default()
         };
         ctxt.init();
@@ -384,6 +387,7 @@ impl XmlDoc {
             format: 0,
             encoding: encoding.map(|e| e.to_owned()),
             handler: None,
+            filename: None,
             ..Default::default()
         };
         ctxt.init();
@@ -427,6 +431,7 @@ impl XmlNode {
             format: (format != 0) as i32,
             encoding: encoding.map(|e| e.to_owned()),
             handler: None,
+            filename: None,
             ..Default::default()
         };
         ctxt.init();
