@@ -49,7 +49,7 @@ use crate::{
             XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlsave::xml_buf_attr_serialize_txt_content,
+        xmlsave::attr_serialize_text_content,
         xmlstring::xml_strndup,
     },
     list::XmlList,
@@ -428,35 +428,31 @@ impl<'a> XmlTextWriter<'a> {
     #[doc(alias = "xmlTextWriterWriteString")]
     pub unsafe fn write_string(&mut self, content: &str) -> io::Result<usize> {
         let mut sum = 0;
-        let content = xml_strndup(content.as_ptr(), content.len() as i32);
-        let mut buf = content;
         if let Some(lk) = self.nodes.front() {
             match lk.state.get() {
                 XmlTextWriterState::XmlTextwriterName | XmlTextWriterState::XmlTextwriterText => {
-                    buf = xml_encode_special_chars(null_mut(), content);
+                    let content = xml_strndup(content.as_ptr(), content.len() as i32);
+                    let buf = xml_encode_special_chars(null_mut(), content);
+                    if !buf.is_null() {
+                        let count = self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes());
+                        if buf != content {
+                            // buf was allocated by us, so free it
+                            xml_free(buf as _);
+                        }
+                        sum += count?;
+                    }
+                    xml_free(content as _);
                 }
                 XmlTextWriterState::XmlTextwriterAttribute => {
-                    buf = null_mut();
-                    xml_buf_attr_serialize_txt_content(
-                        self.out.buffer.map_or(null_mut(), |buf| buf.as_ptr()),
-                        self.doc,
-                        null_mut(),
-                        content,
-                    );
+                    let mut buf = vec![];
+                    attr_serialize_text_content(&mut buf, self.doc, null_mut(), content);
+                    self.out.write_bytes(&buf)?;
                 }
-                _ => {}
+                _ => {
+                    sum += self.write_bytes(content.as_bytes())?;
+                }
             }
         }
-
-        if !buf.is_null() {
-            let count = self.write_bytes(CStr::from_ptr(buf as *const i8).to_bytes());
-            if buf != content {
-                // buf was allocated by us, so free it
-                xml_free(buf as _);
-            }
-            sum += count?;
-        }
-        xml_free(content as _);
 
         Ok(sum)
     }
