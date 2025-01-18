@@ -95,6 +95,48 @@ pub struct XmlSaveCtxt<'a> {
     pub(crate) escape_attr: Option<fn(&str, &mut String) -> i32>, /* used for attribute content */
 }
 
+impl<'a> XmlSaveCtxt<'a> {
+    /// Initialize a saving context
+    #[doc(alias = "xmlSaveCtxtInit")]
+    pub(crate) fn init(&mut self) {
+        if self.encoding.is_none() && self.escape.is_none() {
+            self.escape = Some(xml_escape_entities);
+        }
+        GLOBAL_STATE.with_borrow(|state| {
+            let len = state.tree_indent_string.len();
+            if len == 0 {
+                self.indent.fill(0);
+            } else {
+                self.indent_size = len;
+                self.indent_nr = MAX_INDENT / self.indent_size;
+                for chunk in self.indent.chunks_exact_mut(self.indent_size) {
+                    chunk.copy_from_slice(state.tree_indent_string.as_bytes());
+                }
+                self.indent[self.indent_nr * self.indent_size] = 0;
+            }
+
+            if state.save_no_empty_tags != 0 {
+                self.options |= XmlSaveOption::XmlSaveNoEmpty as i32;
+            }
+        })
+    }
+
+    /// Write out formatting for non-significant whitespace output.
+    #[doc(alias = "xmlOutputBufferWriteWSNonSig")]
+    unsafe fn write_ws_non_sig(&mut self, extra: i32) {
+        self.buf.borrow_mut().write_bytes(b"\n");
+        for i in (0..self.level + extra).step_by(self.indent_nr) {
+            let len = self.indent_size
+                * if self.level + extra - i > self.indent_nr as i32 {
+                    self.indent_nr
+                } else {
+                    (self.level + extra - i) as usize
+                };
+            self.buf.borrow_mut().write_bytes(&self.indent[..len]);
+        }
+    }
+}
+
 impl Default for XmlSaveCtxt<'_> {
     fn default() -> Self {
         Self {
@@ -192,31 +234,6 @@ fn xml_escape_entities(src: &str, dst: &mut String) -> i32 {
     0
 }
 
-/// Initialize a saving context
-#[doc(alias = "xmlSaveCtxtInit")]
-pub(crate) fn xml_save_ctxt_init(ctxt: &mut XmlSaveCtxt) {
-    if ctxt.encoding.is_none() && ctxt.escape.is_none() {
-        ctxt.escape = Some(xml_escape_entities);
-    }
-    GLOBAL_STATE.with_borrow(|state| {
-        let len = state.tree_indent_string.len();
-        if len == 0 {
-            ctxt.indent.fill(0);
-        } else {
-            ctxt.indent_size = len;
-            ctxt.indent_nr = MAX_INDENT / ctxt.indent_size;
-            for chunk in ctxt.indent.chunks_exact_mut(ctxt.indent_size) {
-                chunk.copy_from_slice(state.tree_indent_string.as_bytes());
-            }
-            ctxt.indent[ctxt.indent_nr * ctxt.indent_size] = 0;
-        }
-
-        if state.save_no_empty_tags != 0 {
-            ctxt.options |= XmlSaveOption::XmlSaveNoEmpty as i32;
-        }
-    })
-}
-
 unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i32 {
     let mut buf = ctxt.buf.borrow_mut();
 
@@ -241,21 +258,6 @@ unsafe fn xml_save_switch_encoding(ctxt: &mut XmlSaveCtxt, encoding: &str) -> i3
     0
 }
 
-/// Write out formatting for non-significant whitespace output.
-#[doc(alias = "xmlOutputBufferWriteWSNonSig")]
-unsafe fn xml_output_buffer_write_ws_non_sig(ctxt: &mut XmlSaveCtxt, extra: i32) {
-    ctxt.buf.borrow_mut().write_bytes(b"\n");
-    for i in (0..ctxt.level + extra).step_by(ctxt.indent_nr) {
-        let len = ctxt.indent_size
-            * if ctxt.level + extra - i > ctxt.indent_nr as i32 {
-                ctxt.indent_nr
-            } else {
-                (ctxt.level + extra - i) as usize
-            };
-        ctxt.buf.borrow_mut().write_bytes(&ctxt.indent[..len]);
-    }
-}
-
 /// Dump a local Namespace definition.
 /// Should be called in the context of attributes dumps.
 /// If @ctxt is supplied, @buf should be its buffer.
@@ -274,7 +276,7 @@ pub(crate) unsafe fn xml_ns_dump_output(
         }
 
         if !ctxt.is_null() && (*ctxt).format == 2 {
-            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
+            (*ctxt).write_ws_non_sig(2);
         } else {
             buf.write_bytes(b" ");
         }
@@ -373,7 +375,7 @@ unsafe fn xml_attr_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlAttrPtr) {
         return;
     }
     if (*ctxt).format == 2 {
-        xml_output_buffer_write_ws_non_sig(&mut *ctxt, 2);
+        (*ctxt).write_ws_non_sig(2);
     } else {
         (*ctxt).buf.borrow_mut().write_bytes(b" ");
     }
@@ -513,7 +515,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, mut cur
                             }
                         }
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
+                            (*ctxt).write_ws_non_sig(1);
                         }
                         (*ctxt).buf.borrow_mut().write_bytes(b">");
                         if (*ctxt).format == 1 {
@@ -527,12 +529,12 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, mut cur
                         continue;
                     } else if (*ctxt).options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0 {
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                            (*ctxt).write_ws_non_sig(0);
                         }
                         (*ctxt).buf.borrow_mut().write_bytes(b"/>");
                     } else {
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 1);
+                            (*ctxt).write_ws_non_sig(1);
                         }
                         (*ctxt).buf.borrow_mut().write_bytes(b"></");
                         if !(*cur).ns.is_null() {
@@ -547,7 +549,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, mut cur
                             .borrow_mut()
                             .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                            (*ctxt).write_ws_non_sig(0);
                         }
                         (*ctxt).buf.borrow_mut().write_bytes(b">");
                     }
@@ -593,7 +595,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, mut cur
                         .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                     if !(*cur).content.is_null() {
                         if (*ctxt).format == 2 {
-                            xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                            (*ctxt).write_ws_non_sig(0);
                         } else {
                             (*ctxt).buf.borrow_mut().write_bytes(b" ");
                         }
@@ -613,7 +615,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, mut cur
                         .borrow_mut()
                         .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                     if (*ctxt).format == 2 {
-                        xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                        (*ctxt).write_ws_non_sig(0);
                     }
                     (*ctxt).buf.borrow_mut().write_bytes(b"?>");
                 }
@@ -733,7 +735,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: XmlSaveCtxtPtr, mut cur
                     .borrow_mut()
                     .write_str(CStr::from_ptr((*cur).name as _).to_string_lossy().as_ref());
                 if (*ctxt).format == 2 {
-                    xml_output_buffer_write_ws_non_sig(&mut *ctxt, 0);
+                    (*ctxt).write_ws_non_sig(0);
                 }
                 (*ctxt).buf.borrow_mut().write_bytes(b">");
 
@@ -1520,11 +1522,9 @@ pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlD
                 enc,
                 XmlCharEncoding::UTF8 | XmlCharEncoding::None | XmlCharEncoding::ASCII
             ) {
-                /*
-                 * we need to match to this encoding but just for this
-                 * document since we output the XMLDecl the conversion
-                 * must be done to not generate not well formed documents.
-                 */
+                // we need to match to this encoding but just for this
+                // document since we output the XMLDecl the conversion
+                // must be done to not generate not well formed documents.
                 if xml_save_switch_encoding(&mut *ctxt, encoding.as_deref().unwrap()) < 0 {
                     (*cur).encoding = oldenc;
                     return -1;
@@ -1539,9 +1539,7 @@ pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlD
             }
         }
 
-        /*
-         * Save the XML declaration
-         */
+        // Save the XML declaration
         if (*ctxt).options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
             (*ctxt).buf.borrow_mut().write_bytes(b"<?xml version=");
             if let Some(version) = (*cur).version.as_deref() {
@@ -1611,9 +1609,7 @@ pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: XmlSaveCtxtPtr, cur: XmlD
         }
     }
 
-    /*
-     * Restore the state of the saving context at the end of the document
-     */
+    // Restore the state of the saving context at the end of the document
     if switched_encoding != 0 && oldctxtenc.is_none() {
         xml_save_clear_encoding(ctxt);
         (*ctxt).escape = oldescape;
@@ -1662,13 +1658,11 @@ unsafe fn xml_new_save_ctxt(encoding: Option<&str>, mut options: i32) -> XmlSave
         (*ret).encoding = Some(enc.to_owned());
         (*ret).escape = None;
     }
-    xml_save_ctxt_init(&mut *ret);
+    (*ret).init();
 
-    /*
-     * Use the options
-     */
+    // Use the options
 
-    /* Re-check this option as it may already have been set */
+    // Re-check this option as it may already have been set
     if (*ret).options & XmlSaveOption::XmlSaveNoEmpty as i32 != 0
         && options & XmlSaveOption::XmlSaveNoEmpty as i32 == 0
     {

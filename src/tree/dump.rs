@@ -35,7 +35,7 @@ use crate::{
         parser::xml_init_parser,
         xmlsave::{
             xhtml_node_dump_output, xml_doc_content_dump_output, xml_node_dump_output_internal,
-            xml_save_ctxt_init, xml_save_err, xml_save_err_memory, XmlSaveCtxt, XmlSaveOption,
+            xml_save_err, xml_save_err_memory, XmlSaveCtxt, XmlSaveOption,
         },
         xmlstring::{xml_strndup, XmlChar},
     },
@@ -107,7 +107,7 @@ impl XmlDoc {
         ctxt.level = 0;
         ctxt.format = (format != 0) as i32;
         ctxt.encoding = encoding;
-        xml_save_ctxt_init(&mut ctxt);
+        ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt, self);
         out_buff.borrow_mut().flush();
@@ -210,7 +210,7 @@ impl XmlDoc {
             encoding,
             ..Default::default()
         };
-        xml_save_ctxt_init(&mut ctxt);
+        ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
 
@@ -276,7 +276,7 @@ impl XmlDoc {
             encoding,
             ..Default::default()
         };
-        xml_save_ctxt_init(&mut ctxt);
+        ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
@@ -349,7 +349,7 @@ impl XmlDoc {
             encoding: encoding.map(|e| e.to_owned()),
             ..Default::default()
         };
-        xml_save_ctxt_init(&mut ctxt);
+        ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
         let mut buf = Rc::into_inner(ctxt.buf)
@@ -382,7 +382,7 @@ impl XmlDoc {
             encoding: encoding.map(|e| e.to_owned()),
             ..Default::default()
         };
-        xml_save_ctxt_init(&mut ctxt);
+        ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
         xml_doc_content_dump_output(&raw mut ctxt as _, self);
         let mut buf = Rc::into_inner(ctxt.buf)
@@ -424,7 +424,7 @@ impl XmlNode {
             encoding: encoding.map(|e| e.to_owned()),
             ..Default::default()
         };
-        xml_save_ctxt_init(&mut ctxt);
+        ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
         #[cfg(feature = "html")]
