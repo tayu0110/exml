@@ -465,16 +465,7 @@ impl<'a> XmlTextWriter<'a> {
     ///
     /// Returns the bytes written (may be 0 because of buffering) or -1 in case of error
     #[doc(alias = "xmlTextWriterWriteBase64")]
-    pub unsafe fn write_base64(
-        &mut self,
-        data: *const c_char,
-        start: i32,
-        len: i32,
-    ) -> io::Result<usize> {
-        if data.is_null() || start < 0 || len < 0 {
-            return Err(io::Error::other("Writer or content is invalid"));
-        }
-
+    pub unsafe fn write_base64(&mut self, data: &[u8]) -> io::Result<usize> {
         let mut sum = 0;
         if let Some(lk) = self.nodes.front().cloned() {
             sum += self.handle_state_dependencies(lk)?;
@@ -484,7 +475,7 @@ impl<'a> XmlTextWriter<'a> {
             self.doindent = 0;
         }
 
-        sum += xml_output_buffer_write_base64(&mut self.out, len, data.add(start as usize) as _)?;
+        sum += xml_output_buffer_write_base64(&mut self.out, data)?;
         Ok(sum)
     }
 
@@ -2202,71 +2193,41 @@ const B64CRLF: &str = "\r\n";
 #[doc(alias = "xmlOutputBufferWriteBase64")]
 unsafe fn xml_output_buffer_write_base64(
     out: &mut XmlOutputBuffer,
-    len: i32,
-    data: *const u8,
+    data: &[u8],
 ) -> io::Result<usize> {
-    const DTABLE: [u8; 64] = [
-        b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H', b'I', b'J', b'K', b'L', b'M', b'N', b'O',
-        b'P', b'Q', b'R', b'S', b'T', b'U', b'V', b'W', b'X', b'Y', b'Z', b'a', b'b', b'c', b'd',
-        b'e', b'f', b'g', b'h', b'i', b'j', b'k', b'l', b'm', b'n', b'o', b'p', b'q', b'r', b's',
-        b't', b'u', b'v', b'w', b'x', b'y', b'z', b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7',
-        b'8', b'9', b'+', b'/',
-    ];
+    const DTABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-    let mut i: i32;
-    let mut linelen: i32;
-
-    if len < 0 || data.is_null() {
-        return Err(io::Error::other("Data is invalid"));
-    }
-
-    linelen = 0;
+    let mut linelen = 0;
     let mut sum = 0;
-
-    i = 0;
-    loop {
-        let mut igroup: [u8; 3] = [0; 3];
+    for igroup in data.chunks(3) {
         let mut ogroup: [u8; 4] = [0; 4];
-        let mut c: i32;
-        let mut n: i32 = 3;
-
-        igroup[0] = 0;
-        igroup[1] = 0;
-        igroup[2] = 0;
-        for j in 0..3 {
-            c = *data.add(i as usize) as _;
-            igroup[j] = c as u8;
-            i += 1;
-            if i >= len {
-                n = j as _;
-                break;
+        match *igroup {
+            [i0, i1, i2, ..] => {
+                ogroup[0] = DTABLE[i0 as usize >> 2];
+                ogroup[1] = DTABLE[((i0 as usize & 3) << 4) | (i1 as usize >> 4)];
+                ogroup[2] = DTABLE[((i1 as usize & 0xF) << 2) | (i2 as usize >> 6)];
+                ogroup[3] = DTABLE[i2 as usize & 0x3F];
             }
-        }
-
-        if n > 0 {
-            ogroup[0] = DTABLE[igroup[0] as usize >> 2];
-            ogroup[1] = DTABLE[((igroup[0] as usize & 3) << 4) | (igroup[1] as usize >> 4)];
-            ogroup[2] = DTABLE[((igroup[1] as usize & 0xF) << 2) | (igroup[2] as usize >> 6)];
-            ogroup[3] = DTABLE[igroup[2] as usize & 0x3F];
-
-            if n < 3 {
+            [i0, i1] => {
+                ogroup[0] = DTABLE[i0 as usize >> 2];
+                ogroup[1] = DTABLE[((i0 as usize & 3) << 4) | (i1 as usize >> 4)];
+                ogroup[2] = DTABLE[(i1 as usize & 0xF) << 2];
                 ogroup[3] = b'=';
-                if n < 2 {
-                    ogroup[2] = b'=';
-                }
             }
-
-            if linelen >= B64LINELEN as i32 {
-                sum += out.write_bytes(B64CRLF.as_bytes())?;
-                linelen = 0;
+            [i0] => {
+                ogroup[0] = DTABLE[i0 as usize >> 2];
+                ogroup[1] = DTABLE[(i0 as usize & 3) << 4];
+                ogroup[2] = b'=';
+                ogroup[3] = b'=';
             }
-            sum += out.write_bytes(&ogroup)?;
-            linelen += 4;
+            [] => {}
         }
-
-        if i >= len {
-            break;
+        if linelen >= B64LINELEN as i32 {
+            sum += out.write_bytes(B64CRLF.as_bytes())?;
+            linelen = 0;
         }
+        sum += out.write_bytes(&ogroup)?;
+        linelen += 4;
     }
 
     Ok(sum)
