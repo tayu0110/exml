@@ -6,15 +6,10 @@ use std::{
     ffi::{c_char, c_int, CStr, CString},
     fs::{metadata, File},
     ptr::null_mut,
-    slice::from_raw_parts,
     sync::atomic::{AtomicPtr, Ordering},
 };
 
 use exml::{
-    buf::libxml_api::{
-        xml_buf_add, xml_buf_content, xml_buf_create, xml_buf_empty, xml_buf_free,
-        xml_buf_set_allocation_scheme, xml_buf_use,
-    },
     globals::{
         reset_last_error, set_generic_error, set_get_warnings_default_value,
         set_pedantic_parser_default_value, GenericErrorContext,
@@ -40,7 +35,7 @@ use exml::{
             XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaValidCtxtPtr,
         },
         xmlschemastypes::xml_schema_init_types,
-        xmlstring::{xml_str_equal, xml_strdup, XmlChar},
+        xmlstring::{xml_str_equal, xml_strdup, xml_strndup, XmlChar},
     },
     parser::{
         xml_new_string_input_stream, xml_read_file, xml_read_memory, XmlParserCtxtPtr,
@@ -50,7 +45,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_init_types,
         xml_relaxng_new_mem_parser_ctxt, xml_relaxng_new_valid_ctxt, XmlRelaxNGValidCtxtPtr,
     },
-    tree::{xml_free_doc, XmlBufferAllocationScheme, XmlDocPtr, XmlNodePtr},
+    tree::{xml_free_doc, XmlDocPtr, XmlNodePtr},
     uri::build_uri,
     xpath::{
         internals::xml_xpath_register_ns, xml_xpath_compile, xml_xpath_compiled_eval,
@@ -97,10 +92,6 @@ static mut NB_SCHEMATAS: c_int = 0;
 static mut NB_UNIMPLEMENTED: c_int = 0;
 static mut NB_LEAKS: c_int = 0;
 static mut EXTRA_MEMORY_FROM_RESOLVER: c_int = 0;
-
-unsafe fn fatal_error() -> c_int {
-    panic!("Exitting tests on fatal error");
-}
 
 const MAX_ENTITIES: usize = 20;
 static mut TEST_ENTITIES_NAME: [*mut c_char; MAX_ENTITIES] = [null_mut(); MAX_ENTITIES];
@@ -338,17 +329,9 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
     let memt: c_int = xml_mem_used();
     EXTRA_MEMORY_FROM_RESOLVER = 0;
     // dump the schemas to a buffer, then reparse it and compile the schemas
-    let buf = xml_buf_create();
-    if buf.is_null() {
-        eprintln!("out of memory !");
-        fatal_error();
-    }
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    (*test).dump_memory(buf, (*test).doc, 0, 0);
-    let pctxt = xml_relaxng_new_mem_parser_ctxt(
-        xml_buf_content(buf) as *const c_char,
-        xml_buf_use(buf) as _,
-    );
+    let mut buf = vec![];
+    (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+    let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
     (*pctxt).set_parser_errors(
         Some(test_error_handler),
         Some(test_error_handler),
@@ -365,9 +348,8 @@ unsafe fn xsd_incorrect_test_case(logfile: &mut Option<File>, mut cur: XmlNodePt
         ret = 1;
     }
 
-    if !buf.is_null() {
-        xml_buf_free(buf);
-    }
+    // `buf` must live until at this point.
+    drop(buf);
     if !rng.is_null() {
         xml_relaxng_free(rng);
     }
@@ -390,21 +372,16 @@ unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
     let mut content: *mut XmlChar;
     let mut res: *mut XmlChar;
 
-    let buf = xml_buf_create();
-    if buf.is_null() {
-        eprintln!("out of memory !");
-        fatal_error();
-    }
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    (*tst).dump_memory(buf, (*tst).doc, 0, 0);
+    let mut buf = vec![];
+    (*tst).dump_memory(&mut buf, (*tst).doc, 0, 0);
 
     while !tst.is_null() {
         test = get_next(tst, c"./*".as_ptr() as _);
         if !test.is_null() {
-            xml_buf_empty(buf);
-            (*test).dump_memory(buf, (*test).doc, 0, 0);
+            buf.clear();
+            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
             name = get_string(tst, c"string(@name)".as_ptr() as _);
-            content = xml_strdup(xml_buf_content(buf));
+            content = xml_strndup(buf.as_ptr(), buf.len() as i32);
             if !name.is_null() && !content.is_null() {
                 res = compose_dir(base, name);
                 xml_free(name as _);
@@ -419,9 +396,6 @@ unsafe fn install_resources(mut tst: XmlNodePtr, base: *const XmlChar) {
             }
         }
         tst = get_next(tst, c"following-sibling::resource[1]".as_ptr() as _);
-    }
-    if !buf.is_null() {
-        xml_buf_free(buf);
     }
 }
 
@@ -489,17 +463,9 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
     memt = xml_mem_used();
     EXTRA_MEMORY_FROM_RESOLVER = 0;
     // dump the schemas to a buffer, then reparse it and compile the schemas
-    let buf = xml_buf_create();
-    if buf.is_null() {
-        eprintln!("out of memory !");
-        fatal_error();
-    }
-    xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-    (*test).dump_memory(buf, (*test).doc, 0, 0);
-    let pctxt = xml_relaxng_new_mem_parser_ctxt(
-        xml_buf_content(buf) as *const c_char,
-        xml_buf_use(buf) as _,
-    );
+    let mut buf = vec![];
+    (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
+    let pctxt = xml_relaxng_new_mem_parser_ctxt(buf.as_ptr() as *const c_char, buf.len() as _);
     (*pctxt).set_parser_errors(
         Some(test_error_handler),
         Some(test_error_handler),
@@ -519,9 +485,6 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
         );
         NB_ERRORS += 1;
         ret = 1;
-        if !buf.is_null() {
-            xml_buf_free(buf);
-        }
         if !rng.is_null() {
             xml_relaxng_free(rng);
         }
@@ -548,17 +511,16 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
                 (*tmp).get_line_no(),
             );
         } else {
-            xml_buf_empty(buf);
+            buf.clear();
             if let Some(dtd) = dtd {
-                let dtd = CString::new(dtd).unwrap();
-                xml_buf_add(buf, dtd.as_ptr() as *const u8, -1);
+                buf.extend(dtd.as_bytes());
             }
-            (*test).dump_memory(buf, (*test).doc, 0, 0);
+            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
 
             // We are ready to run the test
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
-            let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
+            let buffer = buf.clone();
             doc = xml_read_memory(buffer, Some("test"), None, 0);
             if doc.is_null() {
                 test_log!(
@@ -623,13 +585,13 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
                 (*tmp).get_line_no()
             );
         } else {
-            xml_buf_empty(buf);
-            (*test).dump_memory(buf, (*test).doc, 0, 0);
+            buf.clear();
+            (*test).dump_memory(&mut buf, (*test).doc, 0, 0);
 
             // We are ready to run the test
             mem = xml_mem_used();
             EXTRA_MEMORY_FROM_RESOLVER = 0;
-            let buffer = from_raw_parts(xml_buf_content(buf), xml_buf_use(buf)).to_vec();
+            let buffer = buf.clone();
             doc = xml_read_memory(buffer, Some("test"), None, 0);
             if doc.is_null() {
                 test_log!(
@@ -685,9 +647,6 @@ unsafe fn xsd_test_case(logfile: &mut Option<File>, tst: XmlNodePtr) -> c_int {
         tmp = get_next(tmp, c"following-sibling::invalid[1]".as_ptr() as _);
     }
 
-    if !buf.is_null() {
-        xml_buf_free(buf);
-    }
     if !rng.is_null() {
         xml_relaxng_free(rng);
     }

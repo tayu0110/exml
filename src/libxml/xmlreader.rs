@@ -750,10 +750,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadInnerXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_inner_xml(&mut self) -> *mut XmlChar {
-        use crate::{
-            buf::{libxml_api::xml_buf_detach, XmlBufRef},
-            tree::NodeCommon,
-        };
+        use crate::{buf::libxml_api::xml_buf_detach, tree::NodeCommon};
 
         let mut node: XmlNodePtr;
         let mut cur_node: XmlNodePtr;
@@ -772,19 +769,16 @@ impl XmlTextReader {
             /* XXX: Why is the node copied? */
             node = xml_doc_copy_node(cur_node, doc, 1);
             /* XXX: Why do we need a second buffer? */
-            let buff2 = xml_buf_create();
+            let mut buff2 = vec![];
             xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-            if (*node).dump_memory(buff2, doc, 0, 0) == 0
-                || !XmlBufRef::from_raw(buff2).unwrap().is_ok()
-            {
+            if (*node).dump_memory(&mut buff2, doc, 0, 0) == 0 {
                 xml_free_node(node);
-                xml_buf_free(buff2);
                 xml_buf_free(buff);
                 return null_mut();
             }
-            xml_buf_cat(buff, xml_buf_content(buff2));
+            buff2.push(0);
+            xml_buf_cat(buff, buff2.as_ptr());
             xml_free_node(node);
-            xml_buf_free(buff2);
             cur_node = (*cur_node).next.map_or(null_mut(), |n| n.as_ptr());
         }
         let resbuf = xml_buf_detach(buff);
@@ -800,7 +794,7 @@ impl XmlTextReader {
     #[doc(alias = "xmlTextReaderReadOuterXml")]
     #[cfg(all(feature = "libxml_reader", feature = "libxml_writer"))]
     pub unsafe fn read_outer_xml(&mut self) -> *mut XmlChar {
-        use crate::{buf::XmlBufRef, tree::NodeCommon};
+        use crate::{libxml::xmlstring::xml_strndup, tree::NodeCommon};
 
         let mut node: XmlNodePtr;
 
@@ -815,20 +809,13 @@ impl XmlTextReader {
         } else {
             node = xml_doc_copy_node(node, doc, 1);
         }
-        let buff = xml_buf_create();
-        xml_buf_set_allocation_scheme(buff, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
-        if (*node).dump_memory(buff, doc, 0, 0) == 0 || !XmlBufRef::from_raw(buff).unwrap().is_ok()
-        {
+        let mut buff = vec![];
+        if (*node).dump_memory(&mut buff, doc, 0, 0) == 0 {
             xml_free_node(node);
-            xml_buf_free(buff);
             return null_mut();
         }
-
-        let resbuf = xml_buf_content(buff);
-
         xml_free_node(node);
-        xml_buf_free(buff);
-        resbuf
+        xml_strndup(buff.as_ptr(), buff.len() as i32)
     }
 
     /// Moves the position of the current instance to the next node in

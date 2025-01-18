@@ -26,7 +26,6 @@ use std::{
 };
 
 use crate::{
-    buf::XmlBufRef,
     encoding::find_encoding_handler,
     error::XmlParserErrors,
     io::XmlOutputBuffer,
@@ -39,13 +38,10 @@ use crate::{
         xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err, xml_save_err_memory,
         XmlSaveCtxt, XmlSaveOption,
     },
-    tree::{is_xhtml, xml_buf_set_allocation_scheme, xml_buf_use, XmlBufferAllocationScheme},
+    tree::is_xhtml,
 };
 
-use super::{
-    xml_buf_get_allocation_scheme, XmlBufPtr, XmlDoc, XmlDocPtr, XmlElementType, XmlNode,
-    XmlNodePtr,
-};
+use super::{XmlDoc, XmlDocPtr, XmlElementType, XmlNode, XmlNodePtr};
 
 impl XmlDoc {
     /// Dump the current DOM tree into memory using the character encoding specified by the caller.  
@@ -464,7 +460,7 @@ impl XmlNode {
 
     /// Dump an XML/HTML node, recursive behaviour, children are printed too.
     #[doc(alias = "xmlElemDump")]
-    pub unsafe fn dump_file<'a>(&mut self, f: impl Write + 'a, doc: XmlDocPtr) {
+    pub unsafe fn dump_file<'a>(&mut self, f: &mut (impl Write + 'a), doc: XmlDocPtr) {
         xml_init_parser();
 
         let Some(mut outbuf) = XmlOutputBuffer::from_writer(f, None) else {
@@ -499,31 +495,20 @@ impl XmlNode {
     #[doc(alias = "xmlBufNodeDump")]
     pub unsafe fn dump_memory(
         &mut self,
-        buf: XmlBufPtr,
+        buf: &mut Vec<u8>,
         doc: XmlDocPtr,
         level: i32,
         format: i32,
     ) -> usize {
         xml_init_parser();
 
-        if buf.is_null() {
+        let Some(outbuf) = XmlOutputBuffer::from_writer(&mut *buf, None) else {
             return usize::MAX;
-        }
-        let mut outbuf = XmlOutputBuffer::default();
-        outbuf.buffer = XmlBufRef::from_raw(buf);
-        outbuf.encoder = None;
-        outbuf.context = None;
-        outbuf.written = 0;
+        };
 
-        let using: usize = xml_buf_use(buf);
-        let oldalloc: i32 = xml_buf_get_allocation_scheme(buf);
-        xml_buf_set_allocation_scheme(buf, XmlBufferAllocationScheme::XmlBufferAllocDoubleit);
         let outbuf = Rc::new(RefCell::new(outbuf));
         self.dump_output(outbuf.clone(), doc, level, format, None);
-        // The buffer should not be dropped because the caller may still use it.
-        let _ = outbuf.borrow_mut().buffer.take();
-        xml_buf_set_allocation_scheme(buf, oldalloc.try_into().unwrap());
-        let ret: i32 = (xml_buf_use(buf) - using) as i32;
-        ret as _
+        drop(outbuf);
+        buf.len()
     }
 }
