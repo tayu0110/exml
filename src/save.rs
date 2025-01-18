@@ -39,6 +39,7 @@ use crate::{
     globals::{get_indent_tree_output, GLOBAL_STATE},
     io::XmlOutputBuffer,
     libxml::{
+        chvalid::xml_is_char,
         htmltree::{
             html_doc_content_dump_format_output, html_get_meta_encoding, html_set_meta_encoding,
         },
@@ -54,7 +55,7 @@ use crate::{
     },
 };
 
-use super::{chvalid::xml_is_char, hash::XmlHashTable};
+use super::hash::XmlHashTable;
 
 const MAX_INDENT: usize = 60;
 
@@ -70,7 +71,7 @@ pub enum XmlSaveOption {
     XmlSaveXHTML = 1 << 4,    /* force XHTML1 specific rules */
     XmlSaveAsXML = 1 << 5,    /* force XML serialization on HTML doc */
     XmlSaveAsHTML = 1 << 6,   /* force HTML serialization on XML doc */
-    XmlSaveWsnonsig = 1 << 7, /* format with non-significant whitespace */
+    XmlSaveWsNonSig = 1 << 7, /* format with non-significant whitespace */
 }
 
 #[repr(C)]
@@ -127,7 +128,7 @@ impl<'a> XmlSaveCtxt<'a> {
         ret.options = options;
         if options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
             ret.format = 1;
-        } else if options & XmlSaveOption::XmlSaveWsnonsig as i32 != 0 {
+        } else if options & XmlSaveOption::XmlSaveWsNonSig as i32 != 0 {
             ret.format = 2;
         }
 
@@ -1196,9 +1197,10 @@ unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
 #[doc(alias = "xhtmlAttrListDumpOutput")]
 #[cfg(feature = "html")]
 unsafe fn xhtml_attr_list_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: XmlAttrPtr) {
-    use crate::tree::{xml_free_node, xml_new_doc_text, XmlNode};
-
-    use super::htmltree::html_is_boolean_attr;
+    use crate::{
+        libxml::htmltree::html_is_boolean_attr,
+        tree::{xml_free_node, xml_new_doc_text, XmlNode},
+    };
 
     let mut xml_lang: XmlAttrPtr = null_mut();
     let mut lang: XmlAttrPtr = null_mut();
@@ -1715,7 +1717,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
 #[doc(alias = "htmlNodeDumpOutputInternal")]
 #[cfg(feature = "html")]
 unsafe fn html_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, cur: XmlNodePtr) -> i32 {
-    use super::htmltree::html_node_dump_format_output;
+    use crate::libxml::htmltree::html_node_dump_format_output;
 
     let mut oldenc = None;
     let oldctxtenc = ctxt.encoding.clone();

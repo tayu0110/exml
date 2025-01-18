@@ -49,11 +49,11 @@ use crate::{
             XML_DEFAULT_VERSION,
         },
         sax2::{xml_sax2_end_element, xml_sax2_init_default_sax_handler, xml_sax2_start_element},
-        xmlsave::attr_serialize_text_content,
         xmlstring::xml_strndup,
     },
     list::XmlList,
     parser::{xml_free_parser_ctxt, XmlParserCtxtPtr},
+    save::attr_serialize_text_content,
     tree::{xml_encode_special_chars, xml_free_doc, xml_new_doc, XmlDocPtr, XmlNodePtr},
     uri::canonic_path,
 };

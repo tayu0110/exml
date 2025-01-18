@@ -26,6 +26,8 @@ pub mod nanohttp;
 pub mod parser;
 #[cfg(feature = "schema")]
 pub mod relaxng;
+#[cfg(feature = "libxml_output")]
+pub mod save;
 #[cfg(test)]
 pub(crate) mod test_util;
 pub mod tree;

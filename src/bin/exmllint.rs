@@ -75,7 +75,6 @@ use exml::{
             xml_mem_used, xml_memory_dump, xml_memory_strdup,
         },
         xmlreader::XmlTextReaderPtr,
-        xmlsave::{XmlSaveCtxt, XmlSaveOption},
         xmlschemas::{
             xml_schema_free, xml_schema_free_parser_ctxt, xml_schema_free_valid_ctxt,
             xml_schema_new_parser_ctxt, xml_schema_new_valid_ctxt, xml_schema_parse,
@@ -94,6 +93,7 @@ use exml::{
         xml_relaxng_free_parser_ctxt, xml_relaxng_free_valid_ctxt, xml_relaxng_new_parser_ctxt,
         xml_relaxng_new_valid_ctxt,
     },
+    save::{XmlSaveCtxt, XmlSaveOption},
     tree::{
         xml_copy_doc, xml_encode_entities_reentrant, xml_free_doc, xml_free_dtd, xml_new_doc,
         xml_new_doc_node, NodeCommon, XmlAttributeDefault, XmlAttributeType, XmlDocPtr, XmlDtdPtr,
@@ -3028,7 +3028,7 @@ unsafe fn parse_and_print_file(filename: Option<&str>, rectxt: XmlParserCtxtPtr)
                 if CMD_ARGS.format {
                     save_opts |= XmlSaveOption::XmlSaveFormat as i32;
                 } else if CMD_ARGS.pretty == Some(2) {
-                    save_opts |= XmlSaveOption::XmlSaveWsnonsig as i32;
+                    save_opts |= XmlSaveOption::XmlSaveWsNonSig as i32;
                 }
 
                 #[cfg(any(feature = "html", feature = "libxml_valid"))]

@@ -40,8 +40,6 @@ pub mod xmlmodule;
 pub mod xmlreader;
 #[cfg(feature = "libxml_regexp")]
 pub mod xmlregexp;
-#[cfg(feature = "libxml_output")]
-pub mod xmlsave;
 #[cfg(feature = "schema")]
 pub mod xmlschemas;
 #[cfg(feature = "schema")]

@@ -33,11 +33,11 @@ use crate::{
     libxml::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
-        xmlsave::{
-            xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err,
-            xml_save_err_memory, XmlSaveCtxt, XmlSaveOption,
-        },
         xmlstring::{xml_strndup, XmlChar},
+    },
+    save::{
+        xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err, xml_save_err_memory,
+        XmlSaveCtxt, XmlSaveOption,
     },
     tree::{is_xhtml, xml_buf_set_allocation_scheme, xml_buf_use, XmlBufferAllocationScheme},
 };

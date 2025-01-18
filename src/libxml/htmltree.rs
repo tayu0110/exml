@@ -1004,8 +1004,8 @@ pub unsafe fn html_node_dump_format_output(
             htmlparser::html_tag_lookup,
             parser::xml_init_parser,
             parser_internals::{XML_STRING_TEXT, XML_STRING_TEXT_NOENC},
-            xmlsave::xml_ns_list_dump_output,
         },
+        save::xml_ns_list_dump_output,
         tree::{xml_encode_entities_reentrant, NodePtr},
     };
 
