@@ -73,7 +73,6 @@ pub enum XmlSaveOption {
     XmlSaveWsnonsig = 1 << 7, /* format with non-significant whitespace */
 }
 
-pub type XmlSaveCtxtPtr<'a> = *mut XmlSaveCtxt<'a>;
 #[repr(C)]
 pub struct XmlSaveCtxt<'a> {
     pub(crate) _private: *mut c_void,
@@ -273,7 +272,7 @@ impl<'a> XmlSaveCtxt<'a> {
         if doc.is_null() {
             return -1;
         }
-        if xml_doc_content_dump_output(self, doc) < 0 {
+        if self.doc_content_dump_output(doc) < 0 {
             return -1;
         }
         ret
@@ -326,6 +325,203 @@ impl<'a> XmlSaveCtxt<'a> {
     #[doc(alias = "xmlSaveClose")]
     pub fn close(&mut self) -> i32 {
         self.flush()
+    }
+
+    /// Dump an XML document.
+    #[doc(alias = "xmlDocContentDumpOutput")]
+    pub(crate) unsafe fn doc_content_dump_output(&mut self, cur: XmlDocPtr) -> i32 {
+        #[cfg(feature = "html")]
+        let dtd: XmlDtdPtr;
+        #[cfg(feature = "html")]
+        let mut is_html = false;
+        let oldenc = (*cur).encoding.clone();
+        let oldctxtenc = self.encoding.clone();
+        let oldescape = self.escape;
+        let oldescape_attr = self.escape_attr;
+        let mut switched_encoding: i32 = 0;
+
+        xml_init_parser();
+
+        if !matches!(
+            (*cur).element_type(),
+            XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
+        ) {
+            return -1;
+        }
+
+        let mut encoding = self.encoding.clone();
+        if let Some(enc) = self.encoding.as_deref() {
+            (*cur).encoding = Some(enc.to_owned());
+        } else if let Some(enc) = (*cur).encoding.as_deref() {
+            encoding = Some(enc.to_owned());
+        }
+
+        if (matches!((*cur).element_type(), XmlElementType::XmlHTMLDocumentNode)
+            && (self.options & XmlSaveOption::XmlSaveAsXML as i32) == 0
+            && (self.options & XmlSaveOption::XmlSaveXHTML as i32) == 0)
+            || self.options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
+        {
+            #[cfg(feature = "html")]
+            {
+                if let Some(enc) = encoding.as_deref() {
+                    html_set_meta_encoding(cur, Some(enc));
+                }
+                if encoding.is_none() {
+                    encoding = html_get_meta_encoding(cur);
+                }
+                if encoding.is_none() {
+                    encoding = Some("HTML".to_owned());
+                }
+                if (encoding.is_some()
+                    && oldctxtenc.is_none()
+                    && self.buf.borrow().encoder.is_none()
+                    && self.buf.borrow().conv.is_none())
+                    && self.switch_encoding(encoding.as_deref().unwrap()) < 0
+                {
+                    (*cur).encoding = oldenc;
+                    return -1;
+                }
+                if self.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
+                    html_doc_content_dump_format_output(
+                        &mut self.buf.borrow_mut(),
+                        cur,
+                        encoding.as_deref(),
+                        1,
+                    );
+                } else {
+                    html_doc_content_dump_format_output(
+                        &mut self.buf.borrow_mut(),
+                        cur,
+                        encoding.as_deref(),
+                        0,
+                    );
+                }
+                if self.encoding.is_some() {
+                    (*cur).encoding = oldenc;
+                }
+                return 0;
+            }
+            #[cfg(not(feature = "html"))]
+            {
+                return -1;
+            }
+        } else if matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
+            || self.options & XmlSaveOption::XmlSaveAsXML as i32 != 0
+            || self.options & XmlSaveOption::XmlSaveXHTML as i32 != 0
+        {
+            let enc = if let Some(encoding) = encoding.as_deref() {
+                encoding
+                    .parse::<XmlCharEncoding>()
+                    .unwrap_or(XmlCharEncoding::Error)
+            } else {
+                XmlCharEncoding::None
+            };
+            if encoding.is_some()
+                && oldctxtenc.is_none()
+                && self.buf.borrow().encoder.is_none()
+                && self.buf.borrow().conv.is_none()
+                && (self.options & XmlSaveOption::XmlSaveNoDecl as i32) == 0
+            {
+                if !matches!(
+                    enc,
+                    XmlCharEncoding::UTF8 | XmlCharEncoding::None | XmlCharEncoding::ASCII
+                ) {
+                    // we need to match to this encoding but just for this
+                    // document since we output the XMLDecl the conversion
+                    // must be done to not generate not well formed documents.
+                    if self.switch_encoding(encoding.as_deref().unwrap()) < 0 {
+                        (*cur).encoding = oldenc;
+                        return -1;
+                    }
+                    switched_encoding = 1;
+                }
+                if self.escape == Some(escape_entities) {
+                    self.escape = None;
+                }
+                if self.escape_attr == Some(escape_entities) {
+                    self.escape_attr = None;
+                }
+            }
+
+            // Save the XML declaration
+            if self.options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
+                self.buf.borrow_mut().write_bytes(b"<?xml version=");
+                if let Some(version) = (*cur).version.as_deref() {
+                    if let Some(mut buf) = self.buf.borrow().buffer {
+                        let version = CString::new(version).unwrap();
+                        buf.push_quoted_cstr(&version);
+                    }
+                } else {
+                    self.buf.borrow_mut().write_bytes(b"\"1.0\"");
+                }
+                if let Some(encoding) = encoding.as_deref() {
+                    self.buf.borrow_mut().write_bytes(b" encoding=");
+                    if let Some(mut buf) = self.buf.borrow().buffer {
+                        let enc = CString::new(encoding).unwrap();
+                        buf.push_quoted_cstr(enc.as_c_str());
+                    }
+                }
+                match (*cur).standalone {
+                    0 => {
+                        self.buf.borrow_mut().write_bytes(b" standalone=\"no\"");
+                    }
+                    1 => {
+                        self.buf.borrow_mut().write_bytes(b" standalone=\"yes\"");
+                    }
+                    _ => {}
+                }
+                self.buf.borrow_mut().write_bytes(b"?>\n");
+            }
+
+            #[cfg(feature = "html")]
+            {
+                if self.options & XmlSaveOption::XmlSaveXHTML as i32 != 0 {
+                    is_html = true;
+                }
+                if self.options & XmlSaveOption::XmlSaveNoXHTML as i32 == 0 {
+                    dtd = (*cur).get_int_subset();
+                    if !dtd.is_null() {
+                        is_html =
+                            is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
+                    }
+                }
+            }
+            if let Some(children) = (*cur).children {
+                let mut child = Some(children);
+
+                while let Some(now) = child {
+                    self.level = 0;
+                    #[cfg(feature = "html")]
+                    {
+                        if is_html {
+                            xhtml_node_dump_output(self, now.as_ptr());
+                        } else {
+                            xml_node_dump_output_internal(self, now.as_ptr());
+                        }
+                    }
+                    #[cfg(not(feature = "html"))]
+                    {
+                        xml_node_dump_output_internal(self, now.as_ptr());
+                    }
+                    if !matches!(
+                        now.element_type(),
+                        XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
+                    ) {
+                        self.buf.borrow_mut().write_bytes(b"\n");
+                    }
+                    child = now.next;
+                }
+            }
+        }
+
+        // Restore the state of the saving context at the end of the document
+        if switched_encoding != 0 && oldctxtenc.is_none() {
+            self.clear_encoding();
+            self.escape = oldescape;
+            self.escape_attr = oldescape_attr;
+        }
+        (*cur).encoding = oldenc;
+        0
     }
 }
 
@@ -436,35 +632,49 @@ fn escape_entities(src: &str, dst: &mut String) -> i32 {
 /// Should be called in the context of attributes dumps.
 /// If @ctxt is supplied, @buf should be its buffer.
 #[doc(alias = "xmlNsDumpOutput")]
-pub(crate) unsafe fn xml_ns_dump_output(
-    buf: &mut XmlOutputBuffer,
+unsafe fn xml_ns_dump_output(
+    mut buf: Option<&mut XmlOutputBuffer>,
     cur: XmlNsPtr,
-    ctxt: XmlSaveCtxtPtr,
+    mut ctxt: Option<&mut XmlSaveCtxt>,
 ) {
     if cur.is_null() {
         return;
     }
+    if buf.is_none() && ctxt.is_none() {
+        return;
+    };
     if matches!((*cur).element_type(), XML_LOCAL_NAMESPACE) && !(*cur).href.is_null() {
         if (*cur).prefix().as_deref() == Some("xml") {
             return;
         }
 
-        if !ctxt.is_null() && (*ctxt).format == 2 {
-            (*ctxt).write_ws_non_sig(2);
+        if let Some(ctxt) = ctxt.as_mut().filter(|ctxt| ctxt.format == 2) {
+            ctxt.write_ws_non_sig(2);
+        } else if let Some(buf) = buf.as_mut() {
+            buf.write_bytes(b" ");
         } else {
+            let mut buf = ctxt.as_ref().unwrap().buf.borrow_mut();
             buf.write_bytes(b" ");
         }
 
-        // Within the context of an element attributes
-        if let Some(prefix) = (*cur).prefix() {
-            buf.write_bytes(b"xmlns:");
-            buf.write_str(&prefix);
+        let write = |buf: &mut XmlOutputBuffer| {
+            // Within the context of an element attributes
+            if let Some(prefix) = (*cur).prefix() {
+                buf.write_bytes(b"xmlns:");
+                buf.write_str(&prefix);
+            } else {
+                buf.write_bytes(b"xmlns");
+            }
+            buf.write_bytes(b"=");
+            if let Some(mut buf) = buf.buffer {
+                buf.push_quoted_cstr(CStr::from_ptr((*cur).href as *const i8));
+            }
+        };
+        if let Some(buf) = buf {
+            write(buf);
         } else {
-            buf.write_bytes(b"xmlns");
-        }
-        buf.write_bytes(b"=");
-        if let Some(mut buf) = buf.buffer {
-            buf.push_quoted_cstr(CStr::from_ptr((*cur).href as *const i8));
+            let mut buf = ctxt.as_ref().unwrap().buf.borrow_mut();
+            write(&mut buf);
         }
     }
 }
@@ -503,10 +713,9 @@ unsafe fn xml_buf_dump_entity_decl(buf: XmlBufPtr, ent: XmlEntityPtr) {
 /// Dump a list of local namespace definitions to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsListDumpOutputCtxt")]
-unsafe fn xml_ns_list_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, mut cur: XmlNsPtr) {
-    let mut buf = (*ctxt).buf.borrow_mut();
+unsafe fn xml_ns_list_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, mut cur: XmlNsPtr) {
     while !cur.is_null() {
-        xml_ns_dump_output(&mut buf, cur, ctxt);
+        xml_ns_dump_output(None, cur, Some(ctxt));
         cur = (*cur).next;
     }
 }
@@ -585,7 +794,7 @@ pub(crate) unsafe fn xml_node_dump_output_internal(ctxt: &mut XmlSaveCtxt, mut c
     loop {
         match (*cur).element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                xml_doc_content_dump_output(ctxt, cur as _);
+                ctxt.doc_content_dump_output(cur as _);
             }
             XmlElementType::XmlDTDNode => {
                 xml_dtd_dump_output(ctxt, cur as _);
@@ -979,9 +1188,8 @@ unsafe fn xml_dtd_dump_output(ctxt: &mut XmlSaveCtxt, dtd: XmlDtdPtr) {
 /// Dump a local Namespace definition to a save context.
 /// Should be called in the context of attribute dumps.
 #[doc(alias = "xmlNsDumpOutputCtxt")]
-unsafe fn xml_ns_dump_output_ctxt(ctxt: XmlSaveCtxtPtr, cur: XmlNsPtr) {
-    let mut buf = (*ctxt).buf.borrow_mut();
-    xml_ns_dump_output(&mut buf, cur, ctxt);
+unsafe fn xml_ns_dump_output_ctxt(ctxt: &mut XmlSaveCtxt, cur: XmlNsPtr) {
+    xml_ns_dump_output(None, cur, Some(ctxt));
 }
 
 /// Dump a list of XML attributes
@@ -1127,7 +1335,7 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
     loop {
         match (*cur).element_type() {
             XmlElementType::XmlDocumentNode | XmlElementType::XmlHTMLDocumentNode => {
-                xml_doc_content_dump_output(ctxt, cur as _);
+                ctxt.doc_content_dump_output(cur as _);
             }
             XmlElementType::XmlNamespaceDecl => {
                 xml_ns_dump_output_ctxt(ctxt, cur as _);
@@ -1503,202 +1711,6 @@ pub(crate) unsafe fn xhtml_node_dump_output(ctxt: &mut XmlSaveCtxt, mut cur: Xml
     }
 }
 
-/// Dump an XML document.
-#[doc(alias = "xmlDocContentDumpOutput")]
-pub(crate) unsafe fn xml_doc_content_dump_output(ctxt: &mut XmlSaveCtxt, cur: XmlDocPtr) -> i32 {
-    #[cfg(feature = "html")]
-    let dtd: XmlDtdPtr;
-    #[cfg(feature = "html")]
-    let mut is_html = false;
-    let oldenc = (*cur).encoding.clone();
-    let oldctxtenc = ctxt.encoding.clone();
-    let oldescape = ctxt.escape;
-    let oldescape_attr = ctxt.escape_attr;
-    let mut switched_encoding: i32 = 0;
-
-    xml_init_parser();
-
-    if !matches!(
-        (*cur).element_type(),
-        XmlElementType::XmlHTMLDocumentNode | XmlElementType::XmlDocumentNode
-    ) {
-        return -1;
-    }
-
-    let mut encoding = ctxt.encoding.clone();
-    if let Some(enc) = ctxt.encoding.as_deref() {
-        (*cur).encoding = Some(enc.to_owned());
-    } else if let Some(enc) = (*cur).encoding.as_deref() {
-        encoding = Some(enc.to_owned());
-    }
-
-    if (matches!((*cur).element_type(), XmlElementType::XmlHTMLDocumentNode)
-        && (ctxt.options & XmlSaveOption::XmlSaveAsXML as i32) == 0
-        && (ctxt.options & XmlSaveOption::XmlSaveXHTML as i32) == 0)
-        || ctxt.options & XmlSaveOption::XmlSaveAsHTML as i32 != 0
-    {
-        #[cfg(feature = "html")]
-        {
-            if let Some(enc) = encoding.as_deref() {
-                html_set_meta_encoding(cur, Some(enc));
-            }
-            if encoding.is_none() {
-                encoding = html_get_meta_encoding(cur);
-            }
-            if encoding.is_none() {
-                encoding = Some("HTML".to_owned());
-            }
-            if (encoding.is_some()
-                && oldctxtenc.is_none()
-                && ctxt.buf.borrow().encoder.is_none()
-                && ctxt.buf.borrow().conv.is_none())
-                && ctxt.switch_encoding(encoding.as_deref().unwrap()) < 0
-            {
-                (*cur).encoding = oldenc;
-                return -1;
-            }
-            if ctxt.options & XmlSaveOption::XmlSaveFormat as i32 != 0 {
-                html_doc_content_dump_format_output(
-                    &mut ctxt.buf.borrow_mut(),
-                    cur,
-                    encoding.as_deref(),
-                    1,
-                );
-            } else {
-                html_doc_content_dump_format_output(
-                    &mut ctxt.buf.borrow_mut(),
-                    cur,
-                    encoding.as_deref(),
-                    0,
-                );
-            }
-            if ctxt.encoding.is_some() {
-                (*cur).encoding = oldenc;
-            }
-            return 0;
-        }
-        #[cfg(not(feature = "html"))]
-        {
-            return -1;
-        }
-    } else if matches!((*cur).element_type(), XmlElementType::XmlDocumentNode)
-        || ctxt.options & XmlSaveOption::XmlSaveAsXML as i32 != 0
-        || ctxt.options & XmlSaveOption::XmlSaveXHTML as i32 != 0
-    {
-        let enc = if let Some(encoding) = encoding.as_deref() {
-            encoding
-                .parse::<XmlCharEncoding>()
-                .unwrap_or(XmlCharEncoding::Error)
-        } else {
-            XmlCharEncoding::None
-        };
-        if encoding.is_some()
-            && oldctxtenc.is_none()
-            && ctxt.buf.borrow().encoder.is_none()
-            && ctxt.buf.borrow().conv.is_none()
-            && (ctxt.options & XmlSaveOption::XmlSaveNoDecl as i32) == 0
-        {
-            if !matches!(
-                enc,
-                XmlCharEncoding::UTF8 | XmlCharEncoding::None | XmlCharEncoding::ASCII
-            ) {
-                // we need to match to this encoding but just for this
-                // document since we output the XMLDecl the conversion
-                // must be done to not generate not well formed documents.
-                if ctxt.switch_encoding(encoding.as_deref().unwrap()) < 0 {
-                    (*cur).encoding = oldenc;
-                    return -1;
-                }
-                switched_encoding = 1;
-            }
-            if ctxt.escape == Some(escape_entities) {
-                ctxt.escape = None;
-            }
-            if ctxt.escape_attr == Some(escape_entities) {
-                ctxt.escape_attr = None;
-            }
-        }
-
-        // Save the XML declaration
-        if ctxt.options & XmlSaveOption::XmlSaveNoDecl as i32 == 0 {
-            ctxt.buf.borrow_mut().write_bytes(b"<?xml version=");
-            if let Some(version) = (*cur).version.as_deref() {
-                if let Some(mut buf) = ctxt.buf.borrow().buffer {
-                    let version = CString::new(version).unwrap();
-                    buf.push_quoted_cstr(&version);
-                }
-            } else {
-                ctxt.buf.borrow_mut().write_bytes(b"\"1.0\"");
-            }
-            if let Some(encoding) = encoding.as_deref() {
-                ctxt.buf.borrow_mut().write_bytes(b" encoding=");
-                if let Some(mut buf) = ctxt.buf.borrow().buffer {
-                    let enc = CString::new(encoding).unwrap();
-                    buf.push_quoted_cstr(enc.as_c_str());
-                }
-            }
-            match (*cur).standalone {
-                0 => {
-                    ctxt.buf.borrow_mut().write_bytes(b" standalone=\"no\"");
-                }
-                1 => {
-                    ctxt.buf.borrow_mut().write_bytes(b" standalone=\"yes\"");
-                }
-                _ => {}
-            }
-            ctxt.buf.borrow_mut().write_bytes(b"?>\n");
-        }
-
-        #[cfg(feature = "html")]
-        {
-            if ctxt.options & XmlSaveOption::XmlSaveXHTML as i32 != 0 {
-                is_html = true;
-            }
-            if ctxt.options & XmlSaveOption::XmlSaveNoXHTML as i32 == 0 {
-                dtd = (*cur).get_int_subset();
-                if !dtd.is_null() {
-                    is_html = is_xhtml((*dtd).system_id.as_deref(), (*dtd).external_id.as_deref());
-                }
-            }
-        }
-        if let Some(children) = (*cur).children {
-            let mut child = Some(children);
-
-            while let Some(now) = child {
-                ctxt.level = 0;
-                #[cfg(feature = "html")]
-                {
-                    if is_html {
-                        xhtml_node_dump_output(&mut *ctxt, now.as_ptr());
-                    } else {
-                        xml_node_dump_output_internal(ctxt, now.as_ptr());
-                    }
-                }
-                #[cfg(not(feature = "html"))]
-                {
-                    xml_node_dump_output_internal(ctxt, now.as_ptr());
-                }
-                if !matches!(
-                    now.element_type(),
-                    XmlElementType::XmlXIncludeStart | XmlElementType::XmlXIncludeEnd
-                ) {
-                    ctxt.buf.borrow_mut().write_bytes(b"\n");
-                }
-                child = now.next;
-            }
-        }
-    }
-
-    // Restore the state of the saving context at the end of the document
-    if switched_encoding != 0 && oldctxtenc.is_none() {
-        (*ctxt).clear_encoding();
-        ctxt.escape = oldescape;
-        ctxt.escape_attr = oldescape_attr;
-    }
-    (*cur).encoding = oldenc;
-    0
-}
-
 /// Dump an HTML node, recursive behaviour, children are printed too.
 #[doc(alias = "htmlNodeDumpOutputInternal")]
 #[cfg(feature = "html")]
@@ -1843,7 +1855,7 @@ pub(crate) unsafe fn attr_serialize_text_content<'a>(
 #[doc(alias = "xmlNsListDumpOutput")]
 pub(crate) unsafe fn xml_ns_list_dump_output(buf: &mut XmlOutputBuffer, mut cur: XmlNsPtr) {
     while !cur.is_null() {
-        xml_ns_dump_output(buf, cur, null_mut());
+        xml_ns_dump_output(Some(buf), cur, None);
         cur = (*cur).next;
     }
 }

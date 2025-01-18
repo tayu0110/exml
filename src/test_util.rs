@@ -38,7 +38,6 @@ use crate::{
         xmlmodule::XmlModulePtr,
         xmlreader::{XmlTextReaderLocatorPtr, XmlTextReaderPtr},
         xmlregexp::{XmlExpCtxtPtr, XmlExpNodePtr, XmlRegExecCtxtPtr, XmlRegexpPtr},
-        xmlsave::XmlSaveCtxtPtr,
         xmlschemas::{
             XmlSchemaParserCtxtPtr, XmlSchemaPtr, XmlSchemaSAXPlugPtr, XmlSchemaValidCtxtPtr,
         },
@@ -471,14 +470,6 @@ pub(crate) fn gen_xml_schema_saxplug_ptr(_no: i32, _nr: i32) -> XmlSchemaSAXPlug
 
 #[cfg(feature = "schema")]
 pub(crate) fn des_xml_schema_saxplug_ptr(_no: i32, _val: XmlSchemaSAXPlugPtr, _nr: i32) {}
-
-#[cfg(feature = "libxml_output")]
-pub(crate) fn gen_xml_save_ctxt_ptr(_no: i32, _nr: i32) -> XmlSaveCtxtPtr<'static> {
-    null_mut()
-}
-
-#[cfg(feature = "libxml_output")]
-pub(crate) fn des_xml_save_ctxt_ptr(_no: i32, _val: XmlSaveCtxtPtr, _nr: i32) {}
 
 #[cfg(all(feature = "libxml_regexp", feature = "libxml_expr"))]
 pub(crate) fn gen_xml_exp_ctxt_ptr(_no: i32, _nr: i32) -> XmlExpCtxtPtr {

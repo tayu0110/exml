@@ -34,8 +34,8 @@ use crate::{
         htmltree::html_node_dump_output,
         parser::xml_init_parser,
         xmlsave::{
-            xhtml_node_dump_output, xml_doc_content_dump_output, xml_node_dump_output_internal,
-            xml_save_err, xml_save_err_memory, XmlSaveCtxt, XmlSaveOption,
+            xhtml_node_dump_output, xml_node_dump_output_internal, xml_save_err,
+            xml_save_err_memory, XmlSaveCtxt, XmlSaveOption,
         },
         xmlstring::{xml_strndup, XmlChar},
     },
@@ -109,7 +109,7 @@ impl XmlDoc {
         ctxt.encoding = encoding;
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&mut ctxt, self);
+        ctxt.doc_content_dump_output(self);
         out_buff.borrow_mut().flush();
         if let Some(conv) = out_buff.borrow().conv {
             *doc_txt_len = conv.len() as i32;
@@ -213,7 +213,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&mut ctxt as _, self);
+        ctxt.doc_content_dump_output(self);
 
         let buf = ctxt.buf.clone();
         drop(ctxt);
@@ -281,7 +281,7 @@ impl XmlDoc {
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
 
-        xml_doc_content_dump_output(&mut ctxt as _, self);
+        ctxt.doc_content_dump_output(self);
 
         let buf = ctxt.buf.clone();
         drop(ctxt);
@@ -354,7 +354,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&mut ctxt as _, self);
+        ctxt.doc_content_dump_output(self);
         let buf = ctxt.buf.clone();
         drop(ctxt);
         let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
@@ -388,7 +388,7 @@ impl XmlDoc {
         };
         ctxt.init();
         ctxt.options |= XmlSaveOption::XmlSaveAsXML as i32;
-        xml_doc_content_dump_output(&mut ctxt as _, self);
+        ctxt.doc_content_dump_output(self);
         let buf = ctxt.buf.clone();
         drop(ctxt);
         let mut buf = Rc::into_inner(buf).expect("Internal Error").into_inner();
